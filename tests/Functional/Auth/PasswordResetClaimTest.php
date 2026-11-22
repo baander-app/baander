@@ -4,8 +4,10 @@ declare(strict_types=1);
 
 namespace App\Tests\Functional\Auth;
 
+use App\Auth\Application\Settings\UserManagementSettingDefinitions;
 use App\Auth\Domain\Model\Passkey\Passkey;
 use App\Auth\Domain\Repository\Passkey\PasskeyRepositoryInterface;
+use App\Shared\Application\Port\SystemSettingStoreInterface;
 use App\Shared\Domain\Model\Uuid;
 use App\Tests\Fixtures\Auth\FirstPartyOAuthClient;
 use App\Tests\Fixtures\Auth\SignedDpopProof;
@@ -28,13 +30,15 @@ final class PasswordResetClaimTest extends RateLimitTestCase
     {
         parent::setUp();
         $this->trackLimiter('auth_password_reset_ip', self::IP);
+        // A signed-out link holder registers before claiming; registration ships closed.
+        static::getContainer()->get(SystemSettingStoreInterface::class)->save([UserManagementSettingDefinitions::REGISTRATION_OPEN => true]);
     }
 
     public function testAResetToANeverVerifiedAddressHandsTheAccountToTheAddressOwner(): void
     {
         FirstPartyOAuthClient::entity(static::getContainer(), $this->entityManager);
         $address = 'claimed-' . bin2hex(random_bytes(4)) . '@baander.app';
-        $registrant = $this->createTestUser($address, password: 'registrant-password-1');
+        $registrant = $this->createTestUser($address, password: 'registrant-password-1', verified: false);
         $this->assertSame(200, $this->login($address, 'registrant-password-1')->getStatusCode(), 'The registrant has a session.');
         $this->enrolTotp($registrant);
         $this->passkeys()->save(Passkey::create(new Uuid(), 'Registrant key', bin2hex(random_bytes(16)), [], 0), $registrant->getId());
@@ -59,9 +63,40 @@ final class PasswordResetClaimTest extends RateLimitTestCase
         $this->assertSame(200, $this->login($address, 'owner-password-1')->getStatusCode(), 'The owner signs in with the password alone.');
     }
 
+    /**
+     * Someone registers under an owner's address, and the owner opens the emailed link while
+     * signed out. Nothing is verified and the link stays usable; the owner's password reset
+     * then claims the account.
+     */
+    public function testALinkOpenedSignedOutVerifiesNothingAndTheOwnersResetClaimsTheAccount(): void
+    {
+        FirstPartyOAuthClient::entity(static::getContainer(), $this->entityManager);
+        $address = 'registered-' . bin2hex(random_bytes(4)) . '@baander.app';
+        $this->assertJsonResponse($this->requestFrom(self::IP, 'POST', '/api/auth/register', content: ['name' => 'Registrant', 'email' => $address, 'password' => 'registrant-password-1']), 202);
+        $this->assertSame(1, preg_match('~/verify-email#token=([0-9a-f]{64})~', (string) $this->lastEmail()->getTextBody(), $link));
+        $userId = $this->connection()->fetchOne('SELECT id FROM users WHERE email = ?', [$address]);
+        $this->assertIsString($userId);
+
+        $opened = $this->requestFrom(self::IP, 'POST', '/api/auth/email/verify', content: ['token' => $link[1]]);
+
+        $this->assertSame(401, $opened->getStatusCode(), (string) $opened->getContent());
+        $this->assertSame(
+            ['verified' => false, 'tokens' => 1],
+            $this->connection()->fetchAssociative('SELECT email_verified_at IS NOT NULL AS verified, (SELECT count(*) FROM email_verification_tokens WHERE user_id = users.id) AS tokens FROM users WHERE id = ?', [$userId]),
+            'The address stays unverified and the link stays usable.',
+        );
+
+        $this->assertJsonResponse($this->requestFrom(self::IP, 'POST', '/api/auth/password/reset-request', content: ['email' => $address]), 200);
+        $this->assertSame(1, preg_match('~/reset-password#token=([0-9a-f]{64})~', (string) $this->lastEmail()->getTextBody(), $reset));
+        $this->assertJsonResponse($this->requestFrom(self::IP, 'POST', '/api/auth/password/reset', content: ['token' => $reset[1], 'password' => 'owner-password-1']), 200, 'data');
+
+        $this->assertTrue($this->connection()->fetchOne('SELECT email_verified_at IS NOT NULL FROM users WHERE id = ?', [$userId]), 'The reset verifies the owner\'s address.');
+        $this->assertSame(200, $this->login($address, 'owner-password-1')->getStatusCode(), 'The owner signs in with the new password.');
+    }
+
     public function testAResetToAVerifiedAddressKeepsTheAuthenticators(): void
     {
-        $user = $this->createTestUser(verified: true);
+        $user = $this->createTestUser();
         $this->enrolTotp($user);
         $this->passkeys()->save(Passkey::create(new Uuid(), 'Own key', bin2hex(random_bytes(16)), [], 0), $user->getId());
 

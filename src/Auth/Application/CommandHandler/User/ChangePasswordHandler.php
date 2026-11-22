@@ -5,47 +5,50 @@ declare(strict_types=1);
 namespace App\Auth\Application\CommandHandler\User;
 
 use App\Auth\Application\Command\User\ChangePasswordCommand;
-use App\Auth\Application\Exception\CurrentPasswordMismatchException;
+use App\Auth\Application\Exception\CredentialsChangedException;
+use App\Auth\Application\Exception\PasswordPolicyException;
+use App\Auth\Application\Exception\StepUpFailedException;
+use App\Auth\Application\Exception\StepUpRateLimitedException;
 use App\Auth\Application\Exception\UserNotFoundException;
-use App\Auth\Application\Port\PasswordHasherInterface;
+use App\Auth\Application\Service\CredentialChangeRevoker;
 use App\Auth\Application\Service\PasswordChanger;
-use App\Auth\Domain\Model\OAuth\TokenId;
-use App\Auth\Domain\Repository\OAuth\AccessTokenRepositoryInterface;
+use App\Auth\Application\Service\PasswordPolicy;
+use App\Auth\Application\Service\StepUpVerifier;
 use App\Auth\Domain\Repository\UserRepositoryInterface;
 use App\Shared\Domain\Model\Uuid;
 use Symfony\Component\Messenger\Attribute\AsMessageHandler;
 
+/**
+ * A signed-in user changes their own password after step-up. The session that asked stays
+ * signed in and every other session ends, its WebSocket connections closed once the change
+ * has committed.
+ */
 final readonly class ChangePasswordHandler
 {
     public function __construct(
         private UserRepositoryInterface $userRepository,
-        private AccessTokenRepositoryInterface $accessTokenRepository,
-        private PasswordHasherInterface $passwordHasher,
+        private StepUpVerifier $stepUp,
         private PasswordChanger $passwordChanger,
+        private CredentialChangeRevoker $credentialChangeRevoker,
     ) {
     }
 
     /**
-     * @throws CurrentPasswordMismatchException when the current password is wrong
+     * @throws PasswordPolicyException     when the new password breaks the policy, before any step-up attempt is spent
+     * @throws StepUpFailedException       when the current password or the code does not match
+     * @throws StepUpRateLimitedException  when the account has used up its step-up attempts
+     * @throws CredentialsChangedException when another change ended the requesting session first
      */
     #[AsMessageHandler]
     public function __invoke(ChangePasswordCommand $command): void
     {
         $user = $this->userRepository->findByUuid(Uuid::fromString($command->userId))
             ?? throw UserNotFoundException::forIdentifier($command->userId);
+        PasswordPolicy::assertAcceptable($command->newPassword);
+        $this->stepUp->verify($user, $command->currentPassword, $command->totpCode);
 
-        if (!$this->passwordHasher->verify($command->currentPassword, $user->getPassword())) {
-            throw CurrentPasswordMismatchException::create();
-        }
-
-        // Keep the requesting session only when its token belongs to this user.
-        $current = $command->currentAccessTokenId === null
-            ? null
-            : $this->accessTokenRepository->findByTokenId(TokenId::fromString($command->currentAccessTokenId));
-        if ($current !== null && $current->getUser()?->getId()->equals($user->getId()) !== true) {
-            $current = null;
-        }
-
-        $this->passwordChanger->change($user, $this->passwordChanger->hash($command->newPassword), $current);
+        $password = $this->passwordChanger->hash($command->newPassword);
+        $this->passwordChanger->change($user, $password, $command->currentAccessTokenId)
+            |> $this->credentialChangeRevoker->closeConnections(...);
     }
 }

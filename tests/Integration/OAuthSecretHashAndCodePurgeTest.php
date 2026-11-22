@@ -27,6 +27,7 @@ final class OAuthSecretHashAndCodePurgeTest extends TestCase
         self::assertSame([
             'chk_oauth_clients_confidential_auth_method' => "CHECK ((confidential = (token_endpoint_auth_method <> 'none'::text)))",
             'chk_oauth_clients_key_source_auth_method' => "CHECK ((num_nonnulls(jwks, jwks_uri) = ((token_endpoint_auth_method = 'private_key_jwt'::text))::integer))",
+            'chk_oauth_clients_personal_access_not_first_party' => 'CHECK ((NOT (personal_access_client AND first_party)))',
             'chk_oauth_clients_secret_hash_auth_method' => "CHECK (((secret_hash IS NOT NULL) = (token_endpoint_auth_method = 'client_secret_post'::text)))",
             'chk_oauth_clients_secret_hash_format' => "CHECK ((secret_hash ~ '^[0-9a-f]{64}$'::text))",
             'chk_oauth_clients_token_endpoint_auth_method' => "CHECK ((token_endpoint_auth_method = ANY (ARRAY['none'::text, 'client_secret_post'::text, 'private_key_jwt'::text])))",

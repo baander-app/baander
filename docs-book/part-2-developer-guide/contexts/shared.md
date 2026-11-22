@@ -134,6 +134,10 @@ Connection management and configuration for all Redis-backed features: caching, 
 | Component | Purpose |
 |-----------|---------|
 | `WsTicketAuthenticator` | Redeems single-use WebSocket tickets through the Auth application port |
+| `PublicOrigins` (`Application/Http`) | The origins the deployment answers on: `APP_URL`'s origin (`primary`) followed by each origin in `AUTH_EXTRA_ORIGINS`, normalized once. DPoP proof checks and passkey ceremonies read them, and `forRequest()` is the one resolver for every origin the server renders: the request's scheme and host when `all` lists them, `primary` otherwise. A forged `Host`, or one a trusted proxy forwards, can therefore only select a listed origin |
+| `SecurityHeadersListener` | Adds the security headers and the web app page's Content-Security-Policy; `connect-src` names the WebSocket origin `PublicOrigins::forRequest()` returns and the primary origin for signed media |
+
+`SpaController` renders the page's API URL, and `ActivityController`, `UserRecentController`, `AlbumController` and `GetRecommendationsForUserHandler` build cover image URLs, through `PublicOrigins::forRequest()`; recommendations built without a current request use the primary origin. The WebSocket handshake does not use `PublicOrigins`: `WebSocketOriginPolicy` accepts only `APP_URL`'s origin, or the `app.websocket.allowed_origins` list when it is set, so a page served on an extra origin gets a `connect-src` entry for its own socket origin but has its upgrade refused. `trusted_hosts` stays unset, because internal callers reach the web server under Hosts such as `gateway`, `web:9501` and `127.0.0.1:9501`, which a trusted-host list would answer with `400`.
 
 ## Logging
 
@@ -215,14 +219,15 @@ Removing a language reverses the steps. A stored choice of the removed language 
 | Controller | Path | Purpose |
 |-----------|------|---------|
 | `SystemSettingsController` | `/api/admin/settings` | Server settings and every setting definition (see [Settings](#settings)) |
-| `HealthCheckController` | `/health`, `/ready`, `/live` | Health and readiness probes |
+| `HealthCheckController` | `/health`, `/ready`, `/live` | Health and readiness probes; each check shows only its component and status |
+| `HealthReportController` | `/api/debug/health` | Full health report with each check's latency and details (CLI: `app:health:check`) |
 | `ServerStatsControllerWithCoroutines` | `/api/debug/stats` | Server diagnostics and statistics |
 | `WorkerStatsController` | `/api/debug/workers` | Server HTTP and user worker statistics (CLI: `app:server:workers`) |
 | `CoroutineStatsController` | `/api/debug/coroutines` | Swoole coroutine and channel statistics per HTTP worker (CLI: `app:server:coroutines`) |
 | `SpanDebugController` | `/api/debug/spans` | Recent server HTTP request spans and buffer clearing (CLI: `app:server:spans`) |
 | `JobMonitorController` | `/api/monitor` | Job status, listing, detail, pruning, retry, and cancellation (`/status`, `/jobs`, `/prune`) |
 | `JobAnalyticsController` | `/api/monitor/analytics/*` | Job analytics and metrics |
-| `PrometheusMetricsController` | `/metrics` | Prometheus metrics endpoint |
+| `PrometheusMetricsController` | `/metrics` | Prometheus metrics endpoint; the production nginx and the preset gateway answer `404` for it |
 | `TransportController` | `/api/monitor/transport/*` | Messenger transport status |
 | `ConfigCheckController` | `/api/debug/config-check` | Configuration validation |
 | `RateLimiterMonitorController` | `/api/monitor/rate-limiters` | Rate limiter status and statistics |

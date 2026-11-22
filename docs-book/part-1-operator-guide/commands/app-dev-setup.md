@@ -1,10 +1,14 @@
 # app:dev:setup
 
-Bootstrap the development environment: run migrations, generate OAuth keys, seed OAuth clients, and create dev users. This dev-only command runs the other setup commands as isolated subprocesses.
+Bootstrap the development environment: run migrations, generate OAuth keys, seed OAuth clients, and create dev users. This development-only command runs the other setup commands as isolated subprocesses.
 
 The development lifecycle runs this only when initializing an empty instance.
 `make exec` below targets the current worktree's preview. Do not rerun setup with
 `--fresh` as a lifecycle or adoption step.
+
+## Development only
+
+The command runs only when the kernel environment is `dev` or `BAANDER_DEVELOPMENT_INSTANCE=1` is set. Otherwise it runs none of its steps, so even `--fresh` drops nothing, and it prints that requirement and exits with code 1. The development lifecycle sets the variable on the persistent development instance and on worktree previews, so the persistent instance initializes although its kernel runs as `prod`. Production images do not set it.
 
 ## Quick start
 
@@ -52,4 +56,4 @@ On success the command prints the dev account credentials (`admin@baander.test` 
 
 - Use `--fresh` only when you want a completely clean database: it drops every table.
 - Pass `--skip-keys` to skip the OAuth key check and key generation. Without it, setup keeps a matching key pair and generates keys only when none exist.
-- Never run this in production.
+- Production refuses the command because it can drop every table and creates accounts with public passwords.

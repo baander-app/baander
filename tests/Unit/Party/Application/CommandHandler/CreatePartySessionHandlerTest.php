@@ -169,7 +169,7 @@ final class CreatePartySessionHandlerTest extends TestCase
         $videoId = Uuid::v4();
         $session = SyncedPartySession::create($hostUserId, $videoId, null);
 
-        $this->mediaAccess->expects($this->once())->method('assertHostCanPlay')->with($videoId, null);
+        $this->mediaAccess->expects($this->once())->method('assertHostCanPlay')->with($hostUserId, $videoId, null);
         $this->sessionPort->expects($this->once())->method('createSession')->with($hostUserId, $videoId, null, 10)->willReturn($session);
         $this->memberPort->method('addMember')->willReturn(PartyMember::create($hostUserId, $session->getId()));
         $this->eventDispatcher->expects($this->exactly(2))->method('dispatch')->willReturnArgument(0);

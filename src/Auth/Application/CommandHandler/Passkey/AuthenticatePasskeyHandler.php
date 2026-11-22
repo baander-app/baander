@@ -9,7 +9,6 @@ use App\Auth\Application\DTO\AuthenticatedPasskeyOwner;
 use App\Auth\Application\Port\PasskeyVerifierInterface;
 use App\Auth\Domain\Repository\Passkey\PasskeyRepositoryInterface;
 use App\Auth\Domain\Repository\UserRepositoryInterface;
-use App\Shared\Domain\Model\Uuid;
 use RuntimeException;
 use Symfony\Component\Messenger\Attribute\AsMessageHandler;
 
@@ -83,19 +82,6 @@ final class AuthenticatePasskeyHandler
             throw new RuntimeException('Possible cloned authenticator detected: signature counter did not increase.');
         }
 
-        $claimedUserId = $command->getUserId();
-        if ($claimedUserId !== null) {
-            try {
-                $claimed = Uuid::fromString($claimedUserId);
-            } catch (\InvalidArgumentException) {
-                throw new RuntimeException('Invalid claimed credential owner.');
-            }
-            if (!$userId->equals($claimed)) {
-                throw new RuntimeException('Claimed user does not own the verified credential.');
-            }
-        }
-
-        // Rejected owner hints never update or persist the credential's counter.
         $passkey->updateCounter($newCounter);
         $this->passkeyRepository->markUsed($passkey);
 

@@ -6,25 +6,34 @@ namespace App\Tests\Unit\Auth\Application\CommandHandler;
 
 use App\Auth\Application\Command\User\RegisterUserCommand;
 use App\Auth\Application\CommandHandler\User\RegisterUserHandler;
+use App\Auth\Application\Exception\RegistrationClosedException;
 use App\Auth\Application\Port\EmailVerificationDeliveryInterface;
 use App\Auth\Application\Port\EmailVerificationTokenRepositoryInterface;
 use App\Auth\Application\Port\PasswordHasherInterface;
 use App\Auth\Application\Port\RegistrationAttemptNoticeInterface;
+use App\Auth\Application\Port\SelfRegistrationInterface;
 use App\Auth\Application\Service\EmailVerificationIssuer;
 use App\Auth\Domain\Model\User;
 use App\Auth\Domain\Repository\UserRepositoryInterface;
+use App\Shared\Application\Port\SleeperInterface;
 use App\Shared\Application\Port\TransactionPortInterface;
 use App\Shared\Domain\Model\Email;
 use App\Shared\Domain\Model\Uuid;
 use App\UserPreference\Application\Port\UserSettingsContractInterface;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\MockObject\Stub;
 use PHPUnit\Framework\TestCase;
+use Symfony\Component\Clock\MockClock;
 use Symfony\Component\EventDispatcher\EventDispatcherInterface;
 use Symfony\Component\Messenger\Envelope;
 use Symfony\Component\Messenger\MessageBusInterface;
 
 final class RegisterUserHandlerTest extends TestCase
 {
+    private const int RESPONSE_FLOOR_MILLISECONDS = 250;
+    /** How long the password hash takes on the test clock. */
+    private const float HASH_SECONDS = 0.4;
+
     private UserRepositoryInterface&Stub $userRepository;
     private PasswordHasherInterface&Stub $passwordHasher;
     private EventDispatcherInterface&Stub $eventDispatcher;
@@ -43,17 +52,31 @@ final class RegisterUserHandlerTest extends TestCase
     private array $noticed = [];
     /** @var list<string> passwords hashed */
     private array $hashed = [];
+    /** @var list<float> seconds the handler waited */
+    private array $slept = [];
+    private bool $registrationOpen = true;
+    /** The account the address already belongs to, if any. */
+    private ?User $existingOwner = null;
+    private MockClock $clock;
+    /** When the password hash finished, on the test clock. */
+    private ?\DateTimeImmutable $hashedAt = null;
+    /** How long storing a new account, or telling an existing owner, takes on the test clock. */
+    private float $workSeconds = 0.0;
 
     protected function setUp(): void
     {
+        $this->clock = new MockClock('2026-11-22 12:00:00');
         $this->userRepository = $this->createStub(UserRepositoryInterface::class);
-        $this->userRepository->method('findByEmail')->willReturn(null);
+        $this->userRepository->method('findByEmail')->willReturnCallback(fn (): ?User => $this->existingOwner);
         $this->userRepository->method('save')->willReturnCallback(function (User $user): void {
             $this->saved[] = $user;
+            $this->clock->sleep($this->workSeconds);
         });
         $this->passwordHasher = $this->createStub(PasswordHasherInterface::class);
         $this->passwordHasher->method('hash')->willReturnCallback(function (string $password): string {
             $this->hashed[] = $password;
+            $this->clock->sleep(self::HASH_SECONDS);
+            $this->hashedAt = $this->clock->now();
 
             return 'hashed-pw';
         });
@@ -155,6 +178,98 @@ final class RegisterUserHandlerTest extends TestCase
         $this->assertSame([], $this->delivered, 'A rolled-back registration emails no link.');
     }
 
+    public function testAClosedRegistrationIsRefusedBeforeAnyWork(): void
+    {
+        $this->registrationOpen = false;
+
+        try {
+            ($this->handler())(new RegisterUserCommand(new Email('test@baander.app'), 'Alice', 'password123'));
+            $this->fail('A closed registration must be refused.');
+        } catch (RegistrationClosedException $exception) {
+            $this->assertSame('registration_closed', $exception::REASON);
+        }
+
+        $this->assertSame([], $this->hashed, 'Nothing is hashed.');
+        $this->assertSame([], $this->saved, 'No account is created.');
+        $this->assertSame([], $this->noticed, 'No owner is told.');
+        $this->assertSame([], $this->issued);
+        $this->assertSame([], $this->delivered, 'No email is sent.');
+        $this->assertSame([], $this->slept, 'A refusal does not wait.');
+    }
+
+    /**
+     * Storing a new account takes longer than telling an existing owner; both answer the same
+     * time after the hash.
+     *
+     * @return iterable<string, array{bool, float}>
+     */
+    public static function outcomes(): iterable
+    {
+        yield 'a new address' => [false, 0.03];
+        yield 'a taken address' => [true, 0.002];
+    }
+
+    #[DataProvider('outcomes')]
+    public function testBothOutcomesAnswerTheFloorAfterTheHash(bool $taken, float $workSeconds): void
+    {
+        $this->existingOwner = $taken ? User::register(new Email('test@baander.app'), 'owner-hash', 'Owner') : null;
+        $this->workSeconds = $workSeconds;
+
+        ($this->handler())(new RegisterUserCommand(new Email('test@baander.app'), 'Alice', 'password123'));
+
+        $this->assertCount($taken ? 0 : 1, $this->saved);
+        $this->assertCount($taken ? 1 : 0, $this->noticed);
+        $this->assertEqualsWithDelta(
+            self::RESPONSE_FLOOR_MILLISECONDS / 1000,
+            $this->secondsSinceTheHash(),
+            0.000002,
+            'The answer leaves the floor after the hash, whichever outcome it is.',
+        );
+        $this->assertCount(1, $this->slept);
+    }
+
+    /**
+     * Failures only a new account can meet, after the password hash.
+     *
+     * @return iterable<string, array{string, bool}> the name, and whether storing the registration event fails
+     */
+    public static function failuresAfterTheHash(): iterable
+    {
+        yield 'a whitespace-only name the account refuses' => ['   ', false];
+        yield 'a failed outbox insertion' => ['Alice', true];
+    }
+
+    #[DataProvider('failuresAfterTheHash')]
+    public function testAFailureAfterTheHashStillAnswersTheFloorAfterIt(string $name, bool $outboxFails): void
+    {
+        if ($outboxFails) {
+            $this->eventDispatcher = $this->createStub(EventDispatcherInterface::class);
+            $this->eventDispatcher->method('dispatch')->willThrowException(new \RuntimeException('Outbox insertion failed.'));
+        }
+
+        try {
+            ($this->handler())(new RegisterUserCommand(new Email('test@baander.app'), $name, 'password123'));
+            $this->fail('The failure must reach the caller.');
+        } catch (\RuntimeException | \InvalidArgumentException) {
+        }
+
+        $this->assertEqualsWithDelta(
+            self::RESPONSE_FLOOR_MILLISECONDS / 1000,
+            $this->secondsSinceTheHash(),
+            0.000002,
+            'A failure answers no sooner than a registration that succeeds.',
+        );
+    }
+
+    public function testAnOutcomeSlowerThanTheFloorDoesNotWaitFurther(): void
+    {
+        $this->workSeconds = self::RESPONSE_FLOOR_MILLISECONDS / 1000 + 0.1;
+
+        ($this->handler())(new RegisterUserCommand(new Email('test@baander.app'), 'Alice', 'password123'));
+
+        $this->assertSame([], $this->slept);
+    }
+
     private function handler(): RegisterUserHandler
     {
         $tokens = $this->createStub(EmailVerificationTokenRepositoryInterface::class);
@@ -169,7 +284,10 @@ final class RegisterUserHandlerTest extends TestCase
         $notice = $this->createStub(RegistrationAttemptNoticeInterface::class);
         $notice->method('deliver')->willReturnCallback(function (User $owner): void {
             $this->noticed[] = $owner;
+            $this->clock->sleep($this->workSeconds);
         });
+        $registration = $this->createStub(SelfRegistrationInterface::class);
+        $registration->method('isOpen')->willReturnCallback(fn (): bool => $this->registrationOpen);
 
         return new RegisterUserHandler(
             $this->userRepository,
@@ -180,7 +298,39 @@ final class RegisterUserHandlerTest extends TestCase
             $this->transaction,
             $this->settings(),
             $notice,
+            $registration,
+            $this->clock,
+            $this->sleeper(),
+            self::RESPONSE_FLOOR_MILLISECONDS,
         );
+    }
+
+    /** Waits on the test clock and records each wait. */
+    private function sleeper(): SleeperInterface
+    {
+        return new readonly class ($this->wait(...)) implements SleeperInterface {
+            public function __construct(private \Closure $wait)
+            {
+            }
+
+            public function sleep(float $seconds): void
+            {
+                ($this->wait)($seconds);
+            }
+        };
+    }
+
+    private function wait(float $seconds): void
+    {
+        $this->slept[] = $seconds;
+        $this->clock->sleep($seconds);
+    }
+
+    private function secondsSinceTheHash(): float
+    {
+        $this->assertNotNull($this->hashedAt);
+
+        return (float) $this->clock->now()->format('U.u') - (float) $this->hashedAt->format('U.u');
     }
 
     private function registered(): User

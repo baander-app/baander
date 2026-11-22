@@ -537,11 +537,6 @@ RUN --mount=type=cache,target=/tmp/pecl \
     && docker-php-ext-configure /tmp/pecl/xdebug \
     && docker-php-ext-install -j$(nproc) /tmp/pecl/xdebug
 
-# Copy CA certificates for local development
-COPY ./docker/dev/ca.crt /usr/local/share/ca-certificates/ca-self.crt
-COPY ./docker/dev/juul.localdomain.crt /usr/local/share/ca-certificates/juul.localdomain.crt
-RUN update-ca-certificates
-
 # Copy runtime entrypoint (disables Xdebug before supervisord starts)
 COPY --chmod=755 ./docker/dev/entrypoint.sh /usr/local/bin/entrypoint.sh
 

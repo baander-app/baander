@@ -61,7 +61,7 @@ final class ShutdownWorkflow
             '-e',
             'APP_DOMAIN=http://127.0.0.1:9501',
             '-e',
-            'AUTH_DPOP_EXTRA_ORIGINS=http://127.0.0.1:9501',
+            'AUTH_EXTRA_ORIGINS=http://127.0.0.1:9501',
             '-e',
             'MAILER_DSN=null://null',
             '-e',
@@ -534,13 +534,18 @@ final class ShutdownWorkflow
         $window = ShutdownAssertions::drainedWindow($this->runLog(), true);
         echo "PASS: {$scenario}: every worker reported drained; the window closed after {$window} seconds.\n";
     }
+    /**
+     * Reads every web worker's memory through the server control socket. The image gives every PHP
+     * process the same memory_limit, so this container's CLI reads the workers' limit.
+     */
     private function sampleMemory(string $container = 'web'): void
     {
+        $limit = $this->exec($container, ['php', '-r', 'echo ini_get("memory_limit");'])->stdout;
         $until = microtime(true) + 5.5;
         $last = '';
         do {
-            $last = $this->exec($container, ['curl', '-sS', '--max-time', '2', 'http://127.0.0.1:9501/health'], false)->stdout;
-            $memory = ShutdownAssertions::memory($last);
+            $last = $this->exec($container, ['php', 'bin/console', 'app:server:stats', '--json', '--no-interaction'], false)->stdout;
+            $memory = ShutdownAssertions::memory($last, $limit);
             if ($memory !== null) {
                 $this->memoryLimit = $memory['limit'];
                 $this->memoryPeak = max($this->memoryPeak, $memory['peak']);
@@ -549,7 +554,7 @@ final class ShutdownWorkflow
         } while (microtime(true) < $until);
         Runtime::require(
             $this->memoryLimit !== null,
-            '/health reported no worker memory against memory_limit: ' . $last,
+            "app:server:stats reported no web worker memory against memory_limit {$limit}: " . $last,
         );
     }
     private function reloadAndSignals(): void

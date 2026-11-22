@@ -6,6 +6,7 @@ namespace App\Auth\Infrastructure\Cache;
 
 use App\Auth\Domain\Model\OAuth\AccessToken;
 use App\Auth\Domain\Model\OAuth\TokenId;
+use App\Auth\Domain\Model\OAuth\TokenIssuance;
 use App\Auth\Domain\Model\OAuth\ValueObject\ChainId;
 use App\Auth\Domain\Repository\OAuth\AccessTokenRepositoryInterface;
 use App\Shared\Domain\Model\Uuid;
@@ -91,20 +92,27 @@ final readonly class CachedAccessTokenRepository implements AccessTokenRepositor
         return $revoked;
     }
 
-    public function revokeForUser(Uuid $userId, ?AccessToken $keep = null): void
+    public function revokeForUser(Uuid $userId, ?AccessToken $keep = null): array
     {
-        $this->inner->revokeForUser($userId, $keep);
+        $revoked = $this->inner->revokeForUser($userId, $keep);
 
         $this->invalidateCache(
             fn (): bool => $this->cache->invalidateTags([CacheTags::OAUTH_TOKEN]),
             'Failed to invalidate token cache on user revocation',
             ['user_id' => $userId->toString()],
         );
+
+        return $revoked;
     }
 
-    public function currentCredentialEpoch(TokenId $tokenId): ?int
+    public function isSessionCurrent(AccessToken $token, int $credentialEpoch): bool
     {
-        return $this->inner->currentCredentialEpoch($tokenId);
+        return $this->inner->isSessionCurrent($token, $credentialEpoch);
+    }
+
+    public function currentIssuance(TokenId $tokenId): ?TokenIssuance
+    {
+        return $this->inner->currentIssuance($tokenId);
     }
 
     public function restampCredentialEpoch(AccessToken $keep, int $credentialEpoch): void

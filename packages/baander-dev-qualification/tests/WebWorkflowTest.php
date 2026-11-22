@@ -96,12 +96,23 @@ LOG;
         ShutdownAssertions::deliveryOnly($server, 'S /usr/bin/ffmpeg -i track');
     }
 
-    public function testMemoryReportsKeepMeasuredLimitAndUsage(): void
+    public function testMemoryReadsTheLargestWorkerFromServerStatsAgainstTheLimit(): void
     {
-        $health = '{"component":"memory","status":"healthy","responseTimeMs":0.1,'
-            . '"details":{"workerId":2,"usageMb":42.5,"limitMb":128,"other":0}}';
-        self::assertSame(['peak' => 42.5, 'limit' => 128.0], ShutdownAssertions::memory($health));
-        self::assertNull(ShutdownAssertions::memory('{"component":"database"}'));
+        $stats = json_encode([
+            'workers' => [
+                ['worker_id' => 0, 'memory' => ['usage' => 30.1, 'peak' => 40.0, 'real' => 36.0, 'real_peak' => 44.0]],
+                ['worker_id' => 1, 'memory' => ['usage' => 38.2, 'peak' => 41.0, 'real' => 42.5, 'real_peak' => 46.0]],
+            ],
+            'missing_workers' => [],
+            'worker_errors' => [],
+            'redis' => ['connected' => true],
+        ], JSON_THROW_ON_ERROR);
+
+        self::assertSame(['peak' => 42.5, 'limit' => 128.0], ShutdownAssertions::memory($stats, '128M'));
+        self::assertSame(['peak' => 42.5, 'limit' => 1024.0], ShutdownAssertions::memory($stats, "1G\n"));
+        self::assertNull(ShutdownAssertions::memory($stats, '-1'), 'No limit, no share of it.');
+        self::assertNull(ShutdownAssertions::memory('{"workers":[],"missing_workers":[0],"worker_errors":[]}', '128M'));
+        self::assertNull(ShutdownAssertions::memory('Server control socket unavailable', '128M'));
     }
 
     public function testFailedContainerStartCleansOnlyOwnedResourcesAndRetainsFailureStatus(): void
@@ -129,8 +140,8 @@ LOG;
             $application = array_values(array_filter($commands, static fn(array $command): bool => ($command[2] ?? '') === 'create' && in_array('APP_DOMAIN=http://127.0.0.1:9501', $command, true)));
             self::assertCount(1, $application);
             self::assertSame(
-                ['APP_URL=https://baander.app', 'DEFAULT_URI=https://baander.app', 'APP_DOMAIN=http://127.0.0.1:9501', 'AUTH_DPOP_EXTRA_ORIGINS=http://127.0.0.1:9501'],
-                array_values(array_filter($application[0], static fn(string $argument): bool => preg_match('/^(APP_URL|DEFAULT_URI|APP_DOMAIN|AUTH_DPOP_EXTRA_ORIGINS)=/', $argument) === 1)),
+                ['APP_URL=https://baander.app', 'DEFAULT_URI=https://baander.app', 'APP_DOMAIN=http://127.0.0.1:9501', 'AUTH_EXTRA_ORIGINS=http://127.0.0.1:9501'],
+                array_values(array_filter($application[0], static fn(string $argument): bool => preg_match('/^(APP_URL|DEFAULT_URI|APP_DOMAIN|AUTH_EXTRA_ORIGINS)=/', $argument) === 1)),
             );
             $network = array_values(array_filter($commands, static fn(array $command): bool => in_array('--internal', $command, true)))[0];
             $id = $network[array_key_last($network)];

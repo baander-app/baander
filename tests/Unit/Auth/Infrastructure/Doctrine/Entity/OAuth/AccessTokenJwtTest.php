@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Auth\Infrastructure\Doctrine\Entity\OAuth;
 
+use App\Auth\Domain\Model\OAuth\SignInGrant;
 use App\Auth\Infrastructure\Doctrine\Entity\OAuth\AccessTokenEntity;
 use App\Auth\Infrastructure\Doctrine\Entity\OAuth\ClientEntity;
 use App\Auth\Infrastructure\Doctrine\Entity\UserEntity;
@@ -32,7 +33,7 @@ final class AccessTokenJwtTest extends TestCase
         $client = new ClientEntity(new PublicId(), 'JWT client', '["https://baander.app/callback"]');
         $user = $withUser ? new UserEntity(new PublicId(), 'JWT user', 'jwt@baander.app', 'hashed', id: Uuid::generate()) : null;
         $expiry = new \DateTimeImmutable('+10 minutes');
-        $entity = new AccessTokenEntity('jwt-token-identifier', $client, $user, scopes: ['profile', 'library:read'], expiresAt: $expiry);
+        $entity = new AccessTokenEntity('jwt-token-identifier', $client, SignInGrant::AuthorizationCode, $user, scopes: ['profile', 'library:read'], expiresAt: $expiry);
         $entity->setPrivateKey(new CryptKey($pem));
         $entity->setResourceServerUri('https://baander.app');
         $entity->setDpopJkt(str_repeat('a', 43));
@@ -55,7 +56,7 @@ final class AccessTokenJwtTest extends TestCase
 
     public function testUnconfiguredEntityCannotReturnAnOpaqueTokenAsAccessToken(): void
     {
-        $entity = new AccessTokenEntity('opaque-token', new ClientEntity(new PublicId(), 'JWT client', '[]'));
+        $entity = new AccessTokenEntity('opaque-token', new ClientEntity(new PublicId(), 'JWT client', '[]'), SignInGrant::AuthorizationCode);
         $this->expectException(RuntimeException::class);
         $this->expectExceptionMessage('Access token signing requires a key, audience and expiry.');
         $entity->toString();
@@ -67,7 +68,7 @@ final class AccessTokenJwtTest extends TestCase
         $ec = openssl_pkey_new(['private_key_type' => OPENSSL_KEYTYPE_EC, 'curve_name' => 'prime256v1']);
         self::assertNotFalse($ec);
         self::assertTrue(openssl_pkey_export($ec, $pem));
-        $entity = new AccessTokenEntity('opaque-token', new ClientEntity(new PublicId(), 'JWT client', '[]'), expiresAt: new \DateTimeImmutable('+10 minutes'));
+        $entity = new AccessTokenEntity('opaque-token', new ClientEntity(new PublicId(), 'JWT client', '[]'), SignInGrant::AuthorizationCode, expiresAt: new \DateTimeImmutable('+10 minutes'));
         $entity->setPrivateKey(new CryptKey($pem));
         $entity->setResourceServerUri('https://baander.app');
         $this->expectException(\Lcobucci\JWT\Signer\InvalidKeyProvided::class);

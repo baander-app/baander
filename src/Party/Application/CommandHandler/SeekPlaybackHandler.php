@@ -39,7 +39,8 @@ final class SeekPlaybackHandler
             return;
         }
 
-        // Without a job (none was named, or it has been deleted) there is no encoder to steer.
+        // Without a job (none was named, it has been deleted, or its owner left) there is no
+        // encoder to steer.
         $jobId = $session->getTranscodeJobId();
         if ($jobId !== null) {
             $this->eventDispatcher->dispatch(new PlaybackPositionChanged(

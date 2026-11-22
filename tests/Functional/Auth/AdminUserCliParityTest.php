@@ -57,8 +57,8 @@ final class AdminUserCliParityTest extends TestCase
     public function testMarkingAnAddressVerifiedLeavesTheSameStateAndSucceedsWhenRepeated(): void
     {
         $superAdmin = $this->createSuperAdminUser();
-        $viaApi = $this->createTestUser();
-        $viaCli = $this->createTestUser();
+        $viaApi = $this->createTestUser(verified: false);
+        $viaCli = $this->createTestUser(verified: false);
 
         foreach ([1, 2] as $attempt) {
             $data = $this->assertJsonResponse($this->authenticatedRequest('POST', $this->userPath($viaApi) . '/verify-email', $superAdmin), 200, 'data')['data'];
@@ -149,6 +149,49 @@ final class AdminUserCliParityTest extends TestCase
         $this->entityManager->clear();
         self::assertNull($this->userRepository->findByUuid($viaApi->getId()));
         self::assertNull($this->userRepository->findByUuid($viaCli->getId()));
+    }
+
+    public function testTheOnlyEnabledSuperAdminIsKeptAlikeOnBothPaths(): void
+    {
+        $superAdmin = $this->createSuperAdminUser();
+
+        foreach ([
+            ['DELETE', '', [], 'app:user:delete', ['identifier' => $superAdmin->getEmail(), '--force' => true]],
+            ['POST', '/disable', [], 'app:user:disable', ['identifier' => $superAdmin->getEmail()]],
+            ['POST', '/roles', ['roles' => ['ROLE_USER', 'ROLE_ADMIN']], 'app:user:roles', ['identifier' => $superAdmin->getEmail(), 'roles' => ['ROLE_USER', 'ROLE_ADMIN']]],
+        ] as [$method, $suffix, $body, $name, $arguments]) {
+            $error = $this->assertJsonResponse($this->authenticatedRequest($method, $this->userPath($superAdmin) . $suffix, $superAdmin, $body), 409, 'error');
+            self::assertSame('last_super_admin', $error['error']['details']['reason'] ?? null, $method . ' ' . $suffix);
+
+            $command = $this->command($name);
+            self::assertSame(Command::FAILURE, $command->execute($arguments, ['interactive' => false]), $name);
+            self::assertStringContainsString($error['error']['message'], preg_replace('/\s+/', ' ', $command->getDisplay()) ?? '', $name);
+        }
+
+        $stored = $this->stored($superAdmin);
+        self::assertFalse($stored->isDisabled());
+        self::assertTrue($stored->hasRole('ROLE_SUPER_ADMIN'));
+    }
+
+    public function testWithoutASuperAdminTheConsoleStillDemotesDisablesAndDeletesAnAdmin(): void
+    {
+        $demoted = $this->createAdminUser();
+        $disabled = $this->createAdminUser();
+        $deleted = $this->createAdminUser();
+        self::assertSame(0, (int) $this->entityManager->getConnection()->fetchOne(
+            "SELECT count(*) FROM users WHERE roles @> '[\"ROLE_SUPER_ADMIN\"]'",
+        ), 'The install has no super admin.');
+
+        $roles = $this->command('app:user:roles');
+        self::assertSame(Command::SUCCESS, $roles->execute(['identifier' => $demoted->getEmail(), 'roles' => ['ROLE_USER']]), $roles->getDisplay());
+        $disable = $this->command('app:user:disable');
+        self::assertSame(Command::SUCCESS, $disable->execute(['identifier' => $disabled->getEmail()]), $disable->getDisplay());
+        $delete = $this->command('app:user:delete');
+        self::assertSame(Command::SUCCESS, $delete->execute(['identifier' => $deleted->getEmail(), '--force' => true], ['interactive' => false]), $delete->getDisplay());
+
+        self::assertSame(['ROLE_USER'], $this->stored($demoted)->getRoles());
+        self::assertTrue($this->stored($disabled)->isDisabled());
+        self::assertNull($this->userRepository->findByUuid($deleted->getId()));
     }
 
     public function testRenamingStoresTheSameNameAndRejectsTheSameNames(): void

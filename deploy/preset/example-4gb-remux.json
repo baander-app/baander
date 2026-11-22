@@ -13,7 +13,13 @@
     "origin": "http://baander.app:8080",
     "listen": {
         "address": "127.0.0.1",
-        "port": 8080
+        "port": 8080,
+        "frontProxies": []
+    },
+    "network": {
+        "subnet": "10.231.0.0/28",
+        "ipv6": true,
+        "subnet6": "fd00:baa:231::/64"
     },
     "images": {
         "application": "martinjuul/baander-app:latest",

@@ -313,13 +313,17 @@ services:
     Symfony\Bridge\PsrHttpMessage\HttpFoundationFactoryInterface:
         alias: Symfony\Bridge\PsrHttpMessage\Factory\HttpFoundationFactory
 
+    App\Shared\Application\Http\PublicOrigins:
+        arguments:
+            $publicUrl: '%env(APP_URL)%'
+            $extraOrigins: '%auth.extra_origins%'
+
     # --- WebAuthn ---
     Webauthn\Counter\CounterChecker:
         alias: App\Auth\Infrastructure\Security\Passkey\AuthenticatorCounterChecker
 
     App\Auth\Infrastructure\Security\Passkey\PasskeyService:
         arguments:
-            $appDomain: '%app.domain%'
             $appName: '%app.name%'
             $timeout: '%auth.passkey.timeout%'
             $authenticatorAttachment: '%auth.passkey.authenticator_attachment%'
@@ -345,6 +349,7 @@ services:
             $oauthPublicKeyPath: '%auth.public_key_path%'
             $vapidPublicKey: '%env(VAPID_PUBLIC_KEY)%'
             $vapidPrivateKey: '%env(VAPID_PRIVATE_KEY)%'
+            $mailerDsn: '%env(default::MAILER_DSN)%'
             $apiKeys:
                 Discogs: '%env(DISCOGS_TOKEN)%'
                 Last.fm: '%env(LASTFM_API_KEY)%'
@@ -451,8 +456,6 @@ services:
     # iat is within the clock skew (either side) or while the nonce it carries lives.
     App\Auth\Infrastructure\Security\OAuth\DpopProofValidator:
         arguments:
-            $publicUrl: '%env(APP_URL)%'
-            $extraOrigins: '%auth.dpop.extra_origins%'
             $clockSkewSeconds: '%auth.dpop.clock_skew%'
             $jtiTtlSeconds: '@=max(parameter("auth.dpop.nonce_ttl"), 2 * parameter("auth.dpop.clock_skew"))'
 
@@ -799,6 +802,8 @@ services:
 
     App\Library\Application\Port\LibraryFileAvailabilityInterface:
         alias: App\Library\Infrastructure\LibraryFileAvailability
+    App\Library\Application\Port\LibraryTypeLookupInterface:
+        alias: App\Library\Infrastructure\LibraryTypeLookup
     App\Library\Application\Port\LibraryMediaFilesInterface:
         alias: App\Library\Infrastructure\Filesystem\LibraryMediaFiles
 
@@ -896,6 +901,9 @@ services:
 
     App\Transcode\Application\Port\CompletedVideoDeliveryPort:
         alias: App\Transcode\Infrastructure\Transcode\CompletedVideoDeliveryAdapter
+
+    App\Transcode\Application\Port\LiveDeliveryAccessPort:
+        alias: App\Transcode\Infrastructure\Transcode\LiveDeliveryAccessAdapter
 
     App\Transcode\Application\Port\CompletedVideoArtifactPort:
         alias: App\Transcode\Infrastructure\Transcode\CompletedVideoArtifactAdapter
@@ -1059,6 +1067,7 @@ services:
     App\Metadata\Interface\Controller\MetadataSearchController:
         arguments:
             $musicbrainzUserLimiter: '@limiter.musicbrainz_user'
+            $metadataProviderUserLimiter: '@limiter.metadata_provider_user'
 
     App\Metadata\Interface\Controller\MetadataBrowseController:
         arguments:
@@ -1796,7 +1805,6 @@ services:
 
     App\Shared\Infrastructure\EventListener\SecurityHeadersListener:
         arguments:
-            $appUrl: '%env(APP_URL)%'
             $developmentOrigins: '%app.csp.development_origins%'
 
     App\Recommendation\Application\Port\RecommendationPublicIdentityInterface:

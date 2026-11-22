@@ -6,6 +6,7 @@ namespace App\Auth\Infrastructure\Security\OAuth;
 
 use App\Auth\Application\Http\AccessTokenAttributes;
 use App\Auth\Domain\Model\OAuth\TokenId;
+use App\Auth\Domain\Model\OAuth\TokenIssuance;
 use App\Auth\Domain\Repository\OAuth\AccessTokenRepositoryInterface;
 use App\Auth\Domain\Repository\OAuth\ClientRepositoryInterface;
 use App\Auth\Domain\Repository\OAuth\TokenMetadataRepositoryInterface;
@@ -36,10 +37,13 @@ use Symfony\Component\Security\Http\Authenticator\Passport\SelfValidatingPasspor
  * Extracts the token from the Authorization header, validates it through
  * the league/oauth2-server ResourceServer, and creates a Passport with
  * the user loaded from the database by public ID. A disabled account does not authenticate.
+ * Whether the user's address is verified is set as a request attribute from that load, so
+ * UnverifiedAccountListener can confine an unverified account.
  *
  * A token issued before the user's latest password change does not authenticate: its
  * credential epoch, read from storage with the user's, must not be behind. The epoch is
- * set as a request attribute, so approvals made with the token carry it.
+ * set as a request attribute, so approvals made with the token carry it. The same read
+ * returns the sign-in grant that started the token's chain.
  *
  * A DPoP-bound token is accepted under the DPoP scheme only (RFC 9449 section 7.1);
  * presented as a Bearer token it is refused like any other invalid token. The
@@ -47,9 +51,11 @@ use Symfony\Component\Security\Http\Authenticator\Passport\SelfValidatingPasspor
  *
  * The token's client, whether it is first-party and its scopes are set as request
  * attributes (AccessTokenAttributes). A token is first-party only when its client is
- * the first-party client registered as `auth.spa_client_id`; any other token is
- * delegated, reaches only what its scopes cover, and authenticates its user with
- * ROLE_USER alone, so no admin authority travels with it.
+ * the first-party client registered as `auth.spa_client_id` and its chain began with a
+ * password or passkey sign-in. Any other token is delegated, reaches only what its
+ * scopes cover, and authenticates its user with ROLE_USER alone, so no admin authority
+ * travels with it. Tokens of the first-party client carry no scopes: one that a delegated
+ * grant issued around the issuance check reaches public routes only.
  */
 final class OAuth2Authenticator extends AbstractAuthenticator
 {
@@ -142,19 +148,21 @@ final class OAuth2Authenticator extends AbstractAuthenticator
             );
         }
         $request->attributes->set(AccessTokenAttributes::TOKEN_ID, $accessTokenId);
-        $request->attributes->set(AccessTokenAttributes::CREDENTIAL_EPOCH, $this->currentCredentialEpoch($accessTokenId));
+        $issuance = $this->currentIssuance($accessTokenId);
+        $request->attributes->set(AccessTokenAttributes::CREDENTIAL_EPOCH, $issuance->credentialEpoch);
 
         // Enforce the client fingerprint binding of tokens issued with a fingerprint.
         $this->verifyTokenBinding($accessTokenId, $request);
 
-        $firstParty = $this->isFirstPartyClient($clientId);
+        $firstPartyClient = $this->isFirstPartyClient($clientId);
+        $firstParty = $firstPartyClient && $issuance->grant->isFirstPartySignIn();
         $request->attributes->set(AccessTokenAttributes::CLIENT_ID, $clientId);
         $request->attributes->set(AccessTokenAttributes::FIRST_PARTY, $firstParty);
-        $request->attributes->set(AccessTokenAttributes::SCOPES, $firstParty ? [] : AccessTokenAttributes::scopes($scopes));
+        $request->attributes->set(AccessTokenAttributes::SCOPES, $firstPartyClient ? [] : AccessTokenAttributes::scopes($scopes));
 
         $badge = new UserBadge(
             $userIdentifier,
-            function (string $publicId) use ($firstParty): SecurityUser {
+            function (string $publicId) use ($firstParty, $request): SecurityUser {
                 $user = $this->userRepository->findByPublicId(PublicId::fromString($publicId));
 
                 if ($user === null) {
@@ -174,6 +182,7 @@ final class OAuth2Authenticator extends AbstractAuthenticator
                         ['error_code' => 'AUTH_INVALID_TOKEN'],
                     );
                 }
+                $request->attributes->set(AccessTokenAttributes::EMAIL_VERIFIED, $user->isEmailVerified());
 
                 return new SecurityUser(
                     $user->getId()->toString(),
@@ -193,17 +202,17 @@ final class OAuth2Authenticator extends AbstractAuthenticator
     }
 
     /**
-     * The token's credential epoch, when the user's credentials have not changed since it was
-     * issued; otherwise the token is refused.
+     * The token's sign-in grant and credential epoch, when the user's credentials have not
+     * changed since it was issued; otherwise the token is refused.
      */
-    private function currentCredentialEpoch(string $accessTokenId): int
+    private function currentIssuance(string $accessTokenId): TokenIssuance
     {
         try {
-            $epoch = $this->accessTokenRepository->currentCredentialEpoch(TokenId::fromString($accessTokenId));
+            $issuance = $this->accessTokenRepository->currentIssuance(TokenId::fromString($accessTokenId));
         } catch (\InvalidArgumentException) {
-            $epoch = null;
+            $issuance = null;
         }
-        if ($epoch === null) {
+        if ($issuance === null) {
             $this->logger->info('OAuth2 token issued before a password change refused.', ['access_token_id' => $accessTokenId]);
             throw new CustomUserMessageAuthenticationException(
                 AuthenticationFailureMessage::INVALID_TOKEN,
@@ -211,7 +220,7 @@ final class OAuth2Authenticator extends AbstractAuthenticator
             );
         }
 
-        return $epoch;
+        return $issuance;
     }
 
     /** Only the client registered as Baander's own, under its configured public ID, is first-party. */

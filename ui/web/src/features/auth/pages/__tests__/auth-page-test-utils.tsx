@@ -12,7 +12,7 @@ import { LocationProbe } from './LocationProbe'
  * StrictMode, as the app does, so effects are replayed once on mount.
  */
 export function renderAt(entry: string, routes: Record<string, ReactElement>) {
-  const client = new QueryClient({ defaultOptions: { mutations: { retry: false } } })
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } })
 
   return render(
     <StrictMode>
@@ -32,9 +32,14 @@ export function renderAt(entry: string, routes: Record<string, ReactElement>) {
   )
 }
 
-export function httpError(status: number, message: string, headers: Record<string, string> = {}) {
+export function httpError(
+  status: number,
+  message: string,
+  headers: Record<string, string> = {},
+  details?: Record<string, unknown>,
+) {
   return new AxiosError('Request failed', 'ERR_BAD_REQUEST', undefined, undefined, {
-    data: { error: { code: status, message } },
+    data: { error: { code: status, message, ...(details === undefined ? {} : { details }) } },
     status,
     statusText: 'Error',
     headers,

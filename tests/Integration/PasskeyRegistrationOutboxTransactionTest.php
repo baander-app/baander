@@ -6,15 +6,25 @@ namespace App\Tests\Integration;
 
 use App\Auth\Application\Command\Passkey\RegisterPasskeyCommand;
 use App\Auth\Application\CommandHandler\Passkey\RegisterPasskeyHandler;
+use App\Auth\Application\Service\ChainConnectionCloser;
+use App\Auth\Application\Service\CredentialChangeRevoker;
 use App\Auth\Domain\Event\Passkey\PasskeyRegistered;
+use App\Auth\Domain\Model\OAuth\SignInGrant;
+use App\Auth\Infrastructure\Doctrine\Entity\OAuth\AccessTokenEntity;
+use App\Auth\Infrastructure\Doctrine\Entity\OAuth\ClientEntity;
+use App\Auth\Infrastructure\Doctrine\Entity\OAuth\RefreshTokenEntity;
 use App\Auth\Infrastructure\Doctrine\Entity\PasskeyEntity;
 use App\Auth\Infrastructure\Doctrine\Entity\UserEntity;
 use App\Auth\Infrastructure\Doctrine\UserRepository;
 use App\Auth\Infrastructure\Repository\EmailVerificationTokenRepository;
+use App\Auth\Infrastructure\Repository\OAuth\AccessTokenRepository;
+use App\Auth\Infrastructure\Repository\OAuth\RefreshTokenRepository;
 use App\Auth\Infrastructure\Repository\PasswordResetTokenRepository;
 use App\Auth\Infrastructure\Repository\Passkey\PasskeyRepository;
+use App\Shared\Application\Port\LiveConnectionsPortInterface;
 use App\Shared\Domain\Event\Outbox\OutboxRepository;
 use App\Shared\Domain\Event\Outbox\OutboxSubscriber;
+use App\Shared\Domain\Model\Uuid;
 use App\Shared\Infrastructure\Doctrine\DoctrineTransaction;
 use App\Shared\Infrastructure\Doctrine\Platform\BaanderDriverMiddleware;
 use App\Shared\Infrastructure\Doctrine\Type\CustomTypesRegistrar;
@@ -32,7 +42,12 @@ use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
 use SwooleBundle\SwooleBundle\Bridge\Swoole\Swoole;
 use Symfony\Component\EventDispatcher\EventDispatcher;
+use Symfony\Component\Serializer\Encoder\JsonEncoder;
 
+/**
+ * A new passkey, its PasskeyRegistered event and the end of the account's other sessions commit
+ * together or not at all.
+ */
 final class PasskeyRegistrationOutboxTransactionTest extends TestCase
 {
     private Connection $writer;
@@ -64,7 +79,7 @@ final class PasskeyRegistrationOutboxTransactionTest extends TestCase
         $this->manager = new EntityManager($this->writer, $orm);
         (new SchemaTool($this->manager))->createSchema(array_map(
             $this->manager->getClassMetadata(...),
-            [UserEntity::class, PasskeyEntity::class],
+            [UserEntity::class, PasskeyEntity::class, ClientEntity::class, AccessTokenEntity::class, RefreshTokenEntity::class],
         ));
         $this->writer->executeStatement(<<<'SQL'
             CREATE TABLE domain_event_outbox (
@@ -97,25 +112,26 @@ final class PasskeyRegistrationOutboxTransactionTest extends TestCase
         }
     }
 
-    public function testOutboxFailureRollsBackCredentialThenRetryPersistsMatchingIdentityAndEvent(): void
+    public function testOutboxFailureRollsBackCredentialAndSessionEndThenRetryPersistsBoth(): void
     {
         $userEntity = new UserEntity(new PublicId(), 'Passkey owner', 'passkey-owner@baander.app', 'unused');
+        $client = new ClientEntity(new PublicId(), 'Web', '[]', firstParty: true);
         $this->manager->persist($userEntity);
+        $this->manager->persist($client);
+        // Token ids are at least 32 characters; the prefixes keep them in this order.
+        $registeringId = 'registering-session-' . bin2hex(random_bytes(16));
+        $otherId = 'other-session-' . bin2hex(random_bytes(16));
+        $registering = new AccessTokenEntity($registeringId, $client, SignInGrant::Password, $userEntity, chainId: Uuid::v7());
+        $other = new AccessTokenEntity($otherId, $client, SignInGrant::Password, $userEntity, chainId: Uuid::v7());
+        $this->manager->persist($registering);
+        $this->manager->persist($other);
         $this->manager->flush();
         $userId = $userEntity->getId();
         $credentialRecord = [
             'credential' => 'key-material',
             'userHandle' => $userEntity->getPublicId()->toString(),
         ];
-        $users = new UserRepository(
-            $this->manager,
-            new PasswordResetTokenRepository($this->manager->getConnection()),
-            new EmailVerificationTokenRepository($this->manager->getConnection()),
-        );
-        $passkeys = new PasskeyRepository($this->manager);
-        $outbox = new OutboxRepository($this->writer);
-        $events = new EventDispatcher();
-        $events->addListener(PasskeyRegistered::class, new OutboxSubscriber($outbox, new NullLogger()));
+        $command = new RegisterPasskeyCommand($userId->toString(), 'Laptop', 'credential-a', $credentialRecord, 0, $registeringId);
 
         $this->writer->executeStatement(<<<'SQL'
             CREATE FUNCTION reject_outbox_event() RETURNS trigger LANGUAGE plpgsql AS $$
@@ -131,9 +147,7 @@ final class PasskeyRegistrationOutboxTransactionTest extends TestCase
             SQL);
 
         try {
-            $this->handler($users, $passkeys, $events)(new RegisterPasskeyCommand(
-                $userId->toString(), 'Laptop', 'credential-a', $credentialRecord, 0,
-            ));
+            $this->handler()($command);
             self::fail('Outbox insertion failure must abort passkey registration.');
         } catch (\Throwable $error) {
             self::assertStringContainsString('rejected outbox event', $error->getMessage());
@@ -141,13 +155,13 @@ final class PasskeyRegistrationOutboxTransactionTest extends TestCase
 
         self::assertSame(0, (int) $this->observer->fetchOne('SELECT COUNT(*) FROM passkeys'));
         self::assertSame(0, (int) $this->observer->fetchOne('SELECT COUNT(*) FROM domain_event_outbox'));
+        self::assertSame(0, $this->credentialEpoch(), 'The credential epoch stays.');
+        self::assertSame([$otherId => false, $registeringId => false], $this->revokedSessions());
 
         $this->writer->executeStatement('DROP TRIGGER reject_outbox_event ON domain_event_outbox');
         $this->writer->executeStatement('DROP FUNCTION reject_outbox_event()');
         $this->manager->clear();
-        $passkey = $this->handler($users, $passkeys, $events)(new RegisterPasskeyCommand(
-            $userId->toString(), 'Laptop', 'credential-a', $credentialRecord, 0,
-        ));
+        $passkey = $this->handler()($command);
 
         self::assertSame(1, (int) $this->observer->fetchOne('SELECT COUNT(*) FROM passkeys'));
         self::assertSame(1, (int) $this->observer->fetchOne('SELECT COUNT(*) FROM domain_event_outbox'));
@@ -160,21 +174,51 @@ final class PasskeyRegistrationOutboxTransactionTest extends TestCase
         );
         $payload = json_decode($payloadJson, true, flags: JSON_THROW_ON_ERROR);
         self::assertSame($passkey->getId()->toString(), $payload['passkey_id']);
+        self::assertSame(1, $this->credentialEpoch());
+        self::assertSame([$otherId => true, $registeringId => false], $this->revokedSessions());
+        self::assertSame(1, (int) $this->observer->fetchOne(
+            'SELECT credential_epoch FROM oauth_access_tokens WHERE token_id = ?',
+            [$registeringId],
+        ), 'The registering session moves to the new epoch.');
     }
 
-    private function handler(
-        UserRepository $users,
-        PasskeyRepository $passkeys,
-        EventDispatcher $events,
-    ): RegisterPasskeyHandler {
+    private function credentialEpoch(): int
+    {
+        return (int) $this->observer->fetchOne('SELECT credential_epoch FROM users');
+    }
+
+    /** @return array<string, bool> each session's token id and whether it is revoked */
+    private function revokedSessions(): array
+    {
+        return array_map(
+            static fn (mixed $revoked): bool => (bool) $revoked,
+            $this->observer->fetchAllKeyValue('SELECT token_id, revoked FROM oauth_access_tokens ORDER BY token_id'),
+        );
+    }
+
+    private function handler(): RegisterPasskeyHandler
+    {
         $registry = $this->createStub(ManagerRegistry::class);
         $registry->method('getManager')->willReturn($this->manager);
+        $users = new UserRepository(
+            $this->manager,
+            new PasswordResetTokenRepository($this->manager->getConnection()),
+            new EmailVerificationTokenRepository($this->manager->getConnection()),
+        );
+        $events = new EventDispatcher();
+        $events->addListener(PasskeyRegistered::class, new OutboxSubscriber(new OutboxRepository($this->writer), new NullLogger()));
 
         return new RegisterPasskeyHandler(
             $users,
-            $passkeys,
+            new PasskeyRepository($this->manager),
             $events,
             new DoctrineTransaction($registry, new Swoole()),
+            new CredentialChangeRevoker(
+                $users,
+                new AccessTokenRepository($this->manager, new JsonEncoder()),
+                new RefreshTokenRepository($this->manager, new JsonEncoder()),
+                new ChainConnectionCloser($this->createStub(LiveConnectionsPortInterface::class), new NullLogger()),
+            ),
         );
     }
 }

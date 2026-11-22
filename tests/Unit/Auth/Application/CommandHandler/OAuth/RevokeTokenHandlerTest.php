@@ -13,6 +13,7 @@ use App\Shared\Domain\Model\Email;
 use App\Auth\Domain\Model\OAuth\AccessToken;
 use App\Auth\Domain\Model\OAuth\Client;
 use App\Auth\Domain\Model\OAuth\RefreshToken;
+use App\Auth\Domain\Model\OAuth\SignInGrant;
 use App\Auth\Domain\Model\OAuth\TokenId;
 use App\Auth\Domain\Model\OAuth\ValueObject\ChainId;
 use App\Auth\Domain\Model\User;
@@ -687,6 +688,7 @@ final class RevokeTokenHandlerTest extends TestCase
                 name: 'Test Client',
                 redirectUris: ['https://player.baander.app/callback'],
             ),
+            grant: SignInGrant::AuthorizationCode,
             user: $user,
             chainId: $chainId,
         );

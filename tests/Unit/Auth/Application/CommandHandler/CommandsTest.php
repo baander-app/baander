@@ -13,6 +13,7 @@ use App\Auth\Application\Command\OAuth\RefreshTokenCommand;
 use App\Auth\Application\Command\Passkey\RegisterPasskeyCommand;
 use App\Auth\Application\Command\User\RegisterUserCommand;
 use App\Auth\Application\Command\User\RequestPasswordResetCommand;
+use App\Auth\Domain\Model\OAuth\SignInGrant;
 use App\Shared\Domain\Model\Email;
 use App\Shared\Domain\Model\Uuid;
 use PHPUnit\Framework\TestCase;
@@ -54,6 +55,7 @@ final class CommandsTest extends TestCase
             userId: $userId,
             dpopJkt: 'thumbprint',
             credentialEpoch: 3,
+            grant: SignInGrant::Passkey,
             ipAddress: '127.0.0.1',
             userAgent: 'PHPUnit',
             clientFingerprint: 'fingerprint',
@@ -63,6 +65,7 @@ final class CommandsTest extends TestCase
         $this->assertSame($userId, $cmd->getUserId());
         $this->assertSame('thumbprint', $cmd->getDpopJkt());
         $this->assertSame(3, $cmd->getCredentialEpoch());
+        $this->assertSame(SignInGrant::Passkey, $cmd->getGrant());
         $this->assertSame('127.0.0.1', $cmd->getIpAddress());
         $this->assertSame('PHPUnit', $cmd->getUserAgent());
         $this->assertSame('fingerprint', $cmd->getClientFingerprint());
@@ -70,7 +73,7 @@ final class CommandsTest extends TestCase
 
     public function testIssueTokenCommandDefaults(): void
     {
-        $cmd = new IssueTokenCommand(Uuid::v4(), Uuid::v4(), 'thumbprint', 0);
+        $cmd = new IssueTokenCommand(Uuid::v4(), Uuid::v4(), 'thumbprint', 0, SignInGrant::Password);
 
         $this->assertEmpty($cmd->getScopes());
         $this->assertNull($cmd->getTokenName());
@@ -80,18 +83,10 @@ final class CommandsTest extends TestCase
     public function testAuthenticatePasskeyCommandGetters(): void
     {
         $response = ['id' => 'raw-id-value', 'clientDataJSON' => 'cdj', 'authenticatorData' => 'ad'];
-        $cmd = new AuthenticatePasskeyCommand('user-uuid', 'challenge-key', $response);
+        $cmd = new AuthenticatePasskeyCommand('challenge-key', $response);
 
-        $this->assertSame('user-uuid', $cmd->getUserId());
         $this->assertSame('challenge-key', $cmd->getChallengeKey());
         $this->assertSame($response, $cmd->getResponse());
-    }
-
-    public function testAuthenticatePasskeyCommandNullUserId(): void
-    {
-        $cmd = new AuthenticatePasskeyCommand(null, 'challenge-key', ['id' => 'raw-id']);
-
-        $this->assertNull($cmd->getUserId());
     }
 
     public function testRegisterPasskeyCommandGetters(): void

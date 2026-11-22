@@ -14,6 +14,7 @@ use App\Auth\Domain\Model\OAuth\AccessToken;
 use App\Auth\Domain\Model\OAuth\Client;
 use App\Auth\Domain\Model\OAuth\RefreshToken;
 use App\Auth\Domain\Model\OAuth\RefreshTokenState;
+use App\Auth\Domain\Model\OAuth\SignInGrant;
 use App\Auth\Domain\Model\OAuth\TokenId;
 use App\Auth\Domain\Model\OAuth\ValueObject\ChainId;
 use App\Auth\Domain\Model\OAuth\ValueObject\ClientSecret;
@@ -205,6 +206,7 @@ final class RefreshTokenHandlerConcurrencyTest extends TestCase
     {
         $accessToken = AccessToken::issue(
             $this->client,
+            SignInGrant::Password,
             $this->user,
             [new Scope('profile')],
             null,
@@ -229,7 +231,7 @@ final class RefreshTokenHandlerConcurrencyTest extends TestCase
 
     private function replacement(): RefreshToken
     {
-        $accessToken = AccessToken::issue($this->client, $this->user, [new Scope('profile')], null, null, $this->chainId, dpopJkt: self::JKT);
+        $accessToken = AccessToken::issue($this->client, SignInGrant::Password, $this->user, [new Scope('profile')], null, null, $this->chainId, dpopJkt: self::JKT);
 
         return RefreshToken::issue($accessToken, $this->chainId, null, $this->presentedToken(usedAt: new \DateTimeImmutable()));
     }

@@ -4,7 +4,7 @@ import { useAuthStore } from '../stores/auth-store'
 import { useTranslation } from '@/shared/i18n'
 import { Input } from '@/shared/components/ui/input'
 import { Button } from '@/shared/components/ui/button'
-import { parseApiError } from '../lib/parse-api-error'
+import { apiErrorReason, parseApiError } from '../lib/parse-api-error'
 import styled from 'styled-components'
 import { textRole } from '@/shared/theme'
 
@@ -51,7 +51,12 @@ const StyledLink = styled(Link)`
   }
 `;
 
-export function RegisterForm() {
+interface RegisterFormProps {
+  /** Called when the server refuses the registration because self-registration is closed. */
+  onRegistrationClosed: () => void
+}
+
+export function RegisterForm({ onRegistrationClosed }: RegisterFormProps) {
   const { t } = useTranslation()
   const navigate = useNavigate()
   const register = useAuthStore((s) => s.register)
@@ -76,6 +81,11 @@ export function RegisterForm() {
       await register(email, password, name || undefined)
       navigate('/login')
     } catch (err: unknown) {
+      if (apiErrorReason(err) === 'registration_closed') {
+        onRegistrationClosed()
+        return
+      }
+
       const parsed = parseApiError(err, t('common.error'))
       setError(parsed.message)
     }

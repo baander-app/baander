@@ -83,7 +83,7 @@ final class PartySessionController
             ),
             new OA\Response(
                 response: '404',
-                description: 'The video or transcode job does not exist, or the user may not play its video',
+                description: 'The video or transcode job does not exist, another user owns the job, or the user may not play its video',
                 content: new OA\MediaType\Json(
                     schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
                 ),

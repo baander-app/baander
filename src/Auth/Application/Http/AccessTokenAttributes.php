@@ -31,9 +31,24 @@ final class AccessTokenAttributes
      */
     public const string CREDENTIAL_EPOCH = 'oauth_credential_epoch';
 
+    /** True when the token's user has verified their current email address, absent or false otherwise. */
+    public const string EMAIL_VERIFIED = 'oauth_email_verified';
+
     public static function isFirstParty(mixed $attribute): bool
     {
         return $attribute === true;
+    }
+
+    /** A request without the marker counts as unverified, so a missing attribute confines the account. */
+    public static function isEmailVerified(mixed $attribute): bool
+    {
+        return $attribute === true;
+    }
+
+    /** Null when the request carries no access token id, so a credential change keeps no session. */
+    public static function tokenId(mixed $attribute): ?string
+    {
+        return is_string($attribute) && $attribute !== '' ? $attribute : null;
     }
 
     /** Null when the request carries no epoch, which a caller must treat as unauthenticated. */

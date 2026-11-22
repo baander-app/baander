@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Shared\Infrastructure\Swoole\Drain;
 
+use App\Auth\Application\Port\SelfRegistrationInterface;
 use App\QoL\Application\Port\EncoderProfileFingerprintPortInterface;
 use App\QoL\Domain\Port\QualityLadderPortInterface;
 use App\QoL\Domain\Service\LearningModel;
@@ -184,6 +185,8 @@ final class DrainWorkerExitSubscriberTest extends TestCase
             oauthPublicKeyPath: '',
             vapidPublicKey: '',
             vapidPrivateKey: '',
+            mailerDsn: 'smtp://mail.baander.app:587',
+            selfRegistration: $this->createStub(SelfRegistrationInterface::class),
             messengerWorkerHealth: new MessengerWorkerHealth($redis, new MockClock(), new HealthAlertTable()),
             workerProfileHealth: new WorkerProfileHealth($this->createStub(Connection::class), new DeploymentProfile()),
         );

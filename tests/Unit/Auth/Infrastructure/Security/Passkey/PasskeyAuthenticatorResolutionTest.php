@@ -17,6 +17,7 @@ use App\Auth\Infrastructure\Security\OAuth\DpopTokenRequestVerifier;
 use App\Auth\Infrastructure\Security\Passkey\DpopProofRejectedException;
 use App\Auth\Infrastructure\Security\Passkey\PasskeyAuthenticator;
 use App\Auth\Infrastructure\Security\SecurityUser;
+use App\Shared\Application\Http\PublicOrigins;
 use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
 use App\Shared\Infrastructure\Redis\RedisClientFactory;
@@ -110,8 +111,7 @@ final class PasskeyAuthenticatorResolutionTest extends TestCase
         $bus->expects($this->never())->method('dispatch');
         $authenticator = new PasskeyAuthenticator($bus, $repository, new NullLogger(), new JsonEncoder(), $this->verifier(), AuthenticationFailureMessages::create());
         foreach (['{', 'null', '17', '{"challengeKey":[],"response":[]}',
-            '{"challengeKey":"challenge","response":"invalid"}',
-            '{"challengeKey":"challenge","response":[],"userId":17}'] as $json) {
+            '{"challengeKey":"challenge","response":"invalid"}'] as $json) {
             $this->assertGenericFailure($authenticator, $this->request($json));
         }
     }
@@ -201,7 +201,7 @@ final class PasskeyAuthenticatorResolutionTest extends TestCase
         $redis->method('borrow')->willReturn(true);
 
         return new DpopTokenRequestVerifier(
-            new DpopProofValidator($this->createStub(DpopJtiCacheInterface::class), publicUrl: 'https://baander.app'),
+            new DpopProofValidator($this->createStub(DpopJtiCacheInterface::class), new PublicOrigins('https://baander.app')),
             new DpopNonceManager($redis),
         );
     }

@@ -25,6 +25,7 @@ use Symfony\Component\Messenger\MessageBusInterface;
 use Symfony\Component\Security\Core\Authentication\Token\Storage\TokenStorage;
 use Symfony\Component\Security\Core\Authentication\Token\UsernamePasswordToken;
 use Symfony\Component\Security\Core\User\UserInterface;
+use Symfony\Component\Translation\Translator;
 
 final class PartyMemberControllerTest extends TestCase
 {
@@ -76,6 +77,7 @@ final class PartyMemberControllerTest extends TestCase
             $this->identities(),
             $members,
         );
+        $controller->setTranslator(new Translator('en'));
 
         $hidden = $controller->index($session->getPublicId()->toString());
         $missing = $controller->index((new PublicId())->toString());
@@ -174,6 +176,7 @@ final class PartyMemberControllerTest extends TestCase
             $identities,
             $members,
         );
+        $controller->setTranslator(new Translator('en'));
         $request = new TransferHostRequest((new PublicId())->toString());
 
         $hidden = $controller->transferHost($session->getPublicId()->toString(), $request);
@@ -192,6 +195,7 @@ final class PartyMemberControllerTest extends TestCase
         $members->expects($this->never())->method('findByUserAndSession');
         $members->expects($this->never())->method('save');
         $controller = new PartyMemberController($this->security(null), $bus, $this->createStub(PartySessionPortInterface::class), $this->identities(), $members);
+        $controller->setTranslator(new Translator('en'));
         $sessionId = (new Uuid())->toString();
 
         $list = $controller->index($sessionId);
@@ -219,6 +223,7 @@ final class PartyMemberControllerTest extends TestCase
             $this->identities(),
             $members,
         );
+        $controller->setTranslator(new Translator('en'));
         $sessionId = (new Uuid())->toString();
 
         $list = $controller->index($sessionId);

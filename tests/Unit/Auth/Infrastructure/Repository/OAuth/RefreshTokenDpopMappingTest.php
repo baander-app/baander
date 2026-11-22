@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Auth\Infrastructure\Repository\OAuth;
 
+use App\Auth\Domain\Model\OAuth\SignInGrant;
 use App\Auth\Domain\Model\OAuth\TokenId;
 use App\Auth\Infrastructure\Doctrine\Entity\OAuth\AccessTokenEntity;
 use App\Auth\Infrastructure\Doctrine\Entity\OAuth\ClientEntity;
@@ -23,7 +24,7 @@ final class RefreshTokenDpopMappingTest extends TestCase
     public function testLoadingRefreshAndSavingRevokedAccessPreservesBinding(?string $jkt): void
     {
         $client = new ClientEntity(new PublicId(), 'Mapping client', '["https://baander.app/callback"]');
-        $access = new AccessTokenEntity(bin2hex(random_bytes(40)), $client);
+        $access = new AccessTokenEntity(bin2hex(random_bytes(40)), $client, SignInGrant::Passkey);
         $access->setDpopJkt($jkt);
         $refresh = new RefreshTokenEntity(bin2hex(random_bytes(40)), $access, chainExpiresAt: new \DateTimeImmutable("+1 day"));
         $refreshEntities = $this->createMock(EntityRepository::class);
@@ -41,6 +42,7 @@ final class RefreshTokenDpopMappingTest extends TestCase
         self::assertNotNull($loaded);
         $accessToken = $loaded->getAccessToken();
         self::assertSame($jkt, $accessToken->getDpopJkt());
+        self::assertSame(SignInGrant::Passkey, $accessToken->getGrant(), 'A rotation copies the grant it loads with the refresh token.');
         $accessToken->revoke();
         new AccessTokenRepository($manager, new JsonEncoder())->save($accessToken, false);
         self::assertTrue($access->isRevoked());
@@ -50,10 +52,10 @@ final class RefreshTokenDpopMappingTest extends TestCase
     public function testPredecessorAccessBindingIsAlsoPreserved(): void
     {
         $client = new ClientEntity(new PublicId(), 'Mapping client', '["https://baander.app/callback"]');
-        $previousAccess = new AccessTokenEntity(bin2hex(random_bytes(40)), $client);
+        $previousAccess = new AccessTokenEntity(bin2hex(random_bytes(40)), $client, SignInGrant::AuthorizationCode);
         $previousAccess->setDpopJkt(str_repeat('b', 43));
         $previous = new RefreshTokenEntity(bin2hex(random_bytes(40)), $previousAccess, chainExpiresAt: new \DateTimeImmutable("+1 day"));
-        $access = new AccessTokenEntity(bin2hex(random_bytes(40)), $client);
+        $access = new AccessTokenEntity(bin2hex(random_bytes(40)), $client, SignInGrant::AuthorizationCode);
         $access->setDpopJkt(str_repeat('a', 43));
         $refresh = new RefreshTokenEntity(bin2hex(random_bytes(40)), $access, previousRefreshToken: $previous, chainExpiresAt: new \DateTimeImmutable("+1 day"));
         $entities = $this->createMock(EntityRepository::class);

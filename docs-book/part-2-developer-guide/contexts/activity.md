@@ -64,7 +64,7 @@ All endpoints are prefixed with `/api` and served by `ActivityController`, `User
 | `MediaActivityEntity` | Doctrine entity | ORM mapping for media activity |
 | `MediaActivityRepository` | Doctrine repository | Persistence implementation (`MediaActivityRepositoryInterface`) |
 | `ActivityService` | Port implementation | Implements `ActivityPortInterface` |
-| `ActivityEnrichmentService` | Service | Batch-resolves songs, albums, cover images, artist names, movies, and song availability for activity responses |
+| `ActivityEnrichmentService` | Service | Batch-resolves songs, albums, cover images, artist names, movies, and song availability for activity responses. It names only items inside the viewer's current library access: it filters the album and movie maps through the viewer's `LibraryReadScope` and keeps a song only when its album survives. An activity whose song, album or movie lies outside that access keeps its own fields, such as play count and last played time, but carries null item IDs, titles, cover and poster and `songAvailable: false`, and its artist is named only alongside a readable item. History pages keep their size |
 | `ActivityAnalyticsRepository` | Doctrine repository | Implements `ActivityAnalyticsPortInterface` |
 | `ActivityIdentityProjection` | Port implementation | Implements `ActivityIdentityProjectionPortInterface` |
 

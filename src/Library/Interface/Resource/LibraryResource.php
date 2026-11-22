@@ -21,7 +21,10 @@ use OpenApi\Spec as OA;
         ),
         'name' => new OA\Schema(description: 'Library name', type: 'string'),
         'slug' => new OA\Schema(description: 'URL-friendly slug', type: 'string'),
-        'path' => new OA\Schema(description: 'Filesystem path', type: 'string'),
+        'path' => new OA\Schema(
+            description: 'Filesystem path of the library root; only administrators read it',
+            type: 'string',
+        ),
         'type' => new OA\Schema(
             description: 'Library type',
             type: 'string',
@@ -55,7 +58,7 @@ use OpenApi\Spec as OA;
             format: 'date-time',
         ),
     ],
-    required: ['publicId', 'name', 'slug', 'path', 'type', 'filesystemType', 'sortOrder', 'createdAt', 'updatedAt'],
+    required: ['publicId', 'name', 'slug', 'type', 'filesystemType', 'sortOrder', 'createdAt', 'updatedAt'],
     component: 'LibraryResource',
 )]
 final class LibraryResource extends AbstractResource
@@ -77,5 +80,19 @@ final class LibraryResource extends AbstractResource
             'createdAt' => $source->getCreatedAt()->format(\DateTimeInterface::ATOM),
             'updatedAt' => $source->getUpdatedAt()->format(\DateTimeInterface::ATOM),
         ];
+    }
+
+    /**
+     * The library a member reads: every field except the filesystem path, which only
+     * administrators and the console see.
+     *
+     * @return array<string, mixed>
+     */
+    public static function forMember(Library $library): array
+    {
+        $resource = self::from($library);
+        unset($resource['path']);
+
+        return $resource;
     }
 }

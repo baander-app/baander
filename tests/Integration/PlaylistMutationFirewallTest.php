@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Integration;
 
+use App\Auth\Domain\Model\OAuth\SignInGrant;
 use App\Auth\Domain\Model\User;
 use App\Auth\Domain\Repository\UserRepositoryInterface;
 use App\Auth\Infrastructure\Doctrine\Entity\OAuth\AccessTokenEntity;
@@ -567,9 +568,13 @@ final class PlaylistMutationFirewallTest extends TestCase
         self::assertInstanceOf(UserEntity::class, $entity);
         $this->rows[] = [UserEntity::class, $entity->getId()];
         $proof = new SignedDpopProof();
-        $client = FirstPartyOAuthClient::entity($this->kernel->getContainer(), $this->manager);
-        $token = new AccessTokenEntity((new Uuid())->toString(), $client, $entity, scopes: ['library'], expiresAt: new \DateTimeImmutable('+1 hour'));
-        $token->setDpopJkt($proof->thumbprint());
+        $token = FirstPartyOAuthClient::accessToken(
+            $this->kernel->getContainer(),
+            $this->manager,
+            $entity,
+            SignInGrant::Password,
+            $proof->thumbprint(),
+        );
         $this->persist($token);
         $this->manager->flush();
         $jwt = OAuthAccessTokenJwt::sign(self::$privateKey, $token);

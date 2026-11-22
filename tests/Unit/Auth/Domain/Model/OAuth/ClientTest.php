@@ -71,7 +71,7 @@ final class ClientTest extends TestCase
 
         $this->assertSame('My Token', $client->getName());
         $this->assertTrue($client->isPersonalAccessClient());
-        $this->assertTrue($client->isFirstParty());
+        $this->assertFalse($client->isFirstParty());
     }
 
     public function testReconstituteRestoresRevokedState(): void

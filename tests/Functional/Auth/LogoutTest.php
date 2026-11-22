@@ -10,6 +10,7 @@ use App\Auth\Application\DTO\ClientCredentials;
 use App\Auth\Application\DTO\TokenResponseDTO;
 use App\Auth\Application\Exception\OAuthProtocolException;
 use App\Auth\Domain\Model\OAuth\Client;
+use App\Auth\Domain\Model\OAuth\SignInGrant;
 use App\Auth\Domain\Model\OAuth\TokenId;
 use App\Auth\Domain\Model\User;
 use App\Auth\Domain\Repository\OAuth\AccessTokenRepositoryInterface;
@@ -263,7 +264,7 @@ final class LogoutTest extends TestCase
     private function issueTokens(User $user, Client $client): TokenResponseDTO
     {
         $result = $this->bus()
-            ->dispatch(new IssueTokenCommand($client->getId(), $user->getId(), self::DPOP_JKT, 0))
+            ->dispatch(new IssueTokenCommand($client->getId(), $user->getId(), self::DPOP_JKT, 0, SignInGrant::AuthorizationCode))
             ->last(HandledStamp::class)?->getResult();
         self::assertInstanceOf(TokenResponseDTO::class, $result);
 

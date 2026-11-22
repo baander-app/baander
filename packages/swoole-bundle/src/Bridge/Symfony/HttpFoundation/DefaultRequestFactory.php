@@ -7,11 +7,17 @@ namespace SwooleBundle\SwooleBundle\Bridge\Symfony\HttpFoundation;
 use Swoole\Http\Request as SwooleRequest;
 use Symfony\Component\HttpFoundation\Request as HttpFoundationRequest;
 
+use function SwooleBundle\SwooleBundle\canonical_ip_address;
+
 final class DefaultRequestFactory implements RequestFactory
 {
     public function make(SwooleRequest $request): HttpFoundationRequest
     {
         $server = array_change_key_case($request->server, CASE_UPPER);
+        // Proxy trust, rate limits and access logs then see an IPv4 peer of a dual-stack socket in one form.
+        if (is_string($server['REMOTE_ADDR'] ?? null)) {
+            $server['REMOTE_ADDR'] = canonical_ip_address($server['REMOTE_ADDR']);
+        }
 
         // Add formatted headers to server
         foreach ($request->header as $key => $value) {

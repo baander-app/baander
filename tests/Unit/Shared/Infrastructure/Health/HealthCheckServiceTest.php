@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Shared\Infrastructure\Health;
 
+use App\Auth\Application\Port\SelfRegistrationInterface;
 use App\Shared\Application\DTO\DeploymentProfile;
 use App\Shared\Infrastructure\Health\HealthCheckResult;
 use App\Shared\Infrastructure\Health\HealthCheckService;
@@ -171,6 +172,39 @@ final class HealthCheckServiceTest extends TestCase
         yield 'empty injected keys remain optional' => ['', 0];
     }
 
+    /** @return iterable<string, array{string, bool, bool}> */
+    public static function registrationMailers(): iterable
+    {
+        yield 'open on a null mailer' => ['null://null', true, true];
+        yield 'closed on a null mailer' => ['null://null', false, false];
+        yield 'open on a mail server' => ['smtp://mail.baander.app:587', true, false];
+    }
+
+    #[DataProvider('registrationMailers')]
+    public function testOpenRegistrationOnAMailerThatDiscardsMailWarns(string $mailerDsn, bool $open, bool $warns): void
+    {
+        $registration = $this->createStub(SelfRegistrationInterface::class);
+        $registration->method('isOpen')->willReturn($open);
+
+        $results = $this->registrationResults($this->service(mailerDsn: $mailerDsn, selfRegistration: $registration));
+
+        self::assertCount($warns ? 1 : 0, $results);
+        if ($warns) {
+            self::assertSame(HealthStatus::NotAvailable, $results[0]->status);
+            self::assertSame('warning', $results[0]->details['severity']);
+            self::assertSame('MAILER_DSN', $results[0]->details['var']);
+            self::assertStringContainsString('Self-registration is open', $results[0]->details['message']);
+        }
+    }
+
+    public function testAnUnreadableRegistrationSettingLeavesTheConfigurationChecksQuiet(): void
+    {
+        $registration = $this->createStub(SelfRegistrationInterface::class);
+        $registration->method('isOpen')->willThrowException(new \RuntimeException('The database is unavailable.'));
+
+        self::assertSame([], $this->registrationResults($this->service(mailerDsn: 'null://null', selfRegistration: $registration)));
+    }
+
     public function testReadinessLeavesOutTheWorkerItsProfileAndMemoryWhileTheFullCheckStillListsThem(): void
     {
         $redis = new ArrayRedis();
@@ -213,6 +247,15 @@ final class HealthCheckServiceTest extends TestCase
         }
     }
 
+    /** @return list<HealthCheckResult> */
+    private function registrationResults(HealthCheckService $service): array
+    {
+        return array_values(array_filter(
+            $service->checkConfiguration(),
+            static fn (HealthCheckResult $result): bool => $result->component === 'registration',
+        ));
+    }
+
     private function memory(HealthCheckService $service): HealthCheckResult
     {
         $results = array_values(array_filter($service->check(), static fn (HealthCheckResult $result): bool => $result->component === 'memory'));
@@ -236,6 +279,8 @@ final class HealthCheckServiceTest extends TestCase
         ?RedisClientFactory $redis = null,
         ?MessengerWorkerHealth $messenger = null,
         ?WorkerMemoryTable $workerMemory = null,
+        string $mailerDsn = 'smtp://mail.baander.app:587',
+        ?SelfRegistrationInterface $selfRegistration = null,
     ): HealthCheckService {
         $redis ??= $this->createStub(RedisClientFactory::class);
         $connection ??= $this->createStub(Connection::class);
@@ -250,6 +295,8 @@ final class HealthCheckServiceTest extends TestCase
             oauthPublicKeyPath: '/missing-baander-oauth/public.key',
             vapidPublicKey: '',
             vapidPrivateKey: '',
+            mailerDsn: $mailerDsn,
+            selfRegistration: $selfRegistration ?? $this->createStub(SelfRegistrationInterface::class),
             messengerWorkerHealth: $messenger ?? new MessengerWorkerHealth($redis, new MockClock(), new HealthAlertTable()),
             workerProfileHealth: new WorkerProfileHealth($connection, new DeploymentProfile()),
             workerMemory: $workerMemory ?? new WorkerMemoryTable(),

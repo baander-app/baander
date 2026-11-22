@@ -5,9 +5,13 @@ declare(strict_types=1);
 namespace App\Tests\Functional\Controller;
 
 use App\Auth\Application\Port\EmailVerificationTokenRepositoryInterface;
+use App\Auth\Application\Settings\UserManagementSettingDefinitions;
 use App\Auth\Domain\Model\User;
+use App\Shared\Application\Port\SystemSettingStoreInterface;
 use App\Shared\Domain\Model\Email;
 use App\Tests\Functional\TestCase;
+use Symfony\Bundle\FrameworkBundle\Console\Application;
+use Symfony\Component\Console\Tester\CommandTester;
 
 final class AuthControllerTest extends TestCase
 {
@@ -15,8 +19,54 @@ final class AuthControllerTest extends TestCase
     // POST /api/auth/register
     // ---------------------------------------------------------------
 
+    public function testRegistrationIsClosedUntilAnOperatorOpensIt(): void
+    {
+        $email = 'closed-' . bin2hex(random_bytes(4)) . '@baander.app';
+
+        $response = $this->anonymousRequest('POST', '/api/auth/register', [
+            'email' => $email,
+            'name' => 'Turned Away',
+            'password' => 'securepassword123',
+        ]);
+
+        $data = $this->assertJsonResponse($response, 403, 'error');
+        $this->assertSame('registration_closed', $data['error']['details']['reason'] ?? null);
+        $this->assertSame('Registration is closed. Ask the administrator for an account.', $data['error']['message']);
+        $this->assertNull($this->userRepository->findByEmail(new Email($email)), 'A closed registration creates no account.');
+        $this->assertEmailCount(0);
+    }
+
+    public function testTheSettingsCommandOpensRegistration(): void
+    {
+        $tester = new CommandTester(new Application(static::$kernel)->find('app:settings:set'));
+        $tester->execute(['key' => 'auth.registration_open', 'value' => 'true']);
+        $tester->assertCommandIsSuccessful();
+        $email = 'opened-' . bin2hex(random_bytes(4)) . '@baander.app';
+
+        $response = $this->anonymousRequest('POST', '/api/auth/register', [
+            'email' => $email,
+            'name' => 'Let In',
+            'password' => 'securepassword123',
+        ]);
+
+        $this->assertJsonResponse($response, 202, 'data');
+        $this->assertNotNull($this->userRepository->findByEmail(new Email($email)));
+    }
+
+    public function testTheRegistrationStateIsPublic(): void
+    {
+        $closed = $this->anonymousRequest('GET', '/api/auth/registration');
+        $this->assertSame(['open' => false], $this->assertJsonResponse($closed, 200, 'data')['data']);
+
+        $this->openRegistration();
+
+        $open = $this->anonymousRequest('GET', '/api/auth/registration');
+        $this->assertSame(['open' => true], $this->assertJsonResponse($open, 200, 'data')['data']);
+    }
+
     public function testRegisterCreatesUser(): void
     {
+        $this->openRegistration();
         $email = 'new-' . bin2hex(random_bytes(4)) . '@baander.app';
 
         $response = $this->anonymousRequest('POST', '/api/auth/register', [
@@ -31,6 +81,7 @@ final class AuthControllerTest extends TestCase
 
     public function testRegisterPersistsUser(): void
     {
+        $this->openRegistration();
         $email = 'persist-' . bin2hex(random_bytes(4)) . '@baander.app';
 
         $this->anonymousRequest('POST', '/api/auth/register', [
@@ -49,6 +100,7 @@ final class AuthControllerTest extends TestCase
     /** A taken address gets the answer a new one gets; only its owner learns of the attempt. */
     public function testRegisteringATakenAddressAnswersLikeANewOneAndEmailsTheOwner(): void
     {
+        $this->openRegistration();
         $email = 'dup-' . bin2hex(random_bytes(4)) . '@baander.app';
         $owner = $this->createTestUser($email, name: 'Original Owner');
         $fresh = 'fresh-' . bin2hex(random_bytes(4)) . '@baander.app';
@@ -86,6 +138,33 @@ final class AuthControllerTest extends TestCase
         $this->assertTrue($stored->getId()->equals($owner->getId()));
         $this->assertSame('Original Owner', $stored->getName(), 'The existing account is left as it was.');
         $this->assertSame($owner->getPassword(), $stored->getPassword());
+    }
+
+    /** A whitespace-only name is refused before the address is looked up, so a taken address answers like a free one. */
+    public function testAWhitespaceNameIsRefusedAlikeForATakenAndAFreeAddress(): void
+    {
+        $this->openRegistration();
+        $takenAddress = 'blank-taken-' . bin2hex(random_bytes(4)) . '@baander.app';
+        $this->createTestUser($takenAddress, name: 'Original Owner');
+        $freeAddress = 'blank-free-' . bin2hex(random_bytes(4)) . '@baander.app';
+
+        $taken = $this->anonymousRequest('POST', '/api/auth/register', [
+            'email' => $takenAddress,
+            'name' => '   ',
+            'password' => 'securepassword123',
+        ]);
+        $free = $this->anonymousRequest('POST', '/api/auth/register', [
+            'email' => $freeAddress,
+            'name' => '   ',
+            'password' => 'securepassword123',
+        ]);
+
+        $this->assertSame($free->getStatusCode(), $taken->getStatusCode(), (string) $taken->getContent());
+        $this->assertSame($free->getContent(), $taken->getContent());
+        $data = $this->assertJsonResponse($free, 422, 'error');
+        $this->assertSame('Validation failed.', $data['error']['message']);
+        $this->assertEmailCount(0, message: 'A refused registration tells no owner.');
+        $this->assertNull($this->userRepository->findByEmail(new Email($freeAddress)));
     }
 
     public function testRegisterWithInvalidDataFails(): void
@@ -162,18 +241,62 @@ final class AuthControllerTest extends TestCase
 
     public function testVerifyEmailWithValidTokenMarksUserVerified(): void
     {
-        $user = $this->createTestUser();
+        $user = $this->createTestUser(verified: false);
         $this->verificationTokens()->issue($user->getId(), new Email($user->getEmail()), 'functional-test-token', new \DateTimeImmutable('+1 hour'));
 
-        $response = $this->anonymousRequest('POST', '/api/auth/email/verify', [
+        $response = $this->authenticatedRequest('POST', '/api/auth/email/verify', $user, [
             'token' => 'functional-test-token',
         ]);
 
         $data = $this->assertJsonResponse($response, 200, 'data');
-        $this->assertSame('Email verified.', $data['data']['message']);
+        $this->assertSame(['message' => 'Email verified.', 'emailChanged' => false], $data['data']);
 
         $verifiedUser = $this->userRepository->findByUuid($user->getId());
         $this->assertTrue($verifiedUser->isEmailVerified());
+    }
+
+    /** Holding the link is not enough: signed out, nothing is verified and the link stays usable. */
+    public function testAnAnonymousRedemptionIsRefusedAndLeavesTheLinkForTheAccount(): void
+    {
+        $user = $this->createTestUser(verified: false);
+        $this->verificationTokens()->issue($user->getId(), new Email($user->getEmail()), 'signed-out-token', new \DateTimeImmutable('+1 hour'));
+
+        $this->assertJsonResponse($this->anonymousRequest('POST', '/api/auth/email/verify', ['token' => 'signed-out-token']), 401);
+
+        $this->assertSame(
+            ['verified' => false, 'tokens' => 1],
+            $this->verificationState($user),
+            'The address stays unverified and the token stays stored.',
+        );
+        $this->assertJsonResponse($this->authenticatedRequest('POST', '/api/auth/email/verify', $user, ['token' => 'signed-out-token']), 200);
+        $this->assertSame(['verified' => true, 'tokens' => 0], $this->verificationState($user));
+    }
+
+    public function testAnotherAccountCannotRedeemTheLinkAndTheAccountStillCan(): void
+    {
+        $user = $this->createTestUser(verified: false);
+        $other = $this->createTestUser();
+        $this->verificationTokens()->issue($user->getId(), new Email($user->getEmail()), 'other-account-token', new \DateTimeImmutable('+1 hour'));
+
+        $response = $this->authenticatedRequest('POST', '/api/auth/email/verify', $other, ['token' => 'other-account-token']);
+
+        $data = $this->assertJsonResponse($response, 403, 'error');
+        $this->assertSame('This verification link was sent for another account. Sign out, then sign in to that account to use it.', $data['error']['message']);
+        $this->assertSame(['reason' => 'verification_link_other_account'], $data['error']['details']);
+        $this->assertSame(['verified' => false, 'tokens' => 1], $this->verificationState($user));
+        $this->assertJsonResponse($this->authenticatedRequest('POST', '/api/auth/email/verify', $user, ['token' => 'other-account-token']), 200);
+        $this->assertSame(['verified' => true, 'tokens' => 0], $this->verificationState($user));
+    }
+
+    public function testADelegatedTokenCannotRedeemALink(): void
+    {
+        $user = $this->createTestUser(verified: false);
+        $this->verificationTokens()->issue($user->getId(), new Email($user->getEmail()), 'delegated-token', new \DateTimeImmutable('+1 hour'));
+
+        $response = $this->delegatedRequest('POST', '/api/auth/email/verify', $user, ['profile', 'email'], ['token' => 'delegated-token']);
+
+        $this->assertJsonResponse($response, 403);
+        $this->assertSame(['verified' => false, 'tokens' => 1], $this->verificationState($user));
     }
 
     public function testVerifyEmailWithExpiredTokenFails(): void
@@ -181,7 +304,7 @@ final class AuthControllerTest extends TestCase
         $user = $this->createTestUser();
         $this->verificationTokens()->issue($user->getId(), new Email($user->getEmail()), 'expired-functional-token', new \DateTimeImmutable('-1 hour'));
 
-        $response = $this->anonymousRequest('POST', '/api/auth/email/verify', [
+        $response = $this->authenticatedRequest('POST', '/api/auth/email/verify', $user, [
             'token' => 'expired-functional-token',
         ]);
 
@@ -189,12 +312,30 @@ final class AuthControllerTest extends TestCase
         $this->assertSame('This verification link is invalid or has expired.', $data['error']['message']);
     }
 
-    public function testVerifyEmailRejectsATokenForAnAddressTheAccountNoLongerHas(): void
+    /** Another account's expired link is as unusable as an unknown one, and says nothing more. */
+    public function testUnknownUsedAndAnotherAccountsExpiredTokensGetTheSameAnswer(): void
     {
         $user = $this->createTestUser();
+        $other = $this->createTestUser();
+        $this->verificationTokens()->issue($user->getId(), new Email($user->getEmail()), 'used-token', new \DateTimeImmutable('+1 hour'));
+        $this->verificationTokens()->issue($other->getId(), new Email($other->getEmail()), 'expired-other-token', new \DateTimeImmutable('-1 hour'));
+        $this->assertJsonResponse($this->authenticatedRequest('POST', '/api/auth/email/verify', $user, ['token' => 'used-token']), 200);
+
+        $answers = array_map(
+            fn (string $token): string => (string) $this->authenticatedRequest('POST', '/api/auth/email/verify', $user, ['token' => $token])->getContent(),
+            ['unknown-token', 'used-token', 'expired-other-token'],
+        );
+
+        $expected = json_encode(['error' => ['message' => 'This verification link is invalid or has expired.', 'code' => 400]], JSON_THROW_ON_ERROR);
+        $this->assertSame([$expected, $expected, $expected], $answers);
+    }
+
+    public function testVerifyEmailRejectsATokenForAnAddressTheAccountNoLongerHas(): void
+    {
+        $user = $this->createTestUser(verified: false);
         $this->verificationTokens()->issue($user->getId(), new Email('previous-' . $user->getEmail()), 'stale-address-token', new \DateTimeImmutable('+1 hour'));
 
-        $this->assertJsonResponse($this->anonymousRequest('POST', '/api/auth/email/verify', ['token' => 'stale-address-token']), 400);
+        $this->assertJsonResponse($this->authenticatedRequest('POST', '/api/auth/email/verify', $user, ['token' => 'stale-address-token']), 400);
 
         $this->entityManager->clear();
         $this->assertFalse($this->userRepository->findByUuid($user->getId())?->isEmailVerified());
@@ -248,7 +389,25 @@ final class AuthControllerTest extends TestCase
         ]);
 
         $data = $this->assertJsonResponse($response, 422, 'error');
-        $this->assertSame('Current password is incorrect.', $data['error']['message']);
+        $this->assertSame('The password or code is incorrect.', $data['error']['message']);
+        $this->assertSame('step_up_failed', $data['error']['details']['reason'] ?? null);
+    }
+
+    private function openRegistration(): void
+    {
+        static::getContainer()->get(SystemSettingStoreInterface::class)->save([UserManagementSettingDefinitions::REGISTRATION_OPEN => true]);
+    }
+
+    /** @return array{verified: bool, tokens: int} whether the address is verified, and how many tokens the user holds */
+    private function verificationState(User $user): array
+    {
+        $state = $this->entityManager->getConnection()->fetchAssociative(
+            'SELECT email_verified_at IS NOT NULL AS verified, (SELECT count(*) FROM email_verification_tokens WHERE user_id = users.id) AS tokens FROM users WHERE id = ?',
+            [$user->getId()->toString()],
+        );
+        $this->assertIsArray($state);
+
+        return ['verified' => (bool) $state['verified'], 'tokens' => (int) $state['tokens']];
     }
 
     private function verificationTokens(): EmailVerificationTokenRepositoryInterface

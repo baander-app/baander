@@ -12,6 +12,9 @@ use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\Console\Style\SymfonyStyle;
 
+/**
+ * The CLI counterpart of GET /api/debug/health, and the web image's container healthcheck.
+ */
 #[AsCommand(
     name: 'app:health:check',
     description: 'Check the health of all system components.',
@@ -30,16 +33,11 @@ final class HealthCheckCommand extends Command
         $results = $this->healthCheckService->check();
 
         $rows = [];
-        $allHealthy = true;
         /** @var list<string> $unhealthyElsewhere */
         $unhealthyElsewhere = [];
         foreach ($results as $result) {
-            if ($result->status === HealthStatus::Unhealthy) {
-                if (HealthCheckService::affectsContainerHealth($result)) {
-                    $allHealthy = false;
-                } else {
-                    $unhealthyElsewhere[] = $result->component;
-                }
+            if ($result->status === HealthStatus::Unhealthy && !HealthCheckService::affectsContainerHealth($result)) {
+                $unhealthyElsewhere[] = $result->component;
             }
 
             $detailStrs = [];
@@ -68,7 +66,7 @@ final class HealthCheckCommand extends Command
             ));
         }
 
-        if ($allHealthy) {
+        if (HealthCheckService::containerHealthy($results)) {
             $io->success('This container is healthy.');
 
             return Command::SUCCESS;

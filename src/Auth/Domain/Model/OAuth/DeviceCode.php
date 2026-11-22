@@ -221,9 +221,14 @@ final class DeviceCode
         return $this->state->id;
     }
 
+    /**
+     * The device code to hand to the device. Only the request that issued the code knows it; a
+     * code read back from storage has only its hash.
+     */
     public function getDeviceCode(): TokenId
     {
-        return $this->state->deviceCode;
+        return $this->state->deviceCode
+            ?? throw new \LogicException('A stored device code keeps only its hash.');
     }
 
     public function getUserCode(): string

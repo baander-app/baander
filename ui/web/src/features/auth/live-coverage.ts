@@ -40,10 +40,31 @@ export const authLiveCoverage = [
     mirrors: ["auth-store"],
     responseCaches: ["authoritative-read"],
     consumers: [
-      "src/features/auth/components/VerifyEmail.tsx#getAuthMe:generated",
       "src/features/auth/hooks/use-current-user-refresh.ts#useGetAuthMe:generated",
+      "src/features/auth/lib/current-user.ts#getAuthMe:generated",
     ],
     coverageVerification: ["tests/live-updates/coverage.test.ts"],
     behaviorVerification: { unitProofs: ["tests/live-updates/account-consumers.test.tsx"] },
+  },
+  {
+    id: "auth.registration",
+    family: "account",
+    policy: {
+      kind: "demand",
+      reason: "Whether self-registration is open is an operator setting, read when the signed-out register page opens; a closed refusal on submit switches the page to its closed state.",
+    },
+    audiences: ["global"],
+    sourceTables: ["system_settings"],
+    deploymentTables: [],
+    sources: ["[ `/api/auth/registration` ]"],
+    keyVariants: [],
+    dependentFamilies: [],
+    mirrors: [],
+    responseCaches: [],
+    consumers: [
+      "src/features/auth/pages/RegisterPage.tsx#getAuthRegistration:generated",
+    ],
+    coverageVerification: ["tests/live-updates/coverage.test.ts"],
+    behaviorVerification: { unitProofs: ["src/features/auth/pages/__tests__/RegisterPage.test.tsx"] },
   },
 ] as const satisfies readonly LiveCoverageDescriptor[]

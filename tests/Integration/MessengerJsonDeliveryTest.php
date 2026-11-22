@@ -34,6 +34,7 @@ use App\Metadata\Application\Message\SyncArtistsMessage;
 use App\Metadata\Application\Message\SyncLibraryMessage;
 use App\Metadata\Application\Message\SyncSongMessage;
 use App\Metadata\Application\Message\SyncMovieMessage;
+use App\Metadata\Application\Message\SyncTvLibraryMessage;
 use App\Metadata\Application\MessageHandler\SyncMovieHandler;
 use App\Metadata\Application\MovieMetadataEnricher;
 use App\Metadata\Infrastructure\Api\Tmdb\TmdbAdapter;
@@ -319,8 +320,11 @@ final class MessengerJsonDeliveryTest extends TestCase
                     ++$effects;
                     return [];
                 });
+            // An empty library still queues the refresh of its registered TV records.
+            $tvSync = new SyncTvLibraryMessage($id, true);
             $nestedBus = $this->createMock(MessageBusInterface::class);
-            $nestedBus->expects($this->never())->method('dispatch');
+            $nestedBus->expects($this->once())->method('dispatch')->with($this->equalTo($tvSync))
+                ->willReturn(new Envelope($tvSync));
             $handler = new SyncLibraryHandler($albums, $nestedBus, $logger, new CancelAtCheckpoint(), $this->createStub(\App\Catalog\Application\Port\MoviePortInterface::class));
         } elseif ($messageType === SyncArtistsMessage::class) {
             $message = new SyncArtistsMessage();

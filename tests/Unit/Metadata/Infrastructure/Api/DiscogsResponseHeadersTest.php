@@ -29,6 +29,48 @@ final class DiscogsResponseHeadersTest extends TestCase
         self::assertSame(2, $calls);
     }
 
+    public function testARetryAfterLongerThanTheCapIsNotWaitedOutInsideTheRequest(): void
+    {
+        $calls = 0;
+        $raw = new MockHttpClient(static function () use (&$calls): MockResponse {
+            ++$calls;
+
+            return new MockResponse('{}', ['http_code' => 429, 'response_headers' => ['Retry-After: 60']]);
+        });
+        $adapter = new DiscogsAdapter('private-token', new NullLogger(), new JsonEncoder(), $this->client($raw));
+
+        $started = hrtime(true);
+        $result = $adapter->searchArtist('Artist');
+        $elapsedSeconds = (hrtime(true) - $started) / 1e9;
+
+        self::assertSame([], $result->artists);
+        self::assertSame(1, $calls);
+        self::assertLessThan(1, $elapsedSeconds);
+    }
+
+    public function testSearchesAskDiscogsForThePageSizeItPagesBy(): void
+    {
+        $queries = [];
+        $raw = new MockHttpClient(static function (string $method, string $url) use (&$queries): MockResponse {
+            parse_str((string) parse_url($url, PHP_URL_QUERY), $query);
+            $queries[] = $query;
+
+            return new MockResponse('{"results":[],"pagination":{"items":0}}');
+        });
+        $adapter = new DiscogsAdapter('private-token', new NullLogger(), new JsonEncoder(), $this->client($raw));
+
+        $adapter->searchArtist('Artist', 100);
+        $adapter->searchRelease('Album', 'Artist', 100);
+        $adapter->searchMaster('Album', null, 100);
+
+        self::assertCount(3, $queries);
+        foreach ($queries as $query) {
+            self::assertSame('100', $query['per_page'] ?? null);
+            self::assertArrayNotHasKey('limit', $query);
+            self::assertArrayNotHasKey('offset', $query);
+        }
+    }
+
     public function testRedirectIsNotAProviderRateLimitRetry(): void
     {
         $calls = 0;

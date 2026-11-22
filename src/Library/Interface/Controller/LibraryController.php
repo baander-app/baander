@@ -23,7 +23,6 @@ use App\Library\Interface\Resource\PathValidationResource;
 use App\Shared\Domain\Model\Uuid;
 use App\Shared\Interface\Attribute\CliCounterpart;
 use App\Shared\Interface\Controller\ApiResponsesTrait;
-use App\Shared\Interface\Controller\TranslatorTrait;
 use OpenApi\Spec as OA;
 use Symfony\Bundle\SecurityBundle\Security;
 use Symfony\Component\HttpFoundation\JsonResponse;
@@ -40,7 +39,6 @@ use Symfony\Component\Security\Http\Attribute\IsGranted;
 final class LibraryController
 {
     use ApiResponsesTrait;
-    use TranslatorTrait;
 
     public function __construct(
         private readonly MessageBusInterface $commandBus,
@@ -104,7 +102,9 @@ final class LibraryController
         $type = $request->query->get('type');
         $libraries = $this->dispatch(new ListLibrariesQuery($this->readScopes->current(), $type !== null ? (string) $type : null));
 
-        return $this->successResponse(LibraryResource::collection($libraries));
+        return $this->successResponse($this->readsServerPaths()
+            ? LibraryResource::collection($libraries)
+            : array_map(LibraryResource::forMember(...), $libraries));
     }
 
     #[OA\Operation\Post(
@@ -185,13 +185,13 @@ final class LibraryController
     {
         $user = $this->security?->getUser();
         if (!$user instanceof AuthenticatedUserIdentityInterface) {
-            return $this->unauthorized($this->trans('errors.unauthorized.default', domain: 'messages'));
+            return $this->unauthorized();
         }
 
         try {
             $userId = Uuid::fromString($user->getId());
         } catch (\InvalidArgumentException) {
-            return $this->unauthorized($this->trans('errors.unauthorized.default', domain: 'messages'));
+            return $this->unauthorized();
         }
 
         $library = $this->dispatch(new CreateLibraryCommand(
@@ -252,7 +252,11 @@ final class LibraryController
     #[CliCounterpart('app:library:show')]
     public function show(string $id): JsonResponse
     {
-        return $this->successResponse(LibraryResource::from($this->dispatch(new GetLibraryQuery($id, $this->readScopes->current()))));
+        $library = $this->dispatch(new GetLibraryQuery($id, $this->readScopes->current()));
+
+        return $this->successResponse($this->readsServerPaths()
+            ? LibraryResource::from($library)
+            : LibraryResource::forMember($library));
     }
 
     #[OA\Operation\Patch(
@@ -642,6 +646,12 @@ final class LibraryController
     public function scanAll(): JsonResponse
     {
         return $this->successResponse(LibraryScanAllResource::from($this->dispatch(new ScanAllLibrariesCommand())), Response::HTTP_ACCEPTED);
+    }
+
+    /** Only administrators read the filesystem paths of libraries; members read the rest. */
+    private function readsServerPaths(): bool
+    {
+        return $this->security?->isGranted('ROLE_ADMIN') === true;
     }
 
     /** A handler's exception reaches ExceptionSubscriber, which unwraps it to its 404, 409 or 422 response. */

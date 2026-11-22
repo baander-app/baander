@@ -75,7 +75,7 @@ graph TD
 | **Aggregates** | `User` |
 | **Repositories** | `UserRepositoryInterface` |
 | **Ports** | `UserPortInterface`, `AuthenticatedUserIdentityInterface`, `PasswordHasherInterface`, `JwtGeneratorInterface`, `TotpVerifierInterface`, `DpopJtiCacheInterface`, `PasskeyVerifierInterface`, `PasswordResetTokenRepositoryInterface`, `EmailVerificationTokenRepositoryInterface`, `OAuthSecretBundleInterface`, `OAuthTokenInvalidatorInterface` |
-| **Events** | `UserRegistered`, `UserCreatedByOperator`, `EmailVerified`, `PasswordChanged`, `TokenRevoked`, `DeviceCodeApproved`, `PasskeyRegistered`; `PasskeyDeleted` is defined but no code raises it |
+| **Events** | `UserRegistered`, `UserCreatedByOperator`, `EmailVerified`, `PasswordChanged`, `TokenRevoked`, `DeviceCodeApproved`, `PasskeyRegistered`, `PasskeyDeleted` |
 | **Tech** | Own OAuth 2.0 authorization server (RFC 6749, 7636, 8628, 8414, 9207), League OAuth2 Server resource server (anti-corruption layer), WebAuthn (web-auth/webauthn-lib), OTPHP (TOTP), Redis (DPoP JTI cache and nonces, WebSocket tickets, rate limiters) |
 
 ### Catalog

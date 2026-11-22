@@ -46,11 +46,13 @@ security:
         - { path: '^/api/discovery/register$', roles: ROLE_ADMIN, methods: [POST] }
         - { path: '^/api/discovery/', roles: IS_AUTHENTICATED_FULLY }
         - { path: '^/api/stream/(video|original/track)$', roles: PUBLIC_ACCESS, methods: [GET, HEAD] }
-        - { path: '^/api/transcode/artifacts/[^/]+/[1-9][0-9]*/master\.m3u8$', roles: PUBLIC_ACCESS, methods: [GET] }
-        - { path: '^/api/transcode/artifacts/[^/]+/[1-9][0-9]*/tracks/(video|audio)/(media\.m3u8|init\.mp4|segment\.m4s)$', roles: PUBLIC_ACCESS, methods: [GET] }
-        - { path: '^/api/transcode/[^/]+/(master\.m3u8|manifest\.mpd)$', roles: PUBLIC_ACCESS, methods: [GET] }
-        - { path: '^/api/transcode/[^/]+/tracks/(video|audio)/(media\.m3u8|init\.mp4|segment\.m4s)$', roles: PUBLIC_ACCESS, methods: [GET] }
-        - { path: '^/api/transcode/[^/]+/subtitles/[^/]+/(media\.m3u8|[^/]+\.vtt)$', roles: PUBLIC_ACCESS, methods: [GET] }
+        # Signed video delivery. Video and job IDs are public IDs, subtitle tracks are keyed s<index>
+        # and served whole as full.vtt; DeliveryRouteInventoryTest holds these rows to the routes.
+        - { path: '^/api/transcode/artifacts/[0-9a-zA-Z_-]{21}/[1-9][0-9]*/master\.m3u8$', roles: PUBLIC_ACCESS, methods: [GET] }
+        - { path: '^/api/transcode/artifacts/[0-9a-zA-Z_-]{21}/[1-9][0-9]*/tracks/(video|audio)/(media\.m3u8|init\.mp4|segment\.m4s)$', roles: PUBLIC_ACCESS, methods: [GET] }
+        - { path: '^/api/transcode/[0-9a-zA-Z_-]{21}/(master\.m3u8|manifest\.mpd)$', roles: PUBLIC_ACCESS, methods: [GET] }
+        - { path: '^/api/transcode/[0-9a-zA-Z_-]{21}/tracks/(video|audio)/(media\.m3u8|init\.mp4|segment\.m4s)$', roles: PUBLIC_ACCESS, methods: [GET] }
+        - { path: '^/api/transcode/[0-9a-zA-Z_-]{21}/subtitles/s[0-9]+/(media\.m3u8|full\.vtt)$', roles: PUBLIC_ACCESS, methods: [GET] }
         - { path: '^/api/monitor', roles: ROLE_ADMIN }
         - { path: '^/api/ws', roles: IS_AUTHENTICATED_FULLY }
         - { path: '^/api/', roles: IS_AUTHENTICATED_FULLY }

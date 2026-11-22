@@ -32,7 +32,7 @@ Members connect over the application WebSocket: a single-use ticket from `POST /
 | `PartySessionPortInterface` | Session lifecycle |
 | `PartyMemberPortInterface` | Member management |
 | `PartyInvitationPortInterface` | Invitations: invite, revoke, check, list by session |
-| `PartyMediaAccessPortInterface` | Checks that the host may play a new party's video and that its transcode job encodes it |
+| `PartyMediaAccessPortInterface` | Checks that the host may play a new party's video and that its transcode job is the host's own job of it, and tells whether a user owns a job |
 
 ## Events
 
@@ -49,7 +49,7 @@ Invitations raise no events of their own. A revoke that deletes a member row rai
 ## Interactions
 
 - **Transcode** — playback handlers send `PlaybackPositionChanged` to steer the session's transcode job; a session without a job sends none
-- **Transcode** — party creation checks the video and job through Transcode's `PlaybackAccessInterface`, the authority that also guards stream signing
+- **Transcode** — party creation checks the video and the host's ownership of the job through Transcode's `PlaybackAccessInterface`, the authority that also guards stream signing; a leave or revoke of the job's owner clears the party's job
 
 ---
 
@@ -57,4 +57,4 @@ Invitations raise no events of their own. A revoke that deletes a member row rai
 
 ## Notes
 
-`party_sessions.video_id` cascades from `videos`: deleting a video deletes its parties, their members and events. `party_sessions.transcode_job_id` is optional and set to NULL when the job is deleted, for example by orphaned-job cleanup. The party keeps running; synchronization does not depend on the job.
+`party_sessions.video_id` cascades from `videos`: deleting a video deletes its parties, their members and events. `party_sessions.transcode_job_id` is optional, cleared when the job's owner leaves the party or is revoked, and set to NULL when the job is deleted, for example by orphaned-job cleanup. The party keeps running; synchronization does not depend on the job.

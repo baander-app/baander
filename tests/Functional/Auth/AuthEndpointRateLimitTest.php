@@ -37,6 +37,17 @@ final class AuthEndpointRateLimitTest extends RateLimitTestCase
         self::assertFalse($this->hasResetToken($user->getId()->toString()), 'No token may be issued over the account limit.');
     }
 
+    public function testRegistrationIsLimitedWhateverThePathEncoding(): void
+    {
+        $this->exhaust('auth_register_ip', '198.51.100.140');
+
+        $this->assertTooManyRequests($this->requestFrom('198.51.100.140', 'POST', '/%61pi/auth/registe%72', content: [
+            'email' => 'encoded-path@baander.app',
+            'name' => 'Encoded Path',
+            'password' => 'encoded-path-password',
+        ]));
+    }
+
     public function testPasswordResetStillLimitsPerIp(): void
     {
         $this->exhaust('auth_password_reset_ip', '198.51.100.42');
@@ -141,6 +152,24 @@ final class AuthEndpointRateLimitTest extends RateLimitTestCase
 
         $lookup = $this->requestFrom('198.51.100.65', 'GET', '/api/oauth/device/verify?user_code=BCDF-GHJK', $user->getId()->toString());
         self::assertSame(400, $lookup->getStatusCode(), (string) $lookup->getContent());
+    }
+
+    public function testHeadOnALimitedGetRouteIsChargedLikeGet(): void
+    {
+        $user = $this->createTestUser();
+        $this->exhaust('oauth_authorize_ip', '198.51.100.144');
+        $this->exhaust('oauth_device_verify_ip', '198.51.100.144');
+
+        $responses = [
+            'authorization request' => $this->requestFrom('198.51.100.144', 'HEAD', '/api/oauth/authorize?client_id=rate_limit_client_0007&request_uri=urn:ietf:params:oauth:request_uri:unknown', $user->getId()->toString()),
+            'user code lookup' => $this->requestFrom('198.51.100.144', 'HEAD', '/api/oauth/device/verify?user_code=BCDF-GHJK', $user->getId()->toString()),
+        ];
+
+        foreach ($responses as $name => $response) {
+            // A HEAD response carries no body, so only the status and Retry-After remain.
+            self::assertSame(429, $response->getStatusCode(), $name);
+            self::assertMatchesRegularExpression('/^[1-9]\d*$/', (string) $response->headers->get('Retry-After'), $name);
+        }
     }
 
     private function hasResetToken(string $userId): bool

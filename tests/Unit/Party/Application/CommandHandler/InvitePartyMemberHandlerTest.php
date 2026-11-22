@@ -20,6 +20,7 @@ use PHPUnit\Framework\AssertionFailedError;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Security\Core\Exception\AccessDeniedException;
+use Symfony\Component\Translation\IdentityTranslator;
 use Symfony\Contracts\Translation\TranslatableInterface;
 
 /**
@@ -129,10 +130,11 @@ final class InvitePartyMemberHandlerTest extends TestCase
 
         $refused = $this->refusalOf($this->invite(by: 'host', user: 'outsider'));
 
-        // The shared not-found outcome with the message a route gives for a missing party. A
-        // translatable outcome would be reported in the request's language and differ from it.
+        // The shared not-found outcome, translated with the key a route's notFound() uses, so a
+        // refused caller reads exactly as for a missing party in every request language.
         self::assertInstanceOf(NotFoundException::class, $refused);
-        self::assertNotInstanceOf(TranslatableInterface::class, $refused);
+        self::assertInstanceOf(TranslatableInterface::class, $refused);
+        self::assertSame('errors.not_found.resource', $refused->trans(new IdentityTranslator()));
         self::assertSame(PartyNotFoundException::class, $refused::class);
         self::assertSame('Resource not found.', $refused->getMessage());
         self::assertSame([$this->userIds['host']->toString()], $this->invited);

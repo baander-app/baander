@@ -33,14 +33,14 @@ final class TwoCommandOriginTest extends TestCase
         $details = openssl_pkey_get_details($key);
         self::assertIsArray($details);
         $client = new \App\Tests\Fixtures\WebRuntime\StreamClient($manager, 'listener@baander.app', $private,
-            LocalOrigin::BASE . '/api/stream/track', audience: LocalOrigin::BASE);
+            LocalOrigin::BASE . '/api/stream/track', \App\Auth\Domain\Model\OAuth\SignInGrant::AuthorizationCode, audience: LocalOrigin::BASE);
         $tokens = $this->createStub(\League\OAuth2\Server\Repositories\AccessTokenRepositoryInterface::class);
         $tokens->method('isAccessTokenRevoked')->willReturn(false);
         $validator = new \App\Auth\Infrastructure\Security\OAuth\DpopAwareBearerTokenValidator($tokens, resourceServerUri: LocalOrigin::BASE);
         $validator->setPublicKey(new \League\OAuth2\Server\CryptKey($details['key'], null, false));
         $request = new \Nyholm\Psr7\ServerRequest('GET', LocalOrigin::BASE . '/api/stream/track', ['Authorization' => 'Bearer ' . $client->accessToken()]);
         self::assertIsString($validator->validateAuthorization($request)->getAttribute('oauth_dpop_jkt'));
-        $foreign = new \App\Tests\Fixtures\WebRuntime\StreamClient($manager, 'listener@baander.app', $private, LocalOrigin::BASE . '/api/stream/track');
+        $foreign = new \App\Tests\Fixtures\WebRuntime\StreamClient($manager, 'listener@baander.app', $private, LocalOrigin::BASE . '/api/stream/track', \App\Auth\Domain\Model\OAuth\SignInGrant::AuthorizationCode);
         $foreignRequest = $request->withHeader('Authorization', 'Bearer ' . $foreign->accessToken());
         try {
             $validator->validateAuthorization($foreignRequest);
@@ -69,8 +69,8 @@ final class TwoCommandOriginTest extends TestCase
         $configured = new \App\Auth\Infrastructure\Doctrine\Entity\OAuth\ClientEntity(
             new \App\Shared\Domain\Model\PublicId(), 'Baander', '["https://baander.app/callback"]', firstParty: true,
         );
-        new \App\Tests\Fixtures\WebRuntime\StreamClient($manager, 'listener@baander.app', $private, LocalOrigin::BASE . '/api/stream/track');
-        new \App\Tests\Fixtures\WebRuntime\StreamClient($manager, 'listener@baander.app', $private, LocalOrigin::BASE . '/api/stream/track', client: $configured);
+        new \App\Tests\Fixtures\WebRuntime\StreamClient($manager, 'listener@baander.app', $private, LocalOrigin::BASE . '/api/stream/track', \App\Auth\Domain\Model\OAuth\SignInGrant::AuthorizationCode);
+        new \App\Tests\Fixtures\WebRuntime\StreamClient($manager, 'listener@baander.app', $private, LocalOrigin::BASE . '/api/stream/track', \App\Auth\Domain\Model\OAuth\SignInGrant::Password, client: $configured);
         self::assertCount(2, $tokens);
         self::assertFalse($tokens[0]->getClient()->isFirstParty());
         self::assertNotSame($configured, $tokens[0]->getClient());

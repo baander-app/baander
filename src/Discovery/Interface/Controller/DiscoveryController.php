@@ -17,7 +17,6 @@ use App\Discovery\Interface\Resource\ServerInstanceResource;
 use App\Shared\Domain\Model\PublicId;
 use App\Shared\Interface\Attribute\CliCounterpart;
 use App\Shared\Interface\Controller\ApiResponsesTrait;
-use App\Shared\Interface\Controller\TranslatorTrait;
 use OpenApi\Spec as OA;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Response;
@@ -32,7 +31,6 @@ use Symfony\Component\Security\Http\Attribute\IsGranted;
 final class DiscoveryController
 {
     use ApiResponsesTrait;
-    use TranslatorTrait;
 
     public function __construct(
         private readonly MessageBusInterface $commandBus,
@@ -136,9 +134,9 @@ final class DiscoveryController
         return $this->created(PairingSessionResource::from($session));
     }
 
-    #[OA\Operation\Get(
+    #[OA\Operation\Post(
         path: '/api/discovery/qr-payload/{serverPublicId}',
-        summary: 'Get QR payload for a pending pairing session',
+        summary: 'Create a QR code pairing session and return its payload',
         parameters: [
             new OA\Parameter(
                 name: 'serverPublicId',
@@ -173,7 +171,7 @@ final class DiscoveryController
             ),
         ],
     )]
-    #[Route('/qr-payload/{serverPublicId}', name: 'qr_payload', methods: ['GET'])]
+    #[Route('/qr-payload/{serverPublicId}', name: 'qr_payload', methods: ['POST'])]
     #[IsGranted('IS_AUTHENTICATED_FULLY')]
     public function qrPayload(string $serverPublicId): JsonResponse
     {

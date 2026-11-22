@@ -185,6 +185,21 @@ final class DevelopmentRuntimeTest extends TestCase
         self::assertSame([$release['images']['app_image']['resolvedId'], 'php', 'bin/console', 'cache:warmup'], array_slice($container['arguments'], -4));
     }
 
+    public function testPersistentAndPreviewApplicationsCarryTheDevelopmentInstanceMarker(): void
+    {
+        $preview = array_replace($this->instance, ['kind' => 'preview', 'worktree' => $this->release['source']]);
+        foreach ([$this->instance, $preview] as $instance) {
+            $application = $this->runtime->config($instance, $this->release)['services']['app'];
+            self::assertSame('1', $application['environment']['BAANDER_DEVELOPMENT_INSTANCE'], $instance['kind']);
+        }
+
+        $setup = $this->runtime->applicationContainer($this->instance, $this->release, [
+            'php', 'bin/console', 'app:dev:setup', '--origin=https://dev.baander.app', '--no-interaction',
+        ]);
+        self::assertSame('1', $setup['environment']['BAANDER_DEVELOPMENT_INSTANCE']);
+        self::assertContains('BAANDER_DEVELOPMENT_INSTANCE', $setup['arguments']);
+    }
+
     public function testWritePersistsComposeOwnershipAndInputIdentityBeforeProvisioning(): void
     {
         $instance = $this->runtime->write($this->instance, $this->release);

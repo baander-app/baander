@@ -26,6 +26,6 @@ class PersonIdentityConflictEntity
     #[ORM\Column(type: 'text')]
     private string $source;
 
-    #[ORM\Column(type: 'datetimetz_immutable', options: ['default' => 'CURRENT_TIMESTAMP'])]
+    #[ORM\Column(type: 'datetime_immutable', options: ['default' => 'CURRENT_TIMESTAMP'])]
     private DateTimeImmutable $observedAt;
 }

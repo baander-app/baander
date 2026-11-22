@@ -2,15 +2,8 @@ import { useState } from 'react';
 import styled from 'styled-components';
 import { Button } from '@/shared/components/ui/button';
 import { Input } from '@/shared/components/ui/input';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/shared/components/ui/dialog';
 import { Trash2, Loader2 } from 'lucide-react';
+import { useTranslation } from '@/shared/i18n';
 import { textRole } from '@/shared/theme';
 import { ContentText } from '@/shared/typography';
 import { usePasskeyRegistration } from '../hooks/use-passkey-registration';
@@ -119,17 +112,8 @@ const PasskeyMeta = styled.p`
   color: var(--color-muted-foreground);
 `
 
-const SpinningWithMargin = styled(Loader2)`
-  margin-right: 0.25rem;
-  animation: spin 1s linear infinite;
-
-  @keyframes spin {
-    from { transform: rotate(0deg); }
-    to { transform: rotate(360deg); }
-  }
-`
-
 export function PasskeyManagement() {
+  const { t } = useTranslation();
   const { register, loading: registering, success } = usePasskeyRegistration();
   const { data: passkeys, isPending: loadingList } = usePasskeyList();
   const deletePasskey = useDeletePasskey();
@@ -147,11 +131,11 @@ export function PasskeyManagement() {
     return registered;
   }
 
-  function handleDeleteConfirm() {
-    if (!deleteTarget) return;
-    deletePasskey.mutate(deleteTarget.publicId, {
-      onSuccess: () => setDeleteTarget(null),
-    });
+  async function handleDelete(stepUp: StepUpCredentials) {
+    if (!deleteTarget) return true;
+    await deletePasskey.mutateAsync({ publicId: deleteTarget.publicId, stepUp });
+
+    return true;
   }
 
   return (
@@ -200,6 +184,7 @@ export function PasskeyManagement() {
                 size="icon"
                 variant="ghost"
                 style={{ flexShrink: 0, height: 28, width: 28 }}
+                aria-label={`Delete ${passkey.name}`}
                 onClick={() => setDeleteTarget(passkey)}
                 disabled={deletePasskey.isPending}
               >
@@ -215,7 +200,7 @@ export function PasskeyManagement() {
         open={showRegister}
         onOpenChange={setShowRegister}
         title="Register new passkey"
-        description="Name this passkey so you can identify it later, and confirm it's you."
+        description={<>Name this passkey so you can identify it later, and confirm it&rsquo;s you. {t('auth.stepUp.signsOutOtherSessions')}</>}
         submitLabel={registering ? 'Registering...' : 'Register'}
         fallbackError="Failed to register passkey."
         onConfirm={handleRegister}
@@ -229,38 +214,24 @@ export function PasskeyManagement() {
         />
       </StepUpDialog>
 
-      {/* Delete confirmation */}
-      <Dialog open={!!deleteTarget} onOpenChange={(open) => !open && setDeleteTarget(null)}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Delete passkey</DialogTitle>
-            <DialogDescription>
-              {isLastPasskey
-                ? `This is your only passkey. Deleting it means you could lose access to your account. Make sure you have another way to sign in.`
-                : <>Are you sure you want to delete &ldquo;<ContentText textRole="body" text={deleteTarget?.name ?? ''} />&rdquo;?</>}
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setDeleteTarget(null)}>
-              Cancel
-            </Button>
-            <Button
-              variant={isLastPasskey ? 'destructive' : 'default'}
-              onClick={handleDeleteConfirm}
-              disabled={deletePasskey.isPending}
-            >
-              {deletePasskey.isPending ? (
-                <>
-                  <SpinningWithMargin size={14} />
-                  Deleting...
-                </>
-              ) : (
-                'Delete'
-              )}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <StepUpDialog
+        open={!!deleteTarget}
+        onOpenChange={(open) => !open && setDeleteTarget(null)}
+        title="Delete passkey"
+        description={
+          <>
+            {isLastPasskey
+              ? 'This is your only passkey. Deleting it means you could lose access to your account. Make sure you have another way to sign in.'
+              : <>Are you sure you want to delete &ldquo;<ContentText textRole="body" text={deleteTarget?.name ?? ''} />&rdquo;?</>}
+            {' '}
+            {t('auth.stepUp.signsOutOtherSessions')}
+          </>
+        }
+        submitLabel="Delete"
+        submitVariant={isLastPasskey ? 'destructive' : 'default'}
+        fallbackError="Failed to delete passkey."
+        onConfirm={handleDelete}
+      />
     </Container>
   );
 }

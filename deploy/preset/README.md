@@ -44,10 +44,12 @@ its `size` if needed, replace every secret and set the origin and
 listening address for your installation. Rendering and starting refuse any value that
 still begins with `replace-with-`. `APP_SECRET`, `STREAM_URL_HMAC_SECRET` and
 `AUTH_TOTP_ENCRYPTION_KEY` must each be at least 32 bytes, or the containers refuse to
-boot; generate the TOTP key with `openssl rand -base64 32`. The gateway serves HTTP. For an HTTPS
-origin, configure an external TLS reverse proxy and the application's trusted proxy
-settings for that proxy. The default listener is reachable only from the local host.
-Keep the configuration file and state directory accessible only to the operator.
+boot; generate the TOTP key with `openssl rand -base64 32`. The containers also refuse
+to boot with `baander`, the repository's development password, as the Redis or database
+password, and with a VAPID private key the repository has committed. The default listener is
+reachable only from the local host; [Gateway and client addresses](#gateway-and-client-addresses)
+covers HTTPS and reverse proxies. Keep the configuration file and state directory
+accessible only to the operator.
 
 Install the standalone tooling loader with `composer tooling:autoload`. The host
 requires the normal tooling runtime, Docker Compose, and a daemon-visible Unix
@@ -55,10 +57,59 @@ socket for the trusted worker operator. The Docker daemon must run rootful;
 rendering refuses a rootless daemon, which cannot apply the negative
 out-of-memory scores. The web container has no Docker socket.
 The account bootstrap commands documented in the operator guide remain applicable;
-this preset creates no default account. After first startup, run `app:auth:setup-clients`
-and [create an administrator](../../docs-book/part-1-operator-guide/administration/user-management.md)
-in the web container. OAuth key
+this preset creates no default account, and self-registration ships closed. After first
+startup, run `app:auth:setup-clients` and
+[create the first account](../../docs-book/part-1-operator-guide/administration/user-management.md)
+as a super admin with `app:user:create` and `--role=super-admin` in the web container.
+The examples set `MAILER_DSN` to `null://null`, which discards mail; opening
+self-registration on that mailer draws a configuration warning, because new accounts
+never receive their verification link. OAuth key
 generation is automatic for an empty secrets volume and preserves an existing pair.
+
+## Gateway and client addresses
+
+The gateway serves HTTP on `listen.address` and `listen.port`; the address may be IPv4
+or IPv6. The gateway is web's only trusted proxy. It shares the deployment's edge
+network, `<name>-edge`, with web alone, and holds a fixed address in each of that
+network's two subnets, one IPv4 and one IPv6. The deployment sets `TRUSTED_PROXIES` to
+those two addresses and refuses the variable in `environment`.
+
+Because web believes the gateway's forwarding headers, the gateway writes all of them:
+`X-Forwarded-For` carries the client address, `X-Forwarded-Host` the request's `Host`
+header and `X-Forwarded-Proto` the protocol, and `X-Forwarded-Port` is dropped. Web
+therefore rate limits each client under its own address, and a client's own forwarding
+headers cannot change the scheme, host or port that web sees. This holds in both
+families: the gateway accepts clients over IPv4 and IPv6, and it reaches web over both.
+Web listens on `::`, whose IPv6 socket also accepts IPv4 connections. The socket reports
+an IPv4 peer such as `10.231.0.2` in mapped form, `::ffff:10.231.0.2`; web converts it
+back to the plain address, so proxy trust, rate limits and logs see one address per peer.
+
+For an HTTPS origin, run a TLS reverse proxy in front of the gateway. The gateway
+reads the client address from `X-Forwarded-For` and the protocol from
+`X-Forwarded-Proto` only on connections from a declared front proxy; for any other
+peer it ignores both headers and uses the connection's own address and protocol.
+List front proxies in `listen.frontProxies` as IPv4 or IPv6 addresses or CIDR ranges.
+Each must append the client address to `X-Forwarded-For` and set `X-Forwarded-Proto`.
+A loopback listener, the default, also declares the Docker host; any address in
+`127.0.0.0/8` or `::1` counts as loopback. Host connections reach the gateway from the
+edge network's bridge address in their own family, which is that subnet's first host
+address, so any process on the host can report a client address.
+
+The IPv4 subnet defaults to `10.231.0.0/28` and the IPv6 subnet to the unique local
+range `fd00:baa:231::/64`. If a range is in use, set `network.subnet` to another IPv4
+network of /29 or larger, or `network.subnet6` to another IPv6 network of /125 or
+larger; start refuses a subnet that overlaps another Docker network. In each subnet the
+gateway takes the second host address, and Docker assigns web's address from the upper
+half, so no container can take the gateway's address first.
+
+Because the edge network carries both families, the Docker daemon must be able to
+create IPv6 networks. A daemon that cannot fails start when it creates the edge
+network, and the error names `network.ipv6`. Set that to `false` for an IPv4-only edge
+network: it has the IPv4 subnet alone, and the configuration must not set
+`network.subnet6`. The gateway then holds only its IPv4 address and listens on IPv4,
+and web trusts that one address and listens on `0.0.0.0`. Host connections arrive from
+the IPv4 bridge address; with Docker's userland proxy, so do host connections to an
+IPv6 listen address.
 
 ## Render and start
 
@@ -93,7 +144,7 @@ OpenTelemetry export stays off unless the configuration's `environment` sets
 takes effect when the deployment starts again, which retires the old worker pair
 before installing the selected release; no live toggle exists.
 
-Stop retires workers and removes service containers and the private network. It
+Stop retires workers and removes service containers and the private and edge networks. It
 retains every named data volume. Application code caches remain inside each
 container, while media, storage, conversions, transcode state and OAuth keys
 persist separately. The media volume is mounted read-only for playback and workers;

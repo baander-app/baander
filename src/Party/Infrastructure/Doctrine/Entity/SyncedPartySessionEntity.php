@@ -31,7 +31,7 @@ class SyncedPartySessionEntity
     #[ORM\Column(type: 'uuid')]
     private Uuid $videoId;
 
-    /** Cleared by fk_party_sessions_transcode_job_id when the job is deleted. */
+    /** Cleared when the job's owner leaves the party, and by fk_party_sessions_transcode_job_id when the job is deleted. */
     #[ORM\Column(type: 'uuid', nullable: true)]
     private ?Uuid $transcodeJobId;
 
@@ -97,6 +97,7 @@ class SyncedPartySessionEntity
     public function getUpdatedAt(): \DateTimeImmutable { return $this->updatedAt; }
 
     public function setHostUserId(Uuid $hostUserId): void { $this->hostUserId = $hostUserId; $this->updatedAt = new \DateTimeImmutable(); }
+    public function releaseTranscodeJob(): void { $this->transcodeJobId = null; $this->updatedAt = new \DateTimeImmutable(); }
     public function setPlaybackState(string $state): void { $this->playbackState = $state; $this->updatedAt = new \DateTimeImmutable(); }
     public function setWallClockPosition(float $position): void { $this->wallClockPosition = $position; $this->updatedAt = new \DateTimeImmutable(); }
     public function setPlaybackStartedAt(?\DateTimeImmutable $at): void { $this->playbackStartedAt = $at; $this->updatedAt = new \DateTimeImmutable(); }

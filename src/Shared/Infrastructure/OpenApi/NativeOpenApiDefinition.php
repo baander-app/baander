@@ -18,7 +18,7 @@ use OpenApi\Spec as OA;
     version: '2.0.0',
 )]
 #[OA\Security\Scheme\Http(
-    description: 'DPoP-bound access token (JWT), sent as `Authorization: DPoP <token>` with a DPoP proof. First-party apps obtain it via `/api/auth/login`, `/api/auth/login/passkey` or `/api/auth/refresh`; other clients via `/api/oauth/token`.',
+    description: 'DPoP-bound access token (JWT), sent as `Authorization: DPoP <token>` with a DPoP proof. First-party apps obtain it via `/api/auth/login`, `/api/auth/login/passkey` or `/api/auth/refresh`; other clients via `/api/oauth/token`. Until the account\'s email address is verified, its tokens reach only the public routes, `GET /api/auth/me`, `POST /api/auth/email/verify`, `POST /api/auth/me/email/verification`, `PUT /api/auth/me/email` and `POST /api/auth/logout`; every other route answers 403 with `details.reason` `email_unverified`.',
     scheme: 'bearer',
     bearerFormat: 'JWT',
     component: 'bearerAuth',

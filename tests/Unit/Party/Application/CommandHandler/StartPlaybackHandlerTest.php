@@ -51,7 +51,7 @@ final class StartPlaybackHandlerTest extends TestCase
         self::assertInstanceOf(PlaybackPositionChanged::class, $encoder);
         self::assertTrue($encoder->getJobId()->equals($transcodeJobId));
         self::assertSame(100.0, $encoder->getPosition());
-        self::assertSame('play', $encoder->getAction());
+        self::assertSame('resume', $encoder->getAction());
         $this->assertBroadcast($this->dispatched[1], $session, PlaybackState::Playing, 100.0);
     }
 
@@ -68,7 +68,7 @@ final class StartPlaybackHandlerTest extends TestCase
         self::assertInstanceOf(PlaybackPositionChanged::class, $encoder);
         // A stopped session starts from its wall clock position, 0.0, and has barely advanced since.
         self::assertEqualsWithDelta(0.0, $encoder->getPosition(), 1.0);
-        self::assertSame('play', $encoder->getAction());
+        self::assertSame('resume', $encoder->getAction());
         $this->assertBroadcast($this->dispatched[1], $session, PlaybackState::Playing, 0.0);
     }
 
@@ -106,20 +106,25 @@ final class StartPlaybackHandlerTest extends TestCase
         $this->assertBroadcast($this->dispatched[0], $session, PlaybackState::Playing, 30.0);
     }
 
-    public function testOnceTheHostRoleMovesOnlyTheNewHostsStartAppliesAndBroadcasts(): void
+    public function testOnceTheHostRoleMovesOnlyTheNewHostsStartAppliesAndSteersTheFormerHostsJob(): void
     {
         $formerHostUserId = Uuid::v4();
         $newHostUserId = Uuid::v4();
-        $session = SyncedPartySession::create($formerHostUserId, Uuid::v4(), null);
+        $transcodeJobId = Uuid::v4();
+        $session = SyncedPartySession::create($formerHostUserId, Uuid::v4(), $transcodeJobId);
         $session->transferHost($newHostUserId);
         $this->portStartsPlaybackOn($session, 15.0);
 
         ($this->handler)(new StartPlaybackCommand($session->getId(), $formerHostUserId, 99.0));
         ($this->handler)(new StartPlaybackCommand($session->getId(), $newHostUserId, 15.0));
 
-        // The port saw one start, at the new host's position, and only that start broadcast.
-        self::assertCount(1, $this->dispatched);
-        $this->assertBroadcast($this->dispatched[0], $session, PlaybackState::Playing, 15.0);
+        // The port saw one start, at the new host's position, and only that start steered and broadcast.
+        self::assertCount(2, $this->dispatched);
+        $encoder = $this->dispatched[0];
+        self::assertInstanceOf(PlaybackPositionChanged::class, $encoder);
+        self::assertTrue($encoder->getJobId()->equals($transcodeJobId));
+        self::assertSame(15.0, $encoder->getPosition());
+        $this->assertBroadcast($this->dispatched[1], $session, PlaybackState::Playing, 15.0);
     }
 
     /** The port changes the same session the handler reads back afterwards. */

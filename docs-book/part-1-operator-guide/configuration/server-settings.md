@@ -34,6 +34,7 @@ A stored value can stop being allowed, for example when a setting's allowed valu
 |-----|---------|------------------|
 | `admin.can_view_users` | `true` | Whether administrators who are not super administrators may list users. See [Who can manage users](../administration/user-management.md#who-can-manage-users). |
 | `admin.can_create_users` | `false` | Whether those administrators may create users. They can create only users with the User role. |
+| `auth.registration_open` | `false` | Whether anyone may create an account on the sign-up page; labelled **Self-registration** in the admin panel. A new account confirms its address through an emailed link, so open it only when the server sends email. See [Registration and address changes](account-security.md#registration-and-address-changes). |
 | `diagnostics.spans_enabled` | `true` with `APP_ENV=dev`; otherwise `false` | Capture HTTP request spans for diagnostics and, when `OTEL_ENABLED=true`, export. See [HTTP request spans](#http-request-spans). |
 | `i18n.default_language` | `en` | The language of emails to users who have not chosen one: `en` (English), `da` (Dansk) or `th` (ไทย). See [Email language](#email-language). |
 | `lyrics.auto_fetch` | `false` | Fetch lyrics from LRCLIB for each new track a scan adds that has no `.lrc` file beside it, and for each track without lyrics that a [rescan](../commands/app-library-scan.md#what-a-rescan-repairs) gives an artist credit or a new length. See [Library Management](../media/library-management.md#what-happens-to-new-music). |

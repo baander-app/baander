@@ -63,6 +63,7 @@ final class TestAuthenticator extends AbstractAuthenticator
                 }
                 // A test request stands for a token issued under the user's current credentials.
                 $request->attributes->set(AccessTokenAttributes::CREDENTIAL_EPOCH, $user->getCredentialEpoch());
+                $request->attributes->set(AccessTokenAttributes::EMAIL_VERIFIED, $user->isEmailVerified());
 
                 return new SecurityUser(
                     $user->getId()->toString(),

@@ -12,7 +12,7 @@ The pushed authorization request endpoint, device authorization and all three to
 | `client_secret_post` | A secret in the body or in HTTP Basic, never both, compared in constant time; no assertion |
 | `private_key_jwt` | A JWT bearer assertion (`urn:ietf:params:oauth:client-assertion-type:jwt-bearer`) that `ClientAssertionVerifierInterface` accepts; no secret |
 
-Any other combination, including a second method alongside the registered one, is `401` `invalid_client` (RFC 6749 section 2.3). Unknown, malformed, and revoked clients fail the same way, so the answer does not reveal which it was. `identify()` resolves a client without authenticating it, for the consent page's front-channel calls.
+Any other combination, including a second method alongside the registered one, is `401` `invalid_client` (RFC 6749 section 2.3). Unknown, malformed, and revoked clients fail the same way, so the answer does not reveal which it was. `identify()` resolves a client without authenticating it, for the consent page's front-channel calls. Both refuse Baander's first-party client, whose apps sign in through password and passkey login: `authenticate()` answers `unauthorized_client` once the client's ID has authenticated it, and `identify()` answers `invalid_client`, an error the consent page shows without redirecting.
 
 `ClientAssertionVerifier` (Infrastructure, on `lcobucci/jwt`) implements the verifier port under the rules of RFC 7523 as updated by RFC 10070:
 

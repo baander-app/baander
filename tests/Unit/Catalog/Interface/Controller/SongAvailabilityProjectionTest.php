@@ -17,6 +17,7 @@ use App\Catalog\Interface\Controller\SongController;
 use App\Catalog\Interface\Request\UpdateSongRequest;
 use App\Library\Application\Port\LibraryReadScopeProviderInterface;
 use App\Media\Application\Port\ImagePortInterface;
+use App\Shared\Application\Http\PublicOrigins;
 use App\Shared\Domain\Model\CursorPage;
 use App\Shared\Domain\Model\Uuid;
 use App\Shared\Domain\ValueObject\LibraryReadScope;
@@ -27,7 +28,9 @@ use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\Messenger\Envelope;
 use Symfony\Component\Messenger\MessageBusInterface;
 use Symfony\Component\Messenger\Stamp\HandledStamp;
+use Symfony\Component\Security\Core\Authorization\AuthorizationCheckerInterface;
 use Symfony\Component\Serializer\Encoder\JsonEncoder;
+use Symfony\Component\Translation\Translator;
 
 final class SongAvailabilityProjectionTest extends TestCase
 {
@@ -64,10 +67,10 @@ final class SongAvailabilityProjectionTest extends TestCase
             $albums = $this->createStub(AlbumPortInterface::class);
             $albums->method('findVisibleByPublicId')->willReturn($album);
             $albums->method('findVisibleWithSongs')->willReturn([$album, $listed]);
-            $controller = new AlbumController($albums, $scopes, $this->createStub(ImagePortInterface::class), $this->createStub(AlbumDuplicatePortInterface::class), $this->createStub(AlbumMergePortInterface::class), $bus, $availability);
+            $controller = new AlbumController($albums, $scopes, $this->createStub(ImagePortInterface::class), $this->createStub(AlbumDuplicatePortInterface::class), $this->createStub(AlbumMergePortInterface::class), $bus, $availability, $this->createStub(AuthorizationCheckerInterface::class), new PublicOrigins('https://baander.app'));
             $response = $controller->show($album->getPublicId()->toString(), Request::create('https://baander.app/api/albums/' . $album->getPublicId()->toString()));
         } else {
-            $controller = new SongController($songs, $scopes, new CursorCodec(new JsonEncoder()), $bus, $availability);
+            $controller = new SongController($songs, $scopes, new CursorCodec(new JsonEncoder()), $bus, $availability, $this->createStub(AuthorizationCheckerInterface::class));
             $response = match ($entrypoint) {
                 'index' => $controller->index(Request::create('https://baander.app/api/songs/?q=Song')),
                 'show' => $controller->show($song->getPublicId()->toString()),
@@ -92,7 +95,8 @@ final class SongAvailabilityProjectionTest extends TestCase
         $availability->expects(self::never())->method('forSongs');
         $scopes = $this->createStub(LibraryReadScopeProviderInterface::class);
         $scopes->method('current')->willReturn(LibraryReadScope::none());
-        $controller = new SongController($this->createStub(SongPortInterface::class), $scopes, new CursorCodec(new JsonEncoder()), $this->createStub(MessageBusInterface::class), $availability);
+        $controller = new SongController($this->createStub(SongPortInterface::class), $scopes, new CursorCodec(new JsonEncoder()), $this->createStub(MessageBusInterface::class), $availability, $this->createStub(AuthorizationCheckerInterface::class));
+        $controller->setTranslator(new Translator('en'));
 
         self::assertSame(404, $controller->show((new \App\Shared\Domain\Model\PublicId())->toString())->getStatusCode());
     }

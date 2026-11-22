@@ -37,6 +37,22 @@ interface UserRepositoryInterface
     public function count(?string $roleFilter = null, ?bool $disabledFilter = null): int;
 
     /**
+     * Takes the lock that serializes deleting, disabling and demoting users, so a change that
+     * can take an enabled super admin away waits for another one to commit or roll back.
+     * Requires an open transaction; the lock holds until it ends.
+     *
+     * @throws \LogicException outside a transaction
+     */
+    public function lockSuperAdminRemovals(): void;
+
+    /**
+     * The ID of the install's only enabled super admin, or null when it has none or several.
+     * Read after lockSuperAdminRemovals() in the same transaction, it reflects every removal
+     * that committed while the lock waited.
+     */
+    public function soleEnabledSuperAdmin(): ?Uuid;
+
+    /**
      * Upgrades the hash if it still matches the one verified at login. Call under the
      * credential epoch lock. A hash upgrade preserves the credentials and reset links.
      */
@@ -61,6 +77,14 @@ interface UserRepositoryInterface
      * lock holds until it ends.
      */
     public function lockCredentialEpoch(Uuid $id): ?int;
+
+    /**
+     * Locks the user's row as lockCredentialEpoch() does and loads the user as of the lock, also
+     * when this unit of work loaded it earlier. A change saved from this copy keeps a disable or
+     * role change that committed while the lock waited, and later ones wait for the transaction.
+     * Null when the user does not exist. Requires an open transaction; the lock holds until it ends.
+     */
+    public function lockAndFind(Uuid $id): ?User;
 
     /**
      * Increments the user's credential epoch in one statement and returns the new value. The

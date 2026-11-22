@@ -256,7 +256,54 @@ final class NginxTemplateTest extends TestCase
         $this->assertNginxConfigValid($this->readProdConfig());
     }
 
+    /**
+     * Prometheus scrapes web on the application network, so this gateway answers /metrics
+     * itself and still forwards every other path to web.
+     */
+    public function testProdConfigAnswersMetricsItselfAndForwardsOtherPaths(): void
+    {
+        $listener = $this->unusedPort();
+        $upstream = $this->unusedPort();
+        $local = [
+            'listen 80;' => 'listen 127.0.0.1:' . $listener . ';',
+            'server app:9501;' => 'server 127.0.0.1:' . $upstream . ';',
+        ];
+
+        $this->inNginxPrefix($this->readProdConfig(), $local, function (string $nginx, string $directory) use ($listener): void {
+            exec($nginx . ' 2>&1', $output, $exitCode);
+            $this->assertSame(0, $exitCode, "nginx did not start:\n" . implode("\n", $output));
+            try {
+                // Nothing listens on the upstream port, so a forwarded request answers 502.
+                $this->assertSame(
+                    ['/metrics' => 404, '/health' => 502],
+                    ['/metrics' => $this->statusOf($listener, '/metrics'), '/health' => $this->statusOf($listener, '/health')],
+                );
+            } finally {
+                exec($nginx . ' -s stop 2>&1');
+                for ($attempt = 0; $attempt < 50 && is_file($directory . '/nginx.pid'); ++$attempt) {
+                    usleep(100_000);
+                }
+            }
+        });
+    }
+
     private function assertNginxConfigValid(string $config): void
+    {
+        $this->inNginxPrefix($config, [], function (string $nginx): void {
+            exec($nginx . ' -t 2>&1', $output, $exitCode);
+            $this->assertSame(0, $exitCode, "nginx -t failed:\n" . implode("\n", $output));
+        });
+    }
+
+    /**
+     * Writes an http-context fragment into a private nginx prefix and calls $use with the nginx
+     * command line for it. Deployment dependencies are swapped for local ones so nginx can load
+     * the fragment without DNS or shared paths; $local swaps further values first.
+     *
+     * @param array<string, string> $local
+     * @param callable(string, string): void $use receives the command line and the prefix directory
+     */
+    private function inNginxPrefix(string $config, array $local, callable $use): void
     {
         $nginxPath = $this->findNginxBinary();
         $this->assertNotNull($nginxPath, 'nginx must be installed to validate configuration syntax.');
@@ -270,21 +317,13 @@ final class NginxTemplateTest extends TestCase
                 $this->writeTestCertificate($directory);
             }
 
-            // These files are http-context fragments. Replace only deployment
-            // dependencies so nginx can validate them without DNS or shared paths.
-            $config = str_replace([
-                'server app:9501;',
-                '/etc/nginx/certificates/cert.pem',
-                '/etc/nginx/certificates/key.pem',
-                '/var/log/nginx/access.log',
-                '/var/log/nginx/error.log',
-            ], [
-                'server 127.0.0.1:9501;',
-                $directory . '/cert.pem',
-                $directory . '/key.pem',
-                $directory . '/access.log',
-                $directory . '/error.log',
-            ], $config);
+            $config = strtr($config, $local + [
+                'server app:9501;' => 'server 127.0.0.1:9501;',
+                '/etc/nginx/certificates/cert.pem' => $directory . '/cert.pem',
+                '/etc/nginx/certificates/key.pem' => $directory . '/key.pem',
+                '/var/log/nginx/access.log' => $directory . '/access.log',
+                '/var/log/nginx/error.log' => $directory . '/error.log',
+            ]);
 
             $wrapper = "pid {$directory}/nginx.pid;\n"
                 . "error_log {$directory}/error.log;\n"
@@ -298,17 +337,33 @@ final class NginxTemplateTest extends TestCase
             $configPath = $directory . '/nginx.conf';
             $this->assertNotFalse(file_put_contents($configPath, $wrapper));
 
-            exec(
-                escapeshellarg($nginxPath) . ' -t -p ' . escapeshellarg($directory . '/')
+            $use(
+                escapeshellarg($nginxPath) . ' -p ' . escapeshellarg($directory . '/')
                 . ' -e ' . escapeshellarg($directory . '/error.log')
-                . ' -c ' . escapeshellarg($configPath) . ' 2>&1',
-                $output,
-                $exitCode,
+                . ' -c ' . escapeshellarg($configPath),
+                $directory,
             );
-            $this->assertSame(0, $exitCode, "nginx -t failed:\n" . implode("\n", $output));
         } finally {
             $filesystem->remove($directory);
         }
+    }
+
+    private function unusedPort(): int
+    {
+        $socket = stream_socket_server('tcp://127.0.0.1:0');
+        $this->assertNotFalse($socket);
+        $port = (int) substr((string) strrchr((string) stream_socket_get_name($socket, false), ':'), 1);
+        fclose($socket);
+
+        return $port;
+    }
+
+    private function statusOf(int $port, string $path): ?int
+    {
+        file_get_contents('http://127.0.0.1:' . $port . $path, false, stream_context_create(['http' => ['ignore_errors' => true, 'timeout' => 5]]));
+        $statusLine = http_get_last_response_headers()[0] ?? '';
+
+        return preg_match('~^HTTP/\S+ (\d{3})~', $statusLine, $match) === 1 ? (int) $match[1] : null;
     }
 
     private function writeTestCertificate(string $directory): void

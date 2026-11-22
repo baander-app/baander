@@ -12,6 +12,7 @@ use Baander\RedisRateLimiter\Exception\RateLimiterUnavailableException;
 use App\Shared\Application\Exception\RetryableFault;
 use App\Shared\Application\Exception\ServiceUnavailableException;
 use App\Shared\Application\Http\RequestLocale;
+use App\Shared\Infrastructure\Http\ApiRequestPath;
 use App\Shared\Interface\DTO\ApiError;
 use Doctrine\DBAL\Exception\DriverException;
 use Psr\Log\LoggerInterface;
@@ -31,6 +32,18 @@ final class ExceptionSubscriber
     /** PostgreSQL's lock_not_available: a lock wait passed the transaction's lock_timeout. */
     private const string LOCK_NOT_AVAILABLE = '55P03';
 
+    /** The message of each client error status with wording of its own, in the `messages` catalog. */
+    private const array CLIENT_ERROR_MESSAGES = [
+        Response::HTTP_BAD_REQUEST => 'errors.bad_request.default',
+        Response::HTTP_UNAUTHORIZED => 'errors.unauthorized.default',
+        Response::HTTP_FORBIDDEN => 'errors.forbidden.default',
+        Response::HTTP_NOT_FOUND => 'errors.not_found.resource',
+        Response::HTTP_METHOD_NOT_ALLOWED => 'errors.method_not_allowed.default',
+        Response::HTTP_TOO_MANY_REQUESTS => 'errors.too_many_requests.default',
+    ];
+
+    private const string CLIENT_ERROR_MESSAGE = 'errors.client_error.default';
+
     public function __construct(
         private readonly LoggerInterface $logger,
         private readonly TranslatorInterface $translator,
@@ -46,14 +59,14 @@ final class ExceptionSubscriber
             $event->setThrowable($exception);
         }
 
-        if ($this->respondWithOutcome($event, $exception) || $this->respondWithRetryAfter($event, $exception) || $this->respondToRefusal($event, $exception)) {
+        if ($this->respondWithOutcome($event, $exception) || $this->respondWithRetryAfter($event, $exception) || $this->respondToClientError($event, $exception)) {
             return;
         }
 
         if ($exception instanceof HttpExceptionInterface) {
             $status = $exception->getStatusCode();
 
-            // Don't log client errors (4xx)
+            // A client error outside the API is the framework's to render, and is not logged here.
             if ($status < 500) {
                 return;
             }
@@ -150,25 +163,25 @@ final class ExceptionSubscriber
     }
 
     /**
-     * A 401 or 403, including the firewall's refusals, as the shared error envelope with a
-     * generic message in the request's language. The exception's own message is not shown.
+     * A 4xx HTTP exception as the shared error envelope, with its status's message in the
+     * request's language and the exception's headers (Allow, Retry-After). Its own message is
+     * not shown; the router's names the unmatched request. A 401 or 403, including the
+     * firewall's refusals, answers so on every path, any other client error only on an API
+     * path; elsewhere the framework renders it.
      */
-    private function respondToRefusal(ExceptionEvent $event, Throwable $exception): bool
+    private function respondToClientError(ExceptionEvent $event, Throwable $exception): bool
     {
-        if (!$exception instanceof HttpExceptionInterface) {
-            return false;
-        }
-
-        $key = match ($exception->getStatusCode()) {
-            Response::HTTP_UNAUTHORIZED => 'errors.unauthorized.default',
-            Response::HTTP_FORBIDDEN => 'errors.forbidden.default',
-            default => null,
-        };
-        if ($key === null) {
+        if (!$exception instanceof HttpExceptionInterface || $exception->getStatusCode() >= Response::HTTP_INTERNAL_SERVER_ERROR) {
             return false;
         }
 
         $status = $exception->getStatusCode();
+        $refusal = $status === Response::HTTP_UNAUTHORIZED || $status === Response::HTTP_FORBIDDEN;
+        if (!$refusal && !ApiRequestPath::isApi($event->getRequest())) {
+            return false;
+        }
+
+        $key = self::CLIENT_ERROR_MESSAGES[$status] ?? self::CLIENT_ERROR_MESSAGE;
         $error = new ApiError($this->translator->trans($key, [], 'messages', $this->locale($event)), $status);
         $event->setResponse(new JsonResponse($error->toArray(), $status, $exception->getHeaders()));
 

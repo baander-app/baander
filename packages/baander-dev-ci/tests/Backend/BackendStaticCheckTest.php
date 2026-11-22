@@ -52,7 +52,7 @@ final class BackendStaticCheckTest extends TestCase
         $this->git(['init', '-b', 'master']);
         $this->git(['config', 'user.email', 'dev@baander.app']);
         $this->git(['config', 'user.name', 'Development fixture']);
-        foreach (['src/Marker.php', 'config/services.yaml', '.env'] as $path) {
+        foreach (['src/Marker.php', 'config/services.yaml', '.env.example'] as $path) {
             $this->write($path, 'baked source');
         }
         $this->git(['add', '.']);
@@ -116,7 +116,8 @@ final class BackendStaticCheckTest extends TestCase
         self::assertFileExists($extracted . '/relay/vendor/autoload.php');
         $registry = $this->executor->run(new ProcessSpec([PHP_BINARY, $extracted . '/relay/static-check-fixture.php']));
         self::assertSame('current registry tooling', $registry->stdout);
-        self::assertSame('baked source', file_get_contents($extracted . '/.env'));
+        self::assertSame('baked source', file_get_contents($extracted . '/.env.example'));
+        self::assertFileDoesNotExist($extracted . '/.env');
         self::assertFileDoesNotExist($extracted . '/.env.local');
         self::assertDirectoryDoesNotExist($extracted . '/config/secrets');
     }

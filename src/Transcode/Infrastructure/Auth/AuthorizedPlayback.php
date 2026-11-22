@@ -64,11 +64,11 @@ final readonly class AuthorizedPlayback implements PlaybackPortInterface
         }
     }
 
-    public function findTranscodeJobVideoId(Uuid $jobId): ?Uuid
+    public function findOwnedTranscodeJobVideoId(Uuid $jobId, Uuid $ownerUserId): ?Uuid
     {
         $videoId = $this->connection->fetchOne(
-            'SELECT video_id FROM transcode_jobs WHERE id = :jobId',
-            ['jobId' => $jobId->toString()],
+            'SELECT video_id FROM transcode_jobs WHERE id = :jobId AND owner_user_id = :owner',
+            ['jobId' => $jobId->toString(), 'owner' => $ownerUserId->toString()],
         );
 
         return is_string($videoId) ? Uuid::fromString($videoId) : null;

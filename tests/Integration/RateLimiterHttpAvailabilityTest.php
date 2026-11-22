@@ -62,7 +62,7 @@ final class RateLimiterHttpAvailabilityTest extends TestCase
 
     public function testVerificationResendBudgetOutageIssuesNoVerificationToken(): void
     {
-        $user = $this->createTestUser();
+        $user = $this->createTestUser(verified: false);
         $this->failLimiter('auth_email_verification_user');
         $before = $this->entityManager->getConnection()->fetchAllAssociative('SELECT * FROM email_verification_tokens WHERE user_id = ?', [$user->getId()->toString()]);
 

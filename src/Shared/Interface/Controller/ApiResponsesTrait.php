@@ -12,8 +12,14 @@ use Symfony\Component\HttpFoundation\RedirectResponse;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Validator\ConstraintViolationListInterface;
 
+/**
+ * A helper called without a message answers with the `messages` catalog entry that the
+ * exception listeners render for the same status, in the request's language.
+ */
 trait ApiResponsesTrait
 {
+    use TranslatorTrait;
+
     /** @param array<string, string|list<string>|null> $headers */
     protected function json(mixed $data, int $status = Response::HTTP_OK, array $headers = []): JsonResponse
     {
@@ -64,7 +70,7 @@ trait ApiResponsesTrait
         }
 
         return $this->errorResponse(
-            message: 'Validation failed.',
+            message: $this->trans('errors.validation.failed'),
             status: Response::HTTP_UNPROCESSABLE_ENTITY,
             details: $details,
         );
@@ -73,7 +79,7 @@ trait ApiResponsesTrait
     protected function notFound(?string $message = null): JsonResponse
     {
         return $this->errorResponse(
-            $message ?? 'Resource not found.',
+            $message ?? $this->trans('errors.not_found.resource'),
             Response::HTTP_NOT_FOUND,
         );
     }
@@ -81,7 +87,7 @@ trait ApiResponsesTrait
     protected function unauthorized(?string $message = null): JsonResponse
     {
         return $this->errorResponse(
-            $message ?? 'Authentication required.',
+            $message ?? $this->trans('errors.unauthorized.default'),
             Response::HTTP_UNAUTHORIZED,
         );
     }
@@ -89,7 +95,7 @@ trait ApiResponsesTrait
     protected function forbidden(?string $message = null): JsonResponse
     {
         return $this->errorResponse(
-            $message ?? 'Forbidden.',
+            $message ?? $this->trans('errors.forbidden.default'),
             Response::HTTP_FORBIDDEN,
         );
     }

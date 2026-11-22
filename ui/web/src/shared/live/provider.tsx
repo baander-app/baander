@@ -1,6 +1,7 @@
 import { useEffect, useState, type ReactNode } from 'react'
 import { QueryClientProvider } from '@tanstack/react-query'
 import { useAuthStore } from '@/features/auth/stores/auth-store'
+import { selectAwaitsVerification } from '@/features/auth/stores/auth-selectors'
 import { useNotificationStore } from '@/features/notification/stores/notification-store'
 import { useSidebarStore } from '@/features/layout/stores/sidebar-store'
 import { useEqProfilesStore } from '@/features/equalizer/stores/eq-profiles-store'
@@ -27,21 +28,28 @@ interface ClientProviderProps {
 }
 
 interface PrincipalClientProps {
-  principal: string | null
+  /** Whether the client runs live recovery, its coordinator and the activity refresh. */
+  live: boolean
   children: ReactNode
   freshnessEnabled: boolean
 }
 
+/**
+ * An account that has yet to verify its address is refused live recovery and WebSocket tickets, so
+ * its client starts no live work, as for a signed-out tab. Verifying the address starts that work
+ * on the same client: the pages stay mounted, so the verification page keeps its outcome.
+ */
 export function AuthenticatedClientProvider({ children, freshnessEnabled = false }: ClientProviderProps) {
   const principal = useAuthStore(state => state.principalSessionId)
+  const awaitsVerification = useAuthStore(selectAwaitsVerification)
   return (
-    <PrincipalClient key={principal ?? 'anonymous'} principal={principal} freshnessEnabled={freshnessEnabled}>
+    <PrincipalClient key={principal ?? 'anonymous'} live={principal !== null && !awaitsVerification} freshnessEnabled={freshnessEnabled}>
       {children}
     </PrincipalClient>
   )
 }
 
-function PrincipalClient({ principal, children, freshnessEnabled }: PrincipalClientProps) {
+function PrincipalClient({ live, children, freshnessEnabled }: PrincipalClientProps) {
   const [{ client, recovery, coordinator }] = useState(() => {
     const client = new OwnedQueryClient()
     const recovery = new LiveRecovery(authenticatedTransport, resetMirrors, undefined, freshnessEnabled)
@@ -52,25 +60,28 @@ function PrincipalClient({ principal, children, freshnessEnabled }: PrincipalCli
   useEffect(() => {
     resetMirrors()
     const detach = client.attach()
-    const stopCoordinator = principal && freshnessEnabled ? coordinator.start() : () => undefined
-    const stop = principal ? recovery.start() : () => undefined
-    const stopOutageWatcher = principal ? startLiveOutageWatcher(recovery, freshnessEnabled) : () => undefined
-    const detachActivity = principal
-      ? activityService.attachRefresh(client, freshnessEnabled ? coordinator : undefined)
-      : () => undefined
+    return () => {
+      detach()
+      client.dispose()
+      resetMirrors()
+    }
+  }, [client])
+  useEffect(() => {
+    if (!live) return undefined
+    const stopCoordinator = freshnessEnabled ? coordinator.start() : () => undefined
+    const stop = recovery.start()
+    const stopOutageWatcher = startLiveOutageWatcher(recovery, freshnessEnabled)
+    const detachActivity = activityService.attachRefresh(client, freshnessEnabled ? coordinator : undefined)
     return () => {
       detachActivity()
       stopOutageWatcher()
       stop()
       stopCoordinator()
-      detach()
-      client.dispose()
-      resetMirrors()
     }
-  }, [client, coordinator, freshnessEnabled, principal, recovery])
+  }, [client, coordinator, freshnessEnabled, live, recovery])
   return (
     <QueryClientProvider client={client}>
-      <LiveCoordinatorContext.Provider value={principal && freshnessEnabled ? coordinator : null}>
+      <LiveCoordinatorContext.Provider value={live && freshnessEnabled ? coordinator : null}>
         {children}
       </LiveCoordinatorContext.Provider>
     </QueryClientProvider>

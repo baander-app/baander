@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Integration;
 
+use App\Auth\Domain\Model\OAuth\SignInGrant;
 use App\Auth\Domain\Model\User;
 use App\Auth\Domain\Repository\UserRepositoryInterface;
 use App\Auth\Infrastructure\Doctrine\Entity\OAuth\AccessTokenEntity;
@@ -125,9 +126,13 @@ final class PushUnsubscribeFirewallTest extends TestCase
         $proof = new SignedDpopProof();
         if ($actor !== 'anonymous') {
             $user = $actor === 'owner' ? $owner : $this->createUser($actor);
-            $client = FirstPartyOAuthClient::entity($this->kernel->getContainer(), $this->manager);
-            $token = new AccessTokenEntity((new Uuid())->toString(), $client, $user, scopes: ['library'], expiresAt: new \DateTimeImmutable('+1 hour'));
-            $token->setDpopJkt($proof->thumbprint());
+            $token = FirstPartyOAuthClient::accessToken(
+                $this->kernel->getContainer(),
+                $this->manager,
+                $user,
+                SignInGrant::Password,
+                $proof->thumbprint(),
+            );
             $this->manager->persist($token);
             $this->entities[] = $token;
             $this->manager->flush();
@@ -195,9 +200,13 @@ final class PushUnsubscribeFirewallTest extends TestCase
         $jwt = null;
         if ($actor !== 'anonymous') {
             $user = $actor === 'owner' ? $owner : $this->createUser($actor);
-            $client = FirstPartyOAuthClient::entity($this->kernel->getContainer(), $this->manager);
-            $token = new AccessTokenEntity((new Uuid())->toString(), $client, $user, scopes: ['library'], expiresAt: new \DateTimeImmutable('+1 hour'));
-            $token->setDpopJkt($proof->thumbprint());
+            $token = FirstPartyOAuthClient::accessToken(
+                $this->kernel->getContainer(),
+                $this->manager,
+                $user,
+                SignInGrant::Password,
+                $proof->thumbprint(),
+            );
             $this->manager->persist($token);
             $this->entities[] = $token;
             $this->manager->flush();

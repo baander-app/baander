@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Auth\Infrastructure\Doctrine\Entity\OAuth;
 
+use App\Auth\Domain\Model\OAuth\SignInGrant;
 use App\Auth\Infrastructure\Doctrine\Entity\UserEntity;
 use App\Shared\Domain\Model\Uuid;
 use Doctrine\ORM\Mapping as ORM;
@@ -42,6 +43,13 @@ class AccessTokenEntity implements AccessTokenEntityInterface
     #[ORM\ManyToOne(targetEntity: ClientEntity::class)]
     #[ORM\JoinColumn(name: 'client_id', referencedColumnName: 'id', nullable: false, onDelete: 'CASCADE')]
     private ClientEntity $client;
+
+    /**
+     * The grant that started the token's refresh chain. Written on insert only; a rotation
+     * copies it from the token it replaces.
+     */
+    #[ORM\Column(type: 'text', enumType: SignInGrant::class, updatable: false)]
+    private SignInGrant $grantType;
 
     #[ORM\Column(type: 'text', nullable: true)]
     private ?string $name = null;
@@ -85,6 +93,7 @@ class AccessTokenEntity implements AccessTokenEntityInterface
     public function __construct(
         string $tokenId,
         ClientEntity $client,
+        SignInGrant $grantType,
         ?UserEntity $user = null,
         ?string $name = null,
         ?array $scopes = null,
@@ -97,6 +106,7 @@ class AccessTokenEntity implements AccessTokenEntityInterface
         $this->tokenId = $tokenId;
         $this->credentialEpoch = $credentialEpoch;
         $this->client = $client;
+        $this->grantType = $grantType;
         $this->user = $user;
         $this->name = $name;
         $this->scopes = $scopes;
@@ -129,6 +139,11 @@ class AccessTokenEntity implements AccessTokenEntityInterface
     public function getClient(): ClientEntity
     {
         return $this->client;
+    }
+
+    public function getGrantType(): SignInGrant
+    {
+        return $this->grantType;
     }
 
     // --- TokenInterface ---

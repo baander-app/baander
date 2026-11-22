@@ -11,10 +11,12 @@ use App\Catalog\Application\Port\AlbumPortInterface;
 use App\Catalog\Application\Port\MoviePortInterface;
 use App\Catalog\Application\Port\SongPortInterface;
 use App\Media\Application\Port\ImagePortInterface;
+use App\Shared\Application\Http\PublicOrigins;
 use PHPUnit\Framework\TestCase;
 use Symfony\Bundle\SecurityBundle\Security;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\Security\Core\User\UserInterface;
+use Symfony\Component\Translation\Translator;
 
 final class RecentIdentityTest extends TestCase
 {
@@ -33,7 +35,8 @@ final class RecentIdentityTest extends TestCase
             $this->createStub(\App\Catalog\Application\Port\SongAvailabilityPortInterface::class),
             $this->createStub(\App\Library\Application\Port\LibraryReadScopeProviderInterface::class),
         );
-        $controller = new UserRecentController($security, $activities, $enrichment);
+        $controller = new UserRecentController($security, $activities, $enrichment, new PublicOrigins('https://baander.app'));
+        $controller->setTranslator(new Translator('en'));
 
         self::assertSame(401, $controller->recent(new Request())->getStatusCode());
     }

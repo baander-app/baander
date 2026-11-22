@@ -72,7 +72,7 @@ final class MutationRouteInventoryTest extends TestCase
             'radio_starred_star', 'radio_starred_unstar',
             'radio_subscription_subscribe', 'radio_subscription_unsubscribe', 'radio_subscription_refresh',
         ],
-        'discovery' => ['discovery_register', 'discovery_pairing_code', 'discovery_complete_pairing'],
+        'discovery' => ['discovery_register', 'discovery_pairing_code', 'discovery_qr_payload', 'discovery_complete_pairing'],
         'party' => [
             'party_session_create', 'party_session_join', 'party_session_leave', 'party_session_sync', 'party_session_end',
             'party_member_update_me', 'party_member_transfer_host',
@@ -107,6 +107,8 @@ final class MutationRouteInventoryTest extends TestCase
             'user_settings_set', 'user_settings_reset',
         ],
         'operator monitoring, settings and scheduling' => [
+            // The admin log viewer's query takes its filters as a POST body; it changes nothing.
+            'admin_logs_query',
             'monitor_jobs_cancel', 'monitor_jobs_retry', 'monitor_prune',
             'monitor_ratelimiters_clear', 'monitor_ratelimiters_clear_all',
             'monitor_transport_failed_retry', 'monitor_transport_failed_remove', 'monitor_transport_failed_flush',

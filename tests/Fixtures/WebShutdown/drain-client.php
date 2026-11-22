@@ -30,6 +30,7 @@ declare(strict_types=1);
  *                                   the response ended
  */
 
+use App\Auth\Domain\Model\OAuth\SignInGrant;
 use App\Tests\Fixtures\Auth\FirstPartyOAuthClient;
 use App\Tests\Fixtures\WebRuntime\HeldRendition;
 use App\Tests\Fixtures\WebRuntime\StreamClient;
@@ -102,6 +103,7 @@ $client = new StreamClient(
     $user,
     (string) file_get_contents($projectDir . '/config/secrets/oauth/private.key'),
     'http://127.0.0.1:9501/api/stream/track',
+    $mode === 'ws' ? SignInGrant::Password : SignInGrant::AuthorizationCode,
     client: $mode === 'ws' ? FirstPartyOAuthClient::entity($kernel->getContainer(), $manager) : null,
 );
 

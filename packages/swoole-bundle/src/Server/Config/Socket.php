@@ -20,6 +20,8 @@ final class Socket
         'unix_dgram' => SWOOLE_SOCK_UNIX_DGRAM,
         'unix_stream' => SWOOLE_SOCK_UNIX_STREAM,
     ];
+    /** The IPv6 socket of each internet socket type, which an IPv6 listen address requires. */
+    private const array IPV6_SOCKET_TYPE = ['tcp' => 'tcp_ipv6', 'udp' => 'udp_ipv6'];
 
     /**
      * @var string
@@ -69,7 +71,7 @@ final class Socket
 
     public function addressPort(): string
     {
-        return sprintf('%s:%d', $this->host, $this->port);
+        return sprintf($this->hasIpv6Host() ? '[%s]:%d' : '%s:%d', $this->host, $this->port);
     }
 
     public function host(): string
@@ -84,7 +86,9 @@ final class Socket
 
     public function type(): int
     {
-        $resolvedSocketType = self::SWOOLE_SOCKET_TYPE[$this->type];
+        // Swoole cannot listen on an IPv6 address with an IPv4 socket. An IPv6 socket on :: also accepts IPv4 peers.
+        $type = $this->hasIpv6Host() ? (self::IPV6_SOCKET_TYPE[$this->type] ?? $this->type) : $this->type;
+        $resolvedSocketType = self::SWOOLE_SOCKET_TYPE[$type];
 
         if ($this->ssl) {
             if (!defined('SWOOLE_SSL')) {
@@ -154,5 +158,10 @@ final class Socket
     private function setHost(string $host): void
     {
         $this->host = $host;
+    }
+
+    private function hasIpv6Host(): bool
+    {
+        return filter_var($this->host, FILTER_VALIDATE_IP, FILTER_FLAG_IPV6) !== false;
     }
 }

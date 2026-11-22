@@ -5,21 +5,22 @@ declare(strict_types=1);
 namespace App\Tests\Functional\Controller;
 
 use App\Auth\Domain\Model\User;
-use App\Catalog\Infrastructure\Doctrine\Entity\MovieEntity;
-use App\Catalog\Infrastructure\Doctrine\Entity\MovieVideoEntity;
 use App\Catalog\Infrastructure\Doctrine\Entity\VideoEntity;
-use App\Library\Application\Port\LibraryAccessPortInterface;
 use App\Library\Infrastructure\Doctrine\Entity\LibraryEntity;
 use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
+use App\Tests\Functional\Party\PartyFixtures;
 use App\Tests\Functional\TestCase;
 use Symfony\Component\HttpFoundation\Response;
 
 /**
- * Creating a party checks its video and transcode job against the playback authority.
+ * Creating a party checks its video and transcode job against the playback authority: the job
+ * must be the host's own. The party keeps the job only while the job's owner is a member.
  */
 final class PartySessionCreationTest extends TestCase
 {
+    use PartyFixtures;
+
     private const URI = '/api/party/sessions/';
 
     private User $host;
@@ -32,10 +33,9 @@ final class PartySessionCreationTest extends TestCase
         parent::setUp();
 
         $this->hostLibrary = $this->library();
-        $this->host = $this->createTestUser();
-        self::getContainer()->get(LibraryAccessPortInterface::class)->grant($this->host->getId(), $this->hostLibrary->getId());
+        $this->host = $this->viewer($this->hostLibrary);
         $this->video = $this->video($this->hostLibrary);
-        $this->job = $this->job($this->video);
+        $this->job = $this->job($this->video, $this->host);
     }
 
     public function testCreatesAPartyForAPlayableVideoAndItsJob(): void
@@ -81,9 +81,21 @@ final class PartySessionCreationTest extends TestCase
         self::assertSame(0, $this->countParties($this->video));
     }
 
+    public function testAnotherUsersJobOfAVideoBothMayPlayIsNotFound(): void
+    {
+        $foreignJob = $this->job($this->video, $this->viewer($this->hostLibrary));
+
+        $response = $this->assertJsonResponse($this->create(['videoId' => $this->video->getPublicId()->toString(), 'transcodeJobId' => $foreignJob->toString()]), 404);
+        $missing = $this->assertJsonResponse($this->create(['videoId' => $this->video->getPublicId()->toString(), 'transcodeJobId' => (new PublicId())->toString()]), 404);
+
+        // The response does not reveal that the other user's job exists.
+        self::assertSame($missing, $response);
+        self::assertSame(0, $this->countParties($this->video));
+    }
+
     public function testAJobOfAVideoOutsideTheHostsLibrariesIsNotFound(): void
     {
-        $hiddenJob = $this->job($this->video($this->library()));
+        $hiddenJob = $this->job($this->video($this->library()), $this->host);
 
         $this->assertJsonResponse($this->create(['videoId' => $this->video->getPublicId()->toString(), 'transcodeJobId' => $hiddenJob->toString()]), 404);
         self::assertSame(0, $this->countParties($this->video));
@@ -91,7 +103,7 @@ final class PartySessionCreationTest extends TestCase
 
     public function testAJobOfAnotherVideoIsRejected(): void
     {
-        $otherJob = $this->job($this->video($this->hostLibrary));
+        $otherJob = $this->job($this->video($this->hostLibrary), $this->host);
 
         $error = $this->assertJsonResponse($this->create(['videoId' => $this->video->getPublicId()->toString(), 'transcodeJobId' => $otherJob->toString()]), 422);
 
@@ -114,47 +126,86 @@ final class PartySessionCreationTest extends TestCase
         self::assertSame(0, $this->countParties($this->video));
     }
 
+    public function testANewHostKeepsTheJobWhileItsOwnerStaysAndThePartyLosesItWhenTheOwnerLeaves(): void
+    {
+        [$party, $guest] = $this->partyWithAGuest();
+
+        $this->assertJsonResponse($this->transfer($party, to: $guest), 200);
+        self::assertSame($this->job->toString(), $this->session($party, $guest)['transcodeJobId']);
+
+        $this->assertJsonResponse($this->authenticatedRequest('POST', self::URI . $party . '/leave', $this->host), 200);
+        self::assertNull($this->session($party, $guest)['transcodeJobId']);
+    }
+
+    public function testAMemberWhoDoesNotOwnTheJobLeavesAndThePartyKeepsIt(): void
+    {
+        [$party, $guest] = $this->partyWithAGuest();
+
+        $this->assertJsonResponse($this->authenticatedRequest('POST', self::URI . $party . '/leave', $guest), 200);
+
+        self::assertSame($this->job->toString(), $this->session($party, $this->host)['transcodeJobId']);
+    }
+
+    public function testThePartyLosesTheJobWhenANewHostRemovesItsOwner(): void
+    {
+        [$party, $guest] = $this->partyWithAGuest();
+        $this->assertJsonResponse($this->transfer($party, to: $guest), 200);
+
+        $response = $this->authenticatedRequest('DELETE', $this->invitationUri($this->host, $party), $guest);
+
+        self::assertSame(204, $response->getStatusCode(), (string) $response->getContent());
+        self::assertNull($this->session($party, $guest)['transcodeJobId']);
+    }
+
     /** @param array<string, mixed> $body */
     private function create(array $body): Response
     {
         return $this->authenticatedRequest('POST', self::URI, $this->host, $body);
     }
 
-    private function library(): LibraryEntity
+    /**
+     * A party the host creates with their own job, and a guest who joined it.
+     *
+     * @return array{string, User} the party's public ID and the guest
+     */
+    private function partyWithAGuest(): array
     {
-        $library = new LibraryEntity(
-            name: 'Party test',
-            slug: 'party-' . bin2hex(random_bytes(8)),
-            path: '/media/party-' . bin2hex(random_bytes(8)),
-            type: 'movie',
-            filesystemType: 'local',
+        $party = $this->assertJsonResponse($this->create([
+            'videoId' => $this->video->getPublicId()->toString(),
+            'transcodeJobId' => $this->job->toString(),
+        ]), 201, 'data')['data']['publicId'];
+        $guest = $this->viewer($this->hostLibrary);
+        $this->invite($this->host, $guest, $party);
+        $this->join($guest, $party);
+
+        return [$party, $guest];
+    }
+
+    private function transfer(string $party, User $to): Response
+    {
+        return $this->authenticatedRequest(
+            'POST',
+            self::URI . $party . '/members/transfer-host',
+            $this->host,
+            ['newHostUserId' => $to->getPublicId()->toString()],
         );
-        $this->entityManager->persist($library);
-        $this->entityManager->flush();
-
-        return $library;
     }
 
-    private function video(LibraryEntity $library): VideoEntity
+    /** @return array<string, mixed> the party as one of its members reads it */
+    private function session(string $party, User $member): array
     {
-        $video = new VideoEntity(new PublicId(), '/media/party-test.mkv', bin2hex(random_bytes(16)));
-        $movie = new MovieEntity(new PublicId(), $library, 'Party test movie');
-        $this->entityManager->persist($video);
-        $this->entityManager->persist($movie);
-        $this->entityManager->persist(new MovieVideoEntity($movie, $video));
-        $this->entityManager->flush();
-
-        return $video;
+        return $this->assertJsonResponse($this->authenticatedRequest('GET', self::URI . $party, $member), 200, 'data')['data'];
     }
 
-    private function job(VideoEntity $video): PublicId
+    /** A job of the video that the user owns. */
+    private function job(VideoEntity $video, User $owner): PublicId
     {
-        $id = Uuid::generate();
         $publicId = new PublicId();
         $this->entityManager->getConnection()->insert('transcode_jobs', [
             'request_id' => Uuid::generate()->toString(),
-            'id' => $id->toString(),
+            'id' => Uuid::generate()->toString(),
             'video_id' => $video->getId()->toString(),
+            'owner_user_id' => $owner->getId()->toString(),
             'public_id' => $publicId->toString(),
             'quality_tier_name' => '1080p',
             'created_at' => '2026-10-07 12:00:00+00',

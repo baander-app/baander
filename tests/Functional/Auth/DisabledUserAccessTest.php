@@ -20,6 +20,7 @@ use App\Auth\Application\Service\WebSocketOriginPolicy;
 use App\Auth\Application\Port\WebSocketTicketIssuerInterface;
 use App\Auth\Application\Port\WebSocketTicketRedeemerInterface;
 use App\Auth\Domain\Model\OAuth\Client;
+use App\Auth\Domain\Model\OAuth\SignInGrant;
 use App\Auth\Domain\Model\User;
 use App\Auth\Domain\Repository\OAuth\AccessTokenRepositoryInterface;
 use App\Auth\Domain\Repository\OAuth\ClientRepositoryInterface;
@@ -257,7 +258,7 @@ final class DisabledUserAccessTest extends TestCase
     private function issueTokens(User $user, string $clientPublicId): TokenResponseDTO
     {
         $result = $this->bus()
-            ->dispatch(new IssueTokenCommand(Uuid::fromString($this->clientUuids[$clientPublicId]), $user->getId(), self::DPOP_JKT, 0))
+            ->dispatch(new IssueTokenCommand(Uuid::fromString($this->clientUuids[$clientPublicId]), $user->getId(), self::DPOP_JKT, 0, SignInGrant::AuthorizationCode))
             ->last(HandledStamp::class)?->getResult();
         self::assertInstanceOf(TokenResponseDTO::class, $result);
 

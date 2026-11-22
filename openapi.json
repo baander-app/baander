@@ -6,12 +6,197 @@
         "version": "2.0.0"
     },
     "paths": {
+        "/api/movies/directors": {
+            "get": {
+                "tags": [
+                    "Catalog"
+                ],
+                "summary": "List directors of accessible movies",
+                "operationId": "get_movie_director_index",
+                "parameters": [
+                    {
+                        "name": "page",
+                        "in": "query",
+                        "schema": {
+                            "type": "integer",
+                            "default": 1
+                        }
+                    },
+                    {
+                        "name": "limit",
+                        "in": "query",
+                        "schema": {
+                            "type": "integer",
+                            "maximum": 100,
+                            "default": 50
+                        }
+                    },
+                    {
+                        "name": "q",
+                        "in": "query",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Paginated directors",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "allOf": [
+                                        {
+                                            "$ref": "#/components/schemas/PaginatedResponse"
+                                        },
+                                        {
+                                            "type": "object",
+                                            "properties": {
+                                                "data": {
+                                                    "type": "array",
+                                                    "items": {
+                                                        "$ref": "#/components/schemas/DirectorResource"
+                                                    }
+                                                }
+                                            },
+                                            "required": [
+                                                "data"
+                                            ]
+                                        }
+                                    ]
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/movies/directors/{publicId}": {
+            "get": {
+                "tags": [
+                    "Catalog"
+                ],
+                "summary": "Get a director of accessible movies",
+                "operationId": "get_movie_director_show",
+                "parameters": [
+                    {
+                        "name": "publicId",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "pattern": "^[0-9a-zA-Z_-]{21}$"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Director",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/DirectorResource"
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Director not found"
+                    }
+                }
+            }
+        },
+        "/api/movies/directors/{publicId}/movies": {
+            "get": {
+                "tags": [
+                    "Catalog"
+                ],
+                "summary": "List accessible movies by a director",
+                "operationId": "get_movie_director_movies",
+                "parameters": [
+                    {
+                        "name": "publicId",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "pattern": "^[0-9a-zA-Z_-]{21}$"
+                        }
+                    },
+                    {
+                        "name": "page",
+                        "in": "query",
+                        "schema": {
+                            "type": "integer",
+                            "default": 1
+                        }
+                    },
+                    {
+                        "name": "limit",
+                        "in": "query",
+                        "schema": {
+                            "type": "integer",
+                            "maximum": 100,
+                            "default": 50
+                        }
+                    },
+                    {
+                        "name": "q",
+                        "in": "query",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Paginated movies",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "allOf": [
+                                        {
+                                            "$ref": "#/components/schemas/PaginatedResponse"
+                                        },
+                                        {
+                                            "type": "object",
+                                            "properties": {
+                                                "data": {
+                                                    "type": "array",
+                                                    "items": {
+                                                        "$ref": "#/components/schemas/MovieResource"
+                                                    }
+                                                }
+                                            },
+                                            "required": [
+                                                "data"
+                                            ]
+                                        }
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Director not found"
+                    }
+                }
+            }
+        },
         "/api/transcode/jobs/": {
             "get": {
                 "tags": [
                     "Transcode"
                 ],
-                "summary": "List orphaned transcode jobs in accessible libraries",
+                "summary": "List the caller's orphaned transcode jobs in accessible libraries; administrators see every user's",
                 "operationId": "get_transcode_job_index",
                 "responses": {
                     "200": {
@@ -51,7 +236,7 @@
                 "tags": [
                     "Transcode"
                 ],
-                "summary": "Get a transcode job by public ID",
+                "summary": "Get one of the caller's transcode jobs by public ID; administrators may read any user's",
                 "operationId": "get_transcode_job_show",
                 "parameters": [
                     {
@@ -92,7 +277,7 @@
                         }
                     },
                     "404": {
-                        "description": "Not found",
+                        "description": "No such job, or another user's job for a caller who is not an administrator",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -153,7 +338,7 @@
                 "tags": [
                     "Transcode"
                 ],
-                "summary": "Get transcode job metrics",
+                "summary": "Get the metrics of one of the caller's transcode jobs; administrators may read any user's",
                 "operationId": "get_transcode_job_metrics",
                 "parameters": [
                     {
@@ -178,7 +363,7 @@
                         }
                     },
                     "404": {
-                        "description": "Not found",
+                        "description": "No such job, or another user's job for a caller who is not an administrator",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -2273,6 +2458,16 @@
                                 }
                             }
                         }
+                    },
+                    "409": {
+                        "description": "The user is the only enabled super admin",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
                     }
                 }
             }
@@ -2322,6 +2517,16 @@
                     },
                     "404": {
                         "description": "User not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "The user is the only enabled super admin",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -2564,6 +2769,16 @@
                     },
                     "404": {
                         "description": "User not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "The user is the only enabled super admin",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -3159,7 +3374,7 @@
                     "Auth"
                 ],
                 "summary": "Push an authorization request (RFC 9126 section 2)",
-                "description": "Every authorization request is pushed here first. The client authenticates as at the token endpoint and binds the request to its DPoP key (RFC 9449 section 10.1) with a `DPoP` proof header carrying a server-issued nonce, the `dpop_jkt` parameter, or both naming the same key; the authorization code is later bound to that key. A proof is checked as at the token endpoint: `use_dpop_nonce` and `invalid_dpop_proof` answers carry a `DPoP-Nonce` header, and every answer to a verified proof carries the next nonce. Send the browser to the authorization endpoint with only `client_id` and the returned `request_uri`. Parameters may be form-encoded (RFC 9126) or JSON. Answers carry `Cache-Control: no-store`.",
+                "description": "Every authorization request is pushed here first. The client authenticates as at the token endpoint and binds the request to its DPoP key (RFC 9449 section 10.1) with a `DPoP` proof header carrying a server-issued nonce, the `dpop_jkt` parameter, or both naming the same key; the authorization code is later bound to that key. A proof is checked as at the token endpoint: `use_dpop_nonce` and `invalid_dpop_proof` answers carry a `DPoP-Nonce` header, and every answer to a verified proof carries the next nonce. Send the browser to the authorization endpoint with only `client_id` and the returned `request_uri`. Baander's first-party client gets `unauthorized_client`. Parameters may be form-encoded (RFC 9126) or JSON. Answers carry `Cache-Control: no-store`.",
                 "operationId": "post_oauth_par",
                 "requestBody": {
                     "content": {
@@ -3290,7 +3505,7 @@
                     "Auth"
                 ],
                 "summary": "OAuth 2.0 token endpoint (RFC 6749 section 3.2)",
-                "description": "Requires a DPoP proof carrying a server-issued nonce. A missing or invalid proof is answered with `invalid_dpop_proof`, a proof without a fresh nonce with `use_dpop_nonce`; both carry a `DPoP-Nonce` header. Every answer carries the nonce for the next proof and `Cache-Control: no-store`. The issued tokens are bound to the proof key, and to the `X-Baander-Client-Fingerprint` header when it is sent. Parameters may be form-encoded (RFC 6749) or JSON. Every request names its client in `client_id` or in an HTTP Basic `Authorization` header. Public clients authenticate with `client_id` alone; confidential clients add `client_secret`, or `client_assertion` with `client_assertion_type`, by the one method they were registered with. A secret client sends its secret in the body or, with its client ID, in HTTP Basic (`client_secret_basic`, each part form-urlencoded first), never both; a failed Basic authentication is answered with a `WWW-Authenticate: Basic` challenge. A client assertion (RFC 7523 as updated by RFC 10070) is a JWT signed with one of the client's registered keys: `iss` and `sub` are the `client_id`, `aud` is the issuer identifier as its sole value, `exp` and `jti` are required, it lives at most 300 seconds by default, and its `jti` is accepted once. Its `typ` header is `client-authentication+jwt` or absent.",
+                "description": "Requires a DPoP proof carrying a server-issued nonce. A missing or invalid proof is answered with `invalid_dpop_proof`, a proof without a fresh nonce with `use_dpop_nonce`; both carry a `DPoP-Nonce` header. Every answer carries the nonce for the next proof and `Cache-Control: no-store`. The issued tokens are bound to the proof key, and to the `X-Baander-Client-Fingerprint` header when it is sent. Parameters may be form-encoded (RFC 6749) or JSON. Every request names its client in `client_id` or in an HTTP Basic `Authorization` header. Public clients authenticate with `client_id` alone; confidential clients add `client_secret`, or `client_assertion` with `client_assertion_type`, by the one method they were registered with. Baander's first-party client gets `unauthorized_client` for every grant; it refreshes at `/api/auth/refresh`. A secret client sends its secret in the body or, with its client ID, in HTTP Basic (`client_secret_basic`, each part form-urlencoded first), never both; a failed Basic authentication is answered with a `WWW-Authenticate: Basic` challenge. A client assertion (RFC 7523 as updated by RFC 10070) is a JWT signed with one of the client's registered keys: `iss` and `sub` are the `client_id`, `aud` is the issuer identifier as its sole value, `exp` and `jti` are required, it lives at most 300 seconds by default, and its `jti` is accepted once. Its `typ` header is `client-authentication+jwt` or absent.",
                 "operationId": "post_oauth_token",
                 "requestBody": {
                     "content": {
@@ -3797,7 +4012,7 @@
                     "Auth"
                 ],
                 "summary": "Get WebAuthn registration options",
-                "description": "Needs a verified email address, answered otherwise with 422 and `details.reason` `email_unverified`. Needs the current password, plus a current TOTP code when TOTP is on; a wrong password and a missing or wrong code get the same 422 with `details.reason` `step_up_failed`. The challenge is bound to the signed-in user and expires after 5 minutes.",
+                "description": "Needs a verified email address, answered otherwise with 403 and `details.reason` `email_unverified`. Needs the current password, plus a current TOTP code when TOTP is on; a wrong password and a missing or wrong code get the same 422 with `details.reason` `step_up_failed`. The challenge is bound to the signed-in user and expires after 5 minutes.",
                 "operationId": "post_passkey_options",
                 "requestBody": {
                     "content": {
@@ -3836,8 +4051,18 @@
                             }
                         }
                     },
+                    "403": {
+                        "description": "The email address is unverified (`details.reason` `email_unverified`)",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    },
                     "422": {
-                        "description": "Validation error, an unverified email address, or the password or code is wrong",
+                        "description": "Validation error, or the password or code is wrong",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -3884,6 +4109,7 @@
                     "Auth"
                 ],
                 "summary": "Register a new passkey",
+                "description": "Signs the account out of every other session, paired devices and third-party apps included; the session that completes the registration stays signed in.",
                 "operationId": "post_passkey_register",
                 "requestBody": {
                     "content": {
@@ -3939,7 +4165,7 @@
                         }
                     },
                     "401": {
-                        "description": "Not authenticated",
+                        "description": "Not authenticated, or another change ended this session first (reason credentials_changed); nothing was stored",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -3949,7 +4175,7 @@
                         }
                     },
                     "400": {
-                        "description": "Invalid challenge or verification failed",
+                        "description": "The challenge is unknown, spent or issued to another user (`details.reason` `invalid_challenge`), or the ceremony was refused (`details.reason` `passkey_registration_failed`); why it was refused is logged, not returned",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -3996,23 +4222,8 @@
                     "Auth"
                 ],
                 "summary": "Get WebAuthn authentication options",
+                "description": "Passkey sign-in is discoverable: the options name no account and list no credential, so the authenticator offers the passkeys it holds for this relying party. The challenge is spent by the first sign-in or check that presents it and expires after 5 minutes.",
                 "operationId": "post_passkey_authenticate_options",
-                "requestBody": {
-                    "content": {
-                        "application/json": {
-                            "schema": {
-                                "type": "object",
-                                "properties": {
-                                    "userId": {
-                                        "type": "string",
-                                        "description": "Optional user public ID to get passkey options for"
-                                    }
-                                }
-                            }
-                        }
-                    },
-                    "required": true
-                },
                 "responses": {
                     "200": {
                         "description": "Authentication options",
@@ -4030,16 +4241,6 @@
                             }
                         }
                     },
-                    "422": {
-                        "description": "Validation error",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/ValidationError"
-                                }
-                            }
-                        }
-                    },
                     "503": {
                         "description": "The passkey challenge store is unavailable; retry after the Retry-After delay.",
                         "headers": {
@@ -4059,7 +4260,8 @@
                             }
                         }
                     }
-                }
+                },
+                "security": []
             }
         },
         "/api/auth/passkey/authenticate": {
@@ -4067,32 +4269,14 @@
                 "tags": [
                     "Auth"
                 ],
-                "summary": "Authenticate with a passkey (API-based flow)",
-                "description": "The main passkey login flow goes through PasskeyAuthenticator at /api/auth/login/passkey. This endpoint is an alternative for API-based flows where the frontend manages the ceremony.",
+                "summary": "Check a passkey assertion without signing in",
+                "description": "Runs the checks passkey sign-in runs and names the account the assertion proves, without issuing tokens; sign-in itself is `POST /api/auth/login/passkey`. The challenge is spent once; the signature counter must increase unless the authenticator keeps none; an account with TOTP on needs a passkey that verified the user; a disabled account is refused.",
                 "operationId": "post_passkey_authenticate",
                 "requestBody": {
                     "content": {
                         "application/json": {
                             "schema": {
-                                "type": "object",
-                                "properties": {
-                                    "challengeKey": {
-                                        "type": "string",
-                                        "example": "challenge-key-abc123"
-                                    },
-                                    "response": {
-                                        "type": "object",
-                                        "description": "WebAuthn authenticator response (base64-encoded assertion)"
-                                    },
-                                    "userId": {
-                                        "type": "string",
-                                        "nullable": true
-                                    }
-                                },
-                                "required": [
-                                    "challengeKey",
-                                    "response"
-                                ]
+                                "$ref": "#/components/schemas/VerifyPasskeyChallengeRequest"
                             }
                         }
                     },
@@ -4100,7 +4284,7 @@
                 },
                 "responses": {
                     "200": {
-                        "description": "Authentication successful",
+                        "description": "The assertion holds",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -4111,35 +4295,23 @@
                                             "properties": {
                                                 "userId": {
                                                     "type": "string",
+                                                    "description": "Public ID of the account the passkey belongs to",
                                                     "minLength": 21,
                                                     "maxLength": 21,
                                                     "pattern": "^[0-9a-zA-Z_-]{21}$"
-                                                },
-                                                "credentialId": {
-                                                    "type": "string"
-                                                },
-                                                "signCount": {
-                                                    "type": "integer"
                                                 }
-                                            }
+                                            },
+                                            "required": [
+                                                "userId"
+                                            ]
                                         }
                                     }
                                 }
                             }
                         }
                     },
-                    "400": {
-                        "description": "Invalid challenge or verification failed",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/ApiError"
-                                }
-                            }
-                        }
-                    },
                     "401": {
-                        "description": "No passkey found for credential ID",
+                        "description": "The assertion was refused. An unknown credential, a bad signature, a spent challenge and every other refusal get the same answer, with `details.reason` `passkey_auth_failed`.",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -4177,7 +4349,8 @@
                             }
                         }
                     }
-                }
+                },
+                "security": []
             }
         },
         "/api/auth/passkey/{publicId}": {
@@ -4186,6 +4359,7 @@
                     "Auth"
                 ],
                 "summary": "Delete a passkey",
+                "description": "Needs the current password, plus a current TOTP code when TOTP is on; a wrong password and a missing or wrong code get the same 422 with `details.reason` `step_up_failed`. An unknown passkey answers 404 before any step-up attempt is spent. Signs the account out of every other session, paired devices and third-party apps included; the session that made the request stays signed in.",
                 "operationId": "delete_passkey_delete",
                 "parameters": [
                     {
@@ -4198,6 +4372,16 @@
                         }
                     }
                 ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/DeletePasskeyRequest"
+                            }
+                        }
+                    },
+                    "required": true
+                },
                 "responses": {
                     "200": {
                         "description": "Passkey deleted",
@@ -4226,7 +4410,7 @@
                         }
                     },
                     "401": {
-                        "description": "Not authenticated",
+                        "description": "Not authenticated, or another change ended this session first (reason credentials_changed); nothing was changed",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -4237,6 +4421,26 @@
                     },
                     "404": {
                         "description": "Passkey not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation error, or the password or code is wrong",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ValidationError"
+                                }
+                            }
+                        }
+                    },
+                    "429": {
+                        "description": "Too many step-up attempts for this account",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -4269,10 +4473,6 @@
                                     "response": {
                                         "type": "object",
                                         "description": "WebAuthn assertion from navigator.credentials.get()"
-                                    },
-                                    "userId": {
-                                        "type": "string",
-                                        "description": "Optional user ID the assertion must belong to"
                                     }
                                 },
                                 "required": [
@@ -4344,7 +4544,7 @@
                     "Auth"
                 ],
                 "summary": "Generate TOTP secret and provisioning URI",
-                "description": "Refused while TOTP is on, and for an unverified email address with 422 and `details.reason` `email_unverified`. Needs the current password; a wrong one gets 422 with `details.reason` `step_up_failed`. Each setup replaces the pending secret of the previous one; it expires after 10 minutes.",
+                "description": "Refused while TOTP is on, and for an unverified email address with 403 and `details.reason` `email_unverified`. Needs the current password; a wrong one gets 422 with `details.reason` `step_up_failed`. Each setup replaces the pending secret of the previous one; it expires after 10 minutes.",
                 "operationId": "post_totp_setup",
                 "requestBody": {
                     "content": {
@@ -4402,8 +4602,18 @@
                             }
                         }
                     },
+                    "403": {
+                        "description": "The email address is unverified (`details.reason` `email_unverified`)",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    },
                     "422": {
-                        "description": "Validation error, an unverified email address, or the password is wrong",
+                        "description": "Validation error, or the password is wrong",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -4431,21 +4641,13 @@
                     "Auth"
                 ],
                 "summary": "Enable TOTP after verifying a code from the authenticator app",
+                "description": "Signs the account out of every other session, paired devices and third-party apps included; the session that sent the code stays signed in.",
                 "operationId": "post_totp_enable",
                 "requestBody": {
                     "content": {
                         "application/json": {
                             "schema": {
-                                "type": "object",
-                                "properties": {
-                                    "code": {
-                                        "type": "string",
-                                        "example": "123456"
-                                    }
-                                },
-                                "required": [
-                                    "code"
-                                ]
+                                "$ref": "#/components/schemas/EnableTotpRequest"
                             }
                         }
                     },
@@ -4474,7 +4676,7 @@
                         }
                     },
                     "401": {
-                        "description": "Not authenticated",
+                        "description": "Not authenticated, or another change ended this session first (reason credentials_changed); nothing was changed",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -4521,22 +4723,14 @@
                 "tags": [
                     "Auth"
                 ],
-                "summary": "Disable TOTP (requires current TOTP code to verify)",
+                "summary": "Disable TOTP",
+                "description": "Refused with 400 while TOTP is off, before any step-up attempt is spent. Needs the current password and a current TOTP code; a missing or wrong password or code gets the same 422 with `details.reason` `step_up_failed`. Signs the account out of every other session, paired devices and third-party apps included; the session that made the request stays signed in.",
                 "operationId": "post_totp_disable",
                 "requestBody": {
                     "content": {
                         "application/json": {
                             "schema": {
-                                "type": "object",
-                                "properties": {
-                                    "code": {
-                                        "type": "string",
-                                        "example": "123456"
-                                    }
-                                },
-                                "required": [
-                                    "code"
-                                ]
+                                "$ref": "#/components/schemas/DisableTotpRequest"
                             }
                         }
                     },
@@ -4565,7 +4759,7 @@
                         }
                     },
                     "401": {
-                        "description": "Not authenticated",
+                        "description": "Not authenticated, or another change ended this session first (reason credentials_changed); nothing was changed",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -4575,7 +4769,7 @@
                         }
                     },
                     "400": {
-                        "description": "Invalid TOTP code or TOTP not enabled",
+                        "description": "TOTP is not on",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -4585,11 +4779,21 @@
                         }
                     },
                     "422": {
-                        "description": "Validation error",
+                        "description": "The password or code is wrong",
                         "content": {
                             "application/json": {
                                 "schema": {
                                     "$ref": "#/components/schemas/ValidationError"
+                                }
+                            }
+                        }
+                    },
+                    "429": {
+                        "description": "Too many step-up attempts for this account",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
                                 }
                             }
                         }
@@ -4636,7 +4840,7 @@
                 },
                 "responses": {
                     "202": {
-                        "description": "Registration received. The answer is the same whether or not an account uses the address: a new account is created and emailed a verification link, while the owner of an existing account is emailed that someone tried to register with it.",
+                        "description": "Registration received. The answer and its timing are the same whether or not an account uses the address: a new account is created and emailed a verification link, while the owner of an existing account is emailed that someone tried to register with it.",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -4672,6 +4876,56 @@
                             "application/json": {
                                 "schema": {
                                     "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Self-registration is closed; `details.reason` is `registration_closed`. Nothing was stored or sent.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": []
+            }
+        },
+        "/api/auth/registration": {
+            "get": {
+                "tags": [
+                    "Auth"
+                ],
+                "summary": "Whether self-registration is open",
+                "description": "Lets the sign-up page show whether it takes registrations. Operators open and close self-registration with the `auth.registration_open` server setting.",
+                "operationId": "get_auth_registration",
+                "responses": {
+                    "200": {
+                        "description": "The current state",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "object",
+                                            "properties": {
+                                                "open": {
+                                                    "type": "boolean",
+                                                    "example": false
+                                                }
+                                            },
+                                            "required": [
+                                                "open"
+                                            ]
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
                                 }
                             }
                         }
@@ -5171,7 +5425,7 @@
                     "Auth"
                 ],
                 "summary": "Verify an email address with a token",
-                "description": "Redeems the token from a verification email once. The token verifies only the address it was sent to, while the account still has that address.",
+                "description": "Redeems the token from a verification email once, in a signed-in session of the account it was sent for. The token verifies only the address it was sent to, while the account still has that address. A token for a pending email change makes that address the account's address and signs the account out of every other session; the session that made the request stays signed in.",
                 "operationId": "post_auth_email_verify",
                 "requestBody": {
                     "content": {
@@ -5197,8 +5451,16 @@
                                                 "message": {
                                                     "type": "string",
                                                     "example": "Email verified."
+                                                },
+                                                "emailChanged": {
+                                                    "type": "boolean",
+                                                    "description": "True when the link confirmed a pending email change: the account now uses the new address, and every other session was signed out."
                                                 }
-                                            }
+                                            },
+                                            "required": [
+                                                "message",
+                                                "emailChanged"
+                                            ]
                                         }
                                     }
                                 }
@@ -5207,6 +5469,26 @@
                     },
                     "400": {
                         "description": "The token is unknown, expired, already used or for an address the account no longer has",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Not authenticated, or another change ended this session first (reason credentials_changed); the token stays usable",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "The token is valid but was sent for another account (`details.reason` `verification_link_other_account`), or the request used a delegated access token; the token stays usable",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -5235,8 +5517,7 @@
                             }
                         }
                     }
-                },
-                "security": []
+                }
             }
         },
         "/api/auth/me/email/verification": {
@@ -5371,29 +5652,13 @@
                     "Auth"
                 ],
                 "summary": "Change the current user password",
-                "description": "Signs the account out of every other session; the session that made the request stays signed in.",
+                "description": "Needs the current password, plus a current TOTP code when TOTP is on; a wrong password and a missing or wrong code get the same 422 with `details.reason` `step_up_failed`. A new password outside the length policy is refused before any step-up attempt is spent. Signs the account out of every other session, paired devices and third-party apps included; the session that made the request stays signed in.",
                 "operationId": "put_auth_me_password",
                 "requestBody": {
                     "content": {
                         "application/json": {
                             "schema": {
-                                "type": "object",
-                                "properties": {
-                                    "currentPassword": {
-                                        "type": "string",
-                                        "example": "********"
-                                    },
-                                    "newPassword": {
-                                        "type": "string",
-                                        "minLength": 8,
-                                        "maxLength": 255,
-                                        "example": "********"
-                                    }
-                                },
-                                "required": [
-                                    "currentPassword",
-                                    "newPassword"
-                                ]
+                                "$ref": "#/components/schemas/ChangePasswordRequest"
                             }
                         }
                     },
@@ -5422,7 +5687,7 @@
                         }
                     },
                     "401": {
-                        "description": "Not authenticated",
+                        "description": "Not authenticated, or another change ended this session first (reason credentials_changed); nothing was changed",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -5432,11 +5697,21 @@
                         }
                     },
                     "422": {
-                        "description": "Validation error or wrong current password",
+                        "description": "Validation error, or the password or code is wrong",
                         "content": {
                             "application/json": {
                                 "schema": {
                                     "$ref": "#/components/schemas/ValidationError"
+                                }
+                            }
+                        }
+                    },
+                    "429": {
+                        "description": "Too many step-up attempts for this account",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
                                 }
                             }
                         }
@@ -6723,6 +6998,16 @@
                                 }
                             }
                         }
+                    },
+                    "404": {
+                        "description": "Library not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
                     }
                 }
             }
@@ -7809,7 +8094,7 @@
                 ],
                 "summary": "Extract cover art for all albums missing one",
                 "description": "Queues individual extraction jobs for embedded cover art from audio files for all albums without a cover image.",
-                "operationId": "post_extract_covers_app_catalog_interface_extractcovers__invoke",
+                "operationId": "post_album_covers_extract",
                 "responses": {
                     "202": {
                         "description": "Batch extraction dispatched",
@@ -8606,191 +8891,6 @@
                                 }
                             }
                         }
-                    }
-                }
-            }
-        },
-        "/api/movies/directors": {
-            "get": {
-                "tags": [
-                    "Catalog"
-                ],
-                "summary": "List directors of accessible movies",
-                "operationId": "get_movie_director_index",
-                "parameters": [
-                    {
-                        "name": "page",
-                        "in": "query",
-                        "schema": {
-                            "type": "integer",
-                            "default": 1
-                        }
-                    },
-                    {
-                        "name": "limit",
-                        "in": "query",
-                        "schema": {
-                            "type": "integer",
-                            "maximum": 100,
-                            "default": 50
-                        }
-                    },
-                    {
-                        "name": "q",
-                        "in": "query",
-                        "schema": {
-                            "type": "string"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "Paginated directors",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "allOf": [
-                                        {
-                                            "$ref": "#/components/schemas/PaginatedResponse"
-                                        },
-                                        {
-                                            "type": "object",
-                                            "properties": {
-                                                "data": {
-                                                    "type": "array",
-                                                    "items": {
-                                                        "$ref": "#/components/schemas/DirectorResource"
-                                                    }
-                                                }
-                                            },
-                                            "required": [
-                                                "data"
-                                            ]
-                                        }
-                                    ]
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        },
-        "/api/movies/directors/{publicId}": {
-            "get": {
-                "tags": [
-                    "Catalog"
-                ],
-                "summary": "Get a director of accessible movies",
-                "operationId": "get_movie_director_show",
-                "parameters": [
-                    {
-                        "name": "publicId",
-                        "in": "path",
-                        "required": true,
-                        "schema": {
-                            "type": "string",
-                            "pattern": "^[0-9a-zA-Z_-]{21}$"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "Director",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "type": "object",
-                                    "properties": {
-                                        "data": {
-                                            "$ref": "#/components/schemas/DirectorResource"
-                                        }
-                                    },
-                                    "required": [
-                                        "data"
-                                    ]
-                                }
-                            }
-                        }
-                    },
-                    "404": {
-                        "description": "Director not found"
-                    }
-                }
-            }
-        },
-        "/api/movies/directors/{publicId}/movies": {
-            "get": {
-                "tags": [
-                    "Catalog"
-                ],
-                "summary": "List accessible movies by a director",
-                "operationId": "get_movie_director_movies",
-                "parameters": [
-                    {
-                        "name": "publicId",
-                        "in": "path",
-                        "required": true,
-                        "schema": {
-                            "type": "string",
-                            "pattern": "^[0-9a-zA-Z_-]{21}$"
-                        }
-                    },
-                    {
-                        "name": "page",
-                        "in": "query",
-                        "schema": {
-                            "type": "integer",
-                            "default": 1
-                        }
-                    },
-                    {
-                        "name": "limit",
-                        "in": "query",
-                        "schema": {
-                            "type": "integer",
-                            "maximum": 100,
-                            "default": 50
-                        }
-                    },
-                    {
-                        "name": "q",
-                        "in": "query",
-                        "schema": {
-                            "type": "string"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "Paginated movies",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "allOf": [
-                                        {
-                                            "$ref": "#/components/schemas/PaginatedResponse"
-                                        },
-                                        {
-                                            "type": "object",
-                                            "properties": {
-                                                "data": {
-                                                    "type": "array",
-                                                    "items": {
-                                                        "$ref": "#/components/schemas/MovieResource"
-                                                    }
-                                                }
-                                            },
-                                            "required": [
-                                                "data"
-                                            ]
-                                        }
-                                    ]
-                                }
-                            }
-                        }
-                    },
-                    "404": {
-                        "description": "Director not found"
                     }
                 }
             }
@@ -10527,12 +10627,12 @@
             }
         },
         "/api/discovery/qr-payload/{serverPublicId}": {
-            "get": {
+            "post": {
                 "tags": [
                     "Discovery"
                 ],
-                "summary": "Get QR payload for a pending pairing session",
-                "operationId": "get_discovery_qr_payload",
+                "summary": "Create a QR code pairing session and return its payload",
+                "operationId": "post_discovery_qr_payload",
                 "parameters": [
                     {
                         "name": "serverPublicId",
@@ -13481,8 +13581,18 @@
                             }
                         }
                     },
+                    "422": {
+                        "description": "The result count is outside 1 to 100",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    },
                     "429": {
-                        "description": "The user already searched MusicBrainz in the last ten seconds",
+                        "description": "The user already searched MusicBrainz in the last ten seconds, or Discogs and Last.fm ten times in the last minute",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -13588,8 +13698,18 @@
                             }
                         }
                     },
+                    "422": {
+                        "description": "The result count is outside 1 to 100",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    },
                     "429": {
-                        "description": "The user already searched MusicBrainz in the last ten seconds",
+                        "description": "The user already searched MusicBrainz in the last ten seconds, or Discogs and Last.fm ten times in the last minute",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -13695,8 +13815,18 @@
                             }
                         }
                     },
+                    "422": {
+                        "description": "The result count is outside 1 to 100",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    },
                     "429": {
-                        "description": "The user already searched MusicBrainz in the last ten seconds",
+                        "description": "The user already searched MusicBrainz in the last ten seconds, or Discogs and Last.fm ten times in the last minute",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -15458,7 +15588,7 @@
                         }
                     },
                     "404": {
-                        "description": "The video or transcode job does not exist, or the user may not play its video",
+                        "description": "The video or transcode job does not exist, another user owns the job, or the user may not play its video",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -20815,6 +20945,82 @@
                 }
             }
         },
+        "/api/debug/health": {
+            "get": {
+                "tags": [
+                    "System"
+                ],
+                "summary": "Full health report",
+                "description": "Runs the checks of `/health` and returns each with its latency and details: connection state, Redis key count, Swoole figures, the largest web worker's memory against its limit, the background worker's heartbeat, the deployment profile fingerprints, and a failed dependency's error. The status code follows `/health`: the background worker, the worker profile and memory can read unhealthy while it answers 200.",
+                "operationId": "get_debug_health",
+                "responses": {
+                    "200": {
+                        "description": "This container is healthy",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "status": {
+                                            "type": "string",
+                                            "enum": [
+                                                "healthy"
+                                            ]
+                                        },
+                                        "checks": {
+                                            "type": "array",
+                                            "items": {
+                                                "type": "object",
+                                                "properties": {
+                                                    "component": {
+                                                        "type": "string",
+                                                        "example": "postgresql"
+                                                    },
+                                                    "status": {
+                                                        "type": "string",
+                                                        "enum": [
+                                                            "healthy",
+                                                            "unhealthy",
+                                                            "not_available"
+                                                        ]
+                                                    },
+                                                    "responseTimeMs": {
+                                                        "type": "number"
+                                                    },
+                                                    "details": {
+                                                        "type": "object"
+                                                    }
+                                                },
+                                                "required": [
+                                                    "component",
+                                                    "status",
+                                                    "responseTimeMs",
+                                                    "details"
+                                                ]
+                                            }
+                                        }
+                                    },
+                                    "required": [
+                                        "status",
+                                        "checks"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "503": {
+                        "description": "A component that decides this container's health is unhealthy; the body is the same report, with status `unhealthy`",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
         "/api/monitor/analytics/summary": {
             "get": {
                 "tags": [
@@ -23001,6 +23207,16 @@
                         "content": {
                             "application/vnd.apple.mpegurl": {}
                         }
+                    },
+                    "409": {
+                        "description": "The job owner may no longer play the video",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
                     }
                 }
             }
@@ -23043,7 +23259,10 @@
                         "description": "Job public ID",
                         "required": true,
                         "schema": {
-                            "type": "string"
+                            "type": "string",
+                            "minLength": 21,
+                            "maxLength": 21,
+                            "pattern": "^[0-9a-zA-Z_-]{21}$"
                         }
                     }
                 ],
@@ -23052,6 +23271,16 @@
                         "description": "HLS media manifest",
                         "content": {
                             "application/vnd.apple.mpegurl": {}
+                        }
+                    },
+                    "409": {
+                        "description": "The job owner may no longer play the video",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
                         }
                     }
                 }
@@ -23092,6 +23321,16 @@
                         "description": "DASH manifest",
                         "content": {
                             "application/dash+xml": {}
+                        }
+                    },
+                    "409": {
+                        "description": "The job owner may no longer play the video",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
                         }
                     }
                 }
@@ -23199,7 +23438,10 @@
                         "description": "Job public ID",
                         "required": true,
                         "schema": {
-                            "type": "string"
+                            "type": "string",
+                            "minLength": 21,
+                            "maxLength": 21,
+                            "pattern": "^[0-9a-zA-Z_-]{21}$"
                         }
                     },
                     {
@@ -23208,7 +23450,8 @@
                         "description": "Source subtitle track key: s followed by the absolute FFprobe stream index (for example s2)",
                         "required": true,
                         "schema": {
-                            "type": "string"
+                            "type": "string",
+                            "pattern": "^s[0-9]+$"
                         }
                     }
                 ],
@@ -23219,6 +23462,16 @@
                             "application/vnd.apple.mpegurl": {
                                 "schema": {
                                     "type": "string"
+                                }
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "The job owner may no longer play the video",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
                                 }
                             }
                         }
@@ -23264,7 +23517,10 @@
                         "description": "Job public ID",
                         "required": true,
                         "schema": {
-                            "type": "string"
+                            "type": "string",
+                            "minLength": 21,
+                            "maxLength": 21,
+                            "pattern": "^[0-9a-zA-Z_-]{21}$"
                         }
                     },
                     {
@@ -23324,6 +23580,16 @@
                     },
                     "404": {
                         "description": "Not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "The job owner may no longer play the video",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -23398,7 +23664,10 @@
                         "description": "Job public ID",
                         "required": true,
                         "schema": {
-                            "type": "string"
+                            "type": "string",
+                            "minLength": 21,
+                            "maxLength": 21,
+                            "pattern": "^[0-9a-zA-Z_-]{21}$"
                         }
                     },
                     {
@@ -23452,6 +23721,16 @@
                                 }
                             }
                         }
+                    },
+                    "409": {
+                        "description": "The job owner may no longer play the video",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
                     }
                 }
             }
@@ -23480,7 +23759,10 @@
                         "description": "Job public ID",
                         "required": true,
                         "schema": {
-                            "type": "string"
+                            "type": "string",
+                            "minLength": 21,
+                            "maxLength": 21,
+                            "pattern": "^[0-9a-zA-Z_-]{21}$"
                         }
                     },
                     {
@@ -23489,16 +23771,21 @@
                         "description": "Source subtitle track key: s followed by the absolute FFprobe stream index (for example s2)",
                         "required": true,
                         "schema": {
-                            "type": "string"
+                            "type": "string",
+                            "pattern": "^s[0-9]+$"
                         }
                     },
                     {
                         "name": "segment",
                         "in": "path",
-                        "description": "Segment name",
+                        "description": "Segment name; the whole track is one segment",
                         "required": true,
                         "schema": {
-                            "type": "string"
+                            "type": "string",
+                            "enum": [
+                                "full"
+                            ],
+                            "pattern": "full"
                         }
                     },
                     {
@@ -23536,6 +23823,16 @@
                     },
                     "404": {
                         "description": "Not found"
+                    },
+                    "409": {
+                        "description": "The job owner may no longer play the video",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
                     }
                 }
             }
@@ -26112,41 +26409,46 @@
                     "response"
                 ]
             },
-            "WebAuthnOptionsRequest": {
-                "type": "object",
-                "properties": {
-                    "userId": {
-                        "type": "string",
-                        "description": "Optional user public ID to get passkey options for",
-                        "default": ""
-                    }
-                }
-            },
             "VerifyPasskeyChallengeRequest": {
                 "type": "object",
                 "properties": {
                     "challengeKey": {
                         "type": "string",
+                        "description": "Key returned by /api/auth/passkey/authenticate/options",
                         "maxLength": 255,
                         "default": "",
                         "example": "challenge-key-abc123"
                     },
                     "response": {
                         "type": "object",
-                        "description": "WebAuthn authenticator response (base64-encoded assertion)",
+                        "description": "WebAuthn assertion from navigator.credentials.get()",
                         "nullable": true,
                         "default": null
-                    },
-                    "userId": {
-                        "type": "string",
-                        "nullable": true,
-                        "maxLength": 255,
-                        "default": ""
                     }
                 },
                 "required": [
                     "challengeKey",
                     "response"
+                ]
+            },
+            "DeletePasskeyRequest": {
+                "type": "object",
+                "properties": {
+                    "currentPassword": {
+                        "type": "string",
+                        "default": "",
+                        "example": "********"
+                    },
+                    "totpCode": {
+                        "type": "string",
+                        "description": "A current TOTP code; needed when TOTP is on",
+                        "nullable": true,
+                        "default": null,
+                        "example": "123456"
+                    }
+                },
+                "required": [
+                    "currentPassword"
                 ]
             },
             "StartTotpSetupRequest": {
@@ -26180,16 +26482,22 @@
             "DisableTotpRequest": {
                 "type": "object",
                 "properties": {
-                    "code": {
+                    "currentPassword": {
                         "type": "string",
-                        "minLength": 6,
-                        "maxLength": 6,
                         "default": "",
+                        "example": "********"
+                    },
+                    "totpCode": {
+                        "type": "string",
+                        "description": "A current TOTP code",
+                        "nullable": true,
+                        "default": null,
                         "example": "123456"
                     }
                 },
                 "required": [
-                    "code"
+                    "currentPassword",
+                    "totpCode"
                 ]
             },
             "RegisterRequest": {
@@ -26341,6 +26649,13 @@
                         "maxLength": 255,
                         "default": "",
                         "example": "********"
+                    },
+                    "totpCode": {
+                        "type": "string",
+                        "description": "A current TOTP code; needed when TOTP is on",
+                        "nullable": true,
+                        "default": null,
+                        "example": "123456"
                     }
                 },
                 "required": [
@@ -27242,6 +27557,36 @@
                     "containers"
                 ]
             },
+            "SearchMetadataRequest": {
+                "type": "object",
+                "properties": {
+                    "q": {
+                        "type": "string",
+                        "description": "Search query",
+                        "default": ""
+                    },
+                    "source": {
+                        "type": "string",
+                        "description": "Data source",
+                        "default": "musicbrainz"
+                    },
+                    "artist": {
+                        "type": "string",
+                        "description": "Filter by artist name",
+                        "nullable": true
+                    },
+                    "limit": {
+                        "type": "integer",
+                        "description": "Maximum number of results",
+                        "minimum": 1,
+                        "maximum": 100,
+                        "default": 25
+                    }
+                },
+                "required": [
+                    "q"
+                ]
+            },
             "ExtractMetadataRequest": {
                 "type": "object",
                 "properties": {
@@ -27322,7 +27667,7 @@
                     },
                     "transcodeJobId": {
                         "type": "string",
-                        "description": "Transcode job of the video that the host's playback steers",
+                        "description": "The host's own transcode job of the video, which the host's playback steers",
                         "nullable": true,
                         "minLength": 21,
                         "maxLength": 21,
@@ -28341,6 +28686,203 @@
                     "value"
                 ]
             },
+            "PaginatedResponse": {
+                "type": "object",
+                "properties": {
+                    "data": {
+                        "type": "array",
+                        "items": {}
+                    },
+                    "meta": {
+                        "type": "object",
+                        "properties": {
+                            "current_page": {
+                                "type": "integer"
+                            },
+                            "last_page": {
+                                "type": "integer"
+                            },
+                            "per_page": {
+                                "type": "integer"
+                            },
+                            "total": {
+                                "type": "integer"
+                            }
+                        },
+                        "required": [
+                            "current_page",
+                            "last_page",
+                            "per_page",
+                            "total"
+                        ]
+                    }
+                },
+                "required": [
+                    "data",
+                    "meta"
+                ]
+            },
+            "DirectorResource": {
+                "type": "object",
+                "properties": {
+                    "publicId": {
+                        "type": "string",
+                        "minLength": 21,
+                        "maxLength": 21,
+                        "pattern": "^[0-9a-zA-Z_-]{21}$"
+                    },
+                    "name": {
+                        "type": "string"
+                    },
+                    "tmdbId": {
+                        "type": "integer"
+                    },
+                    "profileUrl": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "movieCount": {
+                        "type": "integer"
+                    }
+                },
+                "required": [
+                    "publicId",
+                    "name",
+                    "tmdbId",
+                    "profileUrl",
+                    "movieCount"
+                ]
+            },
+            "MovieResource": {
+                "type": "object",
+                "properties": {
+                    "publicId": {
+                        "type": "string",
+                        "description": "Public identifier",
+                        "minLength": 21,
+                        "maxLength": 21,
+                        "pattern": "^[0-9a-zA-Z_-]{21}$"
+                    },
+                    "title": {
+                        "type": "string",
+                        "description": "Movie title"
+                    },
+                    "year": {
+                        "type": "integer",
+                        "description": "Release year",
+                        "nullable": true
+                    },
+                    "summary": {
+                        "type": "string",
+                        "description": "Plot summary",
+                        "nullable": true
+                    },
+                    "overview": {
+                        "type": "string",
+                        "description": "TMDB overview",
+                        "nullable": true
+                    },
+                    "tagline": {
+                        "type": "string",
+                        "description": "Movie tagline",
+                        "nullable": true
+                    },
+                    "posterUrl": {
+                        "type": "string",
+                        "description": "Poster image URL",
+                        "nullable": true
+                    },
+                    "backdropUrl": {
+                        "type": "string",
+                        "description": "Backdrop image URL",
+                        "nullable": true
+                    },
+                    "runtime": {
+                        "type": "integer",
+                        "description": "Runtime in minutes",
+                        "nullable": true
+                    },
+                    "rating": {
+                        "type": "number",
+                        "format": "float",
+                        "description": "TMDB vote average",
+                        "nullable": true
+                    },
+                    "originalLanguage": {
+                        "type": "string",
+                        "description": "Original language code",
+                        "nullable": true
+                    },
+                    "tmdbId": {
+                        "type": "integer",
+                        "description": "TMDB ID",
+                        "nullable": true
+                    },
+                    "imdbId": {
+                        "type": "string",
+                        "description": "IMDB ID",
+                        "nullable": true
+                    },
+                    "tmdbCollectionId": {
+                        "type": "integer",
+                        "description": "TMDB collection ID",
+                        "nullable": true
+                    },
+                    "collectionName": {
+                        "type": "string",
+                        "description": "Collection name",
+                        "nullable": true
+                    },
+                    "videoIds": {
+                        "type": "array",
+                        "description": "Video public identifiers",
+                        "items": {
+                            "type": "string",
+                            "minLength": 21,
+                            "maxLength": 21,
+                            "pattern": "^[0-9a-zA-Z_-]{21}$"
+                        }
+                    },
+                    "posterImage": {
+                        "type": "object",
+                        "description": "Poster image data",
+                        "nullable": true
+                    },
+                    "genres": {
+                        "type": "array",
+                        "description": "Genre list",
+                        "items": {
+                            "type": "object"
+                        }
+                    },
+                    "videos": {
+                        "type": "array",
+                        "description": "Video variants",
+                        "items": {
+                            "type": "object"
+                        }
+                    },
+                    "createdAt": {
+                        "type": "string",
+                        "format": "date-time",
+                        "description": "Creation timestamp"
+                    },
+                    "updatedAt": {
+                        "type": "string",
+                        "format": "date-time",
+                        "description": "Update timestamp"
+                    }
+                },
+                "required": [
+                    "publicId",
+                    "title",
+                    "videoIds",
+                    "genres",
+                    "videos",
+                    "createdAt",
+                    "updatedAt"
+                ]
+            },
             "ApiError": {
                 "type": "object",
                 "properties": {
@@ -28558,6 +29100,7 @@
             },
             "ActivityResource": {
                 "type": "object",
+                "description": "An activity of the viewer. The fields that name its song, album, artist or movie are null when that item was deleted or lies outside the viewer's current library access.",
                 "properties": {
                     "publicId": {
                         "type": "string",
@@ -28579,11 +29122,11 @@
                     },
                     "songAvailable": {
                         "type": "boolean",
-                        "description": "Whether the latest scan or ingestion observation marked the song source available"
+                        "description": "Whether the latest scan or ingestion observation marked the song source available; false when the song lies outside the viewer's current library access"
                     },
                     "songId": {
                         "type": "string",
-                        "description": "Song public ID",
+                        "description": "Song public ID; null when the song was deleted or lies outside the viewer's current library access",
                         "nullable": true,
                         "minLength": 21,
                         "maxLength": 21,
@@ -28591,7 +29134,7 @@
                     },
                     "albumId": {
                         "type": "string",
-                        "description": "Album public ID",
+                        "description": "Album public ID; null when the album was deleted or lies outside the viewer's current library access",
                         "nullable": true,
                         "minLength": 21,
                         "maxLength": 21,
@@ -28599,7 +29142,7 @@
                     },
                     "artistId": {
                         "type": "string",
-                        "description": "Artist public ID",
+                        "description": "Artist public ID; null when the artist was deleted or the activity names no song, album or movie inside the viewer's current library access",
                         "nullable": true,
                         "minLength": 21,
                         "maxLength": 21,
@@ -28607,7 +29150,7 @@
                     },
                     "movieId": {
                         "type": "string",
-                        "description": "Movie public ID",
+                        "description": "Movie public ID; null when the movie was deleted or lies outside the viewer's current library access",
                         "nullable": true,
                         "minLength": 21,
                         "maxLength": 21,
@@ -29169,7 +29712,6 @@
                         "enum": [
                             "public",
                             "confidential",
-                            "first_party",
                             "personal_access"
                         ]
                     },
@@ -29188,10 +29730,6 @@
                         "type": "string",
                         "format": "uri",
                         "description": "The validated redirect URI the answer goes to"
-                    },
-                    "consent_required": {
-                        "type": "boolean",
-                        "description": "False only for first-party clients, whose requests the page may approve without asking"
                     }
                 },
                 "required": [
@@ -29199,8 +29737,7 @@
                     "client_name",
                     "client_type",
                     "scopes",
-                    "redirect_uri",
-                    "consent_required"
+                    "redirect_uri"
                 ]
             },
             "AuthorizationErrorResource": {
@@ -29772,42 +30309,6 @@
                     "affected"
                 ]
             },
-            "PaginatedResponse": {
-                "type": "object",
-                "properties": {
-                    "data": {
-                        "type": "array",
-                        "items": {}
-                    },
-                    "meta": {
-                        "type": "object",
-                        "properties": {
-                            "current_page": {
-                                "type": "integer"
-                            },
-                            "last_page": {
-                                "type": "integer"
-                            },
-                            "per_page": {
-                                "type": "integer"
-                            },
-                            "total": {
-                                "type": "integer"
-                            }
-                        },
-                        "required": [
-                            "current_page",
-                            "last_page",
-                            "per_page",
-                            "total"
-                        ]
-                    }
-                },
-                "required": [
-                    "data",
-                    "meta"
-                ]
-            },
             "SongResource": {
                 "type": "object",
                 "properties": {
@@ -29855,7 +30356,7 @@
                     },
                     "path": {
                         "type": "string",
-                        "description": "File path",
+                        "description": "File path; only administrators read it",
                         "nullable": true
                     },
                     "length": {
@@ -30115,167 +30616,6 @@
                     "publicId",
                     "name",
                     "slug"
-                ]
-            },
-            "MovieResource": {
-                "type": "object",
-                "properties": {
-                    "publicId": {
-                        "type": "string",
-                        "description": "Public identifier",
-                        "minLength": 21,
-                        "maxLength": 21,
-                        "pattern": "^[0-9a-zA-Z_-]{21}$"
-                    },
-                    "title": {
-                        "type": "string",
-                        "description": "Movie title"
-                    },
-                    "year": {
-                        "type": "integer",
-                        "description": "Release year",
-                        "nullable": true
-                    },
-                    "summary": {
-                        "type": "string",
-                        "description": "Plot summary",
-                        "nullable": true
-                    },
-                    "overview": {
-                        "type": "string",
-                        "description": "TMDB overview",
-                        "nullable": true
-                    },
-                    "tagline": {
-                        "type": "string",
-                        "description": "Movie tagline",
-                        "nullable": true
-                    },
-                    "posterUrl": {
-                        "type": "string",
-                        "description": "Poster image URL",
-                        "nullable": true
-                    },
-                    "backdropUrl": {
-                        "type": "string",
-                        "description": "Backdrop image URL",
-                        "nullable": true
-                    },
-                    "runtime": {
-                        "type": "integer",
-                        "description": "Runtime in minutes",
-                        "nullable": true
-                    },
-                    "rating": {
-                        "type": "number",
-                        "format": "float",
-                        "description": "TMDB vote average",
-                        "nullable": true
-                    },
-                    "originalLanguage": {
-                        "type": "string",
-                        "description": "Original language code",
-                        "nullable": true
-                    },
-                    "tmdbId": {
-                        "type": "integer",
-                        "description": "TMDB ID",
-                        "nullable": true
-                    },
-                    "imdbId": {
-                        "type": "string",
-                        "description": "IMDB ID",
-                        "nullable": true
-                    },
-                    "tmdbCollectionId": {
-                        "type": "integer",
-                        "description": "TMDB collection ID",
-                        "nullable": true
-                    },
-                    "collectionName": {
-                        "type": "string",
-                        "description": "Collection name",
-                        "nullable": true
-                    },
-                    "videoIds": {
-                        "type": "array",
-                        "description": "Video public identifiers",
-                        "items": {
-                            "type": "string",
-                            "minLength": 21,
-                            "maxLength": 21,
-                            "pattern": "^[0-9a-zA-Z_-]{21}$"
-                        }
-                    },
-                    "posterImage": {
-                        "type": "object",
-                        "description": "Poster image data",
-                        "nullable": true
-                    },
-                    "genres": {
-                        "type": "array",
-                        "description": "Genre list",
-                        "items": {
-                            "type": "object"
-                        }
-                    },
-                    "videos": {
-                        "type": "array",
-                        "description": "Video variants",
-                        "items": {
-                            "type": "object"
-                        }
-                    },
-                    "createdAt": {
-                        "type": "string",
-                        "format": "date-time",
-                        "description": "Creation timestamp"
-                    },
-                    "updatedAt": {
-                        "type": "string",
-                        "format": "date-time",
-                        "description": "Update timestamp"
-                    }
-                },
-                "required": [
-                    "publicId",
-                    "title",
-                    "videoIds",
-                    "genres",
-                    "videos",
-                    "createdAt",
-                    "updatedAt"
-                ]
-            },
-            "DirectorResource": {
-                "type": "object",
-                "properties": {
-                    "publicId": {
-                        "type": "string",
-                        "minLength": 21,
-                        "maxLength": 21,
-                        "pattern": "^[0-9a-zA-Z_-]{21}$"
-                    },
-                    "name": {
-                        "type": "string"
-                    },
-                    "tmdbId": {
-                        "type": "integer"
-                    },
-                    "profileUrl": {
-                        "type": "string",
-                        "nullable": true
-                    },
-                    "movieCount": {
-                        "type": "integer"
-                    }
-                },
-                "required": [
-                    "publicId",
-                    "name",
-                    "tmdbId",
-                    "profileUrl",
-                    "movieCount"
                 ]
             },
             "MatchCandidatesResource": {
@@ -31107,7 +31447,7 @@
                     },
                     "path": {
                         "type": "string",
-                        "description": "Filesystem path"
+                        "description": "Filesystem path of the library root; only administrators read it"
                     },
                     "type": {
                         "type": "string",
@@ -31157,7 +31497,6 @@
                     "publicId",
                     "name",
                     "slug",
-                    "path",
                     "type",
                     "filesystemType",
                     "sortOrder",
@@ -31486,7 +31825,7 @@
                     },
                     "transcodeJobId": {
                         "type": "string",
-                        "description": "Transcode job that the host's playback steers; null when none was named or the job has been deleted",
+                        "description": "Transcode job that the host's playback steers; null when none was named, the job has been deleted, or its owner left the party",
                         "nullable": true,
                         "minLength": 21,
                         "maxLength": 21,
@@ -34227,7 +34566,7 @@
         "securitySchemes": {
             "bearerAuth": {
                 "type": "http",
-                "description": "DPoP-bound access token (JWT), sent as `Authorization: DPoP <token>` with a DPoP proof. First-party apps obtain it via `/api/auth/login`, `/api/auth/login/passkey` or `/api/auth/refresh`; other clients via `/api/oauth/token`.",
+                "description": "DPoP-bound access token (JWT), sent as `Authorization: DPoP <token>` with a DPoP proof. First-party apps obtain it via `/api/auth/login`, `/api/auth/login/passkey` or `/api/auth/refresh`; other clients via `/api/oauth/token`. Until the account's email address is verified, its tokens reach only the public routes, `GET /api/auth/me`, `POST /api/auth/email/verify`, `POST /api/auth/me/email/verification`, `PUT /api/auth/me/email` and `POST /api/auth/logout`; every other route answers 403 with `details.reason` `email_unverified`.",
                 "scheme": "bearer",
                 "bearerFormat": "JWT"
             },
@@ -34256,6 +34595,10 @@
         }
     ],
     "tags": [
+        {
+            "name": "Catalog",
+            "description": "Album, artist, song, movie, and genre management endpoints"
+        },
         {
             "name": "Transcode",
             "description": "Video transcoding management endpoints"
@@ -34297,10 +34640,6 @@
         },
         {
             "name": "Admin - Song"
-        },
-        {
-            "name": "Catalog",
-            "description": "Album, artist, song, movie, and genre management endpoints"
         },
         {
             "name": "Album Cover"

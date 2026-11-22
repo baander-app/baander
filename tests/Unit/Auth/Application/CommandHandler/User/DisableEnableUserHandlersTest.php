@@ -9,6 +9,7 @@ use App\Auth\Application\Command\User\EnableUserCommand;
 use App\Auth\Application\CommandHandler\User\DisableUserHandler;
 use App\Auth\Application\CommandHandler\User\EnableUserHandler;
 use App\Auth\Application\Exception\LiveConnectionsNotClosedException;
+use App\Auth\Application\Service\SuperAdminContinuity;
 use App\Auth\Application\Service\UserLookup;
 use App\Auth\Domain\Model\OAuth\AccessToken;
 use App\Auth\Domain\Model\User;
@@ -162,10 +163,12 @@ final class DisableEnableUserHandlersTest extends TestCase
     private function disableHandler(): DisableUserHandler
     {
         $accessTokens = $this->createStub(AccessTokenRepositoryInterface::class);
-        $accessTokens->method('revokeForUser')->willReturnCallback(function (Uuid $userId, ?AccessToken $keep): void {
+        $accessTokens->method('revokeForUser')->willReturnCallback(function (Uuid $userId, ?AccessToken $keep): array {
             self::assertTrue($this->user->getId()->equals($userId));
             self::assertNull($keep);
             $this->record('revoke access tokens');
+
+            return [];
         });
 
         $refreshTokens = $this->createStub(RefreshTokenRepositoryInterface::class);
@@ -202,6 +205,7 @@ final class DisableEnableUserHandlersTest extends TestCase
             $accessTokens,
             $refreshTokens,
             $this->transaction(),
+            new SuperAdminContinuity($users),
             $liveConnections,
             $logger,
         );

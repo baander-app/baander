@@ -9,11 +9,11 @@ use App\Metadata\Application\DTO\MusicBrainz\MusicBrainzSlotWait;
 use App\Metadata\Infrastructure\Api\MusicBrainz\MusicBrainzAdapter;
 use App\Metadata\Infrastructure\Api\Discogs\DiscogsAdapter;
 use App\Metadata\Infrastructure\Api\LastFm\LastFmAdapter;
+use App\Metadata\Interface\Request\SearchMetadataRequest;
 use App\Shared\Interface\Controller\ApiResponsesTrait;
-use App\Shared\Interface\Controller\TranslatorTrait;
 use OpenApi\Spec as OA;
 use Symfony\Component\HttpFoundation\JsonResponse;
-use Symfony\Component\HttpFoundation\Request;
+use Symfony\Component\HttpKernel\Attribute\MapQueryString;
 use Symfony\Component\HttpKernel\Exception\TooManyRequestsHttpException;
 use Symfony\Component\RateLimiter\RateLimiterFactoryInterface;
 use Symfony\Component\Routing\Attribute\Route;
@@ -24,19 +24,24 @@ use Symfony\Component\Security\Http\Attribute\CurrentUser;
  *
  * A MusicBrainz search first spends the user's own allowance of one call per ten seconds
  * (429 when spent), then waits at most ten seconds for a turn under the rate limit every
- * process shares (503 beyond), so one member cannot queue ahead of the matcher.
+ * process shares (503 beyond), so one member cannot queue ahead of the matcher. A Discogs or
+ * Last.fm search spends the user's allowance of ten such searches a minute (429 when spent),
+ * so one member cannot use up the server's provider quota.
  */
 #[OA\Tag(name: 'Metadata', description: 'External metadata enrichment endpoints')]
 #[Route('/api/metadata/search', name: 'metadata_search_')]
 final class MetadataSearchController
 {
     use ApiResponsesTrait;
-    use TranslatorTrait;
+
+    private const string PROVIDER_LIMIT_MESSAGE = 'Too many Discogs and Last.fm searches. Please try again later.';
+
     public function __construct(
         private readonly MusicBrainzAdapter $musicBrainz,
         private readonly DiscogsAdapter $discogs,
         private readonly LastFmAdapter $lastFm,
         private readonly RateLimiterFactoryInterface $musicbrainzUserLimiter,
+        private readonly RateLimiterFactoryInterface $metadataProviderUserLimiter,
     ) {
     }
 
@@ -100,8 +105,16 @@ final class MetadataSearchController
                 ),
             ),
             new OA\Response(
+                response: '422',
+                description: 'The result count is outside 1 to 100',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
+            ),
+            new OA\Response(
                 response: '429',
-                description: 'The user already searched MusicBrainz in the last ten seconds',
+                description: 'The user already searched MusicBrainz in the last ten seconds,'
+                    . ' or Discogs and Last.fm ten times in the last minute',
                 content: new OA\MediaType\Json(
                     schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
                 ),
@@ -116,20 +129,23 @@ final class MetadataSearchController
         ],
     )]
     #[Route('/artist', name: 'artist', methods: ['GET'])]
-    public function searchArtist(Request $request, #[CurrentUser] AuthenticatedUserIdentityInterface $user): JsonResponse
-    {
-        $query = $request->query->get('q', '');
-        $source = $request->query->get('source', 'musicbrainz');
-        $limit = (int) $request->query->get('limit', 25);
-
-        if (trim($query) === '') {
+    public function searchArtist(
+        #[CurrentUser] AuthenticatedUserIdentityInterface $user,
+        #[MapQueryString(validationFailedStatusCode: 422)]
+        SearchMetadataRequest $request = new SearchMetadataRequest(),
+    ): JsonResponse {
+        if (trim($request->q) === '') {
             return $this->errorResponse($this->trans('errors.query_required', domain: 'metadata'));
         }
 
-        $results = match ($source) {
-            'discogs' => $this->discogs->searchArtist($query, $limit),
-            'lastfm' => $this->lastFm->searchArtist($query, $limit),
-            default => $this->musicBrainzFor($user)->searchArtist($query, $limit, wait: MusicBrainzSlotWait::Bounded),
+        $results = match ($request->source) {
+            'discogs' => $this->discogsFor($user)->searchArtist($request->q, $request->limit),
+            'lastfm' => $this->lastFmFor($user)->searchArtist($request->q, $request->limit),
+            default => $this->musicBrainzFor($user)->searchArtist(
+                $request->q,
+                $request->limit,
+                wait: MusicBrainzSlotWait::Bounded,
+            ),
         };
 
         return $this->successResponse(is_array($results) ? $results : get_object_vars($results));
@@ -202,8 +218,16 @@ final class MetadataSearchController
                 ),
             ),
             new OA\Response(
+                response: '422',
+                description: 'The result count is outside 1 to 100',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
+            ),
+            new OA\Response(
                 response: '429',
-                description: 'The user already searched MusicBrainz in the last ten seconds',
+                description: 'The user already searched MusicBrainz in the last ten seconds,'
+                    . ' or Discogs and Last.fm ten times in the last minute',
                 content: new OA\MediaType\Json(
                     schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
                 ),
@@ -218,20 +242,23 @@ final class MetadataSearchController
         ],
     )]
     #[Route('/album', name: 'album', methods: ['GET'])]
-    public function searchAlbum(Request $request, #[CurrentUser] AuthenticatedUserIdentityInterface $user): JsonResponse
-    {
-        $query = $request->query->get('q', '');
-        $source = $request->query->get('source', 'musicbrainz');
-        $artist = $request->query->get('artist');
-        $limit = (int) $request->query->get('limit', 25);
-
-        if (trim($query) === '') {
+    public function searchAlbum(
+        #[CurrentUser] AuthenticatedUserIdentityInterface $user,
+        #[MapQueryString(validationFailedStatusCode: 422)]
+        SearchMetadataRequest $request = new SearchMetadataRequest(),
+    ): JsonResponse {
+        if (trim($request->q) === '') {
             return $this->errorResponse($this->trans('errors.query_required', domain: 'metadata'));
         }
 
-        $results = match ($source) {
-            'discogs' => $this->discogs->searchRelease($query, $artist ?? null, $limit),
-            default => $this->musicBrainzFor($user)->searchReleaseGroup($query, $artist ?? null, $limit, MusicBrainzSlotWait::Bounded),
+        $results = match ($request->source) {
+            'discogs' => $this->discogsFor($user)->searchRelease($request->q, $request->artist, $request->limit),
+            default => $this->musicBrainzFor($user)->searchReleaseGroup(
+                $request->q,
+                $request->artist,
+                $request->limit,
+                MusicBrainzSlotWait::Bounded,
+            ),
         };
 
         return $this->successResponse(get_object_vars($results));
@@ -304,8 +331,16 @@ final class MetadataSearchController
                 ),
             ),
             new OA\Response(
+                response: '422',
+                description: 'The result count is outside 1 to 100',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
+            ),
+            new OA\Response(
                 response: '429',
-                description: 'The user already searched MusicBrainz in the last ten seconds',
+                description: 'The user already searched MusicBrainz in the last ten seconds,'
+                    . ' or Discogs and Last.fm ten times in the last minute',
                 content: new OA\MediaType\Json(
                     schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
                 ),
@@ -320,40 +355,62 @@ final class MetadataSearchController
         ],
     )]
     #[Route('/song', name: 'song', methods: ['GET'])]
-    public function searchSong(Request $request, #[CurrentUser] AuthenticatedUserIdentityInterface $user): JsonResponse
-    {
-        $query = $request->query->get('q', '');
-        $source = $request->query->get('source', 'musicbrainz');
-        $artist = $request->query->get('artist');
-        $limit = (int) $request->query->get('limit', 25);
-
-        if (trim($query) === '') {
+    public function searchSong(
+        #[CurrentUser] AuthenticatedUserIdentityInterface $user,
+        #[MapQueryString(validationFailedStatusCode: 422)]
+        SearchMetadataRequest $request = new SearchMetadataRequest(),
+    ): JsonResponse {
+        if (trim($request->q) === '') {
             return $this->errorResponse($this->trans('errors.query_required', domain: 'metadata'));
         }
 
-        $results = match ($source) {
-            'discogs' => $this->discogs->searchRelease($query, $artist ?? null, $limit),
-            default => $this->musicBrainzFor($user)->searchRecording($query, $artist ?? null, $limit, MusicBrainzSlotWait::Bounded),
+        $results = match ($request->source) {
+            'discogs' => $this->discogsFor($user)->searchRelease($request->q, $request->artist, $request->limit),
+            default => $this->musicBrainzFor($user)->searchRecording(
+                $request->q,
+                $request->artist,
+                $request->limit,
+                MusicBrainzSlotWait::Bounded,
+            ),
         };
 
         return $this->successResponse(get_object_vars($results));
     }
 
-    /**
-     * The MusicBrainz adapter, once the user has spent a call of their own allowance; 429 when it is spent.
-     *
-     * The allowance is counted per user ID, so a changed email address starts no new one.
-     */
+    /** The MusicBrainz adapter, once the user has spent a call of their own allowance; 429 when it is spent. */
     private function musicBrainzFor(AuthenticatedUserIdentityInterface $user): MusicBrainzAdapter
     {
-        $allowance = $this->musicbrainzUserLimiter->create($user->getId())->consume();
+        self::spend($this->musicbrainzUserLimiter, $user, 'Too many MusicBrainz searches. Please try again later.');
+
+        return $this->musicBrainz;
+    }
+
+    private function discogsFor(AuthenticatedUserIdentityInterface $user): DiscogsAdapter
+    {
+        self::spend($this->metadataProviderUserLimiter, $user, self::PROVIDER_LIMIT_MESSAGE);
+
+        return $this->discogs;
+    }
+
+    private function lastFmFor(AuthenticatedUserIdentityInterface $user): LastFmAdapter
+    {
+        self::spend($this->metadataProviderUserLimiter, $user, self::PROVIDER_LIMIT_MESSAGE);
+
+        return $this->lastFm;
+    }
+
+    /** The allowance is counted per user ID, so a changed email address starts no new one. */
+    private static function spend(
+        RateLimiterFactoryInterface $limiter,
+        AuthenticatedUserIdentityInterface $user,
+        string $message,
+    ): void {
+        $allowance = $limiter->create($user->getId())->consume();
         if (!$allowance->isAccepted()) {
             throw new TooManyRequestsHttpException(
                 max(1, $allowance->getRetryAfter()->getTimestamp() - time()),
-                'Too many MusicBrainz searches. Please try again later.',
+                $message,
             );
         }
-
-        return $this->musicBrainz;
     }
 }

@@ -154,6 +154,8 @@ All endpoints are prefixed with `/api`. Every route that writes requires `ROLE_A
 | PATCH | `/api/songs/{publicId}` | Update song |
 | DELETE | `/api/songs/{publicId}` | Delete song |
 
+A song's `path` is its absolute file path on the server, and only administrators read it. The song routes, and the songs an album's detail lists, answer anyone else with `SongResource::forMember()`, the same projection without `path`; a playlist's songs use it for every viewer. `VideoResource::forMember()` leaves out a video's `path` the same way. Console commands and admin-only routes keep the full projection.
+
 ### Movies
 
 | Method | Path | Purpose |

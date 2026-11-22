@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Integration;
 
+use App\Auth\Domain\Model\OAuth\SignInGrant;
 use App\Auth\Domain\Model\User;
 use App\Auth\Domain\Repository\UserRepositoryInterface;
 use App\Auth\Infrastructure\Doctrine\Entity\OAuth\AccessTokenEntity;
@@ -89,14 +90,20 @@ final class OAuthFirewallAcceptanceTest extends TestCase
         $users = $container->get('oauth.acceptance.users');
         self::assertInstanceOf(UserRepositoryInterface::class, $users);
         $this->user = User::register(new Email('oauth-' . bin2hex(random_bytes(8)) . '@baander.app'), 'test-only-password', 'OAuth acceptance user');
+        $this->user->verifyEmail();
         $users->save($this->user);
         $userEntity = $this->manager->find(UserEntity::class, $this->user->getId());
         self::assertInstanceOf(UserEntity::class, $userEntity);
-        // The web app's own client: its tokens are first-party and carry the user's roles.
+        // The web app's own client: a password sign-in's tokens are first-party and carry the user's roles.
         $this->client = FirstPartyOAuthClient::entity($container, $this->manager);
         $this->proof = new SignedDpopProof();
-        $this->token = new AccessTokenEntity((new Uuid())->toString(), $this->client, $userEntity, scopes: ['profile'], expiresAt: new \DateTimeImmutable('+1 hour'));
-        $this->token->setDpopJkt($this->proof->thumbprint());
+        $this->token = FirstPartyOAuthClient::accessToken(
+            $container,
+            $this->manager,
+            $userEntity,
+            SignInGrant::Password,
+            $this->proof->thumbprint(),
+        );
         $this->manager->persist($this->token);
         $this->manager->flush();
     }
@@ -242,7 +249,7 @@ final class OAuthFirewallAcceptanceTest extends TestCase
         yield 'server registration' => ['POST', '/api/discovery/register'];
         yield 'pairing code' => ['POST', '/api/discovery/pairing-code'];
         yield 'pairing completion' => ['POST', '/api/discovery/complete-pairing'];
-        yield 'pairing QR payload' => ['GET', '/api/discovery/qr-payload/' . '00000000-0000-7000-8000-000000000001'];
+        yield 'pairing QR payload' => ['POST', '/api/discovery/qr-payload/' . '00000000-0000-7000-8000-000000000001'];
     }
 
     #[DataProvider('protectedRoutes')]
@@ -271,22 +278,26 @@ final class OAuthFirewallAcceptanceTest extends TestCase
         }
     }
 
-    /** @return iterable<string, array{'first-party'|'personal-access'|'third-party', int}> */
+    /** @return iterable<string, array{'first-party'|'personal-access'|'third-party', SignInGrant, int}> */
     public static function adminTokenClients(): iterable
     {
-        yield 'first-party client' => ['first-party', 200];
-        yield 'personal access client' => ['personal-access', 403];
-        yield 'third-party client' => ['third-party', 403];
+        yield 'password sign-in of the first-party client' => ['first-party', SignInGrant::Password, 200];
+        yield 'passkey sign-in of the first-party client' => ['first-party', SignInGrant::Passkey, 200];
+        yield 'first-party client through an authorization code' => ['first-party', SignInGrant::AuthorizationCode, 403];
+        yield 'first-party client through a device code' => ['first-party', SignInGrant::DeviceCode, 403];
+        yield 'personal access client' => ['personal-access', SignInGrant::AuthorizationCode, 403];
+        yield 'third-party client' => ['third-party', SignInGrant::AuthorizationCode, 403];
     }
 
     /**
-     * Only a token of Baander's own client carries its user's admin role; a token the same
-     * administrator granted any other client authenticates them as a plain user.
+     * Only a token of Baander's own client whose chain began with a password or passkey sign-in
+     * carries its user's admin role; a token the same administrator granted any other client, or
+     * one the first-party client received from a delegated grant, authenticates them as a plain user.
      *
      * @param 'first-party'|'personal-access'|'third-party' $kind
      */
     #[DataProvider('adminTokenClients')]
-    public function testOnlyAFirstPartyTokenCarriesTheAdministratorsRole(string $kind, int $status): void
+    public function testOnlyAFirstPartySignInCarriesTheAdministratorsRole(string $kind, SignInGrant $grant, int $status): void
     {
         $users = $this->kernel->getContainer()->get('oauth.acceptance.users');
         self::assertInstanceOf(UserRepositoryInterface::class, $users);
@@ -296,10 +307,17 @@ final class OAuthFirewallAcceptanceTest extends TestCase
         self::assertInstanceOf(UserEntity::class, $adminEntity);
         $client = match ($kind) {
             'first-party' => FirstPartyOAuthClient::entity($this->kernel->getContainer(), $this->manager),
-            'personal-access' => new ClientEntity(new PublicId(), 'Administrator scripts', '[]', personalAccessClient: true, firstParty: true),
+            'personal-access' => new ClientEntity(new PublicId(), 'Administrator scripts', '[]', personalAccessClient: true),
             'third-party' => new ClientEntity(new PublicId(), 'Third-party player', json_encode(['https://baander.app/callback'], JSON_THROW_ON_ERROR)),
         };
-        $token = new AccessTokenEntity((new Uuid())->toString(), $client, $adminEntity, scopes: $kind === 'first-party' ? [] : ['library', 'playlist'], expiresAt: new \DateTimeImmutable('+1 hour'));
+        $token = new AccessTokenEntity(
+            (new Uuid())->toString(),
+            $client,
+            $grant,
+            $adminEntity,
+            scopes: $kind === 'first-party' ? [] : ['library', 'playlist'],
+            expiresAt: new \DateTimeImmutable('+1 hour'),
+        );
         $token->setDpopJkt($this->proof->thumbprint());
         $this->manager->persist($client);
         $this->manager->persist($token);
@@ -316,6 +334,41 @@ final class OAuthFirewallAcceptanceTest extends TestCase
                 $this->manager->remove($client);
             }
             $this->manager->remove($adminEntity);
+            $this->manager->flush();
+        }
+    }
+
+    /**
+     * The first-party client never takes the authorization code grant, so a token of it from that
+     * grant was minted around issuance, as a crafted pushed request once allowed. Whatever scopes
+     * that request named, the token does not read the user's profile.
+     */
+    public function testAFirstPartyTokenFromAnAuthorizationCodeKeepsNoScopes(): void
+    {
+        $userEntity = $this->manager->find(UserEntity::class, $this->user->getId());
+        self::assertInstanceOf(UserEntity::class, $userEntity);
+        $token = new AccessTokenEntity(
+            (new Uuid())->toString(),
+            $this->client,
+            SignInGrant::AuthorizationCode,
+            $userEntity,
+            scopes: ['profile', 'email', 'library', 'playlist'],
+            expiresAt: new \DateTimeImmutable('+1 hour'),
+        );
+        $token->setDpopJkt($this->proof->thumbprint());
+        $this->manager->persist($token);
+        $this->manager->flush();
+        try {
+            $uri = 'https://baander.app/api/auth/me';
+            $jwt = OAuthAccessTokenJwt::sign($this->privateKey, $token);
+            $exploit = $this->request($jwt, $this->proof->create('GET', $uri, $jwt));
+            $signIn = $this->accessJwt();
+            $owner = $this->request($signIn, $this->proof->create('GET', $uri, $signIn));
+
+            self::assertSame(403, $exploit->getStatusCode(), (string) $exploit->getContent());
+            self::assertSame(200, $owner->getStatusCode(), 'The password sign-in of the same user reads the profile.');
+        } finally {
+            $this->manager->remove($token);
             $this->manager->flush();
         }
     }
@@ -393,6 +446,26 @@ final class OAuthFirewallAcceptanceTest extends TestCase
             $response = $this->request($jwt, $this->proof->create('POST', $uri, $jwt), $uri, 'POST', $origin);
             self::assertSame(403, $response->getStatusCode(), (string) $response->getContent());
         }
+    }
+
+    public function testAnUnverifiedAccountReadsItsProfileButGetsNoTicketOrPlaylists(): void
+    {
+        $entity = $this->manager->find(UserEntity::class, $this->user->getId());
+        self::assertInstanceOf(UserEntity::class, $entity);
+        $entity->setEmailVerifiedAt(null);
+        $this->manager->flush();
+        $jwt = $this->accessJwt();
+
+        foreach ([['POST', '/api/ws/tickets'], ['GET', '/api/playlists/']] as [$method, $path]) {
+            $uri = 'https://baander.app' . $path;
+            $response = $this->request($jwt, $this->proof->create($method, $uri, $jwt), $uri, $method, 'https://baander.app');
+
+            self::assertSame(403, $response->getStatusCode(), (string) $response->getContent());
+            $error = json_decode((string) $response->getContent(), true, flags: JSON_THROW_ON_ERROR)['error'];
+            self::assertSame('email_unverified', $error['details']['reason'] ?? null, $path);
+        }
+        $profile = $this->request($jwt, $this->proof->create('GET', 'https://baander.app/api/auth/me', $jwt));
+        self::assertSame(200, $profile->getStatusCode(), (string) $profile->getContent());
     }
 
     public function testActualRedisPreservesBindingMismatchAndConsumesATicketOnlyOnce(): void

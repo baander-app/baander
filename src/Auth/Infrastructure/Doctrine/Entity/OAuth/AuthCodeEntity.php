@@ -23,6 +23,7 @@ class AuthCodeEntity implements AuthCodeEntityInterface
     #[ORM\GeneratedValue(strategy: 'NONE')]
     private Uuid $id;
 
+    /** The hex SHA-256 digest of the code; the code itself is never stored. */
     #[ORM\Column(type: 'text')]
     private string $codeId;
 

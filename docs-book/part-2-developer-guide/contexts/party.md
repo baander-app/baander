@@ -51,6 +51,12 @@ Party events leave the handler after the transaction commits. `MemberLeft` is di
 
 Two guarantees rest on this order. The party's host always holds a member row: concurrent leaves, a transfer and a revoke cannot leave the host role with a user who is no longer a member. Once a revoke has answered, the revoked user has no member row and no socket in the party's room, even when a join ran beside it. The WebSocket controller completes the second: after a socket enters the room on `party.join`, it reads the member row again and takes the socket out when the row is gone ([Rooms](../architecture/real-time-patterns.md#rooms)).
 
+### Transcode Job
+
+A party may name one transcode job, and the host's play, pause and seek steer its encoder through Transcode's `PlaybackPositionChanged`. A play after a pause resumes the encoder. The job must be the host's own: `PartyMediaAccess` looks it up with `PlaybackAccessInterface::findOwnedTranscodeJobVideoId`, which finds a job only for its owner, so another user's job is refused with the same `404` as a job that does not exist.
+
+The job stays with the party while its owner is a member. A host transfer keeps it, so a new host steers the owner's encoder. When the owner leaves or the host revokes the owner's invitation, `LeavePartySessionHandler` or `RevokePartyInvitationHandler` clears the session's `transcodeJobId` under the party's row lock ([Membership Changes](#membership-changes)); play, pause and seek then signal no encoder. Deleting the job clears the reference through `fk_party_sessions_transcode_job_id`.
+
 ## Ports
 
 | Port | Purpose | Implemented By |
@@ -61,7 +67,7 @@ Two guarantees rest on this order. The party's host always holds a member row: c
 | `PartySessionPortInterface` | Session lifecycle operations (create, end, query) and the row lock that serializes membership changes (`lockByUuid`) | `PartySessionService` |
 | `PartyMemberPortInterface` | Member operations (join, leave, role transfer) | `PartyMemberService` |
 | `PartyInvitationPortInterface` | Invitation operations (invite, revoke, check, list by session) | `PartyInvitationService` |
-| `PartyMediaAccessPortInterface` | Verifies that the host may play the session's video and that any named transcode job encodes it | `PartyMediaAccess` |
+| `PartyMediaAccessPortInterface` | Verifies that the host may play the session's video and that any named transcode job is the host's own job of it, and tells whether a user owns a job | `PartyMediaAccess` |
 | `PartyPublicIdentityPortInterface` | Resolves public and internal identifiers for party sessions, members, invitations, users, videos, and transcode jobs | `PartyPublicIdentity` |
 | `PlaybackSynchronizationPortInterface` | Wall-clock position calculation and jitter compensation | `PlaybackSynchronizer` |
 
@@ -154,7 +160,7 @@ A member or invited user requests a single-use ticket from `POST /api/ws/tickets
 |-----------|---------|-------------|
 | Depends on | Shared | Uses `Uuid`, `PublicId`, `TransactionPortInterface`, and `LivePartyRoomsPortInterface` |
 | Depends on | Catalog | `PartyPublicIdentity` translates video IDs by reading Catalog's `videos` table with SQL; no Catalog class is imported |
-| Depends on | Transcode | References video playback access (`PlaybackAccessInterface`) and transcode job data; the start, pause and seek handlers raise Transcode's `PlaybackPositionChanged` |
+| Depends on | Transcode | Checks video playback access and transcode job ownership through `PlaybackAccessInterface`; the start, pause and seek handlers raise Transcode's `PlaybackPositionChanged` |
 | Depends on | Auth | User identification and authentication |
 
 ## Infrastructure

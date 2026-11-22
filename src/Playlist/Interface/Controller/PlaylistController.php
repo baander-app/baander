@@ -28,7 +28,6 @@ use App\Catalog\Interface\Resource\SongResource;
 use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
 use App\Shared\Interface\Controller\ApiResponsesTrait;
-use App\Shared\Interface\Controller\TranslatorTrait;
 use OpenApi\Spec as OA;
 use Symfony\Bundle\SecurityBundle\Security;
 use Symfony\Component\HttpFoundation\JsonResponse;
@@ -45,7 +44,6 @@ use Symfony\Component\Security\Core\Exception\AccessDeniedException;
 final class PlaylistController
 {
     use ApiResponsesTrait;
-    use TranslatorTrait;
 
     /**
      * The message a refusal carries, by the voter attribute that decided it. A 403 on a
@@ -395,8 +393,9 @@ final class PlaylistController
             if ($song === null) {
                 continue;
             }
-            $data = SongResource::fromWithMeta($song, $artistNames, $albumTitles, $availability, $albumLanguages);
-            unset($data['path']);
+            // A playlist names its songs without their file paths, for every viewer.
+            $data = SongResource::fromWithMeta($song, $artistNames, $albumTitles, $availability, $albumLanguages)
+                |> SongResource::forMember(...);
             $songs[] = array_merge(['position' => $playlistSong->getPosition()], $data);
         }
 

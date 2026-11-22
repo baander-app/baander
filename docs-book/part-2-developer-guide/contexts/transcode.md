@@ -179,10 +179,10 @@ Endpoints are split between session management and streaming delivery.
 
 | Method | Path | Purpose |
 |--------|------|---------|
-| GET | `/api/transcode/jobs` | List orphaned transcoding jobs in accessible libraries |
+| GET | `/api/transcode/jobs` | List the caller's orphaned transcoding jobs in accessible libraries; an administrator sees every user's |
 | GET | `/api/transcode/jobs/list` | List transcoding jobs for the authenticated user |
-| GET | `/api/transcode/jobs/{publicId}` | Get a single job status |
-| GET | `/api/transcode/jobs/{publicId}/metrics` | Job encoding metrics |
+| GET | `/api/transcode/jobs/{publicId}` | Get the status of one of the caller's jobs; another user's job answers `404` unless the caller is an administrator |
+| GET | `/api/transcode/jobs/{publicId}/metrics` | Encoding metrics of one of the caller's jobs, with the same `404` for another user's job |
 | POST | `/api/transcode/jobs/cleanup` | Trigger orphaned-job cleanup |
 
 ### Streaming
@@ -204,6 +204,10 @@ Endpoints are split between session management and streaming delivery.
 | GET | `/api/transcode/artifacts/{jobPublicId}/{generation}/tracks/{track}/segment.m4s?index={index}` | Completed video track media segment (`CompletedVideoController`, signed URL) |
 
 The live media playlist, init segment, media segment and subtitle segment routes take a required `generation` query naming the pinned transcode execution generation. The signed URLs in the master manifest carry it; a request without it answers `404`. Completed video artifact routes carry `{generation}` in the URL path.
+
+The live routes require `{videoId}` and `{jobPublicId}` to be public IDs and `{language}` to be a source subtitle track key of the form `s<index>`, such as `s0`, and `{segment}` is always `full`. The `security.yaml` rows that admit delivery without a token match the same patterns, so any other path under `/api/transcode/`, such as `/api/transcode/jobs/master.m3u8`, needs authentication.
+
+A signed URL is not bound to the user who presents it, but it serves only while the owner of each job it names may still play the job's video. Each live manifest, segment and subtitle request checks that once, after the signature, through `LiveDeliveryAccessPort`; the master and DASH manifests check every job of their rendition set. A lost library, a disabled owner and a missing job all answer `409` (`Playback media is unavailable.`). The wait for a segment to be published re-resolves the job every 0.25 seconds without repeating the check. Completed video artifacts check the job owner the same way in `CompletedVideoDeliveryAdapter`.
 
 ## Cross-Context Relationships
 

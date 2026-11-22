@@ -4,7 +4,7 @@ Inspect component readiness, Swoole worker memory and connection pools, Promethe
 
 ## Health Checks
 
-Baander exposes three HTTP endpoints for health probing. None of these require authentication.
+Baander exposes three HTTP endpoints for health probing. None of these require authentication, so they answer each component's status and nothing else.
 
 | Endpoint | Purpose | Healthy status | Unhealthy status |
 |----------|---------|---------------|-----------------|
@@ -12,11 +12,11 @@ Baander exposes three HTTP endpoints for health probing. None of these require a
 | `GET /ready` | Dependency readiness (PostgreSQL, Redis); not ready while the web server drains | `200` with `"status": "ready"` | `503` with `"status": "not_ready"` |
 | `GET /live` | Process liveness (Swoole worker alive) | `200` with `"status": "alive"` and `"draining": false` | N/A (always 200 if responding; `"draining": true` while the web server drains) |
 
-Because the endpoints need no authentication, a failed check never shows its error text there: the check's `details.error` reads `unavailable`, and the web server logs the real error with the component's name. [`app:health:check`](../commands/app-health-check.md), configuration validation and health alerts keep the detail.
+Each entry of a probe's `checks` list holds only `component` and `status`, and `/ready` and `/live` add a top-level `draining` flag. Latency, figures such as Redis's key count or a worker's memory, the deployment profile fingerprints and a failed check's error stay out of these answers; the web server logs a failed check's error with the component's name. Administrators read the full report with [`app:health:check`](../commands/app-health-check.md) or its admin API counterpart `GET /api/debug/health`, which the **Run Health Check** action on the admin dashboard calls. Configuration validation and health alerts keep the detail too.
 
 `/health` lists the background worker, its deployment profile and memory, but none of them decides the response code: a worker outage, a worker started with a different deployment profile from web, or a web server worker near its memory limit does not turn `/health` into `503`, and `/ready` checks none of them. The web server [alerts administrators](../administration/notifications.md#health-alerts) about all three instead.
 
-While the web server [drains before it stops](../maintenance/web-server-restarts.md#stopping-and-restarting-the-web-server), `/ready` answers `503` without checking any dependency. Its `checks` list holds a single `server` entry whose `details` are `{"draining": true}`. The server accepts no new connections once the drain starts, so only a client that holds a kept-alive connection from before the stop sees this answer, and the answer carries `Connection: close`. `/live` still answers `200` during the drain, so liveness probes do not restart the container, and its body says `"draining": true`. The web player reads that answer as "server not back yet".
+While the web server [drains before it stops](../maintenance/web-server-restarts.md#stopping-and-restarting-the-web-server), `/ready` answers `503` with `"draining": true` without checking any dependency. Its `checks` list holds a single unhealthy `server` entry. The server accepts no new connections once the drain starts, so only a client that holds a kept-alive connection from before the stop sees this answer, and the answer carries `Connection: close`. `/live` still answers `200` during the drain, so liveness probes do not restart the container, and its body says `"draining": true`. The web player reads that answer as "server not back yet".
 
 These endpoints are meant for orchestrator probes. The Docker healthcheck does not call one; it runs the `app:health:check` command. The development stack defines it in `docker-compose.yml` as below; the web image's `Dockerfile` defines the same check with a 10-second start period:
 
@@ -31,13 +31,13 @@ healthcheck:
 
 ### CLI health check
 
-You can also run the health check from the command line inside the container. It prints a table with per-component status and latency:
+You can also run the health check from the command line inside the container. It prints a table with per-component status, latency and details:
 
 ```bash
 dc exec -T app php bin/console app:health:check
 ```
 
-This runs the same checks as `/health` and exits with code 1 if a component other
+This runs the same checks as `/health` and `GET /api/debug/health` and exits with code 1 if a component other
 than the background worker, its deployment profile or memory is unhealthy; otherwise
 it exits with code 0.
 A `not_available` row does not fail the command. Outside a web worker, Swoole can
@@ -123,10 +123,10 @@ Use this for lightweight debugging of memory leaks, connection exhaustion, or ha
 
 ## Prometheus Metrics
 
-Baander exposes a Prometheus-compatible metrics endpoint at `GET /metrics`. No authentication is required.
+The web server exposes a Prometheus-compatible metrics endpoint at `GET /metrics` on its own port, `9501`. No authentication is required, so the shipped gateways keep it off the public listener: the production nginx (`docker/prod/nginx.conf`) and the preset gateway answer `/metrics` with `404`. Read it from a container on the application network:
 
 ```bash
-curl --fail --show-error --silent "$BAANDER_URL/metrics"
+dc exec -T app curl --fail --show-error --silent http://127.0.0.1:9501/metrics
 ```
 
 The endpoint returns metrics in Prometheus text exposition format (`text/plain; version=0.0.4`). Available metrics:
@@ -209,7 +209,7 @@ dc exec -T app php bin/console app:rate-limiter:clear --all
 
 ### Rate-limit storage outages
 
-All 26 configured limiters use atomic Redis state while retaining their configured
+All 27 configured limiters use atomic Redis state while retaining their configured
 budgets and fixed-window, sliding-window or token-bucket policies. A protected request whose limiter state
 cannot be established receives a generic `503`, `Retry-After: 1` and
 `Cache-Control: no-store`; it does not receive a fresh budget from a cache miss.
@@ -253,6 +253,7 @@ The endpoint validates environment variables, key file existence, whether `APP_S
 | VAPID key pair consistency | Warning |
 | External API key lengths | Warning |
 | Optional `MAILER_DSN`, `OAUTH_PRIVATE_KEY_PATH`, `OAUTH_PUBLIC_KEY_PATH` or `MESSENGER_TRANSPORT_DSN` unset | Warning |
+| Self-registration is open while `MAILER_DSN` is a `null://` mailer, which discards the verification links new accounts need | Warning |
 
 ## Logs
 

@@ -24,6 +24,11 @@ use Symfony\Component\Serializer\Encoder\JsonEncoder;
 
 /**
  * Pure domain repository for device codes.
+ *
+ * Callers pass the device code itself; only its SHA-256 hash is written or looked up, so a copy
+ * of the table cannot be redeemed. The user code stays plain: it only lets a signed-in user decide
+ * on their own account, the device page shows it back, and an unsalted hash of its 34.6 bits falls
+ * to an offline search in seconds.
  */
 final class DeviceCodeRepository implements DeviceCodeRepositoryInterface
 {
@@ -57,7 +62,7 @@ final class DeviceCodeRepository implements DeviceCodeRepositoryInterface
     {
         $entity = $this->entityManager
             ->getRepository(DeviceCodeEntity::class)
-            ->findOneBy(['deviceCode' => $deviceCode->toString()]);
+            ->findOneBy(['deviceCode' => self::hash($deviceCode)]);
 
         return $entity !== null ? $this->toDomain($entity) : null;
     }
@@ -88,7 +93,7 @@ final class DeviceCodeRepository implements DeviceCodeRepositoryInterface
             ->find($deviceCode->getClient()->getId());
 
         $entity = new DeviceCodeEntity(
-            $deviceCode->getDeviceCode()->toString(),
+            self::hash($deviceCode->getDeviceCode()),
             $deviceCode->getUserCode(),
             $clientEntity,
             $deviceCode->getVerificationUri(),
@@ -120,7 +125,7 @@ final class DeviceCodeRepository implements DeviceCodeRepositoryInterface
 
         return DeviceCode::reconstitute(new DeviceCodeState(
             id: $entity->getId(),
-            deviceCode: TokenId::fromString($entity->getDeviceCode()),
+            deviceCode: null,
             userCode: $entity->getUserCode(),
             user: $user,
             client: $this->clientEntityToDomain($entity->getClient()),
@@ -285,5 +290,14 @@ final class DeviceCodeRepository implements DeviceCodeRepositoryInterface
         }
 
         return array_filter(array_map('trim', explode(',', $redirect)));
+    }
+
+    /**
+     * Device codes are stored as the hex SHA-256 digest of the code. A device code is 80 random
+     * characters, so an unsalted fast hash cannot be reversed or brute-forced.
+     */
+    private static function hash(TokenId $deviceCode): string
+    {
+        return hash('sha256', $deviceCode->toString());
     }
 }

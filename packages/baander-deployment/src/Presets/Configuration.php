@@ -29,7 +29,8 @@ final readonly class Configuration
     public const array HARDWARE_KEYS = ['accelerator', 'device', 'group'];
     /** The prefix of the example configurations' placeholder values. */
     public const string PLACEHOLDER_PREFIX = 'replace-with-';
-    /** @param array<string,ImageSelection> $images
+    /** @param list<string> $frontProxies Addresses and CIDR ranges of the reverse proxies in front of the gateway.
+     * @param array<string,ImageSelection> $images
      * @param array<string,string> $environment
      * @param array<string,int> $resources
      * @param array<string,string> $volumes
@@ -42,6 +43,8 @@ final readonly class Configuration
         public string $origin,
         public string $listenAddress,
         public int $listenPort,
+        public array $frontProxies,
+        public EdgeNetwork $edge,
         public array $images,
         public array $environment,
         public array $resources,
@@ -53,7 +56,7 @@ final readonly class Configuration
     /** @param array<string,mixed> $data */
     public static function fromArray(array $data): self
     {
-        JsonDocument::keys($data, ['version', 'name', 'capability', 'size', 'hardware', 'origin', 'listen', 'images', 'environment', 'resources', 'volumes'], 'preset configuration');
+        JsonDocument::keys($data, ['version', 'name', 'capability', 'size', 'hardware', 'origin', 'listen', 'network', 'images', 'environment', 'resources', 'volumes'], 'preset configuration');
         if (($data['version'] ?? null) !== 2) {
             throw new \InvalidArgumentException('Unsupported preset configuration version.');
         }
@@ -80,11 +83,13 @@ final readonly class Configuration
             throw new \InvalidArgumentException('Origin must be an HTTP(S) origin without credentials, query or path.');
         }
         $listen = self::map($data, 'listen');
-        JsonDocument::keys($listen, ['address', 'port'], 'listen configuration');
+        JsonDocument::keys($listen, ['address', 'port', 'frontProxies'], 'listen configuration');
         $address = self::string($listen, 'address');
         if (filter_var($address, FILTER_VALIDATE_IP) === false || !is_int($listen['port'] ?? null) || $listen['port'] < 1 || $listen['port'] > 65535) {
             throw new \InvalidArgumentException('Listen requires an IP address and TCP port.');
         }
+        $frontProxies = self::frontProxies($listen['frontProxies'] ?? []);
+        $edge = self::edgeNetwork($data);
         $images = self::map($data, 'images');
         JsonDocument::keys($images, self::IMAGE_ROLES, 'deployment images');
         $selections = [];
@@ -99,6 +104,11 @@ final readonly class Configuration
         }
         foreach ([EnvironmentVariable::APP_SECRET, EnvironmentVariable::STREAM_URL_HMAC_SECRET, EnvironmentVariable::AUTH_TOTP_ENCRYPTION_KEY, 'DB_USERNAME', 'DB_PASSWORD', 'DB_DATABASE', EnvironmentVariable::REDIS_PASSWORD] as $key) {
             self::string($environment, $key);
+        }
+        if (array_key_exists(EnvironmentVariable::TRUSTED_PROXIES, $environment)) {
+            throw new \InvalidArgumentException(
+                'Deployment derives TRUSTED_PROXIES from the gateway; declare reverse proxies in front of the gateway in listen.frontProxies.',
+            );
         }
         foreach ([EnvironmentVariable::BAANDER_DEPLOYMENT_PROFILE, EnvironmentVariable::APP_ENV, EnvironmentVariable::APP_DEBUG, EnvironmentVariable::DATABASE_URL, EnvironmentVariable::DATABASE_CONTROL_URL, EnvironmentVariable::REDIS_URL, EnvironmentVariable::MESSENGER_TRANSPORT_DSN, EnvironmentVariable::APP_URL, EnvironmentVariable::DEFAULT_URI, EnvironmentVariable::APP_DOMAIN, EnvironmentVariable::MEDIA_STORAGE_PATH, EnvironmentVariable::CONVERT_STORAGE_PATH, EnvironmentVariable::APP_HOME, EnvironmentVariable::OAUTH_PRIVATE_KEY_PATH, EnvironmentVariable::OAUTH_PUBLIC_KEY_PATH] as $key) {
             if (array_key_exists($key, $environment)) {
@@ -130,7 +140,27 @@ final readonly class Configuration
         if (count(array_unique($volumes)) !== count($volumes)) {
             throw new \InvalidArgumentException('Persistent volume roles must have distinct names.');
         }
-        return new self($name, $capability, rtrim($origin, '/'), $address, $listen['port'], $selections, $environment, $resources, $volumes, $size, $hardware);
+        return new self($name, $capability, rtrim($origin, '/'), $address, $listen['port'], $frontProxies, $edge, $selections, $environment, $resources, $volumes, $size, $hardware);
+    }
+
+    /**
+     * The peers whose forwarding headers the gateway accepts: the declared front proxies and, for a
+     * loopback listener, the edge bridge addresses that host-local clients of the published port arrive from.
+     *
+     * @return list<string>
+     */
+    public function gatewayFrontProxies(): array
+    {
+        return $this->listensOnLoopback() ? [...$this->frontProxies, ...$this->edge->bridgeAddresses()] : $this->frontProxies;
+    }
+
+    public function listensOnLoopback(): bool
+    {
+        if (filter_var($this->listenAddress, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4) !== false) {
+            return str_starts_with($this->listenAddress, '127.');
+        }
+
+        return inet_pton($this->listenAddress) === inet_pton('::1');
     }
 
     /**
@@ -227,11 +257,70 @@ final readonly class Configuration
         return $encoder;
     }
 
+    /**
+     * The gateway renders each entry into its configuration, so each must be a plain address or range.
+     *
+     * @return list<string>
+     */
+    private static function frontProxies(mixed $proxies): array
+    {
+        if (!is_array($proxies) || !array_is_list($proxies) || !array_all($proxies, self::isAddressOrRange(...))) {
+            throw new \InvalidArgumentException('listen.frontProxies must list IP addresses or CIDR ranges.');
+        }
+
+        return $proxies;
+    }
+
+    private static function isAddressOrRange(mixed $value): bool
+    {
+        if (!is_string($value)) {
+            return false;
+        }
+        [$address, $prefix] = array_pad(explode('/', $value, 2), 2, null);
+        $bits = match (true) {
+            filter_var($address, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4) !== false => 32,
+            filter_var($address, FILTER_VALIDATE_IP, FILTER_FLAG_IPV6) !== false => 128,
+            default => null,
+        };
+
+        return $bits !== null && ($prefix === null || (preg_match('/^\d{1,3}$/D', $prefix) === 1 && (int) $prefix <= $bits));
+    }
+
+    /**
+     * The edge network's IPv4 `subnet` and, unless `ipv6` is false, its IPv6 `subnet6`; each subnet left
+     * out takes its default. An IPv4-only network refuses `subnet6`.
+     *
+     * @param array<string,mixed> $data
+     */
+    private static function edgeNetwork(array $data): EdgeNetwork
+    {
+        $network = array_key_exists('network', $data) ? self::map($data, 'network') : [];
+        JsonDocument::keys($network, ['subnet', 'ipv6', 'subnet6'], 'network configuration');
+        $ipv6 = array_key_exists('ipv6', $network) ? $network['ipv6'] : true;
+        if (!is_bool($ipv6)) {
+            throw new \InvalidArgumentException('network.ipv6 must be true or false.');
+        }
+        if (!$ipv6 && array_key_exists('subnet6', $network)) {
+            throw new \InvalidArgumentException('An IPv4-only edge network takes no network.subnet6; remove it or set network.ipv6 to true.');
+        }
+
+        return EdgeNetwork::fromSubnets(
+            array_key_exists('subnet', $network) ? self::string($network, 'subnet') : EdgeNetwork::DEFAULT_SUBNET,
+            match (true) {
+                !$ipv6 => null,
+                array_key_exists('subnet6', $network) => self::string($network, 'subnet6'),
+                default => EdgeNetwork::DEFAULT_SUBNET6,
+            },
+        );
+    }
+
     /** @return array<string,mixed> */
     public function toArray(): array
     {
         return ['version' => 2, 'name' => $this->name, 'capability' => $this->capability, 'size' => $this->size, 'origin' => $this->origin,
-            'listen' => ['address' => $this->listenAddress, 'port' => $this->listenPort],
+            'listen' => ['address' => $this->listenAddress, 'port' => $this->listenPort, 'frontProxies' => $this->frontProxies],
+            'network' => ['subnet' => $this->edge->ipv4->subnet, 'ipv6' => $this->edge->dualStack()]
+                + ($this->edge->ipv6 === null ? [] : ['subnet6' => $this->edge->ipv6->subnet]),
             'images' => array_map(static fn(ImageSelection $image): string => $image->reference, $this->images),
             'environment' => $this->environment, 'resources' => $this->resources, 'volumes' => $this->volumes]
             + ($this->hardwareEncoder === null ? [] : ['hardware' => $this->hardwareEncoder]);

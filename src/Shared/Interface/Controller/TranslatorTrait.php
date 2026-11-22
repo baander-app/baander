@@ -9,12 +9,15 @@ use Symfony\Component\HttpFoundation\RequestStack;
 use Symfony\Contracts\Service\Attribute\Required;
 use Symfony\Contracts\Translation\TranslatorInterface;
 
-/** Translates in the language of the request being handled (RequestLocale), English outside one. */
+/**
+ * Translates in the language of the request being handled (RequestLocale), English outside one.
+ * The properties are readonly so that a readonly controller can use the trait; each setter runs once.
+ */
 trait TranslatorTrait
 {
-    private TranslatorInterface $translator;
+    private readonly TranslatorInterface $translator;
 
-    private ?RequestStack $translationRequests = null;
+    private readonly RequestStack $translationRequests;
 
     #[Required]
     public function setTranslator(TranslatorInterface $translator): void
@@ -35,7 +38,8 @@ trait TranslatorTrait
         ?string $domain = null,
         ?string $locale = null,
     ): string {
-        $locale ??= RequestLocale::of($this->translationRequests?->getMainRequest()?->attributes->get(RequestLocale::ATTRIBUTE));
+        $request = ($this->translationRequests ?? null)?->getMainRequest();
+        $locale ??= RequestLocale::of($request?->attributes->get(RequestLocale::ATTRIBUTE));
 
         return $this->translator->trans($id, $parameters, $domain, $locale);
     }

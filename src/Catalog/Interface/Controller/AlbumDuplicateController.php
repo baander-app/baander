@@ -9,7 +9,6 @@ use App\Shared\Domain\Model\PublicId;
 use App\Catalog\Interface\Resource\DuplicateGroupResource;
 use App\Shared\Interface\Attribute\CliCounterpart;
 use App\Shared\Interface\Controller\ApiResponsesTrait;
-use App\Shared\Interface\Controller\TranslatorTrait;
 use OpenApi\Spec as OA;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
@@ -22,7 +21,6 @@ use Symfony\Component\Security\Http\Attribute\IsGranted;
 final class AlbumDuplicateController
 {
     use ApiResponsesTrait;
-    use TranslatorTrait;
 
     public function __construct(
         private readonly AlbumDuplicatePortInterface $duplicateService,
@@ -72,6 +70,13 @@ final class AlbumDuplicateController
             new OA\Response(
                 response: '400',
                 description: 'Invalid library ID',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
+            ),
+            new OA\Response(
+                response: '404',
+                description: 'Library not found',
                 content: new OA\MediaType\Json(
                     schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
                 ),

@@ -21,18 +21,24 @@ final readonly class PartyMediaAccess implements PartyMediaAccessPortInterface
     ) {
     }
 
-    public function assertHostCanPlay(Uuid $videoId, ?Uuid $transcodeJobId): void
+    public function assertCanPlay(Uuid $videoId): void
     {
         if (!$this->canPlay($videoId)) {
             throw PartyMediaNotFoundException::video();
         }
+    }
+
+    public function assertHostCanPlay(Uuid $hostUserId, Uuid $videoId, ?Uuid $transcodeJobId): void
+    {
+        $this->assertCanPlay($videoId);
 
         if ($transcodeJobId === null) {
             return;
         }
 
-        $jobVideoId = $this->playback->findTranscodeJobVideoId($transcodeJobId);
-        // A job of a video the host may not play is reported as missing, like the video itself.
+        $jobVideoId = $this->playback->findOwnedTranscodeJobVideoId($transcodeJobId, $hostUserId);
+        // Another user's job, and a job of a video the host may not play, are reported as missing,
+        // like the video itself.
         if ($jobVideoId === null || !(self::same($jobVideoId, $videoId) || $this->canPlay($jobVideoId))) {
             throw PartyMediaNotFoundException::transcodeJob();
         }
@@ -40,6 +46,11 @@ final readonly class PartyMediaAccess implements PartyMediaAccessPortInterface
         if (!self::same($jobVideoId, $videoId)) {
             throw new TranscodeJobVideoMismatchException();
         }
+    }
+
+    public function ownsTranscodeJob(Uuid $userId, Uuid $transcodeJobId): bool
+    {
+        return $this->playback->findOwnedTranscodeJobVideoId($transcodeJobId, $userId) !== null;
     }
 
     /** The request may spell a UUID in upper case; PostgreSQL returns it in lower case. */

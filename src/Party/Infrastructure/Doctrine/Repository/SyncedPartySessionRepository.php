@@ -166,6 +166,11 @@ final class SyncedPartySessionRepository implements SyncedPartySessionRepository
     {
         $state = $session->getState();
         $entity->setHostUserId($state->hostUserId);
+        // A party only ever lets go of its job. Writing the job back would restore one that its
+        // foreign key cleared since the party was read.
+        if ($state->transcodeJobId === null) {
+            $entity->releaseTranscodeJob();
+        }
         $entity->setPlaybackState($state->playbackState->value);
         $entity->setWallClockPosition($state->wallClockPosition);
         $entity->setPlaybackStartedAt($state->playbackStartedAt);

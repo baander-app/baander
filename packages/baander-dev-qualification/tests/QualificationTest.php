@@ -6,6 +6,7 @@ namespace Baander\DevQualification\Tests;
 
 use Baander\Configuration\ApplicationLayout;
 use Baander\Configuration\ToolingConfiguration;
+use Baander\Deployment\Presets\Configuration;
 use Baander\Deployment\Presets\StateStore;
 use Baander\Containers\Docker\Client;
 use Baander\Containers\Docker\Target;
@@ -155,8 +156,12 @@ final class QualificationTest extends TestCase
     {
         $before = ['profileFingerprint' => str_repeat('a', 64), 'composeHash' => str_repeat('b', 64), 'size' => self::SIZE, 'workerBootId' => str_repeat('c', 32)];
         $after = ['profileFingerprint' => str_repeat('d', 64), 'composeHash' => str_repeat('e', 64), 'size' => array_replace(self::SIZE, ['webWorkers' => 1]), 'workerBootId' => str_repeat('f', 32)];
-        $receipt = ['failure' => null, 'before' => $before, 'after' => $after, 'serving' => ['workersReady' => true, 'healthy' => true, 'catalogIntact' => true]];
+        $serving = ['workersReady' => true, 'healthy' => true, 'catalogIntact' => true, 'proxyTrust' => ['status' => 'passed', 'failures' => []]];
+        $receipt = ['failure' => null, 'before' => $before, 'after' => $after, 'serving' => $serving];
         self::assertSame('passed', Qualification::replacementCheck($receipt)['status']);
+        $receipt['serving']['proxyTrust'] = ['status' => 'failed', 'failures' => ['Web cannot reach the gateway health route.']];
+        self::assertSame(['The new boot does not see clients through exactly its gateway.'], Qualification::replacementCheck($receipt)['failures']);
+        $receipt['serving'] = $serving;
         $receipt['after']['profileFingerprint'] = $before['profileFingerprint'];
         $check = Qualification::replacementCheck($receipt);
         self::assertSame('failed', $check['status']);
@@ -187,6 +192,114 @@ final class QualificationTest extends TestCase
             $this->expectException(\InvalidArgumentException::class);
             $qualification->scenario('deployment-replacement', 1, 1);
         });
+    }
+
+    public function testProxyTrustNeedsWebToTrustExactlyTheGatewayAndSeeEachSendersOwnAddressInEitherFamily(): void
+    {
+        $deployment = Configuration::fromArray($this->configuration()['deployment']);
+        $web = ['Config' => ['Env' => ['APP_ENV=prod', 'TRUSTED_PROXIES=10.231.0.2,fd00:baa:231::2']], 'NetworkSettings' => ['Networks' => [
+            'baander-qualification-private' => ['IPAddress' => '172.30.0.5', 'GlobalIPv6Address' => ''],
+            'baander-qualification-edge' => ['IPAddress' => '10.231.0.8', 'GlobalIPv6Address' => 'fd00:baa:231:0:8000::'],
+        ]]];
+        $gateway = ['NetworkSettings' => ['Networks' => ['baander-qualification-edge' => ['IPAddress' => '10.231.0.2', 'GlobalIPv6Address' => 'fd00:baa:231::2']]]];
+        $forwarded = ['ipv4' => '10.231.0.8', 'ipv6' => 'fd00:baa:231:0:8000::'];
+        // Web's HTTP status for a request to its own edge address in each family.
+        $answers = ['ipv4' => 200, 'ipv6' => 200];
+
+        $check = Qualification::proxyTrustCheck($deployment, $web, $gateway, 200, $answers, $forwarded, '10.231.0.1');
+        self::assertSame(['passed', []], [$check['status'], $check['failures']]);
+        self::assertSame(['10.231.0.2,fd00:baa:231::2', '10.231.0.1'], [$check['trustedProxies'], $check['expectedHairpinClient']]);
+        // The same address in another spelling is the same sender.
+        $respelled = ['ipv4' => '10.231.0.8', 'ipv6' => 'FD00:0BAA:0231:0000:8000:0000:0000:0000'];
+        self::assertSame('passed', Qualification::proxyTrustCheck($deployment, $web, $gateway, 200, $answers, $respelled, '10.231.0.1')['status']);
+
+        $ipv4Trusted = $web;
+        $ipv4Trusted['Config']['Env'][1] = 'TRUSTED_PROXIES=10.231.0.2';
+        $rangeTrusted = $web;
+        $rangeTrusted['Config']['Env'][1] = 'TRUSTED_PROXIES=10.231.0.0/28,fd00:baa:231::/64';
+        $twoNetworks = $gateway;
+        $twoNetworks['NetworkSettings']['Networks']['baander-qualification-private'] = ['IPAddress' => '172.30.0.6', 'GlobalIPv6Address' => ''];
+        $ipv4Gateway = $gateway;
+        $ipv4Gateway['NetworkSettings']['Networks']['baander-qualification-edge']['GlobalIPv6Address'] = '';
+        foreach ([
+            [[$ipv4Trusted, $gateway, 200, $answers, $forwarded, '10.231.0.1'], 'Web trusts "10.231.0.2" instead of exactly the gateway addresses 10.231.0.2,fd00:baa:231::2.'],
+            [[$rangeTrusted, $gateway, 200, $answers, $forwarded, '10.231.0.1'], 'Web trusts "10.231.0.0/28,fd00:baa:231::/64" instead of exactly the gateway addresses 10.231.0.2,fd00:baa:231::2.'],
+            [[$web, $twoNetworks, 200, $answers, $forwarded, '10.231.0.1'], 'The gateway joins baander-qualification-edge, baander-qualification-private instead of the edge network alone.'],
+            [[$web, $ipv4Gateway, 200, $answers, $forwarded, '10.231.0.1'], 'The gateway does not hold its pinned edge address fd00:baa:231::2.'],
+            [[$web, $gateway, null, $answers, $forwarded, '10.231.0.1'], 'Web cannot reach the gateway health route.'],
+            // Web's server listening on IPv4 alone refuses its IPv6 edge address.
+            [[$web, $gateway, 200, ['ipv4' => 200, 'ipv6' => null], $forwarded, '10.231.0.1'], 'Web does not answer on its IPv6 edge address "fd00:baa:231:0:8000::".'],
+            [
+                [$web, $gateway, 200, $answers, ['ipv4' => '198.51.100.7', 'ipv6' => 'fd00:baa:231:0:8000::'], '10.231.0.1'],
+                'A request over IPv4 that forged X-Forwarded-For reached web as "198.51.100.7" instead of its sender\'s address.',
+            ],
+            [
+                [$web, $gateway, 200, $answers, ['ipv4' => '10.231.0.8', 'ipv6' => '2001:db8::7'], '10.231.0.1'],
+                'A request over IPv6 that forged X-Forwarded-For reached web as "2001:db8::7" instead of its sender\'s address.',
+            ],
+            [[$web, $gateway, 200, $answers, $forwarded, null], 'A host-local client reached web as "" instead of the trusted edge bridge address 10.231.0.1.'],
+        ] as [$observed, $failure]) {
+            self::assertSame([$failure], Qualification::proxyTrustCheck($deployment, ...$observed)['failures']);
+        }
+
+        // A host-local client of an IPv6 loopback listener arrives from the IPv6 bridge address.
+        $ipv6Loopback = $this->configuration()['deployment'];
+        $ipv6Loopback['listen']['address'] = '::1';
+        $ipv6Loopback = Configuration::fromArray($ipv6Loopback);
+        $check = Qualification::proxyTrustCheck($ipv6Loopback, $web, $gateway, 200, $answers, $forwarded, 'fd00:baa:231::1');
+        self::assertSame(['passed', 'fd00:baa:231::1'], [$check['status'], $check['expectedHairpinClient']]);
+        self::assertSame(
+            ['A host-local client reached web as "10.231.0.1" instead of the trusted edge bridge address fd00:baa:231::1.'],
+            Qualification::proxyTrustCheck($ipv6Loopback, $web, $gateway, 200, $answers, $forwarded, '10.231.0.1')['failures'],
+        );
+
+        // A listener on a LAN address trusts no host-local source, so no hairpin request is expected.
+        $lan = $this->configuration()['deployment'];
+        $lan['listen']['address'] = '192.0.2.40';
+        self::assertSame('passed', Qualification::proxyTrustCheck(Configuration::fromArray($lan), $web, $gateway, 200, $answers, $forwarded, null)['status']);
+    }
+
+    public function testProxyTrustOfAnIpv4OnlyEdgeNetworkChecksIpv4Alone(): void
+    {
+        $data = $this->configuration()['deployment'] + ['network' => ['ipv6' => false]];
+        $web = ['Config' => ['Env' => ['TRUSTED_PROXIES=10.231.0.2']], 'NetworkSettings' => ['Networks' => [
+            'baander-qualification-private' => ['IPAddress' => '172.30.0.5', 'GlobalIPv6Address' => ''],
+            'baander-qualification-edge' => ['IPAddress' => '10.231.0.8', 'GlobalIPv6Address' => ''],
+        ]]];
+        $gateway = ['NetworkSettings' => ['Networks' => ['baander-qualification-edge' => ['IPAddress' => '10.231.0.2', 'GlobalIPv6Address' => '']]]];
+
+        $check = Qualification::proxyTrustCheck(Configuration::fromArray($data), $web, $gateway, 200, ['ipv4' => 200], ['ipv4' => '10.231.0.8'], '10.231.0.1');
+        self::assertSame(['passed', []], [$check['status'], $check['failures']]);
+
+        // Host-local clients of an IPv6 loopback listener reach an IPv4-only gateway from the IPv4 bridge.
+        $data['listen']['address'] = '::1';
+        $check = Qualification::proxyTrustCheck(Configuration::fromArray($data), $web, $gateway, 200, ['ipv4' => 200], ['ipv4' => '10.231.0.8'], '10.231.0.1');
+        self::assertSame(['passed', '10.231.0.1'], [$check['status'], $check['expectedHairpinClient']]);
+    }
+
+    public function testAccessLogProgramReportsTheClientWebChargedTheProbePathTo(): void
+    {
+        $directory = sys_get_temp_dir() . '/baander.app-access-log-' . bin2hex(random_bytes(8));
+        mkdir($directory, 0700);
+        $line = static fn(string $channel, string $message): string => json_encode(['message' => $message, 'context' => [], 'channel' => $channel], JSON_THROW_ON_ERROR) . "\n";
+        file_put_contents($directory . '/prod.log', implode('', [
+            "not a JSON record qualification-forwarding-0a1b\n",
+            $line('app', 'Probe qualification-forwarding-0a1b mentioned outside a request line'),
+            $line('swoole.access_log', '10.231.0.9 - - [22/Nov/2026:15:00:00 +0100] "GET /qualification-forwarding-ffff HTTP/1.1" 200 512'),
+            $line('swoole.access_log', '10.231.0.8 - - [22/Nov/2026:15:00:01 +0100] "GET /qualification-forwarding-0a1b HTTP/1.1" 200 512'),
+        ]));
+        $executor = new EngineExecutor(ExecutionContext::bounded(15, getenv()));
+        try {
+            $result = $executor->run(new ProcessSpec(
+                [PHP_BINARY, '-r', Qualification::accessLogProgram(), 'qualification-forwarding-0a1b'],
+                environment: [...getenv(), 'BAANDER_LOG_DIR' => $directory],
+            ));
+            self::assertSame(['client' => '10.231.0.8'], json_decode($result->stdout, true, flags: JSON_THROW_ON_ERROR));
+            self::assertNotEmpty(token_get_all('<?php ' . Qualification::requestProgram(), TOKEN_PARSE));
+        } finally {
+            $executor->close();
+            Collector::remove($directory);
+        }
     }
 
     public function testHealthyAnswerNeedsHttpOkAndNoUnhealthyCheck(): void

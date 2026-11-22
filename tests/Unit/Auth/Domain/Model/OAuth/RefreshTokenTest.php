@@ -8,6 +8,7 @@ use App\Auth\Domain\Model\OAuth\AccessToken;
 use App\Auth\Domain\Model\OAuth\Client;
 use App\Auth\Domain\Model\OAuth\RefreshToken;
 use App\Auth\Domain\Model\OAuth\RefreshTokenState;
+use App\Auth\Domain\Model\OAuth\SignInGrant;
 use App\Auth\Domain\Model\OAuth\ValueObject\ChainId;
 use DateInterval;
 use PHPUnit\Framework\TestCase;
@@ -21,7 +22,7 @@ final class RefreshTokenTest extends TestCase
     {
         $client = Client::create('Test', []);
         $this->chainId = ChainId::generate();
-        $this->accessToken = AccessToken::issue($client, chainId: $this->chainId);
+        $this->accessToken = AccessToken::issue($client, SignInGrant::AuthorizationCode, chainId: $this->chainId);
     }
 
     public function testIssueWithMinimalParams(): void

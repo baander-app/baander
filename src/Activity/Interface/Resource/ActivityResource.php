@@ -13,6 +13,7 @@ use App\Shared\Interface\Resource\AbstractResource;
 use OpenApi\Spec as OA;
 
 #[OA\Schema(
+    description: 'An activity of the viewer. The fields that name its song, album, artist or movie are null when that item was deleted or lies outside the viewer\'s current library access.',
     type: 'object',
     properties: [
         'publicId' => new OA\Schema(
@@ -31,11 +32,11 @@ use OpenApi\Spec as OA;
         ),
         'activityType' => new OA\Schema(description: 'Type of activity', type: 'string'),
         'songAvailable' => new OA\Schema(
-            description: 'Whether the latest scan or ingestion observation marked the song source available',
+            description: 'Whether the latest scan or ingestion observation marked the song source available; false when the song lies outside the viewer\'s current library access',
             type: 'boolean',
         ),
         'songId' => new OA\Schema(
-            description: 'Song public ID',
+            description: 'Song public ID; null when the song was deleted or lies outside the viewer\'s current library access',
             type: 'string',
             nullable: true,
             minLength: PublicId::LENGTH,
@@ -43,7 +44,7 @@ use OpenApi\Spec as OA;
             pattern: PublicId::SCHEMA_PATTERN,
         ),
         'albumId' => new OA\Schema(
-            description: 'Album public ID',
+            description: 'Album public ID; null when the album was deleted or lies outside the viewer\'s current library access',
             type: 'string',
             nullable: true,
             minLength: PublicId::LENGTH,
@@ -51,7 +52,7 @@ use OpenApi\Spec as OA;
             pattern: PublicId::SCHEMA_PATTERN,
         ),
         'artistId' => new OA\Schema(
-            description: 'Artist public ID',
+            description: 'Artist public ID; null when the artist was deleted or the activity names no song, album or movie inside the viewer\'s current library access',
             type: 'string',
             nullable: true,
             minLength: PublicId::LENGTH,
@@ -59,7 +60,7 @@ use OpenApi\Spec as OA;
             pattern: PublicId::SCHEMA_PATTERN,
         ),
         'movieId' => new OA\Schema(
-            description: 'Movie public ID',
+            description: 'Movie public ID; null when the movie was deleted or lies outside the viewer\'s current library access',
             type: 'string',
             nullable: true,
             minLength: PublicId::LENGTH,
@@ -120,10 +121,10 @@ final class ActivityResource extends AbstractResource
     }
 
     /**
-     * @param array<string, Song> $songs   keyed by song public ID
-     * @param array<string, Album> $albums keyed by album public ID
-     * @param array<string, Image> $images keyed by image public ID
-     * @param array<string, array<int, array{name: string, role: string|null}>> $albumArtists keyed by album public ID
+     * @param array<string, Song> $songs   the songs the viewer may read, keyed by song UUID
+     * @param array<string, Album> $albums the albums the viewer may read, keyed by album UUID
+     * @param array<string, Image> $images keyed by image UUID
+     * @param array<string, array<int, array{name: string, role: string|null}>> $albumArtists keyed by album UUID
      * @param array<string, bool> $availability keyed by song UUID
      * @return array<string, mixed>
      */

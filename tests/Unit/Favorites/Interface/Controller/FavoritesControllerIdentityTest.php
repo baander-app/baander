@@ -15,6 +15,7 @@ use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\Messenger\MessageBusInterface;
 use Symfony\Component\Security\Core\User\InMemoryUser;
 use Symfony\Component\Security\Core\User\UserInterface;
+use Symfony\Component\Translation\Translator;
 
 final class FavoritesControllerIdentityTest extends TestCase
 {
@@ -39,6 +40,7 @@ final class FavoritesControllerIdentityTest extends TestCase
         $favorites->expects($this->never())->method('findByUser');
         $favorites->expects($this->never())->method('countByUser');
         $controller = new FavoritesController($security, $bus, $favorites);
+        $controller->setTranslator(new Translator('en'));
         $response = match ($action) {
             'index' => $controller->index(Request::create('/api/favorites/')),
             'add' => $controller->add(new AddFavoriteRequest('song', (new PublicId())->toString())),

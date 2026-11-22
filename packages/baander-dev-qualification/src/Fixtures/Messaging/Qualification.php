@@ -144,6 +144,9 @@ final class Qualification
                 timeout: null,
             );
             $app = $id . '-app';
+            $directory = $inImage
+                ? $layout->root
+                : ($mode === 'messaging' ? '/tmp/baander-tests' : '/tmp/baander-' . $mode . '-runtime');
             $environment = $mode === 'messaging'
                 ? [
                     'MESSENGER_TEST_REDIS_DSN=redis://redis:6379',
@@ -155,6 +158,11 @@ final class Qualification
                     'APP_DEBUG=0',
                     'XDEBUG_MODE=off',
                     ...FixtureSecrets::assignments(),
+                    // Building server control, as every handler that closes sockets does, creates
+                    // the QoL state directory under the conversions root; .env.example's /storage
+                    // roots are not writable here.
+                    'MEDIA_STORAGE_PATH=' . $directory . '/storage/media',
+                    'CONVERT_STORAGE_PATH=' . $directory . '/storage/conversions',
                     'REDIS_PASSWORD=test-only',
                     'REDIS_URL=redis://default:test-only@redis:6379',
                     'MESSENGER_TRANSPORT_DSN=redis://default:test-only@redis:6379/messages',
@@ -172,9 +180,6 @@ final class Qualification
                 ...$flags, $applicationImage, 'infinity',
             ]);
             $docker->run(['start', $app]);
-            $directory = $inImage
-                ? $layout->root
-                : ($mode === 'messaging' ? '/tmp/baander-tests' : '/tmp/baander-' . $mode . '-runtime');
             if (!$inImage) {
                 $paths = [
                     'vendor', 'scripts/vendor', 'scripts/bootstrap.php', 'src', 'tests', 'config', 'packages', 'migrations', 'bin',

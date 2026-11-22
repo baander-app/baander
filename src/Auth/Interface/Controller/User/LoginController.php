@@ -16,7 +16,6 @@ use App\Shared\Application\Exception\HandlerFailure;
 use App\Shared\Application\Http\BaanderHeader;
 use App\Shared\Domain\Model\PublicId;
 use App\Shared\Interface\Controller\ApiResponsesTrait;
-use App\Shared\Interface\Controller\TranslatorTrait;
 use OpenApi\Spec as OA;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
@@ -31,7 +30,6 @@ use Symfony\Component\Routing\Attribute\Route;
 final class LoginController
 {
     use ApiResponsesTrait;
-    use TranslatorTrait;
 
     public function __construct(
         private readonly MessageBusInterface $bus,
@@ -109,6 +107,7 @@ final class LoginController
                 userId: $user->getId(),
                 dpopJkt: $login->dpopJkt,
                 credentialEpoch: $login->credentialEpoch,
+                grant: $login->grant(),
                 ipAddress: $request->getClientIp(),
                 userAgent: $request->headers->get('User-Agent'),
                 clientFingerprint: $request->headers->get(BaanderHeader::ClientFingerprint->value),

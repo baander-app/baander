@@ -19,17 +19,23 @@ use Symfony\Component\RateLimiter\RateLimiterFactoryInterface;
  * These endpoints are publicly reachable (the discovery firewall allows
  * PUBLIC_ACCESS) so per-IP throttling is required to prevent abuse.
  *
+ * Requests are matched by the route the router resolved from the decoded path,
+ * so no percent-encoding of a path avoids the limit.
+ *
  * Returns 429 Too Many Requests with a Retry-After header when limits are exceeded.
  */
 final class DiscoveryRateLimitListener
 {
-    /**
-     * @var array<int, array{path: string, methods: array<int, string>}>
-     */
+    public const string REGISTER_ROUTE = 'discovery_register';
+    public const string PAIRING_CODE_ROUTE = 'discovery_pairing_code';
+    public const string QR_PAYLOAD_ROUTE = 'discovery_qr_payload';
+    public const string COMPLETE_PAIRING_ROUTE = 'discovery_complete_pairing';
+
     private const array RATE_LIMITED_ROUTES = [
-        ['path' => '/api/discovery/register', 'methods' => ['POST']],
-        ['path' => '/api/discovery/pairing-code', 'methods' => ['POST']],
-        ['path' => '/api/discovery/complete-pairing', 'methods' => ['POST']],
+        self::REGISTER_ROUTE,
+        self::PAIRING_CODE_ROUTE,
+        self::QR_PAYLOAD_ROUTE,
+        self::COMPLETE_PAIRING_ROUTE,
     ];
 
     public function __construct(
@@ -51,10 +57,8 @@ final class DiscoveryRateLimitListener
         }
 
         $request = $event->getRequest();
-        $path = $request->getPathInfo();
-        $method = $request->getMethod();
 
-        if (!$this->isRateLimited($path, $method)) {
+        if (!in_array($request->attributes->get('_route'), self::RATE_LIMITED_ROUTES, true)) {
             return;
         }
 
@@ -67,7 +71,7 @@ final class DiscoveryRateLimitListener
             $seconds = (int) ceil($retryAfter->getTimestamp() - time());
 
             $this->logger->warning('Discovery rate limit exceeded', [
-                'path' => $path,
+                'path' => $request->getPathInfo(),
                 'ip' => $request->getClientIp(),
                 'retry_after' => $seconds,
             ]);
@@ -76,16 +80,5 @@ final class DiscoveryRateLimitListener
         }
 
         $request->attributes->set('rate_limit_remaining', $result->getRemainingTokens());
-    }
-
-    private function isRateLimited(string $path, string $method): bool
-    {
-        foreach (self::RATE_LIMITED_ROUTES as $route) {
-            if ($path === $route['path'] && in_array($method, $route['methods'], true)) {
-                return true;
-            }
-        }
-
-        return false;
     }
 }

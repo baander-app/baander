@@ -323,6 +323,13 @@ final class AdminUserController
                     schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
                 ),
             ),
+            new OA\Response(
+                response: '409',
+                description: 'The user is the only enabled super admin',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
+            ),
         ],
     )]
     #[Route('/{publicId}', name: 'delete', methods: ['DELETE'])]
@@ -361,6 +368,13 @@ final class AdminUserController
             new OA\Response(
                 response: '404',
                 description: 'User not found',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
+            ),
+            new OA\Response(
+                response: '409',
+                description: 'The user is the only enabled super admin',
                 content: new OA\MediaType\Json(
                     schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
                 ),
@@ -490,7 +504,7 @@ final class AdminUserController
     public function resetTotp(string $publicId): JsonResponse
     {
         $publicId = $this->publicIdentifier($publicId);
-        // An administrator's own TOTP goes off only with a current code, through POST /api/auth/totp/disable.
+        // An administrator's own TOTP goes off only with step-up, through POST /api/auth/totp/disable.
         if ($this->isSignedInUser($publicId)) {
             return $this->forbidden(self::OWN_CREDENTIALS_REFUSAL);
         }
@@ -556,6 +570,13 @@ final class AdminUserController
             new OA\Response(
                 response: '404',
                 description: 'User not found',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
+            ),
+            new OA\Response(
+                response: '409',
+                description: 'The user is the only enabled super admin',
                 content: new OA\MediaType\Json(
                     schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
                 ),

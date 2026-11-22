@@ -318,6 +318,7 @@ final class PartyMembershipSerializationTest extends TestCase
         $handler = new LeavePartySessionHandler(
             $this->sessions($manager),
             $this->members($manager),
+            $this->createStub(PartyMediaAccessPortInterface::class),
             $this->transaction($manager),
             $this->events(),
         );
@@ -355,6 +356,7 @@ final class PartyMembershipSerializationTest extends TestCase
             $this->sessions($manager),
             $this->invitations($manager),
             $this->members($manager),
+            $this->createStub(PartyMediaAccessPortInterface::class),
             $this->identities($manager),
             $this->transaction($manager),
             $this->events(),

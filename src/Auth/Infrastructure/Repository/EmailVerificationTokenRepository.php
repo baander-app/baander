@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Auth\Infrastructure\Repository;
 
-use App\Auth\Application\DTO\RedeemedEmailVerification;
 use App\Auth\Application\Port\EmailVerificationTokenRepositoryInterface;
 use App\Shared\Domain\Model\Email;
 use App\Shared\Domain\Model\Uuid;
@@ -49,13 +48,14 @@ final class EmailVerificationTokenRepository implements EmailVerificationTokenRe
         );
     }
 
-    public function redeem(string $token, \DateTimeImmutable $at): ?RedeemedEmailVerification
+    public function redeem(string $token, Uuid $userId, \DateTimeImmutable $at): ?Email
     {
         // Deleting first makes redemption single-use under concurrency; an expired token is
-        // removed as well, since it can never be redeemed.
+        // removed as well, since it can never be redeemed. Matching the user too leaves another
+        // user's token untouched.
         $row = $this->connection->fetchAssociative(
-            'DELETE FROM email_verification_tokens WHERE token_hash = :tokenHash RETURNING user_id, email, expires_at > :at AS valid',
-            ['tokenHash' => self::hash($token), 'at' => $at],
+            'DELETE FROM email_verification_tokens WHERE token_hash = :tokenHash AND user_id = :userId RETURNING email, expires_at > :at AS valid',
+            ['tokenHash' => self::hash($token), 'userId' => $userId->toString(), 'at' => $at],
             ['at' => Types::DATETIME_IMMUTABLE],
         );
 
@@ -63,10 +63,17 @@ final class EmailVerificationTokenRepository implements EmailVerificationTokenRe
             return null;
         }
 
-        return new RedeemedEmailVerification(
-            Uuid::fromString((string) $row['user_id']),
-            Email::fromString((string) $row['email']),
-        );
+        return Email::fromString((string) $row['email']);
+    }
+
+    public function isLiveForAnotherUser(string $token, Uuid $userId, \DateTimeImmutable $at): bool
+    {
+        // A plain read like the statements above, so the entity stays unloaded.
+        return $this->connection->fetchOne(
+            'SELECT EXISTS (SELECT 1 FROM email_verification_tokens WHERE token_hash = :tokenHash AND user_id <> :userId AND expires_at > :at)',
+            ['tokenHash' => self::hash($token), 'userId' => $userId->toString(), 'at' => $at],
+            ['at' => Types::DATETIME_IMMUTABLE],
+        ) === true;
     }
 
     public function revokeForUser(Uuid $userId): void

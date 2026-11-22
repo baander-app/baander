@@ -109,7 +109,7 @@ final class InitialSchemaMigrationTest extends TestCase
         }
         $factory = $this->factory();
         $factory->getMetadataStorage()->ensureInitialized();
-        self::assertCount(36, $factory->getMigrationRepository()->getMigrations());
+        self::assertCount(43, $factory->getMigrationRepository()->getMigrations());
         self::assertSame(0, $this->migrate($factory));
         self::assertSame([
             'DoctrineMigrations\\Version20261017000000',
@@ -148,8 +148,15 @@ final class InitialSchemaMigrationTest extends TestCase
             'DoctrineMigrations\\Version20261120100000',
             'DoctrineMigrations\\Version20261120110000',
             'DoctrineMigrations\\Version20261121143000',
+            'DoctrineMigrations\\Version20261121194500',
+            'DoctrineMigrations\\Version20261121194600',
+            'DoctrineMigrations\\Version20261121194700',
+            'DoctrineMigrations\\Version20261121194800',
+            'DoctrineMigrations\\Version20261122150000',
+            'DoctrineMigrations\\Version20261122160000',
+            'DoctrineMigrations\\Version20261122170000',
         ], $this->connection->fetchFirstColumn('SELECT version FROM doctrine_migration_versions ORDER BY version'));
-        self::assertSame(95, (int) $this->connection->fetchOne("SELECT count(*) FROM pg_tables WHERE schemaname = 'public' AND tablename <> 'doctrine_migration_versions'"));
+        self::assertSame(108, (int) $this->connection->fetchOne("SELECT count(*) FROM pg_tables WHERE schemaname = 'public' AND tablename <> 'doctrine_migration_versions'"));
         self::assertSame(['TimeZone=UTC'], $this->databaseSettings($this->connection));
         $this->assertSchedules();
         $this->assertIdentitiesAllocate();
@@ -162,13 +169,13 @@ final class InitialSchemaMigrationTest extends TestCase
         self::assertSame($history, $this->connection->fetchAllAssociative('SELECT * FROM doctrine_migration_versions'));
 
         $failure = $this->refused($this->factory(), '0');
-        self::assertStringContainsString('Removing director storage would discard imported identities and movie credits.', $failure);
+        self::assertStringContainsString('The deleted authorization and device codes cannot be restored', $failure);
         self::assertSame($catalog, $this->catalog('public'));
         self::assertSame($seeds, $this->connection->fetchAllAssociative('SELECT * FROM scheduled_jobs ORDER BY id'));
         self::assertSame($history, $this->connection->fetchAllAssociative('SELECT * FROM doctrine_migration_versions'));
 
         self::assertSame(0, $this->migrate($this->factory(true)));
-        self::assertSame(37, (int) $this->connection->fetchOne('SELECT count(*) FROM doctrine_migration_versions'));
+        self::assertSame(44, (int) $this->connection->fetchOne('SELECT count(*) FROM doctrine_migration_versions'));
         self::assertSame('future_migration_probe', $this->connection->fetchOne("SELECT to_regclass('future_migration_probe')::text"));
     }
 
@@ -484,7 +491,7 @@ SQL, [$jobs[0], $runtimeSession, $desired, str_repeat('a', 32)]);
             'verification_uri' => 'https://app.baander.app/device', 'approved' => 'true', ...$times,
         ]);
 
-        self::assertSame(0, $this->migrate($this->factory()));
+        self::assertSame(0, $this->migrate($this->factory(), 'DoctrineMigrations\\Version20261120110000'));
 
         foreach (['oauth_access_tokens', 'oauth_refresh_tokens', 'oauth_token_metadata', 'oauth_auth_codes'] as $table) {
             self::assertSame(0, (int) $this->connection->fetchOne(sprintf('SELECT count(*) FROM %s', $table)), $table);
@@ -506,6 +513,39 @@ SQL, [$jobs[0], $runtimeSession, $desired, str_repeat('a', 32)]);
                   WHERE table_schema = 'public' AND column_name IN ('credential_epoch', 'chain_expires_at') ORDER BY table_name, column_name",
             ),
         );
+    }
+
+    /**
+     * The code hashing upgrade deletes the stored authorization and device codes, which hold the
+     * codes themselves, and keeps their clients and users.
+     */
+    public function testCodeHashingUpgradeDeletesStoredCodesAndKeepsTheirClientsAndUsers(): void
+    {
+        self::assertSame(0, $this->migrate($this->factory(), 'DoctrineMigrations\\Version20261122160000'));
+        [$user, $client] = [Uuid::generate()->toString(), Uuid::generate()->toString()];
+        $times = ['created_at' => '2026-11-22 12:00:00+00', 'updated_at' => '2026-11-22 12:00:00+00'];
+        $this->connection->executeStatement(
+            "INSERT INTO users (id, public_id, name, email, password, created_at, updated_at) VALUES (?, ?, 'Code hashing upgrade', 'code-hashing-upgrade@baander.app', 'hash', clock_timestamp(), clock_timestamp())",
+            [$user, (new PublicId())->toString()],
+        );
+        $this->connection->insert('oauth_clients', ['id' => $client, 'public_id' => (new PublicId())->toString(), 'name' => 'Code hashing upgrade', 'redirect' => '["https://app.baander.app/callback"]', ...$times]);
+        $this->connection->insert('oauth_auth_codes', [
+            'id' => Uuid::generate()->toString(), 'code_id' => bin2hex(random_bytes(40)), 'client_id' => $client, 'user_id' => $user,
+            'redirect_uri' => 'https://app.baander.app/callback', 'code_challenge' => 'E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM',
+            'code_challenge_method' => 'S256', 'dpop_jkt' => 'NzbLsXh8uDCcd-6MNwXF4W_7noWXFZAfHkxZsRGC9Xs', 'credential_epoch' => 0,
+            'expires_at' => '2026-11-22 12:01:00+00', ...$times,
+        ]);
+        $this->connection->insert('oauth_device_codes', [
+            'id' => Uuid::generate()->toString(), 'device_code' => bin2hex(random_bytes(40)), 'user_code' => 'BCDF-GHJK', 'user_id' => $user,
+            'client_id' => $client, 'verification_uri' => 'https://app.baander.app/device', 'approved' => 'true', 'credential_epoch' => 0, ...$times,
+        ]);
+
+        self::assertSame(0, $this->migrate($this->factory()));
+
+        self::assertSame(0, (int) $this->connection->fetchOne('SELECT count(*) FROM oauth_auth_codes'));
+        self::assertSame(0, (int) $this->connection->fetchOne('SELECT count(*) FROM oauth_device_codes'));
+        self::assertSame(1, (int) $this->connection->fetchOne('SELECT count(*) FROM oauth_clients WHERE id = ?', [$client]));
+        self::assertSame(1, (int) $this->connection->fetchOne('SELECT count(*) FROM users WHERE id = ?', [$user]));
     }
 
     public function testFreshDatabaseInitializesWithoutPreprovisionedExtensions(): void

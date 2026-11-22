@@ -10,6 +10,7 @@ use App\Auth\Application\Exception\DpopStoreUnavailableException;
 use App\Auth\Application\Port\ClientAssertionJtiStoreInterface;
 use App\Auth\Application\Port\ClientKeySetProviderInterface;
 use App\Auth\Domain\Model\OAuth\Client;
+use App\Auth\Domain\Model\OAuth\SignInGrant;
 use App\Auth\Domain\Model\OAuth\ValueObject\ClientKeySource;
 use App\Auth\Domain\Model\OAuth\ValueObject\ClientSecret;
 use App\Auth\Domain\Repository\OAuth\ClientRepositoryInterface;
@@ -78,7 +79,7 @@ final class ClientAssertionAuthenticationTest extends TestCase
         $this->service(ClientRepositoryInterface::class)->saveClient($client);
 
         $tokens = $this->service(MessageBusInterface::class)
-            ->dispatch(new IssueTokenCommand($client->getId(), $this->createTestUser()->getId(), $this->proofKey->thumbprint(), 0))
+            ->dispatch(new IssueTokenCommand($client->getId(), $this->createTestUser()->getId(), $this->proofKey->thumbprint(), 0, SignInGrant::AuthorizationCode))
             ->last(HandledStamp::class)?->getResult();
         self::assertInstanceOf(TokenResponseDTO::class, $tokens);
         $this->refreshToken = (string) $tokens->getRefreshToken();

@@ -11,7 +11,6 @@ use App\Media\Application\Port\StoragePortInterface;
 use App\Media\Interface\Resource\ImageResource;
 use App\Shared\Domain\Model\PublicId;
 use App\Shared\Interface\Controller\ApiResponsesTrait;
-use App\Shared\Interface\Controller\TranslatorTrait;
 use Baander\ImageProcessing\BlurHash\BlurHashGenerator;
 use OpenApi\Spec as OA;
 use Psr\Log\LoggerInterface;
@@ -20,14 +19,20 @@ use Symfony\Component\HttpFoundation\BinaryFileResponse;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
+use Symfony\Component\HttpFoundation\ResponseHeaderBag;
 use Symfony\Component\Routing\Attribute\Route;
 
 #[OA\Tag(name: 'Media', description: 'Media file and streaming endpoints')]
 #[Route('/api/images', name: 'image_')]
 final class ImageController
 {
+    /**
+     * Media types an image file is served with: the types covers are stored as, plus GIF, which is
+     * served without conversion. Any other recorded type is served as a download.
+     */
+    private const array SERVED_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
+
     use ApiResponsesTrait;
-    use TranslatorTrait;
 
     public function __construct(
         private readonly ImagePortInterface $imageService,
@@ -181,12 +186,13 @@ final class ImageController
             return $this->notFound($this->trans('errors.image_not_found', domain: 'media'));
         }
 
-        $fullPath = $this->storage->resolve($image->getPath());
+        $sourceFullPath = $this->storage->resolve($image->getPath());
 
-        if (!file_exists($fullPath)) {
+        if (!file_exists($sourceFullPath)) {
             return $this->notFound($this->trans('errors.image_file_not_found', domain: 'media'));
         }
 
+        $fullPath = $sourceFullPath;
         $extension = $image->getExtension();
         $sourcePath = $image->getPath();
         $sourceDirectory = pathinfo($sourcePath, PATHINFO_DIRNAME);
@@ -212,11 +218,18 @@ final class ImageController
             }
         }
 
+        $servedType = $fullPath === $sourceFullPath ? $image->getMimeType() : 'image/webp';
+
         $response = new BinaryFileResponse($fullPath);
-        $mimeType = mime_content_type($fullPath);
-        $response->headers->set('Content-Type', $mimeType !== false ? $mimeType : 'application/octet-stream');
+        if (in_array($servedType, self::SERVED_TYPES, true)) {
+            $response->headers->set('Content-Type', $servedType);
+        } else {
+            $response->headers->set('Content-Type', 'application/octet-stream');
+            $response->setContentDisposition(ResponseHeaderBag::DISPOSITION_ATTACHMENT, basename($fullPath));
+        }
         $response->headers->set('Content-Length', (string) filesize($fullPath));
         $response->headers->set('Cache-Control', 'private, no-store');
+        $response->headers->set('Content-Security-Policy', "default-src 'none'; sandbox");
 
         return $response;
     }

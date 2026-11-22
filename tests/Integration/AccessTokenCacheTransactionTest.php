@@ -6,6 +6,7 @@ namespace App\Tests\Integration;
 
 use App\Auth\Domain\Model\OAuth\AccessToken;
 use App\Auth\Domain\Model\OAuth\Client;
+use App\Auth\Domain\Model\OAuth\SignInGrant;
 use App\Auth\Infrastructure\Cache\CachedAccessTokenRepository;
 use App\Auth\Infrastructure\Doctrine\Entity\OAuth\AccessTokenEntity;
 use App\Auth\Infrastructure\Doctrine\Entity\OAuth\ClientEntity;
@@ -171,7 +172,7 @@ final class AccessTokenCacheTransactionTest extends TestCase
 
     private function seedActiveToken(): AccessToken
     {
-        $token = AccessToken::issue($this->client);
+        $token = AccessToken::issue($this->client, SignInGrant::AuthorizationCode);
         $this->repository->save($token);
         self::assertSame(0, $this->revokedStatus($this->observer, $token));
 

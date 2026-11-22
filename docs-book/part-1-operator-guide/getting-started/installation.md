@@ -286,13 +286,16 @@ Key generation is for this new instance. Keep its private key private; use the
 [security guide](../maintenance/security.md) for later key rotation. Confirm that
 `AUTH_SPA_CLIENT_ID` in `.env.dev.local` matches the ID printed by client setup.
 
-Create an administrator interactively:
+Create the first account as a super administrator, interactively:
 
 ```bash
-dc run --rm --no-deps app php bin/console app:user:create admin@baander.app Admin --role admin
+dc run --rm --no-deps app php bin/console app:user:create admin@baander.app Admin --role super-admin
 ```
 
-Choose a password at the hidden prompt and confirm the administrator role. See
+Choose a password at the hidden prompt and confirm the administrator role. Only a
+super administrator can change server settings and other administrators from the web
+app, and self-registration stays closed until a super administrator opens it (see
+[Registration and address changes](../configuration/account-security.md#registration-and-address-changes)). See
 [User management](../administration/user-management.md) and [app:user:create](../commands/app-user-create.md)
 for password rules and scripted creation.
 

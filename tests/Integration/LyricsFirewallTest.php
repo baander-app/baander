@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Integration;
 
+use App\Auth\Domain\Model\OAuth\SignInGrant;
 use App\Auth\Domain\Model\User;
 use App\Auth\Domain\Repository\UserRepositoryInterface;
 use App\Auth\Infrastructure\Doctrine\Entity\OAuth\AccessTokenEntity;
@@ -367,10 +368,14 @@ final class LyricsFirewallTest extends TestCase
     private function authenticate(string $actor): void
     {
         $entity = $actor === 'owner' ? $this->owner : $this->createUser($actor);
-        $client = FirstPartyOAuthClient::entity($this->kernel->getContainer(), $this->manager);
         $this->proof = new SignedDpopProof();
-        $token = new AccessTokenEntity((new Uuid())->toString(), $client, $entity, scopes: ['library'], expiresAt: new \DateTimeImmutable('+1 hour'));
-        $token->setDpopJkt($this->proof->thumbprint());
+        $token = FirstPartyOAuthClient::accessToken(
+            $this->kernel->getContainer(),
+            $this->manager,
+            $entity,
+            SignInGrant::Password,
+            $this->proof->thumbprint(),
+        );
         $this->manager->persist($token);
         $this->entities[] = $token;
         $this->manager->flush();

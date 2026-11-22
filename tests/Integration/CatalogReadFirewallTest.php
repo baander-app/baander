@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace App\Tests\Integration;
 
+use App\Auth\Domain\Model\OAuth\SignInGrant;
 use App\Auth\Domain\Model\User;
 use App\Auth\Domain\Repository\UserRepositoryInterface;
-use App\Auth\Infrastructure\Doctrine\Entity\OAuth\AccessTokenEntity;
 use App\Auth\Infrastructure\Doctrine\Entity\UserEntity;
 use App\Catalog\Infrastructure\Doctrine\Entity\AlbumEntity;
 use App\Catalog\Infrastructure\Doctrine\Entity\GenreEntity;
@@ -669,10 +669,14 @@ final class CatalogReadFirewallTest extends TestCase
         $this->actorId = $user->getId();
         $entity = $this->manager->find(UserEntity::class, $user->getId());
         self::assertInstanceOf(UserEntity::class, $entity);
-        $client = FirstPartyOAuthClient::entity($this->kernel->getContainer(), $this->manager);
         $this->proof = new SignedDpopProof();
-        $token = new AccessTokenEntity((new Uuid())->toString(), $client, $entity, scopes: ['library'], expiresAt: new \DateTimeImmutable('+1 hour'));
-        $token->setDpopJkt($this->proof->thumbprint());
+        $token = FirstPartyOAuthClient::accessToken(
+            $this->kernel->getContainer(),
+            $this->manager,
+            $entity,
+            SignInGrant::Password,
+            $this->proof->thumbprint(),
+        );
         if ($actor === 'member') {
             $this->manager->persist(new UserLibraryAccessEntity($entity->getId(), $this->catalog['allowed']['library'], new \DateTimeImmutable()));
         }

@@ -16,6 +16,8 @@ final class EnvironmentVariable
     public const string DEFAULT_URI = 'DEFAULT_URI';
     public const string BAANDER_DEPLOYMENT_PROFILE = 'BAANDER_DEPLOYMENT_PROFILE';
     public const string BAANDER_DEV_ORIGIN = 'BAANDER_DEV_ORIGIN';
+    public const string BAANDER_DEVELOPMENT_INSTANCE = 'BAANDER_DEVELOPMENT_INSTANCE';
+    public const string TRUSTED_PROXIES = 'TRUSTED_PROXIES';
 
     public const string DATABASE_URL = 'DATABASE_URL';
     public const string DATABASE_CONTROL_URL = 'DATABASE_CONTROL_URL';

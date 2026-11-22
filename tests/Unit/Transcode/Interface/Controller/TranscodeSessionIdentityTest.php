@@ -27,6 +27,7 @@ use Symfony\Component\Messenger\Envelope;
 use Symfony\Component\Messenger\MessageBusInterface;
 use Symfony\Component\Messenger\Stamp\HandledStamp;
 use Symfony\Component\Security\Core\User\UserInterface;
+use Symfony\Component\Translation\Translator;
 
 final class TranscodeSessionIdentityTest extends TestCase
 {
@@ -44,6 +45,7 @@ final class TranscodeSessionIdentityTest extends TestCase
         $this->expectNoCalls($playback, PlaybackPortInterface::class);
         $this->expectNoCalls($query, TranscodeSessionQueryPort::class);
         $controller = new TranscodeSessionController($security, $bus, $sessions, $playback, new \App\Tests\Unit\Transcode\PublicViewStub());
+        $controller->setTranslator(new Translator('en'));
 
         $response = match ($action) {
             'create' => $controller->create(new CreateTranscodeSessionRequest(videoId: Uuid::generate()->toString())),

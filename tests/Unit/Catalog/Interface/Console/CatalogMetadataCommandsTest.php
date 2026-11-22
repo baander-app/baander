@@ -145,6 +145,7 @@ final class CatalogMetadataCommandsTest extends TestCase
         $printed = json_decode($tester->getDisplay(), true, flags: JSON_THROW_ON_ERROR);
         self::assertSame(SongResource::fromWithMeta($song, ['' . $song->getId() => 'The Beatles'], ['' . $song->getAlbumId() => 'Abbey Road'], [$song->getId()->toString() => true], ['' . $song->getAlbumId() => 'eng']), $printed);
         self::assertSame(['The Beatles', 'Abbey Road', 'eng', 1, true, ['title']], [$printed['artistName'], $printed['albumName'], $printed['albumLanguage'], $printed['track'], $printed['explicit'], $printed['lockedFields']]);
+        self::assertSame('/music/come-together.flac', $printed['path'], 'The console reads with full authority, file path included.');
 
         $notExplicit = new CommandTester(new SongUpdateCommand($this->support(songs: $songs), $songs, $availability));
         self::assertSame(Command::SUCCESS, $notExplicit->execute(['public-id' => $song->getPublicId()->toString(), '--no-explicit' => true]));

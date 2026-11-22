@@ -61,6 +61,8 @@ final class DpopStoreOutageTest extends TestCase
     private User $user;
     /** A second account, for the token of another user a revoke may name. */
     private ?User $otherUser = null;
+    /** Public ID of the device client a test registered for the token endpoint. */
+    private ?string $deviceClientId = null;
     private string $ip;
     /** Redis borrows of the working kernel's pool during the last handled request. */
     private int $borrowsDuringLastRequest = 0;
@@ -117,6 +119,7 @@ final class DpopStoreOutageTest extends TestCase
             password_hash(self::PASSWORD, PASSWORD_BCRYPT),
             'Store outage user',
         );
+        $this->user->verifyEmail();
         $users->save($this->user);
 
         // Login and passkey login issue to the first-party SPA client; the row is the one
@@ -143,6 +146,9 @@ final class DpopStoreOutageTest extends TestCase
         }
         if (isset($this->connection) && $this->otherUser !== null) {
             $this->connection->executeStatement('DELETE FROM users WHERE id = ?', [$this->otherUser->getId()->toString()]);
+        }
+        if (isset($this->connection) && $this->deviceClientId !== null) {
+            $this->connection->executeStatement('DELETE FROM oauth_clients WHERE public_id = ?', [$this->deviceClientId]);
         }
         if (isset($this->manager) && $this->manager->isOpen()) {
             $this->manager->close();
@@ -223,24 +229,24 @@ final class DpopStoreOutageTest extends TestCase
         $assertion = $this->passkeyAssertion($this->registerPasskey());
         $refused = $this->refusedKernel();
 
-        self::assertStoreUnavailable($this->send('POST', '/api/auth/passkey/authenticate/options', json: ['userId' => $this->user->getPublicId()->toString()], kernel: $refused), '1');
+        self::assertStoreUnavailable($this->send('POST', '/api/auth/passkey/authenticate/options', kernel: $refused), '1');
         self::assertStoreUnavailable($this->send('POST', '/api/auth/passkey/authenticate', json: $assertion, kernel: $refused), '1');
 
         $verified = $this->send('POST', '/api/auth/passkey/authenticate', json: $assertion);
         self::assertSame(200, $verified->getStatusCode(), (string) $verified->getContent());
         $replayed = $this->send('POST', '/api/auth/passkey/authenticate', json: $assertion);
-        self::assertSame(400, $replayed->getStatusCode(), (string) $replayed->getContent());
+        self::assertSame(401, $replayed->getStatusCode(), (string) $replayed->getContent());
+        self::assertSame('passkey_auth_failed', json_decode((string) $replayed->getContent(), true, flags: JSON_THROW_ON_ERROR)['error']['details']['reason']);
     }
 
     public function testTheTokenEndpointDuringTheOutageAnswers503WithRetryAfter(): void
     {
-        $key = new SignedDpopProof();
-        $login = $this->login($key);
+        [$tv, $clientId, $tokens, $nonce] = $this->deviceTokens();
 
-        $response = $this->tokenRequest($key, $login['nonce'], [
+        $response = $this->tokenRequest($tv, $nonce, [
             'grant_type' => 'refresh_token',
-            'client_id' => $this->spaClientId(),
-            'refresh_token' => $login['refreshToken'],
+            'client_id' => $clientId,
+            'refresh_token' => $tokens['refresh_token'],
         ], $this->refusedKernel());
 
         self::assertStoreUnavailable($response);
@@ -286,12 +292,11 @@ final class DpopStoreOutageTest extends TestCase
     /** A database fault during the grant is answered like the first-party refresh answers it. */
     public function testTheTokenEndpointAnswersADatabaseFaultWith503AndRetryAfter(): void
     {
-        $key = new SignedDpopProof();
-        $login = $this->login($key);
+        [$tv, $clientId, $tokens, $nonce] = $this->deviceTokens();
         $form = [
             'grant_type' => 'refresh_token',
-            'client_id' => $this->spaClientId(),
-            'refresh_token' => $login['refreshToken'],
+            'client_id' => $clientId,
+            'refresh_token' => $tokens['refresh_token'],
         ];
 
         // While PostgreSQL restarts it ends every session and refuses new ones.
@@ -302,7 +307,7 @@ final class DpopStoreOutageTest extends TestCase
             $admin->executeStatement(sprintf('ALTER DATABASE %s WITH ALLOW_CONNECTIONS false', $admin->quoteSingleIdentifier($database)));
             $admin->executeQuery('SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname = ?', [$database]);
 
-            $response = $this->tokenRequest($key, $login['nonce'], $form);
+            $response = $this->tokenRequest($tv, $nonce, $form);
         } finally {
             $admin->executeStatement(sprintf('ALTER DATABASE %s WITH ALLOW_CONNECTIONS true', $admin->quoteSingleIdentifier($database)));
             $admin->close();
@@ -317,7 +322,7 @@ final class DpopStoreOutageTest extends TestCase
         self::assertStringNotContainsStringIgnoringCase('SQLSTATE', (string) $response->getContent());
 
         // The grant decided nothing: the token still rotates once the database is back.
-        $retry = $this->refresh($login['refreshToken'], $key, $this->nonce());
+        $retry = $this->tokenRequest($tv, $this->nonce(), $form);
         self::assertSame(200, $retry->getStatusCode(), (string) $retry->getContent());
     }
 
@@ -729,12 +734,49 @@ final class DpopStoreOutageTest extends TestCase
         return $redis;
     }
 
-    private function spaClientId(): string
+    /**
+     * A pair the device grant issued to a newly registered device client for the test's user,
+     * since the token endpoint serves clients other than the first-party one: the device's key,
+     * the client's public ID, the token answer and the nonce for the device's next proof.
+     *
+     * @return array{SignedDpopProof, string, array<string, mixed>, string}
+     */
+    private function deviceTokens(): array
     {
-        $spaClientId = $this->kernel->getContainer()->getParameter('auth.spa_client_id');
-        self::assertIsString($spaClientId);
+        $publicId = new PublicId();
+        $this->manager->persist(new ClientEntity($publicId, 'Store outage TV', '[]', deviceClient: true));
+        $this->manager->flush();
+        $this->deviceClientId = $publicId->toString();
 
-        return $spaClientId;
+        $authorization = $this->send('POST', '/api/oauth/device/authorize', form: [
+            'client_id' => $this->deviceClientId,
+            'scope' => 'library',
+        ]);
+        self::assertSame(200, $authorization->getStatusCode(), (string) $authorization->getContent());
+        $codes = json_decode((string) $authorization->getContent(), true, flags: JSON_THROW_ON_ERROR);
+
+        $web = new SignedDpopProof();
+        $login = $this->login($web);
+        $approval = $this->send('POST', '/api/oauth/device/approve', json: [
+            'userCode' => $codes['user_code'],
+            'decision' => 'approve',
+        ], headers: [
+            'Authorization' => 'DPoP ' . $login['accessToken'],
+            'DPoP' => $web->create('POST', self::ORIGIN . '/api/oauth/device/approve', $login['accessToken']),
+        ]);
+        self::assertSame(200, $approval->getStatusCode(), (string) $approval->getContent());
+
+        $tv = new SignedDpopProof();
+        $poll = $this->tokenRequest($tv, $this->nonce(), [
+            'grant_type' => 'urn:ietf:params:oauth:grant-type:device_code',
+            'client_id' => $this->deviceClientId,
+            'device_code' => $codes['device_code'],
+        ]);
+        self::assertSame(200, $poll->getStatusCode(), (string) $poll->getContent());
+        $nonce = $poll->headers->get('DPoP-Nonce');
+        self::assertIsString($nonce);
+
+        return [$tv, $this->deviceClientId, json_decode((string) $poll->getContent(), true, flags: JSON_THROW_ON_ERROR), $nonce];
     }
 
     /** @return array{accessToken: string, refreshToken: string, nonce: string} */
@@ -807,7 +849,7 @@ final class DpopStoreOutageTest extends TestCase
     /** @return array{challengeKey: string, response: array<string, mixed>} */
     private function passkeyAssertion(WebAuthnTestCredential $credential): array
     {
-        $options = $this->send('POST', '/api/auth/passkey/authenticate/options', json: ['userId' => $this->user->getPublicId()->toString()]);
+        $options = $this->send('POST', '/api/auth/passkey/authenticate/options');
         self::assertSame(200, $options->getStatusCode(), (string) $options->getContent());
         $data = json_decode((string) $options->getContent(), true, flags: JSON_THROW_ON_ERROR)['data'];
         self::assertIsString($data['challengeKey']);

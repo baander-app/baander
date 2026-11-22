@@ -30,8 +30,8 @@ final class ScopeRouteMap
     public const array PUBLIC_ROUTES = [
         'oauth_authorization_server_metadata', 'jwks', 'oauth_par', 'oauth_token', 'oauth_device_authorize',
         'passkey_authenticate_options', 'passkey_authenticate', 'auth_passkey_login_passkey', 'auth_register',
-        'auth_refresh', 'auth_password_reset_request', 'auth_password_reset', 'auth_email_verify',
-        'auth_login_login', 'stream_original_video', 'stream_original_track', 'health_check', 'health_ready',
+        'auth_refresh', 'auth_password_reset_request', 'auth_password_reset',
+        'auth_login_login', 'auth_registration', 'health_check', 'health_ready',
         'health_live', 'prometheus_metrics', 'stream_artifact_master', 'stream_artifact_media',
         'stream_artifact_init', 'stream_artifact_segment', 'stream_master_manifest', 'stream_media_manifest',
         'stream_dash_manifest', 'stream_subtitle_manifest', 'stream_segment_init_segment',
@@ -75,14 +75,14 @@ final class ScopeRouteMap
         'admin_settings_index', 'admin_settings_definitions', 'admin_settings_update', 'admin_settings_reset',
         'monitor_transport_status', 'monitor_transport_failed_list', 'monitor_transport_failed_show',
         'monitor_transport_failed_flush', 'monitor_transport_failed_retry', 'monitor_transport_failed_remove',
-        'debug_workers',
+        'debug_workers', 'debug_health',
         // Catalog, library, lyrics, metadata, radio source, transcode job, webhook and server
         // registration administration; each requires an admin role.
         'album_update', 'album_merge', 'album_destroy', 'album_cover_upload', 'album_cover_delete',
         'artist_store', 'artist_update', 'artist_destroy', 'artist_add_song', 'artist_remove_song',
         'artist_update_song_role', 'artist_add_album', 'artist_remove_album', 'artist_update_album_role',
         'artist_cover_upload', 'artist_cover_delete',
-        'extract_covers_app_catalog_interface_extractcovers__invoke', 'genre_store', 'genre_update',
+        'album_covers_extract', 'genre_store', 'genre_update',
         'genre_destroy', 'genre_add_song', 'genre_remove_song', 'genre_add_album', 'genre_remove_album',
         'movie_update', 'movie_destroy', 'song_update', 'song_destroy', 'discovery_register', 'library_store',
         'library_update', 'library_delete', 'library_scan', 'library_validate_path', 'library_scan_all',
@@ -92,7 +92,7 @@ final class ScopeRouteMap
         // Account security, sign-in sessions and live connections.
         'live_recovery', 'passkey_list', 'passkey_options', 'passkey_register', 'passkey_delete',
         'totp_setup', 'totp_enable', 'totp_disable', 'auth_logout', 'auth_me_update',
-        'auth_me_email_verification', 'auth_me_email', 'auth_me_password', 'auth_websocket_ticket',
+        'auth_me_email_verification', 'auth_me_email', 'auth_me_password', 'auth_websocket_ticket', 'auth_email_verify',
         // Consent, device approval and client management.
         'oauth_clients_index', 'oauth_clients_create', 'oauth_clients_revoke', 'oauth_authorize',
         'oauth_authorize_decision', 'oauth_revoke', 'oauth_device_verify', 'oauth_device_approve',
@@ -176,6 +176,9 @@ final class ScopeRouteMap
         'image_file' => [self::LIBRARY],
         'image_blurhash' => [self::LIBRARY],
         'stream_track' => [self::LIBRARY],
+        // A signed URL needs no token; a presented token also needs the library scope.
+        'stream_original_video' => [self::LIBRARY],
+        'stream_original_track' => [self::LIBRARY],
         'radio_subscription_list' => [self::LIBRARY],
         'radio_subscription_subscribe' => [self::LIBRARY],
         'radio_subscription_unsubscribe' => [self::LIBRARY],

@@ -35,7 +35,13 @@
     "stepUp": {
       "currentPassword": "Current password",
       "failed": "Password or code is incorrect",
-      "limited": "Too many attempts. Try again later."
+      "limited": "Too many attempts. Try again later.",
+      "signsOutOtherSessions": "This signs you out on your other devices and apps."
+    },
+    "registration": {
+      "title": "Create account",
+      "closed": "This server is not open for sign-ups. Ask its administrator to create an account for you.",
+      "backToLogin": "Back to log in"
     },
     "passwordReset": {
       "requestTitle": "Reset your password",
@@ -58,6 +64,10 @@
       "title": "Verify your email",
       "verifying": "Verifying your email address…",
       "verified": "Your email address is verified.",
+      "emailChanged": "Your account now uses this email address, and your other sessions were signed out.",
+      "signInRequired": "Sign in to the account this link was sent for to verify the address.",
+      "otherAccount": "You are signed in as {{email}}, but this link was sent for another account.",
+      "signOutAndContinue": "Sign out and continue",
       "continue": "Continue to Bånder",
       "logIn": "Log in",
       "invalidLink": "This verification link is invalid or has expired.",
@@ -72,6 +82,14 @@
       "changeEmailDescription": "Enter your new email address. We'll send a link to it, and your account keeps its current address until you open that link.",
       "pendingChange": "Waiting for confirmation",
       "pendingChangeHint": "Open the link we sent to {{email}} to switch your account to that address."
+    },
+    "verificationGate": {
+      "title": "Verify your email address",
+      "intro": "To start using Bånder, open the link we sent to {{email}} in a browser where you are signed in to this account.",
+      "notVerifiedYet": "Your address is not verified yet. Open the link in the email, then check again.",
+      "checkAgain": "Check again",
+      "changeEmail": "Change email address",
+      "signOut": "Sign out"
     },
     "scopes": {
       "intro": "It will be able to:",
@@ -105,8 +123,10 @@
       "requestIntro": "{{client}} wants to use your Bånder account.",
       "clientType": {
         "public": "App on your device",
-        "confidential": "Web service"
+        "confidential": "Web service",
+        "personal_access": "Your personal access client"
       },
+      "loopbackRedirect": "Returns to {{redirect}} on this device.",
       "trustHint": "Allow access only if you started this sign-in and trust this app.",
       "allow": "Allow",
       "deny": "Deny",

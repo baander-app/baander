@@ -244,6 +244,27 @@
       "capture": "child-row-or-exempt"
     },
     {
+      "parent": "tv_episodes",
+      "child": "episode_person_credit_state",
+      "foreign_key": "episode_id",
+      "action": "CASCADE",
+      "capture": "child-row-or-exempt"
+    },
+    {
+      "parent": "people",
+      "child": "episode_person_credits",
+      "foreign_key": "person_id",
+      "action": "CASCADE",
+      "capture": "child-row-or-exempt"
+    },
+    {
+      "parent": "tv_episodes",
+      "child": "episode_person_credits",
+      "foreign_key": "episode_id",
+      "action": "CASCADE",
+      "capture": "child-row-or-exempt"
+    },
+    {
       "parent": "users",
       "child": "eq_device_profiles",
       "foreign_key": "user_id",
@@ -382,6 +403,41 @@
       "foreign_key": "user_id",
       "action": "CASCADE",
       "capture": "before-parent-delete"
+    },
+    {
+      "parent": "movie_directors",
+      "child": "movie_director_credits",
+      "foreign_key": "director_id",
+      "action": "CASCADE",
+      "capture": "child-row-or-exempt"
+    },
+    {
+      "parent": "movies",
+      "child": "movie_director_credits",
+      "foreign_key": "movie_id",
+      "action": "CASCADE",
+      "capture": "child-row-or-exempt"
+    },
+    {
+      "parent": "movies",
+      "child": "movie_person_credit_state",
+      "foreign_key": "movie_id",
+      "action": "CASCADE",
+      "capture": "child-row-or-exempt"
+    },
+    {
+      "parent": "movies",
+      "child": "movie_person_credits",
+      "foreign_key": "movie_id",
+      "action": "CASCADE",
+      "capture": "child-row-or-exempt"
+    },
+    {
+      "parent": "people",
+      "child": "movie_person_credits",
+      "foreign_key": "person_id",
+      "action": "CASCADE",
+      "capture": "child-row-or-exempt"
     },
     {
       "parent": "movies",
@@ -580,6 +636,41 @@
       "capture": "child-row-or-exempt"
     },
     {
+      "parent": "images",
+      "child": "people",
+      "foreign_key": "image_id",
+      "action": "SET NULL",
+      "capture": "child-row-or-exempt"
+    },
+    {
+      "parent": "artists",
+      "child": "person_artist_links",
+      "foreign_key": "artist_id",
+      "action": "CASCADE",
+      "capture": "child-row-or-exempt"
+    },
+    {
+      "parent": "people",
+      "child": "person_artist_links",
+      "foreign_key": "person_id",
+      "action": "CASCADE",
+      "capture": "child-row-or-exempt"
+    },
+    {
+      "parent": "people",
+      "child": "person_external_ids",
+      "foreign_key": "person_id",
+      "action": "CASCADE",
+      "capture": "child-row-or-exempt"
+    },
+    {
+      "parent": "people",
+      "child": "person_id_aliases",
+      "foreign_key": "person_id",
+      "action": "CASCADE",
+      "capture": "child-row-or-exempt"
+    },
+    {
       "parent": "users",
       "child": "playback_destinations",
       "foreign_key": "user_id",
@@ -685,6 +776,27 @@
       "capture": "before-parent-delete"
     },
     {
+      "parent": "tv_series",
+      "child": "series_person_credit_state",
+      "foreign_key": "series_id",
+      "action": "CASCADE",
+      "capture": "child-row-or-exempt"
+    },
+    {
+      "parent": "people",
+      "child": "series_person_credits",
+      "foreign_key": "person_id",
+      "action": "CASCADE",
+      "capture": "child-row-or-exempt"
+    },
+    {
+      "parent": "tv_series",
+      "child": "series_person_credits",
+      "foreign_key": "series_id",
+      "action": "CASCADE",
+      "capture": "child-row-or-exempt"
+    },
+    {
       "parent": "albums",
       "child": "songs",
       "foreign_key": "album_id",
@@ -739,6 +851,27 @@
       "foreign_key": "video_id",
       "action": "CASCADE",
       "capture": "before-parent-delete"
+    },
+    {
+      "parent": "tv_seasons",
+      "child": "tv_episodes",
+      "foreign_key": "season_id",
+      "action": "CASCADE",
+      "capture": "child-row-or-exempt"
+    },
+    {
+      "parent": "tv_series",
+      "child": "tv_seasons",
+      "foreign_key": "series_id",
+      "action": "CASCADE",
+      "capture": "child-row-or-exempt"
+    },
+    {
+      "parent": "libraries",
+      "child": "tv_series",
+      "foreign_key": "library_id",
+      "action": "CASCADE",
+      "capture": "child-row-or-exempt"
     },
     {
       "parent": "users",
@@ -971,6 +1104,18 @@
       "reason": "Secret challenge storage; verification outcome changes users and is captured there."
     },
     {
+      "table": "episode_person_credit_state",
+      "mapping": "src/Catalog/Infrastructure/Doctrine/Entity/EpisodePersonCreditStateEntity.php",
+      "classification": "excluded",
+      "reason": "Whether an episode's cast and crew were imported; the library-scoped TV and People views refresh it by 30-second visible sampling and catalog hints, without capture."
+    },
+    {
+      "table": "episode_person_credits",
+      "mapping": "src/Catalog/Infrastructure/Doctrine/Entity/EpisodePersonCreditEntity.php",
+      "classification": "excluded",
+      "reason": "Episode cast, guest and crew credits; the library-scoped TV and People views refresh them by 30-second visible sampling and catalog hints, without capture."
+    },
+    {
       "table": "eq_device_profiles",
       "mapping": "src/UserPreference/Infrastructure/Doctrine/Entity/EqDeviceProfileEntity.php",
       "classification": "capture",
@@ -1163,6 +1308,30 @@
       "response_cache": "authoritative-read"
     },
     {
+      "table": "movie_director_credits",
+      "mapping": "migrations/Version20261121143000.php",
+      "classification": "excluded",
+      "reason": "Director-only credits that Version20261121194500 copies into movie_person_credits before dropping the table; no current schema holds it."
+    },
+    {
+      "table": "movie_directors",
+      "mapping": "migrations/Version20261121143000.php",
+      "classification": "excluded",
+      "reason": "Director identities that Version20261121194500 copies into people and person_external_ids before dropping the table; no current schema holds it."
+    },
+    {
+      "table": "movie_person_credit_state",
+      "mapping": "src/Catalog/Infrastructure/Doctrine/Entity/MoviePersonCreditStateEntity.php",
+      "classification": "excluded",
+      "reason": "Whether a movie's cast, crew and directors were imported; the library-scoped People and director views refresh it by 30-second visible sampling and catalog hints, without capture."
+    },
+    {
+      "table": "movie_person_credits",
+      "mapping": "src/Catalog/Infrastructure/Doctrine/Entity/MoviePersonCreditEntity.php",
+      "classification": "excluded",
+      "reason": "Movie cast and crew credits; the library-scoped People, movie credit and director views refresh them by 30-second visible sampling and catalog hints, without capture."
+    },
+    {
       "table": "movie_video",
       "mapping": "src/Catalog/Infrastructure/Doctrine/Entity/MovieVideoEntity.php",
       "classification": "capture",
@@ -1216,7 +1385,7 @@
       "classification": "capture",
       "operations": ["INSERT", "UPDATE", "DELETE"],
       "relevant_columns": ["id", "chain_id", "user_id", "client_id", "name", "scopes", "revoked", "expires_at", "last_refreshed_at", "created_at"],
-      "excluded_columns": ["updated_at", "token_id", "dpop_jkt", "credential_epoch"],
+      "excluded_columns": ["updated_at", "token_id", "dpop_jkt", "credential_epoch", "grant_type"],
       "families": ["account", "devices", "admin-security"],
       "scope_routes": ["user", "admin"],
       "readers": ["src/Auth/Infrastructure/Repository/OAuth/AccessTokenRepository.php"],
@@ -1335,6 +1504,42 @@
       "mapping": "src/Auth/Infrastructure/Doctrine/Entity/PasswordResetTokenEntity.php",
       "classification": "excluded",
       "reason": "Secret challenge storage; password/security outcome changes users and is captured there."
+    },
+    {
+      "table": "people",
+      "mapping": "src/Catalog/Infrastructure/Doctrine/Entity/PersonEntity.php",
+      "classification": "excluded",
+      "reason": "Person profiles; the library-scoped People, TV and director views refresh them by 30-second visible sampling and catalog hints, without capture."
+    },
+    {
+      "table": "person_artist_links",
+      "mapping": "src/Catalog/Infrastructure/Doctrine/Entity/PersonArtistLinkEntity.php",
+      "classification": "excluded",
+      "reason": "Artist-to-Person links; the library-scoped People and Artist person views refresh them by 30-second visible sampling and catalog hints, without capture."
+    },
+    {
+      "table": "person_external_ids",
+      "mapping": "src/Catalog/Infrastructure/Doctrine/Entity/PersonExternalIdEntity.php",
+      "classification": "excluded",
+      "reason": "Provider identifiers with profile fetch and claim times for metadata workers; the director views read the TMDB identifier through 30-second visible sampling, without capture."
+    },
+    {
+      "table": "person_id_aliases",
+      "mapping": "src/Catalog/Infrastructure/Doctrine/Entity/PersonIdAliasEntity.php",
+      "classification": "excluded",
+      "reason": "Public IDs retired by Person merges; the library-scoped People views resolve old links through them by 30-second visible sampling, without capture."
+    },
+    {
+      "table": "person_identifier_blocks",
+      "mapping": "src/Catalog/Infrastructure/Doctrine/Entity/PersonIdentifierBlockEntity.php",
+      "classification": "excluded",
+      "reason": "Provider identifiers an operator detached, which identity resolution must not reattach; no browser query."
+    },
+    {
+      "table": "person_identity_conflicts",
+      "mapping": "src/Catalog/Infrastructure/Doctrine/Entity/PersonIdentityConflictEntity.php",
+      "classification": "excluded",
+      "reason": "Unresolved identity claims listed by the app:person:manage console command; no browser query."
     },
     {
       "table": "playback_commands",
@@ -1541,6 +1746,18 @@
       "response_cache": "authoritative-read"
     },
     {
+      "table": "series_person_credit_state",
+      "mapping": "src/Catalog/Infrastructure/Doctrine/Entity/SeriesPersonCreditStateEntity.php",
+      "classification": "excluded",
+      "reason": "Whether a series' cast and crew were imported; the library-scoped TV and People views refresh it by 30-second visible sampling and catalog hints, without capture."
+    },
+    {
+      "table": "series_person_credits",
+      "mapping": "src/Catalog/Infrastructure/Doctrine/Entity/SeriesPersonCreditEntity.php",
+      "classification": "excluded",
+      "reason": "Series cast and crew credits; the library-scoped TV and People views refresh them by 30-second visible sampling and catalog hints, without capture."
+    },
+    {
       "table": "server_instances",
       "mapping": "src/Discovery/Infrastructure/Doctrine/Entity/ServerInstanceEntity.php",
       "classification": "excluded",
@@ -1635,6 +1852,24 @@
       "scope_routes": ["user", "admin"],
       "readers": ["src/Transcode/Infrastructure/Doctrine/Repository/TranscodeSessionRepository.php"],
       "response_cache": "authoritative-read"
+    },
+    {
+      "table": "tv_episodes",
+      "mapping": "src/Catalog/Infrastructure/Doctrine/Entity/TvEpisodeEntity.php",
+      "classification": "excluded",
+      "reason": "Registered TV episodes; the library-scoped TV and People views refresh them by 30-second visible sampling and catalog hints, without capture."
+    },
+    {
+      "table": "tv_seasons",
+      "mapping": "src/Catalog/Infrastructure/Doctrine/Entity/TvSeasonEntity.php",
+      "classification": "excluded",
+      "reason": "Seasons of registered TV series; the library-scoped TV views refresh them by 30-second visible sampling and catalog hints, without capture."
+    },
+    {
+      "table": "tv_series",
+      "mapping": "src/Catalog/Infrastructure/Doctrine/Entity/TvSeriesEntity.php",
+      "classification": "excluded",
+      "reason": "Registered TV series; the library-scoped TV and People views refresh them by 30-second visible sampling and catalog hints, without capture."
     },
     {
       "table": "user_accent_colors",

@@ -12,6 +12,8 @@ use App\Transcode\Application\DTO\TranscodeRenditionSet;
 use Symfony\Component\HttpKernel\Exception\BadRequestHttpException;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 use App\Shared\Interface\Controller\ApiResponsesTrait;
+use App\Shared\Interface\DTO\ApiError;
+use App\Transcode\Application\Port\LiveDeliveryAccessPort;
 use App\Transcode\Application\Port\TranscodeStreamingPortInterface;
 use App\Transcode\Application\Port\PlaybackPortInterface;
 use App\Transcode\Application\Port\TranscodePublicViewInterface;
@@ -23,7 +25,11 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
 use Symfony\Component\Routing\Attribute\Route;
 
 #[OA\Tag(name: 'Streaming', description: 'HLS/DASH streaming endpoints')]
-#[Route('/api/transcode', name: 'stream_')]
+#[Route('/api/transcode', name: 'stream_', requirements: [
+    'videoId' => PublicId::PATTERN,
+    'jobPublicId' => PublicId::PATTERN,
+    'language' => 's[0-9]+',
+])]
 final class StreamManifestController
 {
     use ApiResponsesTrait;
@@ -34,6 +40,7 @@ final class StreamManifestController
         private readonly PlaybackPortInterface $playback,
         private readonly TranscodePublicViewInterface $publicView,
         private readonly SleeperInterface $sleeper,
+        private readonly LiveDeliveryAccessPort $ownerAccess,
     ) {
     }
 
@@ -67,6 +74,13 @@ final class StreamManifestController
                 description: 'HLS master manifest',
                 content: new OA\MediaType(mediaType: 'application/vnd.apple.mpegurl'),
             ),
+            new OA\Response(
+                response: '409',
+                description: 'The job owner may no longer play the video',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: ApiError::class),
+                ),
+            ),
         ],
     )]
     #[Route('/{videoId}/master.m3u8', name: 'master_manifest', methods: ['GET'])]
@@ -74,8 +88,10 @@ final class StreamManifestController
     {
         $expiresAt = $this->signedRequest->validate($request);
         $videoUuid = $this->requireVideo($videoId);
+        $renditions = $this->renditionSet($request);
+        $this->ownerAccess->assertOwnersMayStream($this->jobIds($renditions));
 
-        $manifest = $this->streamingService->getMasterManifest($videoUuid, $this->renditionSet($request), $expiresAt);
+        $manifest = $this->streamingService->getMasterManifest($videoUuid, $renditions, $expiresAt);
 
         return new StreamedResponse(static fn() => print $manifest, $this->available($manifest) ? 200 : 503, [
             'Cache-Control' => 'no-store',
@@ -110,7 +126,12 @@ final class StreamManifestController
                 in: 'path',
                 description: 'Job public ID',
                 required: true,
-                schema: new OA\Schema(type: 'string'),
+                schema: new OA\Schema(
+                    type: 'string',
+                    minLength: PublicId::LENGTH,
+                    maxLength: PublicId::LENGTH,
+                    pattern: PublicId::SCHEMA_PATTERN,
+                ),
             ),
         ],
         responses: [
@@ -119,6 +140,13 @@ final class StreamManifestController
                 description: 'HLS media manifest',
                 content: new OA\MediaType(mediaType: 'application/vnd.apple.mpegurl'),
             ),
+            new OA\Response(
+                response: '409',
+                description: 'The job owner may no longer play the video',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: ApiError::class),
+                ),
+            ),
         ],
     )]
     #[Route('/{jobPublicId}/tracks/{track}/media.m3u8', name: 'media_manifest', requirements: ['track' => 'video|audio'], methods: ['GET'])]
@@ -126,6 +154,7 @@ final class StreamManifestController
     {
         $expiresAt = $this->signedRequest->validate($request);
         $publicId = PublicId::fromString($jobPublicId);
+        $this->ownerAccess->assertOwnerMayStream($publicId);
 
         $manifest = $this->streamingService->getMediaManifest($publicId, $track, $request->query->getInt('generation'), $expiresAt);
 
@@ -166,6 +195,13 @@ final class StreamManifestController
                 description: 'DASH manifest',
                 content: new OA\MediaType(mediaType: 'application/dash+xml'),
             ),
+            new OA\Response(
+                response: '409',
+                description: 'The job owner may no longer play the video',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: ApiError::class),
+                ),
+            ),
         ],
     )]
     #[Route('/{videoId}/manifest.mpd', name: 'dash_manifest', methods: ['GET'])]
@@ -174,6 +210,7 @@ final class StreamManifestController
         $expiresAt = $this->signedRequest->validate($request);
         $video = $this->requireVideo($videoId);
         $renditions = $this->renditionSet($request);
+        $this->ownerAccess->assertOwnersMayStream($this->jobIds($renditions));
         $manifest = $this->streamingService->getDashManifest($video, $renditions, $expiresAt);
         if (str_contains($manifest, 'type="dynamic"')) {
             // Some readers ignore the update interval when a growing SegmentList is exhausted.
@@ -289,14 +326,19 @@ final class StreamManifestController
                 in: 'path',
                 description: 'Job public ID',
                 required: true,
-                schema: new OA\Schema(type: 'string'),
+                schema: new OA\Schema(
+                    type: 'string',
+                    minLength: PublicId::LENGTH,
+                    maxLength: PublicId::LENGTH,
+                    pattern: PublicId::SCHEMA_PATTERN,
+                ),
             ),
             new OA\Parameter(
                 name: 'language',
                 in: 'path',
                 description: 'Source subtitle track key: s followed by the absolute FFprobe stream index (for example s2)',
                 required: true,
-                schema: new OA\Schema(type: 'string'),
+                schema: new OA\Schema(type: 'string', pattern: '^s[0-9]+$'),
             ),
         ],
         responses: [
@@ -308,13 +350,22 @@ final class StreamManifestController
                     schema: new OA\Schema(type: 'string'),
                 ),
             ),
+            new OA\Response(
+                response: '409',
+                description: 'The job owner may no longer play the video',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: ApiError::class),
+                ),
+            ),
         ],
     )]
     #[Route('/{jobPublicId}/subtitles/{language}/media.m3u8', name: 'subtitle_manifest', methods: ['GET'])]
     public function subtitleManifest(string $jobPublicId, string $language, Request $request): StreamedResponse
     {
         $expiresAt = $this->signedRequest->validate($request);
-        $manifest = $this->streamingService->getSubtitleManifest(PublicId::fromString($jobPublicId), $language, $request->query->getInt('generation'), $expiresAt);
+        $publicId = PublicId::fromString($jobPublicId);
+        $this->ownerAccess->assertOwnerMayStream($publicId);
+        $manifest = $this->streamingService->getSubtitleManifest($publicId, $language, $request->query->getInt('generation'), $expiresAt);
 
         return new StreamedResponse(static fn() => print $manifest, $this->available($manifest) ? 200 : 503, [
             'Cache-Control' => 'no-store',
@@ -335,6 +386,15 @@ final class StreamManifestController
         } catch (\InvalidArgumentException) {
             throw new BadRequestHttpException('Invalid signed rendition set.');
         }
+    }
+
+    /**
+     * @param list<array{jobId: string, generation: int}> $renditions
+     * @return list<PublicId>
+     */
+    private function jobIds(array $renditions): array
+    {
+        return array_map(PublicId::fromString(...), array_column($renditions, 'jobId'));
     }
 
     private function available(string $manifest): bool

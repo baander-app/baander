@@ -4,8 +4,10 @@ declare(strict_types=1);
 
 namespace App\Tests\Functional\Auth;
 
+use App\Auth\Application\Settings\UserManagementSettingDefinitions;
 use App\Auth\Domain\Model\User;
 use App\Auth\Infrastructure\Mail\AfterResponseMailer;
+use App\Shared\Application\Port\SystemSettingStoreInterface;
 use App\UserPreference\Application\Port\UserSettingStoreInterface;
 use Doctrine\DBAL\Connection;
 use Monolog\Handler\TestHandler;
@@ -36,6 +38,14 @@ final class EmailVerificationDeliveryTest extends RateLimitTestCase
     private const string LINK_PATTERN = '~(https?://[^\s"<]+/verify-email#token=([0-9a-f]{64}))~';
 
     private int $nextIp = 60;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        // Registration is the way into most of these flows; it ships closed.
+        static::getContainer()->get(SystemSettingStoreInterface::class)->save([UserManagementSettingDefinitions::REGISTRATION_OPEN => true]);
+    }
 
     public function testRegistrationSendsOneEmailWhoseLinkVerifiesTheAddress(): void
     {
@@ -71,11 +81,12 @@ final class EmailVerificationDeliveryTest extends RateLimitTestCase
 
         $this->assertNull($this->connection()->fetchOne('SELECT email_verified_at FROM users WHERE id = ?', [$userId]), 'A new account starts unverified.');
 
-        $this->assertJsonResponse($this->verify($token), 200, 'data');
+        $verified = $this->assertJsonResponse($this->verify($token, $userId), 200, 'data');
+        $this->assertFalse($verified['data']['emailChanged'], 'Verifying the registered address changes no address.');
         $this->assertNotNull($this->connection()->fetchOne('SELECT email_verified_at FROM users WHERE id = ?', [$userId]));
         $this->assertSame(0, $this->outstandingTokens($userId));
 
-        $replay = $this->verify($token);
+        $replay = $this->verify($token, $userId);
         $this->assertJsonResponse($replay, 400, 'error');
     }
 
@@ -159,8 +170,9 @@ final class EmailVerificationDeliveryTest extends RateLimitTestCase
         $this->assertSame([$newAddress], array_map(static fn (Address $a): string => $a->getAddress(), $latest->getTo()));
         [, $newToken] = $this->linkFrom((string) $latest->getTextBody());
 
-        $this->assertJsonResponse($this->verify($oldToken), 400, 'error');
-        $this->assertJsonResponse($this->verify($newToken), 200, 'data');
+        $this->assertJsonResponse($this->verify($oldToken, $user->getId()->toString()), 400, 'error');
+        $confirmed = $this->assertJsonResponse($this->verify($newToken, $user->getId()->toString()), 200, 'data');
+        $this->assertTrue($confirmed['data']['emailChanged']);
         $this->assertSame(
             ['email' => $newAddress, 'pending_email' => null, 'verified' => true],
             $this->connection()->fetchAssociative('SELECT email, pending_email, email_verified_at IS NOT NULL AS verified FROM users WHERE id = ?', [$user->getId()->toString()]),
@@ -176,7 +188,7 @@ final class EmailVerificationDeliveryTest extends RateLimitTestCase
 
     public function testAChangeToATakenAddressAnswersTheSameAndItsLinkFails(): void
     {
-        $user = $this->createTestUser($this->uniqueEmail(), verified: true);
+        $user = $this->createTestUser($this->uniqueEmail());
         $owner = $this->createTestUser($this->uniqueEmail());
         $free = $this->authenticatedRequest('PUT', '/api/auth/me/email', $this->createTestUser($this->uniqueEmail()), ['email' => $this->uniqueEmail(), 'currentPassword' => 'password123']);
 
@@ -189,7 +201,7 @@ final class EmailVerificationDeliveryTest extends RateLimitTestCase
         $this->assertInstanceOf(Email::class, $messages[1]);
         [, $token] = $this->linkFrom((string) $messages[1]->getTextBody());
 
-        $this->assertJsonResponse($this->verify($token), 400, 'error');
+        $this->assertJsonResponse($this->verify($token, $user->getId()->toString()), 400, 'error');
         $this->assertSame(
             ['email' => $user->getEmail(), 'pending_email' => null, 'verified' => true],
             $this->connection()->fetchAssociative('SELECT email, pending_email, email_verified_at IS NOT NULL AS verified FROM users WHERE id = ?', [$user->getId()->toString()]),
@@ -198,9 +210,39 @@ final class EmailVerificationDeliveryTest extends RateLimitTestCase
         $this->assertCount(2, $this->getMailerMessages(), 'Nobody is told of a change that did not happen.');
     }
 
+    /**
+     * An account asks to move onto someone else's address. Whoever holds that address gets the
+     * link, but opening it signed out or signed in to another account confirms nothing.
+     */
+    public function testOnlyTheAccountsOwnSessionConfirmsAPendingChange(): void
+    {
+        $user = $this->createTestUser($this->uniqueEmail());
+        $address = $this->uniqueEmail();
+        $this->assertJsonResponse($this->authenticatedRequest('PUT', '/api/auth/me/email', $user, ['email' => $address, 'currentPassword' => 'password123']), 202);
+        [, $token] = $this->linkFrom((string) $this->onlyEmail()->getTextBody());
+        $addressHolder = $this->createTestUser($this->uniqueEmail());
+        // The reused kernel keeps the token of the last request; clear it so the next one
+        // carries no identity.
+        static::getContainer()->get('security.token_storage')->setToken(null);
+
+        $signedOut = $this->requestFrom($this->ip(), 'POST', '/api/auth/email/verify', content: ['token' => $token]);
+        $otherAccount = $this->verify($token, $addressHolder->getId()->toString());
+
+        $this->assertSame(401, $signedOut->getStatusCode(), (string) $signedOut->getContent());
+        $refused = $this->assertJsonResponse($otherAccount, 403, 'error');
+        $this->assertSame('verification_link_other_account', $refused['error']['details']['reason']);
+        $this->assertSame(
+            ['email' => $user->getEmail(), 'pending_email' => $address, 'verified' => true],
+            $this->connection()->fetchAssociative('SELECT email, pending_email, email_verified_at IS NOT NULL AS verified FROM users WHERE id = ?', [$user->getId()->toString()]),
+            'The account keeps its address and its pending change.',
+        );
+        $this->assertSame(1, $this->outstandingTokens($user->getId()->toString()));
+        $this->assertCount(1, $this->getMailerMessages(), 'Nobody is told of a change that did not happen.');
+    }
+
     public function testAPendingChangeLeavesTheAddressFreeForItsOwnerToRegisterAndReset(): void
     {
-        $user = $this->createTestUser($this->uniqueEmail(), verified: true);
+        $user = $this->createTestUser($this->uniqueEmail());
         $address = $this->uniqueEmail();
         $this->assertJsonResponse($this->authenticatedRequest('PUT', '/api/auth/me/email', $user, ['email' => $address, 'currentPassword' => 'password123']), 202);
 
@@ -220,7 +262,7 @@ final class EmailVerificationDeliveryTest extends RateLimitTestCase
 
     public function testResendSendsANewLinkToAPendingAddress(): void
     {
-        $user = $this->createTestUser($this->uniqueEmail(), verified: true);
+        $user = $this->createTestUser($this->uniqueEmail());
         $address = $this->uniqueEmail();
         $this->assertJsonResponse($this->authenticatedRequest('PUT', '/api/auth/me/email', $user, ['email' => $address, 'currentPassword' => 'password123']), 202);
 
@@ -234,7 +276,7 @@ final class EmailVerificationDeliveryTest extends RateLimitTestCase
 
     public function testAnAdministratorEmailChangeTakesEffectVerifiedAndTellsTheOldAddress(): void
     {
-        $user = $this->createTestUser($this->uniqueEmail());
+        $user = $this->createTestUser($this->uniqueEmail(), verified: false);
         $oldAddress = $user->getEmail();
         $newAddress = $this->uniqueEmail();
 
@@ -282,7 +324,7 @@ final class EmailVerificationDeliveryTest extends RateLimitTestCase
             [$user->getId()->toString()],
         );
 
-        $this->assertJsonResponse($this->verify($token), 400, 'error');
+        $this->assertJsonResponse($this->verify($token, $user->getId()->toString()), 400, 'error');
         $this->assertNull($this->connection()->fetchOne('SELECT email_verified_at FROM users WHERE id = ?', [$user->getId()->toString()]));
     }
 
@@ -311,8 +353,8 @@ final class EmailVerificationDeliveryTest extends RateLimitTestCase
         $this->assertNotSame($first, $second);
         $this->assertSame(1, $this->outstandingTokens($user->getId()->toString()));
 
-        $this->assertJsonResponse($this->verify($first), 400, 'error');
-        $this->assertJsonResponse($this->verify($second), 200, 'data');
+        $this->assertJsonResponse($this->verify($first, $user->getId()->toString()), 400, 'error');
+        $this->assertJsonResponse($this->verify($second, $user->getId()->toString()), 200, 'data');
     }
 
     public function testTheEmailIsInTheLanguageTheUserChose(): void
@@ -341,7 +383,7 @@ final class EmailVerificationDeliveryTest extends RateLimitTestCase
 
     public function testResendOverTheUserLimitAnswersTheSameAndSendsNothing(): void
     {
-        $user = $this->createTestUser($this->uniqueEmail());
+        $user = $this->createTestUser($this->uniqueEmail(), verified: false);
         $this->exhaust('auth_email_verification_user', $user->getId()->toString());
 
         $response = $this->resend($user);
@@ -359,7 +401,7 @@ final class EmailVerificationDeliveryTest extends RateLimitTestCase
         $this->exhaust('auth_email_verification_ip', $ip);
 
         $this->assertTooManyRequests($this->requestFrom($ip, 'POST', '/api/auth/me/email/verification', $user->getId()->toString()));
-        $this->assertTooManyRequests($this->requestFrom($ip, 'POST', '/api/auth/email/verify', content: ['token' => str_repeat('0', 64)]));
+        $this->assertTooManyRequests($this->requestFrom($ip, 'POST', '/api/auth/email/verify', $user->getId()->toString(), ['token' => str_repeat('0', 64)]));
         $this->assertEmailCount(0);
     }
 
@@ -373,7 +415,8 @@ final class EmailVerificationDeliveryTest extends RateLimitTestCase
     public function testOrdinaryVerificationBucketsAreResetDuringTeardown(): void
     {
         $ip = $this->ip();
-        $response = $this->requestFrom($ip, 'POST', '/api/auth/email/verify', content: ['token' => str_repeat('0', 64)]);
+        $user = $this->createTestUser($this->uniqueEmail());
+        $response = $this->requestFrom($ip, 'POST', '/api/auth/email/verify', $user->getId()->toString(), ['token' => str_repeat('0', 64)]);
         $this->assertJsonResponse($response, 400, 'error');
 
         $this->tearDown();
@@ -398,9 +441,10 @@ final class EmailVerificationDeliveryTest extends RateLimitTestCase
         return $user;
     }
 
-    private function verify(string $token): Response
+    /** Opens the link in a signed-in session of the given user. */
+    private function verify(string $token, string $userId): Response
     {
-        return $this->requestFrom($this->ip(), 'POST', '/api/auth/email/verify', content: ['token' => $token]);
+        return $this->requestFrom($this->ip(), 'POST', '/api/auth/email/verify', $userId, ['token' => $token]);
     }
 
     private function resend(User $user): Response

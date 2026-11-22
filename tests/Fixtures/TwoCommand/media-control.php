@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Auth\Domain\Model\OAuth\SignInGrant;
 use App\Shared\Domain\Model\Uuid;
 use App\Tests\Fixtures\Auth\FirstPartyOAuthClient;
 use App\Tests\Fixtures\WebRuntime\HttpExchange;
@@ -80,7 +81,7 @@ function mediaSocket(StreamClient $auth, array $payload): void
 
 $state = state(); $auth = $client(); $sessions = []; $slots = profileSlots();
 $socketAuth = new StreamClient($manager, EMAIL,
-    (string) file_get_contents($project . '/config/secrets/oauth/private.key'), BASE . '/api/stream/track', audience: BASE,
+    (string) file_get_contents($project . '/config/secrets/oauth/private.key'), BASE . '/api/stream/track', SignInGrant::Password, audience: BASE,
     client: FirstPartyOAuthClient::entity($kernel->getContainer(), $manager));
 // One owner per video slot fills every slot; one more owner's 1080p admission waits behind them.
 $owners = [$auth];

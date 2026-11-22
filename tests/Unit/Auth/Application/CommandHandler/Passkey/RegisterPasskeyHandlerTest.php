@@ -6,12 +6,12 @@ namespace App\Tests\Unit\Auth\Application\CommandHandler;
 
 use App\Auth\Application\Command\Passkey\RegisterPasskeyCommand;
 use App\Auth\Application\CommandHandler\Passkey\RegisterPasskeyHandler;
+use App\Auth\Application\Exception\CredentialsChangedException;
 use App\Auth\Domain\Event\Passkey\PasskeyRegistered;
 use App\Auth\Domain\Model\Passkey\Passkey;
 use App\Auth\Domain\Model\User;
 use App\Auth\Domain\Repository\Passkey\PasskeyRepositoryInterface;
 use App\Auth\Domain\Repository\UserRepositoryInterface;
-use App\Shared\Application\Port\TransactionPortInterface;
 use App\Shared\Domain\Model\Email;
 use App\Shared\Domain\Model\Uuid;
 use PHPUnit\Framework\MockObject\Stub;
@@ -21,96 +21,81 @@ use RuntimeException;
 
 final class RegisterPasskeyHandlerTest extends TestCase
 {
+    use RecordsCredentialChanges;
+
     private UserRepositoryInterface&Stub $userRepository;
     private PasskeyRepositoryInterface&Stub $passkeyRepository;
-    private EventDispatcherInterface&Stub $eventDispatcher;
-    private TransactionPortInterface&Stub $transaction;
-    private RegisterPasskeyHandler $handler;
+    private User $user;
+    /** @var list<string> the passkeys saved and the events recorded, each marked when it ran inside the transaction */
+    private array $writes = [];
 
     protected function setUp(): void
     {
+        $this->user = User::register(new Email('test@baander.app'), 'hashed', 'Alice');
         $this->userRepository = $this->createStub(UserRepositoryInterface::class);
+        $this->userRepository->method('findByUuid')->willReturnCallback(fn (Uuid $id): ?User => $id->equals($this->user->getId()) ? $this->user : null);
         $this->passkeyRepository = $this->createStub(PasskeyRepositoryInterface::class);
-        $this->eventDispatcher = $this->createStub(EventDispatcherInterface::class);
-        $this->transaction = $this->createStub(TransactionPortInterface::class);
-        $this->transaction->method('run')->willReturnCallback(static fn(callable $operation): mixed => $operation());
-        $this->handler = $this->createRegisterPasskeyHandlerFixture();
+        $this->passkeyRepository->method('save')->willReturnCallback(function (Passkey $passkey): void {
+            $this->writes[] = 'save ' . $passkey->getName() . ($this->inTransaction ? ' in transaction' : '');
+        });
     }
 
-    private function createRegisterPasskeyHandlerFixture(): RegisterPasskeyHandler
+    /**
+     * The passkey and its event are stored together. The session that completed the ceremony
+     * stays signed in, the others end, and their connections close once it has committed.
+     */
+    public function testRegistersThePasskeyAndEndsEveryOtherSession(): void
     {
-        return new RegisterPasskeyHandler(
-            $this->userRepository,
-            $this->passkeyRepository,
-            $this->eventDispatcher,
-            $this->transaction,
-        );
-    }
+        $session = $this->signedInSession($this->user);
 
-    public function testRegistersPasskey(): void
-    {
-        $insideTransaction = new class {
-            public bool $active = false;
-
-            public function isActive(): bool
-            {
-                return $this->active;
-            }
-        };
-        $this->transaction = $this->createMock(TransactionPortInterface::class);
-        $this->transaction->expects($this->once())->method('run')->willReturnCallback(
-            static function (callable $operation) use ($insideTransaction): mixed {
-                $insideTransaction->active = true;
-                try {
-                    return $operation();
-                } finally {
-                    $insideTransaction->active = false;
-                }
-            },
-        );
-        $this->passkeyRepository = $this->createMock(PasskeyRepositoryInterface::class);
-        $this->userRepository = $this->createMock(UserRepositoryInterface::class);
-
-        $user = User::register(new Email('test@baander.app'), 'hashed', 'Alice');
-        $userId = $user->getId();
-        $this->userRepository->expects($this->once())->method('findByUuid')->with($userId)->willReturn($user);
-        $this->passkeyRepository->method('ofCredentialId')->willReturn(null);
-        $this->passkeyRepository->expects($this->once())->method('save')->willReturnCallback(
-            static function () use ($insideTransaction): void {
-                self::assertTrue($insideTransaction->isActive());
-            },
-        );
-        $this->eventDispatcher = $this->createMock(EventDispatcherInterface::class);
-        $this->eventDispatcher->expects($this->once())->method('dispatch')->willReturnCallback(
-            static function (object $event) use ($insideTransaction): object {
-                self::assertTrue($insideTransaction->isActive());
-                self::assertInstanceOf(PasskeyRegistered::class, $event);
-                return $event;
-            },
-        );
-        $this->handler = $this->createRegisterPasskeyHandlerFixture();
-
-        $result = ($this->handler)(new RegisterPasskeyCommand(
-            $userId->toString(),
+        $result = $this->handler()(new RegisterPasskeyCommand(
+            $this->user->getId()->toString(),
             'My Key',
             'cred-id',
-            ['userHandle' => $user->getPublicId()->toString()],
+            ['userHandle' => $this->user->getPublicId()->toString()],
             0,
+            $session,
         ));
 
-        $this->assertSame('My Key', $result->getName());
-        $this->assertSame('cred-id', $result->getCredentialId());
-        self::assertFalse($insideTransaction->isActive());
+        self::assertSame('My Key', $result->getName());
+        self::assertSame('cred-id', $result->getCredentialId());
+        self::assertSame(['save My Key in transaction', 'event cred-id in transaction'], $this->writes);
+        self::assertSame([
+            'end sessions keeping ' . $session,
+            'commit',
+            'close other-session-token',
+        ], $this->credentialChanges);
+    }
+
+    /** Another change ended the requesting session while the ceremony ran: nothing is stored. */
+    public function testACeremonyWhoseSessionWasEndedStoresNothing(): void
+    {
+        $session = $this->signedInSession($this->user);
+        $this->requestingSessionCurrent = false;
+
+        try {
+            $this->handler()(new RegisterPasskeyCommand(
+                $this->user->getId()->toString(),
+                'My Key',
+                'cred-id',
+                ['userHandle' => $this->user->getPublicId()->toString()],
+                0,
+                $session,
+            ));
+            self::fail('A ceremony of an ended session must be refused.');
+        } catch (CredentialsChangedException) {
+        }
+
+        self::assertSame([], $this->writes);
+        self::assertSame(['rollback'], $this->credentialChanges);
     }
 
     public function testThrowsOnUserNotFound(): void
     {
-        $this->userRepository->method('findByUuid')->willReturn(null);
-
         $this->expectException(RuntimeException::class);
         $this->expectExceptionMessage('not found');
 
-        ($this->handler)(new RegisterPasskeyCommand(
+        $this->handler()(new RegisterPasskeyCommand(
             Uuid::v4()->toString(),
             'Key',
             'cred-id',
@@ -121,37 +106,51 @@ final class RegisterPasskeyHandlerTest extends TestCase
 
     public function testRejectsLegacyOrForeignHandleBeforePersisting(): void
     {
-        $user = User::register(new Email('passkey@baander.app'), 'hash', 'Owner');
-        $this->userRepository->method('findByUuid')->willReturn($user);
-        $repository = $this->createMock(PasskeyRepositoryInterface::class);
-        $repository->expects(self::never())->method('save');
-        $handler = new RegisterPasskeyHandler($this->userRepository, $repository, $this->eventDispatcher, $this->transaction);
-        foreach ([$user->getId()->toString(), (new \App\Shared\Domain\Model\PublicId())->toString()] as $handle) {
+        $handler = $this->handler();
+        foreach ([$this->user->getId()->toString(), (new \App\Shared\Domain\Model\PublicId())->toString()] as $handle) {
             try {
-                $handler(new RegisterPasskeyCommand($user->getId()->toString(), 'Key', 'credential', ['userHandle' => $handle], 0));
+                $handler(new RegisterPasskeyCommand($this->user->getId()->toString(), 'Key', 'credential', ['userHandle' => $handle], 0));
                 self::fail('The credential handle must belong to the authenticated public user.');
             } catch (RuntimeException $error) {
                 self::assertSame('Credential owner does not match its registered user handle.', $error->getMessage());
             }
         }
+        self::assertSame([], $this->writes);
     }
 
     public function testThrowsOnDuplicateCredentialId(): void
     {
-        $user = User::register(new Email('test@baander.app'), 'hashed', 'Alice');
-        $this->userRepository->method('findByUuid')->willReturn($user);
         $passkey = Passkey::create(Uuid::v4(), 'Existing', 'cred-id', [], 0);
         $this->passkeyRepository->method('ofCredentialId')->willReturn($passkey);
 
         $this->expectException(RuntimeException::class);
         $this->expectExceptionMessage('already exists');
 
-        ($this->handler)(new RegisterPasskeyCommand(
-            $user->getId()->toString(),
+        $this->handler()(new RegisterPasskeyCommand(
+            $this->user->getId()->toString(),
             'Key',
             'cred-id',
-            ['userHandle' => $user->getPublicId()->toString()],
+            ['userHandle' => $this->user->getPublicId()->toString()],
             0,
         ));
+    }
+
+    private function handler(): RegisterPasskeyHandler
+    {
+        $events = $this->createStub(EventDispatcherInterface::class);
+        $events->method('dispatch')->willReturnCallback(function (object $event): object {
+            self::assertInstanceOf(PasskeyRegistered::class, $event);
+            $this->writes[] = 'event ' . $event->getCredentialId() . ($this->inTransaction ? ' in transaction' : '');
+
+            return $event;
+        });
+
+        return new RegisterPasskeyHandler(
+            $this->userRepository,
+            $this->passkeyRepository,
+            $events,
+            $this->transaction(),
+            $this->credentialChangeRevoker(),
+        );
     }
 }

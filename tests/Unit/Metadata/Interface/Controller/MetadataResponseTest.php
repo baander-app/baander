@@ -11,10 +11,10 @@ use App\Metadata\Infrastructure\Api\LastFm\LastFmAdapter;
 use App\Metadata\Infrastructure\Api\MusicBrainz\MusicBrainzAdapter;
 use App\Metadata\Interface\Controller\MetadataBrowseController;
 use App\Metadata\Interface\Controller\MetadataSearchController;
+use App\Metadata\Interface\Request\SearchMetadataRequest;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
-use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\Serializer\Encoder\JsonEncoder;
 use Baander\HttpClient\PublicHttpClient;
 use Baander\HttpClient\PublicDestinationPolicy;
@@ -49,9 +49,10 @@ final class MetadataResponseTest extends TestCase
             new DiscogsAdapter('local-test-token', $logger, $encoder, $httpClient),
             new LastFmAdapter('local-test-token', $logger, $encoder, $httpClient),
             self::unlimited(),
+            self::unlimited(),
         );
 
-        $response = $controller->{$action}(new Request(['q' => 'track', 'source' => $source]), self::member());
+        $response = $controller->{$action}(self::member(), new SearchMetadataRequest(q: 'track', source: $source));
         $payload = json_decode((string) $response->getContent(), true, 512, JSON_THROW_ON_ERROR);
 
         self::assertSame(200, $response->getStatusCode());

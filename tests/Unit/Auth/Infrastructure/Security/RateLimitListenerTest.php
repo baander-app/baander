@@ -116,13 +116,24 @@ final class RateLimitListenerTest extends TestCase
         );
     }
 
-    /** @param array<string, mixed> $body */
-    private function createJsonRequest(string $path, string $method = 'POST', array $body = [], string $ip = '192.168.1.1'): Request
+    /**
+     * A request as the listener sees it: the router has already matched its route.
+     *
+     * @param array<string, mixed> $body
+     */
+    private function createJsonRequest(string $route, string $path, string $method = 'POST', array $body = [], string $ip = '192.168.1.1'): Request
     {
         $request = Request::create($path, $method, [], [], [], [
             'CONTENT_TYPE' => 'application/json',
             'REMOTE_ADDR' => $ip,
         ], json_encode($body) ?: '');
+
+        return $this->routed($request, $route);
+    }
+
+    private function routed(Request $request, string $route): Request
+    {
+        $request->attributes->set('_route', $route);
 
         return $request;
     }
@@ -142,6 +153,7 @@ final class RateLimitListenerTest extends TestCase
     public function testMalformedLoginBodyStillChargesIpWithoutCompoundKey(string $body): void
     {
         $request = Request::create('/api/auth/login', 'POST', server: ['REMOTE_ADDR' => '192.0.2.20'], content: $body);
+        $this->routed($request, RateLimitListener::LOGIN_ROUTE);
         $this->loginIpLimiter->expects($this->once())->method('create')->with('192.0.2.20')->willReturn($this->createAcceptedLimit());
         $this->loginIpEmailLimiter->expects($this->never())->method('create');
         $this->listener->onKernelRequest($this->createRequestEvent($request));
@@ -151,6 +163,7 @@ final class RateLimitListenerTest extends TestCase
     public function testMalformedRefreshBodyUsesIpBucket(string $body): void
     {
         $request = Request::create('/api/auth/refresh', 'POST', server: ['REMOTE_ADDR' => '192.0.2.20'], content: $body);
+        $this->routed($request, RateLimitListener::REFRESH_ROUTE);
         $this->refreshClientLimiter->expects($this->once())->method('create')->with('192.0.2.20')->willReturn($this->createAcceptedLimit());
         $this->listener->onKernelRequest($this->createRequestEvent($request));
     }
@@ -159,7 +172,7 @@ final class RateLimitListenerTest extends TestCase
 
     public function testLoginUnderLimitPassesThrough(): void
     {
-        $request = $this->createJsonRequest('/api/auth/login', body: ['email' => 'user@baander.app', 'password' => 'pass']);
+        $request = $this->createJsonRequest(RateLimitListener::LOGIN_ROUTE, '/api/auth/login', body: ['email' => 'user@baander.app', 'password' => 'pass']);
         $event = $this->createRequestEvent($request);
 
         $this->loginIpLimiter->method('create')->willReturn($this->createAcceptedLimit(4));
@@ -174,7 +187,7 @@ final class RateLimitListenerTest extends TestCase
 
     public function testLoginOverLimitThrowsTooManyRequests(): void
     {
-        $request = $this->createJsonRequest('/api/auth/login', body: ['email' => 'user@baander.app', 'password' => 'pass']);
+        $request = $this->createJsonRequest(RateLimitListener::LOGIN_ROUTE, '/api/auth/login', body: ['email' => 'user@baander.app', 'password' => 'pass']);
         $event = $this->createRequestEvent($request);
 
         $this->loginIpLimiter->method('create')->willReturn($this->createRejectedLimit(120));
@@ -191,7 +204,7 @@ final class RateLimitListenerTest extends TestCase
     public function testLoginPerEmailOverLimitThrowsTooManyRequests(): void
     {
         // IP limit passes but IP+email limit rejects
-        $request = $this->createJsonRequest('/api/auth/login', body: ['email' => 'target@baander.app', 'password' => 'pass']);
+        $request = $this->createJsonRequest(RateLimitListener::LOGIN_ROUTE, '/api/auth/login', body: ['email' => 'target@baander.app', 'password' => 'pass']);
         $event = $this->createRequestEvent($request);
 
         $this->loginIpLimiter->method('create')->willReturn($this->createAcceptedLimit(4));
@@ -205,7 +218,7 @@ final class RateLimitListenerTest extends TestCase
     public function testLoginWithoutEmailSkipsCompoundCheck(): void
     {
         // Login body has no email field -- the per-IP check runs, compound check is skipped
-        $request = $this->createJsonRequest('/api/auth/login', body: ['password' => 'pass']);
+        $request = $this->createJsonRequest(RateLimitListener::LOGIN_ROUTE, '/api/auth/login', body: ['password' => 'pass']);
         $event = $this->createRequestEvent($request);
 
         $this->loginIpLimiter->method('create')->willReturn($this->createAcceptedLimit(4));
@@ -219,7 +232,7 @@ final class RateLimitListenerTest extends TestCase
 
     public function testRegisterUnderLimitPassesThrough(): void
     {
-        $request = $this->createJsonRequest('/api/auth/register', body: ['email' => 'new@baander.app', 'name' => 'Test', 'password' => 'pass']);
+        $request = $this->createJsonRequest(RateLimitListener::REGISTER_ROUTE, '/api/auth/register', body: ['email' => 'new@baander.app', 'name' => 'Test', 'password' => 'pass']);
         $event = $this->createRequestEvent($request);
 
         $this->registerIpLimiter->method('create')->willReturn($this->createAcceptedLimit(2));
@@ -229,7 +242,7 @@ final class RateLimitListenerTest extends TestCase
 
     public function testRegisterOverLimitThrowsTooManyRequests(): void
     {
-        $request = $this->createJsonRequest('/api/auth/register', body: ['email' => 'new@baander.app', 'name' => 'Test', 'password' => 'pass']);
+        $request = $this->createJsonRequest(RateLimitListener::REGISTER_ROUTE, '/api/auth/register', body: ['email' => 'new@baander.app', 'name' => 'Test', 'password' => 'pass']);
         $event = $this->createRequestEvent($request);
 
         $this->registerIpLimiter->method('create')->willReturn($this->createRejectedLimit(600));
@@ -243,7 +256,7 @@ final class RateLimitListenerTest extends TestCase
 
     public function testPasswordResetUnderLimitPassesThrough(): void
     {
-        $request = $this->createJsonRequest('/api/auth/password/reset-request', body: ['email' => 'user@baander.app']);
+        $request = $this->createJsonRequest(RateLimitListener::PASSWORD_RESET_REQUEST_ROUTE, '/api/auth/password/reset-request', body: ['email' => 'user@baander.app']);
         $event = $this->createRequestEvent($request);
 
         $this->passwordResetIpLimiter->method('create')->willReturn($this->createAcceptedLimit(4));
@@ -251,18 +264,18 @@ final class RateLimitListenerTest extends TestCase
         $this->listener->onKernelRequest($event);
     }
 
-    /** @return iterable<string, array{string, array<string, string>}> */
+    /** @return iterable<string, array{string, string, array<string, string>}> */
     public static function passwordResetPaths(): iterable
     {
-        yield 'reset request' => ['/api/auth/password/reset-request', ['email' => 'user@baander.app']];
-        yield 'reset redemption' => ['/api/auth/password/reset', ['token' => 'token', 'password' => 'new-password']];
+        yield 'reset request' => [RateLimitListener::PASSWORD_RESET_REQUEST_ROUTE, '/api/auth/password/reset-request', ['email' => 'user@baander.app']];
+        yield 'reset redemption' => [RateLimitListener::PASSWORD_RESET_ROUTE, '/api/auth/password/reset', ['token' => 'token', 'password' => 'new-password']];
     }
 
     /** @param array<string, string> $body */
     #[DataProvider('passwordResetPaths')]
-    public function testPasswordResetOverLimitThrowsTooManyRequests(string $path, array $body): void
+    public function testPasswordResetOverLimitThrowsTooManyRequests(string $route, string $path, array $body): void
     {
-        $request = $this->createJsonRequest($path, body: $body);
+        $request = $this->createJsonRequest($route, $path, body: $body);
         $event = $this->createRequestEvent($request);
 
         $this->passwordResetIpLimiter->method('create')->willReturn($this->createRejectedLimit(300));
@@ -274,18 +287,18 @@ final class RateLimitListenerTest extends TestCase
 
     // --- Passkey sign-in rate limiting tests ---
 
-    /** @return iterable<string, array{string}> */
+    /** @return iterable<string, array{string, string}> */
     public static function passkeySignInPaths(): iterable
     {
-        yield 'authentication options' => ['/api/auth/passkey/authenticate/options'];
-        yield 'assertion verification' => ['/api/auth/passkey/authenticate'];
-        yield 'passkey login' => ['/api/auth/login/passkey'];
+        yield 'authentication options' => [RateLimitListener::PASSKEY_OPTIONS_ROUTE, '/api/auth/passkey/authenticate/options'];
+        yield 'assertion verification' => [RateLimitListener::PASSKEY_AUTHENTICATE_ROUTE, '/api/auth/passkey/authenticate'];
+        yield 'passkey login' => [RateLimitListener::PASSKEY_LOGIN_ROUTE, '/api/auth/login/passkey'];
     }
 
     #[DataProvider('passkeySignInPaths')]
-    public function testPasskeySignInIsLimitedPerIp(string $path): void
+    public function testPasskeySignInIsLimitedPerIp(string $route, string $path): void
     {
-        $request = $this->createJsonRequest($path, ip: '10.0.0.7');
+        $request = $this->createJsonRequest($route, $path, ip: '10.0.0.7');
         $event = $this->createRequestEvent($request);
 
         $this->passkeyIpLimiter->expects($this->once())
@@ -300,7 +313,7 @@ final class RateLimitListenerTest extends TestCase
 
     public function testPasskeyRegistrationIsNotLimitedBySignInLimiter(): void
     {
-        $event = $this->createRequestEvent($this->createJsonRequest('/api/auth/passkey/register'));
+        $event = $this->createRequestEvent($this->createJsonRequest('passkey_register', '/api/auth/passkey/register'));
 
         $this->passkeyIpLimiter->expects($this->never())->method('create');
 
@@ -309,17 +322,17 @@ final class RateLimitListenerTest extends TestCase
 
     // --- Email verification rate limiting tests ---
 
-    /** @return iterable<string, array{string}> */
+    /** @return iterable<string, array{string, string}> */
     public static function emailVerificationPaths(): iterable
     {
-        yield 'redemption' => ['/api/auth/email/verify'];
-        yield 'resend' => ['/api/auth/me/email/verification'];
+        yield 'redemption' => [RateLimitListener::EMAIL_VERIFY_ROUTE, '/api/auth/email/verify'];
+        yield 'resend' => [RateLimitListener::EMAIL_VERIFICATION_RESEND_ROUTE, '/api/auth/me/email/verification'];
     }
 
     #[DataProvider('emailVerificationPaths')]
-    public function testEmailVerificationIsLimitedPerIp(string $path): void
+    public function testEmailVerificationIsLimitedPerIp(string $route, string $path): void
     {
-        $event = $this->createRequestEvent($this->createJsonRequest($path, ip: '10.0.0.9'));
+        $event = $this->createRequestEvent($this->createJsonRequest($route, $path, ip: '10.0.0.9'));
 
         $this->emailVerificationIpLimiter->expects($this->once())
             ->method('create')
@@ -333,7 +346,7 @@ final class RateLimitListenerTest extends TestCase
 
     public function testChangingTheEmailIsNotLimitedByTheVerificationLimiter(): void
     {
-        $event = $this->createRequestEvent($this->createJsonRequest('/api/auth/me/email', 'PUT'));
+        $event = $this->createRequestEvent($this->createJsonRequest('auth_me_email', '/api/auth/me/email', 'PUT'));
 
         $this->emailVerificationIpLimiter->expects($this->never())->method('create');
 
@@ -344,7 +357,7 @@ final class RateLimitListenerTest extends TestCase
 
     public function testRefreshUnderLimitPassesThrough(): void
     {
-        $request = $this->createJsonRequest('/api/auth/refresh', body: ['refreshToken' => 'token-abc']);
+        $request = $this->createJsonRequest(RateLimitListener::REFRESH_ROUTE, '/api/auth/refresh', body: ['refreshToken' => 'token-abc']);
         $event = $this->createRequestEvent($request);
 
         $this->refreshClientLimiter->method('create')->willReturn($this->createAcceptedLimit(29));
@@ -354,7 +367,7 @@ final class RateLimitListenerTest extends TestCase
 
     public function testRefreshOverLimitThrowsTooManyRequests(): void
     {
-        $request = $this->createJsonRequest('/api/auth/refresh', body: ['refreshToken' => 'token-abc']);
+        $request = $this->createJsonRequest(RateLimitListener::REFRESH_ROUTE, '/api/auth/refresh', body: ['refreshToken' => 'token-abc']);
         $event = $this->createRequestEvent($request);
 
         $this->refreshClientLimiter->method('create')->willReturn($this->createRejectedLimit(45));
@@ -366,7 +379,7 @@ final class RateLimitListenerTest extends TestCase
 
     public function testRefreshIsKeyedOnTheHashOfThePresentedToken(): void
     {
-        $request = $this->createJsonRequest('/api/auth/refresh', body: ['refreshToken' => 'unique-token-xyz']);
+        $request = $this->createJsonRequest(RateLimitListener::REFRESH_ROUTE, '/api/auth/refresh', body: ['refreshToken' => 'unique-token-xyz']);
 
         $this->refreshClientLimiter->expects($this->once())
             ->method('create')
@@ -376,11 +389,11 @@ final class RateLimitListenerTest extends TestCase
         $this->listener->onKernelRequest($this->createRequestEvent($request));
     }
 
-    /** @return iterable<string, array{string, string}> */
+    /** @return iterable<string, array{string, string, string}> */
     public static function perIpBeforeAuthentication(): iterable
     {
-        yield 'token endpoint' => ['/api/oauth/token', 'oauthTokenIpLimiter'];
-        yield 'pushed authorization request' => ['/api/oauth/par', 'oauthParIpLimiter'];
+        yield 'token endpoint' => [RateLimitListener::TOKEN_ROUTE, '/api/oauth/token', 'oauthTokenIpLimiter'];
+        yield 'pushed authorization request' => [RateLimitListener::PAR_ROUTE, '/api/oauth/par', 'oauthParIpLimiter'];
     }
 
     /**
@@ -388,9 +401,10 @@ final class RateLimitListenerTest extends TestCase
      * listener, which runs before that, charges only the per-IP bucket.
      */
     #[DataProvider('perIpBeforeAuthentication')]
-    public function testTokenAndPushedRequestsAreLimitedOnlyPerIpBeforeAuthentication(string $path, string $limiter): void
+    public function testTokenAndPushedRequestsAreLimitedOnlyPerIpBeforeAuthentication(string $route, string $path, string $limiter): void
     {
         $request = Request::create($path, 'POST', ['grant_type' => 'refresh_token', 'client_id' => 'tv_client_000000000001'], server: ['REMOTE_ADDR' => '10.0.0.9']);
+        $this->routed($request, $route);
         $factory = $this->{$limiter};
         self::assertInstanceOf(MockObject::class, $factory);
         $factory->expects($this->once())->method('create')->with('10.0.0.9')->willReturn($this->createRejectedLimit(30));
@@ -400,20 +414,22 @@ final class RateLimitListenerTest extends TestCase
         $this->listener->onKernelRequest($this->createRequestEvent($request));
     }
 
-    /** @return iterable<string, array{string, string, string}> */
+    /** @return iterable<string, array{string, string, string, string}> */
     public static function oauthIpLimitedRequests(): iterable
     {
-        yield 'authorize GET' => ['GET', '/api/oauth/authorize', 'oauthAuthorizeIpLimiter'];
-        yield 'authorize POST' => ['POST', '/api/oauth/authorize', 'oauthAuthorizeIpLimiter'];
-        yield 'device authorization' => ['POST', '/api/oauth/device/authorize', 'oauthDeviceAuthorizeIpLimiter'];
-        yield 'user code lookup' => ['GET', '/api/oauth/device/verify', 'oauthDeviceVerifyIpLimiter'];
-        yield 'device approval' => ['POST', '/api/oauth/device/approve', 'oauthDeviceVerifyIpLimiter'];
+        yield 'authorize GET' => [RateLimitListener::AUTHORIZE_ROUTE, 'GET', '/api/oauth/authorize', 'oauthAuthorizeIpLimiter'];
+        // The router serves HEAD from a GET route, so it is charged like GET.
+        yield 'authorize HEAD' => [RateLimitListener::AUTHORIZE_ROUTE, 'HEAD', '/api/oauth/authorize', 'oauthAuthorizeIpLimiter'];
+        yield 'authorize POST' => [RateLimitListener::AUTHORIZE_DECISION_ROUTE, 'POST', '/api/oauth/authorize', 'oauthAuthorizeIpLimiter'];
+        yield 'device authorization' => [RateLimitListener::DEVICE_AUTHORIZE_ROUTE, 'POST', '/api/oauth/device/authorize', 'oauthDeviceAuthorizeIpLimiter'];
+        yield 'user code lookup' => [RateLimitListener::DEVICE_VERIFY_ROUTE, 'GET', '/api/oauth/device/verify', 'oauthDeviceVerifyIpLimiter'];
+        yield 'device approval' => [RateLimitListener::DEVICE_APPROVE_ROUTE, 'POST', '/api/oauth/device/approve', 'oauthDeviceVerifyIpLimiter'];
     }
 
     #[DataProvider('oauthIpLimitedRequests')]
-    public function testOAuthEndpointsAreLimitedPerIp(string $method, string $path, string $limiter): void
+    public function testOAuthEndpointsAreLimitedPerIp(string $route, string $method, string $path, string $limiter): void
     {
-        $request = $this->createJsonRequest($path, $method, ip: '10.0.0.11');
+        $request = $this->createJsonRequest($route, $path, $method, ip: '10.0.0.11');
         $factory = $this->{$limiter};
         self::assertInstanceOf(MockObject::class, $factory);
         $factory->expects($this->once())->method('create')->with('10.0.0.11')->willReturn($this->createRejectedLimit(60));
@@ -427,7 +443,7 @@ final class RateLimitListenerTest extends TestCase
 
     public function testNonAuthEndpointIsNotRateLimited(): void
     {
-        $request = $this->createJsonRequest('/api/catalog/songs');
+        $request = $this->createJsonRequest('song_index', '/api/songs/', 'GET');
         $event = $this->createRequestEvent($request);
 
         // No limiters should be called
@@ -441,7 +457,7 @@ final class RateLimitListenerTest extends TestCase
 
     public function testAuthMeEndpointIsNotRateLimited(): void
     {
-        $request = Request::create('/api/auth/me', 'GET');
+        $request = $this->routed(Request::create('/api/auth/me', 'GET'), 'auth_me');
         $event = $this->createRequestEvent($request);
 
         // No limiters should be called for GET /api/auth/me
@@ -455,10 +471,10 @@ final class RateLimitListenerTest extends TestCase
 
     public function testDifferentIpsHaveIndependentLoginLimits(): void
     {
-        $requestIp1 = $this->createJsonRequest('/api/auth/login', body: ['email' => 'user@baander.app', 'password' => 'pass'], ip: '10.0.0.1');
+        $requestIp1 = $this->createJsonRequest(RateLimitListener::LOGIN_ROUTE, '/api/auth/login', body: ['email' => 'user@baander.app', 'password' => 'pass'], ip: '10.0.0.1');
         $eventIp1 = $this->createRequestEvent($requestIp1);
 
-        $requestIp2 = $this->createJsonRequest('/api/auth/login', body: ['email' => 'user@baander.app', 'password' => 'pass'], ip: '10.0.0.2');
+        $requestIp2 = $this->createJsonRequest(RateLimitListener::LOGIN_ROUTE, '/api/auth/login', body: ['email' => 'user@baander.app', 'password' => 'pass'], ip: '10.0.0.2');
         $eventIp2 = $this->createRequestEvent($requestIp2);
 
         // IP1 is rate limited
@@ -486,7 +502,7 @@ final class RateLimitListenerTest extends TestCase
 
     public function testDifferentIpsHaveIndependentLimitsSecondIpAllowed(): void
     {
-        $requestIp2 = $this->createJsonRequest('/api/auth/login', body: ['email' => 'user@baander.app', 'password' => 'pass'], ip: '10.0.0.2');
+        $requestIp2 = $this->createJsonRequest(RateLimitListener::LOGIN_ROUTE, '/api/auth/login', body: ['email' => 'user@baander.app', 'password' => 'pass'], ip: '10.0.0.2');
         $eventIp2 = $this->createRequestEvent($requestIp2);
 
         $this->loginIpLimiter->method('create')->willReturn($this->createAcceptedLimit(4));
@@ -496,24 +512,31 @@ final class RateLimitListenerTest extends TestCase
         $this->listener->onKernelRequest($eventIp2);
     }
 
-    // --- Method filtering ---
+    // --- Route matching ---
 
-    public function testGetRequestToLoginIsNotRateLimited(): void
+    /**
+     * The router matches the decoded path, so a percent-encoded path reaches the same
+     * route and its limit.
+     */
+    public function testTheMatchedRouteIsLimitedWhateverThePathEncoding(): void
     {
-        $request = Request::create('/api/auth/login', 'GET');
-        $event = $this->createRequestEvent($request);
+        $request = $this->createJsonRequest(RateLimitListener::REGISTER_ROUTE, '/%61pi/auth/registe%72', ip: '10.0.0.13');
 
-        // GET should not be rate limited
-        $this->loginIpLimiter->expects($this->never())->method('create');
+        $this->registerIpLimiter->expects($this->once())
+            ->method('create')
+            ->with('10.0.0.13')
+            ->willReturn($this->createRejectedLimit(600));
 
-        $this->listener->onKernelRequest($event);
+        $this->expectException(TooManyRequestsHttpException::class);
+
+        $this->listener->onKernelRequest($this->createRequestEvent($request));
     }
 
     // --- Sub-request handling ---
 
     public function testSubRequestsAreNotRateLimited(): void
     {
-        $request = $this->createJsonRequest('/api/auth/login', body: ['email' => 'user@baander.app', 'password' => 'pass']);
+        $request = $this->createJsonRequest(RateLimitListener::LOGIN_ROUTE, '/api/auth/login', body: ['email' => 'user@baander.app', 'password' => 'pass']);
         $kernel = $this->createMock(HttpKernelInterface::class);
 
         // Sub-request
@@ -533,7 +556,7 @@ final class RateLimitListenerTest extends TestCase
 
     public function testRateLimitExceededLogsWarning(): void
     {
-        $request = $this->createJsonRequest('/api/auth/register', body: ['email' => 'new@baander.app', 'name' => 'Test', 'password' => 'pass']);
+        $request = $this->createJsonRequest(RateLimitListener::REGISTER_ROUTE, '/api/auth/register', body: ['email' => 'new@baander.app', 'name' => 'Test', 'password' => 'pass']);
         $event = $this->createRequestEvent($request);
 
         $this->registerIpLimiter->method('create')->willReturn($this->createRejectedLimit(300));
@@ -568,7 +591,7 @@ final class RateLimitListenerTest extends TestCase
         ClockMock::withClockMock(1700000000);
 
         try {
-            $request = $this->createJsonRequest('/api/auth/login', body: ['email' => 'user@baander.app', 'password' => 'pass']);
+            $request = $this->createJsonRequest(RateLimitListener::LOGIN_ROUTE, '/api/auth/login', body: ['email' => 'user@baander.app', 'password' => 'pass']);
             $event = $this->createRequestEvent($request);
 
             $this->loginIpLimiter->method('create')->willReturn($this->createRejectedLimit(237));

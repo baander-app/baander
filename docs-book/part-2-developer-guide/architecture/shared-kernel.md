@@ -103,14 +103,15 @@ The Shared kernel provides several shared controllers:
 
 | Controller | Path | Purpose |
 |-----------|------|---------|
-| `HealthCheckController` | `/health`, `/ready`, `/live` | Health and readiness probes |
+| `HealthCheckController` | `/health`, `/ready`, `/live` | Health and readiness probes; each check shows only its component and status |
+| `HealthReportController` | `/api/debug/health` | Full health report with each check's latency and details |
 | `ServerStatsControllerWithCoroutines` | `/api/debug/stats` | Server diagnostics |
 | `WorkerStatsController` | `/api/debug/workers` | Swoole worker diagnostics |
 | `CoroutineStatsController` | `/api/debug/coroutines` | Active coroutine diagnostics |
 | `SpanDebugController` | `/api/debug/spans` | Request and operation span diagnostics |
 | `JobMonitorController` | `/api/monitor/*` | Job status and management |
 | `SystemSettingsController` | `/api/admin/settings` | System settings administration |
-| `PrometheusMetricsController` | `/metrics` | Prometheus metrics endpoint |
+| `PrometheusMetricsController` | `/metrics` | Prometheus metrics endpoint; the production nginx and the preset gateway answer `404` for it |
 | `WebSocketController` | `/api/ws` | WebSocket endpoint |
 
 The health probes, `/metrics` and `/api/ws` are not among the HTTP REST routes that the default OpenAPI export covers. `/metrics` serves Prometheus text rather than an API resource envelope.

@@ -23,6 +23,7 @@ use PHPUnit\Framework\TestCase;
 use Symfony\Bundle\SecurityBundle\Security;
 use Symfony\Component\Messenger\MessageBusInterface;
 use Symfony\Component\Security\Core\User\UserInterface;
+use Symfony\Component\Translation\Translator;
 
 final class IdentityPortControllerTest extends TestCase
 {
@@ -78,6 +79,7 @@ final class IdentityPortControllerTest extends TestCase
             $controllerClass === DeviceController::class && $port instanceof DevicePortInterface => new DeviceController($security, $port),
             default => throw new \LogicException('Unknown controller fixture.'),
         };
+        $controller->setTranslator(new Translator('en'));
 
         self::assertSame($supported ? 200 : 401, $controller->{$action}()->getStatusCode());
     }

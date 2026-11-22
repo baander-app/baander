@@ -11,13 +11,13 @@ reset and email verification have their own [account security reference](account
 |----------|---------|-------------|
 | `OAUTH_PRIVATE_KEY_PATH` | `%kernel.project_dir%/config/secrets/oauth/private.key` | Path to the RSA private key for signing JWT access tokens. Generate with `app:oauth:generate-keys`. |
 | `OAUTH_PUBLIC_KEY_PATH` | `%kernel.project_dir%/config/secrets/oauth/public.key` | Path to the RSA public key for verifying JWT access tokens. |
-| `AUTH_SPA_CLIENT_ID` | `baander_dev_spa_00001` | Public ID of the first-party OAuth client that password and passkey login issue tokens to. The web and Electron apps both use it. Seeded by `app:auth:setup-clients`. Only tokens of this client act with the user's full authority; see [Delegated tokens and scopes](#delegated-tokens-and-scopes). |
-| `AUTH_DPOP_EXTRA_ORIGINS` | empty | Comma-separated origins, besides the origin of `APP_URL`, that a DPoP proof's `htu` may name, such as a LAN address the installation also answers on. Baander never takes the expected origin from the scheme and `Host` a request arrived with. An entry that is not an absolute `http` or `https` URL stops the application from booting. |
+| `AUTH_SPA_CLIENT_ID` | `baander_dev_spa_00001` | Public ID of the first-party OAuth client that password and passkey login issue tokens to. The web and Electron apps both use it. Seeded by `app:auth:setup-clients`. Only tokens of this client from a password or passkey sign-in act with the user's full authority, and the OAuth endpoints refuse this client; see [Delegated tokens and scopes](#delegated-tokens-and-scopes). |
+| `AUTH_EXTRA_ORIGINS` | empty | Comma-separated origins, besides the origin of `APP_URL`, that the installation also answers on, such as a LAN address. A DPoP proof's `htu` may name any of them. Passkey registration and sign-in accept those whose host is the host of `APP_URL` or a subdomain of it; the relying party ID is the host of `APP_URL`. A request that arrives on a listed origin gets that origin as the web app's API URL, as the WebSocket origin its Content-Security-Policy allows, and as the base of absolute URLs in API responses, such as cover image URLs; any other `Host`, sent directly or forwarded by a trusted proxy, gets the origin of `APP_URL`. The WebSocket handshake does not read this list: it accepts only the origin of `APP_URL`, or the origins of the `app.websocket.allowed_origins` parameter in `config/services.yaml` when that is set, so a web app opened on a listed origin is refused its WebSocket connection. Baander never takes the expected origin from the scheme and `Host` a request arrived with. An entry that is not an absolute `http` or `https` URL stops the application from booting. |
 | `AUTH_TOTP_ENCRYPTION_KEY` | development value in `.env` | Key that encrypts stored TOTP secrets: 32 random bytes, base64-encoded. Generate one with `openssl rand -base64 32`. Production refuses to boot without a private value; see [Hardening checklist](../maintenance/security.md#hardening-checklist). |
 
 A DPoP proof names the URL the client sent it to. Behind a TLS-terminating proxy the
 request reaches Baander as plain HTTP, so Baander checks the proof against `APP_URL`
-and `AUTH_DPOP_EXTRA_ORIGINS` instead of the request's own scheme. The shipped
+and `AUTH_EXTRA_ORIGINS` instead of the request's own scheme. The shipped
 production nginx passes the upstream proxy's `X-Forwarded-Proto` on, and uses its own
 scheme only when none arrived.
 
@@ -72,16 +72,16 @@ A key a client removes from the set it publishes at its `jwks_uri` stays usable 
 
 ### Delegated tokens and scopes
 
-Tokens issued to the first-party client act with the user's full authority. Every other client's tokens are delegated, including the user's own personal access clients: the user counts as a plain user, without any administrator role, and the token reaches only the routes its scopes cover. Any other route answers `403` with `insufficient_scope`.
+Tokens issued to the first-party client act with the user's full authority when their session began with a password or passkey sign-in, which is the only way that client gets tokens: the pushed authorization, token and device endpoints refuse it. Every other client's tokens are delegated, including the user's own personal access clients: the user counts as a plain user, without any administrator role, and the token reaches only the routes its scopes cover. Any other route answers `403` with `insufficient_scope`.
 
 | Scope | What a delegated token can do |
 |-------|-------------------------------|
 | `profile` | Read the user's public ID, name and account creation date |
 | `email` | Read the same, plus the user's email address and whether it is verified |
-| `library` | Browse and play the libraries the user is a member of, control playback on their devices, and use favorites, listening history, recommendations and radio |
+| `library` | Browse and play the libraries the user is a member of, download their original track and video files, control playback on their devices, and use favorites, listening history, recommendations and radio. A signed stream URL fetched without a token needs no scope. |
 | `playlist` | Read, create, change, share and delete the user's playlists |
 
-No scope reaches administration, account security (passwords, email addresses, passkeys, TOTP, sessions), consent and device approval, notifications, listening parties, or preferences and settings. The consent and device pages show the user one line for each scope the client would get.
+No scope reaches administration, account security (passwords, email addresses, passkeys, TOTP, sessions), consent and device approval, notifications, listening parties, or preferences and settings. The consent and device pages show the user one line for each scope the client would get, and the user decides on every request. A delegated token of an account whose email address is unverified reaches only public routes and, with the `profile` or `email` scope, the user's own profile; see [Email verification](account-security.md#email-verification).
 
 The issuer is `APP_URL`. `app:auth:setup-clients` creates only the first-party client; administrators register device, public and confidential clients with the `app:oauth:client:*` commands or the admin API (see [OAuth Clients](../administration/oauth-clients.md#oauth-clients)).
 

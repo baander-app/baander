@@ -9,9 +9,14 @@ use Assert\Assertion;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
+use Swoole\Http\Request as SwooleRequest;
+use Swoole\Http\Response as SwooleResponse;
 use SwooleBundle\SwooleBundle\Bridge\Symfony\Bundle\Command\ServerStartCommand;
 use SwooleBundle\SwooleBundle\Bridge\Symfony\Bundle\DependencyInjection\Configuration;
+use SwooleBundle\SwooleBundle\Bridge\Symfony\HttpFoundation\DefaultRequestFactory;
 use SwooleBundle\SwooleBundle\Bridge\Symfony\HttpFoundation\SetRequestRuntimeConfiguration;
+use SwooleBundle\SwooleBundle\Bridge\Symfony\HttpFoundation\TrustAllProxiesRequestHandler;
+use SwooleBundle\SwooleBundle\Server\RequestHandler\RequestHandler;
 use Symfony\Component\Config\Definition\Builder\TreeBuilder;
 use Symfony\Component\Config\Definition\Processor;
 use Symfony\Component\DependencyInjection\ContainerBuilder;
@@ -165,6 +170,65 @@ final class ProxyTrustTest extends TestCase
             $listener->onKernelRequest(new RequestEvent($kernel, $request, HttpKernelInterface::MAIN_REQUEST));
             self::assertSame($client, $request->getClientIp());
         }
+    }
+
+    /** @return iterable<string, array{string, ?string, string, string}> */
+    public static function swoolePeers(): iterable
+    {
+        // An IPv4 connection to a dual-stack socket reaches Swoole as an IPv4-mapped IPv6 address.
+        yield 'gateway over IPv4' => ['::ffff:10.231.0.2', '198.51.100.31', '10.231.0.2', '198.51.100.31'];
+        yield 'gateway over IPv4, hexadecimal spelling' => ['::ffff:ae7:2', '198.51.100.32', '10.231.0.2', '198.51.100.32'];
+        yield 'gateway over IPv6' => ['fd00:baa:231::2', '198.51.100.33', 'fd00:baa:231::2', '198.51.100.33'];
+        yield 'gateway on an IPv4 socket' => ['10.231.0.2', '198.51.100.34', '10.231.0.2', '198.51.100.34'];
+        yield 'direct IPv4 client forging its address' => ['::ffff:198.51.100.35', '203.0.113.9', '198.51.100.35', '198.51.100.35'];
+        yield 'direct IPv6 client' => ['2001:db8::35', null, '2001:db8::35', '2001:db8::35'];
+    }
+
+    #[DataProvider('swoolePeers')]
+    public function testSwooleRequestsCarryOneAddressPerPeer(string $peer, ?string $forwarded, string $remoteAddress, string $client): void
+    {
+        (new SetRequestRuntimeConfiguration())->boot(['trustedProxies' => ['10.231.0.2', 'fd00:baa:231::2']]);
+
+        $request = new DefaultRequestFactory()->make(self::swooleRequest($peer, $forwarded));
+
+        self::assertSame($remoteAddress, $request->server->get('REMOTE_ADDR'));
+        self::assertSame($client, $request->getClientIp());
+    }
+
+    public function testAPeerHasOneApiBudgetWhicheverSocketFamilyItArrivesThrough(): void
+    {
+        (new SetRequestRuntimeConfiguration())->boot(['trustedProxies' => []]);
+        $factory = new RateLimiterFactory(['id' => 'anonymous_api', 'policy' => 'fixed_window', 'limit' => 1, 'interval' => '60 seconds'], new InMemoryStorage());
+        $listener = new ApiRateLimitListener($factory, $factory, new TokenStorage(), new NullLogger(), 'test');
+        $kernel = $this->createStub(HttpKernelInterface::class);
+        foreach (['198.51.100.41', '::ffff:198.51.100.41'] as $index => $peer) {
+            $request = new DefaultRequestFactory()->make(self::swooleRequest($peer, null));
+            if ($index === 1) {
+                $this->expectException(TooManyRequestsHttpException::class);
+            }
+            $listener->onKernelRequest(new RequestEvent($kernel, $request, HttpKernelInterface::MAIN_REQUEST));
+        }
+    }
+
+    public function testTrustingEveryProxyTrustsAMappedPeerInItsIpv4Form(): void
+    {
+        $handler = new TrustAllProxiesRequestHandler(new class implements RequestHandler {
+            public function handle(SwooleRequest $request, SwooleResponse $response): void {}
+        }, trustAllProxies: true);
+        $peer = self::swooleRequest('::ffff:10.231.0.7', '198.51.100.45');
+
+        $handler->handle($peer, new SwooleResponse());
+
+        self::assertSame('198.51.100.45', new DefaultRequestFactory()->make($peer)->getClientIp());
+    }
+
+    private static function swooleRequest(string $peer, ?string $forwarded): SwooleRequest
+    {
+        $request = new SwooleRequest();
+        $request->server = ['request_method' => 'GET', 'request_uri' => '/api/auth/me', 'server_protocol' => 'HTTP/1.1', 'remote_addr' => $peer, 'remote_port' => 41418];
+        $request->header = ['host' => 'api.baander.app'] + ($forwarded === null ? [] : ['x-forwarded-for' => $forwarded]);
+
+        return $request;
     }
 
     /** @return iterable<string, array{bool, string, ?string, string}> */

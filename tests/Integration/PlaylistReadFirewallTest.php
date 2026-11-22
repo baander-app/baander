@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Integration;
 
+use App\Auth\Domain\Model\OAuth\SignInGrant;
 use App\Auth\Domain\Model\User;
 use App\Auth\Domain\Repository\UserRepositoryInterface;
 use App\Auth\Infrastructure\Doctrine\Entity\OAuth\AccessTokenEntity;
@@ -21,7 +22,6 @@ use App\Playlist\Infrastructure\Doctrine\Entity\PlaylistEntity;
 use App\Playlist\Infrastructure\Doctrine\Entity\PlaylistSongEntity;
 use App\Shared\Domain\Model\Email;
 use App\Shared\Domain\Model\PublicId;
-use App\Shared\Domain\Model\Uuid;
 use App\Tests\Fixtures\Auth\FirstPartyOAuthClient;
 use App\Tests\Fixtures\Auth\OAuthAccessTokenJwt;
 use App\Tests\Fixtures\Auth\PlaylistOAuthKernel;
@@ -331,10 +331,14 @@ final class PlaylistReadFirewallTest extends TestCase
     {
         $entity = $actor === 'owner' ? $this->owner : $this->createUser($actor);
         $this->actor = $entity;
-        $client = FirstPartyOAuthClient::entity($this->kernel->getContainer(), $this->manager);
         $this->proof = new SignedDpopProof();
-        $token = new AccessTokenEntity((new Uuid())->toString(), $client, $entity, scopes: ['library'], expiresAt: new \DateTimeImmutable('+1 hour'));
-        $token->setDpopJkt($this->proof->thumbprint());
+        $token = FirstPartyOAuthClient::accessToken(
+            $this->kernel->getContainer(),
+            $this->manager,
+            $entity,
+            SignInGrant::Password,
+            $this->proof->thumbprint(),
+        );
         $this->manager->persist($token);
         $this->entities[] = $token;
         if ($actor === 'collaborator') {

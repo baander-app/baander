@@ -40,7 +40,7 @@ The roles replace the user's current ones; any role not named is removed. A role
 
 `ROLE_SUPER_ADMIN` includes the rights of `ROLE_ADMIN`, and `ROLE_ADMIN` those of `ROLE_USER`. An unknown role is rejected and the user's roles stay as they were.
 
-The command acts with full authority and can change any user's roles, a super admin's included.
+The command acts with full authority and can change any user's roles, a super admin's included, except that it does not demote the only enabled super admin: a set of roles without `ROLE_SUPER_ADMIN` for that user is refused, and their roles stay as they were. The admin API refuses it the same way, with `409` and `details.reason` `last_super_admin`. Make another user a super admin first. A disabled super admin does not count, and an install with no enabled super admin refuses nothing. Demotions, deletions and disables take turns, so two super admins who demote each other at the same moment leave one of them a super admin.
 
 With `--json` the command prints only the user as the API's `data` object, the same user resource `POST /api/admin/users/{publicId}/roles` returns: `publicId`, `name`, `email`, `emailVerifiedAt`, `roles`, `disabled`, `createdAt` and `updatedAt`.
 
@@ -49,5 +49,5 @@ With `--json` the command prints only the user as the API's `data` object, the s
 | Code | Meaning |
 |------|---------|
 | 0 | Roles replaced, or the user already had them |
-| 1 | No user has the email address or public ID, or another error occurred; the message says why |
+| 1 | No user has the email address or public ID, the roles would demote the only enabled super admin, or another error occurred; the message says why |
 | 2 | A role is unknown |

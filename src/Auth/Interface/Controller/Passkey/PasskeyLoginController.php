@@ -50,7 +50,6 @@ final class PasskeyLoginController
                     properties: [
                         'challengeKey' => new OA\Schema(description: 'Key returned by /api/auth/passkey/authenticate/options', type: 'string'),
                         'response' => new OA\Schema(description: 'WebAuthn assertion from navigator.credentials.get()', type: 'object'),
-                        'userId' => new OA\Schema(description: 'Optional user ID the assertion must belong to', type: 'string'),
                     ],
                     required: ['challengeKey', 'response'],
                 ),
@@ -122,6 +121,7 @@ final class PasskeyLoginController
                 userId: $user->getId(),
                 dpopJkt: $login->dpopJkt,
                 credentialEpoch: $login->credentialEpoch,
+                grant: $login->grant(),
                 ipAddress: $request->getClientIp(),
                 userAgent: $request->headers->get('User-Agent'),
                 clientFingerprint: $request->headers->get(BaanderHeader::ClientFingerprint->value),

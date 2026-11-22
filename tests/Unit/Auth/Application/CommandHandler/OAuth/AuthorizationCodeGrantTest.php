@@ -20,6 +20,7 @@ use App\Auth\Domain\Model\OAuth\AuthCode;
 use App\Auth\Domain\Model\OAuth\Client;
 use App\Auth\Domain\Model\OAuth\PushedAuthorizationRequest;
 use App\Auth\Domain\Model\OAuth\PushedAuthorizationRequestState;
+use App\Auth\Domain\Model\OAuth\SignInGrant;
 use App\Auth\Domain\Model\OAuth\TokenId;
 use App\Auth\Domain\Model\OAuth\ValueObject\ChainId;
 use App\Auth\Domain\Model\OAuth\ValueObject\ClientSecret;
@@ -100,7 +101,6 @@ final class AuthorizationCodeGrantTest extends TestCase
         self::assertSame('public', $details->clientType);
         self::assertSame(['library'], $details->scopes);
         self::assertSame(self::REDIRECT, $details->redirectUri);
-        self::assertTrue($details->consentRequired);
         self::assertSame([], $this->codes);
         self::assertFalse($this->pushed[$request->getRequestId()->toString()]->isConsumed(), 'Looking a request up does not use it up.');
         self::assertSame([], $this->describe($this->pushRequest(scopes: []))->scopes, 'No allowed scope grants no scope.');
@@ -171,6 +171,22 @@ final class AuthorizationCodeGrantTest extends TestCase
         self::assertNull($exception->redirectUri);
     }
 
+    /** A request stored for Baander's own client is never shown or decided, and never redirected. */
+    public function testARequestOfTheFirstPartyClientIsRefusedWithoutARedirect(): void
+    {
+        $firstParty = $this->register(Client::create('Baander', [self::REDIRECT], firstParty: true, passwordClient: true));
+        $request = $this->pushRequest($firstParty);
+        $clientId = $firstParty->getPublicId()->toString();
+
+        $lookup = $this->assertProtocolError('invalid_client', fn () => $this->describe($request, clientId: $clientId), 401);
+        $decision = $this->assertProtocolError('invalid_client', fn () => $this->decide($request, clientId: $clientId), 401);
+
+        self::assertNull($lookup->redirectUri);
+        self::assertNull($decision->redirectUri);
+        self::assertSame([], $this->codes);
+        self::assertFalse($this->pushed[$request->getRequestId()->toString()]->isConsumed());
+    }
+
     public function testDenialUsesTheRequestUpAndAnswersAccessDeniedWithThePushedState(): void
     {
         $request = $this->pushRequest();
@@ -198,12 +214,21 @@ final class AuthorizationCodeGrantTest extends TestCase
         self::assertSame([], $this->codes);
     }
 
-    public function testAPersonalAccessClientServesOnlyItsOwnerWithoutConsent(): void
+    /**
+     * The owner sees their personal access client's request like any other, named by its type
+     * and with the loopback port the code would go to, and nothing is approved by looking.
+     */
+    public function testAPersonalAccessClientServesOnlyItsOwnerAndAsksForConsent(): void
     {
         $own = $this->register(Client::createPersonalAccess('CLI', $this->user->getId()));
         $foreign = $this->register(Client::createPersonalAccess('Other CLI', Uuid::generate()));
 
-        self::assertFalse($this->describe($this->pushRequest($own, 'http://localhost'), clientId: $own->getPublicId()->toString())->consentRequired);
+        $ownRequest = $this->pushRequest($own, 'http://localhost:53682');
+        $details = $this->describe($ownRequest, clientId: $own->getPublicId()->toString());
+        self::assertSame('personal_access', $details->clientType);
+        self::assertSame('http://localhost:53682', $details->redirectUri);
+        self::assertSame([], $this->codes);
+        self::assertFalse($this->pushed[$ownRequest->getRequestId()->toString()]->isConsumed(), 'Looking the request up approves nothing.');
 
         $foreignRequest = $this->pushRequest($foreign, 'http://localhost');
         $exception = $this->assertProtocolError('unauthorized_client', fn () => $this->decide($foreignRequest, clientId: $foreign->getPublicId()->toString()));
@@ -232,6 +257,7 @@ final class AuthorizationCodeGrantTest extends TestCase
 
         self::assertSame('DPoP', $tokens->getTokenType());
         self::assertSame(self::JKT, $this->issuedAccessTokens[0]->getDpopJkt());
+        self::assertSame(SignInGrant::AuthorizationCode, $this->issuedAccessTokens[0]->getGrant());
         self::assertSame([self::JKT], $this->jwtBindings);
         self::assertSame($this->issuedRefreshTokens[0]->getTokenId()->toString(), $tokens->getRefreshToken());
         self::assertSame('fp-tv', $this->issuedMetadata[0]->getClientFingerprint());

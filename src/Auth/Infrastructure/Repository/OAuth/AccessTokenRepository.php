@@ -8,7 +8,9 @@ use App\Auth\Domain\Model\OAuth\AccessToken;
 use App\Auth\Domain\Model\OAuth\AccessTokenState;
 use App\Auth\Domain\Model\OAuth\Client;
 use App\Auth\Domain\Model\OAuth\ClientState;
+use App\Auth\Domain\Model\OAuth\SignInGrant;
 use App\Auth\Domain\Model\OAuth\TokenId;
+use App\Auth\Domain\Model\OAuth\TokenIssuance;
 use App\Auth\Domain\Model\User;
 use App\Auth\Domain\Model\OAuth\ValueObject\ChainId;
 use App\Auth\Domain\Model\OAuth\ValueObject\Scope;
@@ -120,30 +122,69 @@ final class AccessTokenRepository implements AccessTokenRepositoryInterface
         );
     }
 
-    public function revokeForUser(Uuid $userId, ?AccessToken $keep = null): void
+    public function revokeForUser(Uuid $userId, ?AccessToken $keep = null): array
     {
-        $sql = 'UPDATE oauth_access_tokens SET revoked = TRUE, updated_at = NOW() WHERE user_id = :userId AND revoked = FALSE';
+        $kept = '';
         $params = ['userId' => $userId->toString()];
         if ($keep !== null) {
-            $sql .= ' AND id <> :keepId';
+            $kept = ' AND id <> :keepId';
             $params['keepId'] = $keep->getId()->toString();
             if ($keep->getChainId() !== null) {
-                $sql .= ' AND chain_id IS DISTINCT FROM :keepChainId';
+                $kept .= ' AND chain_id IS DISTINCT FROM :keepChainId';
                 $params['keepChainId'] = $keep->getChainId()->toString();
             }
         }
 
-        $this->entityManager->getConnection()->executeStatement($sql, $params);
+        // SQL, because DQL has no RETURNING: one statement revokes the tokens and lists every
+        // token of the chains it revoked. The outer SELECT reads the rows as they were before
+        // the UPDATE, which changes no column it reads.
+        /** @var list<string> $tokenIds */
+        $tokenIds = $this->entityManager->getConnection()->fetchFirstColumn(
+            <<<SQL
+                WITH revoked AS (
+                    UPDATE oauth_access_tokens
+                       SET revoked = TRUE, updated_at = NOW()
+                     WHERE user_id = :userId AND revoked = FALSE{$kept}
+                 RETURNING id, chain_id
+                )
+                SELECT token_id
+                  FROM oauth_access_tokens
+                 WHERE user_id = :userId
+                   AND (id IN (SELECT id FROM revoked) OR chain_id IN (SELECT chain_id FROM revoked))
+                 ORDER BY id
+                SQL,
+            $params,
+        );
         $this->entityManager->clear();
+
+        return $tokenIds;
     }
 
-    public function currentCredentialEpoch(TokenId $tokenId): ?int
+    public function isSessionCurrent(AccessToken $token, int $credentialEpoch): bool
+    {
+        // Scalar results, so a token the entity manager already holds cannot answer from the
+        // state it was loaded with.
+        $live = $this->entityManager->createQuery(
+            'SELECT COUNT(live.id) FROM ' . AccessTokenEntity::class . ' live, ' . AccessTokenEntity::class . ' token
+              WHERE token.id = :token
+                AND token.credentialEpoch >= :credentialEpoch
+                AND live.revoked = false
+                AND (live.id = token.id OR live.chainId = token.chainId)',
+        )
+            ->setParameter('token', $token->getId(), 'uuid')
+            ->setParameter('credentialEpoch', $credentialEpoch, ParameterType::INTEGER)
+            ->getSingleScalarResult();
+
+        return (int) $live > 0;
+    }
+
+    public function currentIssuance(TokenId $tokenId): ?TokenIssuance
     {
         // One indexed read per authenticated request. A token without a user has no epoch to
         // fall behind.
-        $epoch = $this->entityManager->getConnection()->fetchOne(
+        $row = $this->entityManager->getConnection()->fetchAssociative(
             <<<'SQL'
-                SELECT a.credential_epoch
+                SELECT a.grant_type, a.credential_epoch
                   FROM oauth_access_tokens a
                   LEFT JOIN users u ON u.id = a.user_id
                  WHERE a.token_id = :tokenId
@@ -151,8 +192,14 @@ final class AccessTokenRepository implements AccessTokenRepositoryInterface
                 SQL,
             ['tokenId' => $tokenId->toString()],
         );
+        if ($row === false) {
+            return null;
+        }
 
-        return $epoch === false ? null : (int) $epoch;
+        return new TokenIssuance(
+            grant: SignInGrant::from((string) $row['grant_type']),
+            credentialEpoch: (int) $row['credential_epoch'],
+        );
     }
 
     public function restampCredentialEpoch(AccessToken $keep, int $credentialEpoch): void
@@ -200,6 +247,7 @@ final class AccessTokenRepository implements AccessTokenRepositoryInterface
         return new AccessTokenEntity(
             $accessToken->getTokenId()->toString(),
             $clientEntity,
+            $accessToken->getGrant(),
             $userEntity,
             $accessToken->getName(),
             $accessToken->getScopes() !== [] ? $accessToken->getScopeIdentifiers() : null,
@@ -221,6 +269,7 @@ final class AccessTokenRepository implements AccessTokenRepositoryInterface
             tokenId: TokenId::fromString($entity->getTokenId()),
             user: $user,
             client: $this->clientEntityToDomain($entity->getClient()),
+            grant: $entity->getGrantType(),
             name: $entity->getName(),
             scopes: array_map(fn (string $s) => new Scope($s), $entity->getScopeIdentifiers() ?? []),
             chainId: $entity->getChainId() !== null ? ChainId::fromUuid($entity->getChainId()) : null,

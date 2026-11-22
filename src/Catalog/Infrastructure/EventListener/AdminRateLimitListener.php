@@ -18,6 +18,9 @@ use Symfony\Component\RateLimiter\RateLimiterFactoryInterface;
  * Separate from the auth-focused RateLimitListener to keep concerns
  * isolated and avoid pre-auth token exhaustion.
  *
+ * The cover-extraction request is matched by the route the router resolved from
+ * the decoded path, so no percent-encoding of the path avoids the limit.
+ *
  * Returns 429 Too Many Requests with a Retry-After header when limits are exceeded.
  *
  * Priority 5 ensures this runs after auth (priority 10) so that
@@ -25,6 +28,8 @@ use Symfony\Component\RateLimiter\RateLimiterFactoryInterface;
  */
 final class AdminRateLimitListener
 {
+    public const string COVER_EXTRACTION_ROUTE = 'album_covers_extract';
+
     public function __construct(
         private readonly RateLimiterFactoryInterface $batchCoverExtractLimiter,
         private readonly LoggerInterface $logger,
@@ -44,9 +49,8 @@ final class AdminRateLimitListener
         }
 
         $request = $event->getRequest();
-        $path = $request->getPathInfo();
 
-        if ($path !== '/api/albums/covers/extract') {
+        if ($request->attributes->get('_route') !== self::COVER_EXTRACTION_ROUTE) {
             return;
         }
 
@@ -59,7 +63,7 @@ final class AdminRateLimitListener
             $seconds = (int) ceil($retryAfter->getTimestamp() - time());
 
             $this->logger->warning('Admin rate limit exceeded', [
-                'path' => $path,
+                'path' => $request->getPathInfo(),
                 'ip' => $request->getClientIp(),
                 'retry_after' => $seconds,
             ]);

@@ -23,6 +23,9 @@ use Symfony\Component\Serializer\Encoder\JsonEncoder;
 
 /**
  * Pure domain repository for authorization codes.
+ *
+ * Callers pass the code itself; only its SHA-256 hash is written or looked up, so a copy of the
+ * table cannot be redeemed.
  */
 final class AuthCodeRepository implements AuthCodeRepositoryInterface
 {
@@ -47,7 +50,7 @@ final class AuthCodeRepository implements AuthCodeRepositoryInterface
     {
         $entity = $this->entityManager
             ->getRepository(AuthCodeEntity::class)
-            ->findOneBy(['codeId' => $codeId->toString()]);
+            ->findOneBy(['codeId' => self::hash($codeId)]);
 
         return $entity !== null ? $this->toDomain($entity) : null;
     }
@@ -73,7 +76,7 @@ final class AuthCodeRepository implements AuthCodeRepositoryInterface
             ->find($authCode->getUser()->getId());
 
         return new AuthCodeEntity(
-            $authCode->getCodeId()->toString(),
+            self::hash($authCode->getCodeId()),
             $userEntity,
             $clientEntity,
             $authCode->getRedirectUri(),
@@ -91,7 +94,7 @@ final class AuthCodeRepository implements AuthCodeRepositoryInterface
     {
         return AuthCode::reconstitute(new AuthCodeState(
             id: $entity->getId(),
-            codeId: TokenId::fromString($entity->getCodeId()),
+            codeId: null,
             user: $this->userEntityToDomain($entity->getUser()),
             client: $this->clientEntityToDomain($entity->getClient()),
             scopes: array_map(
@@ -195,5 +198,14 @@ final class AuthCodeRepository implements AuthCodeRepositoryInterface
         }
 
         return array_filter(array_map('trim', explode(',', $redirect)));
+    }
+
+    /**
+     * Codes are stored as the hex SHA-256 digest of the code. A code is 80 random characters, so
+     * an unsalted fast hash cannot be reversed or brute-forced.
+     */
+    private static function hash(TokenId $codeId): string
+    {
+        return hash('sha256', $codeId->toString());
     }
 }

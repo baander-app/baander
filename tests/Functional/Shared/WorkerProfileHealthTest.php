@@ -21,8 +21,7 @@ final class WorkerProfileHealthTest extends TestCase
         self::assertNotSame($web->fingerprint(), $workers->fingerprint());
         $this->activeBoot($workers->fingerprint());
 
-        $response = $this->anonymousRequest('GET', '/health');
-        $check = $this->workerProfileCheck($response->getContent());
+        $check = $this->workerProfileCheck($this->healthReport());
 
         self::assertSame('unhealthy', $check['status']);
         self::assertSame($web->fingerprint(), $check['details']['webProfile']);
@@ -33,7 +32,7 @@ final class WorkerProfileHealthTest extends TestCase
     {
         $this->activeBoot($this->webProfile()->fingerprint());
 
-        $check = $this->workerProfileCheck($this->anonymousRequest('GET', '/health')->getContent());
+        $check = $this->workerProfileCheck($this->healthReport());
 
         self::assertSame('healthy', $check['status']);
         self::assertSame(1, $check['details']['boots']);
@@ -41,10 +40,16 @@ final class WorkerProfileHealthTest extends TestCase
 
     public function testWithoutAnActiveBootTheProfileCannotBeCompared(): void
     {
-        $check = $this->workerProfileCheck($this->anonymousRequest('GET', '/health')->getContent());
+        $check = $this->workerProfileCheck($this->healthReport());
 
         self::assertSame('not_available', $check['status']);
         self::assertSame('No active worker boot', $check['details']['reason']);
+    }
+
+    /** The full health report, which only an administrator reads; the public probes carry status alone. */
+    private function healthReport(): string
+    {
+        return (string) $this->authenticatedRequest('GET', '/api/debug/health', $this->createAdminUser())->getContent();
     }
 
     private function webProfile(): DeploymentProfile

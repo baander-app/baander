@@ -11,6 +11,8 @@ use App\Discovery\Domain\ValueObject\AuthenticationMethod;
 use App\Discovery\Domain\ValueObject\PairingCode;
 use App\Discovery\Infrastructure\Doctrine\Entity\PairingSessionEntity;
 use App\Shared\Domain\Model\Uuid;
+use DateTimeImmutable;
+use Doctrine\DBAL\Types\Types;
 use Doctrine\ORM\EntityManagerInterface;
 
 final class PairingSessionRepository implements PairingSessionRepositoryInterface
@@ -85,6 +87,16 @@ final class PairingSessionRepository implements PairingSessionRepositoryInterfac
             $this->entityManager->remove($entity);
             $this->entityManager->flush();
         }
+    }
+
+    public function deleteExpired(DateTimeImmutable $now): void
+    {
+        $this->entityManager->createQueryBuilder()
+            ->delete(PairingSessionEntity::class, 'session')
+            ->where('session.expiresAt < :now')
+            ->setParameter('now', $now, Types::DATETIME_IMMUTABLE)
+            ->getQuery()
+            ->execute();
     }
 
     private function findEntityOrCreate(PairingSession $session): PairingSessionEntity

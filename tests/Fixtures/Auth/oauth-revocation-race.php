@@ -11,6 +11,7 @@ declare(strict_types=1);
  */
 
 use App\Auth\Application\Exception\OAuthProtocolException;
+use App\Auth\Domain\Model\OAuth\SignInGrant;
 use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
 use App\Tests\Fixtures\Auth\OAuthRevocationRace;
@@ -34,6 +35,7 @@ if ($operation === 'issue') {
             $manager,
             Uuid::fromString($clientId),
             OAuthRevocationRace::user(Uuid::fromString($userId), PublicId::fromString($userPublicId)),
+            SignInGrant::AuthorizationCode,
         );
         echo json_encode(['issued' => $tokens->getRefreshToken()], JSON_THROW_ON_ERROR);
     } catch (OAuthProtocolException $exception) {

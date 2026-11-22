@@ -16,6 +16,172 @@ Read [AGENTS.md](AGENTS.md) for workflow, [CONCEPTS.md](CONCEPTS.md) for shared 
 and the [testing guide](docs-book/part-2-developer-guide/testing/README.md) for current
 runners and verification boundaries. Historical suite counts apply to their own trees.
 
+## Security review findings
+
+The [security review findings plan](docs/plans/2026-11-22-1418-fix-security-review-findings-plan.md)
+resolves every finding of the 2026-11-20 authentication and authorization review,
+re-verified on `905d7da1e`. The review document is retired; read it with
+`git show 905d7da1e:SECURITY_FINDINGS.md`. Each finding and its resolution, with the
+commits that deliver it:
+
+1. **First-party client through the public pushed request and code grant, with silent
+   consent.** The pushed authorization, token and device endpoints refuse the
+   first-party client with `unauthorized_client`, and the consent page with
+   `invalid_client` and no redirect. Consent is always explicit, and personal access
+   clients are no longer first-party. Each access token records its sign-in grant, and
+   first-party authority needs a password or passkey sign-in (`a0ffc1c41`,
+   `306227154`, `dcae94bc0`).
+2. **Delegated token without `library` fetching original media.** The original track
+   and video routes need `library` for a presented token; a signed URL fetch without
+   a token still works. A unit check fails when a public route reads the caller's
+   identity (`97428933b`).
+3. **Preset deployment putting every client in one rate-limit bucket.** Gateway and
+   web share a dual-stack edge network, web trusts exactly the gateway's pinned
+   addresses, the gateway writes every forwarding header itself, and client addresses
+   pass through only from declared front proxies or the host's bridge on a loopback
+   listener (`cd225b952`, `46430bc42`, `a598c25b2`).
+4. **Percent-encoded paths bypassing the auth and API rate limits.** Every limiter keys
+   on the matched route, and an inventory test holds the limited routes to the
+   compiled ones (`cdd1e368c`).
+5. **TOTP turned off without the password, with no attempt limit.** Turning TOTP off
+   needs step-up, the current password and a current code, under the per-account
+   step-up limit (`e7bf7630c`).
+6. **Password change as an unthrottled password check that skips TOTP.** Password
+   change needs step-up with the TOTP code when TOTP is on; every mismatch answers
+   `step_up_failed` (`e7bf7630c`).
+7. **Party host pausing and seeking another user's transcode session.** A party
+   carries only a job its host owns and loses it when the owner leaves or is revoked;
+   non-admin job listings show only the caller's jobs; a play after a pause resumes
+   the encoder (`d4c35e50d`).
+8. **Pre-registered account keeping the registrant's TOTP and passkeys.** A
+   verification link confirms an address only in a signed-in session of the account
+   it was sent for, so the owner's password reset claims the account (`46bf3bafa`).
+
+The low-severity items:
+
+- **Open self-registration with full access before verification.** Self-registration is
+  the `auth.registration_open` server setting, closed by default. Both open outcomes
+  answer no sooner than 500 ms after the hash, so the timing does not reveal taken
+  addresses, and the configuration check warns while registration is open on a
+  `null://` mailer. An unverified account reaches only what confirming its
+  address needs (`36ce7b428`, `dcc7b5577`).
+- **WebAuthn origins accepting any subdomain and port.** Ceremonies accept only the
+  public origins on the relying party, the host of `APP_URL`, matched exactly; sign-in
+  is discoverable only; passkey endpoints answer fixed reasons, and the check endpoint
+  runs the sign-in checks (`fb80263f9`).
+- **Sessions surviving sign-in method changes; passkey removal without step-up.**
+  Turning TOTP on or off, adding or removing a passkey, changing the password and
+  confirming a new address end every other session and close its sockets through one
+  fenced service; passkey removal needs step-up and records `PasskeyDeleted`
+  (`34381444b`, `e7bf7630c`, `46bf3bafa`).
+- **Role change and user deletion leaving sockets open.** Deleting a user closes their
+  sockets after the commit (`df3281c40`). Closing sockets on a role change was
+  considered and not built: the live runtime re-reads roles within about a second.
+- **Live HLS and DASH URLs serving after access is revoked.** Live delivery re-checks
+  the job owner's access on every request, as original and artifact delivery do
+  (`b6e9e7151`).
+- **Committed VAPID key pair, Redis and database passwords, and a tracked dev TLS
+  key.** Production refuses the committed credentials, and the development key,
+  certificate, `cert.ini` and CA certificate are deleted (`b7206492e`).
+- **`app:dev:create-users` without an environment guard.** Both development commands
+  run only under the `dev` kernel or with `BAANDER_DEVELOPMENT_INSTANCE=1`, which
+  only the development lifecycle sets (`103dc0391`).
+- **No guard for the last super admin.** Deleting, disabling or demoting the only
+  enabled super admin answers `409` `last_super_admin`, or exit 1 on the console,
+  under a transaction-scoped advisory lock (`df3281c40`).
+- **Device and authorization codes stored unhashed.** Both are stored as SHA-256
+  digests; user codes stay plain (`57a4601c1`).
+- **Transcode delivery firewall patterns wider than the routes.** The rows and the
+  live routes match public IDs, `s<index>` subtitle keys and `full.vtt`
+  (`b6e9e7151`).
+- **Activity history naming items from libraries the user lost.** Activity names only
+  items inside the viewer's current access (`a1c5c5b57`).
+- **Absolute server paths returned to members.** Only administrators read library,
+  song and video paths (`a1c5c5b57`).
+- **The remaining items.** Public `/health`, `/ready` and `/live` answer status only,
+  both shipped gateways answer `/metrics` with 404, and the full report is the admin
+  route `GET /api/debug/health` (`7fefe1b45`). The web app shell, its CSP and absolute
+  API URLs render a configured public origin, never a forged `Host` (`1c5d762fd`).
+  Images are served with their stored, allowlisted type and a sandboxing CSP
+  (`a6998f170`). The discovery QR payload is a `POST` under the discovery limit, and
+  creating a pairing session deletes expired ones (`c52d808e0`). Discogs and Last.fm
+  searches spend a per-user limit and accept 1 to 100 results (`c52d808e0`). Passkey
+  endpoints no longer return exception text or list a user's credentials
+  (`fb80263f9`).
+
+Also delivered on the branch: every `/api` client error answers in the error envelope
+with a translated message (`9fc97fadd`, `71dd0b5ce`).
+
+Code review (twelve reviewers plus a second security pass, verdict ready with fixes)
+added: a whitespace-only registration name no longer tells a taken address from a free
+one, and a registration that fails after the hash still waits out the response floor;
+TOTP enable closes the other sessions' sockets before it forgets the pending secret
+(`e24d7fb29`); a password reset that races an operator's disable or demotion no longer
+reverts it, shown first by a two-process race test (`1f1531443`); the super admin race
+test covers demotion, disable and deletion (`6d4b69643`); a refused party join answers
+in the request's language like an unknown party (`3d5066477`); the register page reads
+the registration state with a direct request (`2a20cde13`). Failures inherited from
+master and fixed here: Person and TV capture coverage and cascades (`8e2aace42`,
+`5c99c6273`), movie public ID routes (`ef74d1c2f`), the swoole-bundle inventory
+(`795f191b4`), five unit failures (`d2a5e6f6b` to `53598d4f0`) and four tooling
+failures (`b4f0b1b60` to `63727ec5c`).
+
+Verification checkpoint, 2026-11-22, branch head `29ba8790f`: `make ci` on `6d4b69643`
+passed Composer validation, PHPStan (no errors) and Deptrac (0 violations); its backend
+suite selected 14,503 tests in 1,318 files, the unit lane failed 8 party tests and the
+native lane 1 production-kernel test (both fixed in `29ba8790f`, party unit suite 213
+tests OK), and both stack lanes hit the runner's one-hour Docker timeout under host load,
+so a full rerun was still in progress at the merge. Merged batches in the CI image: 3,182
+tests in 243 files (auth, controllers, OAuth integration), 3,907 in 331 files (after the
+simplify pass), 441, 148 and 76, all green after their fixes. Web: 3,876 tests in 317
+files, typecheck clean; the OpenAPI drift check and `generate:check` match. Tooling: 1,735
+tests with 6 failures inherited from master, fixed and rechecked (75 tests OK);
+`analyse:tooling` no errors; `check:tooling-architecture` exits 0. Browser, against a fresh
+preview: the auth, settings and admin e2e specs passed 35 of 41 at `6d4b69643`, with the
+register specs failing until `2a20cde13` and three admin specs failing on a stale route
+(see Open); at `63727ec5c` auth and settings passed 18 of 20, with one timing-sensitive
+volume spec failing under concurrent CI load after passing in the first run. The preset
+qualification was not run.
+
+Open:
+
+- The WebSocket handshake still accepts only `APP_URL`'s origin (or the explicit
+  `app.websocket.allowed_origins` list), so a page served on an `AUTH_EXTRA_ORIGINS`
+  origin gets a CSP socket for that origin but its upgrade is refused. Deriving the
+  allowlist from the public origins needs the swoole-bundle `WithWebSocketHandler`
+  configurator to take the policy instead of an array, because its container
+  expression is evaluated at compile time, where the `csv:` placeholder of
+  `AUTH_EXTRA_ORIGINS` is still a string.
+- Gates to finish: the full `make ci` backend suite on a quiet host, the preset
+  qualification, and a quiet rerun of
+  `tests/e2e/settings/sign-in-conflict.spec.ts`.
+- `tests/e2e/admin/admin.spec.ts` (from the initial commit) still targets
+  `/admin/monitor` and a "Job Monitor" heading; the app redirects that route to
+  `/admin?tab=jobs`, so three of its tests fail on master and here.
+- Review residual risks: credential-change transactions take the user row lock without
+  the issuance lock timeout; `VerifyEmailHandler` reads `isDisabled()` before the lock, so
+  a confirmation racing an operator disable is untested; members' song file paths are
+  stripped by each caller rather than once; TOTP enable attempts are bounded only by the
+  generic per-account API limiter.
+- The preview of the main checkout (`preview-fd790a887b6899cb`) is blocked on a migration
+  history the dev environment will not reconcile; its database was preserved.
+- Deferred by the plan, each separate work: binding personal access pushes to a
+  secret held by the client's owner, so nobody else can push as that client; a
+  sessions list where users see and end their devices and app grants; a TOTP settings
+  screen in the web app, where TOTP setup and disable remain API-only.
+
+## Typed roles, permissions and scopes
+
+Decided 2026-11-22, to be planned with `ce-plan` as its own refactor after the
+security review findings branch (`fix/security-review-findings`) merges. Replace
+the string references with enums for roles (`ROLE_USER`, `ROLE_ADMIN`,
+`ROLE_SUPER_ADMIN`; 151 uses in 68 source files and 74 test files on that
+branch), the voters' permission attributes, the OAuth scopes and the
+authentication attributes such as `IS_AUTHENTICATED_FULLY`, and add builders for
+permission paths. `security.yaml` keeps its YAML strings, held to the enums by a
+test. What the permission-path builders cover is to be settled when the plan
+starts.
+
 ## Person credits and catalog follow-ups
 
 The current Person profile lists credits for cataloged works. TV file scanning,

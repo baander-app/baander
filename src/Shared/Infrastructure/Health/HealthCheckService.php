@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Shared\Infrastructure\Health;
 
+use App\Auth\Application\Port\SelfRegistrationInterface;
 use App\Shared\Infrastructure\Redis\RedisClientFactory;
 use App\Shared\Infrastructure\Swoole\WorkerMemoryTable;
 use Baander\Core\EnvironmentVariable;
@@ -35,6 +36,8 @@ final class HealthCheckService
         private readonly string $oauthPublicKeyPath,
         private readonly string $vapidPublicKey,
         private readonly string $vapidPrivateKey,
+        private readonly ?string $mailerDsn,
+        private readonly SelfRegistrationInterface $selfRegistration,
         private readonly MessengerWorkerHealth $messengerWorkerHealth,
         private readonly WorkerProfileHealth $workerProfileHealth,
         private readonly WorkerMemoryTable $workerMemory = new WorkerMemoryTable(),
@@ -85,6 +88,20 @@ final class HealthCheckService
     }
 
     /**
+     * Whether these results leave the web container healthy: no result that decides its
+     * health reads unhealthy.
+     *
+     * @param HealthCheckResult[] $results
+     */
+    public static function containerHealthy(array $results): bool
+    {
+        return !array_any(
+            $results,
+            static fn (HealthCheckResult $result): bool => $result->status === HealthStatus::Unhealthy && self::affectsContainerHealth($result),
+        );
+    }
+
+    /**
      * Process liveness — checks if the Swoole worker process is alive.
      * Always returns 200 if the process responds, even if Swoole stats are unavailable.
      */
@@ -132,6 +149,7 @@ final class HealthCheckService
             $this->checkAppSecret(),
             $this->checkOAuthKeyFiles(),
             ...$this->checkFrameworkConfig(),
+            ...$this->checkRegistrationMailer(),
             ...$this->checkExternalApiKeys(),
         ];
     }
@@ -500,6 +518,47 @@ final class HealthCheckService
         }
 
         return $results;
+    }
+
+    /**
+     * Open self-registration needs mail: a new account confirms its address through an
+     * emailed link, which a null:// mailer discards.
+     *
+     * @return HealthCheckResult[]
+     */
+    private function checkRegistrationMailer(): array
+    {
+        if (!str_starts_with($this->mailerDsn ?? '', 'null://') || !$this->registrationIsOpen()) {
+            return [];
+        }
+
+        return [
+            new HealthCheckResult(
+                component: 'registration',
+                status: HealthStatus::NotAvailable,
+                responseTimeMs: 0.0,
+                details: [
+                    'severity' => 'warning',
+                    'var' => EnvironmentVariable::MAILER_DSN,
+                    'message' => 'Self-registration is open, but MAILER_DSN discards every email, so new accounts never get their verification link.',
+                    'suggestion' => 'Point MAILER_DSN at a mail server, or close registration with app:settings:set auth.registration_open false.',
+                ],
+            ),
+        ];
+    }
+
+    /**
+     * The setting lives in the database. When it cannot be read, the PostgreSQL health check
+     * reports why and this one stays quiet: the configuration checks run on a worker's first
+     * request and must never throw.
+     */
+    private function registrationIsOpen(): bool
+    {
+        try {
+            return $this->selfRegistration->isOpen();
+        } catch (Throwable) {
+            return false;
+        }
     }
 
     /**

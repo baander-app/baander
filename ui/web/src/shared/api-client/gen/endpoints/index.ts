@@ -273,30 +273,32 @@ export interface RegisterPasskeyRequest {
   name?: string;
 }
 
-export interface WebAuthnOptionsRequest {
-  /** Optional user public ID to get passkey options for */
-  userId?: string;
-}
-
 /**
- * WebAuthn authenticator response (base64-encoded assertion)
+ * WebAuthn assertion from navigator.credentials.get()
  * @nullable
  */
 export type VerifyPasskeyChallengeRequestResponse = { [key: string]: unknown } | null;
 
 export interface VerifyPasskeyChallengeRequest {
-  /** @maxLength 255 */
+  /**
+     * Key returned by /api/auth/passkey/authenticate/options
+     * @maxLength 255
+     */
   challengeKey: string;
   /**
-     * WebAuthn authenticator response (base64-encoded assertion)
+     * WebAuthn assertion from navigator.credentials.get()
      * @nullable
      */
   response: VerifyPasskeyChallengeRequestResponse;
+}
+
+export interface DeletePasskeyRequest {
+  currentPassword: string;
   /**
-     * @maxLength 255
+     * A current TOTP code; needed when TOTP is on
      * @nullable
      */
-  userId?: string | null;
+  totpCode?: string | null;
 }
 
 export interface StartTotpSetupRequest {
@@ -312,11 +314,12 @@ export interface EnableTotpRequest {
 }
 
 export interface DisableTotpRequest {
+  currentPassword: string;
   /**
-     * @minLength 6
-     * @maxLength 6
+     * A current TOTP code
+     * @nullable
      */
-  code: string;
+  totpCode: string | null;
 }
 
 export interface RegisterRequest {
@@ -384,6 +387,11 @@ export interface ChangePasswordRequest {
      * @maxLength 255
      */
   newPassword: string;
+  /**
+     * A current TOTP code; needed when TOTP is on
+     * @nullable
+     */
+  totpCode?: string | null;
 }
 
 export interface UpdateAlbumRequest {
@@ -906,6 +914,24 @@ export interface DeliveryRequest {
   qualityTier?: DeliveryRequestQualityTier;
 }
 
+export interface SearchMetadataRequest {
+  /** Search query */
+  q: string;
+  /** Data source */
+  source?: string;
+  /**
+     * Filter by artist name
+     * @nullable
+     */
+  artist?: string | null;
+  /**
+     * Maximum number of results
+     * @minimum 1
+     * @maximum 100
+     */
+  limit?: number;
+}
+
 export interface ExtractMetadataRequest {
   /** Filesystem path to the media file to analyze */
   path: string;
@@ -947,7 +973,7 @@ export interface CreatePartySessionRequest {
      */
   videoId: string;
   /**
-     * Transcode job of the video that the host's playback steers
+     * The host's own transcode job of the video, which the host's playback steers
      * @minLength 21
      * @maxLength 21
      * @nullable
@@ -1475,6 +1501,139 @@ export interface SetUserSettingRequest {
   value: boolean | number | string;
 }
 
+export type PaginatedResponseMeta = {
+  current_page: number;
+  last_page: number;
+  per_page: number;
+  total: number;
+};
+
+export interface PaginatedResponse {
+  data: unknown[];
+  meta: PaginatedResponseMeta;
+}
+
+export interface DirectorResource {
+  /**
+     * @minLength 21
+     * @maxLength 21
+     * @pattern ^[0-9a-zA-Z_-]{21}$
+     */
+  publicId: string;
+  name: string;
+  tmdbId: number;
+  /** @nullable */
+  profileUrl: string | null;
+  movieCount: number;
+}
+
+/**
+ * Poster image data
+ * @nullable
+ */
+export type MovieResourcePosterImage = { [key: string]: unknown } | null;
+
+export type MovieResourceGenresItem = { [key: string]: unknown };
+
+export type MovieResourceVideosItem = { [key: string]: unknown };
+
+export interface MovieResource {
+  /**
+     * Public identifier
+     * @minLength 21
+     * @maxLength 21
+     * @pattern ^[0-9a-zA-Z_-]{21}$
+     */
+  publicId: string;
+  /** Movie title */
+  title: string;
+  /**
+     * Release year
+     * @nullable
+     */
+  year?: number | null;
+  /**
+     * Plot summary
+     * @nullable
+     */
+  summary?: string | null;
+  /**
+     * TMDB overview
+     * @nullable
+     */
+  overview?: string | null;
+  /**
+     * Movie tagline
+     * @nullable
+     */
+  tagline?: string | null;
+  /**
+     * Poster image URL
+     * @nullable
+     */
+  posterUrl?: string | null;
+  /**
+     * Backdrop image URL
+     * @nullable
+     */
+  backdropUrl?: string | null;
+  /**
+     * Runtime in minutes
+     * @nullable
+     */
+  runtime?: number | null;
+  /**
+     * TMDB vote average
+     * @nullable
+     */
+  rating?: number | null;
+  /**
+     * Original language code
+     * @nullable
+     */
+  originalLanguage?: string | null;
+  /**
+     * TMDB ID
+     * @nullable
+     */
+  tmdbId?: number | null;
+  /**
+     * IMDB ID
+     * @nullable
+     */
+  imdbId?: string | null;
+  /**
+     * TMDB collection ID
+     * @nullable
+     */
+  tmdbCollectionId?: number | null;
+  /**
+     * Collection name
+     * @nullable
+     */
+  collectionName?: string | null;
+  /**
+     * Video public identifiers
+     * @items.minLength 21
+     * @items.maxLength 21
+     * @items.pattern ^[0-9a-zA-Z_-]{21}$
+     */
+  videoIds: string[];
+  /**
+     * Poster image data
+     * @nullable
+     */
+  posterImage?: MovieResourcePosterImage;
+  /** Genre list */
+  genres: MovieResourceGenresItem[];
+  /** Video variants */
+  videos: MovieResourceVideosItem[];
+  /** Creation timestamp */
+  createdAt: string;
+  /** Update timestamp */
+  updatedAt: string;
+}
+
 /**
  * Additional error details, omitted when empty
  */
@@ -1649,6 +1808,9 @@ export interface ValidationError {
   error: ValidationErrorError;
 }
 
+/**
+ * An activity of the viewer. The fields that name its song, album, artist or movie are null when that item was deleted or lies outside the viewer's current library access.
+ */
 export interface ActivityResource {
   /**
      * Public identifier
@@ -1666,10 +1828,10 @@ export interface ActivityResource {
   userId: string;
   /** Type of activity */
   activityType: string;
-  /** Whether the latest scan or ingestion observation marked the song source available */
+  /** Whether the latest scan or ingestion observation marked the song source available; false when the song lies outside the viewer's current library access */
   songAvailable: boolean;
   /**
-     * Song public ID
+     * Song public ID; null when the song was deleted or lies outside the viewer's current library access
      * @minLength 21
      * @maxLength 21
      * @nullable
@@ -1677,7 +1839,7 @@ export interface ActivityResource {
      */
   songId?: string | null;
   /**
-     * Album public ID
+     * Album public ID; null when the album was deleted or lies outside the viewer's current library access
      * @minLength 21
      * @maxLength 21
      * @nullable
@@ -1685,7 +1847,7 @@ export interface ActivityResource {
      */
   albumId?: string | null;
   /**
-     * Artist public ID
+     * Artist public ID; null when the artist was deleted or the activity names no song, album or movie inside the viewer's current library access
      * @minLength 21
      * @maxLength 21
      * @nullable
@@ -1693,7 +1855,7 @@ export interface ActivityResource {
      */
   artistId?: string | null;
   /**
-     * Movie public ID
+     * Movie public ID; null when the movie was deleted or lies outside the viewer's current library access
      * @minLength 21
      * @maxLength 21
      * @nullable
@@ -2040,7 +2202,6 @@ export type AuthorizationRequestResourceClientType = typeof AuthorizationRequest
 export const AuthorizationRequestResourceClientType = {
   public: 'public',
   confidential: 'confidential',
-  first_party: 'first_party',
   personal_access: 'personal_access',
 } as const;
 
@@ -2055,8 +2216,6 @@ export interface AuthorizationRequestResource {
   scopes: string[];
   /** The validated redirect URI the answer goes to */
   redirect_uri: string;
-  /** False only for first-party clients, whose requests the page may approve without asking */
-  consent_required: boolean;
 }
 
 export type AuthorizationErrorResourceError = typeof AuthorizationErrorResourceError[keyof typeof AuthorizationErrorResourceError];
@@ -2387,18 +2546,6 @@ export interface SongDeletePreviewResource {
   fileDeletion?: FileDeletionPreviewResource | null;
 }
 
-export type PaginatedResponseMeta = {
-  current_page: number;
-  last_page: number;
-  per_page: number;
-  total: number;
-};
-
-export interface PaginatedResponse {
-  data: unknown[];
-  meta: PaginatedResponseMeta;
-}
-
 export interface SongResource {
   /**
      * Public identifier
@@ -2439,7 +2586,7 @@ export interface SongResource {
      */
   year?: number | null;
   /**
-     * File path
+     * File path; only administrators read it
      * @nullable
      */
   path?: string | null;
@@ -2613,127 +2760,6 @@ export interface GenreResource {
      * @nullable
      */
   mbid?: string | null;
-}
-
-/**
- * Poster image data
- * @nullable
- */
-export type MovieResourcePosterImage = { [key: string]: unknown } | null;
-
-export type MovieResourceGenresItem = { [key: string]: unknown };
-
-export type MovieResourceVideosItem = { [key: string]: unknown };
-
-export interface MovieResource {
-  /**
-     * Public identifier
-     * @minLength 21
-     * @maxLength 21
-     * @pattern ^[0-9a-zA-Z_-]{21}$
-     */
-  publicId: string;
-  /** Movie title */
-  title: string;
-  /**
-     * Release year
-     * @nullable
-     */
-  year?: number | null;
-  /**
-     * Plot summary
-     * @nullable
-     */
-  summary?: string | null;
-  /**
-     * TMDB overview
-     * @nullable
-     */
-  overview?: string | null;
-  /**
-     * Movie tagline
-     * @nullable
-     */
-  tagline?: string | null;
-  /**
-     * Poster image URL
-     * @nullable
-     */
-  posterUrl?: string | null;
-  /**
-     * Backdrop image URL
-     * @nullable
-     */
-  backdropUrl?: string | null;
-  /**
-     * Runtime in minutes
-     * @nullable
-     */
-  runtime?: number | null;
-  /**
-     * TMDB vote average
-     * @nullable
-     */
-  rating?: number | null;
-  /**
-     * Original language code
-     * @nullable
-     */
-  originalLanguage?: string | null;
-  /**
-     * TMDB ID
-     * @nullable
-     */
-  tmdbId?: number | null;
-  /**
-     * IMDB ID
-     * @nullable
-     */
-  imdbId?: string | null;
-  /**
-     * TMDB collection ID
-     * @nullable
-     */
-  tmdbCollectionId?: number | null;
-  /**
-     * Collection name
-     * @nullable
-     */
-  collectionName?: string | null;
-  /**
-     * Video public identifiers
-     * @items.minLength 21
-     * @items.maxLength 21
-     * @items.pattern ^[0-9a-zA-Z_-]{21}$
-     */
-  videoIds: string[];
-  /**
-     * Poster image data
-     * @nullable
-     */
-  posterImage?: MovieResourcePosterImage;
-  /** Genre list */
-  genres: MovieResourceGenresItem[];
-  /** Video variants */
-  videos: MovieResourceVideosItem[];
-  /** Creation timestamp */
-  createdAt: string;
-  /** Update timestamp */
-  updatedAt: string;
-}
-
-export interface DirectorResource {
-  /**
-     * @minLength 21
-     * @maxLength 21
-     * @pattern ^[0-9a-zA-Z_-]{21}$
-     */
-  publicId: string;
-  name: string;
-  tmdbId: number;
-  /** @nullable */
-  profileUrl: string | null;
-  movieCount: number;
 }
 
 /**
@@ -3630,8 +3656,8 @@ export interface LibraryResource {
   name: string;
   /** URL-friendly slug */
   slug: string;
-  /** Filesystem path */
-  path: string;
+  /** Filesystem path of the library root; only administrators read it */
+  path?: string;
   /** Library type */
   type: LibraryResourceType;
   /** Filesystem type */
@@ -3896,7 +3922,7 @@ export interface PartySessionResource {
      */
   videoId: string;
   /**
-     * Transcode job that the host's playback steers; null when none was named or the job has been deleted
+     * Transcode job that the host's playback steers; null when none was named, the job has been deleted, or its owner left the party
      * @minLength 21
      * @maxLength 21
      * @nullable
@@ -4932,6 +4958,32 @@ export interface UserSettingResource {
  */
 export type AcceptLanguageParameter = string;
 
+export type GetMovieDirectorIndexParams = {
+  page?: number;
+  /** @maximum 100 */
+  limit?: number;
+  q?: string;
+};
+
+export type GetMovieDirectorIndex200 = PaginatedResponse & {
+  data: DirectorResource[];
+};
+
+export type GetMovieDirectorShow200 = {
+  data: DirectorResource;
+};
+
+export type GetMovieDirectorMoviesParams = {
+  page?: number;
+  /** @maximum 100 */
+  limit?: number;
+  q?: string;
+};
+
+export type GetMovieDirectorMovies200 = PaginatedResponse & {
+  data: MovieResource[];
+};
+
 export type GetTranscodeJobIndex200DataItem = {
   publicId?: string;
   status?: string;
@@ -5644,11 +5696,6 @@ export type PostPasskeyRegister201 = {
   data?: PostPasskeyRegister201Data;
 };
 
-export type PostPasskeyAuthenticateOptionsBody = {
-  /** Optional user public ID to get passkey options for */
-  userId?: string;
-};
-
 /**
  * WebAuthn PublicKeyCredentialRequestOptions
  */
@@ -5659,28 +5706,14 @@ export type PostPasskeyAuthenticateOptions200 = {
   data?: PostPasskeyAuthenticateOptions200Data;
 };
 
-/**
- * WebAuthn authenticator response (base64-encoded assertion)
- */
-export type PostPasskeyAuthenticateBodyResponse = { [key: string]: unknown };
-
-export type PostPasskeyAuthenticateBody = {
-  challengeKey: string;
-  /** WebAuthn authenticator response (base64-encoded assertion) */
-  response: PostPasskeyAuthenticateBodyResponse;
-  /** @nullable */
-  userId?: string | null;
-};
-
 export type PostPasskeyAuthenticate200Data = {
   /**
+     * Public ID of the account the passkey belongs to
      * @minLength 21
      * @maxLength 21
      * @pattern ^[0-9a-zA-Z_-]{21}$
      */
-  userId?: string;
-  credentialId?: string;
-  signCount?: number;
+  userId: string;
 };
 
 export type PostPasskeyAuthenticate200 = {
@@ -5716,8 +5749,6 @@ export type PostAuthPasskeyLoginPasskeyBody = {
   challengeKey: string;
   /** WebAuthn assertion from navigator.credentials.get() */
   response: PostAuthPasskeyLoginPasskeyBodyResponse;
-  /** Optional user ID the assertion must belong to */
-  userId?: string;
 };
 
 export type PostTotpSetup200Data = {
@@ -5729,20 +5760,12 @@ export type PostTotpSetup200 = {
   data?: PostTotpSetup200Data;
 };
 
-export type PostTotpEnableBody = {
-  code: string;
-};
-
 export type PostTotpEnable200Data = {
   message?: string;
 };
 
 export type PostTotpEnable200 = {
   data?: PostTotpEnable200Data;
-};
-
-export type PostTotpDisableBody = {
-  code: string;
 };
 
 export type PostTotpDisable200Data = {
@@ -5765,6 +5788,14 @@ export type PostAuthRegister202Data = {
 
 export type PostAuthRegister202 = {
   data?: PostAuthRegister202Data;
+};
+
+export type GetAuthRegistration200Data = {
+  open: boolean;
+};
+
+export type GetAuthRegistration200 = {
+  data: GetAuthRegistration200Data;
 };
 
 export type PostAuthLogout200Data = {
@@ -5863,7 +5894,9 @@ export type PutAuthMeUpdate200 = {
 };
 
 export type PostAuthEmailVerify200Data = {
-  message?: string;
+  message: string;
+  /** True when the link confirmed a pending email change: the account now uses the new address, and every other session was signed out. */
+  emailChanged: boolean;
 };
 
 export type PostAuthEmailVerify200 = {
@@ -5884,15 +5917,6 @@ export type PutAuthMeEmail202Data = {
 
 export type PutAuthMeEmail202 = {
   data?: PutAuthMeEmail202Data;
-};
-
-export type PutAuthMePasswordBody = {
-  currentPassword: string;
-  /**
-     * @minLength 8
-     * @maxLength 255
-     */
-  newPassword: string;
 };
 
 export type PutAuthMePassword200Data = {
@@ -6303,7 +6327,7 @@ export type PostArtistCoverUpload200 = {
   height?: number;
 };
 
-export type PostExtractCoversAppCatalogInterfaceExtractcoversInvoke202 = {
+export type PostAlbumCoversExtract202 = {
   albums?: number;
 };
 
@@ -6426,32 +6450,6 @@ export type PatchMovieUpdate200 = {
 
 export type DeleteMovieDestroy200 = {
   data?: CatalogDeletionResource;
-};
-
-export type GetMovieDirectorIndexParams = {
-  page?: number;
-  /** @maximum 100 */
-  limit?: number;
-  q?: string;
-};
-
-export type GetMovieDirectorIndex200 = PaginatedResponse & {
-  data: DirectorResource[];
-};
-
-export type GetMovieDirectorShow200 = {
-  data: DirectorResource;
-};
-
-export type GetMovieDirectorMoviesParams = {
-  page?: number;
-  /** @maximum 100 */
-  limit?: number;
-  q?: string;
-};
-
-export type GetMovieDirectorMovies200 = PaginatedResponse & {
-  data: MovieResource[];
 };
 
 export type GetAdminMetadataMatchReviewsParams = {
@@ -6785,13 +6783,13 @@ export type PostDiscoveryPairingCodeBody = {
   method: PostDiscoveryPairingCodeBodyMethod;
 };
 
-export type GetDiscoveryQrPayload200Data = {
+export type PostDiscoveryQrPayload200Data = {
   qrData?: string;
   pairingCode?: string;
 };
 
-export type GetDiscoveryQrPayload200 = {
-  data?: GetDiscoveryQrPayload200Data;
+export type PostDiscoveryQrPayload200 = {
+  data?: PostDiscoveryQrPayload200Data;
 };
 
 export type PostDiscoveryCompletePairingBody = {
@@ -8746,6 +8744,38 @@ export type GetDebugCoroutines200 = {
   worker_errors?: GetDebugCoroutines200WorkerErrorsItem[];
 };
 
+export type GetDebugHealth200Status = typeof GetDebugHealth200Status[keyof typeof GetDebugHealth200Status];
+
+
+export const GetDebugHealth200Status = {
+  healthy: 'healthy',
+} as const;
+
+export type GetDebugHealth200ChecksItemStatus = typeof GetDebugHealth200ChecksItemStatus[keyof typeof GetDebugHealth200ChecksItemStatus];
+
+
+export const GetDebugHealth200ChecksItemStatus = {
+  healthy: 'healthy',
+  unhealthy: 'unhealthy',
+  not_available: 'not_available',
+} as const;
+
+export type GetDebugHealth200ChecksItemDetails = { [key: string]: unknown };
+
+export type GetDebugHealth200ChecksItem = {
+  component: string;
+  status: GetDebugHealth200ChecksItemStatus;
+  responseTimeMs: number;
+  details: GetDebugHealth200ChecksItemDetails;
+};
+
+export type GetDebugHealth200 = {
+  status: GetDebugHealth200Status;
+  checks: GetDebugHealth200ChecksItem[];
+};
+
+export type GetDebugHealth503 = { [key: string]: unknown };
+
 export type GetMonitorAnalyticsSummaryParams = {
   /** Inclusive start of the job creation range (RFC 3339 with a timezone, up to six fractional digits). Defaults to 24 hours ago. */
   from?: string;
@@ -9830,6 +9860,331 @@ const withQueryKey = <T extends object, K>(query: T, queryKey: K): T & { queryKe
   return result;
 };
 
+export const getGetMovieDirectorIndexUrl = (params?: GetMovieDirectorIndexParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/movies/directors?${stringifiedParams}` : `/api/movies/directors`
+}
+
+/**
+ * @summary List directors of accessible movies
+ */
+export const getMovieDirectorIndex = async (params?: GetMovieDirectorIndexParams, options?: Parameters<typeof customInstance>[1]): Promise<GetMovieDirectorIndex200> => {
+
+  return customInstance<GetMovieDirectorIndex200>(getGetMovieDirectorIndexUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetMovieDirectorIndexQueryKey = (params?: GetMovieDirectorIndexParams,) => {
+    return [
+    `/api/movies/directors`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getGetMovieDirectorIndexQueryOptions = <TData = Awaited<ReturnType<typeof getMovieDirectorIndex>>, TError = ErrorType<unknown>>(params?: GetMovieDirectorIndexParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getMovieDirectorIndex>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetMovieDirectorIndexQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getMovieDirectorIndex>>> = ({ signal }) => getMovieDirectorIndex(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getMovieDirectorIndex>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type GetMovieDirectorIndexQueryResult = NonNullable<Awaited<ReturnType<typeof getMovieDirectorIndex>>>
+export type GetMovieDirectorIndexQueryError = ErrorType<unknown>
+
+
+export function useGetMovieDirectorIndex<TData = Awaited<ReturnType<typeof getMovieDirectorIndex>>, TError = ErrorType<unknown>>(
+ params: undefined |  GetMovieDirectorIndexParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getMovieDirectorIndex>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getMovieDirectorIndex>>,
+          TError,
+          Awaited<ReturnType<typeof getMovieDirectorIndex>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetMovieDirectorIndex<TData = Awaited<ReturnType<typeof getMovieDirectorIndex>>, TError = ErrorType<unknown>>(
+ params?: GetMovieDirectorIndexParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getMovieDirectorIndex>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getMovieDirectorIndex>>,
+          TError,
+          Awaited<ReturnType<typeof getMovieDirectorIndex>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetMovieDirectorIndex<TData = Awaited<ReturnType<typeof getMovieDirectorIndex>>, TError = ErrorType<unknown>>(
+ params?: GetMovieDirectorIndexParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getMovieDirectorIndex>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary List directors of accessible movies
+ */
+
+export function useGetMovieDirectorIndex<TData = Awaited<ReturnType<typeof getMovieDirectorIndex>>, TError = ErrorType<unknown>>(
+ params?: GetMovieDirectorIndexParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getMovieDirectorIndex>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getGetMovieDirectorIndexQueryOptions(params,options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getGetMovieDirectorShowUrl = (publicId: string,) => {
+
+
+
+
+  return `/api/movies/directors/${publicId}`
+}
+
+/**
+ * @summary Get a director of accessible movies
+ */
+export const getMovieDirectorShow = async (publicId: string, options?: Parameters<typeof customInstance>[1]): Promise<GetMovieDirectorShow200> => {
+
+  return customInstance<GetMovieDirectorShow200>(getGetMovieDirectorShowUrl(publicId),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetMovieDirectorShowQueryKey = (publicId: string,) => {
+    return [
+    `/api/movies/directors/${publicId}`
+    ] as const;
+    }
+
+
+export const getGetMovieDirectorShowQueryOptions = <TData = Awaited<ReturnType<typeof getMovieDirectorShow>>, TError = ErrorType<void>>(publicId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getMovieDirectorShow>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetMovieDirectorShowQueryKey(publicId);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getMovieDirectorShow>>> = ({ signal }) => getMovieDirectorShow(publicId, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: publicId !== null && publicId !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getMovieDirectorShow>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type GetMovieDirectorShowQueryResult = NonNullable<Awaited<ReturnType<typeof getMovieDirectorShow>>>
+export type GetMovieDirectorShowQueryError = ErrorType<void>
+
+
+export function useGetMovieDirectorShow<TData = Awaited<ReturnType<typeof getMovieDirectorShow>>, TError = ErrorType<void>>(
+ publicId: string, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getMovieDirectorShow>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getMovieDirectorShow>>,
+          TError,
+          Awaited<ReturnType<typeof getMovieDirectorShow>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetMovieDirectorShow<TData = Awaited<ReturnType<typeof getMovieDirectorShow>>, TError = ErrorType<void>>(
+ publicId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getMovieDirectorShow>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getMovieDirectorShow>>,
+          TError,
+          Awaited<ReturnType<typeof getMovieDirectorShow>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetMovieDirectorShow<TData = Awaited<ReturnType<typeof getMovieDirectorShow>>, TError = ErrorType<void>>(
+ publicId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getMovieDirectorShow>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary Get a director of accessible movies
+ */
+
+export function useGetMovieDirectorShow<TData = Awaited<ReturnType<typeof getMovieDirectorShow>>, TError = ErrorType<void>>(
+ publicId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getMovieDirectorShow>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getGetMovieDirectorShowQueryOptions(publicId,options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getGetMovieDirectorMoviesUrl = (publicId: string,
+    params?: GetMovieDirectorMoviesParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/movies/directors/${publicId}/movies?${stringifiedParams}` : `/api/movies/directors/${publicId}/movies`
+}
+
+/**
+ * @summary List accessible movies by a director
+ */
+export const getMovieDirectorMovies = async (publicId: string,
+    params?: GetMovieDirectorMoviesParams, options?: Parameters<typeof customInstance>[1]): Promise<GetMovieDirectorMovies200> => {
+
+  return customInstance<GetMovieDirectorMovies200>(getGetMovieDirectorMoviesUrl(publicId,params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetMovieDirectorMoviesQueryKey = (publicId: string,
+    params?: GetMovieDirectorMoviesParams,) => {
+    return [
+    `/api/movies/directors/${publicId}/movies`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getGetMovieDirectorMoviesQueryOptions = <TData = Awaited<ReturnType<typeof getMovieDirectorMovies>>, TError = ErrorType<void>>(publicId: string,
+    params?: GetMovieDirectorMoviesParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getMovieDirectorMovies>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetMovieDirectorMoviesQueryKey(publicId,params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getMovieDirectorMovies>>> = ({ signal }) => getMovieDirectorMovies(publicId,params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: publicId !== null && publicId !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getMovieDirectorMovies>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type GetMovieDirectorMoviesQueryResult = NonNullable<Awaited<ReturnType<typeof getMovieDirectorMovies>>>
+export type GetMovieDirectorMoviesQueryError = ErrorType<void>
+
+
+export function useGetMovieDirectorMovies<TData = Awaited<ReturnType<typeof getMovieDirectorMovies>>, TError = ErrorType<void>>(
+ publicId: string,
+    params: undefined |  GetMovieDirectorMoviesParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getMovieDirectorMovies>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getMovieDirectorMovies>>,
+          TError,
+          Awaited<ReturnType<typeof getMovieDirectorMovies>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetMovieDirectorMovies<TData = Awaited<ReturnType<typeof getMovieDirectorMovies>>, TError = ErrorType<void>>(
+ publicId: string,
+    params?: GetMovieDirectorMoviesParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getMovieDirectorMovies>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getMovieDirectorMovies>>,
+          TError,
+          Awaited<ReturnType<typeof getMovieDirectorMovies>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetMovieDirectorMovies<TData = Awaited<ReturnType<typeof getMovieDirectorMovies>>, TError = ErrorType<void>>(
+ publicId: string,
+    params?: GetMovieDirectorMoviesParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getMovieDirectorMovies>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary List accessible movies by a director
+ */
+
+export function useGetMovieDirectorMovies<TData = Awaited<ReturnType<typeof getMovieDirectorMovies>>, TError = ErrorType<void>>(
+ publicId: string,
+    params?: GetMovieDirectorMoviesParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getMovieDirectorMovies>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getGetMovieDirectorMoviesQueryOptions(publicId,params,options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
 export const getGetTranscodeJobIndexUrl = () => {
 
 
@@ -9839,7 +10194,7 @@ export const getGetTranscodeJobIndexUrl = () => {
 }
 
 /**
- * @summary List orphaned transcode jobs in accessible libraries
+ * @summary List the caller's orphaned transcode jobs in accessible libraries; administrators see every user's
  */
 export const getTranscodeJobIndex = async ( options?: Parameters<typeof customInstance>[1]): Promise<GetTranscodeJobIndex200> => {
 
@@ -9910,7 +10265,7 @@ export function useGetTranscodeJobIndex<TData = Awaited<ReturnType<typeof getTra
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 /**
- * @summary List orphaned transcode jobs in accessible libraries
+ * @summary List the caller's orphaned transcode jobs in accessible libraries; administrators see every user's
  */
 
 export function useGetTranscodeJobIndex<TData = Awaited<ReturnType<typeof getTranscodeJobIndex>>, TError = ErrorType<unknown>>(
@@ -9940,7 +10295,7 @@ export const getGetTranscodeJobShowUrl = (publicId: string,) => {
 }
 
 /**
- * @summary Get a transcode job by public ID
+ * @summary Get one of the caller's transcode jobs by public ID; administrators may read any user's
  */
 export const getTranscodeJobShow = async (publicId: string, options?: Parameters<typeof customInstance>[1]): Promise<GetTranscodeJobShow200> => {
 
@@ -10011,7 +10366,7 @@ export function useGetTranscodeJobShow<TData = Awaited<ReturnType<typeof getTran
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 /**
- * @summary Get a transcode job by public ID
+ * @summary Get one of the caller's transcode jobs by public ID; administrators may read any user's
  */
 
 export function useGetTranscodeJobShow<TData = Awaited<ReturnType<typeof getTranscodeJobShow>>, TError = ErrorType<ApiError>>(
@@ -10115,7 +10470,7 @@ export const getGetTranscodeJobMetricsUrl = (publicId: string,) => {
 }
 
 /**
- * @summary Get transcode job metrics
+ * @summary Get the metrics of one of the caller's transcode jobs; administrators may read any user's
  */
 export const getTranscodeJobMetrics = async (publicId: string, options?: Parameters<typeof customInstance>[1]): Promise<TranscodeMetricsResource> => {
 
@@ -10186,7 +10541,7 @@ export function useGetTranscodeJobMetrics<TData = Awaited<ReturnType<typeof getT
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 /**
- * @summary Get transcode job metrics
+ * @summary Get the metrics of one of the caller's transcode jobs; administrators may read any user's
  */
 
 export function useGetTranscodeJobMetrics<TData = Awaited<ReturnType<typeof getTranscodeJobMetrics>>, TError = ErrorType<ApiError>>(
@@ -14377,7 +14732,7 @@ export const getPostOauthParUrl = () => {
 }
 
 /**
- * Every authorization request is pushed here first. The client authenticates as at the token endpoint and binds the request to its DPoP key (RFC 9449 section 10.1) with a `DPoP` proof header carrying a server-issued nonce, the `dpop_jkt` parameter, or both naming the same key; the authorization code is later bound to that key. A proof is checked as at the token endpoint: `use_dpop_nonce` and `invalid_dpop_proof` answers carry a `DPoP-Nonce` header, and every answer to a verified proof carries the next nonce. Send the browser to the authorization endpoint with only `client_id` and the returned `request_uri`. Parameters may be form-encoded (RFC 9126) or JSON. Answers carry `Cache-Control: no-store`.
+ * Every authorization request is pushed here first. The client authenticates as at the token endpoint and binds the request to its DPoP key (RFC 9449 section 10.1) with a `DPoP` proof header carrying a server-issued nonce, the `dpop_jkt` parameter, or both naming the same key; the authorization code is later bound to that key. A proof is checked as at the token endpoint: `use_dpop_nonce` and `invalid_dpop_proof` answers carry a `DPoP-Nonce` header, and every answer to a verified proof carries the next nonce. Send the browser to the authorization endpoint with only `client_id` and the returned `request_uri`. Baander's first-party client gets `unauthorized_client`. Parameters may be form-encoded (RFC 9126) or JSON. Answers carry `Cache-Control: no-store`.
  * @summary Push an authorization request (RFC 9126 section 2)
  */
 export const postOauthPar = async (postOauthParBody: PostOauthParBody, options?: Parameters<typeof customInstance>[1]): Promise<PushedAuthorizationRequestResource> => {
@@ -14466,7 +14821,7 @@ export const getPostOauthTokenUrl = () => {
 }
 
 /**
- * Requires a DPoP proof carrying a server-issued nonce. A missing or invalid proof is answered with `invalid_dpop_proof`, a proof without a fresh nonce with `use_dpop_nonce`; both carry a `DPoP-Nonce` header. Every answer carries the nonce for the next proof and `Cache-Control: no-store`. The issued tokens are bound to the proof key, and to the `X-Baander-Client-Fingerprint` header when it is sent. Parameters may be form-encoded (RFC 6749) or JSON. Every request names its client in `client_id` or in an HTTP Basic `Authorization` header. Public clients authenticate with `client_id` alone; confidential clients add `client_secret`, or `client_assertion` with `client_assertion_type`, by the one method they were registered with. A secret client sends its secret in the body or, with its client ID, in HTTP Basic (`client_secret_basic`, each part form-urlencoded first), never both; a failed Basic authentication is answered with a `WWW-Authenticate: Basic` challenge. A client assertion (RFC 7523 as updated by RFC 10070) is a JWT signed with one of the client's registered keys: `iss` and `sub` are the `client_id`, `aud` is the issuer identifier as its sole value, `exp` and `jti` are required, it lives at most 300 seconds by default, and its `jti` is accepted once. Its `typ` header is `client-authentication+jwt` or absent.
+ * Requires a DPoP proof carrying a server-issued nonce. A missing or invalid proof is answered with `invalid_dpop_proof`, a proof without a fresh nonce with `use_dpop_nonce`; both carry a `DPoP-Nonce` header. Every answer carries the nonce for the next proof and `Cache-Control: no-store`. The issued tokens are bound to the proof key, and to the `X-Baander-Client-Fingerprint` header when it is sent. Parameters may be form-encoded (RFC 6749) or JSON. Every request names its client in `client_id` or in an HTTP Basic `Authorization` header. Public clients authenticate with `client_id` alone; confidential clients add `client_secret`, or `client_assertion` with `client_assertion_type`, by the one method they were registered with. Baander's first-party client gets `unauthorized_client` for every grant; it refreshes at `/api/auth/refresh`. A secret client sends its secret in the body or, with its client ID, in HTTP Basic (`client_secret_basic`, each part form-urlencoded first), never both; a failed Basic authentication is answered with a `WWW-Authenticate: Basic` challenge. A client assertion (RFC 7523 as updated by RFC 10070) is a JWT signed with one of the client's registered keys: `iss` and `sub` are the `client_id`, `aud` is the issuer identifier as its sole value, `exp` and `jti` are required, it lives at most 300 seconds by default, and its `jti` is accepted once. Its `typ` header is `client-authentication+jwt` or absent.
  * @summary OAuth 2.0 token endpoint (RFC 6749 section 3.2)
  */
 export const postOauthToken = async (postOauthTokenBody: PostOauthTokenBody, options?: Parameters<typeof customInstance>[1]): Promise<OAuthTokenResource> => {
@@ -15031,7 +15386,7 @@ export const getPostPasskeyOptionsUrl = () => {
 }
 
 /**
- * Needs a verified email address, answered otherwise with 422 and `details.reason` `email_unverified`. Needs the current password, plus a current TOTP code when TOTP is on; a wrong password and a missing or wrong code get the same 422 with `details.reason` `step_up_failed`. The challenge is bound to the signed-in user and expires after 5 minutes.
+ * Needs a verified email address, answered otherwise with 403 and `details.reason` `email_unverified`. Needs the current password, plus a current TOTP code when TOTP is on; a wrong password and a missing or wrong code get the same 422 with `details.reason` `step_up_failed`. The challenge is bound to the signed-in user and expires after 5 minutes.
  * @summary Get WebAuthn registration options
  */
 export const postPasskeyOptions = async (passkeyRegistrationOptionsRequest: PasskeyRegistrationOptionsRequest, options?: Parameters<typeof customInstance>[1]): Promise<PostPasskeyOptions200> => {
@@ -15120,6 +15475,7 @@ export const getPostPasskeyRegisterUrl = () => {
 }
 
 /**
+ * Signs the account out of every other session, paired devices and third-party apps included; the session that completes the registration stays signed in.
  * @summary Register a new passkey
  */
 export const postPasskeyRegister = async (postPasskeyRegisterBody: PostPasskeyRegisterBody, options?: Parameters<typeof customInstance>[1]): Promise<PostPasskeyRegister201> => {
@@ -15208,30 +15564,17 @@ export const getPostPasskeyAuthenticateOptionsUrl = () => {
 }
 
 /**
+ * Passkey sign-in is discoverable: the options name no account and list no credential, so the authenticator offers the passkeys it holds for this relying party. The challenge is spent by the first sign-in or check that presents it and expires after 5 minutes.
  * @summary Get WebAuthn authentication options
  */
-export const postPasskeyAuthenticateOptions = async (postPasskeyAuthenticateOptionsBody: PostPasskeyAuthenticateOptionsBody, options?: Parameters<typeof customInstance>[1]): Promise<PostPasskeyAuthenticateOptions200> => {
+export const postPasskeyAuthenticateOptions = async ( options?: Parameters<typeof customInstance>[1]): Promise<PostPasskeyAuthenticateOptions200> => {
 
-    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
-    if (!h) return {};
-    if (h instanceof Headers) return Object.fromEntries(h.entries());
-    if (Symbol.iterator in h) {
-      return Object.fromEntries(
-        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
-      );
-    }
-    const headers: Record<string, string | readonly string[]> = {};
-    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
-      if (value !== undefined) headers[name] = value;
-    }
-    return headers;
-  };
-return customInstance<PostPasskeyAuthenticateOptions200>(getPostPasskeyAuthenticateOptionsUrl(),
+  return customInstance<PostPasskeyAuthenticateOptions200>(getPostPasskeyAuthenticateOptionsUrl(),
   {
     ...options,
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
-    body: JSON.stringify(postPasskeyAuthenticateOptionsBody)
+    method: 'POST'
+
+
   }
 );}
 
@@ -15241,9 +15584,9 @@ return customInstance<PostPasskeyAuthenticateOptions200>(getPostPasskeyAuthentic
 
 export const getPostPasskeyAuthenticateOptionsMutationKey = () => ['postPasskeyAuthenticateOptions'] as const;
 
-export const getPostPasskeyAuthenticateOptionsMutationOptions = <TError = ErrorType<ValidationError | ApiError>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postPasskeyAuthenticateOptions>>, TError,PostPasskeyAuthenticateOptionsMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
-): UseMutationOptions<Awaited<ReturnType<typeof postPasskeyAuthenticateOptions>>, TError,PostPasskeyAuthenticateOptionsMutationVariables, TContext> => {
+export const getPostPasskeyAuthenticateOptionsMutationOptions = <TError = ErrorType<ApiError>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postPasskeyAuthenticateOptions>>, TError,void, TContext>, request?: SecondParameter<typeof customInstance>}
+): UseMutationOptions<Awaited<ReturnType<typeof postPasskeyAuthenticateOptions>>, TError,void, TContext> => {
 
 const mutationKey = getPostPasskeyAuthenticateOptionsMutationKey();
 const {mutation: mutationOptions, request: requestOptions} = options ?
@@ -15255,10 +15598,10 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
 
 
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof postPasskeyAuthenticateOptions>>, PostPasskeyAuthenticateOptionsMutationVariables> = (props) => {
-          const {data} = props ?? {};
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof postPasskeyAuthenticateOptions>>, void> = () => {
 
-          return  postPasskeyAuthenticateOptions(data,requestOptions)
+
+          return  postPasskeyAuthenticateOptions(requestOptions)
         }
 
 
@@ -15269,19 +15612,19 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
   return  { mutationFn, ...mutationOptions }}
 
     export type PostPasskeyAuthenticateOptionsMutationResult = NonNullable<Awaited<ReturnType<typeof postPasskeyAuthenticateOptions>>>
-    export type PostPasskeyAuthenticateOptionsMutationBody = BodyType<PostPasskeyAuthenticateOptionsBody>
-    export type PostPasskeyAuthenticateOptionsMutationError = ErrorType<ValidationError | ApiError>
-    export type PostPasskeyAuthenticateOptionsMutationVariables = {data: BodyType<PostPasskeyAuthenticateOptionsBody>}
+
+    export type PostPasskeyAuthenticateOptionsMutationError = ErrorType<ApiError>
+
 
     /**
  * @summary Get WebAuthn authentication options
  */
-export const usePostPasskeyAuthenticateOptions = <TError = ErrorType<ValidationError | ApiError>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postPasskeyAuthenticateOptions>>, TError,PostPasskeyAuthenticateOptionsMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
+export const usePostPasskeyAuthenticateOptions = <TError = ErrorType<ApiError>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postPasskeyAuthenticateOptions>>, TError,void, TContext>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient): UseMutationResult<
         Awaited<ReturnType<typeof postPasskeyAuthenticateOptions>>,
         TError,
-        PostPasskeyAuthenticateOptionsMutationVariables,
+        void,
         TContext
       > => {
       return useMutation(getPostPasskeyAuthenticateOptionsMutationOptions(options), queryClient);
@@ -15296,10 +15639,10 @@ export const getPostPasskeyAuthenticateUrl = () => {
 }
 
 /**
- * The main passkey login flow goes through PasskeyAuthenticator at /api/auth/login/passkey. This endpoint is an alternative for API-based flows where the frontend manages the ceremony.
- * @summary Authenticate with a passkey (API-based flow)
+ * Runs the checks passkey sign-in runs and names the account the assertion proves, without issuing tokens; sign-in itself is `POST /api/auth/login/passkey`. The challenge is spent once; the signature counter must increase unless the authenticator keeps none; an account with TOTP on needs a passkey that verified the user; a disabled account is refused.
+ * @summary Check a passkey assertion without signing in
  */
-export const postPasskeyAuthenticate = async (postPasskeyAuthenticateBody: PostPasskeyAuthenticateBody, options?: Parameters<typeof customInstance>[1]): Promise<PostPasskeyAuthenticate200> => {
+export const postPasskeyAuthenticate = async (verifyPasskeyChallengeRequest: VerifyPasskeyChallengeRequest, options?: Parameters<typeof customInstance>[1]): Promise<PostPasskeyAuthenticate200> => {
 
     const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
     if (!h) return {};
@@ -15320,7 +15663,7 @@ return customInstance<PostPasskeyAuthenticate200>(getPostPasskeyAuthenticateUrl(
     ...options,
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
-    body: JSON.stringify(postPasskeyAuthenticateBody)
+    body: JSON.stringify(verifyPasskeyChallengeRequest)
   }
 );}
 
@@ -15358,12 +15701,12 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
   return  { mutationFn, ...mutationOptions }}
 
     export type PostPasskeyAuthenticateMutationResult = NonNullable<Awaited<ReturnType<typeof postPasskeyAuthenticate>>>
-    export type PostPasskeyAuthenticateMutationBody = BodyType<PostPasskeyAuthenticateBody>
+    export type PostPasskeyAuthenticateMutationBody = BodyType<VerifyPasskeyChallengeRequest>
     export type PostPasskeyAuthenticateMutationError = ErrorType<ApiError | ValidationError>
-    export type PostPasskeyAuthenticateMutationVariables = {data: BodyType<PostPasskeyAuthenticateBody>}
+    export type PostPasskeyAuthenticateMutationVariables = {data: BodyType<VerifyPasskeyChallengeRequest>}
 
     /**
- * @summary Authenticate with a passkey (API-based flow)
+ * @summary Check a passkey assertion without signing in
  */
 export const usePostPasskeyAuthenticate = <TError = ErrorType<ApiError | ValidationError>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postPasskeyAuthenticate>>, TError,PostPasskeyAuthenticateMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
@@ -15385,16 +15728,32 @@ export const getDeletePasskeyDeleteUrl = (publicId: string,) => {
 }
 
 /**
+ * Needs the current password, plus a current TOTP code when TOTP is on; a wrong password and a missing or wrong code get the same 422 with `details.reason` `step_up_failed`. An unknown passkey answers 404 before any step-up attempt is spent. Signs the account out of every other session, paired devices and third-party apps included; the session that made the request stays signed in.
  * @summary Delete a passkey
  */
-export const deletePasskeyDelete = async (publicId: string, options?: Parameters<typeof customInstance>[1]): Promise<DeletePasskeyDelete200> => {
+export const deletePasskeyDelete = async (publicId: string,
+    deletePasskeyRequest: DeletePasskeyRequest, options?: Parameters<typeof customInstance>[1]): Promise<DeletePasskeyDelete200> => {
 
-  return customInstance<DeletePasskeyDelete200>(getDeletePasskeyDeleteUrl(publicId),
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customInstance<DeletePasskeyDelete200>(getDeletePasskeyDeleteUrl(publicId),
   {
     ...options,
-    method: 'DELETE'
-
-
+    method: 'DELETE',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(deletePasskeyRequest)
   }
 );}
 
@@ -15404,7 +15763,7 @@ export const deletePasskeyDelete = async (publicId: string, options?: Parameters
 
 export const getDeletePasskeyDeleteMutationKey = () => ['deletePasskeyDelete'] as const;
 
-export const getDeletePasskeyDeleteMutationOptions = <TError = ErrorType<ApiError>,
+export const getDeletePasskeyDeleteMutationOptions = <TError = ErrorType<ApiError | ValidationError>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deletePasskeyDelete>>, TError,DeletePasskeyDeleteMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
 ): UseMutationOptions<Awaited<ReturnType<typeof deletePasskeyDelete>>, TError,DeletePasskeyDeleteMutationVariables, TContext> => {
 
@@ -15419,9 +15778,9 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
 
       const mutationFn: MutationFunction<Awaited<ReturnType<typeof deletePasskeyDelete>>, DeletePasskeyDeleteMutationVariables> = (props) => {
-          const {publicId} = props ?? {};
+          const {publicId,data} = props ?? {};
 
-          return  deletePasskeyDelete(publicId,requestOptions)
+          return  deletePasskeyDelete(publicId,data,requestOptions)
         }
 
 
@@ -15432,14 +15791,14 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
   return  { mutationFn, ...mutationOptions }}
 
     export type DeletePasskeyDeleteMutationResult = NonNullable<Awaited<ReturnType<typeof deletePasskeyDelete>>>
-
-    export type DeletePasskeyDeleteMutationError = ErrorType<ApiError>
-    export type DeletePasskeyDeleteMutationVariables = {publicId: string}
+    export type DeletePasskeyDeleteMutationBody = BodyType<DeletePasskeyRequest>
+    export type DeletePasskeyDeleteMutationError = ErrorType<ApiError | ValidationError>
+    export type DeletePasskeyDeleteMutationVariables = {publicId: string;data: BodyType<DeletePasskeyRequest>}
 
     /**
  * @summary Delete a passkey
  */
-export const useDeletePasskeyDelete = <TError = ErrorType<ApiError>,
+export const useDeletePasskeyDelete = <TError = ErrorType<ApiError | ValidationError>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deletePasskeyDelete>>, TError,DeletePasskeyDeleteMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient): UseMutationResult<
         Awaited<ReturnType<typeof deletePasskeyDelete>>,
@@ -15548,7 +15907,7 @@ export const getPostTotpSetupUrl = () => {
 }
 
 /**
- * Refused while TOTP is on, and for an unverified email address with 422 and `details.reason` `email_unverified`. Needs the current password; a wrong one gets 422 with `details.reason` `step_up_failed`. Each setup replaces the pending secret of the previous one; it expires after 10 minutes.
+ * Refused while TOTP is on, and for an unverified email address with 403 and `details.reason` `email_unverified`. Needs the current password; a wrong one gets 422 with `details.reason` `step_up_failed`. Each setup replaces the pending secret of the previous one; it expires after 10 minutes.
  * @summary Generate TOTP secret and provisioning URI
  */
 export const postTotpSetup = async (startTotpSetupRequest: StartTotpSetupRequest, options?: Parameters<typeof customInstance>[1]): Promise<PostTotpSetup200> => {
@@ -15637,9 +15996,10 @@ export const getPostTotpEnableUrl = () => {
 }
 
 /**
+ * Signs the account out of every other session, paired devices and third-party apps included; the session that sent the code stays signed in.
  * @summary Enable TOTP after verifying a code from the authenticator app
  */
-export const postTotpEnable = async (postTotpEnableBody: PostTotpEnableBody, options?: Parameters<typeof customInstance>[1]): Promise<PostTotpEnable200> => {
+export const postTotpEnable = async (enableTotpRequest: EnableTotpRequest, options?: Parameters<typeof customInstance>[1]): Promise<PostTotpEnable200> => {
 
     const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
     if (!h) return {};
@@ -15660,7 +16020,7 @@ return customInstance<PostTotpEnable200>(getPostTotpEnableUrl(),
     ...options,
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
-    body: JSON.stringify(postTotpEnableBody)
+    body: JSON.stringify(enableTotpRequest)
   }
 );}
 
@@ -15698,9 +16058,9 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
   return  { mutationFn, ...mutationOptions }}
 
     export type PostTotpEnableMutationResult = NonNullable<Awaited<ReturnType<typeof postTotpEnable>>>
-    export type PostTotpEnableMutationBody = BodyType<PostTotpEnableBody>
+    export type PostTotpEnableMutationBody = BodyType<EnableTotpRequest>
     export type PostTotpEnableMutationError = ErrorType<ApiError | ValidationError>
-    export type PostTotpEnableMutationVariables = {data: BodyType<PostTotpEnableBody>}
+    export type PostTotpEnableMutationVariables = {data: BodyType<EnableTotpRequest>}
 
     /**
  * @summary Enable TOTP after verifying a code from the authenticator app
@@ -15725,9 +16085,10 @@ export const getPostTotpDisableUrl = () => {
 }
 
 /**
- * @summary Disable TOTP (requires current TOTP code to verify)
+ * Refused with 400 while TOTP is off, before any step-up attempt is spent. Needs the current password and a current TOTP code; a missing or wrong password or code gets the same 422 with `details.reason` `step_up_failed`. Signs the account out of every other session, paired devices and third-party apps included; the session that made the request stays signed in.
+ * @summary Disable TOTP
  */
-export const postTotpDisable = async (postTotpDisableBody: PostTotpDisableBody, options?: Parameters<typeof customInstance>[1]): Promise<PostTotpDisable200> => {
+export const postTotpDisable = async (disableTotpRequest: DisableTotpRequest, options?: Parameters<typeof customInstance>[1]): Promise<PostTotpDisable200> => {
 
     const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
     if (!h) return {};
@@ -15748,7 +16109,7 @@ return customInstance<PostTotpDisable200>(getPostTotpDisableUrl(),
     ...options,
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
-    body: JSON.stringify(postTotpDisableBody)
+    body: JSON.stringify(disableTotpRequest)
   }
 );}
 
@@ -15786,12 +16147,12 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
   return  { mutationFn, ...mutationOptions }}
 
     export type PostTotpDisableMutationResult = NonNullable<Awaited<ReturnType<typeof postTotpDisable>>>
-    export type PostTotpDisableMutationBody = BodyType<PostTotpDisableBody>
+    export type PostTotpDisableMutationBody = BodyType<DisableTotpRequest>
     export type PostTotpDisableMutationError = ErrorType<ApiError | ValidationError>
-    export type PostTotpDisableMutationVariables = {data: BodyType<PostTotpDisableBody>}
+    export type PostTotpDisableMutationVariables = {data: BodyType<DisableTotpRequest>}
 
     /**
- * @summary Disable TOTP (requires current TOTP code to verify)
+ * @summary Disable TOTP
  */
 export const usePostTotpDisable = <TError = ErrorType<ApiError | ValidationError>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postTotpDisable>>, TError,PostTotpDisableMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
@@ -15891,6 +16252,108 @@ export const usePostAuthRegister = <TError = ErrorType<ApiError | ValidationErro
       > => {
       return useMutation(getPostAuthRegisterMutationOptions(options), queryClient);
     }
+
+export const getGetAuthRegistrationUrl = () => {
+
+
+
+
+  return `/api/auth/registration`
+}
+
+/**
+ * Lets the sign-up page show whether it takes registrations. Operators open and close self-registration with the `auth.registration_open` server setting.
+ * @summary Whether self-registration is open
+ */
+export const getAuthRegistration = async ( options?: Parameters<typeof customInstance>[1]): Promise<GetAuthRegistration200> => {
+
+  return customInstance<GetAuthRegistration200>(getGetAuthRegistrationUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetAuthRegistrationQueryKey = () => {
+    return [
+    `/api/auth/registration`
+    ] as const;
+    }
+
+
+export const getGetAuthRegistrationQueryOptions = <TData = Awaited<ReturnType<typeof getAuthRegistration>>, TError = ErrorType<unknown>>( options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAuthRegistration>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetAuthRegistrationQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getAuthRegistration>>> = ({ signal }) => getAuthRegistration({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getAuthRegistration>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type GetAuthRegistrationQueryResult = NonNullable<Awaited<ReturnType<typeof getAuthRegistration>>>
+export type GetAuthRegistrationQueryError = ErrorType<unknown>
+
+
+export function useGetAuthRegistration<TData = Awaited<ReturnType<typeof getAuthRegistration>>, TError = ErrorType<unknown>>(
+  options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAuthRegistration>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getAuthRegistration>>,
+          TError,
+          Awaited<ReturnType<typeof getAuthRegistration>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetAuthRegistration<TData = Awaited<ReturnType<typeof getAuthRegistration>>, TError = ErrorType<unknown>>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAuthRegistration>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getAuthRegistration>>,
+          TError,
+          Awaited<ReturnType<typeof getAuthRegistration>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetAuthRegistration<TData = Awaited<ReturnType<typeof getAuthRegistration>>, TError = ErrorType<unknown>>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAuthRegistration>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary Whether self-registration is open
+ */
+
+export function useGetAuthRegistration<TData = Awaited<ReturnType<typeof getAuthRegistration>>, TError = ErrorType<unknown>>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAuthRegistration>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getGetAuthRegistrationQueryOptions(options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
 
 export const getPostAuthLogoutUrl = () => {
 
@@ -16429,7 +16892,7 @@ export const getPostAuthEmailVerifyUrl = () => {
 }
 
 /**
- * Redeems the token from a verification email once. The token verifies only the address it was sent to, while the account still has that address.
+ * Redeems the token from a verification email once, in a signed-in session of the account it was sent for. The token verifies only the address it was sent to, while the account still has that address. A token for a pending email change makes that address the account's address and signs the account out of every other session; the session that made the request stays signed in.
  * @summary Verify an email address with a token
  */
 export const postAuthEmailVerify = async (verifyEmailRequest: VerifyEmailRequest, options?: Parameters<typeof customInstance>[1]): Promise<PostAuthEmailVerify200> => {
@@ -16682,10 +17145,10 @@ export const getPutAuthMePasswordUrl = () => {
 }
 
 /**
- * Signs the account out of every other session; the session that made the request stays signed in.
+ * Needs the current password, plus a current TOTP code when TOTP is on; a wrong password and a missing or wrong code get the same 422 with `details.reason` `step_up_failed`. A new password outside the length policy is refused before any step-up attempt is spent. Signs the account out of every other session, paired devices and third-party apps included; the session that made the request stays signed in.
  * @summary Change the current user password
  */
-export const putAuthMePassword = async (putAuthMePasswordBody: PutAuthMePasswordBody, options?: Parameters<typeof customInstance>[1]): Promise<PutAuthMePassword200> => {
+export const putAuthMePassword = async (changePasswordRequest: ChangePasswordRequest, options?: Parameters<typeof customInstance>[1]): Promise<PutAuthMePassword200> => {
 
     const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
     if (!h) return {};
@@ -16706,7 +17169,7 @@ return customInstance<PutAuthMePassword200>(getPutAuthMePasswordUrl(),
     ...options,
     method: 'PUT',
     headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
-    body: JSON.stringify(putAuthMePasswordBody)
+    body: JSON.stringify(changePasswordRequest)
   }
 );}
 
@@ -16744,9 +17207,9 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
   return  { mutationFn, ...mutationOptions }}
 
     export type PutAuthMePasswordMutationResult = NonNullable<Awaited<ReturnType<typeof putAuthMePassword>>>
-    export type PutAuthMePasswordMutationBody = BodyType<PutAuthMePasswordBody>
+    export type PutAuthMePasswordMutationBody = BodyType<ChangePasswordRequest>
     export type PutAuthMePasswordMutationError = ErrorType<ApiError | ValidationError>
-    export type PutAuthMePasswordMutationVariables = {data: BodyType<PutAuthMePasswordBody>}
+    export type PutAuthMePasswordMutationVariables = {data: BodyType<ChangePasswordRequest>}
 
     /**
  * @summary Change the current user password
@@ -19366,7 +19829,7 @@ export const useDeleteArtistCoverDelete = <TError = ErrorType<ApiError>,
       return useMutation(getDeleteArtistCoverDeleteMutationOptions(options), queryClient);
     }
 
-export const getPostExtractCoversAppCatalogInterfaceExtractcoversInvokeUrl = () => {
+export const getPostAlbumCoversExtractUrl = () => {
 
 
 
@@ -19378,9 +19841,9 @@ export const getPostExtractCoversAppCatalogInterfaceExtractcoversInvokeUrl = () 
  * Queues individual extraction jobs for embedded cover art from audio files for all albums without a cover image.
  * @summary Extract cover art for all albums missing one
  */
-export const postExtractCoversAppCatalogInterfaceExtractcoversInvoke = async ( options?: Parameters<typeof customInstance>[1]): Promise<PostExtractCoversAppCatalogInterfaceExtractcoversInvoke202> => {
+export const postAlbumCoversExtract = async ( options?: Parameters<typeof customInstance>[1]): Promise<PostAlbumCoversExtract202> => {
 
-  return customInstance<PostExtractCoversAppCatalogInterfaceExtractcoversInvoke202>(getPostExtractCoversAppCatalogInterfaceExtractcoversInvokeUrl(),
+  return customInstance<PostAlbumCoversExtract202>(getPostAlbumCoversExtractUrl(),
   {
     ...options,
     method: 'POST'
@@ -19393,13 +19856,13 @@ export const postExtractCoversAppCatalogInterfaceExtractcoversInvoke = async ( o
 
 
 
-export const getPostExtractCoversAppCatalogInterfaceExtractcoversInvokeMutationKey = () => ['postExtractCoversAppCatalogInterfaceExtractcoversInvoke'] as const;
+export const getPostAlbumCoversExtractMutationKey = () => ['postAlbumCoversExtract'] as const;
 
-export const getPostExtractCoversAppCatalogInterfaceExtractcoversInvokeMutationOptions = <TError = ErrorType<ApiError>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postExtractCoversAppCatalogInterfaceExtractcoversInvoke>>, TError,void, TContext>, request?: SecondParameter<typeof customInstance>}
-): UseMutationOptions<Awaited<ReturnType<typeof postExtractCoversAppCatalogInterfaceExtractcoversInvoke>>, TError,void, TContext> => {
+export const getPostAlbumCoversExtractMutationOptions = <TError = ErrorType<ApiError>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postAlbumCoversExtract>>, TError,void, TContext>, request?: SecondParameter<typeof customInstance>}
+): UseMutationOptions<Awaited<ReturnType<typeof postAlbumCoversExtract>>, TError,void, TContext> => {
 
-const mutationKey = getPostExtractCoversAppCatalogInterfaceExtractcoversInvokeMutationKey();
+const mutationKey = getPostAlbumCoversExtractMutationKey();
 const {mutation: mutationOptions, request: requestOptions} = options ?
       options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
       options
@@ -19409,10 +19872,10 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
 
 
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof postExtractCoversAppCatalogInterfaceExtractcoversInvoke>>, void> = () => {
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof postAlbumCoversExtract>>, void> = () => {
 
 
-          return  postExtractCoversAppCatalogInterfaceExtractcoversInvoke(requestOptions)
+          return  postAlbumCoversExtract(requestOptions)
         }
 
 
@@ -19422,23 +19885,23 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
   return  { mutationFn, ...mutationOptions }}
 
-    export type PostExtractCoversAppCatalogInterfaceExtractcoversInvokeMutationResult = NonNullable<Awaited<ReturnType<typeof postExtractCoversAppCatalogInterfaceExtractcoversInvoke>>>
+    export type PostAlbumCoversExtractMutationResult = NonNullable<Awaited<ReturnType<typeof postAlbumCoversExtract>>>
 
-    export type PostExtractCoversAppCatalogInterfaceExtractcoversInvokeMutationError = ErrorType<ApiError>
+    export type PostAlbumCoversExtractMutationError = ErrorType<ApiError>
 
 
     /**
  * @summary Extract cover art for all albums missing one
  */
-export const usePostExtractCoversAppCatalogInterfaceExtractcoversInvoke = <TError = ErrorType<ApiError>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postExtractCoversAppCatalogInterfaceExtractcoversInvoke>>, TError,void, TContext>, request?: SecondParameter<typeof customInstance>}
+export const usePostAlbumCoversExtract = <TError = ErrorType<ApiError>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postAlbumCoversExtract>>, TError,void, TContext>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient): UseMutationResult<
-        Awaited<ReturnType<typeof postExtractCoversAppCatalogInterfaceExtractcoversInvoke>>,
+        Awaited<ReturnType<typeof postAlbumCoversExtract>>,
         TError,
         void,
         TContext
       > => {
-      return useMutation(getPostExtractCoversAppCatalogInterfaceExtractcoversInvokeMutationOptions(options), queryClient);
+      return useMutation(getPostAlbumCoversExtractMutationOptions(options), queryClient);
     }
 
 export const getGetGenreIndexUrl = (params?: GetGenreIndexParams,) => {
@@ -20602,331 +21065,6 @@ export const useDeleteMovieDestroy = <TError = ErrorType<ApiError | ValidationEr
       > => {
       return useMutation(getDeleteMovieDestroyMutationOptions(options), queryClient);
     }
-
-export const getGetMovieDirectorIndexUrl = (params?: GetMovieDirectorIndexParams,) => {
-  const normalizedParams = new URLSearchParams();
-
-  Object.entries(params || {}).forEach(([key, value]) => {
-
-    if (value !== undefined) {
-      normalizedParams.append(key, value === null ? 'null' : String(value))
-    }
-  });
-
-  const stringifiedParams = normalizedParams.toString();
-
-  return stringifiedParams.length > 0 ? `/api/movies/directors?${stringifiedParams}` : `/api/movies/directors`
-}
-
-/**
- * @summary List directors of accessible movies
- */
-export const getMovieDirectorIndex = async (params?: GetMovieDirectorIndexParams, options?: Parameters<typeof customInstance>[1]): Promise<GetMovieDirectorIndex200> => {
-
-  return customInstance<GetMovieDirectorIndex200>(getGetMovieDirectorIndexUrl(params),
-  {
-    ...options,
-    method: 'GET'
-
-
-  }
-);}
-
-
-
-
-
-export const getGetMovieDirectorIndexQueryKey = (params?: GetMovieDirectorIndexParams,) => {
-    return [
-    `/api/movies/directors`, ...(params ? [params] : [])
-    ] as const;
-    }
-
-
-export const getGetMovieDirectorIndexQueryOptions = <TData = Awaited<ReturnType<typeof getMovieDirectorIndex>>, TError = ErrorType<unknown>>(params?: GetMovieDirectorIndexParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getMovieDirectorIndex>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
-) => {
-
-const {query: queryOptions, request: requestOptions} = options ?? {};
-
-  const queryKey =  queryOptions?.queryKey ?? getGetMovieDirectorIndexQueryKey(params);
-
-
-
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof getMovieDirectorIndex>>> = ({ signal }) => getMovieDirectorIndex(params, { signal, ...requestOptions });
-
-
-
-
-
-   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getMovieDirectorIndex>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
-}
-
-export type GetMovieDirectorIndexQueryResult = NonNullable<Awaited<ReturnType<typeof getMovieDirectorIndex>>>
-export type GetMovieDirectorIndexQueryError = ErrorType<unknown>
-
-
-export function useGetMovieDirectorIndex<TData = Awaited<ReturnType<typeof getMovieDirectorIndex>>, TError = ErrorType<unknown>>(
- params: undefined |  GetMovieDirectorIndexParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getMovieDirectorIndex>>, TError, TData>> & Pick<
-        DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof getMovieDirectorIndex>>,
-          TError,
-          Awaited<ReturnType<typeof getMovieDirectorIndex>>
-        > , 'initialData'
-      >, request?: SecondParameter<typeof customInstance>}
- , queryClient?: QueryClient
-  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-export function useGetMovieDirectorIndex<TData = Awaited<ReturnType<typeof getMovieDirectorIndex>>, TError = ErrorType<unknown>>(
- params?: GetMovieDirectorIndexParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getMovieDirectorIndex>>, TError, TData>> & Pick<
-        UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof getMovieDirectorIndex>>,
-          TError,
-          Awaited<ReturnType<typeof getMovieDirectorIndex>>
-        > , 'initialData'
-      >, request?: SecondParameter<typeof customInstance>}
- , queryClient?: QueryClient
-  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-export function useGetMovieDirectorIndex<TData = Awaited<ReturnType<typeof getMovieDirectorIndex>>, TError = ErrorType<unknown>>(
- params?: GetMovieDirectorIndexParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getMovieDirectorIndex>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
- , queryClient?: QueryClient
-  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-/**
- * @summary List directors of accessible movies
- */
-
-export function useGetMovieDirectorIndex<TData = Awaited<ReturnType<typeof getMovieDirectorIndex>>, TError = ErrorType<unknown>>(
- params?: GetMovieDirectorIndexParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getMovieDirectorIndex>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
- , queryClient?: QueryClient
- ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
-
-  const queryOptions = getGetMovieDirectorIndexQueryOptions(params,options)
-
-  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
-
-  return withQueryKey(query, queryOptions.queryKey);
-}
-
-
-
-
-
-
-
-export const getGetMovieDirectorShowUrl = (publicId: string,) => {
-
-
-
-
-  return `/api/movies/directors/${publicId}`
-}
-
-/**
- * @summary Get a director of accessible movies
- */
-export const getMovieDirectorShow = async (publicId: string, options?: Parameters<typeof customInstance>[1]): Promise<GetMovieDirectorShow200> => {
-
-  return customInstance<GetMovieDirectorShow200>(getGetMovieDirectorShowUrl(publicId),
-  {
-    ...options,
-    method: 'GET'
-
-
-  }
-);}
-
-
-
-
-
-export const getGetMovieDirectorShowQueryKey = (publicId: string,) => {
-    return [
-    `/api/movies/directors/${publicId}`
-    ] as const;
-    }
-
-
-export const getGetMovieDirectorShowQueryOptions = <TData = Awaited<ReturnType<typeof getMovieDirectorShow>>, TError = ErrorType<void>>(publicId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getMovieDirectorShow>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
-) => {
-
-const {query: queryOptions, request: requestOptions} = options ?? {};
-
-  const queryKey =  queryOptions?.queryKey ?? getGetMovieDirectorShowQueryKey(publicId);
-
-
-
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof getMovieDirectorShow>>> = ({ signal }) => getMovieDirectorShow(publicId, { signal, ...requestOptions });
-
-
-
-
-
-   return  { queryKey, queryFn, enabled: publicId !== null && publicId !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getMovieDirectorShow>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
-}
-
-export type GetMovieDirectorShowQueryResult = NonNullable<Awaited<ReturnType<typeof getMovieDirectorShow>>>
-export type GetMovieDirectorShowQueryError = ErrorType<void>
-
-
-export function useGetMovieDirectorShow<TData = Awaited<ReturnType<typeof getMovieDirectorShow>>, TError = ErrorType<void>>(
- publicId: string, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getMovieDirectorShow>>, TError, TData>> & Pick<
-        DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof getMovieDirectorShow>>,
-          TError,
-          Awaited<ReturnType<typeof getMovieDirectorShow>>
-        > , 'initialData'
-      >, request?: SecondParameter<typeof customInstance>}
- , queryClient?: QueryClient
-  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-export function useGetMovieDirectorShow<TData = Awaited<ReturnType<typeof getMovieDirectorShow>>, TError = ErrorType<void>>(
- publicId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getMovieDirectorShow>>, TError, TData>> & Pick<
-        UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof getMovieDirectorShow>>,
-          TError,
-          Awaited<ReturnType<typeof getMovieDirectorShow>>
-        > , 'initialData'
-      >, request?: SecondParameter<typeof customInstance>}
- , queryClient?: QueryClient
-  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-export function useGetMovieDirectorShow<TData = Awaited<ReturnType<typeof getMovieDirectorShow>>, TError = ErrorType<void>>(
- publicId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getMovieDirectorShow>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
- , queryClient?: QueryClient
-  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-/**
- * @summary Get a director of accessible movies
- */
-
-export function useGetMovieDirectorShow<TData = Awaited<ReturnType<typeof getMovieDirectorShow>>, TError = ErrorType<void>>(
- publicId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getMovieDirectorShow>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
- , queryClient?: QueryClient
- ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
-
-  const queryOptions = getGetMovieDirectorShowQueryOptions(publicId,options)
-
-  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
-
-  return withQueryKey(query, queryOptions.queryKey);
-}
-
-
-
-
-
-
-
-export const getGetMovieDirectorMoviesUrl = (publicId: string,
-    params?: GetMovieDirectorMoviesParams,) => {
-  const normalizedParams = new URLSearchParams();
-
-  Object.entries(params || {}).forEach(([key, value]) => {
-
-    if (value !== undefined) {
-      normalizedParams.append(key, value === null ? 'null' : String(value))
-    }
-  });
-
-  const stringifiedParams = normalizedParams.toString();
-
-  return stringifiedParams.length > 0 ? `/api/movies/directors/${publicId}/movies?${stringifiedParams}` : `/api/movies/directors/${publicId}/movies`
-}
-
-/**
- * @summary List accessible movies by a director
- */
-export const getMovieDirectorMovies = async (publicId: string,
-    params?: GetMovieDirectorMoviesParams, options?: Parameters<typeof customInstance>[1]): Promise<GetMovieDirectorMovies200> => {
-
-  return customInstance<GetMovieDirectorMovies200>(getGetMovieDirectorMoviesUrl(publicId,params),
-  {
-    ...options,
-    method: 'GET'
-
-
-  }
-);}
-
-
-
-
-
-export const getGetMovieDirectorMoviesQueryKey = (publicId: string,
-    params?: GetMovieDirectorMoviesParams,) => {
-    return [
-    `/api/movies/directors/${publicId}/movies`, ...(params ? [params] : [])
-    ] as const;
-    }
-
-
-export const getGetMovieDirectorMoviesQueryOptions = <TData = Awaited<ReturnType<typeof getMovieDirectorMovies>>, TError = ErrorType<void>>(publicId: string,
-    params?: GetMovieDirectorMoviesParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getMovieDirectorMovies>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
-) => {
-
-const {query: queryOptions, request: requestOptions} = options ?? {};
-
-  const queryKey =  queryOptions?.queryKey ?? getGetMovieDirectorMoviesQueryKey(publicId,params);
-
-
-
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof getMovieDirectorMovies>>> = ({ signal }) => getMovieDirectorMovies(publicId,params, { signal, ...requestOptions });
-
-
-
-
-
-   return  { queryKey, queryFn, enabled: publicId !== null && publicId !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getMovieDirectorMovies>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
-}
-
-export type GetMovieDirectorMoviesQueryResult = NonNullable<Awaited<ReturnType<typeof getMovieDirectorMovies>>>
-export type GetMovieDirectorMoviesQueryError = ErrorType<void>
-
-
-export function useGetMovieDirectorMovies<TData = Awaited<ReturnType<typeof getMovieDirectorMovies>>, TError = ErrorType<void>>(
- publicId: string,
-    params: undefined |  GetMovieDirectorMoviesParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getMovieDirectorMovies>>, TError, TData>> & Pick<
-        DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof getMovieDirectorMovies>>,
-          TError,
-          Awaited<ReturnType<typeof getMovieDirectorMovies>>
-        > , 'initialData'
-      >, request?: SecondParameter<typeof customInstance>}
- , queryClient?: QueryClient
-  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-export function useGetMovieDirectorMovies<TData = Awaited<ReturnType<typeof getMovieDirectorMovies>>, TError = ErrorType<void>>(
- publicId: string,
-    params?: GetMovieDirectorMoviesParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getMovieDirectorMovies>>, TError, TData>> & Pick<
-        UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof getMovieDirectorMovies>>,
-          TError,
-          Awaited<ReturnType<typeof getMovieDirectorMovies>>
-        > , 'initialData'
-      >, request?: SecondParameter<typeof customInstance>}
- , queryClient?: QueryClient
-  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-export function useGetMovieDirectorMovies<TData = Awaited<ReturnType<typeof getMovieDirectorMovies>>, TError = ErrorType<void>>(
- publicId: string,
-    params?: GetMovieDirectorMoviesParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getMovieDirectorMovies>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
- , queryClient?: QueryClient
-  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-/**
- * @summary List accessible movies by a director
- */
-
-export function useGetMovieDirectorMovies<TData = Awaited<ReturnType<typeof getMovieDirectorMovies>>, TError = ErrorType<void>>(
- publicId: string,
-    params?: GetMovieDirectorMoviesParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getMovieDirectorMovies>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
- , queryClient?: QueryClient
- ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
-
-  const queryOptions = getGetMovieDirectorMoviesQueryOptions(publicId,params,options)
-
-  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
-
-  return withQueryKey(query, queryOptions.queryKey);
-}
-
-
-
-
-
-
 
 export const getGetAdminMetadataMatchReviewsUrl = (params?: GetAdminMetadataMatchReviewsParams,) => {
   const normalizedParams = new URLSearchParams();
@@ -23329,7 +23467,7 @@ export const usePostDiscoveryPairingCode = <TError = ErrorType<unknown>,
       return useMutation(getPostDiscoveryPairingCodeMutationOptions(options), queryClient);
     }
 
-export const getGetDiscoveryQrPayloadUrl = (serverPublicId: string,) => {
+export const getPostDiscoveryQrPayloadUrl = (serverPublicId: string,) => {
 
 
 
@@ -23338,14 +23476,14 @@ export const getGetDiscoveryQrPayloadUrl = (serverPublicId: string,) => {
 }
 
 /**
- * @summary Get QR payload for a pending pairing session
+ * @summary Create a QR code pairing session and return its payload
  */
-export const getDiscoveryQrPayload = async (serverPublicId: string, options?: Parameters<typeof customInstance>[1]): Promise<GetDiscoveryQrPayload200> => {
+export const postDiscoveryQrPayload = async (serverPublicId: string, options?: Parameters<typeof customInstance>[1]): Promise<PostDiscoveryQrPayload200> => {
 
-  return customInstance<GetDiscoveryQrPayload200>(getGetDiscoveryQrPayloadUrl(serverPublicId),
+  return customInstance<PostDiscoveryQrPayload200>(getPostDiscoveryQrPayloadUrl(serverPublicId),
   {
     ...options,
-    method: 'GET'
+    method: 'POST'
 
 
   }
@@ -23355,80 +23493,53 @@ export const getDiscoveryQrPayload = async (serverPublicId: string, options?: Pa
 
 
 
-export const getGetDiscoveryQrPayloadQueryKey = (serverPublicId: string,) => {
-    return [
-    `/api/discovery/qr-payload/${serverPublicId}`
-    ] as const;
-    }
+export const getPostDiscoveryQrPayloadMutationKey = () => ['postDiscoveryQrPayload'] as const;
 
+export const getPostDiscoveryQrPayloadMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postDiscoveryQrPayload>>, TError,PostDiscoveryQrPayloadMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
+): UseMutationOptions<Awaited<ReturnType<typeof postDiscoveryQrPayload>>, TError,PostDiscoveryQrPayloadMutationVariables, TContext> => {
 
-export const getGetDiscoveryQrPayloadQueryOptions = <TData = Awaited<ReturnType<typeof getDiscoveryQrPayload>>, TError = ErrorType<unknown>>(serverPublicId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getDiscoveryQrPayload>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
-) => {
-
-const {query: queryOptions, request: requestOptions} = options ?? {};
-
-  const queryKey =  queryOptions?.queryKey ?? getGetDiscoveryQrPayloadQueryKey(serverPublicId);
-
-
-
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof getDiscoveryQrPayload>>> = ({ signal }) => getDiscoveryQrPayload(serverPublicId, { signal, ...requestOptions });
+const mutationKey = getPostDiscoveryQrPayloadMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
 
 
 
 
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof postDiscoveryQrPayload>>, PostDiscoveryQrPayloadMutationVariables> = (props) => {
+          const {serverPublicId} = props ?? {};
 
-   return  { queryKey, queryFn, enabled: serverPublicId !== null && serverPublicId !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getDiscoveryQrPayload>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
-}
-
-export type GetDiscoveryQrPayloadQueryResult = NonNullable<Awaited<ReturnType<typeof getDiscoveryQrPayload>>>
-export type GetDiscoveryQrPayloadQueryError = ErrorType<unknown>
+          return  postDiscoveryQrPayload(serverPublicId,requestOptions)
+        }
 
 
-export function useGetDiscoveryQrPayload<TData = Awaited<ReturnType<typeof getDiscoveryQrPayload>>, TError = ErrorType<unknown>>(
- serverPublicId: string, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getDiscoveryQrPayload>>, TError, TData>> & Pick<
-        DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof getDiscoveryQrPayload>>,
-          TError,
-          Awaited<ReturnType<typeof getDiscoveryQrPayload>>
-        > , 'initialData'
-      >, request?: SecondParameter<typeof customInstance>}
- , queryClient?: QueryClient
-  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-export function useGetDiscoveryQrPayload<TData = Awaited<ReturnType<typeof getDiscoveryQrPayload>>, TError = ErrorType<unknown>>(
- serverPublicId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getDiscoveryQrPayload>>, TError, TData>> & Pick<
-        UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof getDiscoveryQrPayload>>,
-          TError,
-          Awaited<ReturnType<typeof getDiscoveryQrPayload>>
-        > , 'initialData'
-      >, request?: SecondParameter<typeof customInstance>}
- , queryClient?: QueryClient
-  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-export function useGetDiscoveryQrPayload<TData = Awaited<ReturnType<typeof getDiscoveryQrPayload>>, TError = ErrorType<unknown>>(
- serverPublicId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getDiscoveryQrPayload>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
- , queryClient?: QueryClient
-  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-/**
- * @summary Get QR payload for a pending pairing session
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type PostDiscoveryQrPayloadMutationResult = NonNullable<Awaited<ReturnType<typeof postDiscoveryQrPayload>>>
+
+    export type PostDiscoveryQrPayloadMutationError = ErrorType<unknown>
+    export type PostDiscoveryQrPayloadMutationVariables = {serverPublicId: string}
+
+    /**
+ * @summary Create a QR code pairing session and return its payload
  */
-
-export function useGetDiscoveryQrPayload<TData = Awaited<ReturnType<typeof getDiscoveryQrPayload>>, TError = ErrorType<unknown>>(
- serverPublicId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getDiscoveryQrPayload>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
- , queryClient?: QueryClient
- ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
-
-  const queryOptions = getGetDiscoveryQrPayloadQueryOptions(serverPublicId,options)
-
-  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
-
-  return withQueryKey(query, queryOptions.queryKey);
-}
-
-
-
-
-
-
+export const usePostDiscoveryQrPayload = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postDiscoveryQrPayload>>, TError,PostDiscoveryQrPayloadMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof postDiscoveryQrPayload>>,
+        TError,
+        PostDiscoveryQrPayloadMutationVariables,
+        TContext
+      > => {
+      return useMutation(getPostDiscoveryQrPayloadMutationOptions(options), queryClient);
+    }
 
 export const getPostDiscoveryCompletePairingUrl = () => {
 
@@ -36822,6 +36933,108 @@ export function useGetDebugCoroutines<TData = Awaited<ReturnType<typeof getDebug
 
 
 
+export const getGetDebugHealthUrl = () => {
+
+
+
+
+  return `/api/debug/health`
+}
+
+/**
+ * Runs the checks of `/health` and returns each with its latency and details: connection state, Redis key count, Swoole figures, the largest web worker's memory against its limit, the background worker's heartbeat, the deployment profile fingerprints, and a failed dependency's error. The status code follows `/health`: the background worker, the worker profile and memory can read unhealthy while it answers 200.
+ * @summary Full health report
+ */
+export const getDebugHealth = async ( options?: Parameters<typeof customInstance>[1]): Promise<GetDebugHealth200> => {
+
+  return customInstance<GetDebugHealth200>(getGetDebugHealthUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetDebugHealthQueryKey = () => {
+    return [
+    `/api/debug/health`
+    ] as const;
+    }
+
+
+export const getGetDebugHealthQueryOptions = <TData = Awaited<ReturnType<typeof getDebugHealth>>, TError = ErrorType<GetDebugHealth503>>( options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getDebugHealth>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetDebugHealthQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getDebugHealth>>> = ({ signal }) => getDebugHealth({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getDebugHealth>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type GetDebugHealthQueryResult = NonNullable<Awaited<ReturnType<typeof getDebugHealth>>>
+export type GetDebugHealthQueryError = ErrorType<GetDebugHealth503>
+
+
+export function useGetDebugHealth<TData = Awaited<ReturnType<typeof getDebugHealth>>, TError = ErrorType<GetDebugHealth503>>(
+  options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getDebugHealth>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getDebugHealth>>,
+          TError,
+          Awaited<ReturnType<typeof getDebugHealth>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetDebugHealth<TData = Awaited<ReturnType<typeof getDebugHealth>>, TError = ErrorType<GetDebugHealth503>>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getDebugHealth>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getDebugHealth>>,
+          TError,
+          Awaited<ReturnType<typeof getDebugHealth>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetDebugHealth<TData = Awaited<ReturnType<typeof getDebugHealth>>, TError = ErrorType<GetDebugHealth503>>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getDebugHealth>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary Full health report
+ */
+
+export function useGetDebugHealth<TData = Awaited<ReturnType<typeof getDebugHealth>>, TError = ErrorType<GetDebugHealth503>>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getDebugHealth>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getGetDebugHealthQueryOptions(options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
 export const getGetMonitorAnalyticsSummaryUrl = (params?: GetMonitorAnalyticsSummaryParams,) => {
   const normalizedParams = new URLSearchParams();
 
@@ -39776,7 +39989,7 @@ export const getGetStreamMasterManifestQueryKey = (videoId: string,
     }
 
 
-export const getGetStreamMasterManifestQueryOptions = <TData = Awaited<ReturnType<typeof getStreamMasterManifest>>, TError = ErrorType<unknown>>(videoId: string,
+export const getGetStreamMasterManifestQueryOptions = <TData = Awaited<ReturnType<typeof getStreamMasterManifest>>, TError = ErrorType<ApiError>>(videoId: string,
     params: GetStreamMasterManifestParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getStreamMasterManifest>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
 ) => {
 
@@ -39796,10 +40009,10 @@ const {query: queryOptions, request: requestOptions} = options ?? {};
 }
 
 export type GetStreamMasterManifestQueryResult = NonNullable<Awaited<ReturnType<typeof getStreamMasterManifest>>>
-export type GetStreamMasterManifestQueryError = ErrorType<unknown>
+export type GetStreamMasterManifestQueryError = ErrorType<ApiError>
 
 
-export function useGetStreamMasterManifest<TData = Awaited<ReturnType<typeof getStreamMasterManifest>>, TError = ErrorType<unknown>>(
+export function useGetStreamMasterManifest<TData = Awaited<ReturnType<typeof getStreamMasterManifest>>, TError = ErrorType<ApiError>>(
  videoId: string,
     params: GetStreamMasterManifestParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getStreamMasterManifest>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
@@ -39810,7 +40023,7 @@ export function useGetStreamMasterManifest<TData = Awaited<ReturnType<typeof get
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-export function useGetStreamMasterManifest<TData = Awaited<ReturnType<typeof getStreamMasterManifest>>, TError = ErrorType<unknown>>(
+export function useGetStreamMasterManifest<TData = Awaited<ReturnType<typeof getStreamMasterManifest>>, TError = ErrorType<ApiError>>(
  videoId: string,
     params: GetStreamMasterManifestParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getStreamMasterManifest>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
@@ -39821,7 +40034,7 @@ export function useGetStreamMasterManifest<TData = Awaited<ReturnType<typeof get
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-export function useGetStreamMasterManifest<TData = Awaited<ReturnType<typeof getStreamMasterManifest>>, TError = ErrorType<unknown>>(
+export function useGetStreamMasterManifest<TData = Awaited<ReturnType<typeof getStreamMasterManifest>>, TError = ErrorType<ApiError>>(
  videoId: string,
     params: GetStreamMasterManifestParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getStreamMasterManifest>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
@@ -39830,7 +40043,7 @@ export function useGetStreamMasterManifest<TData = Awaited<ReturnType<typeof get
  * @summary Get HLS master playlist
  */
 
-export function useGetStreamMasterManifest<TData = Awaited<ReturnType<typeof getStreamMasterManifest>>, TError = ErrorType<unknown>>(
+export function useGetStreamMasterManifest<TData = Awaited<ReturnType<typeof getStreamMasterManifest>>, TError = ErrorType<ApiError>>(
  videoId: string,
     params: GetStreamMasterManifestParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getStreamMasterManifest>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
@@ -39895,7 +40108,7 @@ export const getGetStreamMediaManifestQueryKey = (jobPublicId: string,
     }
 
 
-export const getGetStreamMediaManifestQueryOptions = <TData = Awaited<ReturnType<typeof getStreamMediaManifest>>, TError = ErrorType<unknown>>(jobPublicId: string,
+export const getGetStreamMediaManifestQueryOptions = <TData = Awaited<ReturnType<typeof getStreamMediaManifest>>, TError = ErrorType<ApiError>>(jobPublicId: string,
     track: 'video' | 'audio',
     params: GetStreamMediaManifestParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getStreamMediaManifest>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
 ) => {
@@ -39916,10 +40129,10 @@ const {query: queryOptions, request: requestOptions} = options ?? {};
 }
 
 export type GetStreamMediaManifestQueryResult = NonNullable<Awaited<ReturnType<typeof getStreamMediaManifest>>>
-export type GetStreamMediaManifestQueryError = ErrorType<unknown>
+export type GetStreamMediaManifestQueryError = ErrorType<ApiError>
 
 
-export function useGetStreamMediaManifest<TData = Awaited<ReturnType<typeof getStreamMediaManifest>>, TError = ErrorType<unknown>>(
+export function useGetStreamMediaManifest<TData = Awaited<ReturnType<typeof getStreamMediaManifest>>, TError = ErrorType<ApiError>>(
  jobPublicId: string,
     track: 'video' | 'audio',
     params: GetStreamMediaManifestParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getStreamMediaManifest>>, TError, TData>> & Pick<
@@ -39931,7 +40144,7 @@ export function useGetStreamMediaManifest<TData = Awaited<ReturnType<typeof getS
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-export function useGetStreamMediaManifest<TData = Awaited<ReturnType<typeof getStreamMediaManifest>>, TError = ErrorType<unknown>>(
+export function useGetStreamMediaManifest<TData = Awaited<ReturnType<typeof getStreamMediaManifest>>, TError = ErrorType<ApiError>>(
  jobPublicId: string,
     track: 'video' | 'audio',
     params: GetStreamMediaManifestParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getStreamMediaManifest>>, TError, TData>> & Pick<
@@ -39943,7 +40156,7 @@ export function useGetStreamMediaManifest<TData = Awaited<ReturnType<typeof getS
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-export function useGetStreamMediaManifest<TData = Awaited<ReturnType<typeof getStreamMediaManifest>>, TError = ErrorType<unknown>>(
+export function useGetStreamMediaManifest<TData = Awaited<ReturnType<typeof getStreamMediaManifest>>, TError = ErrorType<ApiError>>(
  jobPublicId: string,
     track: 'video' | 'audio',
     params: GetStreamMediaManifestParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getStreamMediaManifest>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
@@ -39953,7 +40166,7 @@ export function useGetStreamMediaManifest<TData = Awaited<ReturnType<typeof getS
  * @summary Get HLS media playlist for a specific rendition
  */
 
-export function useGetStreamMediaManifest<TData = Awaited<ReturnType<typeof getStreamMediaManifest>>, TError = ErrorType<unknown>>(
+export function useGetStreamMediaManifest<TData = Awaited<ReturnType<typeof getStreamMediaManifest>>, TError = ErrorType<ApiError>>(
  jobPublicId: string,
     track: 'video' | 'audio',
     params: GetStreamMediaManifestParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getStreamMediaManifest>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
@@ -40016,7 +40229,7 @@ export const getGetStreamDashManifestQueryKey = (videoId: string,
     }
 
 
-export const getGetStreamDashManifestQueryOptions = <TData = Awaited<ReturnType<typeof getStreamDashManifest>>, TError = ErrorType<unknown>>(videoId: string,
+export const getGetStreamDashManifestQueryOptions = <TData = Awaited<ReturnType<typeof getStreamDashManifest>>, TError = ErrorType<ApiError>>(videoId: string,
     params: GetStreamDashManifestParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getStreamDashManifest>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
 ) => {
 
@@ -40036,10 +40249,10 @@ const {query: queryOptions, request: requestOptions} = options ?? {};
 }
 
 export type GetStreamDashManifestQueryResult = NonNullable<Awaited<ReturnType<typeof getStreamDashManifest>>>
-export type GetStreamDashManifestQueryError = ErrorType<unknown>
+export type GetStreamDashManifestQueryError = ErrorType<ApiError>
 
 
-export function useGetStreamDashManifest<TData = Awaited<ReturnType<typeof getStreamDashManifest>>, TError = ErrorType<unknown>>(
+export function useGetStreamDashManifest<TData = Awaited<ReturnType<typeof getStreamDashManifest>>, TError = ErrorType<ApiError>>(
  videoId: string,
     params: GetStreamDashManifestParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getStreamDashManifest>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
@@ -40050,7 +40263,7 @@ export function useGetStreamDashManifest<TData = Awaited<ReturnType<typeof getSt
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-export function useGetStreamDashManifest<TData = Awaited<ReturnType<typeof getStreamDashManifest>>, TError = ErrorType<unknown>>(
+export function useGetStreamDashManifest<TData = Awaited<ReturnType<typeof getStreamDashManifest>>, TError = ErrorType<ApiError>>(
  videoId: string,
     params: GetStreamDashManifestParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getStreamDashManifest>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
@@ -40061,7 +40274,7 @@ export function useGetStreamDashManifest<TData = Awaited<ReturnType<typeof getSt
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-export function useGetStreamDashManifest<TData = Awaited<ReturnType<typeof getStreamDashManifest>>, TError = ErrorType<unknown>>(
+export function useGetStreamDashManifest<TData = Awaited<ReturnType<typeof getStreamDashManifest>>, TError = ErrorType<ApiError>>(
  videoId: string,
     params: GetStreamDashManifestParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getStreamDashManifest>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
@@ -40070,7 +40283,7 @@ export function useGetStreamDashManifest<TData = Awaited<ReturnType<typeof getSt
  * @summary Get DASH manifest for a video
  */
 
-export function useGetStreamDashManifest<TData = Awaited<ReturnType<typeof getStreamDashManifest>>, TError = ErrorType<unknown>>(
+export function useGetStreamDashManifest<TData = Awaited<ReturnType<typeof getStreamDashManifest>>, TError = ErrorType<ApiError>>(
  videoId: string,
     params: GetStreamDashManifestParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getStreamDashManifest>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
@@ -40259,7 +40472,7 @@ export const getGetStreamSubtitleManifestQueryKey = (jobPublicId: string,
     }
 
 
-export const getGetStreamSubtitleManifestQueryOptions = <TData = Awaited<ReturnType<typeof getStreamSubtitleManifest>>, TError = ErrorType<unknown>>(jobPublicId: string,
+export const getGetStreamSubtitleManifestQueryOptions = <TData = Awaited<ReturnType<typeof getStreamSubtitleManifest>>, TError = ErrorType<ApiError>>(jobPublicId: string,
     language: string,
     params: GetStreamSubtitleManifestParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getStreamSubtitleManifest>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
 ) => {
@@ -40280,10 +40493,10 @@ const {query: queryOptions, request: requestOptions} = options ?? {};
 }
 
 export type GetStreamSubtitleManifestQueryResult = NonNullable<Awaited<ReturnType<typeof getStreamSubtitleManifest>>>
-export type GetStreamSubtitleManifestQueryError = ErrorType<unknown>
+export type GetStreamSubtitleManifestQueryError = ErrorType<ApiError>
 
 
-export function useGetStreamSubtitleManifest<TData = Awaited<ReturnType<typeof getStreamSubtitleManifest>>, TError = ErrorType<unknown>>(
+export function useGetStreamSubtitleManifest<TData = Awaited<ReturnType<typeof getStreamSubtitleManifest>>, TError = ErrorType<ApiError>>(
  jobPublicId: string,
     language: string,
     params: GetStreamSubtitleManifestParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getStreamSubtitleManifest>>, TError, TData>> & Pick<
@@ -40295,7 +40508,7 @@ export function useGetStreamSubtitleManifest<TData = Awaited<ReturnType<typeof g
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-export function useGetStreamSubtitleManifest<TData = Awaited<ReturnType<typeof getStreamSubtitleManifest>>, TError = ErrorType<unknown>>(
+export function useGetStreamSubtitleManifest<TData = Awaited<ReturnType<typeof getStreamSubtitleManifest>>, TError = ErrorType<ApiError>>(
  jobPublicId: string,
     language: string,
     params: GetStreamSubtitleManifestParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getStreamSubtitleManifest>>, TError, TData>> & Pick<
@@ -40307,7 +40520,7 @@ export function useGetStreamSubtitleManifest<TData = Awaited<ReturnType<typeof g
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-export function useGetStreamSubtitleManifest<TData = Awaited<ReturnType<typeof getStreamSubtitleManifest>>, TError = ErrorType<unknown>>(
+export function useGetStreamSubtitleManifest<TData = Awaited<ReturnType<typeof getStreamSubtitleManifest>>, TError = ErrorType<ApiError>>(
  jobPublicId: string,
     language: string,
     params: GetStreamSubtitleManifestParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getStreamSubtitleManifest>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
@@ -40317,7 +40530,7 @@ export function useGetStreamSubtitleManifest<TData = Awaited<ReturnType<typeof g
  * @summary Get HLS subtitle playlist for a source track
  */
 
-export function useGetStreamSubtitleManifest<TData = Awaited<ReturnType<typeof getStreamSubtitleManifest>>, TError = ErrorType<unknown>>(
+export function useGetStreamSubtitleManifest<TData = Awaited<ReturnType<typeof getStreamSubtitleManifest>>, TError = ErrorType<ApiError>>(
  jobPublicId: string,
     language: string,
     params: GetStreamSubtitleManifestParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getStreamSubtitleManifest>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
@@ -40587,7 +40800,7 @@ export function useGetStreamSegmentSegment<TData = Awaited<ReturnType<typeof get
 
 export const getGetStreamSegmentSubtitleSegmentUrl = (jobPublicId: string,
     language: string,
-    segment: string,
+    segment: 'full',
     params: GetStreamSegmentSubtitleSegmentParams,) => {
   const normalizedParams = new URLSearchParams();
 
@@ -40608,7 +40821,7 @@ export const getGetStreamSegmentSubtitleSegmentUrl = (jobPublicId: string,
  */
 export const getStreamSegmentSubtitleSegment = async (jobPublicId: string,
     language: string,
-    segment: string,
+    segment: 'full',
     params: GetStreamSegmentSubtitleSegmentParams, options?: Parameters<typeof customInstance>[1]): Promise<string> => {
 
   return customInstance<string>(getGetStreamSegmentSubtitleSegmentUrl(jobPublicId,language,segment,params),
@@ -40626,7 +40839,7 @@ export const getStreamSegmentSubtitleSegment = async (jobPublicId: string,
 
 export const getGetStreamSegmentSubtitleSegmentQueryKey = (jobPublicId: string,
     language: string,
-    segment: string,
+    segment: 'full',
     params?: GetStreamSegmentSubtitleSegmentParams,) => {
     return [
     `/api/transcode/${jobPublicId}/subtitles/${language}/${segment}.vtt`, ...(params ? [params] : [])
@@ -40634,9 +40847,9 @@ export const getGetStreamSegmentSubtitleSegmentQueryKey = (jobPublicId: string,
     }
 
 
-export const getGetStreamSegmentSubtitleSegmentQueryOptions = <TData = Awaited<ReturnType<typeof getStreamSegmentSubtitleSegment>>, TError = ErrorType<void>>(jobPublicId: string,
+export const getGetStreamSegmentSubtitleSegmentQueryOptions = <TData = Awaited<ReturnType<typeof getStreamSegmentSubtitleSegment>>, TError = ErrorType<void | ApiError>>(jobPublicId: string,
     language: string,
-    segment: string,
+    segment: 'full',
     params: GetStreamSegmentSubtitleSegmentParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getStreamSegmentSubtitleSegment>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
 ) => {
 
@@ -40656,13 +40869,13 @@ const {query: queryOptions, request: requestOptions} = options ?? {};
 }
 
 export type GetStreamSegmentSubtitleSegmentQueryResult = NonNullable<Awaited<ReturnType<typeof getStreamSegmentSubtitleSegment>>>
-export type GetStreamSegmentSubtitleSegmentQueryError = ErrorType<void>
+export type GetStreamSegmentSubtitleSegmentQueryError = ErrorType<void | ApiError>
 
 
-export function useGetStreamSegmentSubtitleSegment<TData = Awaited<ReturnType<typeof getStreamSegmentSubtitleSegment>>, TError = ErrorType<void>>(
+export function useGetStreamSegmentSubtitleSegment<TData = Awaited<ReturnType<typeof getStreamSegmentSubtitleSegment>>, TError = ErrorType<void | ApiError>>(
  jobPublicId: string,
     language: string,
-    segment: string,
+    segment: 'full',
     params: GetStreamSegmentSubtitleSegmentParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getStreamSegmentSubtitleSegment>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
           Awaited<ReturnType<typeof getStreamSegmentSubtitleSegment>>,
@@ -40672,10 +40885,10 @@ export function useGetStreamSegmentSubtitleSegment<TData = Awaited<ReturnType<ty
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-export function useGetStreamSegmentSubtitleSegment<TData = Awaited<ReturnType<typeof getStreamSegmentSubtitleSegment>>, TError = ErrorType<void>>(
+export function useGetStreamSegmentSubtitleSegment<TData = Awaited<ReturnType<typeof getStreamSegmentSubtitleSegment>>, TError = ErrorType<void | ApiError>>(
  jobPublicId: string,
     language: string,
-    segment: string,
+    segment: 'full',
     params: GetStreamSegmentSubtitleSegmentParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getStreamSegmentSubtitleSegment>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
           Awaited<ReturnType<typeof getStreamSegmentSubtitleSegment>>,
@@ -40685,10 +40898,10 @@ export function useGetStreamSegmentSubtitleSegment<TData = Awaited<ReturnType<ty
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-export function useGetStreamSegmentSubtitleSegment<TData = Awaited<ReturnType<typeof getStreamSegmentSubtitleSegment>>, TError = ErrorType<void>>(
+export function useGetStreamSegmentSubtitleSegment<TData = Awaited<ReturnType<typeof getStreamSegmentSubtitleSegment>>, TError = ErrorType<void | ApiError>>(
  jobPublicId: string,
     language: string,
-    segment: string,
+    segment: 'full',
     params: GetStreamSegmentSubtitleSegmentParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getStreamSegmentSubtitleSegment>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
@@ -40696,10 +40909,10 @@ export function useGetStreamSegmentSubtitleSegment<TData = Awaited<ReturnType<ty
  * @summary Get subtitle segment (WebVTT)
  */
 
-export function useGetStreamSegmentSubtitleSegment<TData = Awaited<ReturnType<typeof getStreamSegmentSubtitleSegment>>, TError = ErrorType<void>>(
+export function useGetStreamSegmentSubtitleSegment<TData = Awaited<ReturnType<typeof getStreamSegmentSubtitleSegment>>, TError = ErrorType<void | ApiError>>(
  jobPublicId: string,
     language: string,
-    segment: string,
+    segment: 'full',
     params: GetStreamSegmentSubtitleSegmentParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getStreamSegmentSubtitleSegment>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {

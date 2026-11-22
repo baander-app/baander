@@ -14,7 +14,7 @@ dc exec app php bin/console app:health:check
 
 ## Details
 
-The command checks each system component and prints a table with the component name, status (`OK`, `FAIL`, or `N/A`), response latency in milliseconds, and any additional details.
+The command checks each system component and prints a table with the component name, status (`OK`, `FAIL`, or `N/A`), response latency in milliseconds, and any additional details. It is the console counterpart of the admin API's `GET /api/debug/health`, which returns the same report as JSON. The public [`/health` probe](../operations/health-and-metrics.md#health-checks) runs the same checks but shows only each component's status.
 
 The `messenger` row observes a shared consumer heartbeat. It reads `N/A` when
 Redis is unreachable, when no heartbeat has been seen by this observation process,
@@ -36,7 +36,7 @@ prints a profile's fingerprint.
 
 The exit status describes this container, so it leaves out the background worker, its deployment profile and memory; the web server alerts administrators about those instead. If no other component is unhealthy, the command prints `This container is healthy.` and exits with code 0. If the worker, its profile or memory is unhealthy, it also prints a warning that names them as unhealthy but not counted toward this container. If any other component is unhealthy, it exits with code 1.
 
-The command runs in its own PHP process, so the `memory` row measures that process against its `memory_limit`, not the web server's workers. The [`/health` endpoint](../operations/health-and-metrics.md#health-checks) reports the workers.
+The command runs in its own PHP process, so the `memory` row measures that process against its `memory_limit`, not the web server's workers. `GET /api/debug/health`, answered by a web server worker, reports the largest worker's memory against its limit; `/health` shows only that row's status.
 
 This is the same check used by the Docker healthcheck, which the web image defines in `Dockerfile` and the development stack in `docker-compose.yml`.
 

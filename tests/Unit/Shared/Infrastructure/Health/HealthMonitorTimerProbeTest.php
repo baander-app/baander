@@ -47,6 +47,9 @@ final class RecordingAlerts implements App\Shared\Application\Port\AdminAlertPor
 final class AlertsOn implements App\Shared\Application\Port\SystemSettingsPortInterface {
     public function get(string $key): bool|int|string { return true; }
 }
+final class RegistrationClosed implements App\Auth\Application\Port\SelfRegistrationInterface {
+    public function isOpen(): bool { return false; }
+}
 $pool = new RecordingPool();
 $clock = new TickClock();
 $alerts = new RecordingAlerts();
@@ -64,6 +67,8 @@ $checks = new App\Shared\Infrastructure\Health\HealthCheckService(
     oauthPublicKeyPath: '',
     vapidPublicKey: '',
     vapidPrivateKey: '',
+    mailerDsn: 'smtp://mail.baander.app:587',
+    selfRegistration: new RegistrationClosed(),
     messengerWorkerHealth: new App\Shared\Infrastructure\Health\MessengerWorkerHealth($redis, new Symfony\Component\Clock\MockClock(), new App\Shared\Infrastructure\Health\HealthAlertTable()),
     workerProfileHealth: new App\Shared\Infrastructure\Health\WorkerProfileHealth(
         Doctrine\DBAL\DriverManager::getConnection(['driver' => 'pdo_sqlite', 'memory' => true]),

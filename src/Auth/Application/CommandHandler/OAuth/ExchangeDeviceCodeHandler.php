@@ -12,6 +12,7 @@ use App\Auth\Application\Port\OAuthClientThrottleInterface;
 use App\Auth\Application\Service\OAuthClientAuthenticator;
 use App\Auth\Application\Service\TokenPairIssuer;
 use App\Auth\Domain\Model\OAuth\DeviceCode;
+use App\Auth\Domain\Model\OAuth\SignInGrant;
 use App\Auth\Domain\Model\OAuth\TokenId;
 use App\Auth\Domain\Repository\OAuth\DeviceCodeRepositoryInterface;
 use InvalidArgumentException;
@@ -87,6 +88,7 @@ final readonly class ExchangeDeviceCodeHandler
                 requestedScopes: $deviceCode->getScopeIdentifiers(),
                 dpopJkt: $command->dpopJkt,
                 credentialEpoch: $credentialEpoch,
+                grant: SignInGrant::DeviceCode,
                 clientFingerprint: $command->clientFingerprint,
                 userAgent: $command->userAgent,
                 ipAddress: $command->ipAddress,

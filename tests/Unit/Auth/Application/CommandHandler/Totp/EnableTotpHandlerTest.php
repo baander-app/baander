@@ -14,81 +14,149 @@ use App\Auth\Application\Service\PendingTotpSecrets;
 use App\Auth\Domain\Model\User;
 use App\Auth\Domain\Repository\UserRepositoryInterface;
 use App\Shared\Domain\Model\Email;
-use PHPUnit\Framework\MockObject\MockObject;
-use PHPUnit\Framework\MockObject\Stub;
+use App\Shared\Domain\Model\Uuid;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Cache\Adapter\ArrayAdapter;
 
 final class EnableTotpHandlerTest extends TestCase
 {
-    private const string SECRET = 'JBSWY3DPEHPK3PXP';
+    use RecordsCredentialChanges;
 
-    private UserRepositoryInterface&MockObject $userRepository;
-    private TotpVerifierInterface&Stub $totpVerifier;
+    private const string SECRET = 'JBSWY3DPEHPK3PXP';
+    private const int STEP = 58_000_000;
+
     private PendingTotpSecrets $pendingSecrets;
-    private EnableTotpHandler $handler;
     private User $user;
+    /** @var list<string> the user's saves and spent steps, each marked when it ran inside the transaction */
+    private array $writes = [];
 
     protected function setUp(): void
     {
         $this->user = User::register(new Email('test@baander.app'), 'hashed', 'Alice');
-        $this->userRepository = $this->createMock(UserRepositoryInterface::class);
-        $this->userRepository->method('findByUuid')->willReturn($this->user);
-        $this->totpVerifier = $this->createStub(TotpVerifierInterface::class);
-        $cipher = $this->createStub(TotpSecretCipherInterface::class);
-        $cipher->method('seal')->willReturnCallback(static fn (string $secret): string => 'sealed:' . $secret);
         $this->pendingSecrets = new PendingTotpSecrets(new ArrayAdapter());
-        $this->handler = new EnableTotpHandler($this->userRepository, $this->totpVerifier, $cipher, $this->pendingSecrets);
     }
 
-    /** The secret is stored sealed, and the confirming code's step is spent so it cannot also sign in. */
-    public function testACodeFromThePendingSecretTurnsTotpOnAndSpendsItsStep(): void
+    /**
+     * The secret is stored sealed and the confirming code's step is spent in the same
+     * transaction, so the code cannot also sign in. The session that sent the code stays signed
+     * in, the others end, and their connections close once the change has committed.
+     */
+    public function testACodeFromThePendingSecretTurnsTotpOnAndEndsEveryOtherSession(): void
     {
         $this->pendingSecrets->hold($this->user->getId(), self::SECRET);
-        $this->totpVerifier->method('matchStep')->willReturnMap([[self::SECRET, '123456', 58_000_000]]);
-        $this->userRepository->expects($this->once())->method('save')->with($this->user);
-        $this->userRepository->expects($this->once())->method('spendTotpStep')->with($this->user->getId(), 58_000_000)->willReturn(true);
+        $session = $this->signedInSession($this->user);
 
-        ($this->handler)(new EnableTotpCommand($this->user->getId()->toString(), '123456'));
+        $this->handler()(new EnableTotpCommand($this->user->getId()->toString(), '123456', $session));
 
-        $this->assertSame('sealed:' . self::SECRET, $this->user->getTotpSecretCiphertext());
-        $this->assertNull($this->pendingSecrets->find($this->user->getId()), 'The pending secret is used once.');
+        self::assertSame('sealed:' . self::SECRET, $this->user->getTotpSecretCiphertext());
+        self::assertSame(['save in transaction', 'spend step ' . self::STEP . ' in transaction'], $this->writes);
+        self::assertSame([
+            'end sessions keeping ' . $session,
+            'commit',
+            'close other-session-token',
+        ], $this->credentialChanges);
+        self::assertNull($this->pendingSecrets->find($this->user->getId()), 'The pending secret is used once.');
+    }
+
+    /** The ended sessions' connections close even when the cache cannot forget the pending secret. */
+    public function testAPendingSecretThatCannotBeForgottenStillClosesTheOtherSessionsConnections(): void
+    {
+        $this->pendingSecrets = new PendingTotpSecrets(new class extends ArrayAdapter {
+            #[\Override]
+            public function deleteItem(mixed $key): bool
+            {
+                throw new \RuntimeException('Redis server went away');
+            }
+        });
+        $this->pendingSecrets->hold($this->user->getId(), self::SECRET);
+        $session = $this->signedInSession($this->user);
+
+        try {
+            $this->handler()(new EnableTotpCommand($this->user->getId()->toString(), '123456', $session));
+        } catch (\RuntimeException $exception) {
+            self::assertSame('Redis server went away', $exception->getMessage(), 'Only the cache failure may reach the caller.');
+        }
+
+        self::assertTrue($this->user->hasTotp());
+        self::assertSame([
+            'end sessions keeping ' . $session,
+            'commit',
+            'close other-session-token',
+        ], $this->credentialChanges);
+    }
+
+    /** A change that timed out waiting for the account's row rolled back, so the same setup can be confirmed again. */
+    public function testAChangeThatRollsBackKeepsThePendingSecret(): void
+    {
+        $this->pendingSecrets->hold($this->user->getId(), self::SECRET);
+        $this->accountLockTimesOut = true;
+
+        try {
+            $this->handler()(new EnableTotpCommand($this->user->getId()->toString(), '123456'));
+            self::fail('The lock timeout must reach the caller.');
+        } catch (\RuntimeException $exception) {
+            self::assertSame('canceling statement due to lock timeout', $exception->getMessage());
+        }
+
+        self::assertSame(['rollback'], $this->credentialChanges);
+        self::assertSame(self::SECRET, $this->pendingSecrets->find($this->user->getId()));
     }
 
     public function testWithoutAPendingSetupTheRequestIsRefused(): void
     {
         $this->assertRefused(TotpChangeRefusal::SetupMissing);
-        $this->assertFalse($this->user->hasTotp());
+        self::assertFalse($this->user->hasTotp());
     }
 
     public function testACodeThatMatchesNoStepIsRefusedAndKeepsThePendingSecret(): void
     {
         $this->pendingSecrets->hold($this->user->getId(), self::SECRET);
-        $this->totpVerifier->method('matchStep')->willReturn(null);
 
-        $this->assertRefused(TotpChangeRefusal::InvalidCode);
-        $this->assertFalse($this->user->hasTotp());
-        $this->assertSame(self::SECRET, $this->pendingSecrets->find($this->user->getId()));
+        $this->assertRefused(TotpChangeRefusal::InvalidCode, code: '000000');
+        self::assertFalse($this->user->hasTotp());
+        self::assertSame(self::SECRET, $this->pendingSecrets->find($this->user->getId()));
     }
 
     public function testWhileTotpIsOnTheRequestIsRefused(): void
     {
         $this->user->enableTotp('sealed-current-secret');
         $this->pendingSecrets->hold($this->user->getId(), self::SECRET);
-        $this->totpVerifier->method('matchStep')->willReturn(58_000_000);
 
         $this->assertRefused(TotpChangeRefusal::AlreadyEnabled);
-        $this->assertSame('sealed-current-secret', $this->user->getTotpSecretCiphertext());
+        self::assertSame('sealed-current-secret', $this->user->getTotpSecretCiphertext());
     }
 
-    private function assertRefused(TotpChangeRefusal $refusal): void
+    private function assertRefused(TotpChangeRefusal $refusal, string $code = '123456'): void
     {
-        $this->userRepository->expects($this->never())->method('save');
         try {
-            ($this->handler)(new EnableTotpCommand($this->user->getId()->toString(), '123456'));
+            $this->handler()(new EnableTotpCommand($this->user->getId()->toString(), $code));
             self::fail('The request must be refused.');
         } catch (TotpChangeRefusedException $exception) {
-            $this->assertSame($refusal, $exception->refusal);
+            self::assertSame($refusal, $exception->refusal);
         }
+        self::assertSame([], $this->writes);
+        self::assertSame([], $this->credentialChanges);
+    }
+
+    private function handler(): EnableTotpHandler
+    {
+        $users = $this->createStub(UserRepositoryInterface::class);
+        $users->method('findByUuid')->willReturn($this->user);
+        $users->method('save')->willReturnCallback(function (): void {
+            $this->writes[] = 'save' . ($this->inTransaction ? ' in transaction' : '');
+        });
+        $users->method('spendTotpStep')->willReturnCallback(function (Uuid $id, int $step): bool {
+            $this->writes[] = 'spend step ' . $step . ($this->inTransaction ? ' in transaction' : '');
+
+            return true;
+        });
+        $totp = $this->createStub(TotpVerifierInterface::class);
+        $totp->method('matchStep')->willReturnCallback(
+            static fn (string $secret, string $code): ?int => $secret === self::SECRET && $code === '123456' ? self::STEP : null,
+        );
+        $cipher = $this->createStub(TotpSecretCipherInterface::class);
+        $cipher->method('seal')->willReturnCallback(static fn (string $secret): string => 'sealed:' . $secret);
+
+        return new EnableTotpHandler($users, $totp, $cipher, $this->pendingSecrets, $this->credentialChangeRevoker(), $this->transaction());
     }
 }

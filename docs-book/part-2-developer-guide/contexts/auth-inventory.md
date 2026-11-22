@@ -44,21 +44,21 @@ Use this reference to locate Auth models, handlers, ports and entry points. The 
 
 ## Commands & Handlers
 
-Commands and handlers are organized into feature namespaces under `Application/Command/` and `Application/CommandHandler/`: `LoginBlock/`, `OAuth/`, `Passkey/`, `Totp/`, and `User/`. Password login is checked by `PasswordAuthenticator` on the API firewall, not by a command. Eight application services under `Application/Service/` are shared by the OAuth handlers: `TokenPairIssuer` mints every new token pair, `TokenChainRevoker` revokes a token chain and closes its WebSocket connections after the commit, `OAuthClientAuthenticator` identifies and authenticates the client of an OAuth request, `PendingDeviceCodeFinder` resolves a user code as the user typed it, `AuthorizationRequestValidator` checks a pushed authorization request when it is pushed and again for the signed-in user, `ClientRevoker` revokes a client together with its tokens, `ChainConnectionCloser` closes the WebSocket connections of a revoked chain, and `IssuanceLockTimeout` bounds the lock waits of a token-issuing transaction.
+Commands and handlers are organized into feature namespaces under `Application/Command/` and `Application/CommandHandler/`: `LoginBlock/`, `OAuth/`, `Passkey/`, `Totp/`, and `User/`. Password login is checked by `PasswordAuthenticator` on the API firewall, not by a command. Eight application services under `Application/Service/` are shared by the OAuth handlers: `TokenPairIssuer` mints every new token pair, `TokenChainRevoker` revokes a token chain and closes its WebSocket connections after the commit, `OAuthClientAuthenticator` identifies and authenticates the client of an OAuth request, `PendingDeviceCodeFinder` resolves a user code as the user typed it, `AuthorizationRequestValidator` checks a pushed authorization request when it is pushed and again for the signed-in user, `ClientRevoker` revokes a client together with its tokens, `ChainConnectionCloser` closes the WebSocket connections of a revoked chain, and `IssuanceLockTimeout` bounds the lock waits of a token-issuing transaction. The account handlers share four more: `PasswordChanger` sets a password, `CredentialChangeRevoker` ends the other sessions of a change to a user's sign-in methods ([Credential Changes](auth-account-security.md#credential-changes)), `StepUpVerifier` checks the current password and code, and `SuperAdminContinuity` refuses to delete, disable or demote the only enabled super admin under a transaction-scoped advisory lock.
 
 | Command | Handler | Purpose |
 |---------|---------|---------|
-| `RegisterUserCommand` | `RegisterUserHandler` | Self-registration; seeds the email language from the browser (User/) |
+| `RegisterUserCommand` | `RegisterUserHandler` | Self-registration while `auth.registration_open` is on; seeds the email language from the browser (User/) |
 | `CreateUserCommand` | `CreateUserHandler` | Operator-created users (User/) |
 | `RenameUserCommand` | `RenameUserHandler` | Update a user's display name from the admin API or `app:user:rename` (User/) |
-| `DeleteUserCommand` | `DeleteUserHandler` | Delete a user account from the admin API or `app:user:delete` (User/) |
-| `SetUserRolesCommand` | `SetUserRolesHandler` | Replace a user's roles from the admin API or `app:user:roles` (User/) |
-| `DisableUserCommand` | `DisableUserHandler` | Disable a user account (User/) |
+| `DeleteUserCommand` | `DeleteUserHandler` | Delete a user account from the admin API or `app:user:delete`, except the only enabled super admin, and close the user's WebSocket connections after the commit (User/) |
+| `SetUserRolesCommand` | `SetUserRolesHandler` | Replace a user's roles from the admin API or `app:user:roles`, except a demotion of the only enabled super admin (User/) |
+| `DisableUserCommand` | `DisableUserHandler` | Disable a user account, except the only enabled super admin (User/) |
 | `EnableUserCommand` | `EnableUserHandler` | Re-enable a disabled account (User/) |
 | `RequestPasswordResetCommand` | `RequestPasswordResetHandler` | Issue a password reset token for the account with that email (User/) |
 | `ResetPasswordCommand` | `ResetPasswordHandler` | Redeem a reset token and set a new password (User/) |
 | `SetUserPasswordCommand` | `SetUserPasswordHandler` | Operator password reset from the admin panel or `app:user:reset-password` (User/) |
-| `ChangePasswordCommand` | `ChangePasswordHandler` | A user changes their own password (User/) |
+| `ChangePasswordCommand` | `ChangePasswordHandler` | A user changes their own password after step-up; every other session ends (User/) |
 | `IssueTokenCommand` | `IssueTokenHandler` | Issue a DPoP-bound token pair after password or passkey login (OAuth/) |
 | `RefreshTokenCommand` | `RefreshTokenHandler` | Rotate a refresh token for a new token pair (OAuth/) |
 | `RevokeTokenCommand` | `RevokeTokenHandler` | Token revocation: a value that is a JWT signed with Baander's key is found as an access token by its `jti`; any other value as a refresh token, then as an access token id (OAuth/) |
@@ -77,17 +77,18 @@ Commands and handlers are organized into feature namespaces under `Application/C
 | `ReplaceClientKeysCommand` | `ReplaceClientKeysHandler` | Replace a `private_key_jwt` client's inline JWK Set or `jwks_uri` for the admin API and `app:oauth:client:replace-keys` (OAuth/) |
 | `RevokeRegisteredClientCommand` | `RevokeRegisteredClientHandler` | Revoke a device, public or confidential client and its tokens for the admin API and `app:oauth:client:revoke` (OAuth/) |
 | `PurgeExpiredOAuthCodesCommand` | `PurgeExpiredOAuthCodesHandler` | Delete authorization codes, device codes and pushed authorization requests expired more than one hour ago (`app:oauth:purge-codes` and daily schedule; OAuth/) |
-| `RegisterPasskeyCommand` | `RegisterPasskeyHandler` | Add a WebAuthn passkey (Passkey/) |
-| `AuthenticatePasskeyCommand` | `AuthenticatePasskeyHandler` | Verify a WebAuthn assertion during passkey login (Passkey/) |
-| `VerifyEmailCommand` | `VerifyEmailHandler` | Redeem a verification token and mark the address verified (User/) |
+| `RegisterPasskeyCommand` | `RegisterPasskeyHandler` | Add a WebAuthn passkey; every other session ends (Passkey/) |
+| `DeletePasskeyCommand` | `DeletePasskeyHandler` | Remove one of the user's passkeys after step-up and record `PasskeyDeleted`; every other session ends (Passkey/) |
+| `AuthenticatePasskeyCommand` | `AuthenticatePasskeyHandler` | Verify a WebAuthn assertion during passkey login and for the passkey check endpoint (Passkey/) |
+| `VerifyEmailCommand` | `VerifyEmailHandler` | Redeem a verification token for the signed-in account it was sent for and mark the address verified; confirming a pending email change ends every other session (User/) |
 | `ResendEmailVerificationCommand` | `ResendEmailVerificationHandler` | Send a signed-in user a new verification link (User/) |
 | `ChangeOwnEmailCommand` | `ChangeOwnEmailHandler` | A user asks to change their own email: step-up, then the new address is held as pending and sent a link (User/) |
 | `ChangeEmailCommand` | `ChangeEmailHandler` | An operator change from the admin panel or `app:user:change-email`, verified at once (User/) |
 | `MarkEmailVerifiedCommand` | `MarkEmailVerifiedHandler` | Mark a user's current address verified on an operator's word, from the admin API or `app:user:mark-email-verified` (User/) |
 | `ResetUserTotpCommand` | `ResetUserTotpHandler` | Drop a user's TOTP secret without reading it and revoke all of their tokens, from the admin API or `app:user:reset-totp` (User/) |
 | `StartTotpSetupCommand` | `StartTotpSetupHandler` | Generate a pending TOTP secret after step-up, held for 10 minutes until enable confirms it (Totp/) |
-| `EnableTotpCommand` | `EnableTotpHandler` | Enable TOTP 2FA (Totp/) |
-| `DisableTotpCommand` | `DisableTotpHandler` | Disable TOTP 2FA (Totp/) |
+| `EnableTotpCommand` | `EnableTotpHandler` | Enable TOTP 2FA; every other session ends (Totp/) |
+| `DisableTotpCommand` | `DisableTotpHandler` | Disable TOTP 2FA after step-up; every other session ends (Totp/) |
 | `DeleteLoginBlockCommand` | `DeleteLoginBlockHandler` | Delete one honeypot login block by `PublicId` (LoginBlock/) |
 | `DeleteAllLoginBlocksCommand` | `DeleteAllLoginBlocksHandler` | Delete all honeypot login blocks (LoginBlock/) |
 
@@ -117,6 +118,7 @@ Six queries serve the OAuth and admin endpoints. `GetAuthorizationRequestQuery` 
 | `EmailChangeNoticeInterface` | Tells an account's previous address that its email changed, after the response is sent |
 | `EmailVerificationResendThrottleInterface` | Per-user limit on verification resend requests |
 | `RegistrationAttemptNoticeInterface` | Tells an account's owner, after the response is sent, that someone tried to register with its address |
+| `SelfRegistrationInterface` | Whether self-registration is open now, read from the `auth.registration_open` system setting (`SelfRegistration`); the Shared health check reads it through this narrow contract |
 | `LoginFailureThrottleInterface` | Per-account limit on failed password logins from all addresses, keyed by normalized email (`RateLimiterLoginFailureThrottle`) |
 | `StepUpAttemptThrottleInterface` | Per-account limit on step-up attempts (`RateLimiterStepUpAttemptThrottle`) |
 | `OAuthClientThrottleInterface` | Per-client limit on token and pushed authorization requests, charged after the client authenticates (`RateLimiterOAuthClientThrottle`) |
@@ -143,7 +145,7 @@ Six queries serve the OAuth and admin endpoints. `GetAuthorizationRequestQuery` 
 | `EmailVerified` | Email verification completed |
 | `DeviceCodeApproved` | The user approved a device request; Notification maps it to the Security category (`device_code.approved`) |
 
-No code raises `PasskeyDeleted`: `DELETE /api/auth/passkey/{publicId}` removes the passkey through the repository without an event, although Notification maps the event to the Security category.
+`DeletePasskeyHandler` records `PasskeyDeleted` in the transaction that removes the passkey, and Notification maps it to the Security category.
 
 ## API Endpoints
 
@@ -151,27 +153,28 @@ All endpoints except the two `/.well-known/` documents are under `/api`.
 
 | Method | Path | Purpose |
 |--------|------|---------|
-| POST | `/api/auth/register` | Self-registration; answers `202` with the same body whether or not the address is taken, and mails the owner of a taken address |
+| POST | `/api/auth/register` | Self-registration; `403` with reason `registration_closed` while it is closed; otherwise answers `202` with the same body, and no sooner than the response floor, whether or not the address is taken, and mails the owner of a taken address |
+| GET | `/api/auth/registration` | Whether self-registration is open (public) |
 | POST | `/api/auth/login` | Password login (issues tokens) |
 | POST | `/api/auth/login/passkey` | Passkey login (issues tokens) |
 | POST | `/api/auth/refresh` | Refresh token rotation for first-party tokens (issues tokens) |
 | POST | `/api/auth/logout` | Revoke the chain of the access token that authenticated the request and close the WebSocket connections opened with any of its access tokens; accepted during a DPoP store outage without the replay check |
 | POST | `/api/auth/password/reset-request` | Issue a password reset token; always answers `200` |
 | POST | `/api/auth/password/reset` | Redeem a reset token and set a new password |
-| POST | `/api/auth/email/verify` | Redeem a verification token; one generic `400` for every unusable token |
+| POST | `/api/auth/email/verify` | Redeem a verification token in a signed-in first-party session of the account it was sent for; `403` with reason `verification_link_other_account` for another account's valid token, which stays usable, and one generic `400` for every unusable token |
 | POST | `/api/auth/me/email/verification` | Send the current user a new verification link; always answers `200` |
 | GET, PUT | `/api/auth/me` | Read or update the current user |
 | PUT | `/api/auth/me/email` | Ask to change email (step-up); the new address is held as pending and sent a link; `202` |
-| PUT | `/api/auth/me/password` | Change password; other sessions are signed out |
+| PUT | `/api/auth/me/password` | Change password (step-up); other sessions are signed out |
 | POST | `/api/auth/totp/setup` | Generate a TOTP secret and provisioning URI (verified address and current password; `409` while TOTP is on) |
-| POST | `/api/auth/totp/enable` | Enable TOTP after verifying a code |
-| POST | `/api/auth/totp/disable` | Disable TOTP (requires a current code) |
+| POST | `/api/auth/totp/enable` | Enable TOTP after verifying a code; other sessions are signed out |
+| POST | `/api/auth/totp/disable` | Disable TOTP (step-up with the current password and a current code; `400` while TOTP is off); other sessions are signed out |
 | GET | `/api/auth/passkey` | List the current user's passkeys |
 | POST | `/api/auth/passkey/options` | WebAuthn registration options (verified address and step-up) |
-| POST | `/api/auth/passkey/register` | Complete passkey registration |
-| POST | `/api/auth/passkey/authenticate/options` | WebAuthn authentication options for passkey login |
-| POST | `/api/auth/passkey/authenticate` | Verify an assertion without issuing tokens |
-| DELETE | `/api/auth/passkey/{publicId}` | Delete a passkey |
+| POST | `/api/auth/passkey/register` | Complete passkey registration; other sessions are signed out |
+| POST | `/api/auth/passkey/authenticate/options` | WebAuthn authentication options for discoverable passkey login: no account, no credential list |
+| POST | `/api/auth/passkey/authenticate` | Verify an assertion with the sign-in checks, without issuing tokens; `401` with reason `passkey_auth_failed` for every refusal |
+| DELETE | `/api/auth/passkey/{publicId}` | Delete a passkey (step-up in the body); other sessions are signed out |
 | POST | `/api/oauth/par` | Push an authorization request (RFC 9126; public; client authentication and a DPoP key binding required) and get its `request_uri` |
 | GET | `/api/oauth/authorize` | Look up a pushed request by `client_id` and `request_uri` for the consent page |
 | POST | `/api/oauth/authorize` | Record the signed-in user's decision on a pushed request and answer the redirect URI |
@@ -189,7 +192,7 @@ All endpoints except the two `/.well-known/` documents are under `/api`.
 
 ### Admin — User Management
 
-All routes under `/api/admin/users` (controller `AdminUserController`, gated `ROLE_ADMIN`; `{publicId}` is validated as a 21-character `PublicId`). Listing needs `USER_MANAGEMENT_LIST` and creating needs `USER_MANAGEMENT_CREATE`; every other route requires `ROLE_SUPER_ADMIN`. `UserManagementVoter` grants both attributes to super administrators. It grants them to other administrators only while the system settings `admin.can_view_users` and `admin.can_create_users` are on, reading them on every vote, and grants creation only when every requested role is `ROLE_USER`. The console commands (`app:user:list`, `app:user:create`, `app:user:rename`, `app:user:change-email`, `app:user:delete`, `app:user:roles`, `app:user:reset-password`, `app:user:reset-totp`, `app:user:mark-email-verified`, `app:user:disable`, `app:user:enable`, and `app:dev:create-users`) are not gated by these settings. The admin API refuses with `403` to change the signed-in administrator's own email address, password or TOTP, which go through the self-service routes with step-up; the console has no such limit.
+All routes under `/api/admin/users` (controller `AdminUserController`, gated `ROLE_ADMIN`; `{publicId}` is validated as a 21-character `PublicId`). Listing needs `USER_MANAGEMENT_LIST` and creating needs `USER_MANAGEMENT_CREATE`; every other route requires `ROLE_SUPER_ADMIN`. `UserManagementVoter` grants both attributes to super administrators. It grants them to other administrators only while the system settings `admin.can_view_users` and `admin.can_create_users` are on, reading them on every vote, and grants creation only when every requested role is `ROLE_USER`. The console commands (`app:user:list`, `app:user:create`, `app:user:rename`, `app:user:change-email`, `app:user:delete`, `app:user:roles`, `app:user:reset-password`, `app:user:reset-totp`, `app:user:mark-email-verified`, `app:user:disable`, `app:user:enable`, and `app:dev:create-users`) are not gated by these settings. The admin API refuses with `403` to change the signed-in administrator's own email address, password or TOTP, which go through the self-service routes with step-up; the console has no such limit. Deleting, disabling or demoting the only enabled super admin is refused by the admin API with `409` and reason `last_super_admin` and by the console commands with exit code 1; a disabled super admin does not count.
 
 | Method | Path | Purpose |
 |--------|------|---------|
@@ -268,6 +271,7 @@ All routes under `/api/admin/login-blocks` (controller `AdminLoginBlockControlle
 | `DpopBindingListener` | Security | Requires a proof from the token's key on every API request made with an access token; answers an unavailable store with `DpopStoreUnavailableResponse` (`503`) |
 | `RateLimitListener` | Security | Per-IP, per-IP-and-email and per-refresh-token limits for the auth and OAuth endpoints, before authentication (see [Rate limiting](../../part-1-operator-guide/configuration/rate-limits.md#rate-limiting)) |
 | `ScopeEnforcementListener` | Security | Answers a delegated token on a route `ScopeRouteMap` does not grant it with `403` `insufficient_scope` |
+| `UnverifiedAccountListener` | Security | Answers an account whose address is unverified with `403` `email_unverified` on every route outside its allowlist ([Unverified Accounts](auth-account-security.md#unverified-accounts)) |
 | `RateLimiterLoginFailureThrottle`, `RateLimiterStepUpAttemptThrottle`, `RateLimiterOAuthClientThrottle` | Security | The per-account login failure, per-account step-up and per-client OAuth limits, charged from inside the authenticator and the handlers |
 | `SodiumTotpSecretCipher` | Security | `TotpSecretCipherInterface` on libsodium secretbox under `AUTH_TOTP_ENCRYPTION_KEY` |
 | `RedisPasskeyChallengeStore` | Cache | `PasskeyChallengeStoreInterface` on Redis: `SET NX EX 300` to store, `GETDEL` to take |

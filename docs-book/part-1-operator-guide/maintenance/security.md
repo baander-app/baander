@@ -25,11 +25,12 @@ records trust boundaries, regression evidence and unresolved findings.
 ### Hardening checklist
 
 - [ ] **Private secrets** — set `APP_SECRET`, `STREAM_URL_HMAC_SECRET` and `AUTH_TOTP_ENCRYPTION_KEY` to private random values. With `APP_ENV=prod`, every web, worker and console process refuses to boot while one of them is unset, still the value committed in `.env`, a `replace-with-` placeholder or shorter than 32 bytes. For `AUTH_TOTP_ENCRYPTION_KEY`, the 32 bytes are counted after base64 decoding. The error names the variable.
-- [ ] **Strong Redis password** — not the default `baander`
-- [ ] **Strong database password** — not the default `baander`
+- [ ] **Strong Redis password** — not the default `baander`. With `APP_ENV=prod`, every process refuses to boot while `REDIS_PASSWORD` is unset or `baander`.
+- [ ] **Strong database password** — not the default `baander`. With `APP_ENV=prod`, every process refuses to boot while the password in `DATABASE_URL`, or in `DATABASE_CONTROL_URL` when it is set, is empty or `baander`.
+- [ ] **Own Web Push keys** — generate the VAPID pair with `app:generate-vapid-keys`. With `APP_ENV=prod`, every process refuses to boot with a `VAPID_PRIVATE_KEY` the repository has ever committed, because anyone can read those keys from its history.
 - [ ] **`APP_ENV=prod`** in production — disables debug mode, verbose errors, and the profiler
 - [ ] **HTTPS in production** — set `DEFAULT_URI` and `APP_URL` to `https://`
-- [ ] **Reverse proxy configured** — set `TRUSTED_PROXIES` to the actual trusted proxy addresses or CIDRs. Both HTTP layers default to no trust. Proxies must replace incoming `X-Forwarded-*` headers; direct access leaves the list empty.
+- [ ] **Reverse proxy configured** — set `TRUSTED_PROXIES` to the actual trusted proxy addresses or CIDRs. Both HTTP layers default to no trust. Proxies must replace incoming `X-Forwarded-*` headers; direct access leaves the list empty. The [deployment preset](../../../deploy/preset/README.md) derives `TRUSTED_PROXIES` to its own gateway and refuses a configured value; list a proxy in front of the gateway under `listen.frontProxies` instead.
 - [ ] **Rate limiting active** — relies on Redis; verify Redis is reachable
 - [ ] **External API keys secured** — store in `.env`, never in source code or config committed to git
 - [ ] **OAuth keys not in version control** — `config/secrets/oauth/` should be in `.gitignore`
@@ -78,13 +79,19 @@ actual published ports before exposing the installation:
 - **Port 6379** — the base Compose file binds Redis on host loopback. Keep it
   inaccessible to untrusted clients.
 
-The base file also binds the web service on host loopback port 9501. Review every
+The base file also binds the web service on host loopback port 9501, where the
+web server answers `/metrics` and the health probes without authentication. The
+production Nginx configuration answers `/metrics` with `404`. Review every
 publication and host firewall rule for your deployment;
 [Getting started](../getting-started/installation.md) describes the source-install topology.
 
 ### Browser protections
 
 Every response carries `X-Content-Type-Options: nosniff` and `X-Frame-Options: DENY`, static files included. The web app's HTML page also carries a Content-Security-Policy. Scripts run only from the installation's own origin or with a nonce issued for that page view. Other sites cannot frame the page (`frame-ancestors 'none'`), and plugins and `<base>` elements are blocked. Images and media may come from any HTTP(S) host, because radio streams and station logos live on the stations' own servers.
+
+The policy's `connect-src` allows a WebSocket only to the public origin the page names as its API URL: the request's origin when it is `APP_URL`'s or listed in `AUTH_EXTRA_ORIGINS`, otherwise `APP_URL`'s. It also allows `APP_URL`'s origin, where signed media URLs point. The WebSocket handshake itself still accepts only `APP_URL`'s origin, so a page served on an origin listed in `AUTH_EXTRA_ORIGINS` loads, but its WebSocket upgrade is refused. A `Host` header, forged by the client or forwarded by a trusted proxy, never chooses an origin the server renders. Baander sets no `trusted_hosts` list, because internal callers reach the web server under Hosts such as `gateway`, `web:9501` and `127.0.0.1:9501`, which such a list would answer with `400`.
+
+Stored image files (`/api/images/{id}/file`) are served with the media type Baander recorded for them when it is JPEG, PNG, WebP or GIF, and converted derivatives as WebP. Any other recorded type is served as an `application/octet-stream` download. Each image file response also carries `Content-Security-Policy: default-src 'none'; sandbox`, so an uploaded file cannot run script at the installation's origin.
 
 A request that reaches Baander as HTTPS, directly or through a proxy listed in `TRUSTED_PROXIES` that sets `X-Forwarded-Proto: https`, also gets `Strict-Transport-Security: max-age=31536000`. With an untrusted proxy, Baander sees plain HTTP and sends no HSTS.
 

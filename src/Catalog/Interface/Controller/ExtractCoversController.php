@@ -15,7 +15,7 @@ use Symfony\Component\Security\Http\Attribute\IsGranted;
 use Symfony\Component\Messenger\MessageBusInterface;
 
 #[OA\Tag(name: 'Album Cover')]
-#[Route('/api/albums/covers/extract', name: 'extract_covers_')]
+#[Route('/api/albums/covers/extract', name: 'album_covers_')]
 #[IsGranted('ROLE_ADMIN')]
 final class ExtractCoversController
 {
@@ -60,7 +60,7 @@ final class ExtractCoversController
             ),
         ],
     )]
-    #[Route(methods: ['POST'])]
+    #[Route(name: 'extract', methods: ['POST'])]
     #[CliCounterpart('app:album:extract-covers')]
     public function __invoke(): JsonResponse
     {

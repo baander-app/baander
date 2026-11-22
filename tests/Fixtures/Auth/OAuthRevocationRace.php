@@ -12,6 +12,7 @@ use App\Auth\Application\ScopeAllowlist;
 use App\Auth\Application\Service\ClientRevoker;
 use App\Auth\Application\Service\TokenPairIssuer;
 use App\Auth\Domain\Model\OAuth\AccessToken;
+use App\Auth\Domain\Model\OAuth\SignInGrant;
 use App\Auth\Domain\Model\User;
 use App\Auth\Domain\Model\UserState;
 use App\Auth\Infrastructure\Doctrine\UserRepository;
@@ -78,9 +79,10 @@ final class OAuthRevocationRace
     }
 
     /**
+     * @param SignInGrant $grant The grant the pair stands for; it must fit the client
      * @param (callable(): void)|null $whileLocked Runs inside the issuing transaction, after the client lock
      */
-    public static function issue(EntityManager $manager, Uuid $clientId, User $user, ?callable $whileLocked = null): TokenResponseDTO
+    public static function issue(EntityManager $manager, Uuid $clientId, User $user, SignInGrant $grant, ?callable $whileLocked = null): TokenResponseDTO
     {
         $encoder = new JsonEncoder();
         $clients = new ClientRepository($manager, $encoder);
@@ -105,7 +107,7 @@ final class OAuthRevocationRace
             7776000,
         );
 
-        return $issuer->issue($client, $user, ['profile'], 'race-proof-key-thumbprint', $user->getCredentialEpoch(), persistWithTokens: $whileLocked);
+        return $issuer->issue($client, $user, ['profile'], 'race-proof-key-thumbprint', $user->getCredentialEpoch(), $grant, persistWithTokens: $whileLocked);
     }
 
     /**

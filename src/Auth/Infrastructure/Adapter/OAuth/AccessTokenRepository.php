@@ -7,6 +7,7 @@ namespace App\Auth\Infrastructure\Adapter\OAuth;
 use App\Auth\Domain\Model\OAuth\AccessToken;
 use App\Auth\Domain\Model\OAuth\AccessTokenState;
 use App\Auth\Domain\Model\OAuth\Client;
+use App\Auth\Domain\Model\OAuth\SignInGrant;
 use App\Auth\Domain\Model\OAuth\TokenId;
 use App\Auth\Domain\Model\OAuth\ValueObject\ChainId;
 use App\Auth\Domain\Model\OAuth\ValueObject\Scope;
@@ -68,9 +69,12 @@ final class AccessTokenRepository implements AccessTokenRepositoryInterface
             );
         }
 
+        // Baander issues its tokens through TokenPairIssuer, not through League's grants. A token
+        // League mints here records a delegated grant, so it never acts with first-party authority.
         $token = new AccessTokenEntity(
             bin2hex(random_bytes(40)),
             $client,
+            SignInGrant::AuthorizationCode,
             $user,
             null,
             array_map(fn ($scope) => $scope->getIdentifier(), $scopes),
@@ -101,6 +105,7 @@ final class AccessTokenRepository implements AccessTokenRepositoryInterface
             tokenId: TokenId::fromString($entity->getTokenId()),
             user: $userDomain,
             client: $clientDomain,
+            grant: $entity->getGrantType(),
             name: $entity->getName(),
             scopes: array_map(fn (string $s) => new Scope($s), $entity->getScopeIdentifiers() ?? []),
             chainId: $entity->getChainId() !== null ? ChainId::fromUuid($entity->getChainId()) : null,

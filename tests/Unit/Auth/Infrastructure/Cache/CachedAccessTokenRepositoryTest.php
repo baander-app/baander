@@ -6,6 +6,7 @@ namespace App\Tests\Unit\Auth\Infrastructure\Cache;
 
 use App\Auth\Domain\Model\OAuth\AccessToken;
 use App\Auth\Domain\Model\OAuth\Client;
+use App\Auth\Domain\Model\OAuth\SignInGrant;
 use App\Auth\Domain\Model\OAuth\ValueObject\ChainId;
 use App\Auth\Domain\Model\User;
 use App\Auth\Domain\Repository\OAuth\AccessTokenRepositoryInterface;
@@ -30,7 +31,7 @@ final class CachedAccessTokenRepositoryTest extends TestCase
     protected function setUp(): void
     {
         $this->user = User::register(new Email('test@baander.app'), 'hashed', 'Alice');
-        $this->token = AccessToken::issue(Client::create('Test', ['https://baander.app']), $this->user);
+        $this->token = AccessToken::issue(Client::create('Test', ['https://baander.app']), SignInGrant::AuthorizationCode, $this->user);
         $this->cache = new TagAwareAdapter(new ArrayAdapter());
     }
 

@@ -715,12 +715,12 @@ export const adminLiveCoverage = [
     audiences: ["admin"],
     sourceTables: [],
     deploymentTables: [],
-    sources: ["health endpoint", "'/health'"],
+    sources: ["full health report", "'/api/debug/health'"],
     keyVariants: [],
     dependentFamilies: [],
     mirrors: [],
     responseCaches: [],
-    consumers: ["src/features/admin/components/dashboard/QuickActions.tsx#AXIOS_INSTANCE.get:'/health'"],
+    consumers: ["src/features/admin/components/dashboard/QuickActions.tsx#AXIOS_INSTANCE.get:'/api/debug/health'"],
     coverageVerification: ["tests/live-updates/coverage.test.ts"],
     behaviorVerification: {
       unitProofs: [

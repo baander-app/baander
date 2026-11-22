@@ -5,11 +5,13 @@ declare(strict_types=1);
 namespace App\Party\Application\CommandHandler;
 
 use App\Party\Application\Command\LeavePartySessionCommand;
+use App\Party\Application\Port\PartyMediaAccessPortInterface;
 use App\Party\Application\Port\PartyMemberPortInterface;
 use App\Party\Application\Port\PartySessionPortInterface;
 use App\Party\Domain\Event\MemberLeft;
 use App\Party\Domain\Event\PartySessionEnded;
 use App\Party\Domain\Model\PartyMember;
+use App\Party\Domain\Model\SyncedPartySession;
 use App\Shared\Application\Port\TransactionPortInterface;
 use App\Shared\Domain\Model\Uuid;
 use Symfony\Component\EventDispatcher\EventDispatcherInterface;
@@ -17,7 +19,8 @@ use Symfony\Component\Messenger\Attribute\AsMessageHandler;
 
 /**
  * Takes a member out of a party. When the host leaves, the earliest-joined remaining member
- * becomes the host; when nobody remains, the party ends.
+ * becomes the host; when nobody remains, the party ends. A member who owns the party's transcode
+ * job takes it along: nobody left in the party steers their encoder.
  *
  * The leave runs under the party's row lock, so it decides on the host and the members as they
  * are stored once its turn comes. A user who holds no member row changes nothing. The events
@@ -29,6 +32,7 @@ final readonly class LeavePartySessionHandler
     public function __construct(
         private PartySessionPortInterface $sessionPort,
         private PartyMemberPortInterface $memberPort,
+        private PartyMediaAccessPortInterface $mediaAccess,
         private TransactionPortInterface $transaction,
         private EventDispatcherInterface $eventDispatcher,
     ) {
@@ -57,6 +61,8 @@ final readonly class LeavePartySessionHandler
             return [];
         }
 
+        $this->releaseJobOwnedBy($session, $userId);
+
         $left = new MemberLeft(sessionId: $sessionId, userId: $userId);
         if (!$session->getHostUserId()->equals($userId)) {
             return [$left];
@@ -78,6 +84,17 @@ final readonly class LeavePartySessionHandler
         $this->memberPort->save($newHost);
 
         return [$left];
+    }
+
+    private function releaseJobOwnedBy(SyncedPartySession $session, Uuid $userId): void
+    {
+        $jobId = $session->getTranscodeJobId();
+        if ($jobId === null || !$this->mediaAccess->ownsTranscodeJob($userId, $jobId)) {
+            return;
+        }
+
+        $session->releaseTranscodeJob();
+        $this->sessionPort->save($session);
     }
 
     /** @param PartyMember[] $members */

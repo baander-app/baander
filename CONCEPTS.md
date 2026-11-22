@@ -52,6 +52,10 @@ A local Baander instance for one development worktree, with its own hostname and
 application state. It supports feature verification without changing the persistent
 development instance or another worktree's preview.
 
+### Development instance marker
+
+The environment variable `BAANDER_DEVELOPMENT_INSTANCE=1`, which the development lifecycle sets in the application environment of the persistent development instance and of worktree previews. Development-only commands, such as `app:dev:setup` and `app:dev:create-users`, run only under the `dev` kernel or with the marker, so the persistent instance can run them under its `prod` kernel. Production images never carry it.
+
 ### Preview worker snapshot
 
 The immutable worker build captured from a worktree when its preview is refreshed.
@@ -89,21 +93,33 @@ It identifies the account independently of the authenticator's credential ID.
 
 ### First-party client
 
-The OAuth client registered with type `first_party` for Baander's own web, desktop and mobile apps, named by `AUTH_SPA_CLIENT_ID`. Password and passkey login issue tokens only to it, only its tokens refresh at `/api/auth/refresh`, and its tokens act with the user's full authority.
+The OAuth client registered with type `first_party` for Baander's own web, desktop and mobile apps, named by `AUTH_SPA_CLIENT_ID`. Password and passkey login issue tokens only to it, and only its tokens refresh at `/api/auth/refresh`. It is never an OAuth client: the pushed authorization, consent, token and device endpoints refuse it. Its tokens act with the user's full authority only when their [sign-in grant](#sign-in-grant) is a password or passkey sign-in.
 
-A personal access client is not first-party, even though it skips the consent screen.
+A personal access client is not first-party: its tokens are delegated, and its requests go through the consent screen like any other client's.
 
 ### Delegated token
 
-An access token issued to any client other than the first-party client: a third-party app, a device or a personal access client. Its user counts as a plain user, without any administrator role, and it reaches only public routes and the routes its granted scopes cover; every other route answers `insufficient_scope`.
+An access token without first-party authority: one issued to a third-party app, a device or a personal access client. Its user counts as a plain user, without any administrator role, and it reaches only public routes and the routes its granted scopes cover; every other route answers `insufficient_scope`.
 
 ### Step-up re-authentication
 
-Proof of the current password, plus a current TOTP code when TOTP is enabled, that a signed-in user gives before a sensitive change to their own account: their email address, a new TOTP factor or a new passkey.
+Proof of the current password, plus a current TOTP code when TOTP is enabled, that a signed-in user gives before a sensitive change to their own account: their email address or password, setting up or turning off TOTP, and adding or removing a passkey. Every mismatch gets one answer and counts against a per-account attempt limit.
+
+### Sign-in grant
+
+The grant that started a refresh token chain: a password sign-in, a passkey sign-in, an authorization code or a device code. Each access token records it, and rotation keeps it. A token acts with first-party authority only when it belongs to the first-party client and its sign-in grant is a password or passkey sign-in.
+
+### Self-registration
+
+Creating an account through the public registration endpoint rather than through an operator's console command or admin action. It is closed unless an operator opens it with the `auth.registration_open` server setting. While it is open, a registration answers the same way, and no sooner than a fixed time after the password hash, whether or not the address already has an account. A self-registered account starts as an [unverified account](#unverified-account).
+
+### Unverified account
+
+An account whose current email address has not yet been confirmed through its verification link, which confirms it only when opened in a signed-in session of that account. Until then, the account reaches only public routes, its own profile, its verification link, resending that link, changing its own address, refreshing its session and signing out, and the web app shows it a verification screen in place of the app.
 
 ### Pending email change
 
-A new address a user asked for in a self-service email change that is not yet confirmed. The account keeps its current address, and that address's verification, until the user opens the link sent to the new address; then the new address replaces it, verified. Asking for the current address, an operator's email change and a password reset drop it.
+A new address a user asked for in a self-service email change that is not yet confirmed. The account keeps its current address, and that address's verification, until the user opens the link sent to the new address in a signed-in session of the account; then the new address replaces it, verified, and every other session of the account ends. Asking for the current address, an operator's email change and a password reset drop it.
 
 ### Refresh token chain
 
@@ -112,9 +128,9 @@ The sequence of refresh tokens one sign-in produces through rotation. Each rotat
 
 ### Credential epoch
 
-A per-user counter that every change to the user's credentials advances, such as a password change or an operator's TOTP reset, and that each sign-in, authorization code, device approval and refresh token chain records from the moment its credential was verified.
+A per-user counter that every change to the user's credentials advances, and that each sign-in, authorization code, device approval and refresh token chain records from the moment its credential was verified. The changes are a password change or reset, turning TOTP on or off, an operator's TOTP reset, adding or removing a passkey, and confirming a [pending email change](#pending-email-change).
 
-Tokens are issued only while the recorded epoch matches the user's current one, so nothing verified before a credential change can produce a session after it. A password change that keeps the requesting session moves that session's chain to the new epoch.
+Tokens are issued only while the recorded epoch matches the user's current one, so nothing verified before a credential change can produce a session after it. A change that keeps the requesting session moves that session's chain to the new epoch and revokes every other session of the user. A change requested from a session another change already ended is refused with `credentials_changed`.
 
 ### Password hash upgrade
 
@@ -158,6 +174,14 @@ A video manifest or segment URL that carries an HMAC signature and an expiry ins
 
 Every child playlist, initialization file, media fragment and subtitle URL inherits the manifest's absolute expiry. Reading a playlist cannot extend it; an authenticated signing refresh can issue a new top-level URL. Expiry refuses new delivery requests after the deadline without revoking bytes already admitted or buffered by the player.
 
+### Public origins
+
+The origins a deployment answers on: the origin of `APP_URL` and each origin listed in `AUTH_EXTRA_ORIGINS`, such as a LAN address, normalized to `scheme://host[:port]`. The scheme and `Host` a request arrived with never add to them. A DPoP proof may name any of them, passkey ceremonies accept those on the host of `APP_URL` or a subdomain of it, and a response renders the request's origin into its URLs and policies only when the list holds it, otherwise the origin of `APP_URL`. The WebSocket handshake does not use the list and accepts only the origin of `APP_URL`.
+
+### Super admin continuity
+
+The rule that an install keeps an enabled super admin. Deleting, disabling or demoting the only enabled super admin is refused, from the admin API and the console alike; such changes take turns under one lock, so two super admins who demote each other at once leave one of them a super admin. A disabled super admin does not count, and an install that has no enabled super admin refuses nothing.
+
 ## Playlists
 
 ### Playlist collaborator
@@ -179,6 +203,10 @@ A session in which signed-in users watch one video together. One member is the h
 The host's permission for one user, named by public ID, to join a watch party. A user joins only with an invitation or as an existing member; the party's public ID alone admits no one. An invitation lasts until the host revokes it or until its party or its user is deleted, and joining and leaving do not use it up. Revoking it also removes the user from the party when they had joined. The party's creator holds one from the party's creation, and invitations follow the party's current host, not the host who issued them.
 
 ## Rate limiting
+
+### Declared front proxy
+
+A reverse proxy in front of the preset gateway that the operator lists, by IPv4 or IPv6 address or range, in the preset configuration's `listen.frontProxies`. The gateway reads the client address and protocol from a declared front proxy's forwarding headers; for any other peer it uses the connection's own address and protocol. A gateway that listens on a loopback address also declares the edge network's bridge addresses, the source of connections from the host. Web trusts only the gateway, so rate limits apply to each client's real address.
 
 ### Limiter generation
 

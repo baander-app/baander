@@ -135,7 +135,7 @@ export function QuickActions() {
       icon: Stethoscope,
       action: async (signal) => {
         const owner = captureOwnership()
-        const result = await AXIOS_INSTANCE.get('/health', { signal })
+        const result = await AXIOS_INSTANCE.get('/api/debug/health', { signal })
         assertCurrentOwnership(owner)
         invalidate(['server-stats'])
         return result

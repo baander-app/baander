@@ -72,6 +72,8 @@ test('preference conflict choices stay readable and keyboard accessible', async 
 
 for (const width of [390, 768, 1280]) {
   test(`public forms fit at ${width}px with visible validation`, async ({ page }, testInfo) => {
+    // Self-registration ships closed; the register form is the one an open server offers.
+    await page.route('**/api/auth/registration', (route) => route.fulfill({ json: { data: { open: true } } }))
     await page.setViewportSize({ width, height: 700 })
     for (const path of ['/register', '/forgot-password', '/reset-password#token=styling-invalid-token']) {
       await page.goto(path)

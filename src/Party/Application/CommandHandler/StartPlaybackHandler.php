@@ -41,13 +41,14 @@ final class StartPlaybackHandler
             return;
         }
 
-        // Without a job (none was named, or it has been deleted) there is no encoder to steer.
+        // Without a job (none was named, it has been deleted, or its owner left) there is no
+        // encoder to steer. A start resumes an encoder that an earlier pause held.
         $jobId = $session->getTranscodeJobId();
         if ($jobId !== null) {
             $this->eventDispatcher->dispatch(new PlaybackPositionChanged(
                 jobId: $jobId,
                 position: $position ?? $session->getCurrentPosition(),
-                action: 'play',
+                action: 'resume',
             ));
         }
 

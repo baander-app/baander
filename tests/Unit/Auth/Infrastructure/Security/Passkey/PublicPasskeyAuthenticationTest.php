@@ -10,6 +10,7 @@ use App\Auth\Domain\Model\User;
 use App\Auth\Domain\Repository\Passkey\PasskeyRepositoryInterface;
 use App\Auth\Domain\Repository\UserRepositoryInterface;
 use App\Auth\Infrastructure\Security\Passkey\PasskeyService;
+use App\Shared\Application\Http\PublicOrigins;
 use App\Shared\Domain\Model\Email;
 use App\Shared\Domain\Model\PublicId;
 use App\Tests\Fixtures\Auth\InMemoryPasskeyChallengeStore;
@@ -45,7 +46,7 @@ final class PublicPasskeyAuthenticationTest extends TestCase
         $credential = new WebAuthnTestCredential($handle, 'baander.app');
         $passkey = $credential->passkey();
         $service = new PasskeyService(
-            appDomain: 'baander.app', appName: 'Baander', timeout: 60000,
+            publicOrigins: new PublicOrigins('https://baander.app'), appName: 'Baander', timeout: 60000,
             authenticatorAttachment: '', userVerification: 'preferred', residentKey: 'preferred', attestation: 'none',
             counterChecker: $this->createStub(CounterChecker::class),
             eventDispatcher: $this->createStub(EventDispatcherInterface::class),
@@ -68,7 +69,7 @@ final class PublicPasskeyAuthenticationTest extends TestCase
         $handler = new AuthenticatePasskeyHandler($repository, $service, $users);
 
         try {
-            $id = $handler(new AuthenticatePasskeyCommand(null, $options['challengeKey'], $assertion));
+            $id = $handler(new AuthenticatePasskeyCommand($options['challengeKey'], $assertion));
         } catch (\Throwable $error) {
             if ($accepted) {
                 throw $error;

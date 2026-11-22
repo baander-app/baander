@@ -8,6 +8,7 @@ use App\Party\Application\Command\RevokePartyInvitationCommand;
 use App\Party\Application\CommandHandler\RevokePartyInvitationHandler;
 use App\Party\Application\Exception\PartyNotFoundException;
 use App\Party\Application\Port\PartyInvitationPortInterface;
+use App\Party\Application\Port\PartyMediaAccessPortInterface;
 use App\Party\Application\Port\PartyMemberPortInterface;
 use App\Party\Application\Port\PartyPublicIdentityPortInterface;
 use App\Party\Application\Port\PartySessionPortInterface;
@@ -23,12 +24,14 @@ use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\EventDispatcher\EventDispatcherInterface;
 use Symfony\Component\Security\Core\Exception\AccessDeniedException;
+use Symfony\Component\Translation\IdentityTranslator;
 use Symfony\Contracts\Translation\TranslatableInterface;
 
 /**
  * A revoke runs in one transaction that starts by locking the party, and the room hears of a
  * removed member after the commit. The ports here keep in memory which users hold an invitation
- * and which hold a member row; the host holds both. Nobody has the unknown public ID.
+ * and which hold a member row; the host holds both. Nobody has the unknown public ID. The
+ * playback authority knows who owns the party's job.
  */
 final class RevokePartyInvitationHandlerTest extends TestCase
 {
@@ -39,6 +42,8 @@ final class RevokePartyInvitationHandlerTest extends TestCase
     private array $invited = [];
     /** @var array<string, true> the users who hold a member row, by user ID */
     private array $members = [];
+    /** @var array<string, Uuid> the owner of each transcode job, by job ID */
+    private array $jobOwners = [];
     /** @var array<string, Uuid> */
     private array $userIds = [];
     /** @var array<string, PublicId> */
@@ -70,8 +75,12 @@ final class RevokePartyInvitationHandlerTest extends TestCase
                 ? SyncedPartySession::reconstitute(clone $this->session->getState())
                 : null;
         });
+        $sessions->method('save')->willReturnCallback(function (SyncedPartySession $session): void {
+            self::assertTrue($this->locked, 'The party changes under its lock.');
+            $this->session = $session;
+        });
 
-        $invitations = $this->createStub(PartyInvitationPortInterface::class);
+        $invitations =$this->createStub(PartyInvitationPortInterface::class);
         $invitations->method('revoke')->willReturnCallback(function (Uuid $userId, Uuid $sessionId): bool {
             self::assertTrue($this->locked, 'An invitation is deleted under the party\'s lock.');
             self::assertTrue($sessionId->equals($this->sessionId));
@@ -116,7 +125,12 @@ final class RevokePartyInvitationHandlerTest extends TestCase
             return $event;
         });
 
-        $this->handler = new RevokePartyInvitationHandler($sessions, $invitations, $members, $identities, $transaction, $events);
+        $media = $this->createStub(PartyMediaAccessPortInterface::class);
+        $media->method('ownsTranscodeJob')->willReturnCallback(
+            fn (Uuid $userId, Uuid $jobId): bool => ($this->jobOwners[$jobId->toString()] ?? null)?->equals($userId) === true,
+        );
+
+        $this->handler = new RevokePartyInvitationHandler($sessions, $invitations, $members, $media, $identities, $transaction, $events);
     }
 
     /** @return iterable<string, array{bool, bool}> whether the user holds an invitation and whether they hold a member row */
@@ -148,6 +162,27 @@ final class RevokePartyInvitationHandlerTest extends TestCase
         self::assertInstanceOf(MemberLeft::class, $left);
         self::assertTrue($left->getSessionId()->equals($this->sessionId));
         self::assertTrue($left->getUserId()->equals($this->userIds['guest']));
+    }
+
+    public function testRevokingTheJobsOwnerTakesTheJobFromTheParty(): void
+    {
+        // The guest created the party with their own job and handed the host role on.
+        $this->partyWithAJobOf('guest');
+        $this->stand('guest', invited: true, joined: true);
+
+        ($this->handler)($this->revoke(by: 'host', user: 'guest'));
+
+        self::assertNull($this->session?->getTranscodeJobId(), 'Nobody left in the party steers the removed member\'s encoder.');
+    }
+
+    public function testRevokingAMemberWhoDoesNotOwnTheJobKeepsItWithTheParty(): void
+    {
+        $job = $this->partyWithAJobOf('host');
+        $this->stand('guest', invited: true, joined: true);
+
+        ($this->handler)($this->revoke(by: 'host', user: 'guest'));
+
+        self::assertTrue($this->session?->getTranscodeJobId()?->equals($job));
     }
 
     /** @return iterable<string, array{string, string, class-string<\Throwable>, string}> the caller, the named user, the refusal and its message */
@@ -183,10 +218,11 @@ final class RevokePartyInvitationHandlerTest extends TestCase
 
         $refused = $this->refusalOf($this->revoke(by: 'host', user: 'guest'));
 
-        // The shared not-found outcome with the message a route gives for a missing party. A
-        // translatable outcome would be reported in the request's language and differ from it.
+        // The shared not-found outcome, translated with the key a route's notFound() uses, so a
+        // refused caller reads exactly as for a missing party in every request language.
         self::assertInstanceOf(NotFoundException::class, $refused);
-        self::assertNotInstanceOf(TranslatableInterface::class, $refused);
+        self::assertInstanceOf(TranslatableInterface::class, $refused);
+        self::assertSame('errors.not_found.resource', $refused->trans(new IdentityTranslator()));
         self::assertSame(PartyNotFoundException::class, $refused::class);
         self::assertSame('Resource not found.', $refused->getMessage());
         self::assertSame(['host', 'guest'], $this->names($this->invited));
@@ -210,6 +246,21 @@ final class RevokePartyInvitationHandlerTest extends TestCase
         }
 
         self::fail('The revoke was not refused.');
+    }
+
+    /**
+     * Replaces the party with one the host leads and whose transcode job the named user owns.
+     *
+     * @return Uuid the job
+     */
+    private function partyWithAJobOf(string $owner): Uuid
+    {
+        $job = Uuid::v4();
+        $this->jobOwners[$job->toString()] = $this->userIds[$owner];
+        $this->session = SyncedPartySession::create($this->userIds['host'], Uuid::v4(), $job);
+        $this->sessionId = $this->session->getId();
+
+        return $job;
     }
 
     /** Stores whether the named user holds an invitation and a member row. */

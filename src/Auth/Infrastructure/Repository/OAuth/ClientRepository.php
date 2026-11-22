@@ -82,9 +82,9 @@ final class ClientRepository implements ClientRepositoryInterface
 
     public function isFirstPartyClient(PublicId $publicId): bool
     {
-        // Mirrors Client::getType(): the personal access flag takes precedence over first-party.
+        // chk_oauth_clients_personal_access_not_first_party keeps the flag off personal access clients.
         return $this->entityManager->getConnection()->fetchOne(
-            'SELECT 1 FROM oauth_clients WHERE public_id = :public_id AND first_party AND NOT personal_access_client',
+            'SELECT 1 FROM oauth_clients WHERE public_id = :public_id AND first_party',
             ['public_id' => $publicId->toString()],
         ) !== false;
     }

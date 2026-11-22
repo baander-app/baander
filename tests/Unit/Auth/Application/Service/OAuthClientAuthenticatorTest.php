@@ -13,6 +13,7 @@ use App\Auth\Domain\Model\OAuth\ValueObject\ClientKeySource;
 use App\Auth\Domain\Model\OAuth\ValueObject\ClientSecret;
 use App\Auth\Domain\Repository\OAuth\ClientRepositoryInterface;
 use App\Shared\Domain\Model\PublicId;
+use App\Shared\Domain\Model\Uuid;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
@@ -110,6 +111,42 @@ final class OAuthClientAuthenticatorTest extends TestCase
         $this->assertInvalidClient(new ClientCredentials($this->id($revoked)));
         $this->assertInvalidClient(new ClientCredentials((new PublicId())->toString()));
         $this->assertInvalidClient(new ClientCredentials('not a public id'));
+    }
+
+    /**
+     * Baander's own client signs in through password and passkey login, never as an OAuth
+     * client: the back channel answers unauthorized_client once its ID authenticated it, and
+     * the consent page's lookup answers invalid_client.
+     */
+    public function testTheFirstPartyClientIsRefusedAsAnOAuthClient(): void
+    {
+        $client = $this->register(Client::create('Baander', ['https://baander.app'], firstParty: true, passwordClient: true));
+
+        $backChannel = $this->protocolError(fn () => $this->authenticator()->authenticate(new ClientCredentials($this->id($client))));
+        self::assertSame(['unauthorized_client', 400], [$backChannel->error, $backChannel->statusCode]);
+
+        $frontChannel = $this->protocolError(fn () => $this->authenticator()->identify($this->id($client)));
+        self::assertSame(['invalid_client', 401], [$frontChannel->error, $frontChannel->statusCode]);
+        self::assertNull($frontChannel->redirectUri);
+    }
+
+    public function testAPersonalAccessClientIsNotRefusedAsFirstParty(): void
+    {
+        $client = $this->register(Client::createPersonalAccess('CLI', Uuid::generate()));
+
+        self::assertSame($client, $this->authenticator()->authenticate(new ClientCredentials($this->id($client))));
+        self::assertSame($client, $this->authenticator()->identify($this->id($client)));
+    }
+
+    private function protocolError(callable $action): OAuthProtocolException
+    {
+        try {
+            $action();
+        } catch (OAuthProtocolException $exception) {
+            return $exception;
+        }
+
+        self::fail('Expected an OAuth protocol error.');
     }
 
     private function assertInvalidClient(ClientCredentials $credentials, bool $verifies = true): void

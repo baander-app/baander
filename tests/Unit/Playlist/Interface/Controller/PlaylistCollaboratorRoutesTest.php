@@ -24,6 +24,7 @@ use Symfony\Component\Messenger\Envelope;
 use Symfony\Component\Messenger\MessageBusInterface;
 use Symfony\Component\Security\Core\Exception\AccessDeniedException;
 use Symfony\Component\Security\Core\User\UserInterface;
+use Symfony\Component\Translation\Translator;
 
 /**
  * The collaborator routes ask the voter before any lookup: the owner manages the rows,
@@ -69,6 +70,7 @@ final class PlaylistCollaboratorRoutesTest extends TestCase
             $this->createStub(PlaylistSongVisibilityInterface::class),
             $this->createStub(\App\Catalog\Application\Port\SongAvailabilityPortInterface::class),
         );
+        $this->controller->setTranslator(new Translator('en'));
     }
 
     public function testTheOwnerAddsACollaboratorAfterTheVoterAdmitsThem(): void

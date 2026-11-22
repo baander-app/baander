@@ -199,7 +199,7 @@ final class OAuthTokenInvalidationTest extends TestCase
             'redirect' => '["https://baander.app/callback"]', ...$times]);
         $this->writer->insert('oauth_scopes', ['id' => 'profile', 'description' => 'Profile', ...$times]);
         $this->writer->insert('oauth_access_tokens', ['id' => $access, 'token_id' => 'rotation-access-token',
-            'client_id' => $client, 'user_id' => $user, 'credential_epoch' => 0, ...$times]);
+            'client_id' => $client, 'user_id' => $user, 'grant_type' => 'authorization_code', 'credential_epoch' => 0, ...$times]);
         $this->writer->insert('oauth_refresh_tokens', ['id' => $refresh, 'token_id' => 'rotation-refresh-token',
             'access_token_id' => $access, 'credential_epoch' => 0, 'chain_expires_at' => '2027-01-01 00:00:00+00', ...$times]);
         $this->writer->insert('oauth_refresh_tokens', ['id' => Uuid::generate()->toString(), 'token_id' => 'rotation-refresh-successor',

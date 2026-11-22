@@ -6,6 +6,7 @@ namespace App\Tests\Unit\Auth\Infrastructure\Security\OAuth;
 
 use App\Auth\Domain\Model\OAuth\AccessToken;
 use App\Auth\Domain\Model\OAuth\Client;
+use App\Auth\Domain\Model\OAuth\SignInGrant;
 use App\Auth\Domain\Model\User;
 use App\Auth\Infrastructure\Security\OAuth\AccessTokenSigningKey;
 use App\Auth\Infrastructure\Security\OAuth\JwtGenerator;
@@ -30,7 +31,7 @@ final class AccessTokenSigningKeyTest extends TestCase
     public function testATokenCarriesTheIssuerTheAccessTokenTypeAndTheKeyIdTheJwksPublishes(): void
     {
         [$private, $public] = $this->keyPair();
-        $token = AccessToken::issue(Client::create('Player', ['https://player.baander.app/callback']), User::register(new Email('kid@baander.app'), 'hashed', 'Kid'));
+        $token = AccessToken::issue(Client::create('Player', ['https://player.baander.app/callback']), SignInGrant::AuthorizationCode, User::register(new Email('kid@baander.app'), 'hashed', 'Kid'));
 
         $jwt = (new Parser(new JoseEncoder()))->parse((new JwtGenerator($private, 'https://baander.app'))->generate($token, 'proof-thumbprint'));
 
@@ -49,7 +50,7 @@ final class AccessTokenSigningKeyTest extends TestCase
         [$private, $public] = $this->keyPair();
         $expiry = new DateInterval('PT1H');
         $expiry->invert = 1;
-        $token = AccessToken::issue(Client::create('Player', ['https://player.baander.app/callback']), ttl: $expiry);
+        $token = AccessToken::issue(Client::create('Player', ['https://player.baander.app/callback']), SignInGrant::AuthorizationCode, ttl: $expiry);
         $jwt = (new JwtGenerator($private, 'https://baander.app'))->generate($token);
 
         self::assertSame($token->getTokenId()->toString(), (new AccessTokenSigningKey($public))->tokenIdOf($jwt));
@@ -59,7 +60,7 @@ final class AccessTokenSigningKeyTest extends TestCase
     {
         [, $public] = $this->keyPair();
         [$otherPrivate] = $this->keyPair();
-        $foreign = (new JwtGenerator($otherPrivate, 'https://baander.app'))->generate(AccessToken::issue(Client::create('Player', ['https://player.baander.app/callback'])));
+        $foreign = (new JwtGenerator($otherPrivate, 'https://baander.app'))->generate(AccessToken::issue(Client::create('Player', ['https://player.baander.app/callback']), SignInGrant::AuthorizationCode));
         $key = new AccessTokenSigningKey($public);
 
         self::assertNull($key->tokenIdOf($foreign));

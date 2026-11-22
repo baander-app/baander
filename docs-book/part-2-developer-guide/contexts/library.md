@@ -58,6 +58,7 @@ The Library context manages media libraries — collections of media files organ
 | `LibraryMediaFilesInterface` | Checks and deletes the audio files of catalog entries being deleted, confined to their library's root | `LibraryMediaFiles` (published with its `LibraryMediaFile*` result types as the Library Media Files Contract; used by Catalog's album and song deletes and their previews) |
 | `LibraryMediaFileResolverInterface` | Resolves an absolute catalog path to an existing file inside its owning library root | `LibraryMediaFileResolver` (part of the Library Media Files Contract; used by Media's `StreamService`) |
 | `LibraryFileAvailabilityInterface` | Reads last-observed source file availability from `library_file_index` without filesystem checks | `LibraryFileAvailability` (published as the Library File Availability Contract) |
+| `LibraryTypeLookupInterface` | Reads a library's `LibraryType` by UUID; null for an unknown ID | `LibraryTypeLookup` (published as the Library Type Lookup Contract; used by Catalog's TV series registration) |
 
 ## Media File Deletion
 
@@ -126,6 +127,8 @@ All endpoints are prefixed with `/api`. Routes under `/api/libraries` are served
 | `PUT` | `/api/admin/users/{userId}/libraries/{libraryId}` | Grant the user access to a library (`ROLE_SUPER_ADMIN`) |
 | `DELETE` | `/api/admin/users/{userId}/libraries/{libraryId}` | Revoke the user's access to a library (`ROLE_SUPER_ADMIN`) |
 
+A library's `path` is its absolute directory on the server, and only administrators read it. `GET /api/libraries` and `GET /api/libraries/{id}` answer anyone else with `LibraryResource::forMember()`, every field except `path`, so `path` is optional in the `LibraryResource` schema. Console commands and admin-only routes keep the full resource.
+
 ### Console Commands
 
 | Command | Class | Purpose |
@@ -156,6 +159,7 @@ All endpoints are prefixed with `/api`. Routes under `/api/libraries` are served
 | `LibraryReadScopeProvider` | Implements `LibraryReadScopeProviderInterface` using `AuthenticatedUserIdentityInterface`, `CurrentUserAuthorityReader`, and `LibraryAccessPortInterface`. |
 | `DoctrineLibraryAudienceReader` | Implements `LibraryAudienceReader` for live-update audience resolution. |
 | `LibraryFileAvailability` | Implements `LibraryFileAvailabilityInterface` via `LibraryFileIndexRepositoryInterface`. |
+| `LibraryTypeLookup` | Implements `LibraryTypeLookupInterface` via `LibraryRepositoryInterface`. |
 | `LibraryDirectoryOutboxEventDispatcher` | Outbox event dispatcher decorator that converts committed `LibraryDirectoryIndexed` events into `FilesDiscovered` messages on the `async` transport. |
 | `LibraryMessagePayloadCodec` | Encodes `ScanLibraryCommand` and `FilesDiscovered` for the `async` transport and job monitor. |
 | `LibraryEntity` | Doctrine ORM entity for the `libraries` table. |
@@ -170,5 +174,5 @@ All endpoints are prefixed with `/api`. Routes under `/api/libraries` are served
 |-----------|---------|--------------|
 | Depends on | Shared | Uses `Uuid`, `PublicId`, `FilesystemType`, `LibraryReadScope`, transactional outbox, and job-monitor ports |
 | Depends on | Auth | Uses `AuthenticatedUserIdentityInterface`, `CurrentUserAuthorityReader`, and `UserIdentifierResolverInterface` for read-scope resolution and member access commands |
-| Depended on by | Catalog | Consumes `FilesDiscovered`; implements `LibraryContentStatsInterface`; uses `LibraryProvisioningInterface`, `LibraryFileAvailabilityInterface`, `LibraryReadScopeProviderInterface`, and `LibraryMediaFilesInterface` (album and song deletes and their previews, and `FilesDiscoveredHandler` to wait for a delete and skip missing files) |
+| Depended on by | Catalog | Consumes `FilesDiscovered`; implements `LibraryContentStatsInterface`; uses `LibraryProvisioningInterface`, `LibraryFileAvailabilityInterface`, `LibraryReadScopeProviderInterface`, `LibraryTypeLookupInterface` (`RegisterTvSeriesHandler` accepts only a TV show library), and `LibraryMediaFilesInterface` (album and song deletes and their previews, and `FilesDiscoveredHandler` to wait for a delete and skip missing files) |
 | Depended on by | Activity, Lyrics, Media, Metadata, Notification, Playlist, Shared | Use `LibraryReadScopeProviderInterface`, `LibraryMediaFileResolverInterface` (Media), `LibraryPortInterface` (Metadata), `LibraryMembershipQueryPort` (Notification), and `LibraryAudienceReader` (Shared live snapshots) |

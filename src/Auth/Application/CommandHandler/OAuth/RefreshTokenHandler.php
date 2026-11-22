@@ -325,8 +325,8 @@ final class RefreshTokenHandler
     /**
      * Issues the next pair of the chain from the presented token's access token, under the
      * credential epoch locked for this rotation, writes it, carries the client fingerprint
-     * binding over and signs inside the transaction. The refresh token keeps the chain's
-     * absolute expiry.
+     * binding over and signs inside the transaction. The access token keeps the sign-in grant
+     * that started the chain, and the refresh token keeps the chain's absolute expiry.
      */
     private function issuePair(RefreshToken $predecessor, RefreshTokenCommand $command, ?int $credentialEpoch): TokenResponseDTO
     {
@@ -335,6 +335,7 @@ final class RefreshTokenHandler
 
         $newAccessToken = AccessToken::issue(
             $template->getClient(),
+            $template->getGrant(),
             $template->getUser(),
             $template->getScopes(),
             $template->getName(),

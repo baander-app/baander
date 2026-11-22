@@ -5,7 +5,7 @@ Use this reference to identify the budget a request consumes, adjust a configura
 ## Rate limiting
 
 Limits are set in `config/packages/auth.yaml`. They feed the Symfony policies in
-`config/packages/framework.yaml`; all 26 configured limiters consume state through
+`config/packages/framework.yaml`; all 27 configured limiters consume state through
 atomic Redis compare-and-set. Each limiter has its own namespace, so the admin
 **Rate Limits** tab and `app:rate-limiter:clear` reset its generation without
 changing other limiters. The catalog reports `storageNamespace`, not a cache pool.
@@ -24,7 +24,7 @@ See [Rate Limiter Monitor](../operations/health-and-metrics.md#rate-limiter-moni
 | `auth.rate_limit.login_per_email.max_attempts` | `10` | Max login attempts per IP and email pair within the window. |
 | `auth.rate_limit.login_failures_per_email.max_attempts` | `10` | Max failed logins per account (normalized email), from all IPs together, within the sliding window. |
 | `auth.rate_limit.login_failures_per_email.window` | `300` (5 min) | Window in seconds for the per-account failure limit. |
-| `auth.rate_limit.step_up.max_attempts` | `10` | Max step-up attempts per account within the window, from all IPs together: the password, plus a TOTP code when TOTP is on, that an email change, TOTP setup and passkey registration ask for. |
+| `auth.rate_limit.step_up.max_attempts` | `10` | Max step-up attempts per account within the window, from all IPs together: the password, plus a TOTP code when TOTP is on, that an email change, a password change, TOTP setup, turning TOTP off, passkey registration and passkey removal ask for. |
 | `auth.rate_limit.step_up.window` | `900` (15 min) | Window in seconds for step-up attempts. |
 | `auth.rate_limit.passkey.max_attempts` | `40` | Max passkey sign-in requests per IP within the window. One sign-in uses two requests. |
 | `auth.rate_limit.passkey.window` | `300` (5 min) | Window in seconds for passkey sign-in. |
@@ -61,7 +61,7 @@ Each limiter counts requests per key:
 | `auth_login_ip` | `POST /api/auth/login` | Client IP |
 | `auth_login_ip_email` | `POST /api/auth/login` | Client IP and email |
 | `auth_login_email_failures` | Failed `POST /api/auth/login` attempts: an unknown address, a wrong password or a rejected TOTP code (sliding window) | Normalized email |
-| `auth_step_up_user` | `PUT /api/auth/me/email`, `POST /api/auth/totp/setup`, `POST /api/auth/passkey/options` | User ID |
+| `auth_step_up_user` | `PUT /api/auth/me/email`, `PUT /api/auth/me/password`, `POST /api/auth/totp/setup`, `POST /api/auth/totp/disable`, `POST /api/auth/passkey/options`, `DELETE /api/auth/passkey/{publicId}` | User ID |
 | `auth_passkey_ip` | `POST /api/auth/passkey/authenticate/options`, `POST /api/auth/passkey/authenticate`, `POST /api/auth/login/passkey` | Client IP |
 | `auth_register_ip` | `POST /api/auth/register` | Client IP |
 | `auth_password_reset_ip` | `POST /api/auth/password/reset-request`, `POST /api/auth/password/reset` (one shared bucket) | Client IP |
@@ -80,12 +80,15 @@ Each limiter counts requests per key:
 | `batch_cover_extract` | `POST /api/albums/covers/extract` (10 per minute) | Client IP |
 | `musicbrainz` | Every MusicBrainz request and every Cover Art Archive cover fetch, from workers and web requests alike (1 per second) | One bucket shared by all callers |
 | `musicbrainz_user` | `GET /api/metadata/browse/*`, and `GET /api/metadata/search/*` when it searches MusicBrainz, the default source (1 per 10 seconds) | User ID |
+| `metadata_provider_user` | `GET /api/metadata/search/*` when it searches Discogs or Last.fm (10 per minute for both providers together) | User ID |
 | `lrclib` | Every LRCLIB request, from workers and web requests alike (1 per 2 seconds) | One bucket shared by all callers |
-| `discovery_endpoint_ip` | Discovery registration and pairing (30 per minute) | Client IP |
+| `discovery_endpoint_ip` | `POST /api/discovery/register`, `POST /api/discovery/pairing-code`, `POST /api/discovery/qr-payload/{serverPublicId}`, `POST /api/discovery/complete-pairing` (30 per minute, one shared bucket) | Client IP |
 
-The last six have fixed limits in `config/packages/framework.yaml` and no `auth.yaml` parameter.
+The last seven have fixed limits in `config/packages/framework.yaml` and no `auth.yaml` parameter.
 
 The per-IP limits run before Baander authenticates the request. The per-account login failure and step-up limits run once the account's address or user is known, and the per-client limits once the client has authenticated, so a caller who merely names a client in `client_id` cannot use up that client's allowance.
+
+The auth, OAuth, discovery and cover-extraction limits are tied to the route the router matched, not to the path as the client spelled it. The router decodes the path first, so a percent-encoded request such as `POST /%61pi/auth/registe%72` reaches `POST /api/auth/register` and is charged to `auth_register_ip` like any other registration; `anonymous_api` and `authenticated_api` likewise judge whether a request is an API request from its decoded path. Each route fixes its own methods, so a `HEAD` request to a limited `GET` route is charged like `GET`.
 
 ### Login attempts and account failures
 
@@ -109,13 +112,15 @@ The `musicbrainz` limit never answers `429`; callers wait for their turn instead
 
 A MusicBrainz search or lookup on the metadata search and browse routes, which any signed-in user may call, first spends one call of the user's `musicbrainz_user` allowance and answers `429` when the allowance is spent. It then waits at most 10 seconds for a turn, and answers `503 Service Unavailable` when no turn comes within those 10 seconds or when the limiter state in Redis cannot be read.
 
+A Discogs or Last.fm search on the metadata search routes spends one call of the user's `metadata_provider_user` allowance and answers `429` when the allowance is spent, so one user cannot use up the quota of the server's Discogs token or Last.fm API key. The search routes accept a `limit` of 1 to 100 and answer `422` to any other value before calling a provider. When Discogs answers `429` with a `Retry-After` of at most 5 seconds, Baander waits that long and retries once. With a longer `Retry-After`, the request does not wait, and the search returns no results.
+
 The `lrclib` limit never answers `429` either. Every LRCLIB request, from any worker or web process, reserves the next free turn in its shared bucket and waits for it; each turn starts at least two seconds after the one before it. The fetch of one song, a lyrics search and an apply, which only administrators may call, wait at most 10 seconds, and a queued lyrics fetch at most 30.
 
 A request whose turn comes later is not sent: LRCLIB then counts as unavailable, as it does when the limiter state in Redis cannot be read, and the lyrics routes answer `503`. Clearing `lrclib`, from the **Rate Limits** tab or with `app:rate-limiter:clear lrclib`, resets these turns only. A pause that LRCLIB asked for with a `429`, or a `503` with a `Retry-After` header, is stored outside the limiter and ends on its own, after one hour at most; see [External APIs](../media/external-apis.md#supported-apis).
 
 Media delivery routes are exempt from `anonymous_api` and `authenticated_api`, so playback is never throttled by the general API budget: the audio stream (`/api/stream/track`), the original-file streams (`/api/stream/video`, `/api/stream/original/track`), the HLS and DASH manifests and segments under `/api/transcode/{id}/` (`master.m3u8`, `media.m3u8`, `manifest.mpd`, `init`, `segment`), the completed-video playlists and segments under `/api/transcode/artifacts/`, subtitle playlists and segments, image files (`/api/images/{id}/file`) and album covers (`GET /api/albums/{id}/cover`). Health, readiness and metrics endpoints (`/health`, `/ready`, `/live`, `/metrics`) are outside `/api` and are never limited.
 
-With `APP_ENV=dev`, only the `config_check`, `auth_password_reset_email`, `auth_email_verification_user`, `auth_login_email_failures`, `auth_step_up_user`, `musicbrainz`, `musicbrainz_user` and `lrclib` limits apply; the others are skipped.
+With `APP_ENV=dev`, only the `config_check`, `auth_password_reset_email`, `auth_email_verification_user`, `auth_login_email_failures`, `auth_step_up_user`, `musicbrainz`, `musicbrainz_user`, `metadata_provider_user` and `lrclib` limits apply; the others are skipped.
 
 Both HTTP layers read `TRUSTED_PROXIES`, a comma-separated list of trusted proxy
 addresses or CIDRs that defaults to empty. With that default, a direct client
@@ -125,3 +130,11 @@ make that proxy replace incoming forwarding headers. Otherwise clients share the
 proxy's address and its anonymous budget. Do not enable broad subnet trust merely
 because the service runs in Docker. See
 [Request identity and proxy deployment](../../part-2-developer-guide/architecture/application-threat-model.md#request-identity-and-proxy-deployment).
+
+The [deployment preset](../../../deploy/preset/README.md#gateway-and-client-addresses)
+sets `TRUSTED_PROXIES` itself, to its gateway's fixed addresses on the edge network,
+and refuses the variable in its configuration. The gateway writes every forwarding
+header from the connection it received, so each client is limited under its own
+address. A reverse proxy in front of the gateway belongs in `listen.frontProxies`;
+only for those peers does the gateway take the client address and protocol from the
+forwarding headers.

@@ -7,23 +7,19 @@ namespace App\Auth\Interface\Controller\Totp;
 use App\Auth\Application\Command\Totp\DisableTotpCommand;
 use App\Auth\Application\Command\Totp\EnableTotpCommand;
 use App\Auth\Application\Command\Totp\StartTotpSetupCommand;
-use App\Auth\Application\Exception\EmailUnverifiedException;
-use App\Auth\Application\Exception\StepUpFailedException;
-use App\Auth\Application\Exception\StepUpRateLimitedException;
 use App\Auth\Application\Exception\TotpChangeRefusal;
 use App\Auth\Application\Exception\TotpChangeRefusedException;
+use App\Auth\Application\Http\AccessTokenAttributes;
 use App\Auth\Infrastructure\Security\SecurityUser;
 use App\Auth\Interface\Request\Totp\DisableTotpRequest;
 use App\Auth\Interface\Request\Totp\EnableTotpRequest;
 use App\Auth\Interface\Request\Totp\StartTotpSetupRequest;
 use App\Shared\Application\Exception\HandlerFailure;
-use Baander\RedisRateLimiter\Exception\RateLimiterUnavailableException;
 use App\Shared\Interface\Controller\ApiResponsesTrait;
-use App\Shared\Interface\Controller\TranslatorTrait;
 use OpenApi\Spec as OA;
 use Symfony\Bundle\SecurityBundle\Security;
-use Psr\Log\LoggerInterface;
 use Symfony\Component\HttpFoundation\JsonResponse;
+use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpKernel\Attribute\MapRequestPayload;
 use Symfony\Component\Messenger\MessageBusInterface;
@@ -35,12 +31,10 @@ use Symfony\Component\Routing\Attribute\Route;
 final class TotpController
 {
     use ApiResponsesTrait;
-    use TranslatorTrait;
 
     public function __construct(
         private readonly Security $security,
         private readonly MessageBusInterface $commandBus,
-        private readonly LoggerInterface $logger,
         private readonly string $appName,
     ) {
     }
@@ -48,7 +42,7 @@ final class TotpController
     #[OA\Operation\Post(
         path: '/api/auth/totp/setup',
         summary: 'Generate TOTP secret and provisioning URI',
-        description: 'Refused while TOTP is on, and for an unverified email address with 422 and `details.reason` `email_unverified`. Needs the current password; a wrong one gets 422 with `details.reason` `step_up_failed`. Each setup replaces the pending secret of the previous one; it expires after 10 minutes.',
+        description: 'Refused while TOTP is on, and for an unverified email address with 403 and `details.reason` `email_unverified`. Needs the current password; a wrong one gets 422 with `details.reason` `step_up_failed`. Each setup replaces the pending secret of the previous one; it expires after 10 minutes.',
         requestBody: new OA\RequestBody(
             required: true,
             content: new OA\MediaType\Json(
@@ -92,8 +86,15 @@ final class TotpController
                 ),
             ),
             new OA\Response(
+                response: '403',
+                description: 'The email address is unverified (`details.reason` `email_unverified`)',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
+            ),
+            new OA\Response(
                 response: '422',
-                description: 'Validation error, an unverified email address, or the password is wrong',
+                description: 'Validation error, or the password is wrong',
                 content: new OA\MediaType\Json(
                     schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ValidationError::class),
                 ),
@@ -134,16 +135,11 @@ final class TotpController
     #[OA\Operation\Post(
         path: '/api/auth/totp/enable',
         summary: 'Enable TOTP after verifying a code from the authenticator app',
+        description: 'Signs the account out of every other session, paired devices and third-party apps included; the session that sent the code stays signed in.',
         requestBody: new OA\RequestBody(
             required: true,
             content: new OA\MediaType\Json(
-                schema: new OA\Schema(
-                    type: 'object',
-                    properties: [
-                        'code' => new OA\Schema(type: 'string', example: '123456'),
-                    ],
-                    required: ['code'],
-                ),
+                schema: new OA\Schema(ref: EnableTotpRequest::class),
             ),
         ),
         responses: [
@@ -166,7 +162,7 @@ final class TotpController
             ),
             new OA\Response(
                 response: '401',
-                description: 'Not authenticated',
+                description: 'Not authenticated, or another change ended this session first (reason credentials_changed); nothing was changed',
                 content: new OA\MediaType\Json(
                     schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
                 ),
@@ -195,7 +191,7 @@ final class TotpController
         ],
     )]
     #[Route('/enable', name: 'enable', methods: ['POST'])]
-    public function enable(#[MapRequestPayload] EnableTotpRequest $payload): JsonResponse
+    public function enable(#[MapRequestPayload] EnableTotpRequest $payload, Request $request): JsonResponse
     {
         $user = $this->getCurrentSecurityUser();
         if ($user === null) {
@@ -205,6 +201,7 @@ final class TotpController
         $command = new EnableTotpCommand(
             userId: $user->getId(),
             code: $payload->code,
+            currentAccessTokenId: $request->attributes->get(AccessTokenAttributes::TOKEN_ID) |> AccessTokenAttributes::tokenId(...),
         );
 
         try {
@@ -220,17 +217,12 @@ final class TotpController
 
     #[OA\Operation\Post(
         path: '/api/auth/totp/disable',
-        summary: 'Disable TOTP (requires current TOTP code to verify)',
+        summary: 'Disable TOTP',
+        description: 'Refused with 400 while TOTP is off, before any step-up attempt is spent. Needs the current password and a current TOTP code; a missing or wrong password or code gets the same 422 with `details.reason` `step_up_failed`. Signs the account out of every other session, paired devices and third-party apps included; the session that made the request stays signed in.',
         requestBody: new OA\RequestBody(
             required: true,
             content: new OA\MediaType\Json(
-                schema: new OA\Schema(
-                    type: 'object',
-                    properties: [
-                        'code' => new OA\Schema(type: 'string', example: '123456'),
-                    ],
-                    required: ['code'],
-                ),
+                schema: new OA\Schema(ref: DisableTotpRequest::class),
             ),
         ),
         responses: [
@@ -253,29 +245,36 @@ final class TotpController
             ),
             new OA\Response(
                 response: '401',
-                description: 'Not authenticated',
+                description: 'Not authenticated, or another change ended this session first (reason credentials_changed); nothing was changed',
                 content: new OA\MediaType\Json(
                     schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
                 ),
             ),
             new OA\Response(
                 response: '400',
-                description: 'Invalid TOTP code or TOTP not enabled',
+                description: 'TOTP is not on',
                 content: new OA\MediaType\Json(
                     schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
                 ),
             ),
             new OA\Response(
                 response: '422',
-                description: 'Validation error',
+                description: 'The password or code is wrong',
                 content: new OA\MediaType\Json(
                     schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ValidationError::class),
+                ),
+            ),
+            new OA\Response(
+                response: '429',
+                description: 'Too many step-up attempts for this account',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
                 ),
             ),
         ],
     )]
     #[Route('/disable', name: 'disable', methods: ['POST'])]
-    public function disable(#[MapRequestPayload] DisableTotpRequest $payload): JsonResponse
+    public function disable(#[MapRequestPayload(mapWhenEmpty: true)] DisableTotpRequest $payload, Request $request): JsonResponse
     {
         $user = $this->getCurrentSecurityUser();
         if ($user === null) {
@@ -284,7 +283,9 @@ final class TotpController
 
         $command = new DisableTotpCommand(
             userId: $user->getId(),
-            code: $payload->code,
+            currentPassword: $payload->currentPassword,
+            totpCode: $payload->totpCode,
+            currentAccessTokenId: $request->attributes->get(AccessTokenAttributes::TOKEN_ID) |> AccessTokenAttributes::tokenId(...),
         );
 
         try {
@@ -312,21 +313,17 @@ final class TotpController
         return $user;
     }
 
-    /** A translated refusal the user can act on; anything else is logged and answered as a server fault. */
+    /**
+     * A translated refusal the user can act on. Anything else is answered by the exception
+     * listeners: a failed or rate-limited step-up, an unverified address, a session another
+     * change ended (401 credentials_changed), a lock wait that timed out (503 with Retry-After,
+     * so the change can be retried) and, logged, any other fault.
+     */
     private function refusal(\Throwable $exception): JsonResponse
     {
         $cause = HandlerFailure::cause($exception);
-        // Shared outcomes, answered by the exception subscribers: 422, 429 and 503.
-        if ($cause instanceof StepUpFailedException
-            || $cause instanceof EmailUnverifiedException
-            || $cause instanceof StepUpRateLimitedException
-            || $cause instanceof RateLimiterUnavailableException) {
-            throw $cause;
-        }
         if (!$cause instanceof TotpChangeRefusedException) {
-            $this->logger->error('TOTP command failed.', ['exception' => $cause]);
-
-            return $this->errorResponse($this->trans('errors.internal', domain: 'auth'), Response::HTTP_INTERNAL_SERVER_ERROR);
+            throw $cause;
         }
 
         return $this->errorResponse(

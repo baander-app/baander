@@ -6,12 +6,14 @@ namespace App\Tests\Unit\Auth\Interface\Controller;
 
 use App\Auth\Application\Command\OAuth\RevokeTokenCommand;
 use App\Auth\Application\Port\DpopJtiCacheInterface;
+use App\Auth\Application\Port\SelfRegistrationInterface;
 use App\Auth\Application\Port\UserPortInterface;
 use App\Auth\Infrastructure\Security\OAuth\DpopNonceManager;
 use App\Auth\Infrastructure\Security\OAuth\DpopProofValidator;
 use App\Auth\Infrastructure\Security\Passkey\PasskeyService;
 use App\Auth\Interface\Controller\User\AuthController;
 use App\Shared\Application\Http\AcceptLanguageMatcher;
+use App\Shared\Application\Http\PublicOrigins;
 use App\Shared\Infrastructure\Redis\RedisClientFactory;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
@@ -50,7 +52,7 @@ final class AuthControllerLogoutFaultTest extends TestCase
         $jsonEncoder = new JsonEncoder();
 
         $passkeyService = new PasskeyService(
-            appDomain: 'baander.app',
+            publicOrigins: new PublicOrigins('https://baander.app'),
             appName: 'Baander',
             timeout: 60000,
             authenticatorAttachment: 'platform',
@@ -70,11 +72,12 @@ final class AuthControllerLogoutFaultTest extends TestCase
             $this->commandBus,
             $this->createStub(UserPortInterface::class),
             $passkeyService,
-            new DpopProofValidator($this->createStub(DpopJtiCacheInterface::class), publicUrl: 'https://baander.app'),
+            new DpopProofValidator($this->createStub(DpopJtiCacheInterface::class), new PublicOrigins('https://baander.app')),
             new DpopNonceManager($this->createStub(RedisClientFactory::class)),
             $jsonEncoder,
             $this->logger,
             new AcceptLanguageMatcher(),
+            $this->createStub(SelfRegistrationInterface::class),
             'baander_dev_spa_00001',
         );
         $translator = $this->createStub(TranslatorInterface::class);

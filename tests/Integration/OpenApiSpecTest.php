@@ -269,6 +269,17 @@ final class OpenApiSpecTest extends KernelTestCase
         }
     }
 
+    public function test_server_paths_are_optional_because_only_administrators_read_them(): void
+    {
+        $schemas = $this->getSpec()['components']['schemas'];
+
+        foreach (['LibraryResource', 'SongResource'] as $name) {
+            self::assertArrayHasKey('path', $schemas[$name]['properties'], $name);
+            self::assertNotContains('path', $schemas[$name]['required'], $name);
+            self::assertStringContainsString('administrators', $schemas[$name]['properties']['path']['description'], $name);
+        }
+    }
+
     public function test_discovery_inline_public_identifiers_match_runtime_identifiers(): void
     {
         $paths = $this->getSpec()['paths'];
@@ -276,7 +287,7 @@ final class OpenApiSpecTest extends KernelTestCase
             $schema = $paths[$path]['post']['requestBody']['content']['application/json']['schema'];
             $this->assertPublicIdentifierSchema($schema['properties']['serverPublicId']);
         }
-        $parameters = array_column($paths['/api/discovery/qr-payload/{serverPublicId}']['get']['parameters'], null, 'name');
+        $parameters = array_column($paths['/api/discovery/qr-payload/{serverPublicId}']['post']['parameters'], null, 'name');
         $this->assertPublicIdentifierSchema($parameters['serverPublicId']['schema']);
     }
 
@@ -393,6 +404,16 @@ final class OpenApiSpecTest extends KernelTestCase
                 }
             }
         }
+    }
+
+    public function test_admin_album_duplicates_document_an_unknown_library_in_the_shared_api_envelope(): void
+    {
+        $responses = $this->getSpec()['paths']['/api/admin/albums/duplicates']['get']['responses'];
+
+        self::assertSame(
+            '#/components/schemas/ApiError',
+            $responses['404']['content']['application/json']['schema']['$ref'] ?? null,
+        );
     }
 
     public function test_player_save_schema_requires_typed_bounded_fields(): void
@@ -520,7 +541,6 @@ final class OpenApiSpecTest extends KernelTestCase
             'EnableTotpRequest',
             'DisableTotpRequest',
             'RegisterPasskeyRequest',
-            'WebAuthnOptionsRequest',
             'VerifyPasskeyChallengeRequest',
             'RevokeTokenRequest',
             // Auth resources
@@ -700,10 +720,12 @@ final class OpenApiSpecTest extends KernelTestCase
         $spec = $this->getSpec();
         $publicPaths = [
             '/api/auth/register' => 'POST',
+            '/api/auth/registration' => 'GET',
             '/api/auth/login' => 'POST',
             '/api/auth/login/passkey' => 'POST',
+            '/api/auth/passkey/authenticate/options' => 'POST',
+            '/api/auth/passkey/authenticate' => 'POST',
             '/api/auth/password/reset-request' => 'POST',
-            '/api/auth/email/verify' => 'POST',
         ];
 
         foreach ($publicPaths as $path => $method) {
@@ -717,6 +739,23 @@ final class OpenApiSpecTest extends KernelTestCase
                 $path,
             ));
         }
+    }
+
+    /** A verification link is redeemed by a signed-in session of the account it was sent for. */
+    public function test_email_verification_needs_the_accounts_session(): void
+    {
+        $operation = $this->getSpec()['paths']['/api/auth/email/verify']['post'];
+
+        $this->assertArrayNotHasKey('security', $operation, 'The operation keeps the document-wide bearer requirement.');
+        $this->assertArrayHasKey('401', $operation['responses']);
+        $this->assertArrayHasKey('403', $operation['responses']);
+        $this->assertSame(
+            ['type' => 'boolean'],
+            array_intersect_key(
+                $operation['responses']['200']['content']['application/json']['schema']['properties']['data']['properties']['emailChanged'] ?? [],
+                ['type' => true],
+            ),
+        );
     }
 
     public function test_spec_has_security_schemes(): void

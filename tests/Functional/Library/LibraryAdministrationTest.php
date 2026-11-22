@@ -62,6 +62,28 @@ final class LibraryAdministrationTest extends TestCase
         self::assertNull($stored->getDiscoveryStatus());
     }
 
+    public function testAMemberReadsLibrariesWithoutTheirServerPathWhileAnAdminSeesIt(): void
+    {
+        $admin = $this->createAdminUser();
+        $library = $this->createThroughApi('pathless-' . bin2hex(random_bytes(3)), $admin);
+        $member = $this->createTestUser();
+        $this->service(LibraryAccessPortInterface::class)->grant($member->getId(), $this->libraryId($library['publicId']));
+
+        $listed = $this->assertJsonResponse($this->authenticatedRequest('GET', '/api/libraries', $member), 200, 'data')['data'];
+        $shown = $this->assertJsonResponse($this->authenticatedRequest('GET', '/api/libraries/' . $library['publicId'], $member), 200, 'data')['data'];
+
+        self::assertSame([$library['publicId']], array_column($listed, 'publicId'));
+        foreach ([$listed[0], $shown] as $read) {
+            self::assertSame($library['slug'], $read['slug']);
+            self::assertArrayNotHasKey('path', $read);
+            self::assertStringNotContainsString($this->directory, json_encode($read, JSON_THROW_ON_ERROR));
+        }
+
+        $adminShown = $this->assertJsonResponse($this->authenticatedRequest('GET', '/api/libraries/' . $library['publicId'], $admin), 200, 'data')['data'];
+        self::assertSame($library['path'], $adminShown['path']);
+        self::assertStringStartsWith($this->directory . '/', $adminShown['path']);
+    }
+
     public function testTheApiAndTheConsoleCreateTheSameLibraryAndRefuseTheSameSlug(): void
     {
         $admin = $this->createAdminUser();
@@ -247,6 +269,7 @@ final class LibraryAdministrationTest extends TestCase
         self::assertSame(Command::SUCCESS, $list->execute(['--json' => true]));
         $data = json_decode($list->getDisplay(), true, flags: JSON_THROW_ON_ERROR);
         self::assertContains($library['slug'], array_column($data, 'slug'));
+        self::assertSame($library['path'], array_column($data, 'path', 'slug')[$library['slug']]);
 
         $api = $this->assertJsonResponse($this->authenticatedRequest('GET', '/api/libraries', $this->createAdminUser()), 200, 'data');
         self::assertSame($api['data'], $data);

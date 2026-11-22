@@ -60,6 +60,17 @@ parameters:
     # Email verification token time-to-live. Default: 24 hours.
     auth.email_verification_token.ttl: 86400
 
+    # --- Self-Registration ---
+    # Operators open and close self-registration at runtime with the auth.registration_open
+    # server setting, which ships closed.
+
+    # Shortest time, in milliseconds, from a registration's password hash to its answer.
+    # A new address stores an account, a taken one only tells its owner; both answer after
+    # this floor, so the response time does not reveal which addresses have accounts. Keep
+    # it above the longest time a new account takes to store after the hash on this host,
+    # including its slowest moments under load. Default: 500.
+    auth.registration.response_floor_ms: 500
+
     # Password reset token lifetime in minutes, from PASSWORD_RESET_EXPIRE. Default: 60.
     env(PASSWORD_RESET_EXPIRE): '60'
     auth.password_reset_token.lifetime_minutes: '%env(int:PASSWORD_RESET_EXPIRE)%'
@@ -67,8 +78,9 @@ parameters:
     # --- First-Party Login Client ---
     # Public ID of the pre-registered client that password and passkey login
     # issue tokens to, for every first-party app (web, Electron and mobile).
-    # Only its tokens act with the user's full authority; every other client's
-    # tokens are delegated and limited to their scopes.
+    # Only its tokens from a password or passkey sign-in act with the user's full
+    # authority, and the OAuth endpoints refuse it; every other client's tokens are
+    # delegated and limited to their scopes.
     # Run `php bin/console app:auth:setup-clients` to create it.
     auth.spa_client_id: '%env(AUTH_SPA_CLIENT_ID)%'
 
@@ -106,6 +118,19 @@ parameters:
     env(OAUTH_PUBLIC_KEY_PATH): '%kernel.project_dir%/config/secrets/oauth/public.key'
     auth.public_key_path: '%env(resolve:OAUTH_PUBLIC_KEY_PATH)%'
 
+    # --- Public Origins ---
+
+    # Comma-separated origins the deployment also answers on besides APP_URL's, such as a
+    # LAN address; never the scheme and Host a request arrived with. A DPoP proof's htu may
+    # name any of them. Passkeys use APP_URL's host as the relying party ID, and their
+    # ceremonies accept the origins on that host or a subdomain of it. A request on a listed
+    # origin gets that origin rendered into the web app page, its CSP and absolute API URLs;
+    # any other request gets APP_URL's. The WebSocket handshake accepts APP_URL's origin
+    # only (WebSocketOriginPolicy), not these. An entry that is not an absolute http or
+    # https URL stops the container from booting. Default: none.
+    env(AUTH_EXTRA_ORIGINS): ''
+    auth.extra_origins: '%env(csv:AUTH_EXTRA_ORIGINS)%'
+
     # --- WebAuthn / Passkeys ---
 
     # Timeout for WebAuthn ceremonies in milliseconds. Default: 5 minutes.
@@ -118,7 +143,8 @@ parameters:
     auth.passkey.user_verification: 'preferred'
 
     # Resident key (discoverable credential) requirement: "required", "preferred", or "discouraged".
-    auth.passkey.resident_key: 'preferred'
+    # Passkey sign-in lists no credentials, so only a discoverable credential can sign in.
+    auth.passkey.resident_key: 'required'
 
     # Attestation conveyance preference: "none", "indirect", "direct", or "enterprise".
     auth.passkey.attestation: 'none'
@@ -145,11 +171,6 @@ parameters:
     # DPoP nonce TTL in seconds. Default: 5 minutes.
     auth.dpop.nonce_ttl: 300
 
-    # A DPoP proof's htu names APP_URL's origin or one of these comma-separated
-    # origins, never the scheme and Host the request arrived with. An entry that is
-    # not an absolute http or https URL stops the container from booting. Default: none.
-    env(AUTH_DPOP_EXTRA_ORIGINS): ''
-    auth.dpop.extra_origins: '%env(csv:AUTH_DPOP_EXTRA_ORIGINS)%'
 
     # --- Client Assertions (private_key_jwt, RFC 7523 and RFC 10070) ---
 
@@ -200,9 +221,10 @@ parameters:
     auth.rate_limit.password_reset_per_email.max_attempts: 10
 
     # Maximum step-up attempts per account within the window: the current password,
-    # plus a TOTP code when TOTP is on, that a user's own email change, TOTP setup
-    # and passkey registration ask for. Every attempt counts, from any address. Over
-    # the limit the request answers 429 with Retry-After. Default: 10 per 15 minutes.
+    # plus a TOTP code when TOTP is on, that a user's own email or password change,
+    # TOTP setup, turning TOTP off, and adding or removing a passkey ask for. Every
+    # attempt counts, from any address. Over the limit the request answers 429 with
+    # Retry-After. Default: 10 per 15 minutes.
     auth.rate_limit.step_up.max_attempts: 10
     auth.rate_limit.step_up.window: 900
 

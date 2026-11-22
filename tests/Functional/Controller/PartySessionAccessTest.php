@@ -29,7 +29,11 @@ final class PartySessionAccessTest extends TestCase
     use PartyFixtures;
 
     private const URI = '/api/party/sessions/';
-    private const MISSING = '{"error":{"message":"Resource not found.","code":404}}';
+    /** The not-found answer for an unknown party, by request language. */
+    private const array MISSING = [
+        'en' => '{"error":{"message":"Resource not found.","code":404}}',
+        'da' => '{"error":{"message":"Ressource ikke fundet.","code":404}}',
+    ];
 
     /** What a user can ask of one party: every party route but the join. */
     private const array REQUESTS_THAT_NAME_A_PARTY = [
@@ -404,7 +408,7 @@ final class PartySessionAccessTest extends TestCase
 
             self::assertSame(404, $hidden->getStatusCode(), $route . ': ' . $hidden->getContent());
             self::assertSame(404, $missing->getStatusCode(), $route . ': ' . $missing->getContent());
-            self::assertSame(self::MISSING, $missing->getContent(), $route);
+            self::assertSame(self::MISSING[$language ?? 'en'], $missing->getContent(), $route);
             self::assertSame($missing->getContent(), $hidden->getContent(), $route);
             self::assertSame($this->headersOf($missing), $this->headersOf($hidden), $route);
         }

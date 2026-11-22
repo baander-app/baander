@@ -51,7 +51,7 @@ All endpoints are prefixed with `/api`.
 |--------|------|---------|
 | POST | `/api/discovery/register` | Register a self-hosted server (`ROLE_ADMIN`; console: `app:discovery:register`) |
 | POST | `/api/discovery/pairing-code` | Create a pairing code for a server (authenticated) |
-| GET | `/api/discovery/qr-payload/{serverPublicId}` | Get QR payload for a pending pairing session (authenticated) |
+| POST | `/api/discovery/qr-payload/{serverPublicId}` | Create a QR code pairing session and return its payload (authenticated) |
 | POST | `/api/discovery/complete-pairing` | Complete a pairing session (authenticated) |
 
 ## Cross-Context Relationships
@@ -67,9 +67,9 @@ All endpoints are prefixed with `/api`.
 | `ServerInstanceEntity` / `PairingSessionEntity` | Doctrine entity | Persistence for both aggregates |
 | `ServerInstanceRepository` / `PairingSessionRepository` | Doctrine repository | Repository implementations for both aggregates |
 | `DiscoveryForeignKeys` | Doctrine foreign key provider | Declares `fk_pairing_sessions_server_id` (`pairing_sessions.server_id` → `server_instances.id`, `ON DELETE CASCADE`) |
-| `DiscoveryRateLimitListener` | Event listener | Per-IP rate limiting on `POST /api/discovery/register`, `POST /api/discovery/pairing-code`, and `POST /api/discovery/complete-pairing` |
+| `DiscoveryRateLimitListener` | Event listener | Per-IP rate limiting on `POST /api/discovery/register`, `POST /api/discovery/pairing-code`, `POST /api/discovery/qr-payload/{serverPublicId}`, and `POST /api/discovery/complete-pairing` |
 | `ServerInstanceService` | Port implementation | Backs `ServerInstancePortInterface` |
-| `DiscoveryService` | Port implementation | Backs `DiscoveryPortInterface` |
+| `DiscoveryService` | Port implementation | Backs `DiscoveryPortInterface`; creating a pairing session also deletes, in the same transaction, every session whose expiry has passed |
 
 ### Console Commands
 

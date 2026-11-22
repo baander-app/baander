@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Auth\Fixtures;
 
+use App\Auth\Domain\Model\OAuth\SignInGrant;
 use App\Auth\Infrastructure\Doctrine\Entity\OAuth\AccessTokenEntity;
 use App\Auth\Infrastructure\Doctrine\Entity\OAuth\ClientEntity;
 use App\Auth\Infrastructure\Doctrine\Entity\OAuth\TokenMetadataEntity;
@@ -121,7 +122,7 @@ final class OAuthAccessTokenJwtTest extends TestCase
     {
         $client = new ClientEntity(new PublicId(), 'Disposable client', json_encode(['https://baander.app/callback'], JSON_THROW_ON_ERROR));
         $user = new UserEntity(new PublicId(), 'Actor', 'actor@baander.app', 'test-only-password-hash');
-        $token = new AccessTokenEntity((new Uuid())->toString(), $client, $user, scopes: ['library'], expiresAt: $expiresAt);
+        $token = new AccessTokenEntity((new Uuid())->toString(), $client, SignInGrant::AuthorizationCode, $user, scopes: ['library'], expiresAt: $expiresAt);
         $token->setDpopJkt('thumbprint-of-the-row');
 
         return $token;

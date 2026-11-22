@@ -33,7 +33,7 @@ use Symfony\Component\HttpFoundation\Response;
  *
  * Password login, passkey login and refresh mint first-party tokens; the authorization
  * code grant from a pushed request with PKCE, and the device grant, mint tokens for other clients under the same
- * DPoP and fingerprint binding. Passkey login signs a real WebAuthn assertion with an
+ * DPoP and fingerprint binding. Each access token stores the grant that started its chain. Passkey login signs a real WebAuthn assertion with an
  * ES256 test authenticator.
  */
 final class OAuthGrantPathAcceptanceTest extends TestCase
@@ -96,6 +96,7 @@ final class OAuthGrantPathAcceptanceTest extends TestCase
             password_hash(self::PASSWORD, PASSWORD_BCRYPT),
             'Grant path user',
         );
+        $this->user->verifyEmail();
         $users->save($this->user);
 
         // Login and passkey login always issue to the configured first-party SPA client.
@@ -329,6 +330,33 @@ final class OAuthGrantPathAcceptanceTest extends TestCase
         self::assertSame(200, $this->me($data['accessToken'], $key)->getStatusCode());
     }
 
+    /**
+     * Every rotation copies the sign-in grant of the chain's first pair, so a password session
+     * stays first-party: the rotated token still manages the user's own clients.
+     */
+    public function testRotationKeepsThePasswordSignInOfTheChainAndItsFirstPartyAuthority(): void
+    {
+        $key = new SignedDpopProof();
+        $login = $this->login($key);
+        $accessTokens = [$login['accessToken']];
+        $refreshToken = $login['refreshToken'];
+
+        for ($rotation = 0; $rotation < 2; ++$rotation) {
+            $response = $this->refresh($refreshToken, $key, $this->nonce());
+            self::assertSame(200, $response->getStatusCode(), (string) $response->getContent());
+            $data = json_decode((string) $response->getContent(), true, flags: JSON_THROW_ON_ERROR)['data'];
+            $accessTokens[] = $data['accessToken'];
+            $refreshToken = $data['refreshToken'];
+        }
+
+        self::assertSame(
+            ['password', 'password', 'password'],
+            array_map(fn (string $jwt): string => $this->storedGrant(self::claims($jwt)['jti']), $accessTokens),
+        );
+        $clients = $this->asUser(array_last($accessTokens), $key, 'GET', '/api/oauth/clients/');
+        self::assertSame(200, $clients->getStatusCode(), (string) $clients->getContent());
+    }
+
     public function testRefreshRejectsARevokedRefreshToken(): void
     {
         $key = new SignedDpopProof();
@@ -453,6 +481,7 @@ final class OAuthGrantPathAcceptanceTest extends TestCase
         $claims = self::claims($data['accessToken']);
         self::assertSame(['jkt' => $key->thumbprint()], $claims['cnf'] ?? null);
         self::assertSame($key->thumbprint(), $this->storedBinding($claims['jti']));
+        self::assertSame('passkey', $this->storedGrant($claims['jti']));
 
         $me = $this->me($data['accessToken'], $key);
         self::assertSame(200, $me->getStatusCode(), (string) $me->getContent());
@@ -464,6 +493,7 @@ final class OAuthGrantPathAcceptanceTest extends TestCase
         self::assertSame(200, $refresh->getStatusCode(), (string) $refresh->getContent());
         $rotated = json_decode((string) $refresh->getContent(), true, flags: JSON_THROW_ON_ERROR)['data'];
         self::assertSame(200, $this->me($rotated['accessToken'], $key)->getStatusCode());
+        self::assertSame('passkey', $this->storedGrant(self::claims($rotated['accessToken'])['jti']));
     }
 
     /** @return iterable<string, array{string}> */
@@ -680,6 +710,7 @@ final class OAuthGrantPathAcceptanceTest extends TestCase
         $claims = self::claims($tokens['access_token']);
         self::assertSame(['jkt' => $tv->thumbprint()], $claims['cnf']);
         self::assertSame($this->user->getPublicId()->toString(), $claims['sub']);
+        self::assertSame('device_code', $this->storedGrant($claims['jti']));
         self::assertSame(200, $this->devices($tokens['access_token'], $tv, $tvFingerprint)->getStatusCode());
         self::assertSame(401, $this->devices($tokens['access_token'], $tv)->getStatusCode(), 'The TV fingerprint binding applies.');
 
@@ -692,6 +723,7 @@ final class OAuthGrantPathAcceptanceTest extends TestCase
         self::assertSame(200, $refreshed['status'], json_encode($refreshed, JSON_THROW_ON_ERROR));
         self::assertTokenResponse($refreshed, 'library playlist');
         self::assertSame(['jkt' => $tv->thumbprint()], self::claims($refreshed['access_token'])['cnf']);
+        self::assertSame('device_code', $this->storedGrant(self::claims($refreshed['access_token'])['jti']));
         self::assertSame(200, $this->devices($refreshed['access_token'], $tv, $tvFingerprint)->getStatusCode());
     }
 
@@ -809,6 +841,49 @@ final class OAuthGrantPathAcceptanceTest extends TestCase
         ), 'No stored value equals an issued refresh token.');
     }
 
+    /**
+     * The table holds only the SHA-256 hash of an issued device code, so a database reader
+     * who polls with the stored value of an approved code receives no tokens.
+     */
+    public function testADeviceCodeIsStoredOnlyAsItsHash(): void
+    {
+        $clientId = $this->deviceClient();
+        $codes = json_decode((string) $this->send('POST', '/api/oauth/device/authorize', form: ['client_id' => $clientId, 'scope' => 'library'])->getContent(), true, flags: JSON_THROW_ON_ERROR);
+
+        self::assertSame(0, (int) $this->connection->fetchOne('SELECT count(*) FROM oauth_device_codes WHERE device_code = ?', [$codes['device_code']]));
+        self::assertSame(1, (int) $this->connection->fetchOne('SELECT count(*) FROM oauth_device_codes WHERE device_code = ?', [hash('sha256', $codes['device_code'])]));
+
+        $web = new SignedDpopProof();
+        $login = $this->login($web);
+        $approval = $this->asUser($login['accessToken'], $web, 'POST', '/api/oauth/device/approve', json: ['userCode' => $codes['user_code'], 'decision' => 'approve']);
+        self::assertSame(200, $approval->getStatusCode(), (string) $approval->getContent());
+        $stored = $this->connection->fetchOne(
+            'SELECT d.device_code FROM oauth_device_codes d JOIN oauth_clients c ON c.id = d.client_id WHERE c.public_id = ?',
+            [$clientId],
+        );
+        self::assertIsString($stored);
+
+        [$reader, $nonce] = $this->pollDevice(new SignedDpopProof(), $clientId, $stored, $this->nonce());
+        self::assertSame(['invalid_grant', 400], [$reader['error'], $reader['status']], json_encode($reader, JSON_THROW_ON_ERROR));
+        self::assertSame(0, $this->issuedTo($clientId), 'The stored value redeems nothing.');
+        [$tv] = $this->pollDevice(new SignedDpopProof(), $clientId, $codes['device_code'], $nonce);
+        self::assertSame(200, $tv['status'], json_encode($tv, JSON_THROW_ON_ERROR));
+    }
+
+    /** A database reader holds only the SHA-256 hash of an authorization code issued on consent. */
+    public function testAnAuthorizationCodeIsStoredOnlyAsItsHash(): void
+    {
+        $clientId = $this->publicClient();
+        [, $challenge] = self::pkcePair();
+        $web = new SignedDpopProof();
+        $login = $this->login($web);
+        $redirect = $this->decide($login['accessToken'], $web, ['client_id' => $clientId, 'request_uri' => $this->push($clientId, $challenge, proof: new SignedDpopProof()), 'decision' => 'approve']);
+        self::assertArrayHasKey('code', $redirect);
+
+        self::assertSame(0, (int) $this->connection->fetchOne('SELECT count(*) FROM oauth_auth_codes WHERE code_id = ?', [$redirect['code']]));
+        self::assertSame(1, (int) $this->connection->fetchOne('SELECT count(*) FROM oauth_auth_codes WHERE code_id = ?', [hash('sha256', $redirect['code'])]));
+    }
+
     public function testDeniedDeviceRequestAnswersAccessDenied(): void
     {
         $tv = new SignedDpopProof();
@@ -835,6 +910,55 @@ final class OAuthGrantPathAcceptanceTest extends TestCase
     }
 
     /**
+     * Baander's own client never starts an authorization request: while its user is signed
+     * in, an anonymous push naming it with the pusher's key is refused and stores nothing
+     * that a consent page could approve.
+     */
+    public function testAnAnonymousPushNamingTheFirstPartyClientIsRefusedAndStoresNothing(): void
+    {
+        $this->login(new SignedDpopProof());
+        $pushedBefore = $this->pushedRequestsOf($this->spaClientId());
+
+        $response = $this->send('POST', '/api/oauth/par', form: [
+            ...$this->pushParameters($this->spaClientId(), self::pkcePair()[1], 'pusher-state'),
+            'dpop_jkt' => (new SignedDpopProof())->thumbprint(),
+        ]);
+
+        self::assertSame(400, $response->getStatusCode(), (string) $response->getContent());
+        $error = json_decode((string) $response->getContent(), true, flags: JSON_THROW_ON_ERROR);
+        self::assertSame('unauthorized_client', $error['error']);
+        self::assertArrayNotHasKey('request_uri', $error);
+        self::assertSame($pushedBefore, $this->pushedRequestsOf($this->spaClientId()), 'No pushed request is stored for the first-party client.');
+    }
+
+    /** @return iterable<string, array{string}> */
+    public static function tokenEndpointGrants(): iterable
+    {
+        yield 'refresh token' => ['refresh_token'];
+        yield 'authorization code' => ['authorization_code'];
+        yield 'device code' => ['urn:ietf:params:oauth:grant-type:device_code'];
+    }
+
+    /** The first-party client refreshes at /api/auth/refresh only; the token endpoint refuses it every grant. */
+    #[DataProvider('tokenEndpointGrants')]
+    public function testTheTokenEndpointRefusesTheFirstPartyClientEveryGrant(string $grantType): void
+    {
+        $key = new SignedDpopProof();
+        $login = $this->login($key);
+        [$verifier] = self::pkcePair();
+        $form = match ($grantType) {
+            'refresh_token' => ['refresh_token' => $login['refreshToken']],
+            'authorization_code' => ['code' => str_repeat('c', 80), 'redirect_uri' => self::REDIRECT, 'code_verifier' => $verifier],
+            default => ['device_code' => str_repeat('d', 80)],
+        };
+
+        [$answer] = $this->tokenRequest($key, $login['nonce'], ['grant_type' => $grantType, 'client_id' => $this->spaClientId(), ...$form]);
+
+        self::assertSame(['unauthorized_client', 400], [$answer['error'] ?? null, $answer['status']], json_encode($answer, JSON_THROW_ON_ERROR));
+        self::assertArrayNotHasKey('access_token', $answer);
+    }
+
+    /**
      * Authorization code with mandatory S256 PKCE from a pushed request, through the production
      * firewall: the client pushes the request with a proof from its key, the web app's consent
      * page looks it up, sends the approval and navigates to the returned URI, and the client
@@ -858,7 +982,6 @@ final class OAuthGrantPathAcceptanceTest extends TestCase
             'client_type' => 'public',
             'scopes' => ['library'],
             'redirect_uri' => self::REDIRECT,
-            'consent_required' => true,
         ], json_decode((string) $check->getContent(), true, flags: JSON_THROW_ON_ERROR));
         self::assertSame(0, (int) $this->connection->fetchOne('SELECT COUNT(*) FROM oauth_auth_codes WHERE user_id = ?', [$this->user->getId()->toString()]), 'Checking issues no code.');
 
@@ -878,6 +1001,7 @@ final class OAuthGrantPathAcceptanceTest extends TestCase
         self::assertTokenResponse($tokens, 'library');
         self::assertSame(['jkt' => $app->thumbprint()], self::claims($tokens['access_token'])['cnf']);
         self::assertSame($app->thumbprint(), $this->storedBinding(self::claims($tokens['access_token'])['jti']));
+        self::assertSame('authorization_code', $this->storedGrant(self::claims($tokens['access_token'])['jti']));
         self::assertSame(200, $this->devices($tokens['access_token'], $app)->getStatusCode());
 
         [$replay] = $this->tokenRequest($app, $nonce, [...$exchange, 'code_verifier' => $verifier]);
@@ -938,7 +1062,7 @@ final class OAuthGrantPathAcceptanceTest extends TestCase
         // The code was issued 61 seconds ago.
         $this->connection->executeStatement(
             "UPDATE oauth_auth_codes SET created_at = created_at - interval '61 seconds', expires_at = expires_at - interval '61 seconds' WHERE code_id = ?",
-            [$redirect['code']],
+            [hash('sha256', $redirect['code'])],
         );
 
         [$late] = $this->tokenRequest($app, $this->nonce(), [
@@ -1133,6 +1257,23 @@ final class OAuthGrantPathAcceptanceTest extends TestCase
         self::assertSame(200, $change->getStatusCode(), (string) $change->getContent());
     }
 
+    /** Pushed authorization requests stored for the client with the given public ID. */
+    private function pushedRequestsOf(string $clientId): int
+    {
+        return (int) $this->connection->fetchOne(
+            'SELECT count(*) FROM oauth_pushed_authorization_requests r JOIN oauth_clients c ON c.id = r.client_id WHERE c.public_id = ?',
+            [$clientId],
+        );
+    }
+
+    private function spaClientId(): string
+    {
+        $spaClientId = $this->kernel->getContainer()->getParameter('auth.spa_client_id');
+        self::assertIsString($spaClientId);
+
+        return $spaClientId;
+    }
+
     /** Access tokens issued to the client with the given public ID. */
     private function issuedTo(string $clientId): int
     {
@@ -1283,7 +1424,7 @@ final class OAuthGrantPathAcceptanceTest extends TestCase
     /** @return array{challengeKey: string, response: array<string, mixed>} */
     private function passkeyAssertion(WebAuthnTestCredential $credential): array
     {
-        $options = $this->send('POST', '/api/auth/passkey/authenticate/options', json: ['userId' => $this->user->getPublicId()->toString()]);
+        $options = $this->send('POST', '/api/auth/passkey/authenticate/options');
         self::assertSame(200, $options->getStatusCode(), (string) $options->getContent());
         $data = json_decode((string) $options->getContent(), true, flags: JSON_THROW_ON_ERROR)['data'];
         self::assertIsString($data['challengeKey']);
@@ -1304,6 +1445,15 @@ final class OAuthGrantPathAcceptanceTest extends TestCase
         self::assertIsString($hash);
 
         return $hash;
+    }
+
+    /** The sign-in grant stored with the access token. */
+    private function storedGrant(string $tokenId): string
+    {
+        $grant = $this->connection->fetchOne('SELECT grant_type FROM oauth_access_tokens WHERE token_id = ?', [$tokenId]);
+        self::assertIsString($grant, 'The issued access token must be persisted.');
+
+        return $grant;
     }
 
     private function storedBinding(string $tokenId): ?string

@@ -22,6 +22,7 @@ use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\Messenger\MessageBusInterface;
 use Symfony\Component\Messenger\Stamp\HandledStamp;
 use Symfony\Component\Routing\Attribute\Route;
+use Symfony\Component\Security\Core\Authorization\AuthorizationCheckerInterface;
 use Symfony\Component\Security\Http\Attribute\CurrentUser;
 use Symfony\Component\Security\Http\Attribute\IsGranted;
 use Symfony\Component\Security\Core\Exception\AccessDeniedException;
@@ -37,12 +38,13 @@ final class TranscodeJobController
         private readonly TranscodeJobPortInterface $jobPort,
         private readonly TranscodePublicViewInterface $publicView,
         private readonly PlaybackAccessInterface $playback,
+        private readonly AuthorizationCheckerInterface $authorization,
     ) {
     }
 
     #[OA\Operation\Get(
         path: '/api/transcode/jobs/',
-        summary: 'List orphaned transcode jobs in accessible libraries',
+        summary: 'List the caller\'s orphaned transcode jobs in accessible libraries; administrators see every user\'s',
         responses: [
             new OA\Response(
                 response: '200',
@@ -69,13 +71,13 @@ final class TranscodeJobController
         ],
     )]
     #[Route('/', name: 'index', methods: ['GET'])]
-    public function index(): JsonResponse
+    public function index(#[CurrentUser] AuthenticatedUserIdentityInterface $user): JsonResponse
     {
         $orphans = $this->jobPort->findOrphanedJobs();
 
         $data = [];
         foreach ($orphans as $job) {
-            if ($this->canAccessVideo($job->getVideoId())) {
+            if ($this->mayRead($user, $job->getOwnerUserId()) && $this->canAccessVideo($job->getVideoId())) {
                 $data[] = TranscodeJobResource::from($this->publicView->job($job));
             }
         }
@@ -85,7 +87,7 @@ final class TranscodeJobController
 
     #[OA\Operation\Get(
         path: '/api/transcode/jobs/{publicId}',
-        summary: 'Get a transcode job by public ID',
+        summary: 'Get one of the caller\'s transcode jobs by public ID; administrators may read any user\'s',
         parameters: [
             new OA\Parameter(
                 name: 'publicId',
@@ -117,7 +119,7 @@ final class TranscodeJobController
             ),
             new OA\Response(
                 response: '404',
-                description: 'Not found',
+                description: 'No such job, or another user\'s job for a caller who is not an administrator',
                 content: new OA\MediaType\Json(
                     schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
                 ),
@@ -125,11 +127,11 @@ final class TranscodeJobController
         ],
     )]
     #[Route('/{publicId}', name: 'show', methods: ['GET'])]
-    public function show(string $publicId): JsonResponse
+    public function show(string $publicId, #[CurrentUser] AuthenticatedUserIdentityInterface $user): JsonResponse
     {
         $job = $this->jobPort->findByPublicId(PublicId::fromString($publicId));
 
-        if ($job === null) {
+        if ($job === null || !$this->mayRead($user, $job->getOwnerUserId())) {
             return $this->notFound();
         }
         $this->playback->assertAccess($job->getVideoId());
@@ -185,7 +187,7 @@ final class TranscodeJobController
 
     #[OA\Operation\Get(
         path: '/api/transcode/jobs/{publicId}/metrics',
-        summary: 'Get transcode job metrics',
+        summary: 'Get the metrics of one of the caller\'s transcode jobs; administrators may read any user\'s',
         parameters: [
             new OA\Parameter(
                 name: 'publicId',
@@ -205,7 +207,7 @@ final class TranscodeJobController
             ),
             new OA\Response(
                 response: '404',
-                description: 'Not found',
+                description: 'No such job, or another user\'s job for a caller who is not an administrator',
                 content: new OA\MediaType\Json(
                     schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
                 ),
@@ -213,10 +215,10 @@ final class TranscodeJobController
         ],
     )]
     #[Route('/{publicId}/metrics', name: 'metrics', methods: ['GET'])]
-    public function getMetrics(string $publicId): JsonResponse
+    public function getMetrics(string $publicId, #[CurrentUser] AuthenticatedUserIdentityInterface $user): JsonResponse
     {
         $job = $this->jobPort->findByPublicId(PublicId::fromString($publicId));
-        if ($job === null) {
+        if ($job === null || !$this->mayRead($user, $job->getOwnerUserId())) {
             return $this->notFound();
         }
         $this->playback->assertAccess($job->getVideoId());
@@ -251,6 +253,13 @@ final class TranscodeJobController
         }
 
         return $this->successResponse($data);
+    }
+
+    /** A job is its owner's business; an administrator sees every job. */
+    private function mayRead(AuthenticatedUserIdentityInterface $user, ?Uuid $jobOwnerId): bool
+    {
+        return $this->authorization->isGranted('ROLE_ADMIN')
+            || $jobOwnerId?->equals(Uuid::fromString($user->getId())) === true;
     }
 
     private function canAccessVideo(Uuid $videoId): bool

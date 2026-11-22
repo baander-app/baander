@@ -25,7 +25,7 @@ final class SignedDeliveryRoutes
             'stream_subtitle_manifest' => "/api/transcode/$jobId/subtitles/$language/media.m3u8",
             'stream_segment_init_segment' => "/api/transcode/$jobId/tracks/$track/init.mp4",
             'stream_segment_segment' => "/api/transcode/$jobId/tracks/$track/segment.m4s?index=0",
-            'stream_segment_subtitle_segment' => "/api/transcode/$jobId/subtitles/$language/0.vtt",
+            'stream_segment_subtitle_segment' => "/api/transcode/$jobId/subtitles/$language/full.vtt",
             'stream_artifact_master' => "/api/transcode/artifacts/$jobId/3/master.m3u8",
             'stream_artifact_media' => "/api/transcode/artifacts/$jobId/3/tracks/$track/media.m3u8",
             'stream_artifact_init' => "/api/transcode/artifacts/$jobId/3/tracks/$track/init.mp4",

@@ -7,6 +7,7 @@ namespace App\Tests\Unit\Auth\Domain\Model;
 use App\Auth\Domain\Model\OAuth\AccessToken;
 use App\Auth\Domain\Model\OAuth\AccessTokenState;
 use App\Auth\Domain\Model\OAuth\Client;
+use App\Auth\Domain\Model\OAuth\SignInGrant;
 use App\Auth\Domain\Model\User;
 use App\Auth\Domain\Model\OAuth\ValueObject\Scope;
 use App\Shared\Domain\Model\Email;
@@ -26,7 +27,7 @@ final class AccessTokenTest extends TestCase
 
     public function testIssueWithMinimalParams(): void
     {
-        $token = AccessToken::issue($this->client);
+        $token = AccessToken::issue($this->client, SignInGrant::AuthorizationCode);
 
         $this->assertInstanceOf(\App\Shared\Domain\Model\Uuid::class, $token->getId());
         $this->assertNull($token->getUser());
@@ -43,6 +44,7 @@ final class AccessTokenTest extends TestCase
         $scopes = [new Scope('profile'), new Scope('admin')];
         $token = AccessToken::issue(
             client: $this->client,
+            grant: SignInGrant::AuthorizationCode,
             user: $this->user,
             scopes: $scopes,
             name: 'My Token',
@@ -51,6 +53,7 @@ final class AccessTokenTest extends TestCase
         );
 
         $this->assertSame($this->user, $token->getUser());
+        $this->assertSame(SignInGrant::AuthorizationCode, $token->getGrant());
         $this->assertSame('My Token', $token->getName());
         $this->assertCount(2, $token->getScopes());
         $this->assertNotNull($token->getExpiresAt());
@@ -59,7 +62,7 @@ final class AccessTokenTest extends TestCase
 
     public function testIssueWithoutTtlHasNoExpiry(): void
     {
-        $token = AccessToken::issue($this->client);
+        $token = AccessToken::issue($this->client, SignInGrant::AuthorizationCode);
 
         $this->assertNull($token->getExpiresAt());
         $this->assertFalse($token->isExpired());
@@ -67,14 +70,14 @@ final class AccessTokenTest extends TestCase
 
     public function testIssueWithPastTtlIsExpired(): void
     {
-        $token = AccessToken::issue($this->client, ttl: new DateInterval('PT0S'));
+        $token = AccessToken::issue($this->client, SignInGrant::AuthorizationCode, ttl: new DateInterval('PT0S'));
 
         $this->assertTrue($token->isExpired());
     }
 
     public function testRevoke(): void
     {
-        $token = AccessToken::issue($this->client);
+        $token = AccessToken::issue($this->client, SignInGrant::AuthorizationCode);
 
         $token->revoke();
 
@@ -83,7 +86,7 @@ final class AccessTokenTest extends TestCase
 
     public function testRevokeIdempotent(): void
     {
-        $token = AccessToken::issue($this->client);
+        $token = AccessToken::issue($this->client, SignInGrant::AuthorizationCode);
         $token->revoke();
         $before = $token->getUpdatedAt();
 
@@ -94,7 +97,7 @@ final class AccessTokenTest extends TestCase
 
     public function testMarkRefreshed(): void
     {
-        $token = AccessToken::issue($this->client);
+        $token = AccessToken::issue($this->client, SignInGrant::AuthorizationCode);
 
         $token->markRefreshed();
 
@@ -103,7 +106,7 @@ final class AccessTokenTest extends TestCase
 
     public function testGetScopeIdentifiers(): void
     {
-        $token = AccessToken::issue($this->client, scopes: [new Scope('library')]);
+        $token = AccessToken::issue($this->client, SignInGrant::AuthorizationCode, scopes: [new Scope('library')]);
 
         $this->assertSame(['library'], $token->getScopeIdentifiers());
     }
@@ -119,6 +122,7 @@ final class AccessTokenTest extends TestCase
             tokenId: \App\Auth\Domain\Model\OAuth\TokenId::generate(),
             user: $this->user,
             client: $this->client,
+            grant: SignInGrant::DeviceCode,
             name: 'Token',
             scopes: [new Scope('admin')],
             chainId: $chainId,
@@ -130,6 +134,7 @@ final class AccessTokenTest extends TestCase
         ));
 
         $this->assertSame($chainId, $token->getChainId());
+        $this->assertSame(SignInGrant::DeviceCode, $token->getGrant());
         $this->assertSame('Token', $token->getName());
         $this->assertSame($expiresAt, $token->getExpiresAt());
     }

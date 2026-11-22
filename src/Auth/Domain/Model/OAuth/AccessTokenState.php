@@ -28,6 +28,8 @@ final class AccessTokenState
         public readonly TokenId $tokenId,
         public ?User $user,
         public readonly Client $client,
+        /** The grant that started the token's refresh chain. */
+        public readonly SignInGrant $grant,
         public ?string $name,
         array $scopes,
         public ?ChainId $chainId,

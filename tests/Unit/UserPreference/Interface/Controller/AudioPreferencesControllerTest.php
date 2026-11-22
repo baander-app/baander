@@ -12,6 +12,7 @@ use PHPUnit\Framework\MockObject\Stub;
 use PHPUnit\Framework\TestCase;
 use Symfony\Bundle\SecurityBundle\Security;
 use Symfony\Component\HttpFoundation\Request;
+use Symfony\Component\Translation\Translator;
 use App\UserPreference\Interface\Request\PreferenceRequestBody;
 use Symfony\Component\Validator\ConstraintViolation;
 use Symfony\Component\Validator\ConstraintViolationList;
@@ -41,6 +42,7 @@ final class AudioPreferencesControllerTest extends TestCase
             new PreferenceRequestBody(),
             $this->security,
         );
+        $fixture->setTranslator(new Translator('en'));
 
         $user = new SecurityUser(
             id: '01911111-1111-7111-8111-111111111111',

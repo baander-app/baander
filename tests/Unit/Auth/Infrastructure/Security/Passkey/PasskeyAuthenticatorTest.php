@@ -17,6 +17,7 @@ use App\Auth\Infrastructure\Security\OAuth\DpopProofValidator;
 use App\Auth\Infrastructure\Security\OAuth\DpopTokenRequestVerifier;
 use App\Auth\Infrastructure\Security\Passkey\PasskeyAuthenticator;
 use App\Auth\Infrastructure\Security\Totp\TotpService;
+use App\Shared\Application\Http\PublicOrigins;
 use App\Shared\Domain\Model\Email;
 use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
@@ -43,7 +44,7 @@ final class PasskeyAuthenticatorTest extends TestCase
         $logger = $this->createStub(LoggerInterface::class);
         $redis = $this->createStub(RedisClientFactory::class);
         $redis->method('borrow')->willReturn(true);
-        $verifier = new DpopTokenRequestVerifier(new DpopProofValidator($this->createStub(DpopJtiCacheInterface::class), publicUrl: 'https://baander.app'), new DpopNonceManager($redis));
+        $verifier = new DpopTokenRequestVerifier(new DpopProofValidator($this->createStub(DpopJtiCacheInterface::class), new PublicOrigins('https://baander.app')), new DpopNonceManager($redis));
         $this->authenticator = new PasskeyAuthenticator($bus, $this->createStub(\App\Auth\Domain\Repository\UserRepositoryInterface::class), $logger, new JsonEncoder(), $verifier, AuthenticationFailureMessages::create());
     }
 
@@ -79,7 +80,7 @@ final class PasskeyAuthenticatorTest extends TestCase
         $redis->method('borrow')->willThrowException(new \RedisException('Connection refused'));
         $bus = $this->createMock(\Symfony\Component\Messenger\MessageBusInterface::class);
         $bus->expects($this->never())->method('dispatch');
-        $verifier = new DpopTokenRequestVerifier(new DpopProofValidator($this->createStub(DpopJtiCacheInterface::class), publicUrl: 'https://baander.app'), new DpopNonceManager($redis));
+        $verifier = new DpopTokenRequestVerifier(new DpopProofValidator($this->createStub(DpopJtiCacheInterface::class), new PublicOrigins('https://baander.app')), new DpopNonceManager($redis));
         $authenticator = new PasskeyAuthenticator($bus, $this->createStub(\App\Auth\Domain\Repository\UserRepositoryInterface::class), $this->createStub(LoggerInterface::class), new JsonEncoder(), $verifier, AuthenticationFailureMessages::create());
         $request = Request::create('https://baander.app/api/auth/login/passkey', 'POST', [], [], [], ['CONTENT_TYPE' => 'application/json'], '{"challengeKey":"key","response":{}}');
         $request->headers->set('DPoP', (new SignedDpopProof())->createWithNonce('POST', 'https://baander.app/api/auth/login/passkey', 'issued-nonce'));
@@ -102,7 +103,7 @@ final class PasskeyAuthenticatorTest extends TestCase
         $outage = new PasskeyChallengeUnavailableException('Passkey challenge storage is unavailable.');
         $bus = $this->createStub(\Symfony\Component\Messenger\MessageBusInterface::class);
         $bus->method('dispatch')->willReturnCallback(static fn (object $command): never => throw new HandlerFailedException(new Envelope($command), [$outage]));
-        $verifier = new DpopTokenRequestVerifier(new DpopProofValidator($this->createStub(DpopJtiCacheInterface::class), publicUrl: 'https://baander.app'), new DpopNonceManager($redis));
+        $verifier = new DpopTokenRequestVerifier(new DpopProofValidator($this->createStub(DpopJtiCacheInterface::class), new PublicOrigins('https://baander.app')), new DpopNonceManager($redis));
         $authenticator = new PasskeyAuthenticator($bus, $this->createStub(\App\Auth\Domain\Repository\UserRepositoryInterface::class), $this->createStub(LoggerInterface::class), new JsonEncoder(), $verifier, AuthenticationFailureMessages::create());
         $request = Request::create('https://baander.app/api/auth/login/passkey', 'POST', [], [], [], ['CONTENT_TYPE' => 'application/json'], '{"challengeKey":"key","response":{}}');
         $request->headers->set('DPoP', (new SignedDpopProof())->createWithNonce('POST', 'https://baander.app/api/auth/login/passkey', 'issued-nonce'));

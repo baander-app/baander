@@ -15,6 +15,7 @@ use App\Auth\Domain\Model\OAuth\AccessToken;
 use App\Auth\Domain\Model\OAuth\Client;
 use App\Auth\Domain\Model\OAuth\RefreshToken;
 use App\Auth\Domain\Model\OAuth\RefreshTokenState;
+use App\Auth\Domain\Model\OAuth\SignInGrant;
 use App\Auth\Domain\Model\OAuth\TokenId;
 use App\Auth\Domain\Model\OAuth\TokenMetadata;
 use App\Auth\Domain\Model\User;
@@ -235,6 +236,7 @@ final class RefreshTokenHandlerTest extends TestCase
 
         $oldAccessToken = AccessToken::issue(
             $client,
+            SignInGrant::Password,
             $user,
             [new Scope('profile'), new Scope('library')],
             'My Token',
@@ -269,11 +271,39 @@ final class RefreshTokenHandlerTest extends TestCase
         self::assertNotContains('lock presented', $this->events, 'An unused token takes the rotation path without the locked evaluation.');
     }
 
+    /** Every rotation copies the grant that started the chain, so a passkey session stays one. */
+    public function testRotationKeepsTheSignInGrantOfTheChainAcrossSeveralRefreshes(): void
+    {
+        $chainId = ChainId::generate();
+        $presented = $this->store(RefreshToken::issue(
+            AccessToken::issue(
+                $this->createConfidentialClient(),
+                SignInGrant::Passkey,
+                User::register(new Email('user@baander.app'), 'hashed-pw', 'Test User'),
+                [],
+                null,
+                new \DateInterval('PT3600S'),
+                $chainId,
+                dpopJkt: self::JKT,
+            ),
+            $chainId,
+            new \DateInterval('PT2592000S'),
+        ));
+
+        foreach (range(1, 3) as $rotation) {
+            ($this->handler)(new RefreshTokenCommand(refreshTokenId: $presented->getTokenId()->toString(), dpopJkt: self::JKT));
+            $presented = $this->store(array_last($this->savedRefreshTokens));
+
+            self::assertSame(SignInGrant::Passkey, $presented->getAccessToken()->getGrant(), sprintf('Rotation %d', $rotation));
+        }
+        self::assertCount(3, $this->savedRefreshTokens);
+    }
+
     public function testReplacementKeepsTheClientFingerprintBinding(): void
     {
         $user = User::register(new Email('user@baander.app'), 'hashed-pw', 'Test User');
         $chainId = ChainId::generate();
-        $oldAccessToken = AccessToken::issue($this->createConfidentialClient(), $user, [new Scope('profile')], null, new \DateInterval('PT3600S'), $chainId, dpopJkt: self::JKT);
+        $oldAccessToken = AccessToken::issue($this->createConfidentialClient(), SignInGrant::Password, $user, [new Scope('profile')], null, new \DateInterval('PT3600S'), $chainId, dpopJkt: self::JKT);
         $oldRefreshToken = $this->store(RefreshToken::issue($oldAccessToken, $chainId, new \DateInterval('PT2592000S')));
         $this->tokenMetadataRepository->method('findByTokenId')->willReturnCallback(
             static fn (TokenId $tokenId): ?TokenMetadata => $tokenId->equals($oldAccessToken->getTokenId())
@@ -331,7 +361,7 @@ final class RefreshTokenHandlerTest extends TestCase
     {
         $chainId = ChainId::generate();
         $presented = $this->store(RefreshToken::issue(
-            AccessToken::issue($this->createConfidentialClient(), User::register(new Email('user@baander.app'), 'hashed-pw', 'Test User'), [], null, new \DateInterval('PT3600S'), $chainId, self::JKT, credentialEpoch: 1),
+            AccessToken::issue($this->createConfidentialClient(), SignInGrant::Password, User::register(new Email('user@baander.app'), 'hashed-pw', 'Test User'), [], null, new \DateInterval('PT3600S'), $chainId, self::JKT, credentialEpoch: 1),
             $chainId,
             new \DateInterval('PT2592000S'),
         ));
@@ -355,7 +385,7 @@ final class RefreshTokenHandlerTest extends TestCase
         $user = User::register(new Email('user@baander.app'), 'hashed-pw', 'Test User');
         $chainId = ChainId::generate();
         $presented = $this->store(RefreshToken::issue(
-            AccessToken::issue($this->createConfidentialClient(), $user, [], null, new \DateInterval('PT3600S'), $chainId, self::JKT, credentialEpoch: 3),
+            AccessToken::issue($this->createConfidentialClient(), SignInGrant::Password, $user, [], null, new \DateInterval('PT3600S'), $chainId, self::JKT, credentialEpoch: 3),
             $chainId,
             new \DateInterval('PT2592000S'),
             maxChainLifetime: new \DateInterval('PT7776000S'),
@@ -702,6 +732,7 @@ final class RefreshTokenHandlerTest extends TestCase
         $chainId = ChainId::generate();
         $accessToken = AccessToken::issue(
             $this->createConfidentialClient(),
+            SignInGrant::Password,
             User::register(new Email('user@baander.app'), 'hashed-pw', 'Test User'),
             [new Scope('profile')],
             null,
@@ -865,6 +896,7 @@ final class RefreshTokenHandlerTest extends TestCase
         // Create an access token with no expiry
         $oldAccessToken = AccessToken::issue(
             $client,
+            SignInGrant::Password,
             $user,
             [new Scope('profile')],
             null,
@@ -906,6 +938,7 @@ final class RefreshTokenHandlerTest extends TestCase
         // Create token pair without chainId (outside rotation model)
         $oldAccessToken = AccessToken::issue(
             $client,
+            SignInGrant::Password,
             $user,
             [new Scope('profile')],
             null,
@@ -934,7 +967,7 @@ final class RefreshTokenHandlerTest extends TestCase
     /** A chainless token has no chain to grace into; used again, it is simply refused. */
     public function testAUsedTokenWithoutAChainIsRefusedWithoutRevoking(): void
     {
-        $accessToken = AccessToken::issue($this->createConfidentialClient(), null, [new Scope('profile')], null, null, null, dpopJkt: self::JKT);
+        $accessToken = AccessToken::issue($this->createConfidentialClient(), SignInGrant::Password, null, [new Scope('profile')], null, null, null, dpopJkt: self::JKT);
         $refreshToken = $this->store(RefreshToken::issue($accessToken, null, null));
         $refreshToken->markUsed();
 
@@ -951,6 +984,7 @@ final class RefreshTokenHandlerTest extends TestCase
 
         $oldAccessToken = AccessToken::issue(
             $client,
+            SignInGrant::Password,
             $user,
             [new Scope('profile')],
             null,
@@ -992,6 +1026,7 @@ final class RefreshTokenHandlerTest extends TestCase
 
         $oldAccessToken = AccessToken::issue(
             $client,
+            SignInGrant::Password,
             $user,
             [new Scope('profile')],
             null,
@@ -1027,6 +1062,7 @@ final class RefreshTokenHandlerTest extends TestCase
 
         $oldAccessToken = AccessToken::issue(
             $client,
+            SignInGrant::Password,
             $user,
             [new Scope('email'), new Scope('library')],
             'My Laptop',
@@ -1063,6 +1099,7 @@ final class RefreshTokenHandlerTest extends TestCase
 
         $oldAccessToken = AccessToken::issue(
             $client,
+            SignInGrant::Password,
             $user,
             [new Scope('profile')],
             null,
@@ -1218,6 +1255,7 @@ final class RefreshTokenHandlerTest extends TestCase
     {
         $accessToken = AccessToken::issue(
             $this->createConfidentialClient(),
+            SignInGrant::Password,
             User::register(new Email('user@baander.app'), 'hashed-pw', 'Test User'),
             [new Scope('profile'), new Scope('library')],
             'Browser',
@@ -1247,6 +1285,7 @@ final class RefreshTokenHandlerTest extends TestCase
         $template = $predecessor->getAccessToken();
         $accessToken = AccessToken::issue(
             $template->getClient(),
+            $template->getGrant(),
             $template->getUser(),
             $template->getScopes(),
             $template->getName(),
@@ -1265,6 +1304,7 @@ final class RefreshTokenHandlerTest extends TestCase
         $chainId = ChainId::generate();
         $accessToken = AccessToken::issue(
             $this->createConfidentialClient(),
+            SignInGrant::Password,
             User::register(new Email('user@baander.app'), 'hashed-pw', 'Test User'),
             [new Scope('profile')],
             null,

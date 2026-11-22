@@ -10,6 +10,8 @@ use SwooleBundle\SwooleBundle\Server\RequestHandler\RequestHandler;
 use SwooleBundle\SwooleBundle\Server\Runtime\Bootable;
 use Symfony\Component\HttpFoundation\Request as SymfonyRequest;
 
+use function SwooleBundle\SwooleBundle\canonical_ip_address;
+
 /**
  * @phpstan-import-type RuntimeConfiguration from Bootable
  */
@@ -45,8 +47,9 @@ final class TrustAllProxiesRequestHandler implements RequestHandler, Bootable
     public function handle(SwooleRequest $request, SwooleResponse $response): void
     {
         if ($this->trustAllProxies()) {
+            // In the form DefaultRequestFactory gives REMOTE_ADDR, which the trusted list is matched against.
             SymfonyRequest::setTrustedProxies(
-                ['127.0.0.1', $request->server['remote_addr']],
+                ['127.0.0.1', canonical_ip_address($request->server['remote_addr'])],
                 self::HEADER_X_FORWARDED_ALL
             );
         }

@@ -19,12 +19,13 @@ use App\Catalog\Interface\Resource\AlbumResource;
 use App\Catalog\Interface\Resource\SongResource;
 use App\Catalog\Interface\Resource\DuplicateGroupResource;
 use App\Media\Application\Port\ImagePortInterface;
+use App\Shared\Application\Http\PublicOrigins;
 use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\SearchOptions;
+use App\Shared\Domain\ValueObject\LibraryReadScope;
 use App\Shared\Interface\Attribute\CliCounterpart;
 use App\Shared\Interface\Controller\ApiResponsesTrait;
 use App\Shared\Interface\Controller\DispatchesMessagesTrait;
-use App\Shared\Interface\Controller\TranslatorTrait;
 use App\Shared\Interface\DTO\ApiError;
 use App\Shared\Interface\DTO\PaginatedResponse;
 use App\Shared\Interface\DTO\ValidationError;
@@ -35,6 +36,7 @@ use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpKernel\Attribute\MapRequestPayload;
 use Symfony\Component\Messenger\MessageBusInterface;
 use Symfony\Component\Routing\Attribute\Route;
+use Symfony\Component\Security\Core\Authorization\AuthorizationCheckerInterface;
 use Throwable;
 
 #[OA\Tag(
@@ -47,7 +49,6 @@ final class AlbumController
 {
     use ApiResponsesTrait;
     use DispatchesMessagesTrait;
-    use TranslatorTrait;
 
     public function __construct(
         private readonly AlbumPortInterface $albumService,
@@ -57,6 +58,8 @@ final class AlbumController
         private readonly AlbumMergePortInterface $mergePort,
         private readonly MessageBusInterface $bus,
         private readonly SongAvailabilityPortInterface $availability,
+        private readonly AuthorizationCheckerInterface $authorization,
+        private readonly PublicOrigins $publicOrigins,
     ) {
     }
 
@@ -178,7 +181,7 @@ final class AlbumController
         ));
         $images = $coverImageIds !== [] ? $this->imagePort->findByUuids($coverImageIds) : [];
 
-        $baseUrl = $request->getSchemeAndHttpHost();
+        $baseUrl = $this->publicOrigins->forRequest($request);
 
         $results = array_map(
             fn(Album $album) => AlbumResource::fromWithCoverAndArtists(
@@ -280,13 +283,7 @@ final class AlbumController
     public function show(string $publicId, Request $request): JsonResponse
     {
         $scope = $this->libraryReadScopeProvider->current();
-        try {
-            $resolvedPublicId = PublicId::fromString($publicId);
-        } catch (Throwable) {
-            return $this->errorResponse($this->trans('errors.invalid_public_id'));
-        }
-
-        $album = $this->albumService->findVisibleByPublicId($resolvedPublicId, $scope);
+        $album = $this->findVisibleAlbum($publicId, $scope);
 
         if ($album === null) {
             return $this->notFound();
@@ -297,6 +294,10 @@ final class AlbumController
         $songs = [];
         if ($result !== null) {
             $songs = SongResource::collectionWithMeta($result[1], [], [], $this->availability->forSongs($result[1]));
+            if (!$this->authorization->isGranted('ROLE_ADMIN')) {
+                // Only administrators read the file paths of songs.
+                $songs = array_map(SongResource::forMember(...), $songs);
+            }
         }
 
         $coverImage = null;
@@ -310,7 +311,7 @@ final class AlbumController
                 $album,
                 $coverImage,
                 $this->albumService->getVisibleArtistNamesForAlbum($album->getId(), $scope),
-                $request->getSchemeAndHttpHost(),
+                $this->publicOrigins->forRequest($request),
             ),
             ['songs' => $songs],
         ));
@@ -350,14 +351,7 @@ final class AlbumController
     #[Route('/{publicId}/cover', name: 'cover', methods: ['GET'])]
     public function cover(string $publicId, Request $request): \Symfony\Component\HttpFoundation\RedirectResponse|\Symfony\Component\HttpFoundation\JsonResponse
     {
-        $scope = $this->libraryReadScopeProvider->current();
-        try {
-            $resolvedPublicId = PublicId::fromString($publicId);
-        } catch (Throwable) {
-            return $this->errorResponse($this->trans('errors.invalid_public_id'), 404);
-        }
-
-        $album = $this->albumService->findVisibleByPublicId($resolvedPublicId, $scope);
+        $album = $this->findVisibleAlbum($publicId, $this->libraryReadScopeProvider->current());
 
         if ($album === null) {
             return $this->notFound();
@@ -430,13 +424,7 @@ final class AlbumController
     public function duplicates(string $publicId): JsonResponse
     {
         $scope = $this->libraryReadScopeProvider->current();
-        try {
-            $resolvedPublicId = PublicId::fromString($publicId);
-        } catch (Throwable) {
-            return $this->errorResponse($this->trans('errors.invalid_public_id'), 404);
-        }
-
-        $album = $this->albumService->findVisibleByPublicId($resolvedPublicId, $scope);
+        $album = $this->findVisibleAlbum($publicId, $scope);
 
         if ($album === null) {
             return $this->notFound();
@@ -681,5 +669,17 @@ final class AlbumController
         $result = $this->dispatch(new DeleteAlbumCommand(publicId: $publicId));
 
         return $this->successResponse(CatalogDeletionResource::from($result));
+    }
+
+    /** No album has a malformed public ID, so the lookup answers it as an unknown one. */
+    private function findVisibleAlbum(string $publicId, LibraryReadScope $scope): ?Album
+    {
+        try {
+            $resolvedPublicId = PublicId::fromString($publicId);
+        } catch (InvalidArgumentException) {
+            return null;
+        }
+
+        return $this->albumService->findVisibleByPublicId($resolvedPublicId, $scope);
     }
 }

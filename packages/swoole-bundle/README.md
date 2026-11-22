@@ -11,8 +11,8 @@ unknown; this revision is a comparison point, not a claim of ancestry.
 
 The [source comparison](upstream-review.json) preserves the initial audit of 403
 source files: 126 identical files and 277 differences. Each record also identifies
-the final source decision and current local hash; two additional local files bring
-the final inventory to 405 entries. Source decisions and runtime qualification
+the final source decision and current local hash; four additional local files bring
+the final inventory to 407 entries. Source decisions and runtime qualification
 are recorded separately.
 
 The reconciled fork owns coroutine lock handoff, service reset and release,

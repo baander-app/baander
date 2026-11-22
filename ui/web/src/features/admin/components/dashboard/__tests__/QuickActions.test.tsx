@@ -37,6 +37,15 @@ describe('QuickActions', () => {
     cleanup()
   })
 
+  it('reads the administrators\' full health report, not the public probe', async () => {
+    mockGet.mockResolvedValue({ data: {} })
+    mount()
+
+    await userEvent.setup().click(screen.getByRole('button', { name: 'Run Health Check' }))
+
+    await waitFor(() => expect(mockGet).toHaveBeenCalledWith('/api/debug/health', { signal: expect.any(AbortSignal) }))
+  })
+
   it('marks a finished action with a check icon rather than a glyph', async () => {
     mockGet.mockResolvedValue({ data: {} })
     mount()

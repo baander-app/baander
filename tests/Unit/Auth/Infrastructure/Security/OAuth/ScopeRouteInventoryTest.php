@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Tests\Unit\Auth\Infrastructure\Security\OAuth;
 
 use App\Auth\Infrastructure\Security\OAuth\ScopeRouteMap;
+use App\Auth\Infrastructure\Security\UnverifiedAccountListener;
 use App\Catalog\Interface\Controller\GenreController;
 use App\Tests\Support\AdminCliParity\AdminRouteClassifier;
 use PHPUnit\Framework\TestCase;
@@ -22,7 +23,8 @@ use Symfony\Component\Routing\RouteCollection;
 /**
  * Every route is public, first-party only, or reachable with named scopes, and a route a
  * delegated token may reach never requires an admin role. A new route fails here until it
- * is classified in ScopeRouteMap, so a delegated token cannot reach it by omission.
+ * is classified in ScopeRouteMap, so a delegated token cannot reach it by omission. Every
+ * route an unverified account may reach exists and is listed once.
  *
  * The routes come from `config/routes.yaml` through the routing component's own loaders;
  * compiling the container would exceed the unit suite's memory budget.
@@ -101,6 +103,40 @@ final class ScopeRouteInventoryTest extends TestCase
             'Route "auth_login_login" is classified more than once.',
             'Classified route "album_relabel" does not exist.',
         ], self::violations(self::$routes, [...ScopeRouteMap::PUBLIC_ROUTES], [...ScopeRouteMap::FIRST_PARTY_ROUTES, 'auth_login_login'], $scoped));
+    }
+
+    public function testEveryRouteAnUnverifiedAccountReachesExistsOnce(): void
+    {
+        self::assertSame([], self::unverifiedRouteViolations(self::$routes, UnverifiedAccountListener::ROUTES));
+    }
+
+    public function testARemovedOrRepeatedRouteOfAnUnverifiedAccountFails(): void
+    {
+        $routes = clone self::$routes;
+        $routes->remove('auth_me_email');
+
+        self::assertSame([
+            'Route "auth_refresh" is listed more than once for unverified accounts.',
+            'Route "auth_me_email" for unverified accounts does not exist.',
+        ], self::unverifiedRouteViolations($routes, [...UnverifiedAccountListener::ROUTES, 'auth_refresh']));
+    }
+
+    /**
+     * @param list<string> $allowed
+     *
+     * @return list<string>
+     */
+    private static function unverifiedRouteViolations(RouteCollection $routes, array $allowed): array
+    {
+        $violations = [];
+        foreach (array_keys(array_filter(array_count_values($allowed), static fn (int $count): bool => $count > 1)) as $name) {
+            $violations[] = sprintf('Route "%s" is listed more than once for unverified accounts.', $name);
+        }
+        foreach (array_diff($allowed, array_keys($routes->all())) as $name) {
+            $violations[] = sprintf('Route "%s" for unverified accounts does not exist.', $name);
+        }
+
+        return $violations;
     }
 
     /**

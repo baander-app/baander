@@ -69,19 +69,19 @@ describe('account consumers', () => {
     expect(after.currentTrack).toBe(before.currentTrack)
   })
 
-  it('keeps consent demand driven without repeating automatic approval after account hints', async () => {
-    const redirect = 'https://baander.app/callback'
+  it('keeps consent demand driven and never approves it on account hints', async () => {
+    const redirect = 'https://music.baander.app/callback'
     mock.onGet('/api/oauth/authorize').reply(200, {
-      client_id: 'first-party', client_name: 'Baander', client_type: 'first_party',
-      scopes: ['library'], redirect_uri: redirect, consent_required: false,
+      client_id: 'music-app', client_name: 'Music App', client_type: 'public',
+      scopes: ['library'], redirect_uri: redirect,
     })
     mock.onPost('/api/oauth/authorize').reply(200, { redirect_uri: redirect + '?code=once' })
     const { coordinator, wrapper } = setup()
-    render(<OAuthConsent query={new URLSearchParams({ client_id: 'first-party', request_uri: 'urn:ietf:params:oauth:request_uri:first-party-request' }).toString()} />, { wrapper })
-    await waitFor(() => expect(mock.history.post).toHaveLength(1))
+    render(<OAuthConsent query={new URLSearchParams({ client_id: 'music-app', request_uri: 'urn:ietf:params:oauth:request_uri:music-app-request' }).toString()} />, { wrapper })
+    await waitFor(() => expect(mock.history.get).toHaveLength(1))
     act(() => { coordinator.hint(['account']); coordinator.hint(['account']) })
     await new Promise(resolve => setTimeout(resolve, 100))
     expect(mock.history.get).toHaveLength(1)
-    expect(mock.history.post).toHaveLength(1)
+    expect(mock.history.post).toHaveLength(0)
   })
 })

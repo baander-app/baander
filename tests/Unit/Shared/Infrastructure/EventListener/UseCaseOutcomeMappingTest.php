@@ -209,7 +209,21 @@ final class UseCaseOutcomeMappingTest extends TestCase
         $this->assertFalse($response->headers->has('Retry-After'));
     }
 
-    public function testAnHttpExceptionFromAHandlerIsPassedOnUnwrappedForTheFrameworkToRender(): void
+    /** The status's own message replaces the exception's, which may name internals. */
+    public function testAClientErrorHttpExceptionFromAHandlerOnAnApiPathIsTheEnvelopeInTheRequestsLanguage(): void
+    {
+        $this->translator->addResource('array', ['errors.not_found.resource' => 'Ressource ikke fundet.'], 'da', 'messages+intl-icu');
+        $bus = $this->bus(static function (): never {
+            throw new NotFoundHttpException('No row in media_files for 0198f0c2-7c4e-7a51-b37e-3f1c2a9d4e10.');
+        });
+
+        $response = $this->handle($this->dispatching($bus), 'da');
+
+        $this->assertSame(Response::HTTP_NOT_FOUND, $response->getStatusCode());
+        $this->assertSame(['error' => ['message' => 'Ressource ikke fundet.', 'code' => 404]], $this->body($response));
+    }
+
+    public function testAClientErrorHttpExceptionOutsideTheApiIsPassedOnUnwrappedForTheFrameworkToRender(): void
     {
         $bus = $this->bus(static function (): never {
             throw new NotFoundHttpException('No such page.');
@@ -217,12 +231,12 @@ final class UseCaseOutcomeMappingTest extends TestCase
 
         $this->expectException(NotFoundHttpException::class);
 
-        $this->handle($this->dispatching($bus));
+        $this->handle($this->dispatching($bus), path: '/library');
     }
 
-    private function handle(callable $controller, ?string $language = null): Response
+    private function handle(callable $controller, ?string $language = null, string $path = '/api/admin/libraries/music/scan'): Response
     {
-        $request = Request::create('/api/admin/libraries/music/scan', 'POST');
+        $request = Request::create($path, 'POST');
         if ($language !== null) {
             $request->attributes->set(RequestLocale::ATTRIBUTE, $language);
         }

@@ -13,6 +13,7 @@ use App\Auth\Application\Service\IssuanceLockTimeout;
 use App\Auth\Domain\Model\OAuth\AccessToken;
 use App\Auth\Domain\Model\OAuth\Client;
 use App\Auth\Domain\Model\OAuth\RefreshToken;
+use App\Auth\Domain\Model\OAuth\SignInGrant;
 use App\Auth\Domain\Model\OAuth\ValueObject\ClientSecret;
 use App\Auth\Domain\Repository\OAuth\AccessTokenRepositoryInterface;
 use App\Auth\Domain\Repository\OAuth\ClientRepositoryInterface;
@@ -48,7 +49,7 @@ final class RefreshTokenTransactionTest extends TestCase
         $connection->insert('token_state', ['used' => 0]);
         $connection->executeStatement('CREATE TABLE replacement_tokens (id INTEGER PRIMARY KEY)');
         $client = Client::create('test', ['https://app.baander.app'], secret: ClientSecret::fromString('secret'), confidential: true, firstParty: true);
-        $token = RefreshToken::issue(AccessToken::issue($client, null, [], null, dpopJkt: 'bound-proof-key-thumbprint'), null);
+        $token = RefreshToken::issue(AccessToken::issue($client, SignInGrant::Password, null, [], null, dpopJkt: 'bound-proof-key-thumbprint'), null);
         $refresh = $this->createMock(RefreshTokenRepositoryInterface::class);
         $refresh->method('findByTokenId')->willReturn($token);
         $refresh->expects($this->once())->method('consumeByTokenId')->willReturnCallback(static function () use ($connection, $token): RefreshToken {

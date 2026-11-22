@@ -256,7 +256,7 @@ export function LibraryDetailPage() {
           </BackButton>
           <TitleArea>
             <ContentText textRole="title" text={library.name} element="h1" />
-            <LibraryPath textRole="mono-sm" text={library.path} element="p" />
+            <LibraryPath textRole="mono-sm" text={library.path ?? ''} element="p" />
           </TitleArea>
           {library.scanStatus && (
             <StatusBadge $status={library.scanStatus}>

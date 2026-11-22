@@ -106,7 +106,7 @@ final class AuthorizationEndpointPushedRequestTest extends TestCase
         self::assertSame('pushed-state', $redirect['state']);
         $code = $this->entityManager->getConnection()->fetchAssociative(
             'SELECT redirect_uri, code_challenge, scopes FROM oauth_auth_codes WHERE code_id = ?',
-            [$redirect['code']],
+            [hash('sha256', $redirect['code'])],
         );
         self::assertIsArray($code);
         self::assertSame(self::REDIRECT, $code['redirect_uri']);
@@ -190,7 +190,7 @@ final class AuthorizationEndpointPushedRequestTest extends TestCase
         self::assertSame(static::getContainer()->getParameter('auth.oauth.issuer'), $redirect['iss']);
         $code = $this->entityManager->getConnection()->fetchAssociative(
             'SELECT dpop_jkt, EXTRACT(EPOCH FROM expires_at - created_at)::int AS lifetime FROM oauth_auth_codes WHERE code_id = ?',
-            [$redirect['code']],
+            [hash('sha256', $redirect['code'])],
         );
         self::assertIsArray($code);
         self::assertSame($this->jkt, $code['dpop_jkt']);
