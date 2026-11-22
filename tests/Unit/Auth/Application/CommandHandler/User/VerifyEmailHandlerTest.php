@@ -15,6 +15,7 @@ use App\Auth\Application\Service\CredentialChangeRevoker;
 use App\Auth\Domain\Event\EmailVerified;
 use App\Auth\Domain\Model\OAuth\AccessToken;
 use App\Auth\Domain\Model\OAuth\Client;
+use App\Auth\Domain\Model\OAuth\SignInGrant;
 use App\Auth\Domain\Model\OAuth\TokenId;
 use App\Auth\Domain\Model\User;
 use App\Auth\Domain\Repository\OAuth\AccessTokenRepositoryInterface;
@@ -144,7 +145,7 @@ final class VerifyEmailHandlerTest extends TestCase
         $this->user = User::createByOperator(new Email('alice@baander.app'), 'hashed-pw', 'Alice', ['ROLE_USER']);
         $this->user->requestEmailChange(new Email('alice.new@baander.app'));
         $this->issue('raw-token', $this->user, 'alice.new@baander.app');
-        $this->requestingSession = AccessToken::issue(Client::create('SPA', ['https://baander.app']), $this->user);
+        $this->requestingSession = AccessToken::issue(Client::create('SPA', ['https://baander.app']), SignInGrant::Password, $this->user);
 
         $emailChanged = ($this->handler())($this->command('raw-token', $this->requestingSession->getTokenId()->toString()));
 
