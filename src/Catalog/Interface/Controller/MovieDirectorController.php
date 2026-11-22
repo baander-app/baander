@@ -23,7 +23,8 @@ use Symfony\Component\Routing\Attribute\Route;
     name: 'Catalog',
     description: 'Album, artist, song, movie, and genre management endpoints',
 )]
-#[Route('/api/movies/directors', name: 'movie_director_', requirements: ['publicId' => PublicId::PATTERN])]
+// Matched before /api/movies/{publicId}, which takes any value so the movie routes answer a malformed ID themselves.
+#[Route('/api/movies/directors', name: 'movie_director_', requirements: ['publicId' => PublicId::PATTERN], priority: 1)]
 final class MovieDirectorController
 {
     use ApiResponsesTrait;

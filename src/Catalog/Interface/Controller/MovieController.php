@@ -18,7 +18,6 @@ use App\Shared\Domain\Model\Uuid;
 use App\Shared\Interface\Attribute\CliCounterpart;
 use App\Shared\Interface\Controller\ApiResponsesTrait;
 use App\Shared\Interface\Controller\DispatchesMessagesTrait;
-use App\Shared\Interface\Controller\TranslatorTrait;
 use App\Shared\Interface\DTO\PaginatedResponse;
 use OpenApi\Spec as OA;
 use OpenApi\Spec\Parameter;
@@ -33,13 +32,12 @@ use Symfony\Component\Routing\Attribute\Route;
     name: 'Catalog',
     description: 'Album, artist, song, movie, and genre management endpoints',
 )]
-#[Route('/api/movies', name: 'movie_', requirements: ['publicId' => PublicId::PATTERN])]
+#[Route('/api/movies', name: 'movie_')]
 #[\Symfony\Component\Security\Http\Attribute\IsGranted('ROLE_ADMIN', methods: ['POST', 'PUT', 'PATCH', 'DELETE'])]
 final class MovieController
 {
     use ApiResponsesTrait;
     use DispatchesMessagesTrait;
-    use TranslatorTrait;
     public function __construct(
         private readonly MoviePortInterface $movieService,
         private readonly LibraryReadScopeProviderInterface $libraryReadScopeProvider,
@@ -151,8 +149,9 @@ final class MovieController
         $scope = $this->libraryReadScopeProvider->current();
         try {
             $resolvedPublicId = PublicId::fromString($publicId);
-        } catch (\Throwable) {
-            return $this->errorResponse($this->trans('errors.invalid_public_id'));
+        } catch (\InvalidArgumentException) {
+            // No movie has a malformed public ID.
+            return $this->notFound();
         }
 
         $movie = $this->movieService->findVisibleByPublicId($resolvedPublicId, $scope);
