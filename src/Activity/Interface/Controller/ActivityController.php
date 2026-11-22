@@ -20,7 +20,6 @@ use App\Shared\Application\Http\PublicOrigins;
 use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
 use App\Shared\Interface\Controller\ApiResponsesTrait;
-use App\Shared\Interface\Controller\TranslatorTrait;
 use App\Shared\Interface\Request\QueryParameters;
 use OpenApi\Spec as OA;
 use Symfony\Bundle\SecurityBundle\Security;
@@ -37,7 +36,6 @@ use Symfony\Component\Routing\Attribute\Route;
 final class ActivityController
 {
     use ApiResponsesTrait;
-    use TranslatorTrait;
 
     public function __construct(
         private readonly Security $security,
