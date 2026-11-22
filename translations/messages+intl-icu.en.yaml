@@ -16,3 +16,11 @@ errors:
     default: "Authentication required."
   forbidden:
     default: "Forbidden."
+  bad_request:
+    default: "The request is malformed."
+  method_not_allowed:
+    default: "This method is not allowed for this resource."
+  too_many_requests:
+    default: "Too many requests. Please try again later."
+  client_error:
+    default: "The request could not be processed."

@@ -16,3 +16,11 @@ errors:
     default: จำเป็นต้องยืนยันตัวตน
   forbidden:
     default: ห้ามเข้าถึง
+  bad_request:
+    default: รูปแบบคำขอไม่ถูกต้อง
+  method_not_allowed:
+    default: ไม่อนุญาตให้ใช้เมธอดนี้กับทรัพยากรนี้
+  too_many_requests:
+    default: มีคำขอมากเกินไป โปรดลองอีกครั้งภายหลัง
+  client_error:
+    default: ไม่สามารถดำเนินการตามคำขอได้

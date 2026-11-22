@@ -16,3 +16,11 @@ errors:
     default: "Godkendelse påkrævet."
   forbidden:
     default: "Forbudt."
+  bad_request:
+    default: "Anmodningen har et ugyldigt format."
+  method_not_allowed:
+    default: "Metoden er ikke tilladt for denne ressource."
+  too_many_requests:
+    default: "For mange anmodninger. Prøv igen senere."
+  client_error:
+    default: "Anmodningen kunne ikke behandles."

@@ -69,8 +69,9 @@ abstract class RateLimitTestCase extends TestCase
         self::assertNotNull($retryAfter, 'A 429 response must carry Retry-After.');
         self::assertMatchesRegularExpression('/^[1-9]\d*$/', $retryAfter);
 
-        $body = json_decode((string) $response->getContent(), true, 512, JSON_THROW_ON_ERROR);
-        self::assertIsArray($body);
-        self::assertSame(429, $body['status'] ?? null, (string) $response->getContent());
+        self::assertSame(
+            ['error' => ['message' => 'Too many requests. Please try again later.', 'code' => 429]],
+            json_decode((string) $response->getContent(), true, 512, JSON_THROW_ON_ERROR),
+        );
     }
 }

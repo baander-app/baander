@@ -16,7 +16,6 @@ use Symfony\Component\HttpFoundation\RequestStack;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpKernel\Controller\ArgumentResolver;
 use Symfony\Component\HttpKernel\Controller\ControllerResolver;
-use Symfony\Component\HttpKernel\Exception\TooManyRequestsHttpException;
 use Symfony\Component\HttpKernel\HttpKernel;
 use Symfony\Component\HttpKernel\KernelEvents;
 use Symfony\Component\RateLimiter\LimiterInterface;
@@ -71,9 +70,11 @@ final class ApiRateLimitAvailabilityTest extends TestCase
     #[DataProvider('revocationRoutes')]
     public function testExhaustedGenericBudgetStillRejectsRevocation(string $route, bool $authenticated): void
     {
-        $this->expectException(TooManyRequestsHttpException::class);
+        [$response, $calls] = $this->request($route, $authenticated, false, true);
 
-        $this->request($route, $authenticated, false, true);
+        self::assertSame(429, $response->getStatusCode());
+        self::assertMatchesRegularExpression('/^[1-9]\d*$/', (string) $response->headers->get('Retry-After'));
+        self::assertSame(0, $calls);
     }
 
     /** @return array{Response, int} */
