@@ -140,6 +140,33 @@ final class AuthControllerTest extends TestCase
         $this->assertSame($owner->getPassword(), $stored->getPassword());
     }
 
+    /** A whitespace-only name is refused before the address is looked up, so a taken address answers like a free one. */
+    public function testAWhitespaceNameIsRefusedAlikeForATakenAndAFreeAddress(): void
+    {
+        $this->openRegistration();
+        $takenAddress = 'blank-taken-' . bin2hex(random_bytes(4)) . '@baander.app';
+        $this->createTestUser($takenAddress, name: 'Original Owner');
+        $freeAddress = 'blank-free-' . bin2hex(random_bytes(4)) . '@baander.app';
+
+        $taken = $this->anonymousRequest('POST', '/api/auth/register', [
+            'email' => $takenAddress,
+            'name' => '   ',
+            'password' => 'securepassword123',
+        ]);
+        $free = $this->anonymousRequest('POST', '/api/auth/register', [
+            'email' => $freeAddress,
+            'name' => '   ',
+            'password' => 'securepassword123',
+        ]);
+
+        $this->assertSame($free->getStatusCode(), $taken->getStatusCode(), (string) $taken->getContent());
+        $this->assertSame($free->getContent(), $taken->getContent());
+        $data = $this->assertJsonResponse($free, 422, 'error');
+        $this->assertSame('Validation failed.', $data['error']['message']);
+        $this->assertEmailCount(0, message: 'A refused registration tells no owner.');
+        $this->assertNull($this->userRepository->findByEmail(new Email($freeAddress)));
+    }
+
     public function testRegisterWithInvalidDataFails(): void
     {
         $response = $this->anonymousRequest('POST', '/api/auth/register', [

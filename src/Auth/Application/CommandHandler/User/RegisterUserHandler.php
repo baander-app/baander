@@ -28,9 +28,9 @@ use Symfony\Component\Messenger\MessageBusInterface;
  * Registers an account, or, when the address is taken, tells its owner instead.
  *
  * The caller cannot tell the two apart. Both hash the password, both send their email after
- * the response, and both return no sooner than a fixed time after the hash, so neither the
- * answer nor its timing reveals which addresses have accounts. While self-registration is
- * closed, a registration is refused before any of that work.
+ * the response, and both return, or fail, no sooner than a fixed time after the hash, so
+ * neither the answer nor its timing reveals which addresses have accounts. While
+ * self-registration is closed, a registration is refused before any of that work.
  */
 final class RegisterUserHandler
 {
@@ -64,14 +64,16 @@ final class RegisterUserHandler
         $hashedPassword = $this->passwordHasher->hash($command->getPlainPassword());
         $hashedAt = $this->clock->now();
 
-        $owner = $this->userRepository->findByEmail($command->getEmail());
-        if ($owner === null) {
-            $this->createAccount($command, $hashedPassword);
-        } else {
-            $this->registrationAttemptNotice->deliver($owner);
+        try {
+            $owner = $this->userRepository->findByEmail($command->getEmail());
+            if ($owner === null) {
+                $this->createAccount($command, $hashedPassword);
+            } else {
+                $this->registrationAttemptNotice->deliver($owner);
+            }
+        } finally {
+            $this->holdUntilTheFloor($hashedAt);
         }
-
-        $this->holdUntilTheFloor($hashedAt);
     }
 
     private function createAccount(RegisterUserCommand $command, string $hashedPassword): void

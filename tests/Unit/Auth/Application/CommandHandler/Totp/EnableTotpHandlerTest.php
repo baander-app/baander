@@ -58,6 +58,33 @@ final class EnableTotpHandlerTest extends TestCase
         self::assertNull($this->pendingSecrets->find($this->user->getId()), 'The pending secret is used once.');
     }
 
+    /** The ended sessions' connections close even when the cache cannot forget the pending secret. */
+    public function testAPendingSecretThatCannotBeForgottenStillClosesTheOtherSessionsConnections(): void
+    {
+        $this->pendingSecrets = new PendingTotpSecrets(new class extends ArrayAdapter {
+            #[\Override]
+            public function deleteItem(mixed $key): bool
+            {
+                throw new \RuntimeException('Redis server went away');
+            }
+        });
+        $this->pendingSecrets->hold($this->user->getId(), self::SECRET);
+        $session = $this->signedInSession($this->user);
+
+        try {
+            $this->handler()(new EnableTotpCommand($this->user->getId()->toString(), '123456', $session));
+        } catch (\RuntimeException $exception) {
+            self::assertSame('Redis server went away', $exception->getMessage(), 'Only the cache failure may reach the caller.');
+        }
+
+        self::assertTrue($this->user->hasTotp());
+        self::assertSame([
+            'end sessions keeping ' . $session,
+            'commit',
+            'close other-session-token',
+        ], $this->credentialChanges);
+    }
+
     /** A change that timed out waiting for the account's row rolled back, so the same setup can be confirmed again. */
     public function testAChangeThatRollsBackKeepsThePendingSecret(): void
     {

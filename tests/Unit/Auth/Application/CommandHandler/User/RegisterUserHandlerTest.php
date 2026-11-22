@@ -219,14 +219,46 @@ final class RegisterUserHandlerTest extends TestCase
 
         $this->assertCount($taken ? 0 : 1, $this->saved);
         $this->assertCount($taken ? 1 : 0, $this->noticed);
-        $this->assertNotNull($this->hashedAt);
         $this->assertEqualsWithDelta(
             self::RESPONSE_FLOOR_MILLISECONDS / 1000,
-            (float) $this->clock->now()->format('U.u') - (float) $this->hashedAt->format('U.u'),
+            $this->secondsSinceTheHash(),
             0.000002,
             'The answer leaves the floor after the hash, whichever outcome it is.',
         );
         $this->assertCount(1, $this->slept);
+    }
+
+    /**
+     * Failures only a new account can meet, after the password hash.
+     *
+     * @return iterable<string, array{string, bool}> the name, and whether storing the registration event fails
+     */
+    public static function failuresAfterTheHash(): iterable
+    {
+        yield 'a whitespace-only name the account refuses' => ['   ', false];
+        yield 'a failed outbox insertion' => ['Alice', true];
+    }
+
+    #[DataProvider('failuresAfterTheHash')]
+    public function testAFailureAfterTheHashStillAnswersTheFloorAfterIt(string $name, bool $outboxFails): void
+    {
+        if ($outboxFails) {
+            $this->eventDispatcher = $this->createStub(EventDispatcherInterface::class);
+            $this->eventDispatcher->method('dispatch')->willThrowException(new \RuntimeException('Outbox insertion failed.'));
+        }
+
+        try {
+            ($this->handler())(new RegisterUserCommand(new Email('test@baander.app'), $name, 'password123'));
+            $this->fail('The failure must reach the caller.');
+        } catch (\RuntimeException | \InvalidArgumentException) {
+        }
+
+        $this->assertEqualsWithDelta(
+            self::RESPONSE_FLOOR_MILLISECONDS / 1000,
+            $this->secondsSinceTheHash(),
+            0.000002,
+            'A failure answers no sooner than a registration that succeeds.',
+        );
     }
 
     public function testAnOutcomeSlowerThanTheFloorDoesNotWaitFurther(): void
@@ -292,6 +324,13 @@ final class RegisterUserHandlerTest extends TestCase
     {
         $this->slept[] = $seconds;
         $this->clock->sleep($seconds);
+    }
+
+    private function secondsSinceTheHash(): float
+    {
+        $this->assertNotNull($this->hashedAt);
+
+        return (float) $this->clock->now()->format('U.u') - (float) $this->hashedAt->format('U.u');
     }
 
     private function registered(): User

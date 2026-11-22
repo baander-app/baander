@@ -40,7 +40,7 @@ use Symfony\Component\Validator\Constraints\Length;
 final readonly class RegisterRequest
 {
     public function __construct(
-        #[NotBlank(message: 'Name is required.')]
+        #[NotBlank(message: 'Name is required.', normalizer: 'trim')]
         #[Length(min: 1, max: 255)]
         public string $name = '',
 

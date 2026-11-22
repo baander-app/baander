@@ -27,9 +27,9 @@ use Symfony\Component\Messenger\Attribute\AsMessageHandler;
  *
  * Turning TOTP on is a credential change: the session that sent the code stays signed in and
  * every other session ends, paired devices and third-party apps included, their WebSocket
- * connections closed once the change has committed. The pending secret is forgotten only then,
- * so a change that rolls back, such as one that timed out waiting for the account's row, can be
- * confirmed again without a new setup.
+ * connections closed once the change has committed. The pending secret is forgotten last, so a
+ * change that rolls back, such as one that timed out waiting for the account's row, can be
+ * confirmed again without a new setup, and a cache failure cannot keep those connections open.
  */
 final readonly class EnableTotpHandler
 {
@@ -66,8 +66,8 @@ final readonly class EnableTotpHandler
             $command->getCurrentAccessTokenId(),
             fn () => $this->turnOnTotp($user, $sealedSecret, $step),
         ));
-        $this->pendingSecrets->forget($userId);
         $this->credentialChangeRevoker->closeConnections($sessions);
+        $this->pendingSecrets->forget($userId);
     }
 
     private function turnOnTotp(User $user, string $sealedSecret, int $step): void
