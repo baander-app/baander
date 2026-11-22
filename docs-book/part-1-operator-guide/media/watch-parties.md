@@ -20,9 +20,9 @@ POST /api/party/sessions/
 
 The host supplies the video public ID, optionally a transcode job public ID, and an optional member limit. The limit defaults to 10 and accepts 2 through 50. A successful creation returns `201` and the session public ID; the host is automatically a member. Use that public ID in subsequent routes, not an internal UUID. The public ID alone admits no one: the host [invites](#invitations) each user who may join.
 
-The host must be allowed to play the video: administrators can play any video, other users only videos in libraries they have access to. The request may also name a transcode job, which must encode that video. A video or job that does not exist, or that the host may not play, returns `404 Not Found`. A job that encodes a different video returns `422 Unprocessable Entity`.
+The host must be allowed to play the video: administrators can play any video, other users only videos in libraries they have access to. The request may also name a transcode job, which must be the host's own job of that video. A video or job that does not exist or that the host may not play, and a job another user owns, return `404 Not Found`. The host's own job of a different video returns `422 Unprocessable Entity`.
 
-Deleting a video ends its sessions. Deleting a transcode job, for example during orphaned-job cleanup, clears the session's `transcodeJobId`. The session continues and keeps its members in sync; play, pause and seek then no longer signal an encoder.
+The job stays with the session while its owner is a member, so a member who becomes host keeps steering it. The session's `transcodeJobId` is cleared when the owner leaves, when the host revokes the owner's invitation, or when the job is deleted, for example during orphaned-job cleanup. The session continues and keeps its members in sync; play, pause and seek then no longer signal an encoder. Deleting the video ends its sessions.
 
 ## Invitations
 

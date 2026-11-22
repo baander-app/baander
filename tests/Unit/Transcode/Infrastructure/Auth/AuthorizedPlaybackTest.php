@@ -406,18 +406,23 @@ final class AuthorizedPlaybackTest extends TestCase
         return $playback->findSessions($video, $requestId, [$jobId]);
     }
 
-    public function testFindsTheVideoATranscodeJobEncodes(): void
+    public function testFindsTheVideoOnlyOfAJobTheGivenUserOwns(): void
     {
         $connection = DriverManager::getConnection(['driver' => 'pdo_sqlite', 'memory' => true]);
-        $connection->executeStatement('CREATE TABLE transcode_jobs (id TEXT PRIMARY KEY, video_id TEXT NOT NULL)');
+        $connection->executeStatement('CREATE TABLE transcode_jobs (id TEXT PRIMARY KEY, video_id TEXT NOT NULL, owner_user_id TEXT)');
+        $owner = new Uuid();
         $jobId = new Uuid();
+        $ownerlessJobId = new Uuid();
         $videoId = new Uuid();
-        $connection->insert('transcode_jobs', ['id' => $jobId->toString(), 'video_id' => $videoId->toString()]);
+        $connection->insert('transcode_jobs', ['id' => $jobId->toString(), 'video_id' => $videoId->toString(), 'owner_user_id' => $owner->toString()]);
+        $connection->insert('transcode_jobs', ['id' => $ownerlessJobId->toString(), 'video_id' => $videoId->toString(), 'owner_user_id' => null]);
         $playback = new AuthorizedPlayback($this->createStub(Security::class), $connection, $this->createStub(MessageBusInterface::class), new MockClock(), $this->qualityTiers());
 
         try {
-            self::assertTrue($playback->findTranscodeJobVideoId($jobId)?->equals($videoId));
-            self::assertNull($playback->findTranscodeJobVideoId(new Uuid()));
+            self::assertTrue($playback->findOwnedTranscodeJobVideoId($jobId, $owner)?->equals($videoId));
+            self::assertNull($playback->findOwnedTranscodeJobVideoId($jobId, new Uuid()), 'Another user\'s job is not found.');
+            self::assertNull($playback->findOwnedTranscodeJobVideoId($ownerlessJobId, $owner), 'A job without an owner is nobody\'s.');
+            self::assertNull($playback->findOwnedTranscodeJobVideoId(new Uuid(), $owner));
         } finally {
             $connection->close();
         }

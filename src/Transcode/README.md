@@ -31,7 +31,7 @@ Key infrastructure:
 | `FFmpegPortInterface` | FFmpeg process abstraction |
 | `SegmentCachePortInterface` | Segment caching |
 | `TranscodeStoragePortInterface` | File storage for segments |
-| `PlaybackAccessInterface` | Playback authority for other contexts: video access and a job's video (Deptrac contract) |
+| `PlaybackAccessInterface` | Playback authority for other contexts: video access and the video of a job a given user owns (Deptrac contract) |
 
 ## Events
 

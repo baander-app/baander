@@ -39,7 +39,7 @@ final readonly class CreatePartySessionHandler
     #[AsMessageHandler]
     public function __invoke(CreatePartySessionCommand $command): SyncedPartySession
     {
-        $this->mediaAccess->assertHostCanPlay($command->getVideoId(), $command->getTranscodeJobId());
+        $this->mediaAccess->assertHostCanPlay($command->getHostUserId(), $command->getVideoId(), $command->getTranscodeJobId());
 
         $session = $this->transaction->run(fn (): SyncedPartySession => $this->create($command));
 

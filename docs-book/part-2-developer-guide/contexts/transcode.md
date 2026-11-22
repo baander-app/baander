@@ -179,10 +179,10 @@ Endpoints are split between session management and streaming delivery.
 
 | Method | Path | Purpose |
 |--------|------|---------|
-| GET | `/api/transcode/jobs` | List orphaned transcoding jobs in accessible libraries |
+| GET | `/api/transcode/jobs` | List the caller's orphaned transcoding jobs in accessible libraries; an administrator sees every user's |
 | GET | `/api/transcode/jobs/list` | List transcoding jobs for the authenticated user |
-| GET | `/api/transcode/jobs/{publicId}` | Get a single job status |
-| GET | `/api/transcode/jobs/{publicId}/metrics` | Job encoding metrics |
+| GET | `/api/transcode/jobs/{publicId}` | Get the status of one of the caller's jobs; another user's job answers `404` unless the caller is an administrator |
+| GET | `/api/transcode/jobs/{publicId}/metrics` | Encoding metrics of one of the caller's jobs, with the same `404` for another user's job |
 | POST | `/api/transcode/jobs/cleanup` | Trigger orphaned-job cleanup |
 
 ### Streaming

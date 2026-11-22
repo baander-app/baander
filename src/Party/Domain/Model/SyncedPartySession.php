@@ -150,6 +150,16 @@ final class SyncedPartySession
     }
 
     /**
+     * Stop steering the transcode job: its owner is no longer a member. Playback stays in sync
+     * without an encoder, as after the job's deletion.
+     */
+    public function releaseTranscodeJob(): void
+    {
+        $this->state->transcodeJobId = null;
+        $this->state->updatedAt = new DateTimeImmutable();
+    }
+
+    /**
      * Transfer host role to another user.
      */
     public function transferHost(Uuid $newHostUserId): void
@@ -197,7 +207,8 @@ final class SyncedPartySession
     }
 
     /**
-     * The job the host's playback steers, or null when none was named or it has since been deleted.
+     * The job the host's playback steers, or null when none was named, it has since been deleted,
+     * or its owner left the party.
      */
     public function getTranscodeJobId(): ?Uuid
     {

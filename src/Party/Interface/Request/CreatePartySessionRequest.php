@@ -21,7 +21,7 @@ use Symfony\Component\Validator\Constraints\Regex;
             default: '',
         ),
         'transcodeJobId' => new OA\Schema(
-            description: 'Transcode job of the video that the host\'s playback steers',
+            description: 'The host\'s own transcode job of the video, which the host\'s playback steers',
             type: 'string',
             nullable: true,
             minLength: PublicId::LENGTH,

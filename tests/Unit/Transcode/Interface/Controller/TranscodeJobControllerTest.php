@@ -58,6 +58,7 @@ final class TranscodeJobControllerTest extends TestCase
             $this->createStub(TranscodeJobPortInterface::class),
             new \App\Tests\Unit\Transcode\PublicViewStub(),
             $this->createStub(\App\Transcode\Application\Port\PlaybackAccessInterface::class),
+            $this->createStub(\Symfony\Component\Security\Core\Authorization\AuthorizationCheckerInterface::class),
         );
     }
 

@@ -19,7 +19,8 @@ interface PlaybackAccessInterface
     public function assertAccess(Uuid $videoId): void;
 
     /**
-     * The video a transcode job encodes, or null when no such job exists. Does not check access.
+     * The video of a transcode job the given user owns, or null when no such job exists or it is not
+     * the user's: another user's job and a missing one look the same. Does not check playback access.
      */
-    public function findTranscodeJobVideoId(Uuid $jobId): ?Uuid;
+    public function findOwnedTranscodeJobVideoId(Uuid $jobId, Uuid $ownerUserId): ?Uuid;
 }

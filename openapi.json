@@ -11,7 +11,7 @@
                 "tags": [
                     "Transcode"
                 ],
-                "summary": "List orphaned transcode jobs in accessible libraries",
+                "summary": "List the caller's orphaned transcode jobs in accessible libraries; administrators see every user's",
                 "operationId": "get_transcode_job_index",
                 "responses": {
                     "200": {
@@ -51,7 +51,7 @@
                 "tags": [
                     "Transcode"
                 ],
-                "summary": "Get a transcode job by public ID",
+                "summary": "Get one of the caller's transcode jobs by public ID; administrators may read any user's",
                 "operationId": "get_transcode_job_show",
                 "parameters": [
                     {
@@ -92,7 +92,7 @@
                         }
                     },
                     "404": {
-                        "description": "Not found",
+                        "description": "No such job, or another user's job for a caller who is not an administrator",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -153,7 +153,7 @@
                 "tags": [
                     "Transcode"
                 ],
-                "summary": "Get transcode job metrics",
+                "summary": "Get the metrics of one of the caller's transcode jobs; administrators may read any user's",
                 "operationId": "get_transcode_job_metrics",
                 "parameters": [
                     {
@@ -178,7 +178,7 @@
                         }
                     },
                     "404": {
-                        "description": "Not found",
+                        "description": "No such job, or another user's job for a caller who is not an administrator",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -15458,7 +15458,7 @@
                         }
                     },
                     "404": {
-                        "description": "The video or transcode job does not exist, or the user may not play its video",
+                        "description": "The video or transcode job does not exist, another user owns the job, or the user may not play its video",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -27322,7 +27322,7 @@
                     },
                     "transcodeJobId": {
                         "type": "string",
-                        "description": "Transcode job of the video that the host's playback steers",
+                        "description": "The host's own transcode job of the video, which the host's playback steers",
                         "nullable": true,
                         "minLength": 21,
                         "maxLength": 21,
@@ -31486,7 +31486,7 @@
                     },
                     "transcodeJobId": {
                         "type": "string",
-                        "description": "Transcode job that the host's playback steers; null when none was named or the job has been deleted",
+                        "description": "Transcode job that the host's playback steers; null when none was named, the job has been deleted, or its owner left the party",
                         "nullable": true,
                         "minLength": 21,
                         "maxLength": 21,

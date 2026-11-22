@@ -6,6 +6,7 @@ namespace App\Tests\Unit\Party\Application\CommandHandler;
 
 use App\Party\Application\Command\LeavePartySessionCommand;
 use App\Party\Application\CommandHandler\LeavePartySessionHandler;
+use App\Party\Application\Port\PartyMediaAccessPortInterface;
 use App\Party\Application\Port\PartyMemberPortInterface;
 use App\Party\Application\Port\PartySessionPortInterface;
 use App\Party\Domain\Event\MemberLeft;
@@ -25,13 +26,15 @@ use Symfony\Component\EventDispatcher\EventDispatcherInterface;
 /**
  * A leave runs in one transaction that starts by locking the party, and the room hears of it
  * after the commit. The ports here keep a party in memory: a read hands out a copy, so only
- * what the handler saves is stored.
+ * what the handler saves is stored. The playback authority knows who owns the party's job.
  */
 final class LeavePartySessionHandlerTest extends TestCase
 {
     private ?SyncedPartySession $session = null;
     /** @var array<string, PartyMember> the stored member rows by user ID */
     private array $members = [];
+    /** @var array<string, Uuid> the owner of each transcode job, by job ID */
+    private array $jobOwners = [];
     private bool $inTransaction = false;
     private bool $locked = false;
     /** @var list<object> */
@@ -96,7 +99,12 @@ final class LeavePartySessionHandlerTest extends TestCase
             return $event;
         });
 
-        $this->handler = new LeavePartySessionHandler($sessions, $members, $transaction, $events);
+        $media = $this->createStub(PartyMediaAccessPortInterface::class);
+        $media->method('ownsTranscodeJob')->willReturnCallback(
+            fn (Uuid $userId, Uuid $jobId): bool => ($this->jobOwners[$jobId->toString()] ?? null)?->equals($userId) === true,
+        );
+
+        $this->handler = new LeavePartySessionHandler($sessions, $members, $media, $transaction, $events);
     }
 
     public function testALeaveByAUserWithNoMemberRowChangesNothingAndTellsNobody(): void
@@ -166,6 +174,46 @@ final class LeavePartySessionHandlerTest extends TestCase
         self::assertTrue($ended->getHostUserId()->equals($host));
     }
 
+    public function testAHostWhoOwnsThePartysJobTakesItAlongWhenLeaving(): void
+    {
+        $host = Uuid::v4();
+        $guest = Uuid::v4();
+        $this->party($host, guests: [$guest], job: $this->jobOf($host));
+
+        ($this->handler)(new LeavePartySessionCommand($host, $this->sessionId()));
+
+        self::assertTrue($this->session?->getHostUserId()->equals($guest));
+        self::assertNull($this->session->getTranscodeJobId(), 'Nobody left in the party steers the leaver\'s encoder.');
+        $this->assertOnlyMemberLeft($host);
+    }
+
+    public function testAJobOwnerWhoHandedOnTheHostRoleTakesTheJobAlongWhenLeaving(): void
+    {
+        $owner = Uuid::v4();
+        $newHost = Uuid::v4();
+        $this->party($owner, guests: [$newHost], job: $this->jobOf($owner));
+        $this->session?->transferHost($newHost);
+
+        ($this->handler)(new LeavePartySessionCommand($owner, $this->sessionId()));
+
+        self::assertTrue($this->session?->getHostUserId()->equals($newHost));
+        self::assertNull($this->session->getTranscodeJobId());
+        $this->assertOnlyMemberLeft($owner);
+    }
+
+    public function testAMemberWhoDoesNotOwnTheJobLeavesItWithTheParty(): void
+    {
+        $host = Uuid::v4();
+        $guest = Uuid::v4();
+        $job = $this->jobOf($host);
+        $this->party($host, guests: [$guest], job: $job);
+
+        ($this->handler)(new LeavePartySessionCommand($guest, $this->sessionId()));
+
+        self::assertTrue($this->session?->getTranscodeJobId()?->equals($job));
+        $this->assertOnlyMemberLeft($guest);
+    }
+
     public function testALeaveOfAPartyThatDoesNotExistDoesNothing(): void
     {
         ($this->handler)(new LeavePartySessionCommand(Uuid::v4(), Uuid::v4()));
@@ -179,9 +227,9 @@ final class LeavePartySessionHandlerTest extends TestCase
      * @param list<Uuid> $guests
      * @param list<int>  $joinedAfterMinutes each guest's joining time after the host's; one minute apart in the given order when empty
      */
-    private function party(Uuid $host, array $guests, array $joinedAfterMinutes = []): void
+    private function party(Uuid $host, array $guests, array $joinedAfterMinutes = [], ?Uuid $job = null): void
     {
-        $this->session = SyncedPartySession::create($host, Uuid::v4(), null);
+        $this->session = SyncedPartySession::create($host, Uuid::v4(), $job);
         $this->member($host, MemberRole::Host, 0);
         foreach ($guests as $index => $guest) {
             $this->member($guest, MemberRole::Member, $joinedAfterMinutes[$index] ?? $index + 1);
@@ -198,6 +246,15 @@ final class LeavePartySessionHandlerTest extends TestCase
             joinedAt: new DateTimeImmutable('2026-01-01T10:00:00+00:00')->modify('+' . $joinedAfterMinutes . ' minutes'),
             role: $role,
         ));
+    }
+
+    /** @return Uuid a transcode job the user owns */
+    private function jobOf(Uuid $owner): Uuid
+    {
+        $job = Uuid::v4();
+        $this->jobOwners[$job->toString()] = $owner;
+
+        return $job;
     }
 
     private function sessionId(): Uuid

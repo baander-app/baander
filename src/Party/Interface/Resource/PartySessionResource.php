@@ -34,7 +34,7 @@ use OpenApi\Spec as OA;
             pattern: PublicId::SCHEMA_PATTERN,
         ),
         'transcodeJobId' => new OA\Schema(
-            description: 'Transcode job that the host\'s playback steers; null when none was named or the job has been deleted',
+            description: 'Transcode job that the host\'s playback steers; null when none was named, the job has been deleted, or its owner left the party',
             type: 'string',
             nullable: true,
             minLength: PublicId::LENGTH,

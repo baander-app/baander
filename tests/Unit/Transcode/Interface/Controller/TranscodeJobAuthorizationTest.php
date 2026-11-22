@@ -24,6 +24,7 @@ use Symfony\Component\Messenger\Exception\HandlerFailedException;
 use Symfony\Component\Messenger\MessageBusInterface;
 use Symfony\Component\Messenger\Stamp\HandledStamp;
 use Symfony\Component\Security\Http\Attribute\IsGranted;
+use Symfony\Component\Security\Core\Authorization\AuthorizationCheckerInterface;
 use Symfony\Component\Security\Core\Exception\AccessDeniedException;
 
 final class TranscodeJobAuthorizationTest extends TestCase
@@ -40,7 +41,8 @@ final class TranscodeJobAuthorizationTest extends TestCase
     #[DataProvider('jobReads')]
     public function testIndividualJobReadsCheckLibraryAccessBeforePublicProjection(string $method, bool $allowed): void
     {
-        $job = TranscodeJob::create(new Uuid(), QualityTier::p720(), '/tmp/transcode', \App\Shared\Domain\Model\Uuid::generate());
+        $owner = Uuid::generate();
+        $job = TranscodeJob::create(new Uuid(), QualityTier::p720(), '/tmp/transcode', $owner);
         $jobs = $this->createMock(TranscodeJobPortInterface::class);
         $jobs->expects(self::once())->method('findByPublicId')->with($job->getPublicId())->willReturn($job);
         $playback = $this->createMock(PlaybackAccessInterface::class);
@@ -52,12 +54,12 @@ final class TranscodeJobAuthorizationTest extends TestCase
         $view = $this->createMock(TranscodePublicViewInterface::class);
         $view->expects($allowed ? self::once() : self::never())->method('job')->with($job)
             ->willReturn(TranscodeJobDto::fromModel($job, $videoPublicId));
-        $controller = new TranscodeJobController($this->createStub(MessageBusInterface::class), $jobs, $view, $playback);
+        $controller = $this->controller($jobs, $view, $playback);
         if (!$allowed) {
             $this->expectException(AccessDeniedException::class);
         }
 
-        $response = $controller->$method($job->getPublicId()->toString());
+        $response = $controller->$method($job->getPublicId()->toString(), self::user($owner));
 
         self::assertSame(200, $response->getStatusCode());
         $content = $response->getContent();
@@ -65,12 +67,83 @@ final class TranscodeJobAuthorizationTest extends TestCase
         self::assertStringNotContainsString($job->getVideoId()->toString(), $content);
     }
 
+    /** @return iterable<string, array{string}> */
+    public static function individualJobReads(): iterable
+    {
+        yield 'show' => ['show'];
+        yield 'getMetrics' => ['getMetrics'];
+    }
+
+    #[DataProvider('individualJobReads')]
+    public function testAnotherUsersJobIsNotFoundForAMemberAsAMissingOneIs(string $method): void
+    {
+        $job = TranscodeJob::create(new Uuid(), QualityTier::p720(), '/tmp/transcode', Uuid::generate());
+        $jobs = $this->createStub(TranscodeJobPortInterface::class);
+        $jobs->method('findByPublicId')->willReturnCallback(
+            static fn (PublicId $id): ?TranscodeJob => $id->equals($job->getPublicId()) ? $job : null,
+        );
+        $controller = $this->controller($jobs, new \App\Tests\Unit\Transcode\PublicViewStub(), $this->createStub(PlaybackAccessInterface::class));
+        $member = self::user(Uuid::generate());
+
+        $foreign = $controller->$method($job->getPublicId()->toString(), $member);
+        $missing = $controller->$method((new PublicId())->toString(), $member);
+
+        self::assertSame(404, $foreign->getStatusCode());
+        self::assertSame($missing->getContent(), $foreign->getContent());
+    }
+
+    #[DataProvider('individualJobReads')]
+    public function testAnAdministratorReadsAnotherUsersJob(string $method): void
+    {
+        $job = TranscodeJob::create(new Uuid(), QualityTier::p720(), '/tmp/transcode', Uuid::generate());
+        $jobs = $this->createStub(TranscodeJobPortInterface::class);
+        $jobs->method('findByPublicId')->willReturn($job);
+        $controller = $this->controller($jobs, new \App\Tests\Unit\Transcode\PublicViewStub(), $this->createStub(PlaybackAccessInterface::class), admin: true);
+
+        $response = $controller->$method($job->getPublicId()->toString(), self::user(Uuid::generate()));
+
+        self::assertSame(200, $response->getStatusCode());
+        self::assertSame(
+            $job->getPublicId()->toString(),
+            json_decode((string) $response->getContent(), true, flags: JSON_THROW_ON_ERROR)['data']['publicId'],
+        );
+    }
+
+    /** @return iterable<string, array{bool, list<string>}> whether the caller is an administrator, and the jobs they see */
+    public static function orphanReaders(): iterable
+    {
+        yield 'a member sees only their own jobs' => [false, ['own']];
+        yield 'an administrator sees every job' => [true, ['own', 'foreign']];
+    }
+
+    /** @param list<string> $visible */
+    #[DataProvider('orphanReaders')]
+    public function testTheOrphanCollectionShowsAMemberOnlyTheirOwnJobs(bool $admin, array $visible): void
+    {
+        $caller = Uuid::generate();
+        $jobs = [
+            'own' => TranscodeJob::create(new Uuid(), QualityTier::p720(), '/tmp/own', $caller),
+            'foreign' => TranscodeJob::create(new Uuid(), QualityTier::p720(), '/tmp/foreign', Uuid::generate()),
+        ];
+        $port = $this->createStub(TranscodeJobPortInterface::class);
+        $port->method('findOrphanedJobs')->willReturn(array_values($jobs));
+        $controller = $this->controller($port, new \App\Tests\Unit\Transcode\PublicViewStub(), $this->createStub(PlaybackAccessInterface::class), $admin);
+
+        $result = json_decode($controller->index(self::user($caller))->getContent(), true, flags: JSON_THROW_ON_ERROR);
+
+        self::assertSame(
+            array_map(static fn (string $name): string => $jobs[$name]->getPublicId()->toString(), $visible),
+            array_column($result['data'], 'publicId'),
+        );
+    }
+
     public function testOrphanCollectionFiltersInaccessibleJobsBeforeProjectionAndPreservesOrder(): void
     {
+        $owner = Uuid::generate();
         $jobs = [
-            TranscodeJob::create(new Uuid(), QualityTier::p720(), '/tmp/first', \App\Shared\Domain\Model\Uuid::generate()),
-            TranscodeJob::create(new Uuid(), QualityTier::p720(), '/tmp/denied', \App\Shared\Domain\Model\Uuid::generate()),
-            TranscodeJob::create(new Uuid(), QualityTier::p720(), '/tmp/last', \App\Shared\Domain\Model\Uuid::generate()),
+            TranscodeJob::create(new Uuid(), QualityTier::p720(), '/tmp/first', $owner),
+            TranscodeJob::create(new Uuid(), QualityTier::p720(), '/tmp/denied', $owner),
+            TranscodeJob::create(new Uuid(), QualityTier::p720(), '/tmp/last', $owner),
         ];
         $port = $this->createMock(TranscodeJobPortInterface::class);
         $port->expects(self::once())->method('findOrphanedJobs')->willReturn($jobs);
@@ -86,9 +159,9 @@ final class TranscodeJobAuthorizationTest extends TestCase
 
             return TranscodeJobDto::fromModel($job, new PublicId());
         });
-        $controller = new TranscodeJobController($this->createStub(MessageBusInterface::class), $port, $view, $playback);
+        $controller = $this->controller($port, $view, $playback);
 
-        $result = json_decode($controller->index()->getContent(), true, flags: JSON_THROW_ON_ERROR);
+        $result = json_decode($controller->index(self::user($owner))->getContent(), true, flags: JSON_THROW_ON_ERROR);
 
         self::assertSame([$jobs[0]->getPublicId()->toString(), $jobs[2]->getPublicId()->toString()], array_column($result['data'], 'publicId'));
         self::assertSame([0, 1], array_keys($result['data']));
@@ -106,9 +179,9 @@ final class TranscodeJobAuthorizationTest extends TestCase
         $view->expects(self::once())->method('videoId')->with($videoPublicId)->willReturn($job->getVideoId());
         $playback = $this->createMock(PlaybackAccessInterface::class);
         $playback->expects(self::once())->method('assertAccess')->with($job->getVideoId())->willThrowException(new AccessDeniedException());
-        $controller = new TranscodeJobController($this->createStub(MessageBusInterface::class), $this->createStub(TranscodeJobPortInterface::class), $view, $playback);
+        $controller = $this->controller($this->createStub(TranscodeJobPortInterface::class), $view, $playback);
 
-        $response = $controller->listJobs($query, new SecurityUser($owner->toString(), 'viewer@baander.app', ''));
+        $response = $controller->listJobs($query, self::user($owner));
 
         self::assertSame(['data' => []], json_decode($response->getContent(), true, flags: JSON_THROW_ON_ERROR));
     }
@@ -132,7 +205,7 @@ final class TranscodeJobAuthorizationTest extends TestCase
         $bus = $this->createMock(MessageBusInterface::class);
         $bus->expects($this->once())->method('dispatch')->with($this->isInstanceOf(CleanupOrphanedJobsCommand::class))
             ->willReturn(new Envelope(new CleanupOrphanedJobsCommand(), [new HandledStamp(new \App\Transcode\Application\DTO\TranscodeCleanupResult(expired: 2, cleaned: 3), 'cleanup')]));
-        $controller = new TranscodeJobController($bus, $this->createStub(TranscodeJobPortInterface::class), new \App\Tests\Unit\Transcode\PublicViewStub(), $this->createStub(\App\Transcode\Application\Port\PlaybackAccessInterface::class));
+        $controller = $this->cleanupController($bus);
 
         self::assertSame(['data' => ['expired' => 2, 'cleaned' => 3]], json_decode($controller->cleanup()->getContent(), true, flags: JSON_THROW_ON_ERROR));
     }
@@ -141,7 +214,7 @@ final class TranscodeJobAuthorizationTest extends TestCase
     {
         $bus = $this->createStub(MessageBusInterface::class);
         $bus->method('dispatch')->willReturn(new Envelope(new CleanupOrphanedJobsCommand(), [new HandledStamp(['expired' => 2, 'cleaned' => 3], 'cleanup')]));
-        $controller = new TranscodeJobController($bus, $this->createStub(TranscodeJobPortInterface::class), new \App\Tests\Unit\Transcode\PublicViewStub(), $this->createStub(\App\Transcode\Application\Port\PlaybackAccessInterface::class));
+        $controller = $this->cleanupController($bus);
 
         $this->expectException(\LogicException::class);
         $controller->cleanup();
@@ -154,7 +227,7 @@ final class TranscodeJobAuthorizationTest extends TestCase
             new Envelope(new CleanupOrphanedJobsCommand()),
             [new TranscodeCleanupIncompleteException(removed: 6, failed: 2, expired: 4)],
         ));
-        $controller = new TranscodeJobController($bus, $this->createStub(TranscodeJobPortInterface::class), new \App\Tests\Unit\Transcode\PublicViewStub(), $this->createStub(PlaybackAccessInterface::class));
+        $controller = $this->cleanupController($bus);
 
         // The controller holds no answer of its own for this outcome: the exception subscriber every
         // endpoint shares unwraps the handler's failure and answers it.
@@ -184,7 +257,7 @@ final class TranscodeJobAuthorizationTest extends TestCase
         $failure = new HandlerFailedException(new Envelope(new CleanupOrphanedJobsCommand()), [new \RuntimeException('The orphaned jobs could not be read.')]);
         $bus = $this->createStub(MessageBusInterface::class);
         $bus->method('dispatch')->willThrowException($failure);
-        $controller = new TranscodeJobController($bus, $this->createStub(TranscodeJobPortInterface::class), new \App\Tests\Unit\Transcode\PublicViewStub(), $this->createStub(PlaybackAccessInterface::class));
+        $controller = $this->cleanupController($bus);
 
         try {
             $controller->cleanup();
@@ -192,5 +265,37 @@ final class TranscodeJobAuthorizationTest extends TestCase
         } catch (HandlerFailedException $thrown) {
             self::assertSame($failure, $thrown);
         }
+    }
+
+    /** The controller, with a caller who is an administrator only when the test says so. */
+    private function controller(
+        TranscodeJobPortInterface $jobs,
+        TranscodePublicViewInterface $view,
+        PlaybackAccessInterface $playback,
+        bool $admin = false,
+        ?MessageBusInterface $bus = null,
+    ): TranscodeJobController {
+        $authorization = $this->createStub(AuthorizationCheckerInterface::class);
+        $authorization->method('isGranted')->willReturnCallback(
+            static fn (mixed $attribute): bool => $admin && $attribute === 'ROLE_ADMIN',
+        );
+
+        return new TranscodeJobController($bus ?? $this->createStub(MessageBusInterface::class), $jobs, $view, $playback, $authorization);
+    }
+
+    private function cleanupController(MessageBusInterface $bus): TranscodeJobController
+    {
+        return $this->controller(
+            $this->createStub(TranscodeJobPortInterface::class),
+            new \App\Tests\Unit\Transcode\PublicViewStub(),
+            $this->createStub(PlaybackAccessInterface::class),
+            admin: true,
+            bus: $bus,
+        );
+    }
+
+    private static function user(Uuid $id): SecurityUser
+    {
+        return new SecurityUser($id->toString(), 'viewer@baander.app', '');
     }
 }

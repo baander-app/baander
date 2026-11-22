@@ -61,7 +61,7 @@ final readonly class PartyPublicIdentity implements PartyPublicIdentityPortInter
     public function videoId(PublicId $publicId): Uuid
     {
         $id = $this->internalId('videos', $publicId) ?? throw PartyMediaNotFoundException::video();
-        $this->mediaAccess->assertHostCanPlay($id, null);
+        $this->mediaAccess->assertCanPlay($id);
 
         return $id;
     }

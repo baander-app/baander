@@ -91,7 +91,7 @@ final class PartyPublicIdentityTest extends TestCase
             ->with('SELECT id FROM videos WHERE public_id = :publicId', ['publicId' => $video->getPublicId()->toString()])
             ->willReturn($video->getId()->toString());
         $access = $this->createMock(\App\Party\Application\Port\PartyMediaAccessPortInterface::class);
-        $access->expects($this->once())->method('assertHostCanPlay')->with($video->getId(), null)
+        $access->expects($this->once())->method('assertCanPlay')->with($video->getId())
             ->willThrowException(\App\Party\Application\Exception\PartyMediaNotFoundException::video());
         $this->expectException(\App\Party\Application\Exception\PartyMediaNotFoundException::class);
 

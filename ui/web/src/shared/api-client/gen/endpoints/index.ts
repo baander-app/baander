@@ -947,7 +947,7 @@ export interface CreatePartySessionRequest {
      */
   videoId: string;
   /**
-     * Transcode job of the video that the host's playback steers
+     * The host's own transcode job of the video, which the host's playback steers
      * @minLength 21
      * @maxLength 21
      * @nullable
@@ -3896,7 +3896,7 @@ export interface PartySessionResource {
      */
   videoId: string;
   /**
-     * Transcode job that the host's playback steers; null when none was named or the job has been deleted
+     * Transcode job that the host's playback steers; null when none was named, the job has been deleted, or its owner left the party
      * @minLength 21
      * @maxLength 21
      * @nullable
@@ -9839,7 +9839,7 @@ export const getGetTranscodeJobIndexUrl = () => {
 }
 
 /**
- * @summary List orphaned transcode jobs in accessible libraries
+ * @summary List the caller's orphaned transcode jobs in accessible libraries; administrators see every user's
  */
 export const getTranscodeJobIndex = async ( options?: Parameters<typeof customInstance>[1]): Promise<GetTranscodeJobIndex200> => {
 
@@ -9910,7 +9910,7 @@ export function useGetTranscodeJobIndex<TData = Awaited<ReturnType<typeof getTra
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 /**
- * @summary List orphaned transcode jobs in accessible libraries
+ * @summary List the caller's orphaned transcode jobs in accessible libraries; administrators see every user's
  */
 
 export function useGetTranscodeJobIndex<TData = Awaited<ReturnType<typeof getTranscodeJobIndex>>, TError = ErrorType<unknown>>(
@@ -9940,7 +9940,7 @@ export const getGetTranscodeJobShowUrl = (publicId: string,) => {
 }
 
 /**
- * @summary Get a transcode job by public ID
+ * @summary Get one of the caller's transcode jobs by public ID; administrators may read any user's
  */
 export const getTranscodeJobShow = async (publicId: string, options?: Parameters<typeof customInstance>[1]): Promise<GetTranscodeJobShow200> => {
 
@@ -10011,7 +10011,7 @@ export function useGetTranscodeJobShow<TData = Awaited<ReturnType<typeof getTran
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 /**
- * @summary Get a transcode job by public ID
+ * @summary Get one of the caller's transcode jobs by public ID; administrators may read any user's
  */
 
 export function useGetTranscodeJobShow<TData = Awaited<ReturnType<typeof getTranscodeJobShow>>, TError = ErrorType<ApiError>>(
@@ -10115,7 +10115,7 @@ export const getGetTranscodeJobMetricsUrl = (publicId: string,) => {
 }
 
 /**
- * @summary Get transcode job metrics
+ * @summary Get the metrics of one of the caller's transcode jobs; administrators may read any user's
  */
 export const getTranscodeJobMetrics = async (publicId: string, options?: Parameters<typeof customInstance>[1]): Promise<TranscodeMetricsResource> => {
 
@@ -10186,7 +10186,7 @@ export function useGetTranscodeJobMetrics<TData = Awaited<ReturnType<typeof getT
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 /**
- * @summary Get transcode job metrics
+ * @summary Get the metrics of one of the caller's transcode jobs; administrators may read any user's
  */
 
 export function useGetTranscodeJobMetrics<TData = Awaited<ReturnType<typeof getTranscodeJobMetrics>>, TError = ErrorType<ApiError>>(
