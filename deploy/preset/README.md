@@ -73,8 +73,10 @@ Because web believes the gateway's forwarding headers, the gateway writes all of
 header and `X-Forwarded-Proto` the protocol, and `X-Forwarded-Port` is dropped. Web
 therefore rate limits each client under its own address, and a client's own forwarding
 headers cannot change the scheme, host or port that web sees. This holds in both
-families: the gateway accepts clients over IPv4 and IPv6, and it reaches web over IPv4,
-the only family web listens on.
+families: the gateway accepts clients over IPv4 and IPv6, and it reaches web over both.
+Web listens on `::`, whose IPv6 socket also accepts IPv4 connections. The socket reports
+an IPv4 peer such as `10.231.0.2` in mapped form, `::ffff:10.231.0.2`; web converts it
+back to the plain address, so proxy trust, rate limits and logs see one address per peer.
 
 For an HTTPS origin, run a TLS reverse proxy in front of the gateway. The gateway
 reads the client address from `X-Forwarded-For` and the protocol from
@@ -92,8 +94,16 @@ range `fd00:baa:231::/64`. If a range is in use, set `network.subnet` to another
 network of /29 or larger, or `network.subnet6` to another IPv6 network of /125 or
 larger; start refuses a subnet that overlaps another Docker network. In each subnet the
 gateway takes the second host address, and Docker assigns web's address from the upper
-half, so no container can take the gateway's address first. Because the edge network
-carries both families, the Docker daemon must be able to create IPv6 networks.
+half, so no container can take the gateway's address first.
+
+Because the edge network carries both families, the Docker daemon must be able to
+create IPv6 networks. A daemon that cannot fails start when it creates the edge
+network, and the error names `network.ipv6`. Set that to `false` for an IPv4-only edge
+network: it has the IPv4 subnet alone, and the configuration must not set
+`network.subnet6`. The gateway then holds only its IPv4 address and listens on IPv4,
+and web trusts that one address and listens on `0.0.0.0`. Host connections arrive from
+the IPv4 bridge address; with Docker's userland proxy, so do host connections to an
+IPv6 listen address.
 
 ## Render and start
 

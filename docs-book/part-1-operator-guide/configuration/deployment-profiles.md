@@ -254,7 +254,7 @@ Configured in `config/packages/swoole.yaml`:
 
 | Setting | Default | Description |
 |---------|---------|-------------|
-| `swoole.http_server.host` | `0.0.0.0` | Address to bind the HTTP server. |
+| `swoole.http_server.host` | `0.0.0.0` | Address to bind the HTTP server; `app:serve --host` overrides it. An IPv6 address binds an IPv6 socket; on `::` it also accepts IPv4 clients, which the server logs, rate limits and matches against trusted proxies as plain IPv4 addresses. |
 | `swoole.http_server.port` | `9501` | HTTP server port. |
 | `swoole.http_server.shutdown_timeout` | `WEB_DRAIN_SECONDS` | Seconds `swoole:server:stop` expects a stop to take; it waits 5 seconds longer for the server to exit. When the server is its container's PID 1, as in the shipped images, the command does not wait: it exits once the stop is requested. |
 | `swoole.http_server.settings.heartbeat_check_interval` | `1` | Seconds between Swoole's checks for idle connections. A stop waits for the current interval to end before any worker stops, so keep it short. |

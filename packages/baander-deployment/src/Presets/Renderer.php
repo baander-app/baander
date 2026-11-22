@@ -79,7 +79,7 @@ final class Renderer
         $services = [
             'web' => $common + [
                 'image' => $images['application']['id'], 'environment' => $environment,
-                'entrypoint' => ['php'], 'command' => ['-d', 'memory_limit=' . $profile->phpHeapMiB . 'M', $layout->path('bin/console'), 'app:serve', '--no-interaction'],
+                'entrypoint' => ['php'], 'command' => ['-d', 'memory_limit=' . $profile->phpHeapMiB . 'M', $layout->path('bin/console'), 'app:serve', ...self::webListener($configuration), '--no-interaction'],
                 'volumes' => $webMounts, 'init' => true, 'stop_grace_period' => '35s', 'cap_drop' => ['ALL'],
                 'oom_score_adj' => KillOrder::WEB,
                 'depends_on' => [Pooler::SERVICE => ['condition' => 'service_healthy'], 'redis' => ['condition' => 'service_healthy']],
@@ -112,12 +112,10 @@ final class Renderer
                 'oom_score_adj' => KillOrder::GATEWAY,
             ],
         ];
-        // Web and the gateway alone share the edge network, where the gateway holds the two addresses web trusts.
+        // Web and the gateway alone share the edge network, where the gateway holds the addresses web trusts.
         $services['web']['networks'] = ['private', 'edge'];
-        $services['gateway']['networks'] = ['edge' => [
-            'ipv4_address' => $configuration->edge->ipv4->gatewayAddress,
-            'ipv6_address' => $configuration->edge->ipv6->gatewayAddress,
-        ]];
+        $services['gateway']['networks'] = ['edge' => ['ipv4_address' => $configuration->edge->ipv4->gatewayAddress]
+            + ($configuration->edge->ipv6 === null ? [] : ['ipv6_address' => $configuration->edge->ipv6->gatewayAddress])];
         if ($logging !== null) {
             $target = \Baander\Containers\Docker\Target::fromArray($logging['target']);
             $groups = [['labels' => ['org.baander.preset' => $configuration->name, 'org.baander.preset.owner' => $owner]], ['labels' => ['app.baander.worker.namespace' => $configuration->name], 'serviceLabel' => 'app.baander.worker.role']];
@@ -140,12 +138,9 @@ final class Renderer
         }
         $networks = [
             'private' => ['name' => $configuration->name . '-private', 'labels' => $labels],
-            'edge' => [
-                'name' => EdgeNetwork::name($configuration->name),
-                'labels' => $labels,
-                'enable_ipv6' => true,
-                'ipam' => ['config' => array_map(self::edgePool(...), [$configuration->edge->ipv4, $configuration->edge->ipv6])],
-            ],
+            'edge' => ['name' => EdgeNetwork::name($configuration->name), 'labels' => $labels]
+                + ($configuration->edge->dualStack() ? ['enable_ipv6' => true] : [])
+                + ['ipam' => ['config' => array_map(self::edgePool(...), $configuration->edge->subnets())]],
         ];
 
         return self::escapeInterpolation(['name' => $configuration->name, 'services' => $services, 'volumes' => $volumes, 'networks' => $networks]);
@@ -171,6 +166,18 @@ final class Renderer
         return $mounts;
     }
 
+    /**
+     * The listen address web's server takes on a dual-stack edge network: an IPv6 socket on ::, which
+     * also takes IPv4 peers. An IPv4-only deployment keeps the configured 0.0.0.0, which needs no IPv6
+     * support from the host's kernel.
+     *
+     * @return list<string>
+     */
+    private static function webListener(Configuration $configuration): array
+    {
+        return $configuration->edge->dualStack() ? ['--host', '::'] : [];
+    }
+
     /** @return array{subnet:string,gateway:string,ip_range:string} */
     private static function edgePool(EdgeSubnet $subnet): array
     {
@@ -193,10 +200,10 @@ final class Renderer
     /**
      * Web trusts the gateway's forwarding headers, so the gateway sets each one itself: the client is the
      * TCP peer unless that peer is a declared front proxy, and the protocol is the gateway's own scheme
-     * unless a declared front proxy reported HTTP or HTTPS. The gateway accepts clients in both address
-     * families. It reaches web over IPv4 alone: web's server listens on IPv4, while Docker's DNS also
-     * answers web's IPv6 edge address, which refuses the connection. Resolving web at run time also
-     * follows a replaced web container to its new address.
+     * unless a declared front proxy reported HTTP or HTTPS. On a dual-stack edge network the gateway
+     * accepts clients in both families and reaches web in both, through Docker's A and AAAA answers for
+     * web; on an IPv4-only one it uses IPv4 alone. Resolving web at run time follows a replaced web
+     * container to its new addresses.
      */
     private static function gateway(Configuration $configuration): string
     {
@@ -213,7 +220,7 @@ map $http_upgrade $connection_upgrade {
 }
 upstream web {
     zone web 64k;
-    resolver 127.0.0.11 ipv6=off valid=10s;
+    resolver 127.0.0.11 valid=10s;
     server web:9501 resolve;
 }
 geo $realip_remote_addr $from_front_proxy {
@@ -226,8 +233,7 @@ map "$from_front_proxy:$http_x_forwarded_proto" $forwarded_proto {
 @REAL_IP@log_format preset escape=json '{"host":"$host","method":"$request_method","uri":"$uri","status":$status,"bytes":$body_bytes_sent}';
 server {
     listen 80;
-    listen [::]:80;
-    server_name _;
+@LISTEN6@    server_name _;
     server_tokens off;
     access_log /dev/stdout preset;
     client_max_body_size 0;
@@ -265,6 +271,7 @@ NGINX;
         return strtr($template, [
             '@FRONT_PROXIES@' => implode('', array_map(static fn(string $proxy): string => '    ' . $proxy . " 1;\n", $proxies)),
             '@REAL_IP@' => $realIp,
+            '@LISTEN6@' => $configuration->edge->dualStack() ? "    listen [::]:80;\n" : '',
         ]);
     }
 }

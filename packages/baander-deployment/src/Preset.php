@@ -12,6 +12,7 @@ use Baander\Containers\Docker\Target;
 use Baander\Containers\Docker\TargetResolver;
 use Baander\Filesystem\AtomicFile;
 use Baander\Process\Execution\CommandExecutor;
+use Baander\Process\Execution\CommandFailure;
 use Baander\Process\Execution\EngineExecutor;
 use Baander\Process\Execution\ExecutionContext;
 use Baander\Containers\Resources\DisposableContainer;
@@ -176,7 +177,7 @@ final readonly class Preset
         $this->migrate($configuration, $state, $layout, $profile);
         $this->initializeSecrets($configuration, $state, $layout, $profile);
         $this->verifyPostgres($configuration, $state);
-        $this->docker->compose($configuration->name, $this->composeFile(), ['up', '-d', '--wait', 'log-agent', 'web', 'gateway'], timeout: 180);
+        $this->startEdgeServices($configuration);
         $workers = $this->store->workers();
         $record = $workers->load();
         $lifecycle = new Lifecycle($workers, $this->executor, $this->environment);
@@ -290,6 +291,27 @@ final readonly class Preset
     }
 
     /**
+     * Starts the services on the edge network; Compose creates that network with them. A daemon that
+     * cannot create IPv6 networks fails a dual-stack one here, so the failure names the setting that
+     * renders it IPv4-only.
+     */
+    private function startEdgeServices(PresetConfiguration $configuration): void
+    {
+        try {
+            $this->docker->compose($configuration->name, $this->composeFile(), ['up', '-d', '--wait', 'log-agent', 'web', 'gateway'], timeout: 180);
+        } catch (CommandFailure $failure) {
+            $edge = EdgeNetwork::name($configuration->name);
+            if (!$configuration->edge->dualStack() || !str_contains($failure->getMessage(), 'failed to create network ' . $edge . ':')) {
+                throw $failure;
+            }
+            throw new \RuntimeException(
+                'Docker could not create the dual-stack edge network ' . $edge . '; if the daemon cannot create IPv6 networks, set network.ipv6 to false. ' . $failure->getMessage(),
+                previous: $failure,
+            );
+        }
+    }
+
+    /**
      * Refuses an edge subnet, in either family, that shares addresses with another Docker network before
      * anything starts; the deployment's own edge network, whose ownership is already checked, is exempt.
      */
@@ -300,7 +322,7 @@ final readonly class Preset
             |> (static fn(string $output): array => preg_split('/\s+/', $output, flags: PREG_SPLIT_NO_EMPTY) ?: []);
         $networks = $ids === [] ? [] : json_decode($this->docker->run(['network', 'inspect', ...$ids])->stdout, true, flags: JSON_THROW_ON_ERROR);
         $own = EdgeNetwork::name($configuration->name);
-        $edges = ['network.subnet' => $configuration->edge->ipv4, 'network.subnet6' => $configuration->edge->ipv6];
+        $edges = array_filter(['network.subnet' => $configuration->edge->ipv4, 'network.subnet6' => $configuration->edge->ipv6]);
         foreach ($networks as $network) {
             if (($network['Name'] ?? null) === $own) {
                 continue;

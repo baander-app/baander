@@ -303,6 +303,11 @@ final class PresetDeploymentTest extends TestCase
             [['network' => ['subnet6' => 'fd00:baa:231::/126']], 'The edge network subnet6 must be an IPv6 network address with a prefix of /125 or shorter.'],
             [['network' => ['subnet6' => '10.231.1.0/28']], 'The edge network subnet6 must be an IPv6 network address with a prefix of /125 or shorter.'],
             [['network' => ['gateway' => '10.231.0.1']], 'Unknown key in network configuration.'],
+            [['network' => ['ipv6' => 'false']], 'network.ipv6 must be true or false.'],
+            [
+                ['network' => ['ipv6' => false, 'subnet6' => 'fd00:baa:231::/64']],
+                'An IPv4-only edge network takes no network.subnet6; remove it or set network.ipv6 to true.',
+            ],
             [
                 ['listen' => ['address' => '127.0.0.1', 'port' => 8080, 'frontProxies' => ['192.0.2.10; allow all']]],
                 'listen.frontProxies must list IP addresses or CIDR ranges.',
@@ -456,8 +461,8 @@ final class PresetDeploymentTest extends TestCase
             $document = JsonDocument::read($path);
             $configuration = Configuration::fromArray($document);
             self::assertStringEndsWith('-' . $configuration->capability . '.json', $path);
-            // Each example spells out the edge network's subnet in both families.
-            self::assertSame(['subnet' => '10.231.0.0/28', 'subnet6' => 'fd00:baa:231::/64'], $document['network'], $path);
+            // Each example spells out the dual-stack default and the edge network's subnet in both families.
+            self::assertSame(['subnet' => '10.231.0.0/28', 'ipv6' => true, 'subnet6' => 'fd00:baa:231::/64'], $document['network'], $path);
             $settings = $configuration->profileSettings();
             $deployment = new DeploymentProfile(
                 $settings['capability'],
@@ -631,7 +636,10 @@ final class PresetDeploymentTest extends TestCase
             ],
             $configured['networks']['edge']['ipam']['config'],
         );
-        self::assertSame($network, Configuration::fromArray(self::configuration() + ['network' => $network])->toArray()['network']);
+        self::assertSame(
+            ['subnet' => '192.168.240.0/24', 'ipv6' => true, 'subnet6' => 'fd12:3456:789a:1::/112'],
+            Configuration::fromArray(self::configuration() + ['network' => $network])->toArray()['network'],
+        );
 
         // Either subnet may be set alone; the other keeps its default.
         $ipv4Only = $this->compose(self::configuration() + ['network' => ['subnet' => '192.168.240.0/24']]);
@@ -719,18 +727,63 @@ final class PresetDeploymentTest extends TestCase
         self::assertMatchesRegularExpression('/map "\$from_front_proxy:\$http_x_forwarded_proto" \$forwarded_proto \{\s*default \$scheme;/', $gateway);
     }
 
-    public function testGatewayAcceptsClientsInBothFamiliesAndReachesWebOverIpv4(): void
+    public function testGatewayAcceptsClientsAndReachesWebInBothFamilies(): void
     {
         $gateway = $this->gatewayConfiguration(self::configuration());
 
         self::assertMatchesRegularExpression('/server \{\s*listen 80;\s*listen \[::\]:80;/', $gateway);
-        // Docker's DNS also answers web's IPv6 edge address, where web's IPv4 server refuses the connection.
+        // Docker's DNS answers web's edge address in each family; a short validity follows a replaced web container.
         self::assertMatchesRegularExpression(
-            '/upstream web \{\s*zone web \d+k;\s*resolver 127\.0\.0\.11 ipv6=off valid=\d+s;\s*server web:9501 resolve;\s*\}/',
+            '/upstream web \{\s*zone web \d+k;\s*resolver 127\.0\.0\.11 valid=\d+s;\s*server web:9501 resolve;\s*\}/',
             $gateway,
         );
+        self::assertStringNotContainsString('ipv6=off', $gateway);
         self::assertSame(2, substr_count($gateway, 'proxy_pass http://web;'));
         self::assertStringNotContainsString('proxy_pass http://web:', $gateway);
+        // Web listens on ::, whose IPv6 socket also takes the gateway's IPv4 connections.
+        self::assertSame(
+            ['-d', 'memory_limit=256M', '/srv/baander/bin/console', 'app:serve', '--host', '::', '--no-interaction'],
+            $this->compose(self::configuration())['services']['web']['command'],
+        );
+    }
+
+    public function testAnIpv4OnlyEdgeNetworkCarriesNoIpv6Address(): void
+    {
+        $data = self::configuration() + ['network' => ['ipv6' => false]];
+        $compose = $this->compose($data);
+        $gateway = $this->gatewayConfiguration($data);
+
+        self::assertArrayNotHasKey('enable_ipv6', $compose['networks']['edge']);
+        self::assertSame([['subnet' => '10.231.0.0/28', 'gateway' => '10.231.0.1', 'ip_range' => '10.231.0.8/29']], $compose['networks']['edge']['ipam']['config']);
+        self::assertSame(['edge' => ['ipv4_address' => '10.231.0.2']], $compose['services']['gateway']['networks']);
+        self::assertSame('10.231.0.2', $compose['services']['web']['environment']['TRUSTED_PROXIES']);
+        // Web keeps the configured 0.0.0.0 listener.
+        self::assertSame(['-d', 'memory_limit=256M', '/srv/baander/bin/console', 'app:serve', '--no-interaction'], $compose['services']['web']['command']);
+        self::assertMatchesRegularExpression('/server \{\s*listen 80;\s*server_name _;/', $gateway);
+        self::assertStringNotContainsString('[::]', $gateway);
+        // Host-local clients of the loopback listener arrive from the IPv4 bridge alone.
+        self::assertStringContainsString("set_real_ip_from 10.231.0.1;\nreal_ip_header X-Forwarded-For;\n", $gateway);
+        self::assertMatchesRegularExpression('/geo \$realip_remote_addr \$from_front_proxy \{\s*default 0;\s*10\.231\.0\.1 1;\s*\}/', $gateway);
+        self::assertSame(['subnet' => '10.231.0.0/28', 'ipv6' => false], Configuration::fromArray($data)->toArray()['network']);
+
+        $configured = self::configuration() + ['network' => ['subnet' => '192.168.240.0/24', 'ipv6' => false]];
+        self::assertSame('192.168.240.2', $this->compose($configured)['services']['web']['environment']['TRUSTED_PROXIES']);
+        self::assertSame($configured['network'], Configuration::fromArray($configured)->toArray()['network']);
+    }
+
+    public function testStartNamesTheIpv4OnlySettingWhenDockerCannotCreateTheDualStackEdgeNetwork(): void
+    {
+        $failure = "failed to create network baander-preset-edge: Error response from daemon: unable to enable IPv6 addresses on bridge\n";
+        $error = $this->startEdgeServicesFailing(self::configuration(), $failure);
+        self::assertStringContainsString('Docker could not create the dual-stack edge network baander-preset-edge;', $error->getMessage());
+        self::assertStringContainsString('set network.ipv6 to false', $error->getMessage());
+        // Docker's own reason stays in the message.
+        self::assertStringContainsString('unable to enable IPv6 addresses on bridge', $error->getMessage());
+
+        // Another failure, or one of an IPv4-only edge network, is reported as Docker reported it.
+        foreach ([[self::configuration(), "container baander-preset-web-1 is unhealthy\n"], [self::configuration() + ['network' => ['ipv6' => false]], $failure]] as [$data, $stderr]) {
+            self::assertStringNotContainsString('network.ipv6', $this->startEdgeServicesFailing($data, $stderr)->getMessage());
+        }
     }
 
     public function testDeclaredFrontProxiesAloneReportTheClientAndItsProtocol(): void
@@ -1064,6 +1117,35 @@ final class PresetDeploymentTest extends TestCase
         } finally {
             Collector::remove($directory);
         }
+    }
+
+    /**
+     * Runs start's last Compose step, which creates the edge network, against a daemon that fails it with
+     * the given error output, and returns the error start reports.
+     *
+     * @param array<string,mixed> $data
+     */
+    private function startEdgeServicesFailing(array $data, string $stderr): \RuntimeException
+    {
+        $executor = $this->createStub(CommandExecutor::class);
+        $executor->method('run')->willReturnCallback(static fn(ProcessSpec $command, CompletionPolicy $policy): ProcessResult => $policy->complete(
+            new ProcessResult(1, null, false, false, '', $stderr, 0),
+            $command,
+        ));
+        $target = new Target('/usr/bin/docker', 'unix:///run/baander.app-docker.sock', 'owned-daemon', null, null);
+        $directory = sys_get_temp_dir() . '/baander.app-preset-' . bin2hex(random_bytes(8));
+        $store = new StateStore($directory);
+        AtomicFile::write($directory . '/compose-fixture.json', '{}');
+        $store->save(['version' => 1, 'phase' => 'starting', 'composeFile' => $directory . '/compose-fixture.json']);
+        $preset = new Preset($store, new Client($executor, $target, []), $executor, []);
+        try {
+            new \ReflectionMethod(Preset::class, 'startEdgeServices')->invoke($preset, Configuration::fromArray($data));
+        } catch (\RuntimeException $error) {
+            return $error;
+        } finally {
+            Collector::remove($directory);
+        }
+        self::fail('Start ignored a failed Compose step.');
     }
 
     /** @return array<string,array{id:string}> */

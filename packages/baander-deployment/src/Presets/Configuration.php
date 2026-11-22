@@ -287,18 +287,30 @@ final readonly class Configuration
     }
 
     /**
-     * The edge network's IPv4 `subnet` and IPv6 `subnet6`; each one left out takes its default.
+     * The edge network's IPv4 `subnet` and, unless `ipv6` is false, its IPv6 `subnet6`; each subnet left
+     * out takes its default. An IPv4-only network refuses `subnet6`.
      *
      * @param array<string,mixed> $data
      */
     private static function edgeNetwork(array $data): EdgeNetwork
     {
         $network = array_key_exists('network', $data) ? self::map($data, 'network') : [];
-        JsonDocument::keys($network, ['subnet', 'subnet6'], 'network configuration');
+        JsonDocument::keys($network, ['subnet', 'ipv6', 'subnet6'], 'network configuration');
+        $ipv6 = array_key_exists('ipv6', $network) ? $network['ipv6'] : true;
+        if (!is_bool($ipv6)) {
+            throw new \InvalidArgumentException('network.ipv6 must be true or false.');
+        }
+        if (!$ipv6 && array_key_exists('subnet6', $network)) {
+            throw new \InvalidArgumentException('An IPv4-only edge network takes no network.subnet6; remove it or set network.ipv6 to true.');
+        }
 
         return EdgeNetwork::fromSubnets(
             array_key_exists('subnet', $network) ? self::string($network, 'subnet') : EdgeNetwork::DEFAULT_SUBNET,
-            array_key_exists('subnet6', $network) ? self::string($network, 'subnet6') : EdgeNetwork::DEFAULT_SUBNET6,
+            match (true) {
+                !$ipv6 => null,
+                array_key_exists('subnet6', $network) => self::string($network, 'subnet6'),
+                default => EdgeNetwork::DEFAULT_SUBNET6,
+            },
         );
     }
 
@@ -307,7 +319,8 @@ final readonly class Configuration
     {
         return ['version' => 2, 'name' => $this->name, 'capability' => $this->capability, 'size' => $this->size, 'origin' => $this->origin,
             'listen' => ['address' => $this->listenAddress, 'port' => $this->listenPort, 'frontProxies' => $this->frontProxies],
-            'network' => ['subnet' => $this->edge->ipv4->subnet, 'subnet6' => $this->edge->ipv6->subnet],
+            'network' => ['subnet' => $this->edge->ipv4->subnet, 'ipv6' => $this->edge->dualStack()]
+                + ($this->edge->ipv6 === null ? [] : ['subnet6' => $this->edge->ipv6->subnet]),
             'images' => array_map(static fn(ImageSelection $image): string => $image->reference, $this->images),
             'environment' => $this->environment, 'resources' => $this->resources, 'volumes' => $this->volumes]
             + ($this->hardwareEncoder === null ? [] : ['hardware' => $this->hardwareEncoder]);

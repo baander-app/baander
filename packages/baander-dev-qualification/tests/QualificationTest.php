@@ -203,13 +203,15 @@ final class QualificationTest extends TestCase
         ]]];
         $gateway = ['NetworkSettings' => ['Networks' => ['baander-qualification-edge' => ['IPAddress' => '10.231.0.2', 'GlobalIPv6Address' => 'fd00:baa:231::2']]]];
         $forwarded = ['ipv4' => '10.231.0.8', 'ipv6' => 'fd00:baa:231:0:8000::'];
+        // Web's HTTP status for a request to its own edge address in each family.
+        $answers = ['ipv4' => 200, 'ipv6' => 200];
 
-        $check = Qualification::proxyTrustCheck($deployment, $web, $gateway, 200, $forwarded, '10.231.0.1');
+        $check = Qualification::proxyTrustCheck($deployment, $web, $gateway, 200, $answers, $forwarded, '10.231.0.1');
         self::assertSame(['passed', []], [$check['status'], $check['failures']]);
         self::assertSame(['10.231.0.2,fd00:baa:231::2', '10.231.0.1'], [$check['trustedProxies'], $check['expectedHairpinClient']]);
         // The same address in another spelling is the same sender.
         $respelled = ['ipv4' => '10.231.0.8', 'ipv6' => 'FD00:0BAA:0231:0000:8000:0000:0000:0000'];
-        self::assertSame('passed', Qualification::proxyTrustCheck($deployment, $web, $gateway, 200, $respelled, '10.231.0.1')['status']);
+        self::assertSame('passed', Qualification::proxyTrustCheck($deployment, $web, $gateway, 200, $answers, $respelled, '10.231.0.1')['status']);
 
         $ipv4Trusted = $web;
         $ipv4Trusted['Config']['Env'][1] = 'TRUSTED_PROXIES=10.231.0.2';
@@ -220,20 +222,22 @@ final class QualificationTest extends TestCase
         $ipv4Gateway = $gateway;
         $ipv4Gateway['NetworkSettings']['Networks']['baander-qualification-edge']['GlobalIPv6Address'] = '';
         foreach ([
-            [[$ipv4Trusted, $gateway, 200, $forwarded, '10.231.0.1'], 'Web trusts "10.231.0.2" instead of exactly the gateway addresses 10.231.0.2,fd00:baa:231::2.'],
-            [[$rangeTrusted, $gateway, 200, $forwarded, '10.231.0.1'], 'Web trusts "10.231.0.0/28,fd00:baa:231::/64" instead of exactly the gateway addresses 10.231.0.2,fd00:baa:231::2.'],
-            [[$web, $twoNetworks, 200, $forwarded, '10.231.0.1'], 'The gateway joins baander-qualification-edge, baander-qualification-private instead of the edge network alone.'],
-            [[$web, $ipv4Gateway, 200, $forwarded, '10.231.0.1'], 'The gateway does not hold its pinned edge address fd00:baa:231::2.'],
-            [[$web, $gateway, null, $forwarded, '10.231.0.1'], 'Web cannot reach the gateway health route.'],
+            [[$ipv4Trusted, $gateway, 200, $answers, $forwarded, '10.231.0.1'], 'Web trusts "10.231.0.2" instead of exactly the gateway addresses 10.231.0.2,fd00:baa:231::2.'],
+            [[$rangeTrusted, $gateway, 200, $answers, $forwarded, '10.231.0.1'], 'Web trusts "10.231.0.0/28,fd00:baa:231::/64" instead of exactly the gateway addresses 10.231.0.2,fd00:baa:231::2.'],
+            [[$web, $twoNetworks, 200, $answers, $forwarded, '10.231.0.1'], 'The gateway joins baander-qualification-edge, baander-qualification-private instead of the edge network alone.'],
+            [[$web, $ipv4Gateway, 200, $answers, $forwarded, '10.231.0.1'], 'The gateway does not hold its pinned edge address fd00:baa:231::2.'],
+            [[$web, $gateway, null, $answers, $forwarded, '10.231.0.1'], 'Web cannot reach the gateway health route.'],
+            // Web's server listening on IPv4 alone refuses its IPv6 edge address.
+            [[$web, $gateway, 200, ['ipv4' => 200, 'ipv6' => null], $forwarded, '10.231.0.1'], 'Web does not answer on its IPv6 edge address "fd00:baa:231:0:8000::".'],
             [
-                [$web, $gateway, 200, ['ipv4' => '198.51.100.7', 'ipv6' => 'fd00:baa:231:0:8000::'], '10.231.0.1'],
+                [$web, $gateway, 200, $answers, ['ipv4' => '198.51.100.7', 'ipv6' => 'fd00:baa:231:0:8000::'], '10.231.0.1'],
                 'A request over IPv4 that forged X-Forwarded-For reached web as "198.51.100.7" instead of its sender\'s address.',
             ],
             [
-                [$web, $gateway, 200, ['ipv4' => '10.231.0.8', 'ipv6' => '2001:db8::7'], '10.231.0.1'],
+                [$web, $gateway, 200, $answers, ['ipv4' => '10.231.0.8', 'ipv6' => '2001:db8::7'], '10.231.0.1'],
                 'A request over IPv6 that forged X-Forwarded-For reached web as "2001:db8::7" instead of its sender\'s address.',
             ],
-            [[$web, $gateway, 200, $forwarded, null], 'A host-local client reached web as "" instead of the trusted edge bridge address 10.231.0.1.'],
+            [[$web, $gateway, 200, $answers, $forwarded, null], 'A host-local client reached web as "" instead of the trusted edge bridge address 10.231.0.1.'],
         ] as [$observed, $failure]) {
             self::assertSame([$failure], Qualification::proxyTrustCheck($deployment, ...$observed)['failures']);
         }
@@ -242,17 +246,35 @@ final class QualificationTest extends TestCase
         $ipv6Loopback = $this->configuration()['deployment'];
         $ipv6Loopback['listen']['address'] = '::1';
         $ipv6Loopback = Configuration::fromArray($ipv6Loopback);
-        $check = Qualification::proxyTrustCheck($ipv6Loopback, $web, $gateway, 200, $forwarded, 'fd00:baa:231::1');
+        $check = Qualification::proxyTrustCheck($ipv6Loopback, $web, $gateway, 200, $answers, $forwarded, 'fd00:baa:231::1');
         self::assertSame(['passed', 'fd00:baa:231::1'], [$check['status'], $check['expectedHairpinClient']]);
         self::assertSame(
             ['A host-local client reached web as "10.231.0.1" instead of the trusted edge bridge address fd00:baa:231::1.'],
-            Qualification::proxyTrustCheck($ipv6Loopback, $web, $gateway, 200, $forwarded, '10.231.0.1')['failures'],
+            Qualification::proxyTrustCheck($ipv6Loopback, $web, $gateway, 200, $answers, $forwarded, '10.231.0.1')['failures'],
         );
 
         // A listener on a LAN address trusts no host-local source, so no hairpin request is expected.
         $lan = $this->configuration()['deployment'];
         $lan['listen']['address'] = '192.0.2.40';
-        self::assertSame('passed', Qualification::proxyTrustCheck(Configuration::fromArray($lan), $web, $gateway, 200, $forwarded, null)['status']);
+        self::assertSame('passed', Qualification::proxyTrustCheck(Configuration::fromArray($lan), $web, $gateway, 200, $answers, $forwarded, null)['status']);
+    }
+
+    public function testProxyTrustOfAnIpv4OnlyEdgeNetworkChecksIpv4Alone(): void
+    {
+        $data = $this->configuration()['deployment'] + ['network' => ['ipv6' => false]];
+        $web = ['Config' => ['Env' => ['TRUSTED_PROXIES=10.231.0.2']], 'NetworkSettings' => ['Networks' => [
+            'baander-qualification-private' => ['IPAddress' => '172.30.0.5', 'GlobalIPv6Address' => ''],
+            'baander-qualification-edge' => ['IPAddress' => '10.231.0.8', 'GlobalIPv6Address' => ''],
+        ]]];
+        $gateway = ['NetworkSettings' => ['Networks' => ['baander-qualification-edge' => ['IPAddress' => '10.231.0.2', 'GlobalIPv6Address' => '']]]];
+
+        $check = Qualification::proxyTrustCheck(Configuration::fromArray($data), $web, $gateway, 200, ['ipv4' => 200], ['ipv4' => '10.231.0.8'], '10.231.0.1');
+        self::assertSame(['passed', []], [$check['status'], $check['failures']]);
+
+        // Host-local clients of an IPv6 loopback listener reach an IPv4-only gateway from the IPv4 bridge.
+        $data['listen']['address'] = '::1';
+        $check = Qualification::proxyTrustCheck(Configuration::fromArray($data), $web, $gateway, 200, ['ipv4' => 200], ['ipv4' => '10.231.0.8'], '10.231.0.1');
+        self::assertSame(['passed', '10.231.0.1'], [$check['status'], $check['expectedHairpinClient']]);
     }
 
     public function testAccessLogProgramReportsTheClientWebChargedTheProbePathTo(): void

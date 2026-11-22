@@ -103,3 +103,17 @@ function decode_string_as_set(?string $stringSet, string $separator = ',', array
 
     return $set;
 }
+
+/**
+ * The IPv4 form of an IPv4-mapped IPv6 address (::ffff:a.b.c.d), which is how a dual-stack socket
+ * reports an IPv4 peer; any other address is returned unchanged.
+ */
+function canonical_ip_address(string $address): string
+{
+    $packed = filter_var($address, FILTER_VALIDATE_IP, FILTER_FLAG_IPV6) === false ? false : inet_pton($address);
+    if ($packed === false || !str_starts_with($packed, str_repeat("\0", 10) . "\xff\xff")) {
+        return $address;
+    }
+
+    return inet_ntop(substr($packed, 12)) ?: $address;
+}
