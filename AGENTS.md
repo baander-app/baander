@@ -103,6 +103,9 @@ under `.agents/`.
 - Write PHP 8.5 idiom: the pipe operator, first-class callables, small named
   helpers over nested calls. Run `.php-cs-fixer.tooling.php` on files touched
   under the workflow packages listed in `.php-cs-fixer.tooling.php` and `scripts`.
+- Comments and docblocks assume a competent reader: name the mechanism, such as a lock
+  mode, an algorithm or an invariant, instead of narrating its effect, and keep only the
+  reason the code cannot show.
 - Code stands on its own: source, tests, comments and docblocks never cite planning
   artifacts (requirement, acceptance-example or decision ids such as `R5`, `AE4`,
   `KTD2`, roadmap item numbers, plan file paths). State the behaviour in plain
