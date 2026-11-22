@@ -1,597 +1,37 @@
 # Baander roadmap
 
-Updated: 2026-11-22. This roadmap selects future work and records unresolved
-acceptance. Current operating contracts belong in the linked guides; completed
-milestones and their verification evidence remain in Git history.
+Updated 2026-11-22. The roadmap records remaining work, decisions and acceptance
+gates. The linked guides describe current operating contracts. Git history
+keeps completed milestones and their verification evidence.
 
-## Person profiles and cross-media credits
+## Resume here
 
-Baander now opens one Person profile from movie, TV, song and album credits.
-Director IDs and bookmarks carry forward. Individual Artists link to a Person
-through verified provider identifiers, so artist credit roles and credited
-names still come from the music catalog. Profiles and counts use the reader's
-library access. TV credits come from registered series and episodes.
-[Implementation plan](docs/plans/2026-11-21-1948-feat-person-and-cross-media-credits-plan.md),
-[People and credits guide](docs-book/part-1-operator-guide/media/library-management.md#people-and-credits).
+Select work for a concrete user workflow, demonstrated runtime gap or named
+release decision. Historical unchecked items, old plan limitations and incomplete
+experiments do not authorize implementation or indefinite reruns. Reconcile the
+[retained plans](docs/plans/) with current callers before using them. Release gates
+become actionable when their named environment, access or decision is available.
 
-The PostgreSQL run covered the populated Director upgrade, concurrent imports,
-claims that wait on a merge, separate cast and crew replacement, scoped credit
-reads and portrait access. It passed 30 tests with 286 assertions. The Redis
-Artist queue passed seven tests with 28 assertions, including reconciliation
-after a cached details-only answer. The full web suite passed 3,844 tests in
-316 files. Web typecheck passed, ESLint reported zero errors, and the OpenAPI
-export and generated client checks passed. Symfony container lint and Deptrac
-passed, with zero dependency violations.
+Read [AGENTS.md](AGENTS.md) for workflow, [CONCEPTS.md](CONCEPTS.md) for shared terms
+and the [testing guide](docs-book/part-2-developer-guide/testing/README.md) for current
+runners and verification boundaries. Historical suite counts apply to their own trees.
 
-The isolated preview passed one Playwright test with a real catalog. It paged
-through filtered Directors, opened the Person profile from the Director page,
-and displayed its movie credit at desktop and mobile widths. It followed the
-Person's movie, series, episode, song and album credits to their detail pages
-and checked the TV character and music credited name.
-[Director and Person browser check](ui/web/tests/e2e/playback-destinations/directors.spec.ts).
+## Person credits and catalog follow-ups
 
-`make ci` stopped at Composer normalization. The manifest and lockfile are
-identical to the base commit. The broader backend selection also reproduced
-the existing unclassified video and admin log routes recorded below. The
-focused CI-image run passed its 273-test unit lane with 1,302 assertions and
-its 21-test deployed-stack lane with 139 assertions. A Director state lookup
-failed in the other lane. The corrected Director and Redis selection passed
-14 tests with 189 assertions. PHPStan passed in the CI image.
-[Director persistence](tests/Integration/DirectorCreditPersistenceTest.php),
-[Person identity persistence](tests/Integration/PersonIdentityPersistenceTest.php),
-[Scoped People reads](tests/Integration/PeopleReadRepositoryTest.php).
-
-## Composer normalization
-
-Composer 2.11.1 and `ergebnis/composer-normalize` 2.56.0 reordered the root
-requirements and development autoload maps. The manifest values and all 250
-locked package records match the base. Composer regenerated the lockfile content
-hash for the new ordering.
-[Normalization plan](docs/plans/2026-11-22-fix-composer-normalization-gate-plan.md).
-
-`make ci` passed Composer validation, normalization, PHPStan, and Deptrac in
-the CI image. Composer validation reported its existing constraint warnings.
-Deptrac reported zero violations. At this checkpoint the backend coverage run
-had selected 14,195 tests across four lanes and was still running.
-[CI target](Makefile#L141).
-
-The local dependency checker returned exit code 2 on both `8692af0bb` and the
-normalized branch. Both runs reported seven Swoole fork source files that differ
-from the reviewed inventory and a validation evidence gap for the Redis rate
-limiter package. The fork review and the checker's interpretation of Composer
-output are separate follow-ups.
-[Fork inventory](packages/swoole-bundle/upstream-review.json),
-[Composer evidence collector](packages/baander-dev-dependencies/src/Php/ComposerEvidence.php).
-
-## Shared identifier patterns
-
-`PublicId` now supplies the length and patterns used by PHP validators, route
-requirements, and OpenAPI declarations. PHP validation rejects IDs with a
-trailing newline. The OpenAPI export changes only the character order in
-two equivalent character classes. `Genre` uses the same MusicBrainz ID regex as
-the Catalog value type. [Identifier validation plan](docs/plans/2026-11-21-refactor-identifier-validation-patterns-plan.md)
-
-Verification on 2026-11-21: the CI image passed 324 tests with 4,252 assertions
-across identifiers, routes, request validation, and OpenAPI. PHPStan, container
-lint, and the OpenAPI export check passed. Deptrac reported zero violations.
-
-## Password rehash and emergency OAuth rotation
-
-The [authentication plan](docs/plans/2026-11-21-feat-password-rehash-and-emergency-oauth-rotation-plan.md)
-adds hash upgrades to successful password logins. The upgrade uses the configured
-hasher and commits with the new session. It preserves the credential epoch,
-existing sessions and password reset links. The session issuance lock still
-refuses a login that verified a password before a concurrent change.
-
-The [offline rotation runbook](docs-book/part-1-operator-guide/commands/app-auth-rotate-secrets.md)
-now covers recovery when the previous signing key may have been exposed.
-`OAuthKeyRotationAcceptanceTest` runs the maintenance command and restarts the
-production firewall with new key paths. It checks the replacement key in JWKS,
-rejects the old access and refresh tokens, and confirms that a user can sign in
-again. `OAuthTokenInvalidationTest` verifies deletion of outstanding authorization
-and device codes along with the session grants and token metadata.
-
-Verification on 2026-11-21: the CI image passed 190 tests with 1,869 assertions
-across the focused unit, functional and integration suites. PHPStan and container
-lint passed, and Deptrac reported zero violations. The broader Auth unit run
-identified four `ScopeRouteInventoryTest` failures for existing movie, video and
-admin log routes. The same failures reproduced on `master` at that checkpoint.
-
-## OAuth route scope inventory
-
-The route map now classifies both video playback reads under `library` scope.
-Video information and timeline previews use the caller's library grants, including
-when an administrator uses a delegated token. The four admin log routes are
-first-party only and still require `ROLE_SUPER_ADMIN`.
-[Route inventory plan](docs/plans/2026-11-22-fix-oauth-scope-inventory-plan.md).
-
-The CI image passed 1,437 unit tests with 5,133 assertions across the selected Auth
-and video-information suites. The route inventory passed all five tests. The
-admin log functional suite passed all 12 tests with 18 assertions. The production
-OAuth firewall suite passed 12 tests with 118 assertions. Its preview check
-verifies the response when a granted video has no generated preview. PHP syntax
-and `git diff --check` passed.
-[Route inventory test](tests/Unit/Auth/Infrastructure/Security/OAuth/ScopeRouteInventoryTest.php),
-[OAuth firewall tests](tests/Integration/OAuthScopeEnforcementTest.php),
-[admin log tests](tests/Functional/Controller/AdminLogControllerTest.php).
-
-## Cinema video player
-
-The [cinema player plan](docs/plans/2026-11-21-1146-feat-cinema-video-player-plan.md)
-adds a NowPlaying-style console that fades during playback and stays visible for
-focus, pause, settings and errors. It includes fullscreen, keyboard transport,
-chapter navigation, buffered progress and authenticated timeline previews. Quality,
-subtitle and audio-language menus reflect the current media capabilities.
-Independent audio and subtitle timing controls use 100 ms steps within ±10 seconds,
-with separate resets. Settings survive seeks and attachment renewal for the current
-movie and reset for a different movie. Remote destinations retain transport and
-explain why presentation controls require the playing destination.
-
-Backend delivery carries the selected audio stream and timing correction into
-presentation identity, admission and encoding. Native-media tests measure both
-offset signs after startup and a nonzero seek. Scoped metadata supplies chapters
-and tracks; an admitted media worker prepares bounded thumbnail sheets and checks
-source identity before publication. The [playback controls guide](docs-book/part-2-developer-guide/development/video-playback-controls.md)
-records these contracts and limits.
-
-Verification on 2026-11-21: the CI image passes 146 audio/delivery tests with
-8,128 assertions and 172 metadata/preview tests with 881 assertions. The final
-thumbnail-queue correction passes six tests with 35 assertions in the CI image.
-The full web suite passes all 3,757 tests in 309 files; the subsequent page-focus
-regression suite passes both added tests. PHPStan reports no errors
-and Deptrac reports no violations. Web typecheck and production build pass; lint
-reports no errors and 12 existing warnings. The cinema browser scenario passes
-with real audio/subtitle/quality changes, decoded preview JPEG bytes, measured
-subtitle cue shifts, paused native-source seeks, independent timing resets,
-fullscreen, narrow controls and focus restoration. The final browser regression
-run passes all three original/copy delivery and destination-transfer checks,
-including paused transfer, remote reopen, local return and reload recovery.
-
-The review corrected expired preview claims blocking queue admission and the
-generated preview client's binary response handling. Browser verification also
-exposed ordinary polling being disabled by the live-query coordinator; a dedicated
-sampled policy now refreshes pending previews. Keeping the movie page mounted
-behind the modal preserves its Play button for focus restoration. Regression
-tests cover these fixes. Independent review and both focused follow-up reviews
-report no remaining findings.
-The frontend and backend coding rules retain the user's formatting preference:
-readable multiline code, separate statements and a readability check beyond lint.
-
-Manual quality selection now negotiates the requested resolution for original,
-copy, encoded and native HLS playback. The menu lists canonical tiers that fit the
-source, destination and stable QoL qualification, independently of the currently
-published renditions. Delivery retains compatible source-height media, reuses an
-exact completed presentation or admits the requested tier alone. Auto restores
-ordinary delivery selection. Changes preserve the source cursor, pause state,
-audio language, audio correction, subtitle selection and subtitle correction.
-Audio and quality changes share a revision so stale responses cannot overwrite
-newer choices. Pending selection, confirmed selection and current output remain
-distinct. The persistent host now bounds the video to the available cinema area,
-and aspect-preserving containment fits the picture independently of its encoded
-resolution. Lower tiers still use the available display area without cropping;
-resizing and fullscreen retain the selected encoding tier.
-
-Review corrections carry `qualityTier` through the shared delivery adapter,
-reject allocations for a different tier and include matching copy output in
-completed-presentation reuse. Auto now limits its encoding ladder to the configured
-video encoder slots: a single-slot deployment previously tried to admit an
-additional rendition that could not fit. Presentation changes serialize session retirement,
-admission and recovery, so a single producer slot can serve successive choices.
-Failed cancellation retains the accepted settings and cursor until the same
-session is successfully retired. Pending audio, quality and transport intent
-survive overlapping changes; selectors allow reversal to Auto or default audio,
-and repeated timing gestures accumulate against the pending offset. Handoff waits
-for presentation changes and rejects unconfirmed cancellation. The changed code
-uses readable multiline formatting. All five original review findings, two
-follow-up findings and one later finding are corrected; the final focused source
-review reports no findings.
-
-Separate open work: closing the owner while an admission response is lost can
-leave a newly admitted session whose identifier the player never received until
-server expiry. This behavior predates manual quality selection. As the
-[playback controls guide](docs-book/part-2-developer-guide/development/video-playback-controls.md)
-explains, cleanup needs a server-scoped cancellation protocol: cancelling the
-former owner's whole group after ownership changes could cancel its successor.
-
-Manual-quality verification on 2026-11-21: the CI image passes 479 backend tests
-with 4,059 assertions across 33 files: 391 ordinary tests with 2,679 assertions,
-28 native tests with 160 assertions, and two stack selections of 41 tests with
-847 assertions and 19 tests with 373 assertions. The full web suite passes
-3,808 tests in 311 files. After the final recovery corrections, both player-hook
-suites pass all 300 tests; the delivery transport suite passes all 31 tests.
-Final PHPStan checks all 4,047 files in the CI image with no errors; Deptrac reports
-no violations, warnings or errors. Full web lint reports no errors and 12 existing warnings, and the final typecheck
-passes. The production build passes after the viewport-fit change, and all ten
-focused overlay tests pass. After the Auto admission correction, the affected CI
-suite passes 45 tests with 268 assertions; these overlap the backend baseline.
-Scoped viewport-fit lint passes with no errors.
-
-The one-slot manual-quality browser run passes for both original and copy starts.
-It verifies decoded 720p, 480p and 360p media and return to Auto, source cursor and
-pause retention, and actual display geometry at desktop and portrait sizes and in
-fullscreen. Both original/copy delivery browser checks also pass. The broader
-cinema scenario exposed a source cursor reported as zero while replacement reset
-the native clock; retaining the protected cursor fixes both regression cases, and
-the final 300-test hook rerun passes. A later cinema rerun could not complete
-because an unrelated paused media producer held the sole video slot. Fixture
-cleanup completed with no survivors; the producer was left untouched. The cinema
-rerun and cross-client encoded handoff subsequently pass with the other original
-player cases: all six pass after restoring the ordinary eight-slot profile. The
-handoff needs concurrent producers and did not pass with one slot. The earlier
-one-slot replacement and viewport-fit proof remains valid.
-
-## Movie directors
-
-Director browsing is implemented with persisted Catalog director identities and
-movie credits. **Directors** opens a searchable, paginated directory; each director
-links to their accessible movies through the existing movie cards. Names, optional
-portraits and movie counts come from stored records, and every query applies the
-reader's library scope. TMDB person IDs distinguish people who share a name.
-
-The existing metadata sync now queues movie enrichment, allowing existing movies
-to acquire director credits when TMDB is configured. Normal enrichment fills
-missing credits; forced enrichment replaces them, including an authoritative empty
-result. Absent or failed credits retain the stored set. Movie metadata and accepted
-credit updates commit together; existing TMDB movie identity controls lookups,
-and a conflicting search match cannot redirect writes to another local movie.
-The [library guide](docs-book/part-1-operator-guide/media/library-management.md#people-and-credits)
-and [sync command reference](docs-book/part-1-operator-guide/commands/app-metadata-sync.md)
-explain the workflow and its limits.
-
-Director verification on 2026-11-21: the CI image passes 213 backend tests with
-1,346 assertions across 15 files: 123 ordinary tests with 616 assertions, 48 native
-tests with 72 assertions, and two stack selections of 28 tests with 394 assertions
-and 14 tests with 264 assertions. These checks cover real Catalog column types,
-indexes and foreign keys, idempotency, rollback, concurrent identity reuse, forced
-empty replacement and detached credit cleanup. The actual library dispatch,
-message codec, movie consumer and persistence path pass together. Filmography
-hydration takes four queries for a 50-movie page; movie sync reads each identity
-page with one query. The final query-proof rerun passes three tests with 125
-assertions after test-only corrections; these overlap the 213-test baseline and
-add one assertion.
-
-The additive director migration `Version20261121143000` has applied successfully
-to the isolated preview, and the ordinary eight-slot profile and environment are
-restored. Optional `TMDB_BEARER_TOKEN` now passes through admitted worker
-credentials and preset/preview worker setup. The runtime environment suite's
-43 tests and 66 assertions are included in the 213-test backend result; preset
-worker filters separately pass three tests with seven assertions, and preview
-worker filters pass two tests with five assertions. All three added token
-regressions failed before the correction.
-
-All 99 focused frontend tests and typecheck pass. Director directory, detail and
-movie queries use a library-scoped sampled policy: visible views refresh every
-30 seconds and after catalog hints, with hidden-view pause, resume and unmount
-covered through the generated hooks and live coordinator. This supplies credit
-refresh without claiming a new backend event producer. The full web checkpoint
-passes 3,828 tests in 313 files, before the later cached-data/error restoration
-guard. All 26 focused navigation, live-update and route tests in three files
-pass, including four regressions that failed before correction, detail
-search retaining the directory origin, and later live updates preserving newly
-chosen scroll and focus positions. The final UI simplification pass found no
-further changes. The cached-data/error restoration regression also passes after
-the guard; the post-guard production build, typecheck and scoped lint pass. The
-full web lint checkpoint reported no errors and 12 existing warnings.
-PHPStan passed all 4,068 files before the separate Spec parameter integration.
-
-The prior parameter bridge migrated fourteen definitions in the two movie/director
-controllers to the exact Spec parameter class. Its acceptance checkpoint is now
-superseded: the user rejected the deprecated serializer, context and annotation
-classes introduced by the adapter. Replacement follows the reviewed
-[Native Spec OpenAPI plan](docs/plans/2026-11-21-1517-refactor-native-spec-openapi-plan.md).
-The delivery checkpoint appears under Native OpenAPI export. The prior real export
-was structurally equal to its baseline across 279 paths and 172 component
-schemas, and regenerated Orval client output is byte-identical. Five host tests
-pass with 54 assertions, and all five simplification lenses report no actionable
-findings. Affected final CI passes 51 tests with 2,748 assertions across ten files:
-nine ordinary tests with 87 assertions and stack selections of 34 tests with
-2,503 assertions and eight tests with 158 assertions. These overlap the 213-test
-baseline and cover actual OpenAPI export, metadata races, rollback, genre identity
-and scoped queries. Final PHPStan passes all 4,073 files, and Deptrac reports no
-violations, warnings or errors. Seven bounded source-review follow-ups report no
-findings and close the five original director defects. That review preceded the
-user's rejection of the parameter adapter's deprecated boundary. The replacement
-plan and its acceptance evidence appear below. Runtime acceptance for the player
-and director features is complete: the six original player scenarios pass in one
-explicit browser run, and the director navigation scenario passes in a separate
-rerun after correcting the test to select Movies. All seven intended cases pass
-across those two runs, with no fixture-cleanup failures. No user token was
-configured and no provider bulk fetch started.
-
-## Native OpenAPI export
-
-Symfony routes and `OpenApi\Spec` declarations now supply the API document.
-The CLI and protected `/api/doc.json` route share the native exporter. Nelmio
-ApiDoc and the deprecated parameter adapter are removed. A fresh export process
-loads no deprecated OpenAPI classes. The Composer resolution keeps all other
-package versions and upgrades swagger-php from 7.0.0 to 7.2.0. The new release
-preserves empty Media Type objects for binaries and streaming manifests.
-
-Before the request enum refinements, the native JSON document and parsed YAML
-matched all 279 paths and 172 component schemas in `08aa25b4`. The comparison
-ignored object key order and preserved array order and JSON value types. The
-final document differs at 40 entries, all covered by the enum changes in the
-[reviewed plan](docs/plans/2026-11-21-1517-refactor-native-spec-openapi-plan.md).
-The generated web types expose the recognized token hints, library types and
-backend, artist roles, theme mood and playback choices. Composed playback schemas
-preserve their previous index value types. The five nullable enum corrections
-leave the regenerated client byte-identical to its previous output.
-
-The CI image passed 296 affected tests with 4,122 assertions across 19 files.
-The final schema refinements passed 47 focused tests with 2,583 assertions.
-The final schema composition passed 23 acceptance examples and 12 TypeScript
-assignments, including six expected type errors. PHPStan passed all 4,079 files.
-Deptrac reports zero violations, warnings and errors after the two explicit enum
-contracts were added. The session-wide PHP signature audit covered 425 files and
-5,225 calls and attributes with zero ordering mismatches. The web build passed,
-and lint reported zero errors and 12 existing warnings. Code review found no
-migration regressions. The final edits corrected five existing nullable enums
-and made the checkpoint schema assertions independent of the generated map.
-The dependency checker still reports 49 ignored local worktree inventory gaps
-and seven unchanged Swoole fork inventory findings.
-The refreshed isolated preview installed swagger-php 7.2.0 and passed one
-browser smoke. The HTTP route returned 401 anonymously and 200 after sign-in,
-and the JSON response matched the tracked document. Both preview workers and
-the web service reported ready.
+The current Person profile lists credits for cataloged works. TV file scanning,
+playback and catalog-wide management remain separate from TV credit registration.
+Concerts need Catalog targets before they can use Person credit relationships.
+Provider-wide filmographies need their own visibility rules. Importing more
+MusicBrainz recording, release or work relationships needs mapping and
+precedence rules. [People and credits guide](docs-book/part-1-operator-guide/media/library-management.md#people-and-credits).
 
 ## Frontend build warnings
 
-Path validation now imports its already-eager API directly in
-`use-path-validation.ts`, retaining attempt and authorization ownership checks.
-The Vite configuration uses Node's `import.meta.dirname` for its six filesystem
-paths. The production build no longer reports the ineffective dynamic import or
-native configuration directory warning.
-
-Verification: all six library lifecycle tests pass; typecheck, scoped lint and
-production build pass. An isolated browser smoke loads the emitted application
-and worker, renders the anonymous login view, reloads it and checks a protected
-route's login redirect. It reports no page, console, asset or external-request
-errors. Bounded simplification and correctness review report no findings, and
-whitespace checks pass. The correction is saved in local commit `fc8d9305`.
-No validation test, player/director logic or chunking configuration changed.
-
-The minified app is 2322.71 kB, compared with 2322.86 kB before this correction.
-HLS remains 578.15 kB and Three remains 742.80 kB. Their size warning stays
-enabled. The installed full-feature HLS public entry is a single module; Three
-is already loaded on visualizer activation. App/vendor or route splitting remains
-a separate optimization requiring measured benefit and compiled-graph smoke
-coverage, rather than threshold changes or reduced media features.
-
-## Local environment defaults
-
-Image builds, source snapshots and qualification archives now exclude the
-checkout's local `.env`. The tracked `.env.example` supplies safe defaults,
-including CPU encoder settings and empty optional provider credentials. Docker
-stages materialize their runtime `.env` from that template. Host qualification
-archives and backend CI source mounts prepare the same base file before boot,
-without reading private checkout values or changing the source snapshot digest.
-The [installation guide](docs-book/part-1-operator-guide/getting-started/installation.md)
-and [developer setup](docs-book/part-2-developer-guide/getting-started/README.md)
-distinguish build defaults from private runtime configuration.
-
-Verification: source snapshot tests pass 15 tests with 66 assertions. CI bootstrap
-passes both tests with 18 assertions after reproducing the missing-base-file
-failure. Safe archive/workflow checks pass 36 tests with 190 assertions, with two
-POSIX-dependent cases skipped; the subsequent real-archive check passes one test
-with 15 assertions. Synthetic Docker context qualification verifies 37 excluded
-and 31 preserved files and a safe image-local `.env`; fresh-template Dotenv boot
-also passes. Touched formatting, tooling PHPStan, source policy and whitespace
-checks pass. All five simplification lenses and focused correctness/adversarial
-review report no findings. These checks qualify the changed context and staging
-mechanisms; no full application or host fixture-image rebuild was run.
-
-The local `.env` is removed from the Git index and matches the ignore rule. Its
-SHA-256 checksum, inode, permissions and size are unchanged. The environment
-change is saved in local commit `cd1b02c0`. The isolated preview is ready after
-the safe-template build, with the existing local file retained.
-
-## Browser test devices
-
-The [browser device cleanup plan](docs/plans/2026-11-21-fix-browser-test-device-cleanup-plan.md)
-gives each shared-administrator browser context a recorded UUID before navigation.
-Suite teardown removes only that account's device rows matching the run's tokens,
-after browsers and fixture executors close. Target checks bind ownership and cleanup
-to this worktree's managed preview. Cleanup failure retains the manifest and fails
-the run; an interrupted process can leave owned registrations. The 428 historical
-administrator device rows remain because their ownership is ambiguous. The
-[browser-test guide](ui/web/tests/e2e/README.md#saved-browser-devices)
-describes context ownership and manifest retention.
-
-Verification on 2026-11-21: the CI backend fixture checks pass all four tests with
-15 assertions, and all eight Node lifecycle tests pass. The full web rerun with
-`--maxWorkers=2` passes all 3,733 tests in 305 files. The toast case that hit its
-5,000 ms timeout passes both its eleven-test focused rerun and the full rerun. Lint reports
-no errors and 12 existing warnings. Both application TypeScript configurations and
-the explicit nine-file browser harness TypeScript check pass in the CI image.
-Simplification found no behavior change to make. The focused correctness review
-and independent adversarial review reported no defects; no code changed afterwards.
-
-Live preview acceptance passes nine checks with one opt-in check skipped out of
-ten defined. A separate fixture-backed administration form check passes and
-verifies executor ordering. A forced authenticated test failure exits with status
-1, and cleanup leaves the exact 428 baseline device IDs unchanged. A combined
-test failure and injected cleanup failure also exits with status 1 and reports
-both errors; it retains the manifest and exactly one owned device row while
-preserving all 428 baseline IDs. Recovery using that exact manifest removes the
-owned row and manifest; the final device IDs match the original 428 byte for byte,
-and no ownership manifests remain. All browser cleanup acceptance checks are
-complete.
-
-## Admin span inspection
-
-The [span inspector plan](docs/plans/2026-11-21-1002-feat-admin-span-inspector-plan.md)
-adds a full-height span workspace at **Admin → Spans**, linked from Diagnostics.
-Search, service/error/duration filters, and newest or slowest ordering narrow
-the retained buffer. **All spans** compares independent requests on one time
-axis; opening a result shows its trace summary, overview strip and collapsible
-service tree. Fixed operation labels, vertical gridlines, duration bars and
-Fit/2×/4×/8× zoom keep timing visible. Selecting a trace row or bar expands
-attributes and metadata directly beneath that row. Both views support keyboard
-navigation and virtualize large collections, including expanded details.
-
-The displayed snapshot starts paused so new spans do not move rows while an
-operator reads them. **Refresh** accepts the latest snapshot; **Live** opts into
-updates and **Pause** freezes it again. Updates preserve zoom and scroll position.
-Eviction returns to search results with a notice, failed reads preserve the
-snapshot, and successful clear dismisses details and empties the displayed rows.
-
-Search covers the current instance's last 500 completed spans. The current HTTP
-capture records independent root spans; the viewer shows related spans only when
-the returned data contains them. The [operator guide](docs-book/part-1-operator-guide/commands/app-server-spans.md#inspecting-spans-in-the-admin-panel)
-describes retention, capture and refresh behavior.
-
-Initial inspector verification on 2026-11-21: the frontend CI image passes all 3,712 web tests in
-302 files and lint with no errors. After correcting three test-selector type
-errors, the 27 focused model, inspector and diagnostics-page tests pass, and the
-production build passes both TypeScript configurations. Simplification removed
-repeated timestamp formatting and an unnecessary fragment; selected rows now use
-the current theme token. Five independent review passes completed; the one
-confirmed finding, spacing outside the prescribed scale, is fixed. Final focused
-tests, lint and production build pass in the CI image; lint reports 12 warnings
-and no errors. All four authenticated preview browser scenarios pass at desktop
-and mobile widths, covering light/dark selection, inert diagnostic text,
-refresh/clear failures, eviction and keyboard navigation through 500-row results
-and waterfalls. Documentation prose audits and `git diff --check` pass; added
-audit tokens describe the new controls, retention limits and verified design
-requirements.
-
-Timeline verification on 2026-11-21: the CI image passes 3,720 web tests in
-303 files. After review corrections, all 27 focused snapshot, inspector and
-diagnostics-page tests pass, including two new regressions for cleared cache
-restoration. Lint reports no errors and 12 warnings; the production build and
-both TypeScript configurations pass. Simplification found no further changes.
-
-The browser suite in `ui/web/tests/e2e/admin/spans.spec.ts` verifies proportional
-span offsets and widths, aligned axes and gridlines, fixed labels, every zoom
-scale, the retained summary and overview, collapsed branches and inline details
-at desktop and narrow widths in both themes. It also checks instantaneous spans,
-independent roots, measured expansion and keyboard navigation through 500 rows,
-frozen background arrivals, explicit Refresh, Live/Pause and scroll anchors.
-All six authenticated preview browser scenarios pass after the final fixes.
-Six independent review lenses completed; both confirmed findings are fixed:
-clear now resets the cached snapshot as well as the display, and tree controls
-have tooltips. Focused follow-up review found no further defect. The clear/Live
-regression failed before the fix and passes afterward; remount and late-response
-cases also pass. Documentation prose audits and `git diff --check` pass; added
-audit tokens record the new controls, test counts and reviewed corrections.
-
-The dedicated `/admin/spans` route now replaces embedded inspection in Diagnostics.
-Its sidebar entry and direct route retain super-admin access. The workspace uses
-the remaining admin height, bounds its controls on short screens and scrolls the
-timeline internally. Browser checks at 1280×900 and 390×640 verify that visible-row
-selection, long inline expansion and closing details preserve row position and
-outer scroll offsets; keyboard navigation reveals rows inside the timeline.
-Diagnostics links to the page without fetching spans, and direct reload works.
-The CI image passes 3,725 web tests in 304 files. All ten preview browser scenarios
-pass, including backward-scroll selection, returning to an old selection and
-collapsing/reopening a branch. Five independent review lenses completed. The
-confirmed finding exposed 1,198 pixels of stale off-screen detail height; separate
-expanded/closed measurement keys and explicit header anchoring fix it. The
-regression failed before the fix and passes afterward; focused follow-up review
-found no further defect. After the fix, all 36 focused tests in five files pass;
-lint reports no errors and 12 warnings, and the production build passes both
-TypeScript configurations. Documentation prose audits and `git diff --check`
-pass; their added tokens record the dedicated route, viewport sizes, test counts
-and reproduced stale-height defect.
-
-## Audio metadata import
-
-The [audio format plan](docs/plans/2026-11-21-audio-metadata-formats-plan.md)
-adds MP4 audio (AAC and ALAC), WMA/ASF, AIFF/AIFC and tagged ADTS AAC readers.
-WAV now reads embedded ID3 and ordinary sixteen-byte PCM format chunks while
-seeking past audio data. Its INFO reader accepts both track-number spellings,
-including FFmpeg's `IPRT`. Shared ID3 parsing preserves MusicBrainz recording and
-release IDs in MP3, WAV, AIFF and AAC.
-
-Discovery, both audio classification filters and catalog MIME mapping accept
-`.mp4a`, `.m4b`, `.wave`, `.oga`, `.aif`, `.aiff` and `.aifc`.
-The [package reference](packages/baander-media-metadata/README.md) lists supported
-tags and reader behavior. Import uses the existing catalog persistence path and
-audio probe; source files are unchanged.
-
-Verification on 2026-11-21: the CI image passes 329 focused package, import,
-catalog-handler and command tests with 1,659 assertions, plus five functional
-CLI/API parity tests with 30 assertions. The eleven import cases use committed
-FFmpeg-generated files and verify scanning, extraction, persisted titles, artist
-credits, numbering, MIME types and source hashes. Full-project PHPStan and Symfony
-container lint pass in the CI image. All 25 changed PHP files pass syntax checks;
-documentation links, prose audits and `git diff --check` pass. The prose audit's
-added tokens and table rows describe the new formats; no existing requirements
-were removed. Independent review's one correctness finding, dropped embedded-ID3
-recording and release IDs, is fixed and covered by four regression cases.
-
-Raw AAC duration and bitrate remain with the audio probe. APE, WavPack and DSD
-remain outside this change, as scoped in the plan; no source-tag editing was
-requested or added.
-
-## Documentation readability
-
-The [readability plan](docs/plans/2026-11-20-documentation-readability-plan.md)
-separates twelve long guides into task pages and references. Six operator guides
-now distinguish account administration, credential rotation, rate limits,
-playback delivery and upgrade procedures. Auth and Catalog overviews link to
-their inventories and mechanisms; media, worker and frontend testing guides
-separate runner selection from detailed qualification and historical results.
-The manual has 292 pages, including 42 new pages. Counts use whitespace-separated
-words in the Markdown sources, with `3adfbd9f0` as the before revision.
-
-| Entry page | Before | After |
-| --- | ---: | ---: |
-| Security | 4,838 | 862 |
-| Authentication configuration | 4,801 | 1,501 |
-| User management | 4,101 | 1,311 |
-| Transcoding | 4,837 | 1,388 |
-| External APIs | 3,560 | 1,325 |
-| Upgrading | 3,429 | 2,268 |
-| Auth context | 11,645 | 237 |
-| Catalog context | 9,020 | 1,984 |
-| API authentication | 5,951 | 2,513 |
-| Media and playback testing | 12,099 | 219 |
-| Workers and messaging testing | 4,818 | 598 |
-| Frontend and browser testing | 3,007 | 1,071 |
-
-Repeated navigation was removed from the manual landing pages. Technical limits,
-protocols and measurements were retained; historical results now sit with their
-qualification procedures. The frame-capture measurement's unavailable original
-receipt is identified in the adaptive-playback guide, and the database credential
-rotation procedure retains its source-derived, undrilled qualification.
-
-Verification on 2026-11-20: individual and aggregate prose audits, plus independent
-review, preserve all 96 fenced examples and 721 source table rows across the
-twelve source guides. The public-site build passes for all 292 manual pages;
-35 rendering tests pass. Across 310 rendered HTML pages, all 108,753 local links
-and 4,473 fragment links resolve, and every manual page is reachable. All 851
-relative file links in the changed Markdown resolve. The full browser run passed
-220 checks and found one stale chapter-size expectation; after updating the two
-counts for the new pages, that navigation test passed its focused rerun. PHP
-syntax checks pass for all four touched PHP files, and `git diff --check` passes.
-The final review has no unresolved findings. No application behavior changed.
-
-Release on 2026-11-20: `8572afba4f3e326c0210ba6c04a646a7518f2413` was
-fast-forwarded into `master` and pushed to both `origin` and `baander-github`.
-The site was rebuilt from that commit and published to the existing
-`martin-juuls-projects/baander` project. The
-[Vercel deployment](https://baander-eph84fzr5-martin-juuls-projects.vercel.app)
-is Ready and serves [baander.app](https://baander.app) and
-[baander.vercel.app](https://baander.vercel.app). Before promotion, the homepage
-and credential-rotation page returned 200, the moved credential-rotation anchor
-and source revision matched, and an unknown path returned 404. After promotion,
-the homepage, credential-rotation page and native-media page returned 200 and
-matched the build byte for byte on both public hostnames, with valid HTTPS.
-The rebuilt artifact also passed the 310-page link and reachability check above.
-All five live Chromium checks passed on `baander.app`: search reaches the new
-credential-rotation page, its moved section link lands correctly, light and dark
-themes persist across navigation and reload, navigation at 390 px reaches the
-native-media page without horizontal overflow, and an unknown path shows the
-404 page. No uncaught browser errors were reported.
-
-## Tooling context packages and shared core
-
-The local PHP dependency audit reports seven existing Swoole
-fork-review inventory discrepancies, covering server execution, configuration,
-pooling, the coroutine watchdog and static file serving. The affected source and
-review inventory are unchanged from `7491ddcecfa546a1845ff79f85878649e6f79560`;
-their review evidence needs a separate refresh.
+At `fc8d9305`, the production build measured 2322.71 kB for the minified app,
+578.15 kB for HLS and 742.80 kB for Three. Vite still warns about their sizes.
+The full-feature HLS entry is a single module. Three loads when the visualizer
+opens. App/vendor or route splitting needs a measured benefit and smoke coverage
+of the built application.
 
 ## Admin and terminal log viewers
 
@@ -775,21 +215,6 @@ after Play. One instrumented rerun passed reload, tab-close and renderer-crash
 recovery with the duration assertions. The first failure remains an unexplained
 intermittent resume issue; the rerun does not establish its cause.
 
-After a lost response, an old playback control no longer blocks the next intent
-when the server confirms that the request is absent from the ledger and its
-revision is already stale. The browser reports the refusal and clears the pending
-control. Endpoint authority and transport failures leave the request pending
-for reconciliation. Recorded controls still answer with their exact result.
-[Playback control retry plan](docs/plans/2026-11-22-fix-playback-control-retry-plan.md).
-
-Verification on 2026-11-22 passed 190 backend unit tests with 1,149 assertions
-and 78 PostgreSQL-backed integration tests with 1,311 assertions in the CI
-image. All 248 web Session tests passed. Web typecheck, lint on the changed files,
-PHP syntax checks and `git diff --check` passed. Full web lint reported zero
-errors and 12 existing warnings.
-[Backend control tests](tests/Unit/Session/Application/PlaybackControlDeliveryTest.php),
-[web coordinator tests](ui/web/src/features/session/__tests__/playback-session-coordinator.test.ts).
-
 ## Bånder Audio Core in the server transcoder
 
 Open items:
@@ -825,21 +250,6 @@ Open items:
 
 The shared durable-consumer heartbeat can mask an individual consumer's outage;
 that limitation is recorded for follow-up, with no runtime change in the 2026-10-31 learnings refresh.
-
-## Resume here
-
-The Back-to-next-movie follow-up is complete. Its reproduction, recovery and
-verification are recorded under [Playback investigation and evidence limits](#playback-investigation-and-evidence-limits).
-
-Select other work for a concrete user workflow, demonstrated runtime gap or named
-release decision. Historical unchecked items, old plan limitations and incomplete
-experiments do not authorize implementation or indefinite reruns. Reconcile the
-[retained plans](docs/plans/) with current callers before using them. Release gates
-become actionable when their named environment, access or decision is available.
-
-Read [AGENTS.md](AGENTS.md) for workflow, [CONCEPTS.md](CONCEPTS.md) for shared terms
-and the [testing guide](docs-book/part-2-developer-guide/testing/README.md) for current
-runners and verification boundaries. Historical suite counts apply to their own trees.
 
 ## OAuth pushed authorization requests and auth hardening
 
@@ -883,6 +293,13 @@ not authorization to continue expanding this upgrade.
 
 Swoole bundle reconciliation: unconfigured session defects are recorded as
 deferred defects; readonly proxy support remains unselected.
+
+The local dependency checker returned the same seven Swoole fork inventory
+findings and one Redis rate limiter validation evidence gap before and after
+Composer normalization. Review the changed fork files and the checker's
+interpretation of Composer output.
+[Fork inventory](packages/swoole-bundle/upstream-review.json),
+[Composer evidence collector](packages/baander-dev-dependencies/src/Php/ComposerEvidence.php).
 
 Five root packages remain behind stable because the latest reli-prof 0.12.0 pins
 their shared dependencies: Monolog, Webmozart Assert, Amp, Parallel and
@@ -1132,17 +549,6 @@ a new bootstrap run.
 
 ## Local development workflow
 
-The persistent instance was refreshed with `make dev-up` on 2026-11-20 after its
-installed controller failed to find the layout in the retired `baander-tooling`
-package. The refreshed controller reads `baander-configuration` and activated
-`3adfbd9f0d6a97c676dec44ffc5fa481e86a91b4`. Status reports web and workers ready,
-no failure, and automatic updates enabled; the HTTPS root returns 200. CLI OPcache
-is enabled. The first post-update sample reports 27.07, 27.06, 36.05 and 27.06 MiB
-of worker heap, versus 665.12 MiB combined before the update. The new combined
-117.24 MiB is a fresh-process observation, not a long-running memory bound.
-This refresh resolves the failed update; the controller-version issue below
-remains a separate design limitation.
-
 Open: in a linked worktree the PHP tooling suite fails up to three
 `ApplicationInventoryTest` cases (the two `testInterruptedCollection…` cases always,
 `testShellRecoversUncertainCreationWhenCollectorIsInterrupted` sometimes) because a
@@ -1164,49 +570,11 @@ versioned profile request the image can refuse with a reason.
 
 ## Playback investigation and evidence limits
 
-**Original movie departure checkpoint:** Back closed the player, but three producers retained
-live ownership and renewed leases at a fixed cursor across 31 database samples
-spanning 30.111 seconds. Native snapshots before and after that window showed the same three
-stopped encoders. The next movie began admission, but the browser test exited
-before its startup outcome, cancellation of the first movie or recovery could be
-captured. Both diagnostic attempts remain nonpassing; both cleaned up successfully.
-
-The detailed investigation remains in commit `f31c3ef3f`, including the
-observer-timeout hypothesis and missing browser error evidence.
-
-**Movie departure follow-up, 2026-11-22:** On `3f0a87f2d`, Chromium reproduced
-the failure with one video encoder slot. Back closed the first movie while its
-producer still held the slot. The next movie's signing request ended with
-`net::ERR_ABORTED`, and its job reached `refused` without a claim. The movie
-dialog stayed closed. The local video reported ready state 0 and zero decoded
-frames, and the page showed “The destination rejected the playback request.”
-The failed player had no dedicated Retry button. An authenticated DELETE returned
-200 and released the first claim. The failed second player then exposed a stale
-stop observation that prevented Play from attempting admission again.
-
-Back now cancels the browser's owned presentation before acknowledging stop.
-It waits for admission in flight and uses the session identifier returned by
-delivery or signing. A cancellation failure keeps the player open for another
-Back. Selecting the next movie clears the previous stop observation so a failed
-player can close and start fresh. With only that runtime correction applied,
-the browser gate recovered from the original retained claim using the
-authenticated DELETE followed by Back and Play in the second movie. With both
-fixes applied, the first Back issued the authenticated DELETE, the first claim
-was released, and the second movie mounted and decoded advancing frames in
-the same SPA session. Both browser checks cleaned up with zero fixture survivors.
-[Plan](docs/plans/2026-11-22-fix-movie-departure-recovery-plan.md),
-[browser gate](ui/web/tests/e2e/playback-destinations/movie-departure.spec.ts),
-[playback controls](docs-book/part-2-developer-guide/development/video-playback-controls.md#audio-tracks-and-timing).
-
-The focused web suites passed 274 tests across six files. They cover stop
-ordering, failed cancellation, a connection that loses presentation ownership,
-late copy and encoded admission, recovery after failed preparation and transfer
-quiesce. Web typecheck, touched-file ESLint, fixture PHP lint and `git diff --check`
-passed. Full web lint reported zero errors and 12 existing warnings.
-
 An admission request can allocate a producer before a lost response or a server
 error leaves the browser without the session identifier. That cleanup case still
-needs server-side reconciliation using the Playback client-session identity.
+needs server-side reconciliation using the Playback client-session identity. The
+cancellation must identify the former owner's admission so it cannot cancel its
+successor's producer.
 [Playback controls](docs-book/part-2-developer-guide/development/video-playback-controls.md#audio-tracks-and-timing).
 
 **Frame capture:** the historical native timestamp of 24.64 seconds versus a
@@ -1316,22 +684,7 @@ and tooling reconciliation for `ui/rn` only when the user resumes that work.
 Historical mobile failures do not select a task or a new CI lane.
 Essentia remains out of scope under [AGENTS.md](AGENTS.md); this cleanup does not resume it.
 
-## Completed work and evidence
-
-The roadmap and plans before this cleanup are preserved at
-`92dfdbec9010974bcf7654aa277077080cd95379`. Read the delivery narratives and their
-verification with `git show 92dfdbec9010974bcf7654aa277077080cd95379:ROADMAP.md`.
-List the plans with `git ls-tree -r --name-only 92dfdbec9010974bcf7654aa277077080cd95379 docs/plans/`,
-then read one with `git show 92dfdbec9010974bcf7654aa277077080cd95379:<path>`.
-Plans retired earlier remain recoverable from the revisions named in that roadmap.
-Completed work and earlier failed attempts do not reopen acceptance closed by later evidence.
-
-This cleanup retires the implemented tooling-package and opcode-cache plans and
-removes completed delivery history. Remaining acceptance, deferred scope and
-uncertainty stay below and in the retained plans. All 41 local roadmap links and
-six incoming links to five distinct anchors resolve. All 12 retained original plans
-are unchanged, and no deleted-plan reference dangles. Prose and whitespace checks
-pass; no runtime suite was rerun for this documentation-only change.
+## Earlier acceptance and limits
 
 ### Geist and Noto typography
 
@@ -1616,8 +969,6 @@ Open:
   - genre slugs collapsing non-ASCII names, and Unicode (NFC and NFD) spellings of one
     name becoming two artists: both predate the branch, and no real library has shown
     them yet;
-  - M4A tags: the ID3 reader finds none, so an MP4 atom reader is needed; the
-    persistent library has no M4A files;
   - a forced-sync rename followed by a wrong ID: no code path reaches it today.
 - From review, not fixed: the import handler's size and its `PreparedSong` array shape
   (a split into a tag-credit reader and a rescan repair was suggested); genre creation
@@ -1736,3 +1087,16 @@ Open:
 Open: the pane fix has no automated test, because jsdom computes no layout; a
 Playwright check of the songs view would cover it. Not run: `yarn build`, and Firefox
 or Safari.
+
+## Completed work and evidence
+
+The roadmap and plans before this cleanup are preserved at
+`707dd55c24e073ea902fe42a92c830d77b777b37`. Read the delivery narratives and suite results with
+`git show 707dd55c24e073ea902fe42a92c830d77b777b37:ROADMAP.md`.
+List the plans with `git ls-tree -r --name-only 707dd55c24e073ea902fe42a92c830d77b777b37 docs/plans/`,
+then read one with `git show 707dd55c24e073ea902fe42a92c830d77b777b37:<path>`. Earlier retirements
+remain available at the revisions named in that roadmap.
+
+The 2026-11-22 cleanup retired 13 delivered plans. The 12 retained plans match
+the pinned revision. All 44 local roadmap links and six incoming fragment links
+resolve.

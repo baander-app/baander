@@ -230,14 +230,15 @@ The Catalog identity for an individual credited in movies, television or
 music. A Person can have several verified provider identifiers and can link to
 multiple individual Artist identities. A reader sees the Person and their
 credits through works in libraries they can access.
-[Person and cross-media credits plan](docs/plans/2026-11-21-1948-feat-person-and-cross-media-credits-plan.md).
+[People and credits guide](docs-book/part-1-operator-guide/media/library-management.md#people-and-credits).
 
 ### Person credit
 
 The link between a Person and a cataloged movie, TV series or episode.
 It records a cast or crew role and can include a character, credited name and
 billing order. The Person profile also shows song and album credits through
-linked Artists. [Credit relationship model](docs/plans/2026-11-21-1948-feat-person-and-cross-media-credits-plan.md#relationship-model).
+linked Artists. [Person credit input](src/Catalog/Application/Port/PersonCreditInput.php),
+[People read repository](src/Catalog/Infrastructure/Doctrine/Repository/PeopleReadRepository.php).
 
 ### Director
 
