@@ -406,6 +406,16 @@ final class OpenApiSpecTest extends KernelTestCase
         }
     }
 
+    public function test_admin_album_duplicates_document_an_unknown_library_in_the_shared_api_envelope(): void
+    {
+        $responses = $this->getSpec()['paths']['/api/admin/albums/duplicates']['get']['responses'];
+
+        self::assertSame(
+            '#/components/schemas/ApiError',
+            $responses['404']['content']['application/json']['schema']['$ref'] ?? null,
+        );
+    }
+
     public function test_player_save_schema_requires_typed_bounded_fields(): void
     {
         $spec = $this->getSpec();

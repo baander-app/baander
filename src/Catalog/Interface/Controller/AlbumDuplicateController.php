@@ -76,6 +76,13 @@ final class AlbumDuplicateController
                     schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
                 ),
             ),
+            new OA\Response(
+                response: '404',
+                description: 'Library not found',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
+            ),
         ],
     )]
     #[Route('/duplicates', name: 'duplicates', methods: ['GET'])]

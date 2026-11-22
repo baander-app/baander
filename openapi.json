@@ -6998,6 +6998,16 @@
                                 }
                             }
                         }
+                    },
+                    "404": {
+                        "description": "Library not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
                     }
                 }
             }
