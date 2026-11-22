@@ -214,7 +214,6 @@ export function PasskeyManagement() {
         />
       </StepUpDialog>
 
-      {/* Delete confirmation: step-up before the passkey goes */}
       <StepUpDialog
         open={!!deleteTarget}
         onOpenChange={(open) => !open && setDeleteTarget(null)}

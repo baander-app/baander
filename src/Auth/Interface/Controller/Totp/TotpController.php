@@ -16,7 +16,6 @@ use App\Auth\Interface\Request\Totp\EnableTotpRequest;
 use App\Auth\Interface\Request\Totp\StartTotpSetupRequest;
 use App\Shared\Application\Exception\HandlerFailure;
 use App\Shared\Interface\Controller\ApiResponsesTrait;
-use App\Shared\Interface\Controller\TranslatorTrait;
 use OpenApi\Spec as OA;
 use Symfony\Bundle\SecurityBundle\Security;
 use Symfony\Component\HttpFoundation\JsonResponse;
@@ -32,7 +31,6 @@ use Symfony\Component\Routing\Attribute\Route;
 final class TotpController
 {
     use ApiResponsesTrait;
-    use TranslatorTrait;
 
     public function __construct(
         private readonly Security $security,

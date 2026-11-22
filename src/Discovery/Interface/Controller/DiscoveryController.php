@@ -17,7 +17,6 @@ use App\Discovery\Interface\Resource\ServerInstanceResource;
 use App\Shared\Domain\Model\PublicId;
 use App\Shared\Interface\Attribute\CliCounterpart;
 use App\Shared\Interface\Controller\ApiResponsesTrait;
-use App\Shared\Interface\Controller\TranslatorTrait;
 use OpenApi\Spec as OA;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Response;
@@ -32,7 +31,6 @@ use Symfony\Component\Security\Http\Attribute\IsGranted;
 final class DiscoveryController
 {
     use ApiResponsesTrait;
-    use TranslatorTrait;
 
     public function __construct(
         private readonly MessageBusInterface $commandBus,

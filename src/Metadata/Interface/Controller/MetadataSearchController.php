@@ -11,7 +11,6 @@ use App\Metadata\Infrastructure\Api\Discogs\DiscogsAdapter;
 use App\Metadata\Infrastructure\Api\LastFm\LastFmAdapter;
 use App\Metadata\Interface\Request\SearchMetadataRequest;
 use App\Shared\Interface\Controller\ApiResponsesTrait;
-use App\Shared\Interface\Controller\TranslatorTrait;
 use OpenApi\Spec as OA;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpKernel\Attribute\MapQueryString;
@@ -34,7 +33,6 @@ use Symfony\Component\Security\Http\Attribute\CurrentUser;
 final class MetadataSearchController
 {
     use ApiResponsesTrait;
-    use TranslatorTrait;
 
     private const string PROVIDER_LIMIT_MESSAGE = 'Too many Discogs and Last.fm searches. Please try again later.';
 

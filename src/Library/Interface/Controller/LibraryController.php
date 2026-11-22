@@ -23,7 +23,6 @@ use App\Library\Interface\Resource\PathValidationResource;
 use App\Shared\Domain\Model\Uuid;
 use App\Shared\Interface\Attribute\CliCounterpart;
 use App\Shared\Interface\Controller\ApiResponsesTrait;
-use App\Shared\Interface\Controller\TranslatorTrait;
 use OpenApi\Spec as OA;
 use Symfony\Bundle\SecurityBundle\Security;
 use Symfony\Component\HttpFoundation\JsonResponse;
@@ -40,7 +39,6 @@ use Symfony\Component\Security\Http\Attribute\IsGranted;
 final class LibraryController
 {
     use ApiResponsesTrait;
-    use TranslatorTrait;
 
     public function __construct(
         private readonly MessageBusInterface $commandBus,
@@ -187,13 +185,13 @@ final class LibraryController
     {
         $user = $this->security?->getUser();
         if (!$user instanceof AuthenticatedUserIdentityInterface) {
-            return $this->unauthorized($this->trans('errors.unauthorized.default', domain: 'messages'));
+            return $this->unauthorized();
         }
 
         try {
             $userId = Uuid::fromString($user->getId());
         } catch (\InvalidArgumentException) {
-            return $this->unauthorized($this->trans('errors.unauthorized.default', domain: 'messages'));
+            return $this->unauthorized();
         }
 
         $library = $this->dispatch(new CreateLibraryCommand(

@@ -43,7 +43,6 @@ use App\Shared\Application\Exception\HandlerFailure;
 use App\Shared\Application\Http\BaanderHeader;
 use App\Shared\Domain\Model\Uuid;
 use App\Shared\Interface\Controller\ApiResponsesTrait;
-use App\Shared\Interface\Controller\TranslatorTrait;
 use App\Shared\Interface\DTO\ApiError;
 use App\Shared\Interface\DTO\OAuthError;
 use OpenApi\Spec as OA;
@@ -86,7 +85,6 @@ use Symfony\Component\Routing\Attribute\Route;
 final class OAuthController
 {
     use ApiResponsesTrait;
-    use TranslatorTrait;
 
     /** The largest pushed authorization request body accepted, in bytes. */
     private const int MAX_PAR_BODY_BYTES = 65536;

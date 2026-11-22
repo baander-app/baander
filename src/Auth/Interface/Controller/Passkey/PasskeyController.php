@@ -26,7 +26,6 @@ use App\Shared\Application\Exception\HandlerFailure;
 use App\Shared\Domain\Model\Uuid;
 use App\Shared\Domain\Model\PublicId;
 use App\Shared\Interface\Controller\ApiResponsesTrait;
-use App\Shared\Interface\Controller\TranslatorTrait;
 use OpenApi\Spec as OA;
 use Psr\Log\LoggerInterface;
 use Symfony\Bundle\SecurityBundle\Security;
@@ -44,7 +43,6 @@ use Symfony\Component\Serializer\Encoder\JsonEncoder;
 final class PasskeyController
 {
     use ApiResponsesTrait;
-    use TranslatorTrait;
 
     private const string INVALID_CHALLENGE = 'invalid_challenge';
     private const string REGISTRATION_FAILED = 'passkey_registration_failed';

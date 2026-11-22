@@ -194,7 +194,6 @@ final class UserRepository implements UserRepositoryInterface
     {
         // SQL for the jsonb containment DQL cannot express, as in count(). A statement of its own
         // after the lock: under READ COMMITTED it sees what the lock's previous holder committed.
-        // Two rows tell one super admin from several.
         $ids = $this->entityManager->getConnection()->fetchFirstColumn(
             'SELECT id FROM users WHERE roles @> :role AND NOT disabled LIMIT 2',
             ['role' => json_encode(['ROLE_SUPER_ADMIN'])],

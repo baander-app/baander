@@ -180,7 +180,6 @@ function ChangePasswordDialog({ open, onOpenChange, children }: { open: boolean;
     confirmInput.current?.setCustomValidity(confirmPassword === newPassword ? '' : t('auth.passwordMismatch'))
   }, [newPassword, confirmPassword, t])
 
-  // Closing, after a change or without one, drops the new password.
   const handleOpenChange = (next: boolean) => {
     if (!next) {
       setNewPassword('')

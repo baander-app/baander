@@ -11,7 +11,6 @@ use App\Media\Application\Port\StoragePortInterface;
 use App\Media\Interface\Resource\ImageResource;
 use App\Shared\Domain\Model\PublicId;
 use App\Shared\Interface\Controller\ApiResponsesTrait;
-use App\Shared\Interface\Controller\TranslatorTrait;
 use Baander\ImageProcessing\BlurHash\BlurHashGenerator;
 use OpenApi\Spec as OA;
 use Psr\Log\LoggerInterface;
@@ -34,7 +33,6 @@ final class ImageController
     private const array SERVED_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
 
     use ApiResponsesTrait;
-    use TranslatorTrait;
 
     public function __construct(
         private readonly ImagePortInterface $imageService,

@@ -26,7 +26,6 @@ use App\Shared\Domain\ValueObject\LibraryReadScope;
 use App\Shared\Interface\Attribute\CliCounterpart;
 use App\Shared\Interface\Controller\ApiResponsesTrait;
 use App\Shared\Interface\Controller\DispatchesMessagesTrait;
-use App\Shared\Interface\Controller\TranslatorTrait;
 use App\Shared\Interface\DTO\ApiError;
 use App\Shared\Interface\DTO\PaginatedResponse;
 use App\Shared\Interface\DTO\ValidationError;
@@ -50,7 +49,6 @@ final class AlbumController
 {
     use ApiResponsesTrait;
     use DispatchesMessagesTrait;
-    use TranslatorTrait;
 
     public function __construct(
         private readonly AlbumPortInterface $albumService,
