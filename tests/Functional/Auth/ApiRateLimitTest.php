@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Tests\Functional\Auth;
 
 use App\Auth\Infrastructure\Security\ApiRateLimitListener;
+use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
 use Symfony\Component\Routing\RouterInterface;
 
@@ -64,12 +65,13 @@ final class ApiRateLimitTest extends RateLimitTestCase
         $this->exhaust('anonymous_api', '198.51.100.30');
         $this->exhaust('authenticated_api', $userId);
         $missing = Uuid::generate()->toString();
+        $job = new PublicId()->toString();
 
         $responses = [
-            'segment' => $this->requestFrom('198.51.100.30', 'GET', '/api/transcode/' . $missing . '/segment?index=0'),
-            'init segment' => $this->requestFrom('198.51.100.30', 'GET', '/api/transcode/' . $missing . '/init'),
-            'media manifest' => $this->requestFrom('198.51.100.30', 'GET', '/api/transcode/' . $missing . '/media.m3u8'),
-            'master manifest' => $this->requestFrom('198.51.100.30', 'GET', '/api/transcode/' . $missing . '/master.m3u8'),
+            'segment' => $this->requestFrom('198.51.100.30', 'GET', '/api/transcode/' . $job . '/tracks/video/segment.m4s?index=0'),
+            'init segment' => $this->requestFrom('198.51.100.30', 'GET', '/api/transcode/' . $job . '/tracks/video/init.mp4'),
+            'media manifest' => $this->requestFrom('198.51.100.30', 'GET', '/api/transcode/' . $job . '/tracks/video/media.m3u8'),
+            'master manifest' => $this->requestFrom('198.51.100.30', 'GET', '/api/transcode/' . $job . '/master.m3u8'),
             'audio stream' => $this->requestFrom('198.51.100.30', 'GET', '/api/stream/track?id=' . $missing, $userId),
             'image file' => $this->requestFrom('198.51.100.30', 'GET', '/api/images/' . $missing . '/file', $userId),
             'album cover' => $this->requestFrom('198.51.100.30', 'GET', '/api/albums/' . $missing . '/cover', $userId),

@@ -13,6 +13,7 @@ use App\Catalog\Infrastructure\Doctrine\Entity\MovieVideoEntity;
 use App\Catalog\Infrastructure\Doctrine\Entity\VideoEntity;
 use App\Library\Infrastructure\Doctrine\Entity\LibraryEntity;
 use App\Library\Infrastructure\Doctrine\Entity\UserLibraryAccessEntity;
+use App\Shared\Application\Exception\ConflictException;
 use App\Shared\Application\Http\BaanderHeader;
 use App\Shared\Domain\Model\Email;
 use App\Shared\Domain\Model\PublicId;
@@ -60,7 +61,8 @@ use Symfony\Component\Security\Core\Exception\AccessDeniedException;
  * with only the media and encoding boundary as a fixture.
  *
  * A signed delivery URL is a bearer capability: it serves without a credential, and a
- * credential it does carry is validated by the authenticator but its proof is never read. The
+ * credential it does carry is validated by the authenticator but its proof is never read. A live
+ * URL serves only while the owner of the jobs it names may still play their video. The
  * signing endpoint and the quality ladder are DPoP-bound and library-checked. Every refusal row
  * asserts the component that refused: the authenticator's code in a 401 body, or the class and
  * message of the exception a 403 began as, recorded by a kernel-exception probe before the
@@ -71,6 +73,7 @@ final class SignedDeliveryFirewallTest extends TestCase
     private const string INVALID_TOKEN = 'AUTH_INVALID_TOKEN';
     private const string SIGNATURE_REFUSED = 'Invalid or expired signature.';
     private const string VIDEO_NOT_ACCESSIBLE = 'Video is not accessible.';
+    private const string PLAYBACK_UNAVAILABLE = 'Playback media is unavailable.';
     private const string PROOF_REQUIRED = 'DPoP proof header is required.';
     private const string PROOF_KEY_MISMATCH = 'DPoP proof jwk thumbprint does not match token binding.';
     private const string TOKEN_UNBOUND = 'Access token is not DPoP-bound.';
@@ -99,8 +102,10 @@ final class SignedDeliveryFirewallTest extends TestCase
     private array $admittedJobs = [];
     private HmacStreamAuthAdapter $signer;
     private SignedDpopProof $proof;
+    /** The video that `$jobId` encodes, in a library its owner is a member of. */
     private PublicId $videoId;
     private PublicId $jobId;
+    private UserEntity $streamOwner;
     private UserEntity $actor;
     private AccessTokenEntity $accessToken;
     private ?UserLibraryAccessEntity $membership = null;
@@ -199,8 +204,9 @@ final class SignedDeliveryFirewallTest extends TestCase
         $this->signatures = [];
         $this->bodies = [];
         $this->signedUrlRequested = false;
-        $video = new VideoEntity(new PublicId(), self::$directory . '/segment.mp4', bin2hex(random_bytes(16)));
-        $this->persist($video);
+        $this->streamOwner = $this->createUser(['ROLE_USER']);
+        [$video] = $this->libraryVideo($this->streamOwner);
+        $this->persist(new TranscodeJobEntity($this->jobId, $video->getId(), '720p', $this->streamOwner->getId()));
         $this->manager->flush();
         $this->videoId = $video->getPublicId();
     }
@@ -307,7 +313,11 @@ final class SignedDeliveryFirewallTest extends TestCase
         $this->assertNoCredentialInResponsesOrLogs();
     }
 
-    public function testPublicAccessPatternOverMatchStillValidatesTheSignature(): void
+    /**
+     * A path segment of the job and session routes in the place of a video ID is not a delivery
+     * path: the firewall asks for a credential although the URL carries a valid signature.
+     */
+    public function testTranscodeRoutesNamedLikeDeliveryPathsNeedAuthentication(): void
     {
         $this->bus->expects($this->never())->method('dispatch');
         foreach (self::STREAMING_METHODS as $method) {
@@ -317,7 +327,9 @@ final class SignedDeliveryFirewallTest extends TestCase
             $this->completed->expects($this->never())->method($method);
         }
 
-        $this->assertSignatureRefused($this->request('GET', 'https://baander.app/api/transcode/sessions/tracks/video/init.mp4'), 'stream_segment_init_segment');
+        foreach (['/api/transcode/jobs/master.m3u8', '/api/transcode/sessions/manifest.mpd'] as $path) {
+            $this->assertDecidedBy($this->request('GET', $this->signedUrl($path)), 401, null, $path);
+        }
     }
 
     /** @return iterable<string, array{string}> */
@@ -429,21 +441,42 @@ final class SignedDeliveryFirewallTest extends TestCase
         $this->assertNoCredentialInResponsesOrLogs();
     }
 
-    public function testMemberOfAnotherLibraryIsServedBySignedUrlWithoutCredential(): void
+    /**
+     * The job's owner is a member of another library than the video's, so a live URL for the
+     * job is refused on every route before the streaming port is read.
+     */
+    public function testLiveUrlsForAJobWhoseOwnerIsAMemberOfAnotherLibraryAreRefused(): void
     {
         $this->actorToken('member');
         $this->createVideoLibrary(true);
         $foreign = $this->createVideoLibrary(false);
+        $job = $this->admittedJobs[$foreign->getId()->toString()][0];
+        $this->bus->expects($this->never())->method('dispatch');
+        foreach (self::STREAMING_METHODS as $method) {
+            $this->streaming->expects($this->never())->method($method);
+        }
+        foreach ($this->livePaths($foreign->getPublicId()->toString(), $job) as $route => $path) {
+            $this->assertOwnerAccessRefused($this->request('GET', $this->signedUrl($path, setJob: $job)), $route);
+        }
+        $this->assertNoCredentialInResponsesOrLogs();
+    }
+
+    public function testLiveUrlsStopServingOnceTheJobOwnerIsDisabled(): void
+    {
         $this->bus->expects($this->never())->method('dispatch');
         foreach (self::STREAMING_METHODS as $method) {
             $this->streaming->expects(in_array($method, ['getInitSegmentPath', 'getSubtitleSegmentPath', 'resolveSegmentAvailability'], true) ? $this->atLeastOnce() : $this->once())->method($method);
         }
-        $this->completed->expects($this->once())->method('master');
-        $this->completed->expects($this->once())->method('playlist');
-        $this->completed->expects($this->exactly(2))->method('path');
-        foreach (SignedDeliveryRoutes::paths($foreign->getPublicId()->toString(), $this->jobId->toString()) as $route => $path) {
-            $response = $this->request('GET', $this->signedUrl($path));
+        $urls = array_map($this->signedUrl(...), $this->livePaths($this->videoId->toString(), $this->jobId->toString()));
+        foreach ($urls as $route => $url) {
+            $response = $this->request('GET', $url);
             self::assertSame(200, $response->getStatusCode(), $route . ': ' . $this->responseDetails($response));
+        }
+
+        $this->disableStreamOwner();
+
+        foreach ($urls as $route => $url) {
+            $this->assertOwnerAccessRefused($this->request('GET', $url), $route);
         }
         $this->assertNoCredentialInResponsesOrLogs();
     }
@@ -604,7 +637,11 @@ final class SignedDeliveryFirewallTest extends TestCase
         $this->assertNoCredentialInResponsesOrLogs();
     }
 
-    public function testMembershipRemovedAfterSigningLeavesTheSignedUrlServingAndRefusesNewGrants(): void
+    /**
+     * The member's signed master URL, and the media playlist and segment URLs a manifest would
+     * list for the member's job, serve until the membership is removed and are refused after it.
+     */
+    public function testMembershipRemovedAfterSigningStopsTheSignedLiveUrlsAndRefusesNewGrants(): void
     {
         $jwt = $this->actorToken('member');
         $video = $this->createVideoLibrary(true);
@@ -612,14 +649,25 @@ final class SignedDeliveryFirewallTest extends TestCase
         $this->bus->expects($this->exactly(3))->method('dispatch')
             ->willReturnCallback($this->admittedSession(...));
         $this->streaming->expects($this->once())->method('getMasterManifest');
+        $this->streaming->expects($this->once())->method('getMediaManifest');
         $this->streaming->expects($this->never())->method('getQualityLadderForVideo');
         $data = $this->signingBody('/api/transcode/' . $id . '/master.m3u8');
-        $url = $this->issuedUrl($this->request('POST', self::SIGN_URL, $jwt, true, $data));
+        $paths = SignedDeliveryRoutes::paths($id, $this->admittedJobs[$video->getId()->toString()][0]);
+        $urls = [
+            'stream_master_manifest' => $this->issuedUrl($this->request('POST', self::SIGN_URL, $jwt, true, $data)),
+            'stream_media_manifest' => $this->signedUrl($paths['stream_media_manifest']),
+            'stream_segment_segment' => $this->signedUrl($paths['stream_segment_segment']),
+        ];
+        foreach ($urls as $route => $url) {
+            $response = $this->request('GET', $url);
+            self::assertSame(200, $response->getStatusCode(), $route . ': ' . $this->responseDetails($response));
+        }
 
         $this->removeMembership();
 
-        $delivery = $this->request('GET', $url);
-        self::assertSame(200, $delivery->getStatusCode(), $this->responseDetails($delivery));
+        foreach ($urls as $route => $url) {
+            $this->assertOwnerAccessRefused($this->request('GET', $url), $route);
+        }
         $this->assertDecidedBy($this->request('GET', $this->qualityLadderUrl($video), $jwt, true), 403, self::VIDEO_NOT_ACCESSIBLE, 'quality ladder');
         $this->assertDecidedBy($this->request('POST', self::SIGN_URL, $jwt, true, $data), 403, self::VIDEO_NOT_ACCESSIBLE, 'new signature');
         $this->assertNoCredentialInResponsesOrLogs();
@@ -647,6 +695,16 @@ final class SignedDeliveryFirewallTest extends TestCase
     private function deliveryPaths(): array
     {
         return SignedDeliveryRoutes::paths($this->videoId->toString(), $this->jobId->toString(), track: $this->mediaTrack);
+    }
+
+    /** @return array<string, string> route name => request path, for the live routes only */
+    private function livePaths(string $videoId, string $jobId): array
+    {
+        return array_filter(
+            SignedDeliveryRoutes::paths($videoId, $jobId, track: $this->mediaTrack),
+            static fn (string $route): bool => !str_starts_with($route, 'stream_artifact_'),
+            ARRAY_FILTER_USE_KEY,
+        );
     }
 
     /**
@@ -726,19 +784,8 @@ final class SignedDeliveryFirewallTest extends TestCase
      */
     private function actorToken(string $actor, array $claims = [], ?\DateTimeImmutable $expiresAt = null, ?string $fingerprint = null): string
     {
-        $users = $this->kernel->getContainer()->get('oauth.acceptance.users');
-        self::assertInstanceOf(UserRepositoryInterface::class, $users);
-        $user = User::createByOperator(
-            new Email('stream-' . bin2hex(random_bytes(8)) . '@baander.app'),
-            'test-only-password',
-            'Stream actor',
-            $actor === 'admin' ? ['ROLE_USER', 'ROLE_ADMIN'] : ['ROLE_USER'],
-        );
-        $users->save($user);
-        $entity = $this->manager->find(UserEntity::class, $user->getId());
-        self::assertInstanceOf(UserEntity::class, $entity);
+        $entity = $this->createUser($actor === 'admin' ? ['ROLE_USER', 'ROLE_ADMIN'] : ['ROLE_USER']);
         $this->actor = $entity;
-        $this->entities[] = $entity;
         $client = FirstPartyOAuthClient::entity($this->kernel->getContainer(), $this->manager);
         $token = new AccessTokenEntity((new Uuid())->toString(), $client, $entity, scopes: ['library'], expiresAt: $expiresAt ?? new \DateTimeImmutable('+1 hour'));
         $token->setDpopJkt($this->proof->thumbprint());
@@ -754,11 +801,47 @@ final class SignedDeliveryFirewallTest extends TestCase
         return $jwt;
     }
 
+    /** @param list<string> $roles */
+    private function createUser(array $roles): UserEntity
+    {
+        $user = User::createByOperator(
+            new Email('stream-' . bin2hex(random_bytes(8)) . '@baander.app'),
+            'test-only-password',
+            'Stream actor',
+            $roles,
+        );
+        $this->users()->save($user);
+        $entity = $this->manager->find(UserEntity::class, $user->getId());
+        self::assertInstanceOf(UserEntity::class, $entity);
+        $this->entities[] = $entity;
+
+        return $entity;
+    }
+
+    private function disableStreamOwner(): void
+    {
+        $users = $this->users();
+        $owner = $users->findByUuid($this->streamOwner->getId());
+        self::assertInstanceOf(User::class, $owner);
+        $owner->disable();
+        $users->save($owner);
+    }
+
+    private function users(): UserRepositoryInterface
+    {
+        $users = $this->kernel->getContainer()->get('oauth.acceptance.users');
+        self::assertInstanceOf(UserRepositoryInterface::class, $users);
+
+        return $users;
+    }
+
     /**
-     * A library video with a 1080p source, so playback admits all three quality tiers and
-     * signing dispatches one session per tier; a source without a height admits 360p alone.
+     * A movie video with a 1080p source in a new library, and the library membership of
+     * `$member` when one is given.
+     *
+     * @return array{VideoEntity, ?UserLibraryAccessEntity}
      */
-    private function createVideoLibrary(bool $grant): VideoEntity
+    private function libraryVideo(?UserEntity $member): array
     {
         $library = new LibraryEntity('Disposable library', bin2hex(random_bytes(16)), self::$directory, 'video', 'local');
         $movie = new MovieEntity(new PublicId(), $library, 'Disposable movie');
@@ -768,11 +851,24 @@ final class SignedDeliveryFirewallTest extends TestCase
         $this->persist($movie);
         $this->persist($video);
         $this->persist(new MovieVideoEntity($movie, $video));
-        if ($grant) {
-            $this->membership = new UserLibraryAccessEntity($this->actor->getId(), $library, new \DateTimeImmutable());
-            $this->persist($this->membership);
+        $membership = $member === null ? null : new UserLibraryAccessEntity($member->getId(), $library, new \DateTimeImmutable());
+        if ($membership !== null) {
+            $this->persist($membership);
         }
         $this->manager->flush();
+
+        return [$video, $membership];
+    }
+
+    /**
+     * A library video with a 1080p source, so playback admits all three quality tiers and
+     * signing dispatches one session per tier; a source without a height admits 360p alone.
+     * Once an actor exists, each tier has a job the actor owns.
+     */
+    private function createVideoLibrary(bool $grant): VideoEntity
+    {
+        [$video, $membership] = $this->libraryVideo($grant ? $this->actor : null);
+        $this->membership = $membership ?? $this->membership;
         if (isset($this->actor)) {
             $now = new \DateTimeImmutable();
             $videoKey = $video->getId()->toString();
@@ -833,10 +929,13 @@ final class SignedDeliveryFirewallTest extends TestCase
         $this->entities[] = $entity;
     }
 
-    /** Signs a delivery path and records the signature for the credential scan. */
-    private function signedUrl(string $path, int $expiresInSeconds = 86400, ?HmacStreamAuthAdapter $signer = null): string
+    /**
+     * Signs a delivery path and records the signature for the credential scan. A manifest path
+     * gets a rendition set of `$setJob`, by default the job the stream owner owns.
+     */
+    private function signedUrl(string $path, int $expiresInSeconds = 86400, ?HmacStreamAuthAdapter $signer = null, ?string $setJob = null): string
     {
-        $path .= (str_contains($path, '?') ? '&' : '?').(str_ends_with($path, 'master.m3u8') || str_ends_with($path, 'manifest.mpd') ? 'set='.$this->jobId.'.3' : 'generation=3');
+        $path .= (str_contains($path, '?') ? '&' : '?').(str_ends_with($path, 'master.m3u8') || str_ends_with($path, 'manifest.mpd') ? 'set='.($setJob ?? $this->jobId).'.3' : 'generation=3');
         $signed = ($signer ?? $this->signer)->signUrl($path, $expiresInSeconds);
         $this->signatures[] = $signed['sig'];
 
@@ -886,6 +985,13 @@ final class SignedDeliveryFirewallTest extends TestCase
             return;
         }
         self::assertSame([AccessDeniedException::class, $discriminator], $this->refusal, $context);
+    }
+
+    /** A live URL whose job owner may no longer play the video answers 409 from the owner check. */
+    private function assertOwnerAccessRefused(Response $response, string $route): void
+    {
+        self::assertSame(409, $response->getStatusCode(), $route . ': ' . $this->responseDetails($response));
+        self::assertSame([ConflictException::class, self::PLAYBACK_UNAVAILABLE], $this->refusal, $route);
     }
 
     /**

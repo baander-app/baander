@@ -8,6 +8,7 @@ use App\Shared\Domain\Model\Uuid;
 use App\Transcode\Application\DTO\DesiredTranscodeState;
 use App\Transcode\Application\DTO\MediaTrack;
 use App\Transcode\Application\DTO\TranscodeRuntimeSnapshot;
+use App\Transcode\Application\Port\LiveDeliveryAccessPort;
 use App\Transcode\Application\Port\PlaybackPortInterface;
 use App\Transcode\Application\Port\TranscodeExecutionOwnershipPort;
 use App\Transcode\Application\Port\TranscodePublicViewInterface;
@@ -126,9 +127,12 @@ final class AdaptiveBrowserFixture
         $publicView->method('videoId')->willReturn($state['videoId']);
         $playback = $generator->testDouble(PlaybackPortInterface::class, false);
         $sleeper = $generator->testDouble(SleeperInterface::class, false);
+        // The fixture serves one disposable owner, whose access never changes.
+        $ownerAccess = $generator->testDouble(LiveDeliveryAccessPort::class, false);
         assert($playback instanceof PlaybackPortInterface);
         assert($sleeper instanceof SleeperInterface);
+        assert($ownerAccess instanceof LiveDeliveryAccessPort);
         $signed = new SignedStreamRequest($auth);
-        return [$streaming, new StreamManifestController($streaming, $signed, $playback, $publicView, $sleeper), $signed];
+        return [$streaming, new StreamManifestController($streaming, $signed, $playback, $publicView, $sleeper, $ownerAccess), $signed];
     }
 }

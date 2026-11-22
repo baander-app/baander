@@ -10,6 +10,7 @@ use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
 use App\Shared\Application\Port\SleeperInterface;
 use App\Transcode\Application\DTO\MediaTrack;
+use App\Transcode\Application\Port\LiveDeliveryAccessPort;
 use App\Transcode\Application\Port\StreamAuthPortInterface;
 use App\Transcode\Application\Port\PlaybackPortInterface;
 use App\Transcode\Application\Port\TranscodeStreamingPortInterface;
@@ -38,7 +39,7 @@ final class StreamManifestSecurityTest extends TestCase
         $videos = $this->createStub(TranscodePublicViewInterface::class);
         $videos->method('videoId')->willReturn($video->getId());
         $controller = new StreamManifestController($streaming, new SignedStreamRequest(new HmacStreamAuthAdapter('test-secret')),
-            $playback, $videos, $this->createStub(SleeperInterface::class));
+            $playback, $videos, $this->createStub(SleeperInterface::class), $this->createStub(LiveDeliveryAccessPort::class));
 
         $response = $controller->qualityLadder($video->getPublicId()->toString(), Request::create('/?' . http_build_query(['requestId' => $requestId, 'jobIds' => [$jobId]])));
 
@@ -87,7 +88,13 @@ final class StreamManifestSecurityTest extends TestCase
         $videos = $this->createMock(TranscodePublicViewInterface::class);
         $videos->expects($valid && in_array($method, ['masterManifest', 'dashManifest'], true) ? $this->once() : $this->never())
             ->method('videoId')->with($video->getPublicId())->willReturn($video->getId());
-        $controller = new StreamManifestController($streaming, new SignedStreamRequest($signer), $playback, $videos, $this->createStub(SleeperInterface::class));
+        $ownerAccess = $this->createMock(LiveDeliveryAccessPort::class);
+        $setChecks = $valid && in_array($method, ['masterManifest', 'dashManifest'], true);
+        $ownerAccess->expects($setChecks ? $this->once() : $this->never())
+            ->method('assertOwnersMayStream')->with([PublicId::fromString($jobId)]);
+        $ownerAccess->expects($valid && !$setChecks ? $this->once() : $this->never())
+            ->method('assertOwnerMayStream')->with(PublicId::fromString($jobId));
+        $controller = new StreamManifestController($streaming, new SignedStreamRequest($signer), $playback, $videos, $this->createStub(SleeperInterface::class), $ownerAccess);
         if (!$valid) {
             $this->expectException(AccessDeniedHttpException::class);
         }
@@ -106,7 +113,7 @@ final class StreamManifestSecurityTest extends TestCase
         $signer = new HmacStreamAuthAdapter('test-secret');
         $streaming = $this->createMock(TranscodeStreamingPortInterface::class);
         $streaming->expects($this->once())->method('getMediaManifest')->with(self::anything(), MediaTrack::Video, 3, self::callback(is_int(...)))->willReturn('#EXTM3U');
-        $controller = new StreamManifestController($streaming, new SignedStreamRequest($signer), $this->createStub(PlaybackPortInterface::class), $this->createStub(TranscodePublicViewInterface::class), $this->createStub(SleeperInterface::class));
+        $controller = new StreamManifestController($streaming, new SignedStreamRequest($signer), $this->createStub(PlaybackPortInterface::class), $this->createStub(TranscodePublicViewInterface::class), $this->createStub(SleeperInterface::class), $this->createStub(LiveDeliveryAccessPort::class));
         $response = $controller->mediaManifest($jobId, MediaTrack::Video, Request::create($signer->signUrl("/api/transcode/$jobId/tracks/video/media.m3u8?generation=3")['url']));
         self::assertSame(503, $response->getStatusCode());
     }
@@ -133,7 +140,9 @@ final class StreamManifestSecurityTest extends TestCase
             ->willReturnCallback(static function () use ($state): void { $state->advanced = true; });
         $videos = $this->createStub(TranscodePublicViewInterface::class);
         $videos->method('videoId')->willReturn($video->getId());
-        $controller = new StreamManifestController($streaming, new SignedStreamRequest($signer), $this->createStub(PlaybackPortInterface::class), $videos, $sleeper);
+        $ownerAccess = $this->createMock(LiveDeliveryAccessPort::class);
+        $ownerAccess->expects(self::once())->method('assertOwnersMayStream')->with([PublicId::fromString($jobId)]);
+        $controller = new StreamManifestController($streaming, new SignedStreamRequest($signer), $this->createStub(PlaybackPortInterface::class), $videos, $sleeper, $ownerAccess);
 
         $response = $controller->dashManifest($video->getPublicId()->toString(), Request::create($signer->signUrlUntil('/api/transcode/'.$video->getPublicId().'/manifest.mpd?set='.$jobId.'.3', $expiresAt)['url']));
 
@@ -168,7 +177,7 @@ final class StreamManifestSecurityTest extends TestCase
             ->willReturnCallback(static function () use ($state): void { $state->afterWait = true; });
         $videos = $this->createStub(TranscodePublicViewInterface::class);
         $videos->method('videoId')->willReturn($video->getId());
-        $controller = new StreamManifestController($streaming, new SignedStreamRequest($auth), $this->createStub(PlaybackPortInterface::class), $videos, $sleeper);
+        $controller = new StreamManifestController($streaming, new SignedStreamRequest($auth), $this->createStub(PlaybackPortInterface::class), $videos, $sleeper, $this->createStub(LiveDeliveryAccessPort::class));
 
         $this->expectException(AccessDeniedHttpException::class);
         $controller->dashManifest($video->getPublicId()->toString(), Request::create('/api/transcode/'.$video->getPublicId().'/manifest.mpd?set='.$jobId.'.3&sig=valid&exp=2000000000'));
@@ -185,7 +194,7 @@ final class StreamManifestSecurityTest extends TestCase
         $sleeper->expects(self::never())->method('sleep');
         $videos = $this->createStub(TranscodePublicViewInterface::class);
         $videos->method('videoId')->willReturn($video->getId());
-        $controller = new StreamManifestController($streaming, new SignedStreamRequest($signer), $this->createStub(PlaybackPortInterface::class), $videos, $sleeper);
+        $controller = new StreamManifestController($streaming, new SignedStreamRequest($signer), $this->createStub(PlaybackPortInterface::class), $videos, $sleeper, $this->createStub(LiveDeliveryAccessPort::class));
 
         self::assertSame(200, $controller->dashManifest($video->getPublicId()->toString(), Request::create($signer->signUrl('/api/transcode/'.$video->getPublicId().'/manifest.mpd?set='.$jobId.'.3')['url']))->getStatusCode());
     }

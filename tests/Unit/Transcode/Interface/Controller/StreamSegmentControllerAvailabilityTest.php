@@ -8,6 +8,7 @@ use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
 use App\Shared\Infrastructure\Swoole\AsyncSleeper;
 use App\Transcode\Application\DTO\MediaTrack;
+use App\Transcode\Application\Port\LiveDeliveryAccessPort;
 use App\Transcode\Application\Port\SegmentAvailabilityInterface;
 use App\Transcode\Application\Port\StreamAuthPortInterface;
 use App\Transcode\Application\Port\TranscodeStreamingPortInterface;
@@ -63,7 +64,7 @@ final class StreamSegmentControllerAvailabilityTest extends TestCase
                 'matching' => $this->expectedPath,
                 default => null,
             });
-        $controller = new StreamSegmentController($streaming, new SignedStreamRequest($auth), $availability, new AsyncSleeper());
+        $controller = new StreamSegmentController($streaming, new SignedStreamRequest($auth), $availability, new AsyncSleeper(), $this->createStub(LiveDeliveryAccessPort::class));
         $request = Request::create('https://baander.app/api/transcode/' . $publicId . '/tracks/video/segment.m4s?index=7&generation=3&sig=valid-signature&exp=2000000000');
 
         $response = $controller->segment($publicId->toString(), MediaTrack::Video, $request);
@@ -93,12 +94,45 @@ final class StreamSegmentControllerAvailabilityTest extends TestCase
         $auth->method('validateUrl')->willReturn(true);
         $availability = $this->createMock(SegmentAvailabilityInterface::class);
         $availability->expects(self::once())->method('isReady')->with($jobId, $tierKey, 7)->willReturn($this->expectedPath);
-        $controller = new StreamSegmentController($streaming, new SignedStreamRequest($auth), $availability, new AsyncSleeper());
+        $controller = new StreamSegmentController($streaming, new SignedStreamRequest($auth), $availability, new AsyncSleeper(), $this->createStub(LiveDeliveryAccessPort::class));
 
         $response = $controller->segment($publicId->toString(), MediaTrack::Audio, Request::create('https://baander.app/api/transcode/'.$publicId.'/tracks/audio/segment.m4s?index=7&generation=3&sig=valid&exp=2000000000'));
 
         self::assertSame(200, $response->getStatusCode());
         self::assertSame('audio/mp4', $response->headers->get('Content-Type'));
+    }
+
+    /**
+     * Without a readiness hint the segment is resolved again on every poll of the file wait,
+     * while the owner's access is checked once, for the signed job, before the first resolve.
+     */
+    public function testOwnerAccessIsCheckedOnceWhileTheSegmentIsResolvedAgainDuringTheWait(): void
+    {
+        $publicId = new PublicId();
+        $resolved = ['jobId' => Uuid::generate(), 'tierKey' => '720p', 'path' => $this->expectedPath];
+        $streaming = $this->createMock(TranscodeStreamingPortInterface::class);
+        $streaming->expects(self::atLeast(3))->method('resolveSegmentAvailability')->willReturn($resolved);
+        $auth = $this->createStub(StreamAuthPortInterface::class);
+        $auth->method('validateUrl')->willReturn(true);
+        $ownerAccess = $this->createMock(LiveDeliveryAccessPort::class);
+        $ownerAccess->expects(self::once())->method('assertOwnerMayStream')->with($publicId);
+        $controller = new StreamSegmentController(
+            $streaming,
+            new SignedStreamRequest($auth),
+            $this->createStub(SegmentAvailabilityInterface::class),
+            new AsyncSleeper(),
+            $ownerAccess,
+        );
+
+        $response = $controller->segment($publicId->toString(), MediaTrack::Video, Request::create('https://baander.app/api/transcode/'.$publicId.'/tracks/video/segment.m4s?index=7&generation=3&sig=valid&exp=2000000000'));
+
+        self::assertSame(200, $response->getStatusCode());
+        ob_start();
+        try {
+            $response->sendContent();
+        } finally {
+            ob_end_clean();
+        }
     }
 
     public function testChangingTheSignedTrackCannotResolveMedia(): void
@@ -108,7 +142,15 @@ final class StreamSegmentControllerAvailabilityTest extends TestCase
         $signed = $signer->signUrl('/api/transcode/'.$publicId.'/tracks/video/segment.m4s?index=7&generation=3')['url'];
         $streaming = $this->createMock(TranscodeStreamingPortInterface::class);
         $streaming->expects(self::never())->method('resolveSegmentAvailability');
-        $controller = new StreamSegmentController($streaming, new SignedStreamRequest($signer), $this->createStub(SegmentAvailabilityInterface::class), new AsyncSleeper());
+        $ownerAccess = $this->createMock(LiveDeliveryAccessPort::class);
+        $ownerAccess->expects(self::never())->method('assertOwnerMayStream');
+        $controller = new StreamSegmentController(
+            $streaming,
+            new SignedStreamRequest($signer),
+            $this->createStub(SegmentAvailabilityInterface::class),
+            new AsyncSleeper(),
+            $ownerAccess,
+        );
 
         $response = $controller->segment($publicId->toString(), MediaTrack::Audio, Request::create(str_replace('/tracks/video/', '/tracks/audio/', $signed)));
 
@@ -126,7 +168,7 @@ final class StreamSegmentControllerAvailabilityTest extends TestCase
         $auth->method('validateUrl')->willReturn(true);
         $sleeper = $this->createStub(\App\Shared\Application\Port\SleeperInterface::class);
         $sleeper->method('sleep')->willReturnCallback(function () use ($state): void { $state->current = false; });
-        $controller = new StreamSegmentController($streaming, new SignedStreamRequest($auth), $this->createStub(SegmentAvailabilityInterface::class), $sleeper);
+        $controller = new StreamSegmentController($streaming, new SignedStreamRequest($auth), $this->createStub(SegmentAvailabilityInterface::class), $sleeper, $this->createStub(LiveDeliveryAccessPort::class));
         $request = Request::create('https://baander.app/api/transcode/'.$publicId.'/tracks/video/segment.m4s?index=7&generation=3&sig=valid&exp=2000000000');
         $response = $controller->segment($publicId->toString(), MediaTrack::Video, $request);
         self::assertSame(503, $response->getStatusCode());
@@ -152,6 +194,7 @@ final class StreamSegmentControllerAvailabilityTest extends TestCase
             new SignedStreamRequest($this->createStub(StreamAuthPortInterface::class)),
             $availability,
             new AsyncSleeper(),
+            $this->createStub(LiveDeliveryAccessPort::class),
         );
 
         $wait = new \ReflectionMethod(StreamSegmentController::class, 'waitForSegment');

@@ -9,6 +9,8 @@ use App\Shared\Domain\Model\PublicId;
 use App\Transcode\Application\DTO\MediaTrack;
 use App\Shared\Domain\Model\Uuid;
 use App\Shared\Interface\Controller\ApiResponsesTrait;
+use App\Shared\Interface\DTO\ApiError;
+use App\Transcode\Application\Port\LiveDeliveryAccessPort;
 use App\Transcode\Application\Port\SegmentAvailabilityInterface;
 use App\Transcode\Interface\Security\SignedStreamRequest;
 use App\Transcode\Application\Port\TranscodeStreamingPortInterface;
@@ -20,7 +22,11 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
 use Symfony\Component\Routing\Attribute\Route;
 
 #[OA\Tag(name: 'Stream', description: 'HLS streaming endpoints')]
-#[Route('/api/transcode/{jobPublicId}', name: 'stream_segment_')]
+#[Route('/api/transcode/{jobPublicId}', name: 'stream_segment_', requirements: [
+    'jobPublicId' => PublicId::PATTERN,
+    'language' => 's[0-9]+',
+    'segment' => 'full',
+])]
 final class StreamSegmentController
 {
     use ApiResponsesTrait;
@@ -30,6 +36,7 @@ final class StreamSegmentController
         private readonly SignedStreamRequest $signedRequest,
         private readonly SegmentAvailabilityInterface $segmentAvailability,
         private readonly SleeperInterface $sleeper,
+        private readonly LiveDeliveryAccessPort $ownerAccess,
     ) {
     }
 
@@ -59,7 +66,12 @@ final class StreamSegmentController
                 in: 'path',
                 description: 'Job public ID',
                 required: true,
-                schema: new OA\Schema(type: 'string'),
+                schema: new OA\Schema(
+                    type: 'string',
+                    minLength: PublicId::LENGTH,
+                    maxLength: PublicId::LENGTH,
+                    pattern: PublicId::SCHEMA_PATTERN,
+                ),
             ),
             new OA\Parameter(
                 name: 'sig',
@@ -108,7 +120,14 @@ final class StreamSegmentController
                 response: '404',
                 description: 'Not found',
                 content: new OA\MediaType\Json(
-                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                    schema: new OA\Schema(ref: ApiError::class),
+                ),
+            ),
+            new OA\Response(
+                response: '409',
+                description: 'The job owner may no longer play the video',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: ApiError::class),
                 ),
             ),
             new OA\Response(
@@ -139,9 +158,11 @@ final class StreamSegmentController
         if (!$this->signedRequest->isValid($request)) {
             return new JsonResponse(['error' => 'Invalid or expired signature'], Response::HTTP_FORBIDDEN);
         }
+        $job = PublicId::fromString($jobPublicId);
+        $this->ownerAccess->assertOwnerMayStream($job);
 
         $generation = $request->query->getInt('generation');
-        $resolve = fn (): ?string => $this->streamingService->getInitSegmentPath(PublicId::fromString($jobPublicId), $track, $generation);
+        $resolve = fn (): ?string => $this->streamingService->getInitSegmentPath($job, $track, $generation);
         $path = $resolve();
 
         if ($path === null) {
@@ -187,7 +208,12 @@ final class StreamSegmentController
                 in: 'path',
                 description: 'Job public ID',
                 required: true,
-                schema: new OA\Schema(type: 'string'),
+                schema: new OA\Schema(
+                    type: 'string',
+                    minLength: PublicId::LENGTH,
+                    maxLength: PublicId::LENGTH,
+                    pattern: PublicId::SCHEMA_PATTERN,
+                ),
             ),
             new OA\Parameter(
                 name: 'index',
@@ -226,7 +252,14 @@ final class StreamSegmentController
                 response: '404',
                 description: 'Not found',
                 content: new OA\MediaType\Json(
-                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                    schema: new OA\Schema(ref: ApiError::class),
+                ),
+            ),
+            new OA\Response(
+                response: '409',
+                description: 'The job owner may no longer play the video',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: ApiError::class),
                 ),
             ),
         ],
@@ -237,6 +270,8 @@ final class StreamSegmentController
         if (!$this->signedRequest->isValid($request)) {
             return new JsonResponse(['error' => 'Invalid or expired signature'], Response::HTTP_FORBIDDEN);
         }
+        $job = PublicId::fromString($jobPublicId);
+        $this->ownerAccess->assertOwnerMayStream($job);
 
         $index = $request->query->getInt('index', -1);
         if ($index < 0) {
@@ -244,7 +279,7 @@ final class StreamSegmentController
         }
 
         $generation = $request->query->getInt('generation');
-        $resolve = fn (): ?array => $this->streamingService->resolveSegmentAvailability(PublicId::fromString($jobPublicId), $track, $index, $generation);
+        $resolve = fn (): ?array => $this->streamingService->resolveSegmentAvailability($job, $track, $index, $generation);
         $resolved = $resolve();
 
         if ($resolved === null) {
@@ -290,21 +325,26 @@ final class StreamSegmentController
                 in: 'path',
                 description: 'Job public ID',
                 required: true,
-                schema: new OA\Schema(type: 'string'),
+                schema: new OA\Schema(
+                    type: 'string',
+                    minLength: PublicId::LENGTH,
+                    maxLength: PublicId::LENGTH,
+                    pattern: PublicId::SCHEMA_PATTERN,
+                ),
             ),
             new OA\Parameter(
                 name: 'language',
                 in: 'path',
                 description: 'Source subtitle track key: s followed by the absolute FFprobe stream index (for example s2)',
                 required: true,
-                schema: new OA\Schema(type: 'string'),
+                schema: new OA\Schema(type: 'string', pattern: '^s[0-9]+$'),
             ),
             new OA\Parameter(
                 name: 'segment',
                 in: 'path',
-                description: 'Segment name',
+                description: 'Segment name; the whole track is one segment',
                 required: true,
-                schema: new OA\Schema(type: 'string'),
+                schema: new OA\Schema(type: 'string', enum: ['full']),
             ),
             new OA\Parameter(
                 name: 'sig',
@@ -332,6 +372,13 @@ final class StreamSegmentController
             ),
             new OA\Response(response: '403', description: 'Invalid or expired signature'),
             new OA\Response(response: '404', description: 'Not found'),
+            new OA\Response(
+                response: '409',
+                description: 'The job owner may no longer play the video',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: ApiError::class),
+                ),
+            ),
         ],
     )]
     #[Route('/subtitles/{language}/{segment}.vtt', name: 'subtitle_segment', methods: ['GET'])]
@@ -340,14 +387,18 @@ final class StreamSegmentController
         if (!$this->signedRequest->isValid($request)) {
             return new JsonResponse(['error' => 'Invalid or expired signature'], Response::HTTP_FORBIDDEN);
         }
+        $job = PublicId::fromString($jobPublicId);
+        $this->ownerAccess->assertOwnerMayStream($job);
 
-        $path = $this->streamingService->getSubtitleSegmentPath(PublicId::fromString($jobPublicId), $language, $segment, $request->query->getInt('generation'));
+        $generation = $request->query->getInt('generation');
+        $resolve = fn (): ?string => $this->streamingService->getSubtitleSegmentPath($job, $language, $segment, $generation);
+        $path = $resolve();
 
         if ($path === null) {
             return $this->notFound('Subtitle segment not found.');
         }
 
-        return $this->streamFile($path, 'text/vtt', fn (): bool => $this->streamingService->getSubtitleSegmentPath(PublicId::fromString($jobPublicId), $language, $segment, $request->query->getInt('generation')) === $path);
+        return $this->streamFile($path, 'text/vtt', fn (): bool => $resolve() === $path);
     }
 
     /**

@@ -897,6 +897,9 @@ services:
     App\Transcode\Application\Port\CompletedVideoDeliveryPort:
         alias: App\Transcode\Infrastructure\Transcode\CompletedVideoDeliveryAdapter
 
+    App\Transcode\Application\Port\LiveDeliveryAccessPort:
+        alias: App\Transcode\Infrastructure\Transcode\LiveDeliveryAccessAdapter
+
     App\Transcode\Application\Port\CompletedVideoArtifactPort:
         alias: App\Transcode\Infrastructure\Transcode\CompletedVideoArtifactAdapter
 

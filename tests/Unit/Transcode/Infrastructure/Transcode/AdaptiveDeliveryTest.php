@@ -15,6 +15,7 @@ use App\Transcode\Application\DTO\DesiredTranscodeState;
 use App\Transcode\Application\Command\CreateTranscodeSessionCommand;
 use App\Transcode\Application\DTO\MediaTrack;
 use App\Transcode\Application\DTO\TranscodeRuntimeSnapshot;
+use App\Transcode\Application\Port\LiveDeliveryAccessPort;
 use App\Transcode\Application\Port\TranscodeExecutionOwnershipPort;
 use App\Transcode\Application\Port\TranscodePublicViewInterface;
 use App\Transcode\Application\Port\TranscodeStoragePortInterface;
@@ -164,7 +165,7 @@ final class AdaptiveDeliveryTest extends TestCase
         $videos = $this->createStub(TranscodePublicViewInterface::class);
         $videos->method('videoId')->willReturn($this->video);
         $this->signing = new StreamSigningController($auth, $playback, $videos, $this->streaming);
-        $this->manifests = new StreamManifestController($this->streaming, new SignedStreamRequest($auth), $playback, $videos, $this->createStub(SleeperInterface::class));
+        $this->manifests = new StreamManifestController($this->streaming, new SignedStreamRequest($auth), $playback, $videos, $this->createStub(SleeperInterface::class), $this->createStub(LiveDeliveryAccessPort::class));
     }
 
     protected function tearDown(): void
