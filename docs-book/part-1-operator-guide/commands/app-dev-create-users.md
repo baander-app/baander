@@ -1,6 +1,10 @@
 # app:dev:create-users
 
-Create the standard development users. This dev-only command seeds two fixed test accounts and is safe to run repeatedly: it skips an existing user instead of treating it as an error.
+Create the standard development users. This development-only command seeds two fixed test accounts and is safe to run repeatedly: it skips an existing user instead of treating it as an error.
+
+## Development only
+
+The command runs only when the kernel environment is `dev` or `BAANDER_DEVELOPMENT_INSTANCE=1` is set. Otherwise it creates no users, prints that requirement and exits with code 1. The development lifecycle sets the variable on the persistent development instance and on worktree previews, so the persistent instance can seed its users although its kernel runs as `prod`. Production images do not set it.
 
 ## Quick start
 
@@ -26,9 +30,9 @@ When a user already exists, the command reports `User exists` and continues. Any
 | Code | Meaning |
 |------|---------|
 | 0 | All dev users created or already present |
-| 1 | A user failed to create for a reason other than "already exists" |
+| 1 | The command refused to run (see [Development only](#development-only)), or a user failed to create for a reason other than "already exists" |
 
 ## Tips
 
-- Never run this in production. The passwords (`admin`, `user`) are public and known.
+- The passwords (`admin`, `user`) are public; that is why production refuses the command.
 - Running it again creates no duplicate users and does not fail on existing ones.

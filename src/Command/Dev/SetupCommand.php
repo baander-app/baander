@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Command\Dev;
 
+use Baander\Core\EnvironmentVariable;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputInterface;
@@ -25,6 +26,10 @@ final class SetupCommand extends Command
         private readonly KernelInterface $kernel,
         private readonly Filesystem $filesystem,
         private readonly string $projectDir,
+        #[Autowire(param: 'kernel.environment')]
+        private readonly string $environment,
+        #[Autowire(env: 'bool:default::' . EnvironmentVariable::BAANDER_DEVELOPMENT_INSTANCE)]
+        private readonly bool $developmentInstance,
         #[Autowire('%env(resolve:OAUTH_PRIVATE_KEY_PATH)%')]
         private readonly string $privateKeyPath = '',
         #[Autowire('%env(resolve:OAUTH_PUBLIC_KEY_PATH)%')]
@@ -45,6 +50,17 @@ final class SetupCommand extends Command
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
         $io = new SymfonyStyle($input, $output);
+
+        if ($this->environment !== 'dev' && !$this->developmentInstance) {
+            $io->getErrorStyle()->error(sprintf(
+                '%s runs only in the dev environment or on a development instance (%s=1); it can drop the database and creates accounts with public passwords.',
+                $this->getName(),
+                EnvironmentVariable::BAANDER_DEVELOPMENT_INSTANCE,
+            ));
+
+            return Command::FAILURE;
+        }
+
         $fresh = $input->getOption('fresh');
         $skipKeys = $input->getOption('skip-keys');
 

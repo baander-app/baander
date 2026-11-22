@@ -6,11 +6,13 @@ namespace App\Auth\Interface\Console;
 
 use App\Auth\Application\Command\User\CreateUserCommand;
 use App\Shared\Domain\Model\Email;
+use Baander\Core\EnvironmentVariable;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\Console\Style\SymfonyStyle;
+use Symfony\Component\DependencyInjection\Attribute\Autowire;
 use Symfony\Component\Messenger\MessageBusInterface;
 
 /**
@@ -44,6 +46,10 @@ final class CreateUsersCommand extends Command
 
     public function __construct(
         private readonly MessageBusInterface $bus,
+        #[Autowire(param: 'kernel.environment')]
+        private readonly string $environment,
+        #[Autowire(env: 'bool:default::' . EnvironmentVariable::BAANDER_DEVELOPMENT_INSTANCE)]
+        private readonly bool $developmentInstance,
     ) {
         parent::__construct();
     }
@@ -51,6 +57,16 @@ final class CreateUsersCommand extends Command
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
         $io = new SymfonyStyle($input, $output);
+
+        if ($this->environment !== 'dev' && !$this->developmentInstance) {
+            $io->getErrorStyle()->error(sprintf(
+                '%s runs only in the dev environment or on a development instance (%s=1); its accounts have public passwords.',
+                $this->getName(),
+                EnvironmentVariable::BAANDER_DEVELOPMENT_INSTANCE,
+            ));
+
+            return Command::FAILURE;
+        }
 
         foreach (self::DEV_USERS as $user) {
             try {

@@ -88,10 +88,12 @@ For functional test conventions (TestCase base class, test authentication via `X
 
 ## Dev Users
 
+`app:dev:setup` creates these accounts in the dev environment and on development instances; production refuses it.
+
 | Role | Email | Password |
 |------|-------|----------|
-| Admin | `admin@baander.test` | `password` |
-| User | `user@baander.test` | `password` |
+| Admin | `admin@baander.test` | `admin` |
+| User | `user@baander.test` | `user` |
 
 ## Debugging
 

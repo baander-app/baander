@@ -106,6 +106,8 @@ class ComposeRuntime
             EnvironmentVariable::DEFAULT_URI => $origin,
             EnvironmentVariable::APP_DOMAIN => $instance['hostname'],
             EnvironmentVariable::TRUSTED_PROXIES => $instance['proxy_ip'] ?? '',
+            // Admits the development-only console commands under the persistent instance's prod kernel.
+            EnvironmentVariable::BAANDER_DEVELOPMENT_INSTANCE => '1',
             EnvironmentVariable::BAANDER_LOG_DIR => LogCollection::ROOT . '/web/' . ($instance['log_boot_id'] ?? $instance['id']),
             EnvironmentVariable::BAANDER_LOG_NODES => LogCollection::nodes($project, $environment[EnvironmentVariable::BAANDER_LOG_NODES] ?? '[]'),
         ]);

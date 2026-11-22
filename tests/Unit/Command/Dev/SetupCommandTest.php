@@ -130,7 +130,7 @@ PHP,
         file_put_contents($directory . '/bin/console', $script);
 
         try {
-            $tester = new CommandTester(new SetupCommand($this->kernel, $filesystem, $directory));
+            $tester = new CommandTester(new SetupCommand($this->kernel, $filesystem, $directory, 'dev', false));
 
             self::assertSame(Command::FAILURE, $tester->execute($options));
             self::assertSame($expectedStages, file($log, FILE_IGNORE_NEW_LINES));
@@ -159,7 +159,7 @@ PHP,
         $log = $directory . '/commands.jsonl';
         file_put_contents($directory . '/bin/console', '<?php file_put_contents(' . var_export($log, true) . ', json_encode($argv) . PHP_EOL, FILE_APPEND);');
         try {
-            $tester = new CommandTester(new SetupCommand($this->kernel, $filesystem, $directory));
+            $tester = new CommandTester(new SetupCommand($this->kernel, $filesystem, $directory, 'dev', false));
             self::assertSame(Command::SUCCESS, $tester->execute(['--origin' => 'https://dev.baander.app']));
             $calls = file_get_contents($log);
             self::assertIsString($calls);
@@ -171,12 +171,69 @@ PHP,
         }
     }
 
+    /** @return iterable<string, array{string, bool}> */
+    public static function admittedRuntimes(): iterable
+    {
+        yield 'dev kernel' => ['dev', false];
+        yield 'prod kernel on a development instance' => ['prod', true];
+    }
+
+    #[DataProvider('admittedRuntimes')]
+    public function testAdmittedRuntimeRunsEverySetupStep(string $environment, bool $developmentInstance): void
+    {
+        $directory = sys_get_temp_dir() . '/baander-admitted-' . bin2hex(random_bytes(8));
+        $log = $directory . '/stages.log';
+        $filesystem = new Filesystem();
+        $filesystem->mkdir($directory . '/bin');
+        file_put_contents($directory . '/bin/console', '<?php file_put_contents(' . var_export($log, true) . ', $argv[1] . PHP_EOL, FILE_APPEND);');
+        try {
+            $tester = new CommandTester(new SetupCommand($this->kernel, $filesystem, $directory, $environment, $developmentInstance));
+
+            self::assertSame(Command::SUCCESS, $tester->execute([]));
+            self::assertSame(
+                [
+                    'doctrine:migrations:migrate',
+                    'app:oauth:generate-keys',
+                    'app:auth:setup-clients',
+                    'app:dev:create-users',
+                ],
+                file($log, FILE_IGNORE_NEW_LINES),
+            );
+        } finally {
+            $filesystem->remove($directory);
+        }
+    }
+
+    public function testProdKernelWithoutDevelopmentInstanceMarkerRunsNoSetupStep(): void
+    {
+        $directory = sys_get_temp_dir() . '/baander-refused-' . bin2hex(random_bytes(8));
+        $log = $directory . '/stages.log';
+        $filesystem = new Filesystem();
+        $filesystem->mkdir([$directory . '/bin', $directory . '/cache']);
+        $this->kernel->method('getCacheDir')->willReturn($directory . '/cache');
+        file_put_contents($directory . '/bin/console', '<?php file_put_contents(' . var_export($log, true) . ', $argv[1] . PHP_EOL, FILE_APPEND);');
+        try {
+            $tester = new CommandTester(new SetupCommand($this->kernel, $filesystem, $directory, 'prod', false));
+
+            self::assertSame(Command::FAILURE, $tester->execute(['--fresh' => true]));
+            self::assertFileDoesNotExist($log);
+            self::assertDirectoryExists($directory . '/cache');
+            $display = preg_replace('/\s+/', ' ', $tester->getDisplay()) ?? '';
+            self::assertStringContainsString('dev environment', $display);
+            self::assertStringContainsString('BAANDER_DEVELOPMENT_INSTANCE=1', $display);
+        } finally {
+            $filesystem->remove($directory);
+        }
+    }
+
     private function createCommand(): SetupCommand
     {
         return new SetupCommand(
             $this->kernel,
             $this->filesystem,
             sys_get_temp_dir() . '/baander-project',
+            'dev',
+            false,
         );
     }
 }
