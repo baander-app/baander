@@ -107,6 +107,8 @@ final class MutationRouteInventoryTest extends TestCase
             'user_settings_set', 'user_settings_reset',
         ],
         'operator monitoring, settings and scheduling' => [
+            // The admin log viewer's query takes its filters as a POST body; it changes nothing.
+            'admin_logs_query',
             'monitor_jobs_cancel', 'monitor_jobs_retry', 'monitor_prune',
             'monitor_ratelimiters_clear', 'monitor_ratelimiters_clear_all',
             'monitor_transport_failed_retry', 'monitor_transport_failed_remove', 'monitor_transport_failed_flush',
