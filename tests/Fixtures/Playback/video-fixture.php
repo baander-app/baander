@@ -53,6 +53,7 @@ final class PlaybackVideoFixture
                 ($command['cinema'] ?? false) === true,
                 ($command['quality'] ?? false) === true,
                 ($command['directors'] ?? false) === true,
+                ($command['departure'] ?? false) === true,
             ),
             'cleanup' => $this->cleanup($run),
             'inspect' => $this->inspect($run),
@@ -60,13 +61,37 @@ final class PlaybackVideoFixture
         };
     }
 
-    /** @return array<string, mixed> */
-    private function create(string $run, string $delivery, bool $cinema, bool $quality, bool $directors): array
-    {
+    /** @param array<string, mixed>|null $scope
+     * @return array<string, mixed>
+     */
+    private function create(
+        string $run,
+        string $delivery,
+        bool $cinema,
+        bool $quality,
+        bool $directors,
+        bool $departure = false,
+        ?array $scope = null,
+    ): array {
         if (!in_array($delivery, ['encoded', 'original', 'copy'], true)) {
             throw new InvalidArgumentException('Unknown fixture delivery mode.');
         }
-        $manifest = $this->base->execute(['op' => 'create', 'run' => $run]);
+        $manifest = $scope ?? $this->base->execute(['op' => 'create', 'run' => $run]);
+        $mediaDirectory = $this->movieMediaDirectory($run, $scope['run'] ?? null);
+        if ($scope !== null) {
+            $manifest['run'] = $run;
+            $manifest['parentRun'] = $scope['run'];
+            unset($manifest['successorRun'], $manifest['successor']);
+            foreach ([$this->root . '/' . $run, $mediaDirectory] as $directory) {
+                if (!is_dir($directory) && !mkdir($directory, 0700, true)) {
+                    throw new RuntimeException('Cannot create the successor movie directory.');
+                }
+            }
+            if (!chmod($mediaDirectory, 0755)) {
+                throw new RuntimeException('Cannot publish the successor movie directory.');
+            }
+        }
+        $duration = $departure ? 180 : 30;
         $manifest['movie'] = [
             'id' => (string) new Uuid(),
             'publicId' => (string) new PublicId(),
@@ -75,7 +100,7 @@ final class PlaybackVideoFixture
         $manifest['video'] = [
             'id' => (string) new Uuid(),
             'publicId' => (string) new PublicId(),
-            'path' => $this->mediaRoot . '/' . $run . '/owned.' . $extension,
+            'path' => $mediaDirectory . '/owned.' . $extension,
         ];
         $manifest['movieVideoId'] = (string) new Uuid();
         // Persist exact ownership before creating files or rows, including failed runs.
@@ -83,7 +108,7 @@ final class PlaybackVideoFixture
         if ($cinema) {
             $this->generateCinemaSource($run, $manifest['video']['path'], $quality);
         } else {
-            $this->generateSource($run, $manifest['video']['path'], $delivery, $extension, $quality);
+            $this->generateSource($run, $manifest['video']['path'], $delivery, $extension, $quality, $duration);
         }
         if (!chmod($manifest['video']['path'], 0644)) {
             throw new RuntimeException('Cannot publish the owned video to source workers.');
@@ -122,7 +147,7 @@ final class PlaybackVideoFixture
         ));
         $this->save($run, $manifest);
         $now = (new DateTimeImmutable())->format('Y-m-d H:i:s.uP');
-        $this->connection->transactional(function () use ($manifest, $metadata, $hash, $now): void {
+        $this->connection->transactional(function () use ($manifest, $metadata, $hash, $now, $duration): void {
             $this->connection->update('libraries', ['type' => 'movie'], ['id' => $manifest['library']['id']]);
             $this->connection->insert('movies', [
                 'id' => $manifest['movie']['id'], 'public_id' => $manifest['movie']['publicId'],
@@ -131,7 +156,7 @@ final class PlaybackVideoFixture
             ]);
             $this->connection->insert('videos', [
                 'id' => $manifest['video']['id'], 'public_id' => $manifest['video']['publicId'],
-                'path' => $manifest['video']['path'], 'hash' => $hash, 'duration' => 30,
+                'path' => $manifest['video']['path'], 'hash' => $hash, 'duration' => $duration,
                 'height' => $metadata->height, 'width' => $metadata->width, 'video_bitrate' => $metadata->videoBitrate,
                 'framerate' => 24, 'probe' => json_encode($metadata, JSON_THROW_ON_ERROR),
                 'created_at' => $now, 'updated_at' => $now,
@@ -144,6 +169,19 @@ final class PlaybackVideoFixture
         if ($directors) {
             $manifest = $this->seedDirectors($run, $manifest);
             $manifest = $this->seedCrossMediaCredits($run, $manifest);
+        }
+        if ($departure) {
+            $manifest['successorRun'] = $run . '-next';
+            $this->save($run, $manifest);
+            $manifest['successor'] = $this->create(
+                $manifest['successorRun'],
+                'encoded',
+                cinema: false,
+                quality: false,
+                directors: false,
+                scope: $manifest,
+            );
+            $this->save($run, $manifest);
         }
         return $manifest;
     }
@@ -262,12 +300,12 @@ final class PlaybackVideoFixture
         return $manifest;
     }
 
-    private function generateSource(string $run, string $path, string $delivery, string $extension, bool $quality): void
+    private function generateSource(string $run, string $path, string $delivery, string $extension, bool $quality, int $duration): void
     {
         $process = new Process([
             '/usr/bin/ffmpeg', '-nostdin', '-v', 'error', '-y', '-filter_threads', '1',
             '-f', 'lavfi', '-i', 'color=c=black:size=' . ($quality ? '1280x720' : '320x180') . ':rate=24',
-            '-f', 'lavfi', '-i', 'anullsrc=r=48000:cl=stereo', '-t', '30',
+            '-f', 'lavfi', '-i', 'anullsrc=r=48000:cl=stereo', '-t', (string) $duration,
             '-c:v', $delivery === 'encoded' ? 'mpeg4' : 'libx264', '-threads', '1',
             ...($delivery === 'encoded' ? [] : ['-preset', 'ultrafast']),
             '-pix_fmt', 'yuv420p',
@@ -374,10 +412,12 @@ final class PlaybackVideoFixture
 SELECT j.id, j.quality_tier_name, j.status, j.total_segments, j.completed_segments, j.fail_reason,
        r.outcome, r.desired->>'status' AS desired_status, r.desired->>'position' AS desired_position,
        r.generation, r.desired_revision, r.observed_revision, r.admission_deadline,
+       s.public_id AS session_public_id,
        r.claim_token IS NOT NULL AS has_owner,
        r.claim_token IS NOT NULL AND r.lease_expires_at > clock_timestamp() AS owner_live,
        r.lease_expires_at
 FROM transcode_jobs j LEFT JOIN transcode_runtime_state r ON r.job_id = j.id
+LEFT JOIN transcode_sessions s ON s.id = r.session_id
 WHERE j.video_id = :video ORDER BY j.created_at
 SQL, ['video' => $video['id']]),
         ];
@@ -391,9 +431,19 @@ SQL, ['video' => $video['id']]),
             true,
             flags: JSON_THROW_ON_ERROR,
         );
+        if (isset($manifest['successorRun'])) {
+            $successorManifest = $this->root . '/' . $manifest['successorRun'] . '/manifest.json';
+            if (is_file($successorManifest)) {
+                $cleanup = $this->cleanup($manifest['successorRun']);
+                if (($cleanup['complete'] ?? false) !== true) {
+                    return $cleanup;
+                }
+            }
+        }
+        $mediaDirectory = $this->movieMediaDirectory($run, $manifest['parentRun'] ?? null);
         if (isset($manifest['video'])) {
             $path = $manifest['video']['path'];
-            $basePath = $this->mediaRoot . '/' . $run . '/owned.';
+            $basePath = $mediaDirectory . '/owned.';
             if (!in_array($path, [$basePath . 'mp4', $basePath . 'mkv'], true)) {
                 throw new RuntimeException('Video ownership path does not match its fixture scope.');
             }
@@ -472,7 +522,23 @@ SQL, ['video' => $videoId]);
                 throw new RuntimeException('Cannot remove an owned cinema source input.');
             }
         }
+        if (isset($manifest['parentRun'])) {
+            $this->removeDirectory($mediaDirectory);
+            $this->removeDirectory($this->root . '/' . $run);
+            return ['complete' => true, 'survivors' => 0];
+        }
         return $this->base->execute(['op' => 'cleanup', 'run' => $run, 'waitMs' => 30_000]);
+    }
+
+    private function movieMediaDirectory(string $run, ?string $parentRun): string
+    {
+        if ($parentRun === null) {
+            return $this->mediaRoot . '/' . $run;
+        }
+        if ($run !== $parentRun . '-next') {
+            throw new RuntimeException('Successor media must be within its fixture library.');
+        }
+        return $this->mediaRoot . '/' . $parentRun . '/' . $run;
     }
 
     private function removeDirectory(string $path): void
