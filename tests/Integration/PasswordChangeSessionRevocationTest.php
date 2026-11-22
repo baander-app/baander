@@ -7,6 +7,7 @@ namespace App\Tests\Integration;
 use App\Auth\Application\Command\Totp\DisableTotpCommand;
 use App\Auth\Application\Command\User\ChangePasswordCommand;
 use App\Auth\Application\Command\User\SetUserPasswordCommand;
+use App\Auth\Application\Port\EmailVerificationTokenRepositoryInterface;
 use App\Auth\Application\Port\PasswordResetTokenRepositoryInterface;
 use App\Auth\Application\Port\TotpSecretCipherInterface;
 use App\Auth\Domain\Model\OAuth\SignInGrant;
@@ -432,6 +433,33 @@ final class PasswordChangeSessionRevocationTest extends TestCase
         $this->assertSignedOut($first, $firstKey);
         $this->assertSignedOut($second, $secondKey);
         $this->signIn($this->user, 'changed-by-reset-2');
+    }
+
+    /**
+     * Confirming a pending email change ends the user's other sessions as a password change
+     * does: the session that opened the link stays signed in, every other session and the
+     * paired device's token end, and their connections close when the change commits.
+     */
+    public function testConfirmingAnEmailChangeKeepsTheSessionThatOpenedTheLinkAndEndsTheOthers(): void
+    {
+        [$current, $currentKey] = $this->signIn($this->user);
+        [$other, $otherKey] = $this->signIn($this->user);
+        $pairedDevice = $this->issueDelegatedToken();
+        $address = 'password-session-new-' . bin2hex(random_bytes(8)) . '@baander.app';
+        $this->requestEmailChange($address, 'session-email-change-token');
+        $offset = RecordingLiveConnections::size(self::$sharedDirectory);
+
+        $response = $this->send('POST', '/api/auth/email/verify', $current['accessToken'], $currentKey, ['token' => 'session-email-change-token']);
+
+        self::assertSame(200, $response->getStatusCode(), (string) $response->getContent());
+        self::assertSame($address, $this->connection->fetchOne('SELECT email FROM users WHERE id = ?', [$this->user->getId()->toString()]));
+        self::assertSame(200, $this->me($current['accessToken'], $currentKey)->getStatusCode());
+        self::assertSame(200, $this->refresh($current['refreshToken'], $currentKey)->getStatusCode(), 'The session that opened the link can still refresh.');
+        $this->assertSignedOut($other, $otherKey);
+        self::assertTrue($this->accessTokenRevoked($pairedDevice), "The paired device's token is revoked too.");
+        $closes = RecordingLiveConnections::closedAccessTokens(self::$sharedDirectory, (int) getmypid(), $offset);
+        self::assertCount(1, $closes, 'One close request carries every ended session.');
+        self::assertEqualsCanonicalizing([self::tokenId($other['accessToken']), $pairedDevice], $closes[0]);
     }
 
     public function testAnAdministratorResetEndsEverySession(): void
@@ -953,6 +981,18 @@ final class PasswordChangeSessionRevocationTest extends TestCase
         $tokens = $this->kernel->getContainer()->get('oauth.acceptance.password_reset_tokens');
         self::assertInstanceOf(PasswordResetTokenRepositoryInterface::class, $tokens);
         $tokens->issue($this->user->getId(), $token, new \DateTimeImmutable('+1 hour'));
+    }
+
+    /** Holds the address as the user's pending change, with the token its link would carry. */
+    private function requestEmailChange(string $address, string $token): void
+    {
+        $user = $this->users->findByUuid($this->user->getId());
+        self::assertInstanceOf(User::class, $user);
+        $user->requestEmailChange(new Email($address));
+        $this->users->save($user);
+        $tokens = $this->kernel->getContainer()->get('oauth.acceptance.email_verification_tokens');
+        self::assertInstanceOf(EmailVerificationTokenRepositoryInterface::class, $tokens);
+        $tokens->issue($this->user->getId(), new Email($address), $token, new \DateTimeImmutable('+1 hour'));
     }
 
     private function assertNoResetToken(): void

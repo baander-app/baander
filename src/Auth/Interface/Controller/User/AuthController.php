@@ -24,6 +24,7 @@ use App\Auth\Application\Exception\RefreshTokenRejectedException;
 use App\Auth\Application\Exception\RegistrationClosedException;
 use App\Auth\Application\Exception\StepUpFailedException;
 use App\Auth\Application\Exception\StepUpRateLimitedException;
+use App\Auth\Application\Exception\VerificationLinkOtherAccountException;
 use App\Auth\Application\Port\AuthenticatedUserIdentityInterface;
 use App\Auth\Application\Port\SelfRegistrationInterface;
 use App\Auth\Application\Port\UserPortInterface;
@@ -746,7 +747,7 @@ final class AuthController
     #[OA\Operation\Post(
         path: '/api/auth/email/verify',
         summary: 'Verify an email address with a token',
-        description: 'Redeems the token from a verification email once. The token verifies only the address it was sent to, while the account still has that address.',
+        description: 'Redeems the token from a verification email once, in a signed-in session of the account it was sent for. The token verifies only the address it was sent to, while the account still has that address. A token for a pending email change makes that address the account\'s address and signs the account out of every other session; the session that made the request stays signed in.',
         requestBody: new OA\RequestBody(
             required: true,
             content: new OA\MediaType\Json(
@@ -765,7 +766,12 @@ final class AuthController
                                 type: 'object',
                                 properties: [
                                     'message' => new OA\Schema(type: 'string', example: 'Email verified.'),
+                                    'emailChanged' => new OA\Schema(
+                                        description: 'True when the link confirmed a pending email change: the account now uses the new address, and every other session was signed out.',
+                                        type: 'boolean',
+                                    ),
                                 ],
+                                required: ['message', 'emailChanged'],
                             ),
                         ],
                     ),
@@ -774,6 +780,20 @@ final class AuthController
             new OA\Response(
                 response: '400',
                 description: 'The token is unknown, expired, already used or for an address the account no longer has',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
+            ),
+            new OA\Response(
+                response: '401',
+                description: 'Not authenticated, or another change ended this session first (reason credentials_changed); the token stays usable',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
+            ),
+            new OA\Response(
+                response: '403',
+                description: 'The token is valid but was sent for another account (`details.reason` `verification_link_other_account`), or the request used a delegated access token; the token stays usable',
                 content: new OA\MediaType\Json(
                     schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
                 ),
@@ -793,13 +813,26 @@ final class AuthController
                 ),
             ),
         ],
-        security: [],
     )]
     #[Route('/email/verify', name: 'email_verify', methods: ['POST'])]
-    public function verifyEmail(#[MapRequestPayload] VerifyEmailRequest $payload): JsonResponse
+    #[IsGranted('IS_AUTHENTICATED_FULLY')]
+    public function verifyEmail(#[MapRequestPayload] VerifyEmailRequest $payload, Request $request): JsonResponse
     {
+        $user = $this->getCurrentUser();
+        if ($user === null) {
+            return $this->notFound();
+        }
+
+        // OAuth2Authenticator copies the presenting token's identifier here; when the link
+        // confirms an email change, its session stays signed in.
+        $currentAccessTokenId = $request->attributes->get(AccessTokenAttributes::TOKEN_ID);
+
         try {
-            $this->commandBus->dispatch(new VerifyEmailCommand(token: $payload->token));
+            $emailChanged = $this->commandBus->dispatch(new VerifyEmailCommand(
+                token: $payload->token,
+                userId: $user->getId()->toString(),
+                currentAccessTokenId: is_string($currentAccessTokenId) && $currentAccessTokenId !== '' ? $currentAccessTokenId : null,
+            ))->last(HandledStamp::class)?->getResult() === true;
         } catch (\Throwable $e) {
             return $this->handleCommandException(
                 $e,
@@ -810,6 +843,7 @@ final class AuthController
 
         return $this->successResponse([
             'message' => $this->trans('success.email_verified', domain: 'auth'),
+            'emailChanged' => $emailChanged,
         ]);
     }
 
@@ -1129,6 +1163,14 @@ final class AuthController
             return $this->errorResponse(
                 $this->trans('errors.email_verification_failed', domain: 'auth'),
                 Response::HTTP_BAD_REQUEST,
+            );
+        }
+
+        if ($previous instanceof VerificationLinkOtherAccountException) {
+            return $this->errorResponse(
+                $this->trans('errors.verification_link_other_account', domain: 'auth'),
+                Response::HTTP_FORBIDDEN,
+                ['reason' => VerificationLinkOtherAccountException::REASON],
             );
         }
 

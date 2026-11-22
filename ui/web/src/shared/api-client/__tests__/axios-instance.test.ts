@@ -1,9 +1,20 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
+const authState = vi.hoisted(() => ({
+  accessToken: null as string | null,
+  refreshToken: null as string | null,
+  clearAuth: vi.fn(),
+}));
+
 vi.mock('@/features/auth/stores/auth-store', () => ({
   useAuthStore: {
-    getState: () => ({ accessToken: null, refreshToken: null }),
+    getState: () => authState,
   },
+}));
+
+// A single tab: a refresh runs at once instead of waiting for the origin's auth lock.
+vi.mock('@/features/auth/services/auth-coordination', () => ({
+  coordinateRefresh: ({ refresh }: { refresh: () => Promise<void> }) => refresh(),
 }));
 
 vi.mock('@/shared/crypto/dpop-store', () => ({
@@ -17,6 +28,7 @@ vi.mock('@/shared/crypto/dpop-proof', () => ({
 }));
 
 import { buildHtu, customInstance, AXIOS_INSTANCE } from '../axios-instance';
+import Axios from 'axios';
 import MockAdapter from 'axios-mock-adapter';
 import { getVideoPlaybackPreview } from '../gen/endpoints';
 import { getDpopKeyPair } from '@/shared/crypto/dpop-store';
@@ -290,5 +302,77 @@ describe('API ownership fencing', () => {
     finish();
     expect(await result).toMatchObject({ code: 'ERR_CANCELED' });
     expect(mock.history.get).toHaveLength(1);
+  });
+});
+
+describe('a refresh the server rejects', () => {
+  const origin = 'https://web.baander.app';
+  const page = `${origin}/verify-email`;
+  const unauthorized = { error: { message: 'Unauthorized.', code: 401 } };
+  let api: MockAdapter;
+  let refresh: MockAdapter;
+  let location: { origin: string; href: string };
+
+  beforeEach(() => {
+    api = new MockAdapter(AXIOS_INSTANCE);
+    refresh = new MockAdapter(Axios);
+    refresh.onPost(`${origin}/api/auth/refresh`).reply(401, unauthorized);
+    location = { origin, href: page };
+    vi.stubGlobal('window', { location });
+    authState.accessToken = 'stale-access-token';
+    authState.refreshToken = 'stale-refresh-token';
+    authState.clearAuth.mockImplementation(() => {
+      authState.accessToken = null;
+      authState.refreshToken = null;
+    });
+    vi.mocked(getDpopKeyPair).mockReturnValue({} as NonNullable<ReturnType<typeof getDpopKeyPair>>);
+    vi.mocked(createDpopProof).mockResolvedValue('signed-proof');
+  });
+
+  afterEach(() => {
+    api.restore();
+    refresh.restore();
+    vi.unstubAllGlobals();
+    authState.accessToken = null;
+    authState.refreshToken = null;
+    authState.clearAuth.mockReset();
+    vi.mocked(getDpopKeyPair).mockReturnValue(null);
+    vi.mocked(createDpopProof).mockReset();
+  });
+
+  it('signs the tab out and loads the login page', async () => {
+    api.onGet('/api/protected').reply(401, unauthorized);
+
+    await expect(customInstance('/api/protected', { method: 'GET' })).rejects.toMatchObject({ response: { status: 401 } });
+
+    expect(authState.clearAuth).toHaveBeenCalledOnce();
+    expect(location.href).toBe('/login');
+  });
+
+  it('signs the tab out but keeps the page of a request that asked to', async () => {
+    api.onPost('/api/auth/email/verify').reply(401, unauthorized);
+
+    const verify = customInstance('/api/auth/email/verify', { method: 'POST', body: '{}', keepPageOnSignOut: true });
+
+    await expect(verify).rejects.toMatchObject({ response: { status: 401 } });
+    expect(authState.clearAuth).toHaveBeenCalledOnce();
+    expect(location.href).toBe(page);
+  });
+
+  it('keeps the page while such a request is in flight and another request ends the session', async () => {
+    let answerVerify!: () => void;
+    api.onPost('/api/auth/email/verify').reply(() => new Promise(resolve => {
+      answerVerify = () => resolve([401, unauthorized]);
+    }));
+    api.onGet('/api/protected').reply(401, unauthorized);
+    const verify = customInstance('/api/auth/email/verify', { method: 'POST', body: '{}', keepPageOnSignOut: true })
+      .catch((error: unknown) => error);
+
+    await expect(customInstance('/api/protected', { method: 'GET' })).rejects.toMatchObject({ response: { status: 401 } });
+    answerVerify();
+
+    expect(await verify).toMatchObject({ response: { status: 401 } });
+    expect(authState.clearAuth).toHaveBeenCalledOnce();
+    expect(location.href).toBe(page);
   });
 });

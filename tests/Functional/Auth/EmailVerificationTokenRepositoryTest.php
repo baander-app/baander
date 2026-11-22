@@ -11,7 +11,7 @@ use App\Tests\Functional\TestCase;
 
 final class EmailVerificationTokenRepositoryTest extends TestCase
 {
-    public function testRedeemingReturnsTheUserAndAddressOnceAndStoresOnlyAHash(): void
+    public function testRedeemingReturnsTheAddressOnceAndStoresOnlyAHash(): void
     {
         $user = $this->createTestUser();
         $this->tokens()->issue($user->getId(), new Email($user->getEmail()), 'raw-token-a', new \DateTimeImmutable('+1 hour'));
@@ -22,12 +22,33 @@ final class EmailVerificationTokenRepositoryTest extends TestCase
         $this->assertSame($user->getEmail(), $stored['email']);
         $this->assertNotContains('raw-token-a', $stored);
 
-        $redeemed = $this->tokens()->redeem('raw-token-a', new \DateTimeImmutable());
-        $this->assertNotNull($redeemed);
-        $this->assertTrue($user->getId()->equals($redeemed->userId));
-        $this->assertSame($user->getEmail(), $redeemed->email->toString());
-        $this->assertNull($this->tokens()->redeem('raw-token-a', new \DateTimeImmutable()), 'A token is single use.');
-        $this->assertNull($this->tokens()->redeem('unknown-token', new \DateTimeImmutable()));
+        $this->assertSame($user->getEmail(), $this->tokens()->redeem('raw-token-a', $user->getId(), new \DateTimeImmutable())?->toString());
+        $this->assertNull($this->tokens()->redeem('raw-token-a', $user->getId(), new \DateTimeImmutable()), 'A token is single use.');
+        $this->assertNull($this->tokens()->redeem('unknown-token', $user->getId(), new \DateTimeImmutable()));
+    }
+
+    public function testOnlyTheUserATokenWasIssuedToRedeemsIt(): void
+    {
+        $owner = $this->createTestUser();
+        $other = $this->createTestUser();
+        $this->tokens()->issue($owner->getId(), new Email($owner->getEmail()), 'owner-token', new \DateTimeImmutable('+1 hour'));
+
+        $this->assertNull($this->tokens()->redeem('owner-token', $other->getId(), new \DateTimeImmutable()));
+
+        $this->assertSame(1, $this->outstanding(), 'Another user\'s attempt leaves the token in place.');
+        $this->assertTrue($this->tokens()->isLiveForAnotherUser('owner-token', $other->getId(), new \DateTimeImmutable()));
+        $this->assertFalse($this->tokens()->isLiveForAnotherUser('owner-token', $owner->getId(), new \DateTimeImmutable()));
+        $this->assertSame($owner->getEmail(), $this->tokens()->redeem('owner-token', $owner->getId(), new \DateTimeImmutable())?->toString());
+    }
+
+    public function testAnExpiredOrUnknownTokenIsLiveForNobody(): void
+    {
+        $owner = $this->createTestUser();
+        $other = $this->createTestUser();
+        $this->tokens()->issue($owner->getId(), new Email($owner->getEmail()), 'expired-token', new \DateTimeImmutable('-1 second'));
+
+        $this->assertFalse($this->tokens()->isLiveForAnotherUser('expired-token', $other->getId(), new \DateTimeImmutable()));
+        $this->assertFalse($this->tokens()->isLiveForAnotherUser('unknown-token', $other->getId(), new \DateTimeImmutable()));
     }
 
     public function testATokenExpiresAtItsExactExpiryInstantInAnySessionZone(): void
@@ -45,12 +66,12 @@ final class EmailVerificationTokenRepositoryTest extends TestCase
         $this->assertSame('2030-01-02 03:04:05.500000', $connection->fetchOne(
             "SELECT to_char(expires_at AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI:SS.US') FROM email_verification_tokens",
         ));
-        $this->assertNull($this->tokens()->redeem('raw-token-b', $expiresAt), 'The expiry instant is already too late.');
+        $this->assertNull($this->tokens()->redeem('raw-token-b', $user->getId(), $expiresAt), 'The expiry instant is already too late.');
         $this->assertSame(0, $this->outstanding(), 'An expired token is removed when presented.');
 
         $this->tokens()->issue($user->getId(), $email, 'raw-token-b', $expiresAt);
         $this->assertNotNull(
-            $this->tokens()->redeem('raw-token-b', $expiresAt->modify('-1 microsecond')),
+            $this->tokens()->redeem('raw-token-b', $user->getId(), $expiresAt->modify('-1 microsecond')),
             'A microsecond before expiry, in the same second, the token is still valid.',
         );
     }
@@ -62,8 +83,8 @@ final class EmailVerificationTokenRepositoryTest extends TestCase
         $this->tokens()->issue($user->getId(), new Email($user->getEmail()), 'second-token', new \DateTimeImmutable('+1 hour'));
 
         $this->assertSame(1, $this->outstanding());
-        $this->assertNull($this->tokens()->redeem('first-token', new \DateTimeImmutable()));
-        $this->assertSame($user->getEmail(), $this->tokens()->redeem('second-token', new \DateTimeImmutable())?->email->toString());
+        $this->assertNull($this->tokens()->redeem('first-token', $user->getId(), new \DateTimeImmutable()));
+        $this->assertSame($user->getEmail(), $this->tokens()->redeem('second-token', $user->getId(), new \DateTimeImmutable())?->toString());
     }
 
     public function testRevokingRemovesOnlyThatUsersToken(): void
@@ -76,8 +97,8 @@ final class EmailVerificationTokenRepositoryTest extends TestCase
         $this->tokens()->revokeForUser($owner->getId());
         $this->tokens()->revokeForUser(Uuid::generate());
 
-        $this->assertNull($this->tokens()->redeem('owner-token', new \DateTimeImmutable()));
-        $this->assertNotNull($this->tokens()->redeem('other-token', new \DateTimeImmutable()));
+        $this->assertNull($this->tokens()->redeem('owner-token', $owner->getId(), new \DateTimeImmutable()));
+        $this->assertNotNull($this->tokens()->redeem('other-token', $other->getId(), new \DateTimeImmutable()));
     }
 
     public function testChangingTheEmailRemovesTheTokenButRenamingKeepsIt(): void

@@ -5462,7 +5462,7 @@
                     "Auth"
                 ],
                 "summary": "Verify an email address with a token",
-                "description": "Redeems the token from a verification email once. The token verifies only the address it was sent to, while the account still has that address.",
+                "description": "Redeems the token from a verification email once, in a signed-in session of the account it was sent for. The token verifies only the address it was sent to, while the account still has that address. A token for a pending email change makes that address the account's address and signs the account out of every other session; the session that made the request stays signed in.",
                 "operationId": "post_auth_email_verify",
                 "requestBody": {
                     "content": {
@@ -5488,8 +5488,16 @@
                                                 "message": {
                                                     "type": "string",
                                                     "example": "Email verified."
+                                                },
+                                                "emailChanged": {
+                                                    "type": "boolean",
+                                                    "description": "True when the link confirmed a pending email change: the account now uses the new address, and every other session was signed out."
                                                 }
-                                            }
+                                            },
+                                            "required": [
+                                                "message",
+                                                "emailChanged"
+                                            ]
                                         }
                                     }
                                 }
@@ -5498,6 +5506,26 @@
                     },
                     "400": {
                         "description": "The token is unknown, expired, already used or for an address the account no longer has",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Not authenticated, or another change ended this session first (reason credentials_changed); the token stays usable",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "The token is valid but was sent for another account (`details.reason` `verification_link_other_account`), or the request used a delegated access token; the token stays usable",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -5526,8 +5554,7 @@
                             }
                         }
                     }
-                },
-                "security": []
+                }
             }
         },
         "/api/auth/me/email/verification": {

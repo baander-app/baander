@@ -142,6 +142,12 @@ final class MessagingWorkflowTest extends TestCase
             static fn(array $args): bool => in_array('/srv/baander', $args, true)
                 && in_array('tests/Fixtures/producer-runtime.php', $args, true),
         ));
+        // The production kernel writes its storage inside the checkout, not to .env.example's /storage.
+        self::assertTrue(array_any(
+            $this->recorded(),
+            static fn(array $args): bool => in_array('CONVERT_STORAGE_PATH=/srv/baander/storage/conversions', $args, true)
+                && in_array('MEDIA_STORAGE_PATH=/srv/baander/storage/media', $args, true),
+        ));
     }
 
     public function testMessagingCopiesSourceAndRetainsFailureAcrossCleanupFailure(): void

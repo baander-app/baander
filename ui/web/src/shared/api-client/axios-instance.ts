@@ -239,6 +239,13 @@ export function wait(ms: number): Promise<void> {
 let refreshInFlight: { session: number; promise: Promise<void> } | null = null;
 
 /**
+ * Requests in flight that asked to keep their page when a rejected refresh ends the session
+ * (`keepPageOnSignOut`). While any is in flight, the tab is signed out without loading the
+ * login page, so that page can still show what happened and keep what it holds in memory.
+ */
+let pageKeepingRequests = 0;
+
+/**
  * One refresh has one wall-clock budget (see `@/shared/auth/refresh-budget`), shared by the wait for
  * the origin's auth lock and the attempts. Under the lock the tab first adopts a rotation another tab
  * already made; otherwise it presents its refresh token. A transport failure, a nonce challenge and a
@@ -327,7 +334,7 @@ async function refreshWithServer(session: number, deadline: number): Promise<voi
   } catch (error) {
     if (isCurrentSession() && isRefreshRejected(error)) {
       getAuthStore().clearAuth();
-      window.location.href = '/login';
+      if (pageKeepingRequests === 0) window.location.href = '/login';
     }
     throw error;
   }
@@ -399,18 +406,27 @@ AXIOS_INSTANCE.interceptors.response.use(undefined, async (error) => {
   return AXIOS_INSTANCE(originalRequest);
 });
 
+/** What a generated endpoint function accepts as its request options. */
+export interface ApiRequestOptions extends RequestInit {
+  /**
+   * When a rejected refresh ends the session while this request is in flight, sign the tab out
+   * without loading the login page. The request then fails, and the page decides what to show.
+   */
+  keepPageOnSignOut?: boolean;
+}
+
 export function customInstance<T>(
   url: string,
-  options: RequestInit,
+  options: ApiRequestOptions,
   responseType?: AxiosRequestConfig['responseType'],
 ): Promise<T>;
 export function customInstance(
   url: string,
-  options: RequestInit,
+  options: ApiRequestOptions,
   responseType?: AxiosRequestConfig['responseType'],
 ): Promise<unknown> {
-  const {body, signal, headers, ...rest} = options;
-  return AXIOS_INSTANCE<unknown>({
+  const {body, signal, headers, keepPageOnSignOut, ...rest} = options;
+  const request = AXIOS_INSTANCE<unknown>({
     url,
     method: rest.method as AxiosRequestConfig['method'],
     data: body as AxiosRequestConfig['data'],
@@ -418,6 +434,12 @@ export function customInstance(
     signal: (currentLiveReadSignal() ?? signal) as AxiosRequestConfig['signal'],
     responseType,
   }).then((response) => response.status === 204 ? undefined : response.data);
+  if (!keepPageOnSignOut) return request;
+
+  pageKeepingRequests++;
+  return request.finally(() => {
+    pageKeepingRequests--;
+  });
 }
 
 export function blobInstance<T>(url: string, options: RequestInit): Promise<T> {

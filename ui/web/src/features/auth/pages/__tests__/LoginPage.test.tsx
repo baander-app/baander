@@ -4,14 +4,18 @@ import { AxiosError, AxiosHeaders } from 'axios'
 import { createMemoryRouter, Navigate, RouterProvider } from 'react-router-dom'
 import { ThemeProvider } from 'styled-components'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { customInstance } from '@/shared/api-client/axios-instance'
 import { resolveTheme } from '@/shared/theme/resolve-theme'
 import { useAuthStore } from '../../stores/auth-store'
 import { LoginPage } from '../LoginPage'
+import { VerifyEmailPage } from '../VerifyEmailPage'
 
 vi.mock('../../stores/auth-store', async () => {
   const { create } = await import('zustand')
   return { useAuthStore: create(() => ({ isAuthenticated: false, isLoading: false, login: vi.fn() })) }
 })
+
+vi.mock('@/shared/api-client/axios-instance', () => ({ customInstance: vi.fn() }))
 
 const login = vi.fn<ReturnType<typeof useAuthStore.getState>['login']>()
 const routers: ReturnType<typeof createMemoryRouter>[] = []
@@ -150,5 +154,40 @@ describe('login navigation ownership', () => {
     fireEvent.change(document.getElementById('username')!, { target: { value: 'bot' } })
     await submit()
     expect(login).not.toHaveBeenCalled()
+  })
+})
+
+describe('returning to a verification link', () => {
+  const token = '7d1e4b9a2c6f0e3d8b5a1c9e4f7a2d6b7d1e4b9a2c6f0e3d8b5a1c9e4f7a2d6b'
+
+  afterEach(() => {
+    vi.mocked(customInstance).mockReset()
+  })
+
+  it('redeems the link once a signed-out visitor has signed in', async () => {
+    useAuthStore.setState({ user: null })
+    vi.mocked(customInstance).mockImplementation(async (url: string) => url === '/api/auth/email/verify'
+      ? { data: { message: 'Email verified.', emailChanged: false } }
+      : { data: {} })
+    login.mockImplementationOnce(async () => {
+      useAuthStore.setState({ isAuthenticated: true })
+    })
+    const router = createMemoryRouter([
+      { path: '/login', element: <LoginPage /> },
+      { path: '/verify-email', element: <VerifyEmailPage /> },
+    ], { initialEntries: [`/verify-email#token=${token}`] })
+    routers.push(router)
+    render(<ThemeProvider theme={resolveTheme('dark', 'violet')}><RouterProvider router={router} /></ThemeProvider>)
+
+    expect(customInstance).not.toHaveBeenCalled()
+    await userEvent.click(await screen.findByRole('link', { name: 'Log in' }))
+    await submit()
+
+    expect(await screen.findByText('Your email address is verified.')).toBeInTheDocument()
+    expect(vi.mocked(customInstance).mock.calls.filter(([url]) => url === '/api/auth/email/verify')).toEqual([
+      ['/api/auth/email/verify', expect.objectContaining({ body: JSON.stringify({ token }) })],
+    ])
+    expect(router.state.location.pathname).toBe('/verify-email')
+    expect(router.state.location.hash).toBe('')
   })
 })

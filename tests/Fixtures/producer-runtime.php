@@ -81,7 +81,7 @@ try {
         'UPDATE email_verification_tokens SET token_hash = ? WHERE user_id = (SELECT id FROM users WHERE email = ?)',
         [hash('sha256', $token), $registerEmail],
     );
-    $verify = new VerifyEmailCommand($token);
+    $verify = new VerifyEmailCommand($token, (string) $observer->fetchOne('SELECT id FROM users WHERE email = ?', [$registerEmail]));
     $rejectEvent('user.email_verified');
     $expectConstraintFailure($verify, 'producer_reject_event');
     $assertCount('SELECT COUNT(*) FROM users WHERE email = ? AND email_verified_at IS NULL', 1, [$registerEmail]);

@@ -14,6 +14,7 @@ errors:
   device_already_processed: "Enhedskode er allerede behandlet."
   registration_closed: "Tilmelding er lukket. Bed administratoren om en konto."
   email_verification_failed: "Bekræftelseslinket er ugyldigt eller udløbet."
+  verification_link_other_account: "Dette bekræftelseslink blev sendt til en anden konto. Log ud, og log derefter ind på den konto for at bruge det."
   internal: "Intern serverfejl."
   password_reset_failed: "Linket til nulstilling af adgangskode er ugyldigt eller udløbet."
   step_up_failed: "Adgangskoden eller koden er forkert."
@@ -76,11 +77,11 @@ email_verification_email:
   subject: "Bekræft din e-mailadresse til {app}"
   heading: "Bekræft din e-mailadresse"
   greeting: "Hej {name}"
-  intro: "Bekræft, at denne adresse hører til din konto på {app}. Åbn linket nedenfor for at bekræfte den."
+  intro: "Bekræft, at denne adresse hører til din konto på {app}. Åbn linket nedenfor, mens du er logget ind på kontoen; er du ikke logget ind, beder siden dig først om at logge ind."
   action: "Bekræft e-mailadresse"
   fallback: "Hvis knappen ikke virker, kan du kopiere dette link ind i din browser:"
   expiry: "Linket kan bruges én gang og udløber om {hours, plural, one {# time} other {# timer}}."
-  ignore: "Hvis du ikke har oprettet en konto eller ændret din e-mailadresse, kan du se bort fra denne e-mail."
+  ignore: "Hvis du ikke har oprettet en konto eller ændret din e-mailadresse, kan du se bort fra denne e-mail. Linket virker kun for den, der er logget ind på kontoen."
 
 email_verification:
   resend_sent: "Hvis din e-mailadresse stadig mangler at blive bekræftet, er der sendt et nyt link."

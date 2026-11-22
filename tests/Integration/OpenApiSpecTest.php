@@ -715,7 +715,6 @@ final class OpenApiSpecTest extends KernelTestCase
             '/api/auth/login' => 'POST',
             '/api/auth/login/passkey' => 'POST',
             '/api/auth/password/reset-request' => 'POST',
-            '/api/auth/email/verify' => 'POST',
         ];
 
         foreach ($publicPaths as $path => $method) {
@@ -729,6 +728,23 @@ final class OpenApiSpecTest extends KernelTestCase
                 $path,
             ));
         }
+    }
+
+    /** A verification link is redeemed by a signed-in session of the account it was sent for. */
+    public function test_email_verification_needs_the_accounts_session(): void
+    {
+        $operation = $this->getSpec()['paths']['/api/auth/email/verify']['post'];
+
+        $this->assertArrayNotHasKey('security', $operation, 'The operation keeps the document-wide bearer requirement.');
+        $this->assertArrayHasKey('401', $operation['responses']);
+        $this->assertArrayHasKey('403', $operation['responses']);
+        $this->assertSame(
+            ['type' => 'boolean'],
+            array_intersect_key(
+                $operation['responses']['200']['content']['application/json']['schema']['properties']['data']['properties']['emailChanged'] ?? [],
+                ['type' => true],
+            ),
+        );
     }
 
     public function test_spec_has_security_schemes(): void

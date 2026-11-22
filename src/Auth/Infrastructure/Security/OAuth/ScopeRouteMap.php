@@ -30,7 +30,7 @@ final class ScopeRouteMap
     public const array PUBLIC_ROUTES = [
         'oauth_authorization_server_metadata', 'jwks', 'oauth_par', 'oauth_token', 'oauth_device_authorize',
         'passkey_authenticate_options', 'passkey_authenticate', 'auth_passkey_login_passkey', 'auth_register',
-        'auth_refresh', 'auth_password_reset_request', 'auth_password_reset', 'auth_email_verify',
+        'auth_refresh', 'auth_password_reset_request', 'auth_password_reset',
         'auth_login_login', 'auth_registration', 'health_check', 'health_ready',
         'health_live', 'prometheus_metrics', 'stream_artifact_master', 'stream_artifact_media',
         'stream_artifact_init', 'stream_artifact_segment', 'stream_master_manifest', 'stream_media_manifest',
@@ -92,7 +92,7 @@ final class ScopeRouteMap
         // Account security, sign-in sessions and live connections.
         'live_recovery', 'passkey_list', 'passkey_options', 'passkey_register', 'passkey_delete',
         'totp_setup', 'totp_enable', 'totp_disable', 'auth_logout', 'auth_me_update',
-        'auth_me_email_verification', 'auth_me_email', 'auth_me_password', 'auth_websocket_ticket',
+        'auth_me_email_verification', 'auth_me_email', 'auth_me_password', 'auth_websocket_ticket', 'auth_email_verify',
         // Consent, device approval and client management.
         'oauth_clients_index', 'oauth_clients_create', 'oauth_clients_revoke', 'oauth_authorize',
         'oauth_authorize_decision', 'oauth_revoke', 'oauth_device_verify', 'oauth_device_approve',

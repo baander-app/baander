@@ -5922,7 +5922,9 @@ export type PutAuthMeUpdate200 = {
 };
 
 export type PostAuthEmailVerify200Data = {
-  message?: string;
+  message: string;
+  /** True when the link confirmed a pending email change: the account now uses the new address, and every other session was signed out. */
+  emailChanged: boolean;
 };
 
 export type PostAuthEmailVerify200 = {
@@ -16899,7 +16901,7 @@ export const getPostAuthEmailVerifyUrl = () => {
 }
 
 /**
- * Redeems the token from a verification email once. The token verifies only the address it was sent to, while the account still has that address.
+ * Redeems the token from a verification email once, in a signed-in session of the account it was sent for. The token verifies only the address it was sent to, while the account still has that address. A token for a pending email change makes that address the account's address and signs the account out of every other session; the session that made the request stays signed in.
  * @summary Verify an email address with a token
  */
 export const postAuthEmailVerify = async (verifyEmailRequest: VerifyEmailRequest, options?: Parameters<typeof customInstance>[1]): Promise<PostAuthEmailVerify200> => {
