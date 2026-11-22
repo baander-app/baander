@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Shared\Interface;
 
+use App\Auth\Application\Port\SelfRegistrationInterface;
 use App\Shared\Application\Port\ServerDrainStateInterface;
 use App\Shared\Infrastructure\Health\HealthCheckService;
 use App\Shared\Infrastructure\Health\HealthAlertTable;
@@ -176,6 +177,8 @@ final class HealthCheckWorkerOutageTest extends TestCase
             oauthPublicKeyPath: '/missing-baander-oauth/public.key',
             vapidPublicKey: '',
             vapidPrivateKey: '',
+            mailerDsn: 'smtp://mail.baander.app:587',
+            selfRegistration: $this->createStub(SelfRegistrationInterface::class),
             messengerWorkerHealth: $messenger,
             workerProfileHealth: new WorkerProfileHealth($connection, new DeploymentProfile()),
         );
