@@ -71,7 +71,6 @@ final class PasswordResetClaimTest extends RateLimitTestCase
     public function testALinkOpenedSignedOutVerifiesNothingAndTheOwnersResetClaimsTheAccount(): void
     {
         FirstPartyOAuthClient::entity(static::getContainer(), $this->entityManager);
-        static::getContainer()->get(SystemSettingStoreInterface::class)->save([UserManagementSettingDefinitions::REGISTRATION_OPEN => true]);
         $address = 'registered-' . bin2hex(random_bytes(4)) . '@baander.app';
         $this->assertJsonResponse($this->requestFrom(self::IP, 'POST', '/api/auth/register', content: ['name' => 'Registrant', 'email' => $address, 'password' => 'registrant-password-1']), 202);
         $this->assertSame(1, preg_match('~/verify-email#token=([0-9a-f]{64})~', (string) $this->lastEmail()->getTextBody(), $link));
