@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "8cd2ac0a5761a22f062bf1bc95c384e8",
+    "content-hash": "5da37959f19447595aa2f205f1b2b9ee",
     "packages": [
         {
             "name": "baander/core",
