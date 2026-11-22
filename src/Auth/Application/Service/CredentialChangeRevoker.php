@@ -14,27 +14,16 @@ use App\Auth\Domain\Repository\OAuth\RefreshTokenRepositoryInterface;
 use App\Auth\Domain\Repository\UserRepositoryInterface;
 
 /**
- * Applies a credential change and ends the sessions it outlives, inside the caller's
- * transaction, and refuses a change whose own session another change already ended.
+ * Applies a credential change and ends the sessions it outlives, inside the caller's transaction.
  *
- * Every credential change runs through revokeSessions(), as PasswordChanger and the operator's
- * TOTP reset do. It locks the user's row first, so the changes of one account take turns with
- * each other and with every token issuance and refresh, which lock the same row. Under the lock
- * it reads the session the change keeps as stored now: when another change ended that session
- * while this one waited, or its chain was revoked, the change is refused before it writes
- * anything and the caller's transaction rolls back. Two changes from the same session pass,
- * because the first moved that session to its new credential epoch.
+ * Holds the user row's FOR NO KEY UPDATE lock (lockCredentialEpoch()), the lock token issuance and
+ * refresh also take. Under it, a change whose kept session was revoked or left behind on an older
+ * credential epoch is refused before anything is written. Otherwise the change runs, the epoch
+ * advances, every other access and refresh token of the user is revoked, and the kept session
+ * moves to the new epoch.
  *
- * Then the caller's change runs and saves the aggregate the caller loaded. The credential epoch
- * advances, every access and refresh token of the user except the kept session's is revoked,
- * delegated tokens included, and the kept session moves to the new epoch, so it stays signed
- * in. The change is saved before the revocation because the revocation clears the entity
- * manager: an aggregate saved after it would be compared with the row as it is now and write
- * back every field it loaded before the lock, undoing what a change committed meanwhile wrote.
- *
- * After the caller's transaction commits, closeConnections() closes the WebSocket connections
- * of the revoked sessions. Closing earlier would let a reconnect pass on a token the commit has
- * not yet revoked; a close that fails is logged and left to the socket reconciliation.
+ * The change saves before the revocation, because the revocation clears the entity manager.
+ * closeConnections() runs after commit, so a reconnect cannot pass on a token not yet revoked.
  */
 final readonly class CredentialChangeRevoker
 {
