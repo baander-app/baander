@@ -2,7 +2,7 @@
 title: Classify video playback and admin log routes
 date: 2026-11-22
 type: fix
-status: active
+status: completed
 ---
 
 # Classify video playback and admin log routes
@@ -42,3 +42,5 @@ Record the current inventory and firewall results in [ROADMAP.md](../../ROADMAP.
 ## Definition of Done
 
 The inventory and access tests pass, and the roadmap records the check counts and the permissions each route uses.
+
+The [roadmap checkpoint](../../ROADMAP.md#oauth-route-scope-inventory) records the unit and deployed-stack results from the CI image.

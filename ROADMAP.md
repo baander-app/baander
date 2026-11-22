@@ -73,7 +73,25 @@ Verification on 2026-11-21: the CI image passed 190 tests with 1,869 assertions
 across the focused unit, functional and integration suites. PHPStan and container
 lint passed, and Deptrac reported zero violations. The broader Auth unit run
 identified four `ScopeRouteInventoryTest` failures for existing movie, video and
-admin log routes. The same failures reproduce on `master`.
+admin log routes. The same failures reproduced on `master` at that checkpoint.
+
+## OAuth route scope inventory
+
+The route map now classifies both video playback reads under `library` scope.
+Video information and timeline previews use the caller's library grants, including
+when an administrator uses a delegated token. The four admin log routes are
+first-party only and still require `ROLE_SUPER_ADMIN`.
+[Route inventory plan](docs/plans/2026-11-22-fix-oauth-scope-inventory-plan.md).
+
+The CI image passed 1,437 unit tests with 5,133 assertions across the selected Auth
+and video-information suites. The route inventory passed all five tests. The
+admin log functional suite passed all 12 tests with 18 assertions. The production
+OAuth firewall suite passed 12 tests with 118 assertions. Its preview check
+verifies the response when a granted video has no generated preview. PHP syntax
+and `git diff --check` passed.
+[Route inventory test](tests/Unit/Auth/Infrastructure/Security/OAuth/ScopeRouteInventoryTest.php),
+[OAuth firewall tests](tests/Integration/OAuthScopeEnforcementTest.php),
+[admin log tests](tests/Functional/Controller/AdminLogControllerTest.php).
 
 ## Cinema video player
 
