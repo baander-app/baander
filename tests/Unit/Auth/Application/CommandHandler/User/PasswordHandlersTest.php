@@ -309,6 +309,7 @@ final class PasswordHandlersTest extends TestCase
             return null;
         });
         $users->method('findByUuid')->willReturnCallback(fn (Uuid $id): ?User => $this->users[$id->toString()] ?? null);
+        $users->method('lockAndFind')->willReturnCallback(fn (Uuid $id): ?User => $this->users[$id->toString()] ?? null);
         $users->method('findByEmail')->willReturnCallback(
             fn (Email $email): ?User => $email->toString() === $this->user->getEmail() ? $this->user : null,
         );

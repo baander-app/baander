@@ -268,6 +268,19 @@ final class UserRepository implements UserRepositoryInterface
         return $epoch === false ? null : (int) $epoch;
     }
 
+    public function lockAndFind(Uuid $id): ?User
+    {
+        $entity = $this->lockCredentialEpoch($id) === null ? null : $this->entityManager->find(UserEntity::class, $id);
+        if ($entity === null) {
+            return null;
+        }
+
+        // find() answers from the identity map when this unit of work loaded the user before the lock.
+        $this->entityManager->refresh($entity);
+
+        return UserEntityMapping::toDomain($entity);
+    }
+
     public function advanceCredentialEpoch(Uuid $id): int
     {
         $epoch = $this->entityManager->getConnection()->fetchOne(

@@ -6,7 +6,9 @@ namespace App\Tests\Integration;
 
 use App\Auth\Application\Command\Totp\DisableTotpCommand;
 use App\Auth\Application\Command\User\ChangePasswordCommand;
+use App\Auth\Application\Command\User\DisableUserCommand;
 use App\Auth\Application\Command\User\SetUserPasswordCommand;
+use App\Auth\Application\Command\User\SetUserRolesCommand;
 use App\Auth\Application\Port\EmailVerificationTokenRepositoryInterface;
 use App\Auth\Application\Port\PasswordResetTokenRepositoryInterface;
 use App\Auth\Application\Port\TotpSecretCipherInterface;
@@ -435,6 +437,55 @@ final class PasswordChangeSessionRevocationTest extends TestCase
         $this->signIn($this->user, 'changed-by-reset-2');
     }
 
+    /** @return iterable<string, array{string}> */
+    public static function operatorChangesDuringAReset(): iterable
+    {
+        yield 'disabling the account' => ['disable'];
+        yield 'demoting the admin' => ['demote'];
+    }
+
+    /**
+     * An operator disables or demotes the account and commits while a reset redemption has
+     * redeemed its token and waits on the account's row. The operator's change stands: a reset
+     * of an account disabled meanwhile is refused as any disabled account's is, and a demoted
+     * admin's reset sets the password and leaves the roles as the operator set them.
+     */
+    #[DataProvider('operatorChangesDuringAReset')]
+    public function testAResetRacingAnOperatorChangeKeepsTheOperatorsChange(string $operatorChange): void
+    {
+        $this->assertReadCommitted();
+        $this->bus()->dispatch(new SetUserRolesCommand($this->user->getEmail(), ['ROLE_USER', 'ROLE_ADMIN']));
+        $this->issueResetToken('racing-reset-token');
+
+        $this->connection->beginTransaction();
+        try {
+            $this->bus()->dispatch(match ($operatorChange) {
+                'disable' => new DisableUserCommand($this->user->getEmail()),
+                'demote' => new SetUserRolesCommand($this->user->getEmail(), ['ROLE_USER']),
+            });
+            $reset = $this->startSignedOutRequest('POST', '/api/auth/password/reset', ['token' => 'racing-reset-token', 'password' => 'changed-by-racing-reset']);
+            $this->awaitWaitOnThisSession($reset);
+            $this->connection->commit();
+        } catch (\Throwable $failure) {
+            $this->connection->rollBack();
+            throw $failure;
+        }
+
+        $answer = $this->finish($reset);
+
+        $stored = $this->connection->fetchAssociative('SELECT disabled, roles, password FROM users WHERE id = ?', [$this->user->getId()->toString()]);
+        self::assertIsArray($stored);
+        if ($operatorChange === 'disable') {
+            self::assertTrue($stored['disabled'], 'The account stays disabled.');
+            self::assertSame(400, $answer['status'], json_encode($answer, JSON_THROW_ON_ERROR));
+            self::assertTrue(password_verify(self::PASSWORD, (string) $stored['password']), 'The refused reset left the password.');
+        } else {
+            self::assertSame(['ROLE_USER'], json_decode((string) $stored['roles'], true, flags: JSON_THROW_ON_ERROR), 'The account stays demoted.');
+            self::assertSame(200, $answer['status'], json_encode($answer, JSON_THROW_ON_ERROR));
+            self::assertTrue(password_verify('changed-by-racing-reset', (string) $stored['password']));
+        }
+    }
+
     /**
      * Confirming a pending email change ends the user's other sessions as a password change
      * does: the session that opened the link stays signed in, every other session and the
@@ -641,12 +692,18 @@ final class PasswordChangeSessionRevocationTest extends TestCase
         self::assertSame('read committed', $this->connection->fetchOne('SHOW default_transaction_isolation'));
     }
 
-    /** An operator password reset through the command bus, inside the transaction this test holds open. */
-    private function setPassword(string $password): void
+    private function bus(): MessageBusInterface
     {
         $bus = $this->kernel->getContainer()->get('oauth.acceptance.bus');
         self::assertInstanceOf(MessageBusInterface::class, $bus);
-        $bus->dispatch(new SetUserPasswordCommand($this->user->getEmail(), $password));
+
+        return $bus;
+    }
+
+    /** An operator password reset through the command bus, inside the transaction this test holds open. */
+    private function setPassword(string $password): void
+    {
+        $this->bus()->dispatch(new SetUserPasswordCommand($this->user->getEmail(), $password));
     }
 
     /**
@@ -655,9 +712,7 @@ final class PasswordChangeSessionRevocationTest extends TestCase
      */
     private function changePasswordInThisTransaction(string $accessToken, string $password): void
     {
-        $bus = $this->kernel->getContainer()->get('oauth.acceptance.bus');
-        self::assertInstanceOf(MessageBusInterface::class, $bus);
-        $bus->dispatch(new ChangePasswordCommand(
+        $this->bus()->dispatch(new ChangePasswordCommand(
             userId: $this->user->getId()->toString(),
             currentPassword: self::PASSWORD,
             newPassword: $password,
@@ -668,9 +723,7 @@ final class PasswordChangeSessionRevocationTest extends TestCase
     /** The user's own TOTP disable from the session of this access token, inside the transaction this test holds open. */
     private function turnTotpOffInThisTransaction(string $accessToken): void
     {
-        $bus = $this->kernel->getContainer()->get('oauth.acceptance.bus');
-        self::assertInstanceOf(MessageBusInterface::class, $bus);
-        $bus->dispatch(new DisableTotpCommand(
+        $this->bus()->dispatch(new DisableTotpCommand(
             $this->user->getId()->toString(),
             self::PASSWORD,
             self::currentTotpCode(),
@@ -755,6 +808,16 @@ final class PasswordChangeSessionRevocationTest extends TestCase
             $path,
             json_encode($json, JSON_THROW_ON_ERROR),
         ]);
+    }
+
+    /**
+     * @param array<string, mixed> $json
+     *
+     * @return array{process: resource, output: resource, application: string}
+     */
+    private function startSignedOutRequest(string $method, string $path, array $json): array
+    {
+        return $this->startChild('session-request-race.php', [$this->ip, '', '', $method, $path, json_encode($json, JSON_THROW_ON_ERROR)]);
     }
 
     /** @return array{process: resource, output: resource, application: string} */

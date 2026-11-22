@@ -171,8 +171,10 @@ passes `verified: false`.
   included, and close their sockets when the change commits. Two-process races
   (`tests/Fixtures/Auth/session-request-race.php`) show that a change from a session
   another change ended is refused and stores nothing, while two changes from one
-  session both succeed. `tests/Unit/Auth/Application/Service/CredentialChangeRevokerTest.php`
-  covers the fence alone.
+  session both succeed. A password reset racing an operator's disable or demotion leaves the
+  operator's change in place: the disabled account's reset is refused, and the demoted admin
+  stays demoted.
+  `tests/Unit/Auth/Application/Service/CredentialChangeRevokerTest.php` covers the fence alone.
 - `tests/Functional/Auth/PasswordResetClaimTest.php` opens a verification link signed
   out and checks that it verifies nothing and that the owner's later reset claims the
   account; `tests/Functional/Auth/EmailVerificationDeliveryTest.php` covers redemption

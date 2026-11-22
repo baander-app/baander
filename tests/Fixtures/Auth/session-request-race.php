@@ -3,15 +3,16 @@
 declare(strict_types=1);
 
 /*
- * Child process of PasswordChangeSessionRevocationTest: sends one request a signed-in session
- * makes, such as a password change or the completion of a passkey registration, to the test's
- * production kernel over its own PostgreSQL session, so it can wait on the account's row lock
- * while the test process holds a competing change open.
+ * Child process of PasswordChangeSessionRevocationTest: sends one request, such as a password
+ * change, the completion of a passkey registration or a signed-out password reset, to the
+ * test's production kernel over its own PostgreSQL session, so it can wait on the account's
+ * row lock while the test process holds a competing change open.
  *
  * Arguments: the shared directory (JWT keys and logs of the kernel), the application name to
  * report in pg_stat_activity, the client IP, the path of the DPoP private key (PEM) the
  * session's tokens were issued to, the session's access token, the method, the path and the
- * JSON body. Prints the status and the decoded body of the answer as JSON.
+ * JSON body. An empty key path and access token send the request without a session. Prints
+ * the status and the decoded body of the answer as JSON.
  */
 
 use App\Tests\Fixtures\Auth\PasswordChangeOAuthKernel;
@@ -50,14 +51,16 @@ $connection->executeQuery("SELECT set_config('application_name', :name, false)",
 $connection->executeStatement("SET lock_timeout = '10s'");
 
 $origin = 'https://baander.app';
-$key = new SignedDpopProof((string) file_get_contents($keyPath));
 $request = Request::create($origin . $path, $method, server: [
     'REMOTE_ADDR' => $ip,
     'HTTP_ACCEPT' => 'application/json',
     'CONTENT_TYPE' => 'application/json',
 ], content: $json);
-$request->headers->set('Authorization', 'DPoP ' . $accessToken);
-$request->headers->set('DPoP', $key->create($method, $origin . $path, $accessToken));
+if ($accessToken !== '') {
+    $key = new SignedDpopProof((string) file_get_contents($keyPath));
+    $request->headers->set('Authorization', 'DPoP ' . $accessToken);
+    $request->headers->set('DPoP', $key->create($method, $origin . $path, $accessToken));
+}
 $response = $kernel->handle($request);
 $kernel->terminate($request, $response);
 

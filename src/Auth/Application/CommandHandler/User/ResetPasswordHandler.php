@@ -27,6 +27,11 @@ use Symfony\Component\Messenger\Attribute\AsMessageHandler;
  * account may have been registered by someone else under it: the reset then verifies the
  * address and removes the account's passkeys and TOTP as well.
  *
+ * The user is loaded under its row's FOR NO KEY UPDATE lock (lockAndFind()), which an
+ * operator's disable or role change also waits on, and PasswordChanger saves these changes
+ * with the new password. An account disabled before the lock was granted is refused as any
+ * disabled account is, and no save writes back state read before the lock.
+ *
  * The new password is checked against the policy and hashed before the transaction opens,
  * so a password the policy refuses leaves the token redeemable; redemption and the change
  * then run in one transaction, so nothing is half-claimed. The ended sessions' WebSocket
@@ -58,16 +63,15 @@ final readonly class ResetPasswordHandler
             // An unusable token is still deleted: the transaction commits and the caller is told
             // only that it is invalid.
             $userId = $this->passwordResetTokenRepository->redeem($command->token, new \DateTimeImmutable());
-            $user = $userId === null ? null : $this->userRepository->findByUuid($userId);
+            $user = $userId === null ? null : $this->userRepository->lockAndFind($userId);
 
             if ($user === null || $user->isDisabled()) {
                 return null;
             }
 
-            $sessions = $this->passwordChanger->change($user, $password);
-            $user->isEmailVerified() ? $this->dropPendingEmail($user) : $this->claim($user);
+            $user->isEmailVerified() ? $user->discardPendingEmail() : $this->claim($user);
 
-            return $sessions;
+            return $this->passwordChanger->change($user, $password);
         });
 
         if ($sessions === null) {
@@ -76,16 +80,10 @@ final readonly class ResetPasswordHandler
         $this->credentialChangeRevoker->closeConnections($sessions);
     }
 
-    private function dropPendingEmail(User $user): void
-    {
-        $user->discardPendingEmail();
-        $this->userRepository->save($user);
-    }
-
+    /** Verifies the address and removes the authenticators; PasswordChanger saves the user. */
     private function claim(User $user): void
     {
         $user->claimByPasswordReset();
-        $this->userRepository->save($user);
         $this->userRepository->clearTotpStep($user->getId());
         foreach ($this->passkeyRepository->forUser($user->getId()) as $passkey) {
             $this->passkeyRepository->remove($passkey);

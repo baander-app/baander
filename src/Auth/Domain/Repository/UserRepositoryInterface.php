@@ -79,6 +79,14 @@ interface UserRepositoryInterface
     public function lockCredentialEpoch(Uuid $id): ?int;
 
     /**
+     * Locks the user's row as lockCredentialEpoch() does and loads the user as of the lock, also
+     * when this unit of work loaded it earlier. A change saved from this copy keeps a disable or
+     * role change that committed while the lock waited, and later ones wait for the transaction.
+     * Null when the user does not exist. Requires an open transaction; the lock holds until it ends.
+     */
+    public function lockAndFind(Uuid $id): ?User;
+
+    /**
      * Increments the user's credential epoch in one statement and returns the new value. The
      * row stays locked until the transaction ends, so issuance waiting on it sees the change.
      */
