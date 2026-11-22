@@ -431,6 +431,7 @@ final class RefreshTokenRepository implements RefreshTokenRepositoryInterface
             tokenId: TokenId::fromString($entity->getTokenId()),
             user: $user,
             client: $client,
+            grant: $entity->getGrantType(),
             name: $entity->getName(),
             scopes: $scopes,
             chainId: $chainId,

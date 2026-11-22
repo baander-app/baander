@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Tests\Unit\Auth\Infrastructure\Repository;
 
 use App\Auth\Domain\Model\OAuth\RefreshToken;
+use App\Auth\Domain\Model\OAuth\SignInGrant;
 use App\Auth\Domain\Model\OAuth\TokenId;
 use App\Auth\Domain\Model\OAuth\ValueObject\ChainId;
 use App\Auth\Infrastructure\Doctrine\Entity\OAuth\AccessTokenEntity;
@@ -496,6 +497,7 @@ final class RefreshTokenRepositoryTest extends TestCase
         return new AccessTokenEntity(
             Uuid::v4()->toString(),
             $client,
+            SignInGrant::AuthorizationCode,
             $user,
             null,
             ['read'],

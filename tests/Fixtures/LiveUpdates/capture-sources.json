@@ -1216,7 +1216,7 @@
       "classification": "capture",
       "operations": ["INSERT", "UPDATE", "DELETE"],
       "relevant_columns": ["id", "chain_id", "user_id", "client_id", "name", "scopes", "revoked", "expires_at", "last_refreshed_at", "created_at"],
-      "excluded_columns": ["updated_at", "token_id", "dpop_jkt", "credential_epoch"],
+      "excluded_columns": ["updated_at", "token_id", "dpop_jkt", "credential_epoch", "grant_type"],
       "families": ["account", "devices", "admin-security"],
       "scope_routes": ["user", "admin"],
       "readers": ["src/Auth/Infrastructure/Repository/OAuth/AccessTokenRepository.php"],

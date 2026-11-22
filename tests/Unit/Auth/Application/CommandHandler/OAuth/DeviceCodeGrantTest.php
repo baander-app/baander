@@ -16,6 +16,7 @@ use App\Auth\Domain\Model\OAuth\Client;
 use App\Auth\Domain\Model\OAuth\DeviceCode;
 use App\Auth\Domain\Model\OAuth\ValueObject\ClientSecret;
 use App\Auth\Domain\Model\OAuth\DeviceCodeState;
+use App\Auth\Domain\Model\OAuth\SignInGrant;
 use App\Auth\Domain\Model\OAuth\TokenId;
 use App\Auth\Domain\Model\User;
 use App\Auth\Domain\Repository\OAuth\DeviceCodeRepositoryInterface;
@@ -115,6 +116,7 @@ final class DeviceCodeGrantTest extends TestCase
         self::assertSame(self::JKT, $this->issuedAccessTokens[0]->getDpopJkt());
         self::assertSame([self::JKT], $this->jwtBindings);
         self::assertSame($this->user, $this->issuedAccessTokens[0]->getUser());
+        self::assertSame(SignInGrant::DeviceCode, $this->issuedAccessTokens[0]->getGrant());
         self::assertSame('fp-tv', $this->issuedMetadata[0]->getClientFingerprint());
         self::assertNotNull($tokens->getRefreshToken());
 

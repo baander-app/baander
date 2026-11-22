@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Fixtures\WebRuntime;
 
+use App\Auth\Domain\Model\OAuth\SignInGrant;
 use App\Auth\Infrastructure\Doctrine\Entity\OAuth\AccessTokenEntity;
 use App\Auth\Infrastructure\Doctrine\Entity\OAuth\ClientEntity;
 use App\Auth\Infrastructure\Doctrine\Entity\UserEntity;
@@ -17,6 +18,10 @@ use RuntimeException;
 /**
  * Calls the track stream endpoint as a user, with a DPoP-bound access token signed by
  * the server's OAuth key and a fresh proof for every request.
+ *
+ * The token belongs to a delegated client of its own unless the caller supplies one, and
+ * records the grant the caller names: a password or passkey sign-in on the first-party
+ * client, the authorization code or device code grant on any other.
  */
 final readonly class StreamClient
 {
@@ -28,6 +33,7 @@ final readonly class StreamClient
         string $email,
         string $privateKey,
         private string $endpoint,
+        SignInGrant $grant,
         string $audience = 'https://baander.app',
         ?ClientEntity $client = null,
     ) {
@@ -40,6 +46,7 @@ final readonly class StreamClient
         $token = new AccessTokenEntity(
             (new Uuid())->toString(),
             $client,
+            $grant,
             $user,
             scopes: ['library'],
             expiresAt: new \DateTimeImmutable('+1 hour'),

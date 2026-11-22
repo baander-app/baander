@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 // Production HTTP/upgrade checks; the runner owns disposable services and credentials.
+use App\Auth\Domain\Model\OAuth\SignInGrant;
 use App\Shared\Domain\Model\PublicId;
 use App\Tests\Fixtures\Auth\FirstPartyOAuthClient;
 use App\Tests\Fixtures\Auth\SignedDpopProof;
@@ -114,7 +115,7 @@ $user = new App\Auth\Infrastructure\Doctrine\Entity\UserEntity(new PublicId(), '
 $manager->persist($user);
 $manager->flush();
 $client = new StreamClient($manager, $email, (string) file_get_contents('config/secrets/oauth/private.key'), WS_SERVER . '/api/stream/track',
-    client: FirstPartyOAuthClient::entity($kernel->getContainer(), $manager));
+    SignInGrant::Password, client: FirstPartyOAuthClient::entity($kernel->getContainer(), $manager));
 wsRemember($client->accessToken());
 $ticket = static function () use ($client): string {
     $value = $client->webSocketTicket(WS_TICKETS, WS_ORIGIN);

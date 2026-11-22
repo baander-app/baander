@@ -444,6 +444,7 @@ final class ReferentialIntegrityTest extends TestCase
             'token_id' => bin2hex(random_bytes(16)),
             'client_id' => $client->toString(),
             'user_id' => $user->toString(),
+            'grant_type' => 'authorization_code',
             'credential_epoch' => '0',
             ...$times,
         ]);

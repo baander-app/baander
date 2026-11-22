@@ -20,6 +20,7 @@ use App\Auth\Domain\Model\OAuth\AuthCode;
 use App\Auth\Domain\Model\OAuth\Client;
 use App\Auth\Domain\Model\OAuth\PushedAuthorizationRequest;
 use App\Auth\Domain\Model\OAuth\PushedAuthorizationRequestState;
+use App\Auth\Domain\Model\OAuth\SignInGrant;
 use App\Auth\Domain\Model\OAuth\TokenId;
 use App\Auth\Domain\Model\OAuth\ValueObject\ChainId;
 use App\Auth\Domain\Model\OAuth\ValueObject\ClientSecret;
@@ -256,6 +257,7 @@ final class AuthorizationCodeGrantTest extends TestCase
 
         self::assertSame('DPoP', $tokens->getTokenType());
         self::assertSame(self::JKT, $this->issuedAccessTokens[0]->getDpopJkt());
+        self::assertSame(SignInGrant::AuthorizationCode, $this->issuedAccessTokens[0]->getGrant());
         self::assertSame([self::JKT], $this->jwtBindings);
         self::assertSame($this->issuedRefreshTokens[0]->getTokenId()->toString(), $tokens->getRefreshToken());
         self::assertSame('fp-tv', $this->issuedMetadata[0]->getClientFingerprint());

@@ -33,7 +33,7 @@ use Symfony\Component\HttpFoundation\Response;
  *
  * Password login, passkey login and refresh mint first-party tokens; the authorization
  * code grant from a pushed request with PKCE, and the device grant, mint tokens for other clients under the same
- * DPoP and fingerprint binding. Passkey login signs a real WebAuthn assertion with an
+ * DPoP and fingerprint binding. Each access token stores the grant that started its chain. Passkey login signs a real WebAuthn assertion with an
  * ES256 test authenticator.
  */
 final class OAuthGrantPathAcceptanceTest extends TestCase
@@ -329,6 +329,33 @@ final class OAuthGrantPathAcceptanceTest extends TestCase
         self::assertSame(200, $this->me($data['accessToken'], $key)->getStatusCode());
     }
 
+    /**
+     * Every rotation copies the sign-in grant of the chain's first pair, so a password session
+     * stays first-party: the rotated token still manages the user's own clients.
+     */
+    public function testRotationKeepsThePasswordSignInOfTheChainAndItsFirstPartyAuthority(): void
+    {
+        $key = new SignedDpopProof();
+        $login = $this->login($key);
+        $accessTokens = [$login['accessToken']];
+        $refreshToken = $login['refreshToken'];
+
+        for ($rotation = 0; $rotation < 2; ++$rotation) {
+            $response = $this->refresh($refreshToken, $key, $this->nonce());
+            self::assertSame(200, $response->getStatusCode(), (string) $response->getContent());
+            $data = json_decode((string) $response->getContent(), true, flags: JSON_THROW_ON_ERROR)['data'];
+            $accessTokens[] = $data['accessToken'];
+            $refreshToken = $data['refreshToken'];
+        }
+
+        self::assertSame(
+            ['password', 'password', 'password'],
+            array_map(fn (string $jwt): string => $this->storedGrant(self::claims($jwt)['jti']), $accessTokens),
+        );
+        $clients = $this->asUser(array_last($accessTokens), $key, 'GET', '/api/oauth/clients/');
+        self::assertSame(200, $clients->getStatusCode(), (string) $clients->getContent());
+    }
+
     public function testRefreshRejectsARevokedRefreshToken(): void
     {
         $key = new SignedDpopProof();
@@ -453,6 +480,7 @@ final class OAuthGrantPathAcceptanceTest extends TestCase
         $claims = self::claims($data['accessToken']);
         self::assertSame(['jkt' => $key->thumbprint()], $claims['cnf'] ?? null);
         self::assertSame($key->thumbprint(), $this->storedBinding($claims['jti']));
+        self::assertSame('passkey', $this->storedGrant($claims['jti']));
 
         $me = $this->me($data['accessToken'], $key);
         self::assertSame(200, $me->getStatusCode(), (string) $me->getContent());
@@ -464,6 +492,7 @@ final class OAuthGrantPathAcceptanceTest extends TestCase
         self::assertSame(200, $refresh->getStatusCode(), (string) $refresh->getContent());
         $rotated = json_decode((string) $refresh->getContent(), true, flags: JSON_THROW_ON_ERROR)['data'];
         self::assertSame(200, $this->me($rotated['accessToken'], $key)->getStatusCode());
+        self::assertSame('passkey', $this->storedGrant(self::claims($rotated['accessToken'])['jti']));
     }
 
     /** @return iterable<string, array{string}> */
@@ -680,6 +709,7 @@ final class OAuthGrantPathAcceptanceTest extends TestCase
         $claims = self::claims($tokens['access_token']);
         self::assertSame(['jkt' => $tv->thumbprint()], $claims['cnf']);
         self::assertSame($this->user->getPublicId()->toString(), $claims['sub']);
+        self::assertSame('device_code', $this->storedGrant($claims['jti']));
         self::assertSame(200, $this->devices($tokens['access_token'], $tv, $tvFingerprint)->getStatusCode());
         self::assertSame(401, $this->devices($tokens['access_token'], $tv)->getStatusCode(), 'The TV fingerprint binding applies.');
 
@@ -692,6 +722,7 @@ final class OAuthGrantPathAcceptanceTest extends TestCase
         self::assertSame(200, $refreshed['status'], json_encode($refreshed, JSON_THROW_ON_ERROR));
         self::assertTokenResponse($refreshed, 'library playlist');
         self::assertSame(['jkt' => $tv->thumbprint()], self::claims($refreshed['access_token'])['cnf']);
+        self::assertSame('device_code', $this->storedGrant(self::claims($refreshed['access_token'])['jti']));
         self::assertSame(200, $this->devices($refreshed['access_token'], $tv, $tvFingerprint)->getStatusCode());
     }
 
@@ -926,6 +957,7 @@ final class OAuthGrantPathAcceptanceTest extends TestCase
         self::assertTokenResponse($tokens, 'library');
         self::assertSame(['jkt' => $app->thumbprint()], self::claims($tokens['access_token'])['cnf']);
         self::assertSame($app->thumbprint(), $this->storedBinding(self::claims($tokens['access_token'])['jti']));
+        self::assertSame('authorization_code', $this->storedGrant(self::claims($tokens['access_token'])['jti']));
         self::assertSame(200, $this->devices($tokens['access_token'], $app)->getStatusCode());
 
         [$replay] = $this->tokenRequest($app, $nonce, [...$exchange, 'code_verifier' => $verifier]);
@@ -1369,6 +1401,15 @@ final class OAuthGrantPathAcceptanceTest extends TestCase
         self::assertIsString($hash);
 
         return $hash;
+    }
+
+    /** The sign-in grant stored with the access token. */
+    private function storedGrant(string $tokenId): string
+    {
+        $grant = $this->connection->fetchOne('SELECT grant_type FROM oauth_access_tokens WHERE token_id = ?', [$tokenId]);
+        self::assertIsString($grant, 'The issued access token must be persisted.');
+
+        return $grant;
     }
 
     private function storedBinding(string $tokenId): ?string

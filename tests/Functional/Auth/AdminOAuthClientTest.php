@@ -8,6 +8,7 @@ use App\Auth\Application\Command\OAuth\IssueTokenCommand;
 use App\Auth\Application\DTO\TokenResponseDTO;
 use App\Auth\Application\Port\ClientAssertionVerifierInterface;
 use App\Auth\Domain\Model\OAuth\Client;
+use App\Auth\Domain\Model\OAuth\SignInGrant;
 use App\Auth\Domain\Repository\OAuth\ClientRepositoryInterface;
 use App\Shared\Domain\Model\PublicId;
 use App\Tests\Fixtures\Auth\SignedClientAssertion;
@@ -376,7 +377,7 @@ final class AdminOAuthClientTest extends TestCase
         self::assertNotNull($client);
         $bus = static::getContainer()->get(MessageBusInterface::class);
         self::assertInstanceOf(MessageBusInterface::class, $bus);
-        $result = $bus->dispatch(new IssueTokenCommand($client->getId(), $user->getId(), 'admin-client-test-jkt', 0))
+        $result = $bus->dispatch(new IssueTokenCommand($client->getId(), $user->getId(), 'admin-client-test-jkt', 0, SignInGrant::DeviceCode))
             ->last(HandledStamp::class)?->getResult();
         self::assertInstanceOf(TokenResponseDTO::class, $result);
 

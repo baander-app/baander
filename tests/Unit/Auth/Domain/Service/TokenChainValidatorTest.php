@@ -8,6 +8,7 @@ use App\Auth\Domain\Exception\TokenChainViolationException;
 use App\Auth\Domain\Model\OAuth\AccessToken;
 use App\Auth\Domain\Model\OAuth\Client;
 use App\Auth\Domain\Model\OAuth\RefreshToken;
+use App\Auth\Domain\Model\OAuth\SignInGrant;
 use App\Auth\Domain\Model\OAuth\ValueObject\ChainId;
 use App\Auth\Domain\Service\TokenChainValidator;
 use PHPUnit\Framework\TestCase;
@@ -26,7 +27,7 @@ final class TokenChainValidatorTest extends TestCase
     private function createRefreshToken(bool $used = false, bool $revoked = false, ?ChainId $chainId = null): RefreshToken
     {
         $client = Client::create('Test', []);
-        $accessToken = AccessToken::issue($client, chainId: $chainId ?? $this->chainId);
+        $accessToken = AccessToken::issue($client, SignInGrant::AuthorizationCode, chainId: $chainId ?? $this->chainId);
         $token = RefreshToken::issue($accessToken, $chainId ?? $this->chainId);
 
         if ($used) {

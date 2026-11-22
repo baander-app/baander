@@ -11,7 +11,9 @@ use App\Auth\Application\Port\JwtGeneratorInterface;
 use App\Auth\Application\ScopeAllowlist;
 use App\Auth\Domain\Model\OAuth\AccessToken;
 use App\Auth\Domain\Model\OAuth\Client;
+use App\Auth\Domain\Model\OAuth\ClientType;
 use App\Auth\Domain\Model\OAuth\RefreshToken;
+use App\Auth\Domain\Model\OAuth\SignInGrant;
 use App\Auth\Domain\Model\OAuth\TokenMetadata;
 use App\Auth\Domain\Model\OAuth\ValueObject\ChainId;
 use App\Auth\Domain\Model\OAuth\ValueObject\Scope;
@@ -35,6 +37,11 @@ use Symfony\Component\DependencyInjection\Attribute\Autowire;
  * requires (RFC 9449), and the client fingerprint when the token request sent
  * X-Baander-Client-Fingerprint. Refresh rotates the pair in RefreshTokenHandler
  * and carries both bindings forward.
+ *
+ * The access token records the sign-in grant that started the chain, which every
+ * rotation copies. A password or passkey sign-in issues to the first-party client
+ * only, and the first-party client receives nothing else; any other pairing is
+ * refused before anything is locked or written.
  *
  * The client's row stays locked against revocation while the tokens are
  * written, so a client revoked concurrently either rejects the issuance or has
@@ -84,10 +91,12 @@ final class TokenPairIssuer
     /**
      * @param string[] $requestedScopes Filtered against the allowlist; none requested yields a token without scopes
      * @param int $credentialEpoch The user's credential epoch captured where the credential was proved
+     * @param SignInGrant $grant How the credential was proved; it must fit the client
      * @param (callable(ChainId): void)|null $persistWithTokens Further writes that commit or roll back with the tokens;
      *                                                     it receives the chain the pair starts
      *
-     * @throws OAuthProtocolException invalid_client when the client was revoked before the tokens were stored
+     * @throws OAuthProtocolException unauthorized_client when the grant does not fit the client, invalid_client
+     *                                when the client was revoked before the tokens were stored
      * @throws CredentialsChangedException when the user's credential epoch moved past $credentialEpoch
      */
     public function issue(
@@ -96,17 +105,20 @@ final class TokenPairIssuer
         array $requestedScopes,
         string $dpopJkt,
         int $credentialEpoch,
+        SignInGrant $grant,
         ?string $tokenName = null,
         ?string $clientFingerprint = null,
         ?string $userAgent = null,
         ?string $ipAddress = null,
         ?callable $persistWithTokens = null,
     ): TokenResponseDTO {
+        self::assertGrantFitsClient($grant, $client);
         $chainId = ChainId::generate();
 
         // Persist the proof key with the token so refresh can require the same key.
         $accessToken = AccessToken::issue(
             $client,
+            $grant,
             $user,
             $this->resolveScopes($requestedScopes),
             $tokenName,
@@ -152,6 +164,27 @@ final class TokenPairIssuer
                 scopes: $accessToken->getScopeIdentifiers(),
             );
         });
+    }
+
+    /**
+     * Password and passkey sign-ins issue to the first-party client alone, and it receives
+     * tokens from nothing else, so a grant handler that forgot to refuse a client cannot mint a
+     * pair whose authority does not match how the account approved it.
+     *
+     * @throws OAuthProtocolException unauthorized_client
+     */
+    private static function assertGrantFitsClient(SignInGrant $grant, Client $client): void
+    {
+        $firstPartyClient = $client->getType() === ClientType::FirstParty;
+        if ($grant->isFirstPartySignIn() === $firstPartyClient) {
+            return;
+        }
+
+        throw OAuthProtocolException::unauthorizedClient(
+            $firstPartyClient
+                ? 'The first-party client receives tokens from a password or passkey sign-in only.'
+                : 'Only the first-party client receives tokens from a password or passkey sign-in.',
+        );
     }
 
     /**

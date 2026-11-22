@@ -8,7 +8,9 @@ use App\Auth\Domain\Model\OAuth\AccessToken;
 use App\Auth\Domain\Model\OAuth\AccessTokenState;
 use App\Auth\Domain\Model\OAuth\Client;
 use App\Auth\Domain\Model\OAuth\ClientState;
+use App\Auth\Domain\Model\OAuth\SignInGrant;
 use App\Auth\Domain\Model\OAuth\TokenId;
+use App\Auth\Domain\Model\OAuth\TokenIssuance;
 use App\Auth\Domain\Model\User;
 use App\Auth\Domain\Model\OAuth\ValueObject\ChainId;
 use App\Auth\Domain\Model\OAuth\ValueObject\Scope;
@@ -176,13 +178,13 @@ final class AccessTokenRepository implements AccessTokenRepositoryInterface
         return (int) $live > 0;
     }
 
-    public function currentCredentialEpoch(TokenId $tokenId): ?int
+    public function currentIssuance(TokenId $tokenId): ?TokenIssuance
     {
         // One indexed read per authenticated request. A token without a user has no epoch to
         // fall behind.
-        $epoch = $this->entityManager->getConnection()->fetchOne(
+        $row = $this->entityManager->getConnection()->fetchAssociative(
             <<<'SQL'
-                SELECT a.credential_epoch
+                SELECT a.grant_type, a.credential_epoch
                   FROM oauth_access_tokens a
                   LEFT JOIN users u ON u.id = a.user_id
                  WHERE a.token_id = :tokenId
@@ -190,8 +192,14 @@ final class AccessTokenRepository implements AccessTokenRepositoryInterface
                 SQL,
             ['tokenId' => $tokenId->toString()],
         );
+        if ($row === false) {
+            return null;
+        }
 
-        return $epoch === false ? null : (int) $epoch;
+        return new TokenIssuance(
+            grant: SignInGrant::from((string) $row['grant_type']),
+            credentialEpoch: (int) $row['credential_epoch'],
+        );
     }
 
     public function restampCredentialEpoch(AccessToken $keep, int $credentialEpoch): void
@@ -239,6 +247,7 @@ final class AccessTokenRepository implements AccessTokenRepositoryInterface
         return new AccessTokenEntity(
             $accessToken->getTokenId()->toString(),
             $clientEntity,
+            $accessToken->getGrant(),
             $userEntity,
             $accessToken->getName(),
             $accessToken->getScopes() !== [] ? $accessToken->getScopeIdentifiers() : null,
@@ -260,6 +269,7 @@ final class AccessTokenRepository implements AccessTokenRepositoryInterface
             tokenId: TokenId::fromString($entity->getTokenId()),
             user: $user,
             client: $this->clientEntityToDomain($entity->getClient()),
+            grant: $entity->getGrantType(),
             name: $entity->getName(),
             scopes: array_map(fn (string $s) => new Scope($s), $entity->getScopeIdentifiers() ?? []),
             chainId: $entity->getChainId() !== null ? ChainId::fromUuid($entity->getChainId()) : null,

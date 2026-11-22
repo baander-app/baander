@@ -14,6 +14,7 @@ use App\Auth\Application\Service\PasswordChanger;
 use App\Auth\Domain\Event\PasswordChanged;
 use App\Auth\Domain\Model\OAuth\AccessToken;
 use App\Auth\Domain\Model\OAuth\Client;
+use App\Auth\Domain\Model\OAuth\SignInGrant;
 use App\Auth\Domain\Model\OAuth\TokenId;
 use App\Auth\Domain\Model\User;
 use App\Auth\Domain\Repository\OAuth\AccessTokenRepositoryInterface;
@@ -66,7 +67,7 @@ final class PasswordChangerTest extends TestCase
     public function testKeepsTheRequestingSession(): void
     {
         $user = User::register(new Email('owner@baander.app'), 'old-hash', 'Owner');
-        $this->storedToken = AccessToken::issue(Client::create('SPA', ['https://baander.app']), $user);
+        $this->storedToken = AccessToken::issue(Client::create('SPA', ['https://baander.app']), SignInGrant::Password, $user);
 
         $changer = $this->changer();
         $sessions = $changer->change($user, $changer->hash('new-password'), $this->storedToken->getTokenId()->toString());

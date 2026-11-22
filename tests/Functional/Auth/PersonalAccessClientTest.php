@@ -7,6 +7,7 @@ namespace App\Tests\Functional\Auth;
 use App\Auth\Application\Command\OAuth\IssueTokenCommand;
 use App\Auth\Application\Command\OAuth\RefreshTokenCommand;
 use App\Auth\Application\DTO\TokenResponseDTO;
+use App\Auth\Domain\Model\OAuth\SignInGrant;
 use App\Auth\Domain\Model\User;
 use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
@@ -169,7 +170,7 @@ final class PersonalAccessClientTest extends TestCase
     private function issueTokens(User $user, string $clientPublicId): TokenResponseDTO
     {
         $result = $this->bus()
-            ->dispatch(new IssueTokenCommand($this->clientId($clientPublicId), $user->getId(), self::DPOP_JKT, 0))
+            ->dispatch(new IssueTokenCommand($this->clientId($clientPublicId), $user->getId(), self::DPOP_JKT, 0, SignInGrant::AuthorizationCode))
             ->last(HandledStamp::class)?->getResult();
         self::assertInstanceOf(TokenResponseDTO::class, $result);
 

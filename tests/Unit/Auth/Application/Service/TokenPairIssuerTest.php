@@ -12,6 +12,7 @@ use App\Auth\Application\Service\TokenPairIssuer;
 use App\Auth\Domain\Model\OAuth\AccessToken;
 use App\Auth\Domain\Model\OAuth\Client;
 use App\Auth\Domain\Model\OAuth\RefreshToken;
+use App\Auth\Domain\Model\OAuth\SignInGrant;
 use App\Auth\Domain\Model\OAuth\TokenMetadata;
 use App\Auth\Domain\Model\User;
 use App\Auth\Domain\Repository\OAuth\AccessTokenRepositoryInterface;
@@ -23,13 +24,15 @@ use App\Shared\Application\Port\TransactionPortInterface;
 use App\Shared\Domain\Model\Email;
 use Doctrine\DBAL\Connection;
 use Doctrine\ORM\EntityManagerInterface;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use RuntimeException;
 use Throwable;
 
 /**
  * Issuance writes the pair, its metadata and the signature inside one transaction, in
- * the order flush, metadata, sign, commit, with the lock waits bounded.
+ * the order flush, metadata, sign, commit, with the lock waits bounded. The access token
+ * records the grant that started its chain, which must fit the client.
  */
 final class TokenPairIssuerTest extends TestCase
 {
@@ -41,6 +44,8 @@ final class TokenPairIssuerTest extends TestCase
      * @var list<string>
      */
     private array $events = [];
+    /** @var list<AccessToken> */
+    private array $savedAccessTokens = [];
     private bool $clientActiveAtIssuance = true;
     private bool $signingFails = false;
     private TokenPairIssuer $issuer;
@@ -50,6 +55,7 @@ final class TokenPairIssuerTest extends TestCase
         $accessTokens = $this->createStub(AccessTokenRepositoryInterface::class);
         $accessTokens->method('save')->willReturnCallback(function (AccessToken $token, bool $flush): void {
             $this->events[] = $flush ? 'access token saved and flushed' : 'access token saved';
+            $this->savedAccessTokens[] = $token;
         });
         $refreshTokens = $this->createStub(RefreshTokenRepositoryInterface::class);
         $refreshTokens->method('save')->willReturnCallback(function (RefreshToken $token, bool $flush): void {
@@ -130,7 +136,7 @@ final class TokenPairIssuerTest extends TestCase
 
     public function testTheMetadataAndTheSignatureAreWrittenInsideTheTransactionAfterTheFlush(): void
     {
-        $response = $this->issuer->issue($this->client(), $this->user(), ['profile'], self::JKT, 0, persistWithTokens: function (): void {
+        $response = $this->issuer->issue($this->client(), $this->user(), ['profile'], self::JKT, 0, SignInGrant::Password, persistWithTokens: function (): void {
             $this->events[] = 'grant consumed';
         });
 
@@ -155,7 +161,7 @@ final class TokenPairIssuerTest extends TestCase
         $this->signingFails = true;
 
         try {
-            $this->issuer->issue($this->client(), $this->user(), ['profile'], self::JKT, 0);
+            $this->issuer->issue($this->client(), $this->user(), ['profile'], self::JKT, 0, SignInGrant::Password);
             self::fail('The signing failure must propagate.');
         } catch (RuntimeException $failure) {
             self::assertSame('injected signing failure', $failure->getMessage());
@@ -170,7 +176,7 @@ final class TokenPairIssuerTest extends TestCase
         $this->clientActiveAtIssuance = false;
 
         try {
-            $this->issuer->issue($this->client(), $this->user(), ['profile'], self::JKT, 0);
+            $this->issuer->issue($this->client(), $this->user(), ['profile'], self::JKT, 0, SignInGrant::Password);
             self::fail('A revoked client cannot be issued to.');
         } catch (OAuthProtocolException $refusal) {
             self::assertSame('invalid_client', $refusal->error);
@@ -182,12 +188,61 @@ final class TokenPairIssuerTest extends TestCase
 
     public function testATokenRequestedWithoutScopesCarriesNone(): void
     {
-        $response = $this->issuer->issue($this->client(), $this->user(), [], self::JKT, 0);
+        $response = $this->issuer->issue($this->client(), $this->user(), [], self::JKT, 0, SignInGrant::Password);
 
         self::assertSame([], $response->getScopes());
     }
 
+    /** @return iterable<string, array{Client, SignInGrant}> */
+    public static function grantsThatFitTheirClient(): iterable
+    {
+        yield 'password sign-in of the first-party client' => [self::firstPartyClient(), SignInGrant::Password];
+        yield 'passkey sign-in of the first-party client' => [self::firstPartyClient(), SignInGrant::Passkey];
+        yield 'authorization code of a personal access client' => [Client::createPersonalAccess('Owner CLI'), SignInGrant::AuthorizationCode];
+        yield 'device code of a TV' => [Client::registerDevice('Living room TV'), SignInGrant::DeviceCode];
+    }
+
+    #[DataProvider('grantsThatFitTheirClient')]
+    public function testTheAccessTokenRecordsTheGrantThatStartedItsChain(Client $client, SignInGrant $grant): void
+    {
+        $this->issuer->issue($client, $this->user(), [], self::JKT, 0, $grant);
+
+        self::assertCount(1, $this->savedAccessTokens);
+        self::assertSame($grant, $this->savedAccessTokens[0]->getGrant());
+    }
+
+    /** @return iterable<string, array{Client, SignInGrant}> */
+    public static function grantsForTheWrongClient(): iterable
+    {
+        yield 'password sign-in of a personal access client' => [Client::createPersonalAccess('Owner CLI'), SignInGrant::Password];
+        yield 'passkey sign-in of a TV' => [Client::registerDevice('Living room TV'), SignInGrant::Passkey];
+        yield 'authorization code of the first-party client' => [self::firstPartyClient(), SignInGrant::AuthorizationCode];
+        yield 'device code of the first-party client' => [self::firstPartyClient(), SignInGrant::DeviceCode];
+    }
+
+    /**
+     * Only the first-party client takes a password or passkey sign-in, and it takes nothing else,
+     * so a grant handler that forgot to refuse a client cannot mint a pair with the wrong authority.
+     */
+    #[DataProvider('grantsForTheWrongClient')]
+    public function testAGrantThatDoesNotFitTheClientIsRefusedBeforeAnythingIsWritten(Client $client, SignInGrant $grant): void
+    {
+        try {
+            $this->issuer->issue($client, $this->user(), [], self::JKT, 0, $grant);
+            self::fail('The grant does not fit the client.');
+        } catch (OAuthProtocolException $refusal) {
+            self::assertSame('unauthorized_client', $refusal->error);
+        }
+
+        self::assertSame([], $this->events, 'Nothing was locked or written.');
+    }
+
     private function client(): Client
+    {
+        return self::firstPartyClient();
+    }
+
+    private static function firstPartyClient(): Client
     {
         return Client::create('Browser', ['https://baander.app/callback'], firstParty: true);
     }

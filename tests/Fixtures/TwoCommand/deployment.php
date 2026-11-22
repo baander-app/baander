@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Auth\Domain\Model\OAuth\SignInGrant;
 use App\Catalog\Infrastructure\Doctrine\Entity\AlbumEntity;
 use App\Catalog\Infrastructure\Doctrine\Entity\MovieEntity;
 use App\Catalog\Infrastructure\Doctrine\Entity\MovieVideoEntity;
@@ -530,7 +531,7 @@ function drillOwner(Doctrine\ORM\EntityManagerInterface $manager, string $projec
     $owner->markEmailAsVerified();
     $manager->persist($owner);
     $manager->flush();
-    return new StreamClient($manager, $email, (string) file_get_contents($project . '/config/secrets/oauth/private.key'), BASE . '/api/stream/track', audience: BASE);
+    return new StreamClient($manager, $email, (string) file_get_contents($project . '/config/secrets/oauth/private.key'), BASE . '/api/stream/track', SignInGrant::AuthorizationCode, audience: BASE);
 }
 /**
  * Occupies every audio slot with renditions of one track, each in a distinct format and bitrate,
@@ -587,7 +588,7 @@ $kernel->boot();
 $manager = $kernel->getContainer()->get('doctrine')->getManager();
 $db = $manager->getConnection();
 $client = static fn (): StreamClient => new StreamClient($manager, EMAIL,
-    (string) file_get_contents($project . '/config/secrets/oauth/private.key'), BASE . '/api/stream/track', audience: BASE);
+    (string) file_get_contents($project . '/config/secrets/oauth/private.key'), BASE . '/api/stream/track', SignInGrant::AuthorizationCode, audience: BASE);
 $result = [];
 if ($mode === 'prepare') {
     ensure(is_dir(ROOT) || mkdir(ROOT, 0750, true), 'Cannot create scratch state.');

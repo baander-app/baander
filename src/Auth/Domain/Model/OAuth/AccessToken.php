@@ -29,6 +29,7 @@ final class AccessToken
     /**
      * Issue a new access token.
      *
+     * @param SignInGrant $grant The grant that started the token's refresh chain; a rotation passes its predecessor's
      * @param Scope[] $scopes
      * @param string|null $dpopJkt Thumbprint of the DPoP key the token is bound to (RFC 9449)
      * @param int $credentialEpoch The user's credential epoch the token is issued under; a token
@@ -36,6 +37,7 @@ final class AccessToken
      */
     public static function issue(
         Client $client,
+        SignInGrant $grant,
         ?User $user = null,
         array $scopes = [],
         ?string $name = null,
@@ -54,6 +56,7 @@ final class AccessToken
             tokenId: TokenId::generate(),
             user: $user,
             client: $client,
+            grant: $grant,
             name: $name,
             scopes: $scopes,
             chainId: $chainId,
@@ -124,6 +127,11 @@ final class AccessToken
     public function getClient(): Client
     {
         return $this->state->client;
+    }
+
+    public function getGrant(): SignInGrant
+    {
+        return $this->state->grant;
     }
 
     public function getName(): ?string

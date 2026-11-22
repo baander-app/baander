@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Auth\Domain\Model\OAuth\SignInGrant;
 use App\Shared\Domain\Model\Uuid;
 use App\Tests\Fixtures\WebRuntime\HttpExchange;
 use App\Tests\Fixtures\WebRuntime\StreamClient;
@@ -37,7 +38,7 @@ foreach (range(0, 7) as $index) {
     $manager->persist($owner);
     $manager->flush();
     $owners[] = new StreamClient($manager, $email,
-        (string) file_get_contents($project . '/config/secrets/oauth/private.key'), BASE . '/api/stream/track', audience: BASE);
+        (string) file_get_contents($project . '/config/secrets/oauth/private.key'), BASE . '/api/stream/track', SignInGrant::AuthorizationCode, audience: BASE);
 }
 $phases = [];
 $now = static fn (): float => hrtime(true) / 1e9;

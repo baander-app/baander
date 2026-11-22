@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Integration;
 
+use App\Auth\Domain\Model\OAuth\SignInGrant;
 use App\Auth\Domain\Model\User;
 use App\Auth\Domain\Repository\UserRepositoryInterface;
 use App\Auth\Infrastructure\Doctrine\Entity\OAuth\AccessTokenEntity;
@@ -21,7 +22,6 @@ use App\Metadata\Application\DTO\MusicBrainz\MusicBrainzReleaseSummary;
 use App\Metadata\Application\Port\MusicBrainzLookupInterface;
 use App\Shared\Domain\Model\Email;
 use App\Shared\Domain\Model\PublicId;
-use App\Shared\Domain\Model\Uuid;
 use App\Tests\Fixtures\Auth\FirstPartyOAuthClient;
 use App\Tests\Fixtures\Auth\MusicBrainzMatchOAuthKernel;
 use App\Tests\Fixtures\Auth\OAuthAccessTokenJwt;
@@ -248,10 +248,14 @@ final class MusicBrainzMatchFirewallTest extends TestCase
     private function authenticate(string $actor): void
     {
         $entity = $actor === 'member' ? $this->member : $this->createUser($actor);
-        $client = FirstPartyOAuthClient::entity($this->kernel->getContainer(), $this->manager);
         $this->proof = new SignedDpopProof();
-        $token = new AccessTokenEntity(new Uuid()->toString(), $client, $entity, scopes: ['library'], expiresAt: new \DateTimeImmutable('+1 hour'));
-        $token->setDpopJkt($this->proof->thumbprint());
+        $token = FirstPartyOAuthClient::accessToken(
+            $this->kernel->getContainer(),
+            $this->manager,
+            $entity,
+            SignInGrant::Password,
+            $this->proof->thumbprint(),
+        );
         $this->persist($token);
         $this->manager->flush();
         $this->jwt = OAuthAccessTokenJwt::sign(self::$privateKey, $token);

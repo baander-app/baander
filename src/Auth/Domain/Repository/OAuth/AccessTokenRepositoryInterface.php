@@ -6,6 +6,7 @@ namespace App\Auth\Domain\Repository\OAuth;
 
 use App\Auth\Domain\Model\OAuth\AccessToken;
 use App\Auth\Domain\Model\OAuth\TokenId;
+use App\Auth\Domain\Model\OAuth\TokenIssuance;
 use App\Auth\Domain\Model\OAuth\ValueObject\ChainId;
 use App\Shared\Domain\Model\Uuid;
 
@@ -69,11 +70,11 @@ interface AccessTokenRepositoryInterface
     public function isSessionCurrent(AccessToken $token, int $credentialEpoch): bool;
 
     /**
-     * The credential epoch the token was issued under, read from storage; null when the token
-     * is unknown or its user's credentials changed after it was issued (the user's epoch moved
-     * past the token's).
+     * The sign-in grant and the credential epoch the token was issued under, read from storage
+     * together; null when the token is unknown or its user's credentials changed after it was
+     * issued (the user's epoch moved past the token's).
      */
-    public function currentCredentialEpoch(TokenId $tokenId): ?int;
+    public function currentIssuance(TokenId $tokenId): ?TokenIssuance;
 
     /**
      * Stamps $keep and the access tokens of its chain with the credential epoch a credential

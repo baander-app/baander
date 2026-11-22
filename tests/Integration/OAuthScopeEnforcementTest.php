@@ -6,6 +6,7 @@ namespace App\Tests\Integration;
 
 use App\Auth\Domain\Model\User;
 use App\Auth\Domain\Repository\UserRepositoryInterface;
+use App\Auth\Domain\Model\OAuth\SignInGrant;
 use App\Auth\Infrastructure\Doctrine\Entity\OAuth\AccessTokenEntity;
 use App\Auth\Infrastructure\Doctrine\Entity\OAuth\ClientEntity;
 use App\Auth\Infrastructure\Doctrine\Entity\UserEntity;
@@ -125,7 +126,7 @@ final class OAuthScopeEnforcementTest extends TestCase
     #[DataProvider('firstPartyRoutes')]
     public function testAProfileTokenOfAnAdministratorIsRefusedEverywhereElse(string $method, string $path, array $body): void
     {
-        $jwt = $this->token($this->thirdPartyClient(), $this->admin, ['profile']);
+        $jwt = $this->token($this->thirdPartyClient(), SignInGrant::AuthorizationCode, $this->admin, ['profile']);
 
         $response = $this->send($jwt, $method, $path, $body);
 
@@ -140,7 +141,7 @@ final class OAuthScopeEnforcementTest extends TestCase
         $this->manager->persist(new UserLibraryAccessEntity($member->getId(), $library, new \DateTimeImmutable()));
         $album = $this->persist(new AlbumEntity(new PublicId(), $library, 'Delegated album', 'album'));
         $this->manager->flush();
-        $jwt = $this->token($this->deviceClient(), $member, ['library']);
+        $jwt = $this->token($this->deviceClient(), SignInGrant::DeviceCode, $member, ['library']);
 
         self::assertSame(200, $this->send($jwt, 'GET', '/api/albums/' . $album->getPublicId()->toString())->getStatusCode());
         // The scope check passes and the stream controller looks the track up: an unknown
@@ -159,7 +160,7 @@ final class OAuthScopeEnforcementTest extends TestCase
 
     public function testAPlaylistTokenManagesPlaylistsButCannotBrowseTheCatalog(): void
     {
-        $jwt = $this->token($this->thirdPartyClient(), $this->user(['ROLE_USER']), ['playlist']);
+        $jwt = $this->token($this->thirdPartyClient(), SignInGrant::AuthorizationCode, $this->user(['ROLE_USER']), ['playlist']);
 
         $created = $this->send($jwt, 'POST', '/api/playlists/', ['name' => 'Delegated playlist']);
         self::assertSame(201, $created->getStatusCode(), (string) $created->getContent());
@@ -173,8 +174,8 @@ final class OAuthScopeEnforcementTest extends TestCase
         $granted = '/api/videos/' . $this->videoInLibrary($this->admin);
         $ungranted = '/api/videos/' . $this->videoInLibrary();
         $client = $this->deviceClient();
-        $library = $this->token($client, $this->admin, ['library']);
-        $profile = $this->token($client, $this->admin, ['profile']);
+        $library = $this->token($client, SignInGrant::DeviceCode, $this->admin, ['library']);
+        $profile = $this->token($client, SignInGrant::DeviceCode, $this->admin, ['profile']);
 
         $information = $this->data($this->send($library, 'GET', $granted . '/playback-information'));
         self::assertSame('Opening', $information['chapters'][0]['title']);
@@ -192,7 +193,7 @@ final class OAuthScopeEnforcementTest extends TestCase
     public function testAdminLogsRemainFirstPartyEvenForADelegatedSuperAdministratorWithEveryScope(): void
     {
         $superAdmin = $this->user(['ROLE_USER', 'ROLE_SUPER_ADMIN']);
-        $jwt = $this->token($this->thirdPartyClient(), $superAdmin, ['profile', 'email', 'library', 'playlist']);
+        $jwt = $this->token($this->thirdPartyClient(), SignInGrant::AuthorizationCode, $superAdmin, ['profile', 'email', 'library', 'playlist']);
 
         $this->assertInsufficientScope($this->send($jwt, 'GET', '/api/admin/logs/sources'));
         $this->assertInsufficientScope($this->send($jwt, 'GET', '/api/admin/logs/entries'));
@@ -202,8 +203,8 @@ final class OAuthScopeEnforcementTest extends TestCase
 
     public function testAProfileTokenReadsTheProfileWithoutEmailOrRoles(): void
     {
-        $profile = $this->send($this->token($this->personalAccessClient(), $this->admin, ['profile']), 'GET', '/api/auth/me');
-        $email = $this->send($this->token($this->personalAccessClient(), $this->admin, ['email']), 'GET', '/api/auth/me');
+        $profile = $this->send($this->token($this->personalAccessClient(), SignInGrant::AuthorizationCode, $this->admin, ['profile']), 'GET', '/api/auth/me');
+        $email = $this->send($this->token($this->personalAccessClient(), SignInGrant::AuthorizationCode, $this->admin, ['email']), 'GET', '/api/auth/me');
 
         self::assertSame(['publicId', 'name', 'createdAt'], array_keys($this->data($profile)));
         self::assertSame(['publicId', 'name', 'email', 'emailVerifiedAt', 'createdAt'], array_keys($this->data($email)));
@@ -217,9 +218,9 @@ final class OAuthScopeEnforcementTest extends TestCase
         $this->manager->flush();
         $libraryPath = '/api/libraries/' . $library->getPublicId()->toString();
         $playlistPath = '/api/playlists/' . $playlist->getPublicId()->toString();
-        $library = $this->token($this->personalAccessClient(), $this->admin, ['library']);
-        $playlists = $this->token($this->personalAccessClient(), $this->admin, ['playlist']);
-        $firstParty = $this->token(FirstPartyOAuthClient::entity($this->kernel->getContainer(), $this->manager), $this->admin, []);
+        $library = $this->token($this->personalAccessClient(), SignInGrant::AuthorizationCode, $this->admin, ['library']);
+        $playlists = $this->token($this->personalAccessClient(), SignInGrant::AuthorizationCode, $this->admin, ['playlist']);
+        $firstParty = $this->token(FirstPartyOAuthClient::entity($this->kernel->getContainer(), $this->manager), SignInGrant::Password, $this->admin, []);
 
         self::assertSame(404, $this->send($library, 'GET', $libraryPath)->getStatusCode());
         $this->assertInsufficientScope($this->send($library, 'GET', '/api/admin/activity/summary'));
@@ -294,10 +295,21 @@ final class OAuthScopeEnforcementTest extends TestCase
         return $this->persist(new ClientEntity(new PublicId(), 'Administrator scripts', '[]', personalAccessClient: true));
     }
 
-    /** @param list<string> $scopes */
-    private function token(ClientEntity $client, UserEntity $user, array $scopes): string
+    /**
+     * A signed token of $client for $user, started by $grant.
+     *
+     * @param list<string> $scopes
+     */
+    private function token(ClientEntity $client, SignInGrant $grant, UserEntity $user, array $scopes): string
     {
-        $token = new AccessTokenEntity((new Uuid())->toString(), $client, $user, scopes: $scopes, expiresAt: new \DateTimeImmutable('+1 hour'));
+        $token = new AccessTokenEntity(
+            (new Uuid())->toString(),
+            $client,
+            $grant,
+            $user,
+            scopes: $scopes,
+            expiresAt: new \DateTimeImmutable('+1 hour'),
+        );
         $token->setDpopJkt($this->proof->thumbprint());
         $this->manager->persist($token);
         $this->manager->flush();

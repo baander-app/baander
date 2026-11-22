@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Tests\Integration;
 
 use App\Auth\Domain\Model\OAuth\Client;
+use App\Auth\Domain\Model\OAuth\SignInGrant;
 use App\Auth\Infrastructure\Doctrine\Entity\OAuth\AccessTokenEntity;
 use App\Auth\Infrastructure\Doctrine\Entity\OAuth\ClientEntity;
 use App\Auth\Infrastructure\Doctrine\Entity\OAuth\RefreshTokenEntity;
@@ -103,6 +104,7 @@ final class OAuthClientRevocationRaceTest extends TestCase
             $this->manager,
             $this->client->getId(),
             OAuthRevocationRace::user($this->userId, $this->userPublicId),
+            SignInGrant::AuthorizationCode,
             function () use (&$child): void {
                 // The issuing transaction holds FOR SHARE on the client row; its tokens follow.
                 $child = $this->startChild('revoke');

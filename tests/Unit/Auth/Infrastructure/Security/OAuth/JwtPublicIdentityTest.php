@@ -6,6 +6,7 @@ namespace App\Tests\Unit\Auth\Infrastructure\Security\OAuth;
 
 use App\Auth\Domain\Model\OAuth\AccessToken;
 use App\Auth\Domain\Model\OAuth\Client;
+use App\Auth\Domain\Model\OAuth\SignInGrant;
 use App\Auth\Domain\Model\User;
 use App\Auth\Infrastructure\Security\OAuth\JwtGenerator;
 use App\Shared\Domain\Model\Email;
@@ -37,7 +38,7 @@ final class JwtPublicIdentityTest extends TestCase
         try {
             $client = Client::create('Public claims', ['https://baander.app/callback']);
             $user = $withUser ? User::register(new Email('claims@baander.app'), 'hashed', 'Claims') : null;
-            $token = AccessToken::issue($client, $user);
+            $token = AccessToken::issue($client, SignInGrant::AuthorizationCode, $user);
             $serialized = (new JwtGenerator($path, 'https://baander.app'))->generate($token, 'proof-thumbprint');
             $jwt = (new Parser(new JoseEncoder()))->parse($serialized);
             self::assertInstanceOf(UnencryptedToken::class, $jwt);

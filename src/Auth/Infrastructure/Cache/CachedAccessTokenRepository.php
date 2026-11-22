@@ -6,6 +6,7 @@ namespace App\Auth\Infrastructure\Cache;
 
 use App\Auth\Domain\Model\OAuth\AccessToken;
 use App\Auth\Domain\Model\OAuth\TokenId;
+use App\Auth\Domain\Model\OAuth\TokenIssuance;
 use App\Auth\Domain\Model\OAuth\ValueObject\ChainId;
 use App\Auth\Domain\Repository\OAuth\AccessTokenRepositoryInterface;
 use App\Shared\Domain\Model\Uuid;
@@ -109,9 +110,9 @@ final readonly class CachedAccessTokenRepository implements AccessTokenRepositor
         return $this->inner->isSessionCurrent($token, $credentialEpoch);
     }
 
-    public function currentCredentialEpoch(TokenId $tokenId): ?int
+    public function currentIssuance(TokenId $tokenId): ?TokenIssuance
     {
-        return $this->inner->currentCredentialEpoch($tokenId);
+        return $this->inner->currentIssuance($tokenId);
     }
 
     public function restampCredentialEpoch(AccessToken $keep, int $credentialEpoch): void

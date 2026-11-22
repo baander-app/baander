@@ -7,7 +7,9 @@ namespace App\Tests\Unit\Auth\Infrastructure\Security;
 use App\Auth\Application\Http\AccessTokenAttributes;
 use App\Auth\Domain\Model\OAuth\Client;
 use App\Auth\Domain\Model\OAuth\ClientType;
+use App\Auth\Domain\Model\OAuth\SignInGrant;
 use App\Auth\Domain\Model\OAuth\TokenId;
+use App\Auth\Domain\Model\OAuth\TokenIssuance;
 use App\Auth\Domain\Repository\OAuth\AccessTokenRepositoryInterface;
 use App\Auth\Domain\Repository\OAuth\ClientRepositoryInterface;
 use App\Auth\Domain\Repository\UserRepositoryInterface;
@@ -292,19 +294,52 @@ final class OAuth2AuthenticatorTest extends TestCase
         self::assertSame($user->getId()->toString(), $securityUser->getId());
     }
 
-    public function testATokenOfTheFirstPartyClientCarriesTheFirstPartyMarkerNoScopesAndTheUsersRoles(): void
+    /** @return iterable<string, array{SignInGrant}> */
+    public static function firstPartySignIns(): iterable
+    {
+        yield 'password sign-in' => [SignInGrant::Password];
+        yield 'passkey sign-in' => [SignInGrant::Passkey];
+    }
+
+    #[DataProvider('firstPartySignIns')]
+    public function testASignInOfTheFirstPartyClientCarriesTheFirstPartyMarkerNoScopesAndTheUsersRoles(SignInGrant $grant): void
     {
         $admin = $this->admin();
-        $client = Client::create('Baander', [], firstParty: true, passwordClient: true, publicId: \App\Shared\Domain\Model\PublicId::fromString(self::SPA_CLIENT_ID));
         $this->setupSuccessfulResourceServerValidation(TokenId::generate()->toString(), $admin->getPublicId()->toString(), 'jkt', self::SPA_CLIENT_ID, []);
 
         $request = $this->dpopRequest();
-        $user = $this->createAuthenticator($this->createStub(TokenMetadataRepositoryInterface::class), $admin, client: $client)->authenticate($request)->getUser();
+        $user = $this->createAuthenticator($this->createStub(TokenMetadataRepositoryInterface::class), $admin, client: $this->firstPartyClient(), grant: $grant)->authenticate($request)->getUser();
 
         self::assertTrue($request->attributes->get(AccessTokenAttributes::FIRST_PARTY));
         self::assertSame([], $request->attributes->get(AccessTokenAttributes::SCOPES));
         self::assertSame(self::SPA_CLIENT_ID, $request->attributes->get(AccessTokenAttributes::CLIENT_ID));
         self::assertSame(['ROLE_USER', 'ROLE_ADMIN'], $user->getRoles());
+    }
+
+    /** @return iterable<string, array{SignInGrant}> */
+    public static function delegatedGrants(): iterable
+    {
+        yield 'authorization code' => [SignInGrant::AuthorizationCode];
+        yield 'device code' => [SignInGrant::DeviceCode];
+    }
+
+    /**
+     * Issuance never pairs the first-party client with a delegated grant, so such a token was
+     * minted around it, for example through a pushed request naming the first-party client. It
+     * keeps neither the first-party authority of its client nor the scopes it was granted.
+     */
+    #[DataProvider('delegatedGrants')]
+    public function testATokenOfTheFirstPartyClientFromADelegatedGrantIsDelegatedWithoutScopes(SignInGrant $grant): void
+    {
+        $admin = $this->admin();
+        $this->setupSuccessfulResourceServerValidation(TokenId::generate()->toString(), $admin->getPublicId()->toString(), 'jkt', self::SPA_CLIENT_ID, ['library', 'playlist', 'profile']);
+
+        $request = $this->dpopRequest();
+        $user = $this->createAuthenticator($this->createStub(TokenMetadataRepositoryInterface::class), $admin, client: $this->firstPartyClient(), grant: $grant)->authenticate($request)->getUser();
+
+        self::assertFalse($request->attributes->get(AccessTokenAttributes::FIRST_PARTY));
+        self::assertSame([], $request->attributes->get(AccessTokenAttributes::SCOPES));
+        self::assertSame(['ROLE_USER'], $user->getRoles());
     }
 
     public function testAPersonalAccessTokenOfAnAdminIsDelegatedWithItsScopesAndNoAdminRole(): void
@@ -329,7 +364,7 @@ final class OAuth2AuthenticatorTest extends TestCase
         $this->setupSuccessfulResourceServerValidation(TokenId::generate()->toString(), $admin->getPublicId()->toString(), 'jkt', $client->getPublicId()->toString(), []);
 
         $request = $this->dpopRequest();
-        $user = $this->createAuthenticator($this->createStub(TokenMetadataRepositoryInterface::class), $admin, client: $client)->authenticate($request)->getUser();
+        $user = $this->createAuthenticator($this->createStub(TokenMetadataRepositoryInterface::class), $admin, client: $client, grant: SignInGrant::Password)->authenticate($request)->getUser();
 
         self::assertFalse($request->attributes->get(AccessTokenAttributes::FIRST_PARTY));
         self::assertSame([], $request->attributes->get(AccessTokenAttributes::SCOPES));
@@ -343,11 +378,16 @@ final class OAuth2AuthenticatorTest extends TestCase
         $this->setupSuccessfulResourceServerValidation(TokenId::generate()->toString(), $admin->getPublicId()->toString(), 'jkt', self::SPA_CLIENT_ID, ['library']);
 
         $request = $this->dpopRequest();
-        $user = $this->createAuthenticator($this->createStub(TokenMetadataRepositoryInterface::class), $admin, client: $client)->authenticate($request)->getUser();
+        $user = $this->createAuthenticator($this->createStub(TokenMetadataRepositoryInterface::class), $admin, client: $client, grant: SignInGrant::Password)->authenticate($request)->getUser();
 
         self::assertFalse($request->attributes->get(AccessTokenAttributes::FIRST_PARTY));
         self::assertSame(['library'], $request->attributes->get(AccessTokenAttributes::SCOPES));
         self::assertSame(['ROLE_USER'], $user->getRoles());
+    }
+
+    private function firstPartyClient(): Client
+    {
+        return Client::create('Baander', [], firstParty: true, passwordClient: true, publicId: \App\Shared\Domain\Model\PublicId::fromString(self::SPA_CLIENT_ID));
     }
 
     private function admin(): \App\Auth\Domain\Model\User
@@ -411,6 +451,7 @@ final class OAuth2AuthenticatorTest extends TestCase
         ?\App\Auth\Domain\Repository\UserRepositoryInterface $userRepository = null,
         ?Client $client = null,
         ?int $credentialEpoch = 5,
+        SignInGrant $grant = SignInGrant::AuthorizationCode,
     ): OAuth2Authenticator {
         if ($userRepository === null) {
             $userRepository = $this->createStub(\App\Auth\Domain\Repository\UserRepositoryInterface::class);
@@ -418,9 +459,9 @@ final class OAuth2AuthenticatorTest extends TestCase
         }
         $clients = $this->createStub(ClientRepositoryInterface::class);
         $clients->method('isFirstPartyClient')->willReturn($client?->getType() === ClientType::FirstParty);
-        // Null stands for a token whose user changed the password after it was issued.
+        // A null epoch stands for a token whose user changed the password after it was issued.
         $accessTokens = $this->createStub(AccessTokenRepositoryInterface::class);
-        $accessTokens->method('currentCredentialEpoch')->willReturn($credentialEpoch);
+        $accessTokens->method('currentIssuance')->willReturn($credentialEpoch === null ? null : new TokenIssuance($grant, $credentialEpoch));
 
         return new OAuth2Authenticator(
             $this->resourceServer,

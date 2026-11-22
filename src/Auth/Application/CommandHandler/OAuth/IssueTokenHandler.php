@@ -55,6 +55,7 @@ final readonly class IssueTokenHandler
             requestedScopes: $command->getScopes(),
             dpopJkt: $command->getDpopJkt(),
             credentialEpoch: $command->getCredentialEpoch(),
+            grant: $command->getGrant(),
             tokenName: $command->getTokenName(),
             clientFingerprint: $command->getClientFingerprint(),
             userAgent: $command->getUserAgent(),

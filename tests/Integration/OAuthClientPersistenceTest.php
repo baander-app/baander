@@ -230,7 +230,7 @@ final class OAuthClientPersistenceTest extends TestCase
             'user_code' => strtoupper(bin2hex(random_bytes(6))), 'client_id' => $client->toString(),
             'verification_uri' => 'https://app.baander.app/device', 'expires_at' => '2026-11-19 12:15:00+00', ...$times]);
         $this->writer->insert('oauth_access_tokens', ['id' => $access, 'token_id' => $tokens['access token'],
-            'client_id' => $client->toString(), 'user_id' => $user, 'credential_epoch' => 0, ...$times]);
+            'client_id' => $client->toString(), 'user_id' => $user, 'grant_type' => 'authorization_code', 'credential_epoch' => 0, ...$times]);
         $this->writer->insert('oauth_refresh_tokens', ['id' => Uuid::generate()->toString(), 'token_id' => hash('sha256', $tokens['refresh token']),
             'access_token_id' => $access, 'credential_epoch' => 0, 'chain_expires_at' => '2027-01-01 00:00:00+00', ...$times]);
 

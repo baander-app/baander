@@ -25,6 +25,7 @@ use App\Auth\Application\Service\StepUpVerifier;
 use App\Auth\Application\Service\UserLookup;
 use App\Auth\Domain\Model\OAuth\AccessToken;
 use App\Auth\Domain\Model\OAuth\Client;
+use App\Auth\Domain\Model\OAuth\SignInGrant;
 use App\Auth\Domain\Model\OAuth\TokenId;
 use App\Auth\Domain\Model\Passkey\Passkey;
 use App\Auth\Domain\Model\User;
@@ -170,7 +171,7 @@ final class PasswordHandlersTest extends TestCase
 
     public function testChangeKeepsTheRequestingSession(): void
     {
-        $this->storedToken = AccessToken::issue(Client::create('SPA', ['https://baander.app']), $this->user);
+        $this->storedToken = AccessToken::issue(Client::create('SPA', ['https://baander.app']), SignInGrant::Password, $this->user);
 
         $this->changeHandler()(new ChangePasswordCommand(
             $this->user->getId()->toString(),
@@ -186,7 +187,7 @@ final class PasswordHandlersTest extends TestCase
     public function testChangeDoesNotKeepAnotherUsersToken(): void
     {
         $other = User::register(new Email('other@baander.app'), 'hashed:x', 'Other');
-        $this->storedToken = AccessToken::issue(Client::create('SPA', ['https://baander.app']), $other);
+        $this->storedToken = AccessToken::issue(Client::create('SPA', ['https://baander.app']), SignInGrant::Password, $other);
 
         $this->changeHandler()(new ChangePasswordCommand(
             $this->user->getId()->toString(),

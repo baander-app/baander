@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Integration;
 
+use App\Auth\Domain\Model\OAuth\SignInGrant;
 use App\Auth\Domain\Model\User;
 use App\Auth\Domain\Repository\UserRepositoryInterface;
 use App\Auth\Infrastructure\Doctrine\Entity\OAuth\AccessTokenEntity;
@@ -237,10 +238,14 @@ final class ArtistMutationFirewallTest extends TestCase
             $this->users->save($user);
             $entity = $this->manager->find(UserEntity::class, $user->getId());
             self::assertInstanceOf(UserEntity::class, $entity);
-            $client = FirstPartyOAuthClient::entity($this->kernel->getContainer(), $this->manager);
             $proof = new SignedDpopProof();
-            $token = new AccessTokenEntity((new Uuid())->toString(), $client, $entity, scopes: ['library'], expiresAt: new \DateTimeImmutable('+1 hour'));
-            $token->setDpopJkt($proof->thumbprint());
+            $token = FirstPartyOAuthClient::accessToken(
+                $this->kernel->getContainer(),
+                $this->manager,
+                $entity,
+                SignInGrant::Password,
+                $proof->thumbprint(),
+            );
             $library = $this->manager->find(LibraryEntity::class, $this->library->getId());
             self::assertInstanceOf(LibraryEntity::class, $library);
             $this->manager->persist(new UserLibraryAccessEntity($entity->getId(), $library, new \DateTimeImmutable()));

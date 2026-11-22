@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Integration;
 
+use App\Auth\Domain\Model\OAuth\SignInGrant;
 use App\Auth\Domain\Model\User;
 use App\Auth\Domain\Repository\UserRepositoryInterface;
 use App\Auth\Infrastructure\Doctrine\Entity\OAuth\AccessTokenEntity;
@@ -317,16 +318,14 @@ final class TrackStreamFirewallTest extends TestCase
             return;
         }
         $entity = $actor === 'member' ? $this->member : $this->createUser($actor);
-        $client = FirstPartyOAuthClient::entity($this->kernel->getContainer(), $this->manager);
         $this->proof = new SignedDpopProof();
-        $this->token = new AccessTokenEntity(
-            (new Uuid())->toString(),
-            $client,
+        $this->token = FirstPartyOAuthClient::accessToken(
+            $this->kernel->getContainer(),
+            $this->manager,
             $entity,
-            scopes: ['library'],
-            expiresAt: new \DateTimeImmutable('+1 hour'),
+            SignInGrant::Password,
+            $this->proof->thumbprint(),
         );
-        $this->token->setDpopJkt($this->proof->thumbprint());
         $this->manager->persist($this->token);
         $this->entities[] = $this->token;
         $this->manager->flush();

@@ -14,6 +14,7 @@ use App\Auth\Application\Service\TokenChainRevoker;
 use App\Auth\Application\Service\TokenPairIssuer;
 use App\Auth\Domain\Model\OAuth\AuthCode;
 use App\Auth\Domain\Model\OAuth\Client;
+use App\Auth\Domain\Model\OAuth\SignInGrant;
 use App\Auth\Domain\Model\OAuth\TokenId;
 use App\Auth\Domain\Model\OAuth\ValueObject\ChainId;
 use App\Auth\Domain\Repository\OAuth\AuthCodeRepositoryInterface;
@@ -74,6 +75,7 @@ final readonly class ExchangeAuthorizationCodeHandler
                 requestedScopes: $authCode->getScopeIdentifiers(),
                 dpopJkt: $command->dpopJkt,
                 credentialEpoch: $authCode->getCredentialEpoch(),
+                grant: SignInGrant::AuthorizationCode,
                 clientFingerprint: $command->clientFingerprint,
                 userAgent: $command->userAgent,
                 ipAddress: $command->ipAddress,

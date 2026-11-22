@@ -109,7 +109,7 @@ final class InitialSchemaMigrationTest extends TestCase
         }
         $factory = $this->factory();
         $factory->getMetadataStorage()->ensureInitialized();
-        self::assertCount(36, $factory->getMigrationRepository()->getMigrations());
+        self::assertCount(42, $factory->getMigrationRepository()->getMigrations());
         self::assertSame(0, $this->migrate($factory));
         self::assertSame([
             'DoctrineMigrations\\Version20261017000000',
@@ -148,8 +148,14 @@ final class InitialSchemaMigrationTest extends TestCase
             'DoctrineMigrations\\Version20261120100000',
             'DoctrineMigrations\\Version20261120110000',
             'DoctrineMigrations\\Version20261121143000',
+            'DoctrineMigrations\\Version20261121194500',
+            'DoctrineMigrations\\Version20261121194600',
+            'DoctrineMigrations\\Version20261121194700',
+            'DoctrineMigrations\\Version20261121194800',
+            'DoctrineMigrations\\Version20261122150000',
+            'DoctrineMigrations\\Version20261122160000',
         ], $this->connection->fetchFirstColumn('SELECT version FROM doctrine_migration_versions ORDER BY version'));
-        self::assertSame(95, (int) $this->connection->fetchOne("SELECT count(*) FROM pg_tables WHERE schemaname = 'public' AND tablename <> 'doctrine_migration_versions'"));
+        self::assertSame(108, (int) $this->connection->fetchOne("SELECT count(*) FROM pg_tables WHERE schemaname = 'public' AND tablename <> 'doctrine_migration_versions'"));
         self::assertSame(['TimeZone=UTC'], $this->databaseSettings($this->connection));
         $this->assertSchedules();
         $this->assertIdentitiesAllocate();
@@ -162,13 +168,13 @@ final class InitialSchemaMigrationTest extends TestCase
         self::assertSame($history, $this->connection->fetchAllAssociative('SELECT * FROM doctrine_migration_versions'));
 
         $failure = $this->refused($this->factory(), '0');
-        self::assertStringContainsString('Removing director storage would discard imported identities and movie credits.', $failure);
+        self::assertStringContainsString('The deleted sessions cannot be restored', $failure);
         self::assertSame($catalog, $this->catalog('public'));
         self::assertSame($seeds, $this->connection->fetchAllAssociative('SELECT * FROM scheduled_jobs ORDER BY id'));
         self::assertSame($history, $this->connection->fetchAllAssociative('SELECT * FROM doctrine_migration_versions'));
 
         self::assertSame(0, $this->migrate($this->factory(true)));
-        self::assertSame(37, (int) $this->connection->fetchOne('SELECT count(*) FROM doctrine_migration_versions'));
+        self::assertSame(43, (int) $this->connection->fetchOne('SELECT count(*) FROM doctrine_migration_versions'));
         self::assertSame('future_migration_probe', $this->connection->fetchOne("SELECT to_regclass('future_migration_probe')::text"));
     }
 

@@ -16,6 +16,7 @@ declare(strict_types=1);
  *            the server's workers and started PostgreSQL again; "wait" first waits for the alerts
  */
 
+use App\Auth\Domain\Model\OAuth\SignInGrant;
 use App\Auth\Infrastructure\Doctrine\Entity\UserEntity;
 use App\Catalog\Infrastructure\Doctrine\Entity\AlbumEntity;
 use App\Catalog\Infrastructure\Doctrine\Entity\SongEntity;
@@ -76,6 +77,7 @@ $streamClient = static fn (): StreamClient => new StreamClient(
     STREAM_USER,
     (string) file_get_contents($projectDir . '/config/secrets/oauth/private.key'),
     SERVER . '/api/stream/track',
+    SignInGrant::AuthorizationCode,
 );
 $track = static function (): string {
     $state = json_decode((string) file_get_contents(STATE_FILE), true, 512, JSON_THROW_ON_ERROR);

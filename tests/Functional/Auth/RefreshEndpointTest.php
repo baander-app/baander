@@ -7,6 +7,7 @@ namespace App\Tests\Functional\Auth;
 use App\Auth\Application\Command\OAuth\IssueTokenCommand;
 use App\Auth\Application\DTO\TokenResponseDTO;
 use App\Auth\Domain\Model\OAuth\Client;
+use App\Auth\Domain\Model\OAuth\SignInGrant;
 use App\Auth\Domain\Repository\OAuth\ClientRepositoryInterface;
 use App\Shared\Domain\Model\Uuid;
 use App\Tests\Fixtures\Auth\FirstPartyOAuthClient;
@@ -37,7 +38,7 @@ final class RefreshEndpointTest extends TestCase
     public function testAFirstPartyRefreshTokenRotatesAtTheFirstPartyEndpoint(): void
     {
         $client = FirstPartyOAuthClient::entity(static::getContainer(), $this->entityManager);
-        $tokens = $this->issue($client->getId());
+        $tokens = $this->issue($client->getId(), SignInGrant::Password);
 
         $response = $this->refresh((string) $tokens->getRefreshToken());
 
@@ -50,7 +51,7 @@ final class RefreshEndpointTest extends TestCase
         $owner = $this->createTestUser();
         $client = Client::createPersonalAccess('Owner CLI', $owner->getId());
         static::getContainer()->get(ClientRepositoryInterface::class)->saveClient($client);
-        $tokens = $this->issue($client->getId(), $owner->getId());
+        $tokens = $this->issue($client->getId(), SignInGrant::AuthorizationCode, $owner->getId());
 
         $refused = $this->refresh((string) $tokens->getRefreshToken());
         self::assertSame(Response::HTTP_UNAUTHORIZED, $refused->getStatusCode(), (string) $refused->getContent());
@@ -67,12 +68,12 @@ final class RefreshEndpointTest extends TestCase
         self::assertIsString($this->json($rotated)['refresh_token'] ?? null);
     }
 
-    private function issue(Uuid $clientId, ?Uuid $userId = null): TokenResponseDTO
+    private function issue(Uuid $clientId, SignInGrant $grant, ?Uuid $userId = null): TokenResponseDTO
     {
         $bus = static::getContainer()->get(MessageBusInterface::class);
         self::assertInstanceOf(MessageBusInterface::class, $bus);
         $tokens = $bus
-            ->dispatch(new IssueTokenCommand($clientId, $userId ?? $this->createTestUser()->getId(), $this->key->thumbprint(), 0))
+            ->dispatch(new IssueTokenCommand($clientId, $userId ?? $this->createTestUser()->getId(), $this->key->thumbprint(), 0, $grant))
             ->last(HandledStamp::class)?->getResult();
         self::assertInstanceOf(TokenResponseDTO::class, $tokens);
 
