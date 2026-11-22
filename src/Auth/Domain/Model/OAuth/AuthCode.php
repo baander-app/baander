@@ -143,9 +143,14 @@ final class AuthCode
         return $this->state->id;
     }
 
+    /**
+     * The code to hand to the client. Only the request that issued the code knows it; a code
+     * read back from storage has only its hash.
+     */
     public function getCodeId(): TokenId
     {
-        return $this->state->codeId;
+        return $this->state->codeId
+            ?? throw new \LogicException('A stored authorization code keeps only its hash.');
     }
 
     public function getUser(): User

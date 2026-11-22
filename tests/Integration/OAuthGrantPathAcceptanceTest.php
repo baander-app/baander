@@ -840,6 +840,49 @@ final class OAuthGrantPathAcceptanceTest extends TestCase
         ), 'No stored value equals an issued refresh token.');
     }
 
+    /**
+     * The table holds only the SHA-256 hash of an issued device code, so a database reader
+     * who polls with the stored value of an approved code receives no tokens.
+     */
+    public function testADeviceCodeIsStoredOnlyAsItsHash(): void
+    {
+        $clientId = $this->deviceClient();
+        $codes = json_decode((string) $this->send('POST', '/api/oauth/device/authorize', form: ['client_id' => $clientId, 'scope' => 'library'])->getContent(), true, flags: JSON_THROW_ON_ERROR);
+
+        self::assertSame(0, (int) $this->connection->fetchOne('SELECT count(*) FROM oauth_device_codes WHERE device_code = ?', [$codes['device_code']]));
+        self::assertSame(1, (int) $this->connection->fetchOne('SELECT count(*) FROM oauth_device_codes WHERE device_code = ?', [hash('sha256', $codes['device_code'])]));
+
+        $web = new SignedDpopProof();
+        $login = $this->login($web);
+        $approval = $this->asUser($login['accessToken'], $web, 'POST', '/api/oauth/device/approve', json: ['userCode' => $codes['user_code'], 'decision' => 'approve']);
+        self::assertSame(200, $approval->getStatusCode(), (string) $approval->getContent());
+        $stored = $this->connection->fetchOne(
+            'SELECT d.device_code FROM oauth_device_codes d JOIN oauth_clients c ON c.id = d.client_id WHERE c.public_id = ?',
+            [$clientId],
+        );
+        self::assertIsString($stored);
+
+        [$reader, $nonce] = $this->pollDevice(new SignedDpopProof(), $clientId, $stored, $this->nonce());
+        self::assertSame(['invalid_grant', 400], [$reader['error'], $reader['status']], json_encode($reader, JSON_THROW_ON_ERROR));
+        self::assertSame(0, $this->issuedTo($clientId), 'The stored value redeems nothing.');
+        [$tv] = $this->pollDevice(new SignedDpopProof(), $clientId, $codes['device_code'], $nonce);
+        self::assertSame(200, $tv['status'], json_encode($tv, JSON_THROW_ON_ERROR));
+    }
+
+    /** A database reader holds only the SHA-256 hash of an authorization code issued on consent. */
+    public function testAnAuthorizationCodeIsStoredOnlyAsItsHash(): void
+    {
+        $clientId = $this->publicClient();
+        [, $challenge] = self::pkcePair();
+        $web = new SignedDpopProof();
+        $login = $this->login($web);
+        $redirect = $this->decide($login['accessToken'], $web, ['client_id' => $clientId, 'request_uri' => $this->push($clientId, $challenge, proof: new SignedDpopProof()), 'decision' => 'approve']);
+        self::assertArrayHasKey('code', $redirect);
+
+        self::assertSame(0, (int) $this->connection->fetchOne('SELECT count(*) FROM oauth_auth_codes WHERE code_id = ?', [$redirect['code']]));
+        self::assertSame(1, (int) $this->connection->fetchOne('SELECT count(*) FROM oauth_auth_codes WHERE code_id = ?', [hash('sha256', $redirect['code'])]));
+    }
+
     public function testDeniedDeviceRequestAnswersAccessDenied(): void
     {
         $tv = new SignedDpopProof();
@@ -1018,7 +1061,7 @@ final class OAuthGrantPathAcceptanceTest extends TestCase
         // The code was issued 61 seconds ago.
         $this->connection->executeStatement(
             "UPDATE oauth_auth_codes SET created_at = created_at - interval '61 seconds', expires_at = expires_at - interval '61 seconds' WHERE code_id = ?",
-            [$redirect['code']],
+            [hash('sha256', $redirect['code'])],
         );
 
         [$late] = $this->tokenRequest($app, $this->nonce(), [

@@ -51,7 +51,7 @@ final class ReferentialIntegrityTest extends TestCase
         'oauth_access_tokens.chain_id' => 'token chain identifier with no chain table',
         'oauth_access_tokens.token_id' => 'the token\'s own OAuth identifier',
         'oauth_auth_codes.chain_id' => 'the token chain a redeemed code started; token chain identifier with no chain table',
-        'oauth_auth_codes.code_id' => 'the code\'s own OAuth identifier',
+        'oauth_auth_codes.code_id' => 'the SHA-256 hash of the code\'s own OAuth identifier',
         'oauth_pushed_authorization_requests.request_id' => 'the pushed request\'s own OAuth identifier, carried in its request URI',
         'oauth_refresh_tokens.chain_id' => 'token chain identifier with no chain table',
         'oauth_refresh_tokens.token_id' => 'the SHA-256 hash of the token\'s own OAuth identifier',

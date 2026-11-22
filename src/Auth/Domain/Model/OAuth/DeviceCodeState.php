@@ -24,7 +24,8 @@ final class DeviceCodeState
     /** @param array<array-key, Scope> $scopes */
     public function __construct(
         public readonly Uuid $id,
-        public readonly TokenId $deviceCode,
+        /** The device code itself: known only to the request that issued it; storage keeps its hash. */
+        public readonly ?TokenId $deviceCode,
         public readonly string $userCode,
         public ?User $user,
         public readonly Client $client,

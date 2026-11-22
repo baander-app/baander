@@ -26,6 +26,7 @@ class DeviceCodeEntity implements DeviceCodeEntityInterface
     #[ORM\GeneratedValue(strategy: 'NONE')]
     private Uuid $id;
 
+    /** The hex SHA-256 digest of the device code; the device code itself is never stored. */
     #[ORM\Column(type: 'text')]
     private string $deviceCode;
 

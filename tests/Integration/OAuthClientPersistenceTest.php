@@ -6,6 +6,7 @@ namespace App\Tests\Integration;
 
 use App\Auth\Application\Port\EmailVerificationTokenRepositoryInterface;
 use App\Auth\Application\Port\PasswordResetTokenRepositoryInterface;
+use App\Auth\Domain\Model\OAuth\AuthCode;
 use App\Auth\Domain\Model\OAuth\Client;
 use App\Auth\Domain\Model\OAuth\ClientAuthMethod;
 use App\Auth\Domain\Model\OAuth\ClientType;
@@ -222,7 +223,7 @@ final class OAuthClientPersistenceTest extends TestCase
         ];
         $this->writer->insert('users', ['id' => $user, 'public_id' => (new \App\Shared\Domain\Model\PublicId())->toString(),
             'name' => 'Key client user', 'email' => 'key-client@baander.app', 'password' => 'test-only', ...$times]);
-        $this->writer->insert('oauth_auth_codes', ['id' => Uuid::generate()->toString(), 'code_id' => $tokens['auth code'],
+        $this->writer->insert('oauth_auth_codes', ['id' => Uuid::generate()->toString(), 'code_id' => hash('sha256', $tokens['auth code']),
             'client_id' => $client->toString(), 'user_id' => $user, 'redirect_uri' => 'https://server.baander.app/callback',
             'code_challenge' => 'E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM', 'code_challenge_method' => 'S256',
             'dpop_jkt' => '0ZcOCORZNYy-DWpqq30jZyJGHTN0d2HglBV3uiguA4I', 'credential_epoch' => 0, ...$times]);
@@ -244,6 +245,57 @@ final class OAuthClientPersistenceTest extends TestCase
             ['kty' => 'EC', 'crv' => 'P-256', 'kid' => 'signing-1', 'x' => 'f83OJ3D2xF1Bg8vub9tLe1gHMzV76e8Tus9uPHvRVEU', 'y' => 'x_FEzRu9m36HLN_tue659LNpXW6pCyStikYjKIWI5a0'],
             ['kty' => 'RSA', 'kid' => 'signing-2', 'e' => 'AQAB', 'n' => str_repeat('u1SU1LfVLPHCozMxH2Mo', 17)],
         ]];
+    }
+
+    /** Both code tables hold the SHA-256 hash of the code, and a code read back cannot give its plain value. */
+    public function testCodesAreStoredAsHashesAndReadBackWithoutTheirPlainValue(): void
+    {
+        $user = User::register(new Email('codes-' . bin2hex(random_bytes(4)) . '@baander.app'), 'hashed', 'Code owner');
+        new UserRepository(
+            $this->manager,
+            $this->createStub(PasswordResetTokenRepositoryInterface::class),
+            $this->createStub(EmailVerificationTokenRepositoryInterface::class),
+        )->save($user);
+        $client = Client::create('Code client', ['https://player.baander.app/callback']);
+        new ClientRepository($this->manager, new JsonEncoder())->saveClient($client);
+        $authCodes = new AuthCodeRepository($this->manager, new JsonEncoder());
+        $deviceCodes = new DeviceCodeRepository($this->manager, new JsonEncoder());
+        $authCode = AuthCode::create(
+            $user,
+            $client,
+            'https://player.baander.app/callback',
+            'E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM',
+            'S256',
+            '0ZcOCORZNYy-DWpqq30jZyJGHTN0d2HglBV3uiguA4I',
+            ttl: new DateInterval('PT60S'),
+        );
+        $deviceCode = DeviceCode::create($client, 'BCDF-GHJK', 'https://baander.app/device', ttl: new DateInterval('PT15M'));
+        $authCodes->save($authCode);
+        $deviceCodes->save($deviceCode);
+        $this->manager->clear();
+
+        self::assertSame(
+            [hash('sha256', $authCode->getCodeId()->toString()), hash('sha256', $deviceCode->getDeviceCode()->toString())],
+            [
+                $this->observer->fetchOne('SELECT code_id FROM oauth_auth_codes WHERE id = ?', [$authCode->getId()->toString()]),
+                $this->observer->fetchOne('SELECT device_code FROM oauth_device_codes WHERE id = ?', [$deviceCode->getId()->toString()]),
+            ],
+        );
+
+        $storedAuthCode = $authCodes->findByCodeId($authCode->getCodeId());
+        $storedDeviceCode = $deviceCodes->findByDeviceCode($deviceCode->getDeviceCode());
+        self::assertNotNull($storedAuthCode);
+        self::assertNotNull($storedDeviceCode);
+        self::assertTrue($storedAuthCode->getId()->equals($authCode->getId()));
+        self::assertTrue($storedDeviceCode->getId()->equals($deviceCode->getId()));
+        foreach (['authorization code' => $storedAuthCode->getCodeId(...), 'device code' => $storedDeviceCode->getDeviceCode(...)] as $kind => $plainValue) {
+            try {
+                $plainValue();
+                self::fail('A stored ' . $kind . ' gave its plain value.');
+            } catch (\LogicException) {
+                $this->addToAssertionCount(1);
+            }
+        }
     }
 
     /** Two users who both saw the code pending approve it: one approval is recorded, for its user alone. */

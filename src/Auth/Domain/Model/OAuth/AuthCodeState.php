@@ -25,7 +25,8 @@ final class AuthCodeState
     /** @param array<array-key, Scope> $scopes */
     public function __construct(
         public readonly Uuid $id,
-        public readonly TokenId $codeId,
+        /** The code itself: known only to the request that issued it; storage keeps its hash. */
+        public readonly ?TokenId $codeId,
         public readonly User $user,
         public readonly Client $client,
         array $scopes,

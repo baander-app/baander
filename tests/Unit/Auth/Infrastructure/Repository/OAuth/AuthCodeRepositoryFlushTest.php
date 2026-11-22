@@ -39,28 +39,12 @@ final class AuthCodeRepositoryFlushTest extends TestCase
             $this->entityManager,
             new JsonEncoder(),
         );
-    }
-
-    public function testSaveDoesNotFlushInsideTransaction(): void
-    {
-        $user = User::register(new Email('user@baander.app'), 'hashed-pw', 'Test User');
-        $client = Client::create(
-            name: 'Test App',
-            redirectUris: ['http://localhost'],
-            secret: ClientSecret::fromString('test-secret'),
-            confidential: true,
-            firstParty: true,
-        );
-        $authCode = AuthCode::create($user, $client, 'http://localhost', str_repeat('A', 43), 'S256', 'NzbLsXh8uDCcd-6MNwXF4W_7noWXFZAfHkxZsRGC9Xs', [new Scope('profile')]);
-
-        $clientEntity = $this->createStub(ClientEntity::class);
-        $userEntity = $this->createStub(UserEntity::class);
 
         $clientRepo = $this->createStub(EntityRepository::class);
-        $clientRepo->method('find')->willReturn($clientEntity);
+        $clientRepo->method('find')->willReturn($this->createStub(ClientEntity::class));
 
         $userRepo = $this->createStub(EntityRepository::class);
-        $userRepo->method('find')->willReturn($userEntity);
+        $userRepo->method('find')->willReturn($this->createStub(UserEntity::class));
 
         $authCodeRepo = $this->createStub(EntityRepository::class);
         $authCodeRepo->method('find')->willReturn(null);
@@ -72,12 +56,43 @@ final class AuthCodeRepositoryFlushTest extends TestCase
                 [ClientEntity::class, $clientRepo],
                 [UserEntity::class, $userRepo],
             ]);
+    }
 
+    public function testSaveDoesNotFlushInsideTransaction(): void
+    {
         $this->entityManager->expects($this->once())->method('persist');
         // The repository must NOT flush; the application service (handler) owns
         // the transaction boundary and should flush once after all changes.
         $this->entityManager->expects($this->never())->method('flush');
 
+        $this->repository->save(self::authCode(), false);
+    }
+
+    public function testSaveWritesTheHashOfTheCodeInsteadOfTheCode(): void
+    {
+        $authCode = self::authCode();
+        $persisted = null;
+        $this->entityManager->expects($this->once())->method('persist')->willReturnCallback(static function (object $entity) use (&$persisted): void {
+            $persisted = $entity;
+        });
+
         $this->repository->save($authCode, false);
+
+        self::assertInstanceOf(AuthCodeEntity::class, $persisted);
+        self::assertSame(hash('sha256', $authCode->getCodeId()->toString()), $persisted->getCodeId());
+    }
+
+    private static function authCode(): AuthCode
+    {
+        $user = User::register(new Email('user@baander.app'), 'hashed-pw', 'Test User');
+        $client = Client::create(
+            name: 'Test App',
+            redirectUris: ['http://localhost'],
+            secret: ClientSecret::fromString('test-secret'),
+            confidential: true,
+            firstParty: true,
+        );
+
+        return AuthCode::create($user, $client, 'http://localhost', str_repeat('A', 43), 'S256', 'NzbLsXh8uDCcd-6MNwXF4W_7noWXFZAfHkxZsRGC9Xs', [new Scope('profile')]);
     }
 }
