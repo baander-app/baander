@@ -46,4 +46,25 @@ export const authLiveCoverage = [
     coverageVerification: ["tests/live-updates/coverage.test.ts"],
     behaviorVerification: { unitProofs: ["tests/live-updates/account-consumers.test.tsx"] },
   },
+  {
+    id: "auth.registration",
+    family: "account",
+    policy: {
+      kind: "demand",
+      reason: "Whether self-registration is open is an operator setting, read when the signed-out register page opens; a closed refusal on submit switches the page to its closed state.",
+    },
+    audiences: ["global"],
+    sourceTables: ["system_settings"],
+    deploymentTables: [],
+    sources: ["[ `/api/auth/registration` ]"],
+    keyVariants: ["[ `/api/auth/registration` ]"],
+    dependentFamilies: [],
+    mirrors: [],
+    responseCaches: [],
+    consumers: [
+      "src/features/auth/pages/RegisterPage.tsx#useGetAuthRegistration:generated",
+    ],
+    coverageVerification: ["tests/live-updates/coverage.test.ts"],
+    behaviorVerification: { unitProofs: ["src/features/auth/pages/__tests__/RegisterPage.test.tsx"] },
+  },
 ] as const satisfies readonly LiveCoverageDescriptor[]
