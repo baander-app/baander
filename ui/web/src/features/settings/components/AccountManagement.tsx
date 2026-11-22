@@ -1,9 +1,8 @@
 import { type ReactNode, useEffect, useRef, useState } from 'react'
 import styled from 'styled-components'
-import { useQueryClient } from '@tanstack/react-query'
 import { useAuthStore } from '@/features/auth/stores/auth-store'
 import { useCurrentUserRefresh } from '@/features/auth/hooks/use-current-user-refresh'
-import { getGetAuthMeQueryKey, putAuthMeEmail, putAuthMePassword } from '@/shared/api-client/gen/endpoints'
+import { putAuthMePassword } from '@/shared/api-client/gen/endpoints'
 import { useTranslation } from '@/shared/i18n'
 import { textRole } from '@/shared/theme'
 import { Button } from '@/shared/components/ui/button'
@@ -11,6 +10,7 @@ import { Input } from '@/shared/components/ui/input'
 import { Card, CardContent } from '@/shared/components/ui/card'
 import { Loader2 } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
+import { ChangeEmailDialog } from './ChangeEmailDialog'
 import { EmailVerificationNotice } from './EmailVerificationNotice'
 import { PendingEmailNotice } from './PendingEmailNotice'
 import { StepUpDialog, type StepUpCredentials } from './StepUpDialog'
@@ -163,50 +163,6 @@ export function AccountManagement() {
       </Card>
 
     </>
-  )
-}
-
-function ChangeEmailDialog({ open, onOpenChange, children }: { open: boolean; onOpenChange: (open: boolean) => void; children: ReactNode }) {
-  const { t } = useTranslation()
-  const user = useAuthStore((s) => s.user)
-  const [email, setEmail] = useState(user?.email ?? '')
-  const queryClient = useQueryClient()
-
-  const changeEmail = async (stepUp: StepUpCredentials) => {
-    await putAuthMeEmail({ email, ...stepUp })
-    // The change waits for the link sent to the new address. Reading the profile again shows it
-    // as pending; useCurrentUserRefresh copies the profile into the store.
-    await queryClient.invalidateQueries({ queryKey: getGetAuthMeQueryKey() })
-
-    return true
-  }
-
-  return (
-    <StepUpDialog
-      open={open}
-      onOpenChange={onOpenChange}
-      trigger={children}
-      title="Change email"
-      description={t('auth.emailVerification.changeEmailDescription')}
-      submitLabel="Save"
-      fallbackError="Failed to change email."
-      onConfirm={changeEmail}
-    >
-      <div>
-        <FieldLabel htmlFor="new-email">
-          New email
-        </FieldLabel>
-        <Input
-          id="new-email"
-          type="email"
-          required
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          autoComplete="email"
-          autoFocus
-        />
-      </div>
-    </StepUpDialog>
   )
 }
 

@@ -57,8 +57,8 @@ final class AdminUserCliParityTest extends TestCase
     public function testMarkingAnAddressVerifiedLeavesTheSameStateAndSucceedsWhenRepeated(): void
     {
         $superAdmin = $this->createSuperAdminUser();
-        $viaApi = $this->createTestUser();
-        $viaCli = $this->createTestUser();
+        $viaApi = $this->createTestUser(verified: false);
+        $viaCli = $this->createTestUser(verified: false);
 
         foreach ([1, 2] as $attempt) {
             $data = $this->assertJsonResponse($this->authenticatedRequest('POST', $this->userPath($viaApi) . '/verify-email', $superAdmin), 200, 'data')['data'];

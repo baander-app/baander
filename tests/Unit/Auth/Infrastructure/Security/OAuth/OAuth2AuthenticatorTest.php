@@ -240,6 +240,29 @@ final class OAuth2AuthenticatorTest extends TestCase
         }
     }
 
+    /** @return iterable<string, array{bool}> */
+    public static function addressStates(): iterable
+    {
+        yield 'unverified address' => [false];
+        yield 'verified address' => [true];
+    }
+
+    #[DataProvider('addressStates')]
+    public function testTheRequestCarriesWhetherTheTokenUsersAddressIsVerified(bool $verified): void
+    {
+        $user = $this->user('registrant@baander.app');
+        if ($verified) {
+            $user->verifyEmail();
+        }
+        $this->setupSuccessfulResourceServerValidation(TokenId::generate()->toString(), $user->getPublicId()->toString());
+        $request = Request::create('/api/playlists/');
+        $request->headers->set('Authorization', 'Bearer token123');
+
+        $this->createAuthenticator($this->createStub(TokenMetadataRepositoryInterface::class), $user)->authenticate($request)->getUser();
+
+        self::assertSame($verified, $request->attributes->get(AccessTokenAttributes::EMAIL_VERIFIED));
+    }
+
     /** A DPoP-bound token presented under the Bearer scheme is refused like any other invalid token, before any user is loaded. */
     public function testABoundTokenUnderTheBearerSchemeIsRefused(): void
     {

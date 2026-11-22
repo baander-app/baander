@@ -15386,7 +15386,7 @@ export const getPostPasskeyOptionsUrl = () => {
 }
 
 /**
- * Needs a verified email address, answered otherwise with 422 and `details.reason` `email_unverified`. Needs the current password, plus a current TOTP code when TOTP is on; a wrong password and a missing or wrong code get the same 422 with `details.reason` `step_up_failed`. The challenge is bound to the signed-in user and expires after 5 minutes.
+ * Needs a verified email address, answered otherwise with 403 and `details.reason` `email_unverified`. Needs the current password, plus a current TOTP code when TOTP is on; a wrong password and a missing or wrong code get the same 422 with `details.reason` `step_up_failed`. The challenge is bound to the signed-in user and expires after 5 minutes.
  * @summary Get WebAuthn registration options
  */
 export const postPasskeyOptions = async (passkeyRegistrationOptionsRequest: PasskeyRegistrationOptionsRequest, options?: Parameters<typeof customInstance>[1]): Promise<PostPasskeyOptions200> => {
@@ -15907,7 +15907,7 @@ export const getPostTotpSetupUrl = () => {
 }
 
 /**
- * Refused while TOTP is on, and for an unverified email address with 422 and `details.reason` `email_unverified`. Needs the current password; a wrong one gets 422 with `details.reason` `step_up_failed`. Each setup replaces the pending secret of the previous one; it expires after 10 minutes.
+ * Refused while TOTP is on, and for an unverified email address with 403 and `details.reason` `email_unverified`. Needs the current password; a wrong one gets 422 with `details.reason` `step_up_failed`. Each setup replaces the pending secret of the previous one; it expires after 10 minutes.
  * @summary Generate TOTP secret and provisioning URI
  */
 export const postTotpSetup = async (startTotpSetupRequest: StartTotpSetupRequest, options?: Parameters<typeof customInstance>[1]): Promise<PostTotpSetup200> => {

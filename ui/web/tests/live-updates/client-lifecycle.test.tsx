@@ -1,6 +1,10 @@
 import { StrictMode, useEffect } from 'react'
 import { act, cleanup, render, screen, waitFor } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { QueryClientProvider, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import MockAdapter from 'axios-mock-adapter'
+import { MemoryRouter, Route, Routes } from 'react-router-dom'
+import { ThemeProvider } from 'styled-components'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { OwnedQueryClient } from '@/shared/live/query-client'
 import { advanceAuthorization, captureOwnership, guardMutationCallbacks, setAuthorityPending, synchronizeOwnership } from '@/shared/live/ownership'
@@ -9,6 +13,9 @@ import { authenticatedTransport, type SharedLiveTransport, type LiveTransportLis
 import { AuthenticatedClientProvider } from '@/shared/live/provider'
 import { usePaletteStore } from '@/features/visualizer/stores/palette-store'
 import { useAuthStore } from '@/features/auth/stores/auth-store'
+import { ProtectedRoute } from '@/features/auth/components/ProtectedRoute'
+import { AXIOS_INSTANCE } from '@/shared/api-client/axios-instance'
+import { resolveTheme } from '@/shared/theme/resolve-theme'
 import { toast } from 'sonner'
 import { LIVE_OUTAGE_TOAST_ID } from '@/shared/live/outage-watcher'
 import { useLiveOutageStore } from '@/shared/live/outage-store'
@@ -34,6 +41,21 @@ vi.mock('@/shared/live/transport', () => ({
     isConnected: () => false,
   },
 }))
+
+const VERIFIED_AT = '2026-11-22T10:00:00+00:00'
+const REGISTRANT = {
+  email: 'registrant@baander.app',
+  publicId: 'usr_registrant',
+  name: 'Registrant',
+  roles: ['ROLE_USER'],
+  emailVerifiedAt: null,
+}
+const REGISTRANT_PROFILE = {
+  ...REGISTRANT,
+  createdAt: '2026-11-22T09:00:00+00:00',
+  totpEnabled: false,
+  pendingEmail: null,
+}
 
 function deferred<T>() {
   let resolve!: (value: T) => void
@@ -313,6 +335,69 @@ describe('authenticated provider lifecycle', () => {
     view.unmount()
     expect(transportState.leases).toBe(0)
     expect(transportState.listeners.size).toBe(0)
+  })
+
+  it('starts live updates once the address is verified, without remounting the page', () => {
+    useAuthStore.setState({ isAuthenticated: true, principalSessionId: 'unverified-account', user: REGISTRANT })
+    const mounts = vi.fn()
+    function Page() {
+      useEffect(() => {
+        mounts()
+      }, [])
+      return <span>page</span>
+    }
+    const view = render(<StrictMode><AuthenticatedClientProvider freshnessEnabled><Page /></AuthenticatedClientProvider></StrictMode>)
+    expect(transportState.leases).toBe(0)
+    expect(transportState.listeners.size).toBe(0)
+    const mountsBeforeVerification = mounts.mock.calls.length
+
+    act(() => useAuthStore.setState({ user: { ...REGISTRANT, emailVerifiedAt: VERIFIED_AT } }))
+
+    expect(transportState.leases).toBe(1)
+    expect(transportState.listeners.size).toBe(1)
+    expect(mounts).toHaveBeenCalledTimes(mountsBeforeVerification)
+    view.unmount()
+    expect(transportState.leases).toBe(0)
+  })
+
+  it('lets an account at the verification gate resend its link, and opens the app with live updates once it is verified elsewhere', async () => {
+    const user = userEvent.setup()
+    useAuthStore.setState({ isAuthenticated: true, principalSessionId: 'gate-account', accessToken: null, refreshToken: null, user: REGISTRANT })
+    let verifiedAt: string | null = null
+    const http = new MockAdapter(AXIOS_INSTANCE, { onNoMatch: 'throwException' })
+    http.onGet('/api/auth/me').reply(() => [200, { data: { ...REGISTRANT_PROFILE, emailVerifiedAt: verifiedAt } }])
+    http.onPost('/api/auth/me/email/verification').reply(200, {
+      data: { message: 'If your email address still needs verification, a new link has been sent.' },
+    })
+    try {
+      render(
+        <AuthenticatedClientProvider freshnessEnabled>
+          <ThemeProvider theme={resolveTheme('dark', 'violet')}>
+            <MemoryRouter>
+              <Routes>
+                <Route element={<ProtectedRoute />}>
+                  <Route path="/" element={<p>Home</p>} />
+                </Route>
+              </Routes>
+            </MemoryRouter>
+          </ThemeProvider>
+        </AuthenticatedClientProvider>,
+      )
+
+      await user.click(await screen.findByRole('button', { name: 'Resend verification email' }))
+      expect(await screen.findByRole('status')).toHaveTextContent('a new link is on its way')
+      expect(transportState.leases).toBe(0)
+
+      verifiedAt = VERIFIED_AT
+      act(() => {
+        window.dispatchEvent(new Event('focus'))
+      })
+
+      expect(await screen.findByText('Home')).toBeInTheDocument()
+      expect(transportState.leases).toBe(1)
+    } finally {
+      http.restore()
+    }
   })
 
   it('preserves player lifetime on rotation and access reset, replaces observers on principal switch', async () => {

@@ -188,7 +188,7 @@ final class EmailVerificationDeliveryTest extends RateLimitTestCase
 
     public function testAChangeToATakenAddressAnswersTheSameAndItsLinkFails(): void
     {
-        $user = $this->createTestUser($this->uniqueEmail(), verified: true);
+        $user = $this->createTestUser($this->uniqueEmail());
         $owner = $this->createTestUser($this->uniqueEmail());
         $free = $this->authenticatedRequest('PUT', '/api/auth/me/email', $this->createTestUser($this->uniqueEmail()), ['email' => $this->uniqueEmail(), 'currentPassword' => 'password123']);
 
@@ -216,11 +216,11 @@ final class EmailVerificationDeliveryTest extends RateLimitTestCase
      */
     public function testOnlyTheAccountsOwnSessionConfirmsAPendingChange(): void
     {
-        $user = $this->createTestUser($this->uniqueEmail(), verified: true);
+        $user = $this->createTestUser($this->uniqueEmail());
         $address = $this->uniqueEmail();
         $this->assertJsonResponse($this->authenticatedRequest('PUT', '/api/auth/me/email', $user, ['email' => $address, 'currentPassword' => 'password123']), 202);
         [, $token] = $this->linkFrom((string) $this->onlyEmail()->getTextBody());
-        $addressHolder = $this->createTestUser($this->uniqueEmail(), verified: true);
+        $addressHolder = $this->createTestUser($this->uniqueEmail());
         // The reused kernel keeps the token of the last request; clear it so the next one
         // carries no identity.
         static::getContainer()->get('security.token_storage')->setToken(null);
@@ -242,7 +242,7 @@ final class EmailVerificationDeliveryTest extends RateLimitTestCase
 
     public function testAPendingChangeLeavesTheAddressFreeForItsOwnerToRegisterAndReset(): void
     {
-        $user = $this->createTestUser($this->uniqueEmail(), verified: true);
+        $user = $this->createTestUser($this->uniqueEmail());
         $address = $this->uniqueEmail();
         $this->assertJsonResponse($this->authenticatedRequest('PUT', '/api/auth/me/email', $user, ['email' => $address, 'currentPassword' => 'password123']), 202);
 
@@ -262,7 +262,7 @@ final class EmailVerificationDeliveryTest extends RateLimitTestCase
 
     public function testResendSendsANewLinkToAPendingAddress(): void
     {
-        $user = $this->createTestUser($this->uniqueEmail(), verified: true);
+        $user = $this->createTestUser($this->uniqueEmail());
         $address = $this->uniqueEmail();
         $this->assertJsonResponse($this->authenticatedRequest('PUT', '/api/auth/me/email', $user, ['email' => $address, 'currentPassword' => 'password123']), 202);
 
@@ -276,7 +276,7 @@ final class EmailVerificationDeliveryTest extends RateLimitTestCase
 
     public function testAnAdministratorEmailChangeTakesEffectVerifiedAndTellsTheOldAddress(): void
     {
-        $user = $this->createTestUser($this->uniqueEmail());
+        $user = $this->createTestUser($this->uniqueEmail(), verified: false);
         $oldAddress = $user->getEmail();
         $newAddress = $this->uniqueEmail();
 
@@ -383,7 +383,7 @@ final class EmailVerificationDeliveryTest extends RateLimitTestCase
 
     public function testResendOverTheUserLimitAnswersTheSameAndSendsNothing(): void
     {
-        $user = $this->createTestUser($this->uniqueEmail());
+        $user = $this->createTestUser($this->uniqueEmail(), verified: false);
         $this->exhaust('auth_email_verification_user', $user->getId()->toString());
 
         $response = $this->resend($user);

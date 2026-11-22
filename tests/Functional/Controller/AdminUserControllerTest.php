@@ -317,7 +317,7 @@ final class AdminUserControllerTest extends TestCase
     public function testSuperAdminMarksAUsersAddressVerifiedAndRepeatingChangesNothing(): void
     {
         $superAdmin = $this->createSuperAdminUser();
-        $target = $this->createTestUser();
+        $target = $this->createTestUser(verified: false);
         $path = '/api/admin/users/' . $target->getPublicId()->toString() . '/verify-email';
 
         $first = $this->assertJsonResponse($this->authenticatedRequest('POST', $path, $superAdmin), 200, 'data');
@@ -331,7 +331,7 @@ final class AdminUserControllerTest extends TestCase
 
     public function testOnlyASuperAdminCanMarkAnAddressVerified(): void
     {
-        $target = $this->createTestUser();
+        $target = $this->createTestUser(verified: false);
 
         $response = $this->authenticatedRequest('POST', '/api/admin/users/' . $target->getPublicId()->toString() . '/verify-email', $this->createAdminUser());
 
@@ -342,7 +342,7 @@ final class AdminUserControllerTest extends TestCase
 
     public function testAnOperatorEmailChangeLeavesTheNewAddressVerified(): void
     {
-        $target = $this->createTestUser();
+        $target = $this->createTestUser(verified: false);
         $newEmail = 'operator-set-' . bin2hex(random_bytes(4)) . '@baander.app';
 
         $response = $this->authenticatedRequest('PATCH', '/api/admin/users/' . $target->getPublicId()->toString(), $this->createSuperAdminUser(), ['email' => $newEmail]);

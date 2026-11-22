@@ -96,6 +96,7 @@ final class OAuthGrantPathAcceptanceTest extends TestCase
             password_hash(self::PASSWORD, PASSWORD_BCRYPT),
             'Grant path user',
         );
+        $this->user->verifyEmail();
         $users->save($this->user);
 
         // Login and passkey login always issue to the configured first-party SPA client.

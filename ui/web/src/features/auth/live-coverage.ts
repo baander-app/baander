@@ -40,8 +40,8 @@ export const authLiveCoverage = [
     mirrors: ["auth-store"],
     responseCaches: ["authoritative-read"],
     consumers: [
-      "src/features/auth/components/VerifyEmail.tsx#getAuthMe:generated",
       "src/features/auth/hooks/use-current-user-refresh.ts#useGetAuthMe:generated",
+      "src/features/auth/lib/current-user.ts#getAuthMe:generated",
     ],
     coverageVerification: ["tests/live-updates/coverage.test.ts"],
     behaviorVerification: { unitProofs: ["tests/live-updates/account-consumers.test.tsx"] },

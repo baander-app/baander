@@ -90,6 +90,7 @@ final class OAuthFirewallAcceptanceTest extends TestCase
         $users = $container->get('oauth.acceptance.users');
         self::assertInstanceOf(UserRepositoryInterface::class, $users);
         $this->user = User::register(new Email('oauth-' . bin2hex(random_bytes(8)) . '@baander.app'), 'test-only-password', 'OAuth acceptance user');
+        $this->user->verifyEmail();
         $users->save($this->user);
         $userEntity = $this->manager->find(UserEntity::class, $this->user->getId());
         self::assertInstanceOf(UserEntity::class, $userEntity);
@@ -445,6 +446,26 @@ final class OAuthFirewallAcceptanceTest extends TestCase
             $response = $this->request($jwt, $this->proof->create('POST', $uri, $jwt), $uri, 'POST', $origin);
             self::assertSame(403, $response->getStatusCode(), (string) $response->getContent());
         }
+    }
+
+    public function testAnUnverifiedAccountReadsItsProfileButGetsNoTicketOrPlaylists(): void
+    {
+        $entity = $this->manager->find(UserEntity::class, $this->user->getId());
+        self::assertInstanceOf(UserEntity::class, $entity);
+        $entity->setEmailVerifiedAt(null);
+        $this->manager->flush();
+        $jwt = $this->accessJwt();
+
+        foreach ([['POST', '/api/ws/tickets'], ['GET', '/api/playlists/']] as [$method, $path]) {
+            $uri = 'https://baander.app' . $path;
+            $response = $this->request($jwt, $this->proof->create($method, $uri, $jwt), $uri, $method, 'https://baander.app');
+
+            self::assertSame(403, $response->getStatusCode(), (string) $response->getContent());
+            $error = json_decode((string) $response->getContent(), true, flags: JSON_THROW_ON_ERROR)['error'];
+            self::assertSame('email_unverified', $error['details']['reason'] ?? null, $path);
+        }
+        $profile = $this->request($jwt, $this->proof->create('GET', 'https://baander.app/api/auth/me', $jwt));
+        self::assertSame(200, $profile->getStatusCode(), (string) $profile->getContent());
     }
 
     public function testActualRedisPreservesBindingMismatchAndConsumesATicketOnlyOnce(): void

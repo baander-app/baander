@@ -44,7 +44,7 @@ final class TotpController
     #[OA\Operation\Post(
         path: '/api/auth/totp/setup',
         summary: 'Generate TOTP secret and provisioning URI',
-        description: 'Refused while TOTP is on, and for an unverified email address with 422 and `details.reason` `email_unverified`. Needs the current password; a wrong one gets 422 with `details.reason` `step_up_failed`. Each setup replaces the pending secret of the previous one; it expires after 10 minutes.',
+        description: 'Refused while TOTP is on, and for an unverified email address with 403 and `details.reason` `email_unverified`. Needs the current password; a wrong one gets 422 with `details.reason` `step_up_failed`. Each setup replaces the pending secret of the previous one; it expires after 10 minutes.',
         requestBody: new OA\RequestBody(
             required: true,
             content: new OA\MediaType\Json(
@@ -88,8 +88,15 @@ final class TotpController
                 ),
             ),
             new OA\Response(
+                response: '403',
+                description: 'The email address is unverified (`details.reason` `email_unverified`)',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
+            ),
+            new OA\Response(
                 response: '422',
-                description: 'Validation error, an unverified email address, or the password is wrong',
+                description: 'Validation error, or the password is wrong',
                 content: new OA\MediaType\Json(
                     schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ValidationError::class),
                 ),

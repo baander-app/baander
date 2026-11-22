@@ -1,4 +1,4 @@
-import type { GetAuthMe200Data } from '@/shared/api-client/gen/endpoints'
+import { getAuthMe, type GetAuthMe200Data } from '@/shared/api-client/gen/endpoints'
 import { useAuthStore } from '../stores/auth-store'
 
 /**
@@ -19,4 +19,14 @@ export function applyCurrentUser(resource: GetAuthMe200Data): void {
     totpEnabled: resource.totpEnabled,
     pendingEmail: resource.pendingEmail ?? null,
   })
+}
+
+/**
+ * Reads the signed-in user's profile and copies it into the auth store. It is a direct request,
+ * not a query: a profile query is admitted only by a running live coordinator, and an account
+ * that has yet to verify its address runs none.
+ */
+export async function readCurrentUser(): Promise<void> {
+  const me = await getAuthMe()
+  if (me.data) applyCurrentUser(me.data)
 }

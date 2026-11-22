@@ -83,6 +83,14 @@
       "pendingChange": "Waiting for confirmation",
       "pendingChangeHint": "Open the link we sent to {{email}} to switch your account to that address."
     },
+    "verificationGate": {
+      "title": "Verify your email address",
+      "intro": "To start using Bånder, open the link we sent to {{email}} in a browser where you are signed in to this account.",
+      "notVerifiedYet": "Your address is not verified yet. Open the link in the email, then check again.",
+      "checkAgain": "Check again",
+      "changeEmail": "Change email address",
+      "signOut": "Sign out"
+    },
     "scopes": {
       "intro": "It will be able to:",
       "profile": "See your name and profile",

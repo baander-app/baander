@@ -45,6 +45,22 @@ final class TestAuthenticatorTest extends TestCase
         self::assertSame(['ROLE_USER'], $user->getRoles());
     }
 
+    public function testTheRequestCarriesWhetherTheUsersAddressIsVerified(): void
+    {
+        $registrant = User::register(new Email('registrant@baander.app'), 'hashed-pw', 'Registrant');
+        $users = $this->createStub(UserRepositoryInterface::class);
+        $users->method('findByUuid')->willReturnOnConsecutiveCalls($this->admin, $registrant);
+        $authenticator = new TestAuthenticator($users);
+        $operatorCreated = $this->request();
+        $registered = $this->request();
+
+        $authenticator->authenticate($operatorCreated)->getUser();
+        $authenticator->authenticate($registered)->getUser();
+
+        self::assertTrue($operatorCreated->attributes->get(AccessTokenAttributes::EMAIL_VERIFIED));
+        self::assertFalse($registered->attributes->get(AccessTokenAttributes::EMAIL_VERIFIED));
+    }
+
     private function request(): Request
     {
         $request = Request::create('/api/auth/me');

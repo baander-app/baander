@@ -214,7 +214,7 @@ final class AuthControllerTest extends TestCase
 
     public function testVerifyEmailWithValidTokenMarksUserVerified(): void
     {
-        $user = $this->createTestUser();
+        $user = $this->createTestUser(verified: false);
         $this->verificationTokens()->issue($user->getId(), new Email($user->getEmail()), 'functional-test-token', new \DateTimeImmutable('+1 hour'));
 
         $response = $this->authenticatedRequest('POST', '/api/auth/email/verify', $user, [
@@ -231,7 +231,7 @@ final class AuthControllerTest extends TestCase
     /** Holding the link is not enough: signed out, nothing is verified and the link stays usable. */
     public function testAnAnonymousRedemptionIsRefusedAndLeavesTheLinkForTheAccount(): void
     {
-        $user = $this->createTestUser();
+        $user = $this->createTestUser(verified: false);
         $this->verificationTokens()->issue($user->getId(), new Email($user->getEmail()), 'signed-out-token', new \DateTimeImmutable('+1 hour'));
 
         $this->assertJsonResponse($this->anonymousRequest('POST', '/api/auth/email/verify', ['token' => 'signed-out-token']), 401);
@@ -247,8 +247,8 @@ final class AuthControllerTest extends TestCase
 
     public function testAnotherAccountCannotRedeemTheLinkAndTheAccountStillCan(): void
     {
-        $user = $this->createTestUser();
-        $other = $this->createTestUser(verified: true);
+        $user = $this->createTestUser(verified: false);
+        $other = $this->createTestUser();
         $this->verificationTokens()->issue($user->getId(), new Email($user->getEmail()), 'other-account-token', new \DateTimeImmutable('+1 hour'));
 
         $response = $this->authenticatedRequest('POST', '/api/auth/email/verify', $other, ['token' => 'other-account-token']);
@@ -263,7 +263,7 @@ final class AuthControllerTest extends TestCase
 
     public function testADelegatedTokenCannotRedeemALink(): void
     {
-        $user = $this->createTestUser();
+        $user = $this->createTestUser(verified: false);
         $this->verificationTokens()->issue($user->getId(), new Email($user->getEmail()), 'delegated-token', new \DateTimeImmutable('+1 hour'));
 
         $response = $this->delegatedRequest('POST', '/api/auth/email/verify', $user, ['profile', 'email'], ['token' => 'delegated-token']);
@@ -305,7 +305,7 @@ final class AuthControllerTest extends TestCase
 
     public function testVerifyEmailRejectsATokenForAnAddressTheAccountNoLongerHas(): void
     {
-        $user = $this->createTestUser();
+        $user = $this->createTestUser(verified: false);
         $this->verificationTokens()->issue($user->getId(), new Email('previous-' . $user->getEmail()), 'stale-address-token', new \DateTimeImmutable('+1 hour'));
 
         $this->assertJsonResponse($this->authenticatedRequest('POST', '/api/auth/email/verify', $user, ['token' => 'stale-address-token']), 400);

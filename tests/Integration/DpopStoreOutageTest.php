@@ -119,6 +119,7 @@ final class DpopStoreOutageTest extends TestCase
             password_hash(self::PASSWORD, PASSWORD_BCRYPT),
             'Store outage user',
         );
+        $this->user->verifyEmail();
         $users->save($this->user);
 
         // Login and passkey login issue to the first-party SPA client; the row is the one

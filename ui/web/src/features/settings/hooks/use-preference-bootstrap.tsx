@@ -6,6 +6,7 @@ import { useEqProcessingStore } from '@/features/equalizer/stores/eq-processing-
 import { usePlayerStore } from '@/features/player/stores/player-store'
 import { useContextPanelStore } from '@/features/layout/stores/context-panel-store'
 import { useAuthStore } from '@/features/auth/stores/auth-store'
+import { selectAwaitsVerification } from '@/features/auth/stores/auth-selectors'
 import { useAudioPreferences } from './use-audio-preferences'
 import { usePlayerPreferences } from './use-player-preferences'
 import { useLayoutPreferences } from './use-layout-preferences'
@@ -14,9 +15,11 @@ import { useThemeMood, VALID_MOODS } from './use-theme-mood'
 import { useAccentColor, VALID_COLORS } from './use-accent-color'
 import { AXIOS_INSTANCE } from '@/shared/api-client/axios-instance'
 
+/** An account that has yet to verify its address is refused the preference routes, so it syncs nothing. */
 export function PreferenceSyncProvider({ children }: { children: React.ReactNode }) {
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated)
   const userPublicId = useAuthStore((state) => state.user?.publicId)
+  const awaitsVerification = useAuthStore(selectAwaitsVerification)
   const { applyOnMount: applyThemeMood } = useThemeMood()
   const { applyOnMount: applyAccentColor } = useAccentColor()
 
@@ -28,7 +31,7 @@ export function PreferenceSyncProvider({ children }: { children: React.ReactNode
   return (
     <>
       {children}
-      {isAuthenticated && userPublicId
+      {isAuthenticated && userPublicId && !awaitsVerification
         ? <PreferenceSyncSession key={userPublicId} userPublicId={userPublicId} />
         : null}
     </>

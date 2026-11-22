@@ -133,7 +133,7 @@ final class PasskeyController
     #[OA\Operation\Post(
         path: '/api/auth/passkey/options',
         summary: 'Get WebAuthn registration options',
-        description: 'Needs a verified email address, answered otherwise with 422 and `details.reason` `email_unverified`. Needs the current password, plus a current TOTP code when TOTP is on; a wrong password and a missing or wrong code get the same 422 with `details.reason` `step_up_failed`. The challenge is bound to the signed-in user and expires after 5 minutes.',
+        description: 'Needs a verified email address, answered otherwise with 403 and `details.reason` `email_unverified`. Needs the current password, plus a current TOTP code when TOTP is on; a wrong password and a missing or wrong code get the same 422 with `details.reason` `step_up_failed`. The challenge is bound to the signed-in user and expires after 5 minutes.',
         requestBody: new OA\RequestBody(
             required: true,
             content: new OA\MediaType\Json(
@@ -161,8 +161,15 @@ final class PasskeyController
                 ),
             ),
             new OA\Response(
+                response: '403',
+                description: 'The email address is unverified (`details.reason` `email_unverified`)',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
+            ),
+            new OA\Response(
                 response: '422',
-                description: 'Validation error, an unverified email address, or the password or code is wrong',
+                description: 'Validation error, or the password or code is wrong',
                 content: new OA\MediaType\Json(
                     schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ValidationError::class),
                 ),

@@ -1,11 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { AxiosError } from 'axios'
 import { useLocation } from 'react-router-dom'
-import { getAuthMe, postAuthEmailVerify } from '@/shared/api-client/gen/endpoints'
+import { postAuthEmailVerify } from '@/shared/api-client/gen/endpoints'
 import { useTranslation } from '@/shared/i18n'
 import { createLogger } from '@/shared/lib/logger'
 import { useRetryCountdown } from '../hooks/use-retry-countdown'
-import { applyCurrentUser } from '../lib/current-user'
+import { readCurrentUser } from '../lib/current-user'
 import { parseApiError } from '../lib/parse-api-error'
 import { retryAfterSeconds } from '../lib/retry-after'
 import { returnToState } from '../lib/return-to'
@@ -58,8 +58,7 @@ async function refreshSignedInUser(): Promise<void> {
   if (!useAuthStore.getState().isAuthenticated) return
 
   try {
-    const me = await getAuthMe()
-    if (me.data) applyCurrentUser(me.data)
+    await readCurrentUser()
   } catch (err: unknown) {
     logger.warn('Could not reload the profile after verifying the email address:', err)
   }

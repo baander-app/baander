@@ -37,6 +37,8 @@ use Symfony\Component\Security\Http\Authenticator\Passport\SelfValidatingPasspor
  * Extracts the token from the Authorization header, validates it through
  * the league/oauth2-server ResourceServer, and creates a Passport with
  * the user loaded from the database by public ID. A disabled account does not authenticate.
+ * Whether the user's address is verified is set as a request attribute from that load, so
+ * UnverifiedAccountListener can confine an unverified account.
  *
  * A token issued before the user's latest password change does not authenticate: its
  * credential epoch, read from storage with the user's, must not be behind. The epoch is
@@ -160,7 +162,7 @@ final class OAuth2Authenticator extends AbstractAuthenticator
 
         $badge = new UserBadge(
             $userIdentifier,
-            function (string $publicId) use ($firstParty): SecurityUser {
+            function (string $publicId) use ($firstParty, $request): SecurityUser {
                 $user = $this->userRepository->findByPublicId(PublicId::fromString($publicId));
 
                 if ($user === null) {
@@ -180,6 +182,7 @@ final class OAuth2Authenticator extends AbstractAuthenticator
                         ['error_code' => 'AUTH_INVALID_TOKEN'],
                     );
                 }
+                $request->attributes->set(AccessTokenAttributes::EMAIL_VERIFIED, $user->isEmailVerified());
 
                 return new SecurityUser(
                     $user->getId()->toString(),

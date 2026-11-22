@@ -11,7 +11,7 @@ const mocks = vi.hoisted(() => {
   })
   return {
     audio: sync(), player: sync(), layout: sync(),
-    auth: { isAuthenticated: true, user: { publicId: 'account-a' } as { publicId: string } | null },
+    auth: { isAuthenticated: true, user: { publicId: 'account-a' } as { publicId: string, emailVerifiedAt?: string | null } | null },
     subscribe: vi.fn(), unsubscribe: vi.fn(),
     get: vi.fn(), mount: vi.fn(), cleanup: vi.fn(),
     isActive: undefined as (() => boolean) | undefined,
@@ -159,6 +159,19 @@ describe('PreferenceSyncProvider conflicts', () => {
     expect(mocks.mount).not.toHaveBeenCalled()
     mocks.auth.user = { publicId: 'account-a' }
     rerender(provider())
+    expect(mocks.mount).toHaveBeenCalledTimes(1)
+    expect(mocks.audio.fetchFromServer).toHaveBeenCalledTimes(1)
+  })
+
+  it('syncs nothing for an account until its address is verified', () => {
+    mocks.auth = { isAuthenticated: true, user: { publicId: 'account-a', emailVerifiedAt: null } }
+    const { rerender } = render(provider())
+    expect(mocks.mount).not.toHaveBeenCalled()
+    expect(mocks.get).not.toHaveBeenCalled()
+
+    mocks.auth = { isAuthenticated: true, user: { publicId: 'account-a', emailVerifiedAt: '2026-11-22T10:00:00+00:00' } }
+    rerender(provider())
+
     expect(mocks.mount).toHaveBeenCalledTimes(1)
     expect(mocks.audio.fetchFromServer).toHaveBeenCalledTimes(1)
   })

@@ -4012,7 +4012,7 @@
                     "Auth"
                 ],
                 "summary": "Get WebAuthn registration options",
-                "description": "Needs a verified email address, answered otherwise with 422 and `details.reason` `email_unverified`. Needs the current password, plus a current TOTP code when TOTP is on; a wrong password and a missing or wrong code get the same 422 with `details.reason` `step_up_failed`. The challenge is bound to the signed-in user and expires after 5 minutes.",
+                "description": "Needs a verified email address, answered otherwise with 403 and `details.reason` `email_unverified`. Needs the current password, plus a current TOTP code when TOTP is on; a wrong password and a missing or wrong code get the same 422 with `details.reason` `step_up_failed`. The challenge is bound to the signed-in user and expires after 5 minutes.",
                 "operationId": "post_passkey_options",
                 "requestBody": {
                     "content": {
@@ -4051,8 +4051,18 @@
                             }
                         }
                     },
+                    "403": {
+                        "description": "The email address is unverified (`details.reason` `email_unverified`)",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    },
                     "422": {
-                        "description": "Validation error, an unverified email address, or the password or code is wrong",
+                        "description": "Validation error, or the password or code is wrong",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -4534,7 +4544,7 @@
                     "Auth"
                 ],
                 "summary": "Generate TOTP secret and provisioning URI",
-                "description": "Refused while TOTP is on, and for an unverified email address with 422 and `details.reason` `email_unverified`. Needs the current password; a wrong one gets 422 with `details.reason` `step_up_failed`. Each setup replaces the pending secret of the previous one; it expires after 10 minutes.",
+                "description": "Refused while TOTP is on, and for an unverified email address with 403 and `details.reason` `email_unverified`. Needs the current password; a wrong one gets 422 with `details.reason` `step_up_failed`. Each setup replaces the pending secret of the previous one; it expires after 10 minutes.",
                 "operationId": "post_totp_setup",
                 "requestBody": {
                     "content": {
@@ -4592,8 +4602,18 @@
                             }
                         }
                     },
+                    "403": {
+                        "description": "The email address is unverified (`details.reason` `email_unverified`)",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    },
                     "422": {
-                        "description": "Validation error, an unverified email address, or the password is wrong",
+                        "description": "Validation error, or the password is wrong",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -34536,7 +34556,7 @@
         "securitySchemes": {
             "bearerAuth": {
                 "type": "http",
-                "description": "DPoP-bound access token (JWT), sent as `Authorization: DPoP <token>` with a DPoP proof. First-party apps obtain it via `/api/auth/login`, `/api/auth/login/passkey` or `/api/auth/refresh`; other clients via `/api/oauth/token`.",
+                "description": "DPoP-bound access token (JWT), sent as `Authorization: DPoP <token>` with a DPoP proof. First-party apps obtain it via `/api/auth/login`, `/api/auth/login/passkey` or `/api/auth/refresh`; other clients via `/api/oauth/token`. Until the account's email address is verified, its tokens reach only the public routes, `GET /api/auth/me`, `POST /api/auth/email/verify`, `POST /api/auth/me/email/verification`, `PUT /api/auth/me/email` and `POST /api/auth/logout`; every other route answers 403 with `details.reason` `email_unverified`.",
                 "scheme": "bearer",
                 "bearerFormat": "JWT"
             },

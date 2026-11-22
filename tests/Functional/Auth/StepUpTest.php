@@ -76,7 +76,7 @@ final class StepUpTest extends RateLimitTestCase
 
     public function testTotpSetupNeedsThePassword(): void
     {
-        $user = $this->createTestUser(verified: true);
+        $user = $this->createTestUser();
 
         $this->assertJsonResponse($this->authenticatedRequest('POST', '/api/auth/totp/setup', $user), 422);
         $this->assertStepUpFailed($this->authenticatedRequest('POST', '/api/auth/totp/setup', $user, ['currentPassword' => 'not-the-password']));
@@ -86,7 +86,7 @@ final class StepUpTest extends RateLimitTestCase
 
     public function testPasskeyOptionsNeedThePasswordAndTheCode(): void
     {
-        $user = $this->createTestUser(verified: true);
+        $user = $this->createTestUser();
         $this->enrolTotp($user);
 
         $this->assertJsonResponse($this->authenticatedRequest('POST', '/api/auth/passkey/options', $user), 422);
@@ -97,8 +97,8 @@ final class StepUpTest extends RateLimitTestCase
 
     public function testAChallengeIssuedToOneUserIsRefusedAtAnotherUsersRegistration(): void
     {
-        $owner = $this->createTestUser(verified: true);
-        $other = $this->createTestUser(verified: true);
+        $owner = $this->createTestUser();
+        $other = $this->createTestUser();
         $options = $this->assertJsonResponse($this->authenticatedRequest('POST', '/api/auth/passkey/options', $owner, ['currentPassword' => self::PASSWORD]), 200, 'data');
 
         $response = $this->authenticatedRequest('POST', '/api/auth/passkey/register', $other, [
@@ -112,10 +112,10 @@ final class StepUpTest extends RateLimitTestCase
 
     public function testAnUnverifiedAddressCannotStartTotpSetupOrPasskeyRegistration(): void
     {
-        $user = $this->createTestUser();
+        $user = $this->createTestUser(verified: false);
 
         foreach (['/api/auth/totp/setup', '/api/auth/passkey/options'] as $path) {
-            $error = $this->assertJsonResponse($this->authenticatedRequest('POST', $path, $user, ['currentPassword' => self::PASSWORD]), 422, 'error');
+            $error = $this->assertJsonResponse($this->authenticatedRequest('POST', $path, $user, ['currentPassword' => self::PASSWORD]), 403, 'error');
             self::assertSame('email_unverified', $error['error']['details']['reason'] ?? null, $path);
             self::assertSame('Verify your email address first.', $error['error']['message'], $path);
         }
@@ -203,7 +203,7 @@ final class StepUpTest extends RateLimitTestCase
 
     public function testRemovingAPasskeyNeedsThePasswordAndTheCode(): void
     {
-        $user = $this->createTestUser(verified: true);
+        $user = $this->createTestUser();
         $this->enrolTotp($user);
         $passkey = $this->storePasskey($user);
         $path = '/api/auth/passkey/' . $passkey->getPublicId()->toString();
@@ -232,7 +232,7 @@ final class StepUpTest extends RateLimitTestCase
     #[DataProvider('stepUpRoutes')]
     public function testTheLimitCoversEveryCredentialChange(string $method, string $path, array $change): void
     {
-        $user = $this->createTestUser(verified: true);
+        $user = $this->createTestUser();
         $this->enrolTotp($user);
         $path = str_replace('{passkey}', $this->storePasskey($user)->getPublicId()->toString(), $path);
         $userId = $user->getId()->toString();
