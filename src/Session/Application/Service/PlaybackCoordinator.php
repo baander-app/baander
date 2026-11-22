@@ -62,6 +62,7 @@ final readonly class PlaybackCoordinator implements PlaybackCoordinationInterfac
         $registration = null;
         $result = $this->transactions->run(function () use ($userId, $owner, $operation, $input, $endpoint, $incarnationId, &$registration): array {
             $session = $this->store->lockSession($owner);
+            $lockedRevision = $session->revision();
             if ($operation === PlaybackOperation::RecoverLocal) {
                 return $this->recoverLocal($session, $input);
             }
@@ -152,10 +153,15 @@ final readonly class PlaybackCoordinator implements PlaybackCoordinationInterfac
                     if ($this->replayRequest($session, $requestId, $operation, $input)) {
                         break;
                     }
+                    // Expiry may advance the revision inside this transaction and roll back on refusal.
+                    $expectedRevision = $input['expectedRevision'] ?? null;
+                    $refusalDetails = is_int($expectedRevision) && $expectedRevision < $lockedRevision
+                        ? ['reason' => 'playback_control_stale_revision']
+                        : [];
                     if ($transfer !== null) {
-                        throw new ConflictException('Playback controls wait for transfer reconciliation.');
+                        throw new ConflictException('Playback controls wait for transfer reconciliation.', $refusalDetails);
                     }
-                    $this->expectRevision($session, $input);
+                    $this->expectRevision($session, $input, $refusalDetails);
                     $action = $input['action'] ?? null;
                     if (!in_array($action, ['play', 'pause', 'seek', 'load', 'stop', 'volume', 'queue'], true)) {
                         throw new InvalidArgumentException('Invalid playback action.');
@@ -870,11 +876,13 @@ final readonly class PlaybackCoordinator implements PlaybackCoordinationInterfac
         return new PlaybackTransfer($transfer['id'], $transfer['source_incarnation_id'], $transfer['target_incarnation_id'], $transfer['desired_state'], (float) $transfer['position'], $transfer['state']);
     }
 
-    /** @param array<string,mixed> $input */
-    private function expectRevision(ListeningSession $session, array $input): void
+    /** @param array<string,mixed> $input
+     * @param array<string,string> $refusalDetails
+     */
+    private function expectRevision(ListeningSession $session, array $input, array $refusalDetails = []): void
     {
         if (!isset($input['expectedRevision']) || !is_int($input['expectedRevision']) || $input['expectedRevision'] !== (int) $session->revision()) {
-            throw new ConflictException('Playback revision conflict.');
+            throw new ConflictException('Playback revision conflict.', $refusalDetails);
         }
     }
 

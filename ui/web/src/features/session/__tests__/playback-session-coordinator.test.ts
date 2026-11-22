@@ -159,6 +159,16 @@ function controlledServer() {
   }
 }
 
+function failControlAttempts(...failures: { error: Error; recorded?: boolean }[]) {
+  const post = vi.mocked(AXIOS_INSTANCE.post).getMockImplementation()!
+  vi.mocked(AXIOS_INSTANCE.post).mockImplementation(async (...args) => {
+    const failure = args[0] === '/api/session/control' ? failures.shift() : undefined
+    if (!failure) return post(...args)
+    if (failure.recorded) await post(...args)
+    throw failure.error
+  })
+}
+
 describe('browser playback coordination', () => {
   it('shows the receiving browser compatibility reason for its exact control request', async () => {
     const h = controlledServer()
@@ -844,6 +854,71 @@ describe('browser playback coordination', () => {
     h.settle(0, 'playing')
     await h.runtime.retry()
     await vi.waitFor(() => expect(h.client.getQueryData(PLAYBACK_SESSION_KEY)).toHaveProperty('revision', 4))
+  })
+
+  it('unblocks the next control after the server confirms the lost request is stale', async () => {
+    const h = controlledServer()
+    failControlAttempts(
+      { error: new Error('Connection interrupted') },
+      {
+        error: Object.assign(new Error('Conflict'), {
+          response: {
+            status: 409,
+            data: {
+              error: {
+                message: 'Playback revision conflict.',
+                details: { reason: 'playback_control_stale_revision' }
+              }
+            }
+          }
+        })
+      }
+    )
+
+    await expect(requestPlayback({ action: 'pause' })).rejects.toThrow('Connection interrupted')
+    h.publish()
+    await vi.waitFor(() => {
+      expect(h.client.getQueryData(PLAYBACK_CONNECTION_KEY)).toHaveProperty('error', 'Playback revision conflict.')
+    })
+    expect(posts('/api/session/control')[1][1]).toEqual(posts('/api/session/control')[0][1])
+
+    const next = requestPlayback({ action: 'pause' }).then(() => null, (error: unknown) => error)
+    await vi.waitFor(() => expect(h.requests).toHaveLength(1))
+    expect(h.requests[0].payload).toMatchObject({ action: 'pause', expectedRevision: 2 })
+    const first = posts('/api/session/control')[0][1] as { requestId: string }
+    expect(h.requests[0].payload.requestId).not.toBe(first.requestId)
+    h.settle(0, 'paused')
+    await expect(next).resolves.toBeNull()
+  })
+
+  it('keeps retrying the same recorded control after a refusal of its endpoint authority', async () => {
+    const h = controlledServer()
+    failControlAttempts(
+      { error: new Error('Connection interrupted'), recorded: true },
+      {
+        error: Object.assign(new Error('Conflict'), {
+          response: {
+            status: 409,
+            data: { error: { message: 'Endpoint authority is invalid.' } }
+          }
+        })
+      }
+    )
+
+    await expect(requestPlayback({ action: 'pause' })).rejects.toThrow('Connection interrupted')
+    h.publish()
+    await vi.waitFor(() => {
+      expect(h.client.getQueryData(PLAYBACK_CONNECTION_KEY)).toHaveProperty('error', 'Endpoint authority is invalid.')
+    })
+    await expect(requestPlayback({ action: 'pause' })).rejects.toThrow('A previous playback result is unconfirmed.')
+    expect(h.requests).toHaveLength(1)
+
+    h.settle(0, 'paused')
+    await vi.waitFor(() => {
+      expect(h.client.getQueryData(PLAYBACK_CONNECTION_KEY)).toHaveProperty('error', null)
+    })
+    const attempts = posts('/api/session/control').map(([, payload]) => payload)
+    expect(attempts).toEqual(Array.from({ length: 3 }, () => h.requests[0].payload))
   })
 
   it('waits for stopped acknowledgement before clearing the queue', async () => {

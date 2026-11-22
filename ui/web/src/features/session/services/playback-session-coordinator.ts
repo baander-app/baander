@@ -1,12 +1,17 @@
 import type { QueryClient } from '@tanstack/react-query'
-import type { OverridePlaybackRequest, PlaybackEndpointResource, PlaybackSnapshotResource } from '@/shared/api-client/gen/endpoints'
+import type {
+  ApiError,
+  OverridePlaybackRequest,
+  PlaybackCommandResource,
+  PlaybackEndpointResource,
+  PlaybackSnapshotResource
+} from '@/shared/api-client/gen/endpoints'
 import { AXIOS_INSTANCE } from '@/shared/api-client/axios-instance'
 import { authenticatedTransport, type SharedLiveTransport } from '@/shared/live/transport'
 import { captureOwnership, isCurrentOwnership, subscribeOwnership } from '@/shared/live/ownership'
 import { getDeviceId, getDeviceName } from '../utils/device-id'
 import { parsePlaybackSnapshot } from './playback-protocol'
 import { getPlaybackAdapter, getPlaybackAdapters, registerPlaybackIntentHandler, type PlaybackIntent, type PlaybackQueueOperation } from './playback-execution'
-import type { PlaybackCommandResource } from '@/shared/api-client/gen/endpoints'
 import { PlaybackLocalRecovery, type LocalRecoveryState, type RecoveryEndpoint } from './playback-local-recovery'
 import type { PlaybackRecoveryCheckpoint, PlaybackRecoveryRecord } from './playback-recovery-store'
 import { PlaybackCommandRunner, type PlaybackAcknowledgement } from './playback-command-runner'
@@ -810,7 +815,7 @@ export class PlaybackSessionCoordinator {
       }).catch(error => {
         const status = (error as { response?: { status?: number } }).response?.status
         if (status && status >= 400 && status < 500) this.pendingRequests.delete(String(payload.requestId))
-        this.rejectUnconfirmed(request, error)
+        this.rejectControlRequest(request, error)
       }).finally(() => {
         request.reading = false
         this.refreshRequests()
@@ -828,7 +833,7 @@ export class PlaybackSessionCoordinator {
     return new Error(fallback)
   }
 
-  private rejectUnconfirmed(request: PendingRequest, error: unknown): void {
+  private rejectControlRequest(request: PendingRequest, error: unknown): void {
     const refusal = this.refusal(error, 'The playback result could not be confirmed.')
     request.reject(refusal)
     this.fail(refusal)
@@ -869,7 +874,15 @@ export class PlaybackSessionCoordinator {
       this.postControl(request.payload).then(response => {
         this.completeRequest(request, response.requestResult)
       }).catch(error => {
-        this.rejectUnconfirmed(request, error)
+        const response = (error as { response?: { status: number; data?: ApiError } } | null)?.response
+        if (
+          request.commandId === null &&
+          response?.status === 409 &&
+          response.data?.error?.details?.reason === 'playback_control_stale_revision'
+        ) {
+          this.pendingRequests.delete(String(request.payload.requestId))
+        }
+        this.rejectControlRequest(request, error)
       }).finally(() => {
         request.reading = false
         this.refreshRequests()

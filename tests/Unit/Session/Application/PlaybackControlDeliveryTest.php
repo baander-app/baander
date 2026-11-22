@@ -116,6 +116,67 @@ final class PlaybackControlDeliveryTest extends TestCase
         self::assertSame(1, $session->revision());
     }
 
+    /** @return iterable<string, array{int, bool, string, array<string, string>}> */
+    public static function revisionRefusals(): iterable
+    {
+        $stale = ['reason' => 'playback_control_stale_revision'];
+        yield 'older revision' => [0, false, 'Playback revision conflict.', $stale];
+        yield 'future revision' => [2, false, 'Playback revision conflict.', []];
+        yield 'older revision during transfer' => [0, true, 'Playback controls wait for transfer reconciliation.', $stale];
+        yield 'current revision during transfer' => [1, true, 'Playback controls wait for transfer reconciliation.', []];
+    }
+
+    /** @param array<string, string> $details */
+    #[DataProvider('revisionRefusals')]
+    public function testUnrecordedControlRevisionRefusal(int $expectedRevision, bool $transfer, string $message, array $details): void
+    {
+        $owner = new Uuid();
+        $session = ListeningSession::create($owner, [], 0, 0);
+        $session->advanceRevision();
+        $store = $this->store($session, 0);
+        $store->method('currentTransfer')->willReturn($transfer ? ['expires_at' => '2099-01-01T00:00:00Z'] : null);
+        $store->expects(self::once())->method('rememberRequest')->willReturn(false);
+        $store->expects(self::never())->method('insertCommand');
+
+        try {
+            $this->coordinator($store)->execute($owner, PlaybackOperation::Control, [
+                'requestId' => new Uuid()->toString(),
+                'expectedRevision' => $expectedRevision,
+                'action' => 'pause',
+            ]);
+            self::fail('The playback control should be refused.');
+        } catch (ConflictException $error) {
+            self::assertSame($message, $error->getMessage());
+            self::assertSame($details, $error->details);
+        }
+    }
+
+    public function testExpiryInsideTheRejectedTransactionDoesNotProveTheControlStale(): void
+    {
+        $owner = new Uuid();
+        $session = ListeningSession::create($owner, [], 0, 0);
+        $store = $this->store($session, 0);
+        $store->method('pendingControl')->willReturn([
+            'type' => 'volume',
+            'attempt_id' => new Uuid()->toString(),
+            'expires_at' => '2000-01-01T00:00:00Z',
+            'disclosed_at' => '2000-01-01T00:00:00Z',
+        ]);
+        $store->expects(self::once())->method('cancelCommands');
+
+        try {
+            $this->coordinator($store)->execute($owner, PlaybackOperation::Control, [
+                'requestId' => new Uuid()->toString(),
+                'expectedRevision' => 0,
+                'action' => 'pause',
+            ]);
+            self::fail('The playback control should be refused after expiry advances the revision.');
+        } catch (ConflictException $error) {
+            self::assertSame('Playback revision conflict.', $error->getMessage());
+            self::assertSame([], $error->details);
+        }
+    }
+
     private function store(ListeningSession $session, int $snapshots = 1): PlaybackStoreInterface&MockObject
     {
         $store = $this->createMock(PlaybackStoreInterface::class);
