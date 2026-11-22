@@ -4,8 +4,10 @@ declare(strict_types=1);
 
 namespace App\Tests\Functional\Auth;
 
+use App\Auth\Application\Settings\UserManagementSettingDefinitions;
 use App\Auth\Domain\Model\Passkey\Passkey;
 use App\Auth\Domain\Repository\Passkey\PasskeyRepositoryInterface;
+use App\Shared\Application\Port\SystemSettingStoreInterface;
 use App\Shared\Domain\Model\Uuid;
 use App\Tests\Fixtures\Auth\FirstPartyOAuthClient;
 use App\Tests\Fixtures\Auth\SignedDpopProof;
@@ -28,6 +30,8 @@ final class PasswordResetClaimTest extends RateLimitTestCase
     {
         parent::setUp();
         $this->trackLimiter('auth_password_reset_ip', self::IP);
+        // A signed-out link holder registers before claiming; registration ships closed.
+        static::getContainer()->get(SystemSettingStoreInterface::class)->save([UserManagementSettingDefinitions::REGISTRATION_OPEN => true]);
     }
 
     public function testAResetToANeverVerifiedAddressHandsTheAccountToTheAddressOwner(): void

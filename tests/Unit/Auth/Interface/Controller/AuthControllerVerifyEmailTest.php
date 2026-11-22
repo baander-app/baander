@@ -35,6 +35,7 @@ use Symfony\Component\Messenger\Envelope;
 use Symfony\Component\Messenger\Exception\HandlerFailedException;
 use Symfony\Component\Messenger\MessageBusInterface;
 use Symfony\Component\Messenger\Stamp\HandledStamp;
+use Symfony\Component\Security\Core\User\UserInterface;
 use Symfony\Component\Serializer\Encoder\JsonEncoder;
 use Symfony\Contracts\Translation\TranslatorInterface;
 use Webauthn\Counter\CounterChecker;
@@ -105,7 +106,7 @@ final class AuthControllerVerifyEmailTest extends TestCase
     private function signIn(): Request
     {
         $this->user = User::register(new Email('alice@baander.app'), 'hash', 'Alice');
-        $identity = $this->createStub(AuthenticatedUserIdentityInterface::class);
+        $identity = $this->createStubForIntersectionOfInterfaces([UserInterface::class, AuthenticatedUserIdentityInterface::class]);
         $identity->method('getId')->willReturn($this->user->getId()->toString());
         $this->security->method('getUser')->willReturn($identity);
         $this->userService->method('findByUuid')->willReturn($this->user);
@@ -117,7 +118,7 @@ final class AuthControllerVerifyEmailTest extends TestCase
 
     public function testMeRejectsPrincipalWithoutApplicationIdentity(): void
     {
-        $this->security->method('getUser')->willReturn($this->createStub(\Symfony\Component\Security\Core\User\UserInterface::class));
+        $this->security->method('getUser')->willReturn($this->createStub(UserInterface::class));
         $this->commandBus->expects($this->never())->method('dispatch');
         $this->assertSame(Response::HTTP_NOT_FOUND, $this->controller->me(\Symfony\Component\HttpFoundation\Request::create('/api/auth/me'))->getStatusCode());
     }
