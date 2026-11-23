@@ -28,6 +28,7 @@
       <sourceFolder url="file://$MODULE_DIR$/tests" isTestSource="true" />
       <sourceFolder url="file://$MODULE_DIR$/tests" isTestSource="true" packagePrefix="App\Tests\" />
       <sourceFolder url="file://$MODULE_DIR$/tests/Support/Tooling" isTestSource="true" packagePrefix="Baander\Tests\Tooling\Support\" />
+      <sourceFolder url="file://$MODULE_DIR$/packages/baander-core/tests" isTestSource="true" packagePrefix="Baander\Core\Tests\" />
       <sourceFolder url="file://$MODULE_DIR$/tests/Tooling" isTestSource="true" packagePrefix="Baander\Tests\Tooling\" />
       <excludeFolder url="file://$MODULE_DIR$/vendor/amphp/amp" />
       <excludeFolder url="file://$MODULE_DIR$/vendor/amphp/byte-stream" />
