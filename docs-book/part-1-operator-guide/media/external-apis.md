@@ -69,8 +69,8 @@ An administrator can request a metadata sync of every library; see [`app:metadat
 Library sync also queues each movie for TMDB enrichment. A movie's stored TMDB ID
 controls the lookup; otherwise enrichment searches its title and year. Normal
 sync fills missing director credits, while missing or failed credit information
-retains the stored set. See [Movie directors](library-management.md#movie-directors)
-for browsing and replacement behavior. This work starts through metadata sync;
+retains the stored set. See [People and credits](library-management.md#people-and-credits)
+for browsing the credited people. This work starts through metadata sync;
 scanning alone does not request director credits.
 
 Lyrics have a separate `lyrics.auto_fetch` setting, also off by default. It requests LRCLIB lyrics for newly created tracks without an `.lrc` sidecar, and for tracks without lyrics that a rescan gives an artist credit or a new length. The bulk [`app:lyrics:fetch`](../commands/app-lyrics-fetch.md) command can request lyrics for existing tracks independently of that setting. Embedded cover extraction is another separate task; see [Cover Art Extraction](library-management.md#cover-art-extraction).
