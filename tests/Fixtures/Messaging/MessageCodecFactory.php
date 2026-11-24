@@ -14,6 +14,7 @@ use App\Radio\Infrastructure\Messaging\RadioMessagePayloadCodec;
 use App\Scheduler\Infrastructure\Messaging\SchedulerMessagePayloadCodec;
 use App\Shared\Infrastructure\Messaging\JsonMessageCodec;
 use App\Shared\Infrastructure\Messaging\OutboxMessagePayloadCodec;
+use App\Transcode\Infrastructure\Messaging\TimelinePreviewMessagePayloadCodec;
 use App\Transcode\Infrastructure\Messaging\TranscodeMessagePayloadCodec;
 
 /** Standalone transports use the same feature codecs as the application container. */
@@ -33,6 +34,7 @@ final class MessageCodecFactory
             new SchedulerMessagePayloadCodec(),
             new OutboxMessagePayloadCodec(),
             new TranscodeMessagePayloadCodec(),
+            new TimelinePreviewMessagePayloadCodec(),
         ], $maxPayloadSize);
     }
 }

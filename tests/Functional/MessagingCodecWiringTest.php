@@ -48,12 +48,16 @@ final class MessagingCodecWiringTest extends KernelTestCase
             new \App\Metadata\Application\Message\SyncLibraryMessage($id, true, true),
             new \App\Metadata\Application\Message\SyncArtistsMessage(),
             new \App\Metadata\Application\Message\SyncArtistMessage($id, Uuid::generate(), 2),
+            new \App\Metadata\Application\Message\SyncPeopleMessage('41'),
+            new \App\Metadata\Application\Message\SyncTvLibraryMessage($id, true),
+            new \App\Metadata\Application\Message\SyncMovieMessage($id, true),
             new \App\Lyrics\Application\Command\FetchLyricsCommand($id),
             new \App\Notification\Application\DTO\SendEmailCommand($id, 'listener@baander.app', NotificationCategory::Security, 'title', [], 'body', [], new \DateTimeImmutable('2026-10-18T04:00:00Z')),
             new UpdateTranscodePositionCommand($id, 12.5, 'seek'),
+            new \App\Transcode\Application\Command\PrepareTimelinePreview('/media/movies/film.mkv', 'film-preview', 5400.5, 12.5, str_repeat('a', 64), 0),
         ];
 
-        self::assertCount(21, $messages);
+        self::assertCount(25, $messages);
         $catalog = self::getContainer()->get(\App\Shared\Infrastructure\Messaging\AsyncWorkloadCatalog::class);
         self::assertInstanceOf(\App\Shared\Infrastructure\Messaging\AsyncWorkloadCatalog::class, $catalog);
         $covered = array_fill_keys(array_map(static fn (object $message): string => $message::class, $messages), true);

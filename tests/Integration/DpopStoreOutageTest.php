@@ -147,6 +147,11 @@ final class DpopStoreOutageTest extends TestCase
         if (isset($this->connection) && $this->otherUser !== null) {
             $this->connection->executeStatement('DELETE FROM users WHERE id = ?', [$this->otherUser->getId()->toString()]);
         }
+        // The outbox has no foreign key to users, so the committed events of a deleted user stay
+        // pending, and the next relay in this database fails on their notification insert.
+        foreach (array_filter([$this->user ?? null, $this->otherUser]) as $user) {
+            $this->connection->executeStatement("DELETE FROM domain_event_outbox WHERE payload->>'user_id' = ?", [$user->getId()->toString()]);
+        }
         if (isset($this->connection) && $this->deviceClientId !== null) {
             $this->connection->executeStatement('DELETE FROM oauth_clients WHERE public_id = ?', [$this->deviceClientId]);
         }
