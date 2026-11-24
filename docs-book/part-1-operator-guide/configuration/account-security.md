@@ -12,7 +12,7 @@ Configured in `config/packages/auth.yaml`:
 | `auth.passkey.authenticator_attachment` | `platform` | Prefer platform authenticators (Touch ID, Windows Hello). |
 | `auth.passkey.user_verification` | `preferred` | Whether to require user verification during authentication. Whatever the setting, an account with TOTP enabled accepts a passkey sign-in only with user verification, such as a PIN or fingerprint on the authenticator. |
 | `auth.passkey.resident_key` | `required` | Whether credentials must be discoverable (passkeys). Passkey sign-in names no account and lists no credentials, so only a discoverable credential can sign in. |
-| `auth.passkey.attestation` | `none` | Attestation conveyance preference. Baander requests no attestation: `none` is the only supported value, and registration accepts only the `none` and `packed` attestation statement formats. |
+| `auth.passkey.attestation` | `none` | Attestation conveyance preference. With `none`, registration accepts only the `none` and `packed` attestation statement formats. Any other value also accepts the `fido-u2f`, `android-key`, `apple` and `tpm` formats. |
 
 The relying party ID is the host of `APP_URL`. Passkey registration and sign-in work
 only from the origin of `APP_URL` and from the origins in `AUTH_EXTRA_ORIGINS` whose host

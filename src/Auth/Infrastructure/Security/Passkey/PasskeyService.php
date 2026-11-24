@@ -29,9 +29,13 @@ use Symfony\Component\Serializer\Normalizer\AbstractObjectNormalizer;
 use Symfony\Component\Serializer\Encoder\JsonEncoder;
 use Symfony\Component\Serializer\SerializerInterface;
 use Symfony\Component\Uid\Uuid as SymfonyUuid;
+use Webauthn\AttestationStatement\AndroidKeyAttestationStatementSupport;
+use Webauthn\AttestationStatement\AppleAttestationStatementSupport;
 use Webauthn\AttestationStatement\AttestationStatementSupportManager;
+use Webauthn\AttestationStatement\FidoU2FAttestationStatementSupport;
 use Webauthn\AttestationStatement\NoneAttestationStatementSupport;
 use Webauthn\AttestationStatement\PackedAttestationStatementSupport;
+use Webauthn\AttestationStatement\TPMAttestationStatementSupport;
 use Webauthn\AuthenticatorAssertionResponse;
 use Webauthn\AuthenticatorAssertionResponseValidator;
 use Webauthn\AuthenticatorAttestationResponse;
@@ -105,12 +109,19 @@ final class PasskeyService implements PasskeyVerifierInterface
 
         $algorithmManager = self::createAlgorithmManager($supportedAlgorithmIds);
 
-        // The attestation preference is `none`, so a client answers with `none`, or with
-        // `packed` when it passes a self attestation through unchanged. A statement in any
-        // other format is refused by its name, before that format's parser reads it.
+        // With the preference `none` a client answers with `none`, or with `packed` when it
+        // passes a self attestation through unchanged. The device formats are parsed only when
+        // attestation is requested; otherwise such a statement is refused by its name, before
+        // that format's parser reads it.
         $attestationStatementSupportManager = new AttestationStatementSupportManager();
         $attestationStatementSupportManager->add(NoneAttestationStatementSupport::create());
         $attestationStatementSupportManager->add(PackedAttestationStatementSupport::create($algorithmManager));
+        if ($this->attestation !== 'none') {
+            $attestationStatementSupportManager->add(FidoU2FAttestationStatementSupport::create());
+            $attestationStatementSupportManager->add(AndroidKeyAttestationStatementSupport::create());
+            $attestationStatementSupportManager->add(AppleAttestationStatementSupport::create());
+            $attestationStatementSupportManager->add(TPMAttestationStatementSupport::create());
+        }
 
         $csmFactory = new CeremonyStepManagerFactory();
         $csmFactory->setAllowedOrigins(self::ceremonyOrigins($publicOrigins, $this->relyingPartyId));

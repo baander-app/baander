@@ -19,6 +19,7 @@ use RuntimeException;
 use Symfony\Component\Serializer\Encoder\JsonEncoder;
 use Webauthn\Counter\CounterChecker;
 use Webauthn\CredentialRecord;
+use Webauthn\Exception\AttestationStatementLoadingException;
 use Webauthn\Exception\AuthenticatorResponseVerificationException;
 use Webauthn\Exception\InvalidDataException;
 use Webauthn\PublicKeyCredentialRequestOptions;
@@ -41,7 +42,7 @@ final class PasskeyServiceTest extends TestCase
         $this->service = $this->createService();
     }
 
-    private function createService(PublicOrigins $publicOrigins = new PublicOrigins('https://localhost')): PasskeyService
+    private function createService(PublicOrigins $publicOrigins = new PublicOrigins('https://localhost'), string $attestation = 'none'): PasskeyService
     {
         return new PasskeyService(
             publicOrigins: $publicOrigins,
@@ -50,7 +51,7 @@ final class PasskeyServiceTest extends TestCase
             authenticatorAttachment: '',
             userVerification: 'preferred',
             residentKey: 'preferred',
-            attestation: 'none',
+            attestation: $attestation,
             counterChecker: $this->counterChecker,
             eventDispatcher: $this->eventDispatcher,
             logger: $this->logger,
@@ -268,6 +269,19 @@ final class PasskeyServiceTest extends TestCase
         $this->expectException(InvalidDataException::class);
         $this->expectExceptionMessage('The attestation statement format "' . $format . '" is not supported.');
         $this->service->verifyRegistrationResponse($attestation, $expectedOptions);
+    }
+
+    #[DataProvider('unrequestedAttestationFormats')]
+    public function testAServiceThatRequestsAttestationReadsThatStatementFormat(string $format): void
+    {
+        $service = $this->createService(attestation: 'direct');
+        $issued = $service->createRegistrationOptions(self::USER_A, 'a@baander.app');
+        $attestation = new WebAuthnTestCredential(self::USER_A, 'localhost')->attest($issued['options']['challenge'], 'https://localhost', $format);
+        $expectedOptions = $service->consumeRegistrationChallenge(self::USER_A, $issued['challengeKey']);
+
+        // The fixture's statement is empty, so the format's own parser rejects it: the name was accepted.
+        $this->expectException(AttestationStatementLoadingException::class);
+        $service->verifyRegistrationResponse($attestation, $expectedOptions);
     }
 
     // --- Credential record serialization ---
