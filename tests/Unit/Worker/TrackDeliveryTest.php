@@ -73,10 +73,11 @@ PHP);
         $server = new Process([PHP_BINARY, '-d', 'output_buffering=0', '-d', 'implicit_flush=1', '-S', $address, $this->directory . '/router.php'], timeout: 15);
         $server->start();
         $this->servers[] = $server;
+        $probe = curl_init($base . '/ready');
+        curl_setopt_array($probe, [CURLOPT_RETURNTRANSFER => true, CURLOPT_TIMEOUT => 2]);
         $deadline = microtime(true) + 2;
         do {
-            $ready = @file_get_contents($base . '/ready');
-            if ($ready === 'ready') {
+            if (curl_exec($probe) === 'ready') {
                 return $base;
             }
             usleep(10000);

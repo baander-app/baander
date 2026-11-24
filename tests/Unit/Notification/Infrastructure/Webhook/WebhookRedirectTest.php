@@ -15,8 +15,8 @@ use Doctrine\ORM\EntityManagerInterface;
 use Doctrine\ORM\EntityRepository;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
+use Symfony\Component\HttpClient\CurlHttpClient;
 use Symfony\Component\HttpClient\MockHttpClient;
-use Symfony\Component\HttpClient\NativeHttpClient;
 use Symfony\Component\HttpClient\Response\MockResponse;
 use Symfony\Component\Messenger\Exception\UnrecoverableMessageHandlingException;
 use Symfony\Contracts\HttpClient\Exception\TransportExceptionInterface;
@@ -53,7 +53,7 @@ final class WebhookRedirectTest extends TestCase
         self::assertSame(1, $client->getRequestsCount());
     }
 
-    public function testDeliveryOptionsAreAcceptedByNativeClientWithAConfiguredProxy(): void
+    public function testDeliveryOptionsBypassAProxyConfiguredOnTheCurlClient(): void
     {
         $webhook = new WebhookEntity(Uuid::generate(), (new WebhookSecretCodec('test-app-secret'))->encrypt('original-secret'));
         $webhook->setUrl('http://lan.baander.app/hook');
@@ -75,13 +75,14 @@ final class WebhookRedirectTest extends TestCase
         $deliveryOptions['resolve'] = ['lan.baander.app' => '127.0.0.1'];
         $deliveryOptions['timeout'] = 1;
         $deliveryOptions['max_duration'] = 1;
-        $native = new NativeHttpClient(['proxy' => 'http://127.0.0.1:2']);
+        $curl = new CurlHttpClient(['proxy' => 'http://127.0.0.1:2']);
 
         try {
-            $native->request('POST', 'http://lan.baander.app:1/hook', $deliveryOptions)->getStatusCode();
+            $curl->request('POST', 'http://lan.baander.app:1/hook', $deliveryOptions)->getStatusCode();
             self::fail('The closed local port unexpectedly accepted the request.');
         } catch (TransportExceptionInterface $e) {
-            self::assertStringContainsString('127.0.0.1:1', $e->getMessage());
+            // The refused connection is the webhook's own port 1, not the proxy's port 2.
+            self::assertStringContainsString('lan.baander.app port 1 ', $e->getMessage());
         }
     }
 }

@@ -23,9 +23,11 @@ try {
             }
         }
         $body = json_encode(['containerId' => $containerId, 'timeoutSeconds' => $timeout], JSON_THROW_ON_ERROR);
-        $context = stream_context_create(['http' => ['method' => 'POST', 'header' => 'Authorization: Bearer '.$config->token(true)."\r\nContent-Type: application/json\r\n", 'content' => $body, 'timeout' => min(12, $timeout + 1), 'ignore_errors' => true]]);
-        $response = @file_get_contents('http://127.0.0.1:'.$config->get('listenPort', 9509).'/checkpoint', false, $context);
-        $result = false === $response ? [] : json_decode($response, true);
+        $curl = curl_init('http://127.0.0.1:'.$config->get('listenPort', 9509).'/checkpoint');
+        // libcurl reads http_proxy from the environment; an empty CURLOPT_PROXY keeps the loopback call and its token off any proxy.
+        curl_setopt_array($curl, [CURLOPT_POSTFIELDS => $body, CURLOPT_HTTPHEADER => ['Authorization: Bearer '.$config->token(true), 'Content-Type: application/json'], CURLOPT_RETURNTRANSFER => true, CURLOPT_TIMEOUT_MS => (int) (min(12, $timeout + 1) * 1000), CURLOPT_PROXY => '']);
+        $response = curl_exec($curl);
+        $result = is_string($response) ? json_decode($response, true) : [];
         if (true !== ($result['complete'] ?? false)) {
             fwrite(STDERR, "Final log collection incomplete.\n");
             exit(1);

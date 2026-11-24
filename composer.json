@@ -13,6 +13,7 @@
     "ext-fileinfo": "*",
     "ext-filter": "*",
     "ext-gd": "*",
+    "ext-gmp": "*",
     "ext-hash": "*",
     "ext-iconv": "*",
     "ext-inotify": "*",
@@ -102,7 +103,6 @@
     "symfony/yaml": "~8.1.11",
     "tsduck/php": "@dev",
     "web-auth/webauthn-lib": "^5.3.17",
-    "web-token/jwt-library": "^4.2.8",
     "zircote/swagger-php": "^7.9"
   },
   "require-dev": {
@@ -137,6 +137,7 @@
     "symfony/phpunit-bridge": "~8.1.10",
     "symfony/stopwatch": "~8.1.0",
     "symfony/web-profiler-bundle": "~8.1.11",
+    "web-token/jwt-library": "^4.2.8",
     "zenstruck/foundry": "^2.17.0"
   },
   "replace": {

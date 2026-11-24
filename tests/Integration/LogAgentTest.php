@@ -11,7 +11,9 @@ use App\Shared\Infrastructure\LogViewer\Agent\Collector;
 use App\Shared\Infrastructure\LogViewer\Agent\DockerClient;
 use App\Shared\Infrastructure\LogViewer\Agent\DockerLogSession;
 use App\Shared\Infrastructure\LogViewer\LogIndex;
+use Baander\Core\EnvironmentVariable;
 use PHPUnit\Framework\TestCase;
+use Symfony\Component\Process\Process;
 
 final class LogAgentTest extends TestCase
 {
@@ -273,24 +275,39 @@ final class LogAgentTest extends TestCase
         $process = proc_open([PHP_BINARY, dirname(__DIR__, 2).'/bin/log-agent.php'], [0 => ['file', '/dev/null', 'r'], 1 => ['file', $this->directory.'/stdout', 'w'], 2 => ['file', $this->directory.'/stderr', 'w']], $pipes, null, array_replace(getenv(), $service['environment']));
         self::assertIsResource($process);
         try {
-            $context = stream_context_create(['http' => ['header' => 'Authorization: Bearer '.str_repeat('a', 40), 'timeout' => 0.2, 'ignore_errors' => true]]);
+            $curl = curl_init('http://127.0.0.1:'.$port.'/health');
+            curl_setopt_array($curl, [CURLOPT_HTTPHEADER => ['Authorization: Bearer '.str_repeat('a', 40)], CURLOPT_RETURNTRANSFER => true, CURLOPT_TIMEOUT_MS => 200]);
             $health = false;
             $deadline = microtime(true) + 5;
             while (microtime(true) < $deadline && false === $health) {
-                $health = @file_get_contents('http://127.0.0.1:'.$port.'/health', false, $context);
+                $health = curl_exec($curl);
                 if (false === $health) {
                     usleep(50000);
                 }
             }
             self::assertIsString($health, (string) file_get_contents($this->directory.'/stderr'));
             self::assertSame('local', json_decode($health, true)['node']);
-            $context = stream_context_create(['http' => ['method' => 'POST', 'header' => 'Authorization: Bearer '.str_repeat('b', 40)."\r\nContent-Type: application/json", 'content' => json_encode(['containerId' => 'abcdef123456', 'timeoutSeconds' => 2]), 'timeout' => 3, 'ignore_errors' => true]]);
-            $checkpoint = file_get_contents('http://127.0.0.1:'.$port.'/checkpoint', false, $context);
-            self::assertTrue(json_decode($checkpoint, true)['complete']);
+            // The command a retiring worker's containment runs inside the agent's container.
+            $checkpoint = new Process([PHP_BINARY, dirname(__DIR__, 2).'/bin/log-agent.php', '--checkpoint', 'abcdef123456', '--timeout=2'], env: $service['environment'], timeout: 10);
+            $checkpoint->run();
+            self::assertSame(0, $checkpoint->getExitCode(), $checkpoint->getErrorOutput());
+            self::assertTrue(json_decode($checkpoint->getOutput(), true)['complete']);
         } finally {
             proc_terminate($process);
             proc_close($process);
         }
+    }
+
+    public function testCheckpointCommandExitsNonZeroWhenNoAgentListens(): void
+    {
+        $reservation = stream_socket_server('tcp://127.0.0.1:0', $errno, $error);
+        $port = (int) substr(strrchr(stream_socket_get_name($reservation, false), ':'), 1);
+        fclose($reservation);
+        $configuration = json_encode(array_replace($this->config()->values, ['listenPort' => $port]), JSON_THROW_ON_ERROR);
+        $checkpoint = new Process([PHP_BINARY, dirname(__DIR__, 2).'/bin/log-agent.php', '--checkpoint', 'abcdef123456', '--timeout=1'], env: [EnvironmentVariable::BAANDER_LOG_AGENT_CONFIG => $configuration], timeout: 10);
+        $checkpoint->run();
+        self::assertSame(1, $checkpoint->getExitCode());
+        self::assertStringContainsString('Final log collection incomplete.', $checkpoint->getErrorOutput());
     }
 
     public function testRetirementFailureFileMakesCoverageIncomplete(): void

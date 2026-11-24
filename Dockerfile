@@ -53,6 +53,7 @@ RUN set -xe && \
         libc-ares-dev \
         libcurl4-openssl-dev \
         libfreetype6-dev \
+        libgmp-dev \
         libicu-dev \
         libjpeg-dev \
         libjpeg62-turbo-dev \
@@ -136,6 +137,7 @@ RUN set -xe && \
       ffi \
       gd \
       gettext \
+      gmp \
       intl \
       pcntl \
       pdo_pgsql \
@@ -221,6 +223,7 @@ RUN set -xe && \
         --artifact '/usr/local/lib/php/extensions/*/ffi.so' \
         --artifact '/usr/local/lib/php/extensions/*/gd.so' \
         --artifact '/usr/local/lib/php/extensions/*/gettext.so' \
+        --artifact '/usr/local/lib/php/extensions/*/gmp.so' \
         --artifact '/usr/local/lib/php/extensions/*/intl.so' \
         --artifact '/usr/local/lib/php/extensions/*/pcntl.so' \
         --artifact '/usr/local/lib/php/extensions/*/pdo_pgsql.so' \
@@ -413,6 +416,7 @@ RUN set -xe && \
         libwebp7 \
         libxpm4 \
         libfreetype6 \
+        libgmp10 \
         libzip5 \
         libbrotli1 \
         liblz4-1 \
@@ -460,6 +464,9 @@ COPY --from=builder /usr/local/etc/php/conf.d/ /usr/local/etc/php/conf.d/
 # may replace php.ini without disabling the shared runtime configuration.
 RUN cp /usr/local/etc/php/php.ini-development /usr/local/etc/php/php.ini
 COPY docker/php/opcache.ini /usr/local/etc/php/conf.d/baander-opcache.ini
+# conf.d is read after php.ini, so the URL wrappers stay off under whichever
+# php.ini an image built on this stage installs or a deployment mounts.
+COPY docker/php/url-wrappers.ini /usr/local/etc/php/conf.d/baander-url-wrappers.ini
 RUN php -r '\
     $probe = tempnam(sys_get_temp_dir(), "baander-opcache-"); \
     try { \

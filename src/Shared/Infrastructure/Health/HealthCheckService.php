@@ -151,6 +151,36 @@ final class HealthCheckService
             ...$this->checkFrameworkConfig(),
             ...$this->checkRegistrationMailer(),
             ...$this->checkExternalApiKeys(),
+            ...self::checkUrlWrappers(ini_get('allow_url_fopen')),
+        ];
+    }
+
+    /**
+     * The configuration problem an allow_url_fopen ini value amounts to. With the setting
+     * on, a path that reaches a file function can name an http:// or ftp:// host and make
+     * the server connect to it. The setting is INI_SYSTEM, so the application cannot turn
+     * it off for itself.
+     *
+     * @return HealthCheckResult[]
+     */
+    public static function checkUrlWrappers(string|false $setting): array
+    {
+        if (!filter_var($setting, FILTER_VALIDATE_BOOL)) {
+            return [];
+        }
+
+        return [
+            new HealthCheckResult(
+                component: 'php_settings',
+                status: HealthStatus::Unhealthy,
+                responseTimeMs: 0.0,
+                details: [
+                    'severity' => 'error',
+                    'var' => 'allow_url_fopen',
+                    'message' => 'PHP setting allow_url_fopen is on, so a file path can make the server connect to an http:// or ftp:// host.',
+                    'suggestion' => 'Set allow_url_fopen = Off in php.ini and in every conf.d file that sets it; the images ship it off.',
+                ],
+            ),
         ];
     }
 

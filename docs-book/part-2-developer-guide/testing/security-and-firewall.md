@@ -310,8 +310,10 @@ Logs must exclude API-key query strings and endpoint credentials.
 local TLS peers only in test transport wrappers, after inspecting production
 pinning options. They check trusted success, untrusted certificates, hostname
 mismatch and blocked redirect destinations. Production policy has no test-domain
-or private-address exception. The historical `MetadataStreamRedirectTest` still
-reproduces raw PHP stream behavior; adapter tests establish the new boundary.
+or private-address exception. `MetadataStreamRedirectTest` checks that PHP's URL
+stream wrappers are off in the image: a file function opens no `https://`, `http://`
+or `ftp://` URL, and the local peer receives no request. Adapter tests establish
+the outbound boundary.
 
 DNS and HTTP share one absolute monotonic budget, capped at thirty seconds,
 through approved CAA redirect hops. Push shares its thirty-second budget between

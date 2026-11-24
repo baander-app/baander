@@ -935,7 +935,11 @@ CODE;
         return $address !== null && filter_var($address, FILTER_VALIDATE_IP) !== false && inet_pton($address) === inet_pton($expected);
     }
 
-    /** Sends one GET that closes its connection, with an optional forged client: argv[1] the URL, argv[2] the forged X-Forwarded-For. */
+    /**
+     * Sends one GET that closes its connection, with an optional forged client: argv[1] the URL, argv[2] the
+     * forged X-Forwarded-For. The empty CURLOPT_PROXY keeps libcurl off any proxy named in the environment,
+     * so the answer describes the direct path.
+     */
     public static function requestProgram(): string
     {
         return <<<'PHP'
@@ -943,9 +947,9 @@ $headers = ['Connection: close'];
 if (($argv[2] ?? '') !== '') {
     $headers[] = 'X-Forwarded-For: ' . $argv[2];
 }
-$context = stream_context_create(['http' => ['timeout' => 10, 'ignore_errors' => true, 'header' => $headers]]);
-@file_get_contents($argv[1], false, $context);
-$status = preg_match('~^HTTP/\S+ ([0-9]{3})~', http_get_last_response_headers()[0] ?? '', $match) === 1 ? (int) $match[1] : null;
+$curl = curl_init($argv[1]);
+curl_setopt_array($curl, [CURLOPT_HTTPHEADER => $headers, CURLOPT_TIMEOUT => 10, CURLOPT_RETURNTRANSFER => true, CURLOPT_PROXY => '']);
+$status = curl_exec($curl) === false ? null : curl_getinfo($curl, CURLINFO_RESPONSE_CODE);
 echo json_encode(['httpStatus' => $status], JSON_THROW_ON_ERROR);
 PHP;
     }
@@ -1004,9 +1008,10 @@ PHP;
     private function health(): array
     {
         $deployment = $this->deploymentState();
-        $program = '$context = stream_context_create(["http" => ["timeout" => 10, "ignore_errors" => true]]);'
-            . ' $body = @file_get_contents("http://gateway/health", false, $context);'
-            . ' $status = preg_match("~^HTTP/\\\\S+ ([0-9]{3})~", http_get_last_response_headers()[0] ?? "", $match) === 1 ? (int) $match[1] : null;'
+        $program = '$curl = curl_init("http://gateway/health");'
+            . ' curl_setopt_array($curl, [CURLOPT_TIMEOUT => 10, CURLOPT_RETURNTRANSFER => true, CURLOPT_PROXY => ""]);'
+            . ' $body = curl_exec($curl);'
+            . ' $status = $body === false ? null : curl_getinfo($curl, CURLINFO_RESPONSE_CODE);'
             . ' echo json_encode(["httpStatus" => $status, "body" => is_string($body) ? json_decode($body, true) : null], JSON_THROW_ON_ERROR);';
         $deadline = Runtime::now() + self::HEALTH_DEADLINE_SECONDS;
         do {

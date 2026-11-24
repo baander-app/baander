@@ -184,10 +184,19 @@ final class StreamedResponseProcessorTest extends TestCase
 
     private function get(string $path): string
     {
-        $body = @file_get_contents('http://127.0.0.1:' . $this->port . $path);
+        $body = $this->fetch($path);
         self::assertNotFalse($body, 'The probe server did not answer ' . $path);
 
         return $body;
+    }
+
+    /** The body of a successful GET, or false. It runs in this process, beside a transfer the curl command still holds open. */
+    private function fetch(string $path): string|false
+    {
+        $curl = curl_init('http://127.0.0.1:' . $this->port . $path);
+        curl_setopt_array($curl, [CURLOPT_RETURNTRANSFER => true, CURLOPT_FAILONERROR => true, CURLOPT_TIMEOUT => 5]);
+
+        return curl_exec($curl);
     }
 
     /** @param callable(array{requests: int, streams: int}): bool $until */
@@ -195,7 +204,7 @@ final class StreamedResponseProcessorTest extends TestCase
     {
         $deadline = microtime(true) + 5;
         do {
-            $stats = json_decode((string) @file_get_contents('http://127.0.0.1:' . $this->port . '/stats'), true);
+            $stats = json_decode((string) $this->fetch('/stats'), true);
             if (is_array($stats) && $until($stats)) {
                 return;
             }

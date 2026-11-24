@@ -360,10 +360,10 @@ final class NginxTemplateTest extends TestCase
 
     private function statusOf(int $port, string $path): ?int
     {
-        file_get_contents('http://127.0.0.1:' . $port . $path, false, stream_context_create(['http' => ['ignore_errors' => true, 'timeout' => 5]]));
-        $statusLine = http_get_last_response_headers()[0] ?? '';
+        $curl = curl_init('http://127.0.0.1:' . $port . $path);
+        curl_setopt_array($curl, [CURLOPT_RETURNTRANSFER => true, CURLOPT_TIMEOUT => 5]);
 
-        return preg_match('~^HTTP/\S+ (\d{3})~', $statusLine, $match) === 1 ? (int) $match[1] : null;
+        return curl_exec($curl) === false ? null : curl_getinfo($curl, CURLINFO_RESPONSE_CODE);
     }
 
     private function writeTestCertificate(string $directory): void

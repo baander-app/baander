@@ -134,6 +134,12 @@ final class Production
         if (ini_get('memory_limit') !== '512M') {
             throw new RuntimeException('Production PHP memory_limit must be 512M');
         }
+        if (!in_array(ini_get('allow_url_fopen'), ['', '0'], true)) {
+            throw new RuntimeException('Production PHP file functions open URLs');
+        }
+        if (!extension_loaded('gmp')) {
+            throw new RuntimeException('Production PHP lacks the gmp extension');
+        }
         if (!is_file('vendor/autoload_runtime.php') || Composer\InstalledVersions::isInstalled('phpunit/phpunit')
             || Composer\InstalledVersions::isInstalled('symfony/web-profiler-bundle') || is_dir('config/secrets')
             || is_file('docker/dev/juul.localdomain.key') || is_dir('.reli')) {

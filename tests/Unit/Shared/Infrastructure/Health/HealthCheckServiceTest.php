@@ -205,6 +205,37 @@ final class HealthCheckServiceTest extends TestCase
         self::assertSame([], $this->registrationResults($this->service(mailerDsn: 'null://null', selfRegistration: $registration)));
     }
 
+    /** @return iterable<string, array{string|false, bool}> */
+    public static function urlWrapperSettings(): iterable
+    {
+        yield 'on' => ['1', true];
+        yield 'off, as ini_get reports it' => ['', false];
+        yield 'off, written as a number' => ['0', false];
+        yield 'unreadable' => [false, false];
+    }
+
+    #[DataProvider('urlWrapperSettings')]
+    public function testUrlWrappersLeftOnAreAConfigurationError(string|false $setting, bool $reported): void
+    {
+        $results = HealthCheckService::checkUrlWrappers($setting);
+
+        self::assertCount($reported ? 1 : 0, $results);
+        if ($reported) {
+            self::assertSame('php_settings', $results[0]->component);
+            self::assertSame(HealthStatus::Unhealthy, $results[0]->status);
+            self::assertSame('error', $results[0]->details['severity']);
+            self::assertSame('allow_url_fopen', $results[0]->details['var']);
+        }
+    }
+
+    public function testTheImagesPhpSettingsRaiseNoConfigurationProblem(): void
+    {
+        self::assertSame([], array_filter(
+            $this->service()->checkConfiguration(),
+            static fn (HealthCheckResult $result): bool => $result->component === 'php_settings',
+        ));
+    }
+
     public function testReadinessLeavesOutTheWorkerItsProfileAndMemoryWhileTheFullCheckStillListsThem(): void
     {
         $redis = new ArrayRedis();

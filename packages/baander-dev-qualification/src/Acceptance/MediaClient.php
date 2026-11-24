@@ -98,32 +98,16 @@ final class MediaClient
             if ($this->token !== null) {
                 $headers[] = 'Authorization: DPoP ' . $this->token;
             }
-            $context = stream_context_create([
-                'ssl' => [
-                    'cafile' => $this->ca,
-                    'verify_peer' => true,
-                    'verify_peer_name' => true,
-                ],
-                'http' => [
-                    'method' => $method,
-                    'header' => implode("\r\n", $headers),
-                    'content' => $payload === null ? '' : json_encode(
-                        $payload === [] ? new \stdClass() : $payload,
-                        JSON_THROW_ON_ERROR,
-                    ),
-                    'timeout' => min(180, $this->context->remaining() ?? 180),
-                    'ignore_errors' => true,
-                    'follow_location' => 0,
-                ],
-            ]);
-            $response = @fopen($url, 'rb', false, $context);
+            $exchange = $this->exchange($method, $url, $headers, $payload === null ? null : json_encode(
+                $payload === [] ? new \stdClass() : $payload,
+                JSON_THROW_ON_ERROR,
+            ));
             Support::check(
-                $response !== false,
+                $exchange !== null,
                 $method . ' ' . $path . ' did not complete a verified HTTPS connection.',
             );
+            [$response, $responseHeaders] = $exchange;
             try {
-                $metadata = stream_get_meta_data($response);
-                $responseHeaders = $metadata['wrapper_data'] ?? [];
                 preg_match('/^HTTP\/\S+ (\d+)/', $responseHeaders[0] ?? '', $statusMatch);
                 $status = (int) ($statusMatch[1] ?? 0);
                 $parsed = [];
@@ -199,5 +183,53 @@ final class MediaClient
             }
         }
         throw new \RuntimeException('DPoP nonce negotiation did not complete.');
+    }
+
+    /**
+     * Sends one HTTP/1.1 request over a TLS socket verified against the CA file and reads the
+     * response head. The socket transport stays open to PHP where allow_url_fopen is off, and it
+     * needs no cURL extension, which the tooling runtime does not have.
+     *
+     * @param list<string> $headers
+     * @return array{resource,list<string>}|null the stream at the start of the body and the lines of the head; null when no verified connection returned a complete head
+     */
+    private function exchange(string $method, string $url, array $headers, ?string $body): ?array
+    {
+        $target = parse_url($url);
+        $timeout = min(180, $this->context->remaining() ?? 180);
+        $stream = @stream_socket_client(
+            'tls://' . $target['host'] . ':' . ($target['port'] ?? 443),
+            timeout: $timeout,
+            context: stream_context_create([
+                'ssl' => ['cafile' => $this->ca, 'verify_peer' => true, 'verify_peer_name' => true],
+            ]),
+        );
+        if ($stream === false) {
+            return null;
+        }
+        stream_set_timeout($stream, (int) $timeout, (int) (($timeout - (int) $timeout) * 1_000_000));
+        $request = $method . ' ' . ($target['path'] ?? '/') . (isset($target['query']) ? '?' . $target['query'] : '') . " HTTP/1.1\r\n"
+            . implode("\r\n", [
+                'Host: ' . $target['host'] . (isset($target['port']) ? ':' . $target['port'] : ''),
+                'Connection: close',
+                ...$headers,
+                ...($body === null ? [] : ['Content-Length: ' . strlen($body)]),
+            ]) . "\r\n\r\n" . $body;
+        $head = [];
+        $line = false;
+        if (fwrite($stream, $request) === strlen($request)) {
+            while (($line = fgets($stream)) !== false && ($line = rtrim($line, "\r\n")) !== '') {
+                $head[] = $line;
+            }
+        }
+        if ($head === [] || $line !== '') {
+            fclose($stream);
+            return null;
+        }
+        // A chunked body carries its own framing; PHP's dechunk filter removes it, as the https:// wrapper does.
+        if (array_any($head, static fn(string $line): bool => preg_match('/^transfer-encoding:.*\bchunked\b/i', $line) === 1)) {
+            stream_filter_append($stream, 'dechunk', STREAM_FILTER_READ);
+        }
+        return [$stream, $head];
     }
 }

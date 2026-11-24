@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "6917f6a11a8cb154ba527aac41500109",
+    "content-hash": "31a90f2e494396a15ada30b303f13fc4",
     "packages": [
         {
             "name": "baander/core",
@@ -18365,6 +18365,7 @@
         "ext-fileinfo": "*",
         "ext-filter": "*",
         "ext-gd": "*",
+        "ext-gmp": "*",
         "ext-hash": "*",
         "ext-iconv": "*",
         "ext-inotify": "*",

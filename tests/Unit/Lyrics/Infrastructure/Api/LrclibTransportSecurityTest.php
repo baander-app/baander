@@ -8,11 +8,9 @@ use App\Lyrics\Application\DTO\LrclibUnavailable;
 use App\Lyrics\Infrastructure\Api\LrclibClient;
 use App\Lyrics\Infrastructure\Api\LrclibPauseInterface;
 use App\Tests\Support\Outbound\LocalTlsServer;
-use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
 use Symfony\Component\Clock\NativeClock;
-use Symfony\Component\HttpClient\NativeHttpClient;
 use Symfony\Component\HttpClient\CurlHttpClient;
 use Symfony\Component\RateLimiter\RateLimiterFactory;
 use Symfony\Component\RateLimiter\Storage\InMemoryStorage;
@@ -33,49 +31,38 @@ final class LrclibTransportSecurityTest extends TestCase
         $this->server->close();
     }
 
-    /** @return iterable<string, array{bool}> */
-    public static function transports(): iterable
+    public function testTrustedCertificateAndMatchingHostnameSucceed(): void
     {
-        yield 'native streams' => [false];
-        yield 'curl' => [true];
-    }
-
-    #[DataProvider('transports')]
-    public function testTrustedCertificateAndMatchingHostnameSucceed(bool $curl): void
-    {
-        $response = $this->client($curl)->request('GET', $this->url('/ok'));
+        $response = $this->client()->request('GET', $this->url('/ok'));
         self::assertSame([], $response->toArray());
         self::assertSame(['https /ok'], $this->server->requests());
     }
 
-    #[DataProvider('transports')]
-    public function testUntrustedCertificateIsRejectedBeforeHttp(bool $curl): void
+    public function testUntrustedCertificateIsRejectedBeforeHttp(): void
     {
         try {
-            $this->client($curl, trust: false)->request('GET', $this->url('/ok'))->getStatusCode();
+            $this->client(trust: false)->request('GET', $this->url('/ok'))->getStatusCode();
             self::fail('The untrusted certificate was accepted.');
         } catch (TransportExceptionInterface) {
             self::assertSame([], $this->server->requests());
         }
     }
 
-    #[DataProvider('transports')]
-    public function testTrustedCertificateForAnotherHostnameIsRejectedBeforeHttp(bool $curl): void
+    public function testTrustedCertificateForAnotherHostnameIsRejectedBeforeHttp(): void
     {
         try {
-            $this->client($curl)->request('GET', str_replace('outbound.baander.app', 'mismatch.baander.app', $this->url('/ok')))->getStatusCode();
+            $this->client()->request('GET', str_replace('outbound.baander.app', 'mismatch.baander.app', $this->url('/ok')))->getStatusCode();
             self::fail('The certificate hostname mismatch was accepted.');
         } catch (TransportExceptionInterface) {
             self::assertSame([], $this->server->requests());
         }
     }
 
-    #[DataProvider('transports')]
-    public function testLyricsRedirectCannotDowngradeToPrivateHttpDestination(bool $curl): void
+    public function testLyricsRedirectCannotDowngradeToPrivateHttpDestination(): void
     {
         // Turns come at once and no pause is in effect, so the request goes straight to the transport.
         $adapter = new LrclibClient(
-            $this->client($curl),
+            $this->client(),
             new NullLogger(),
             new RateLimiterFactory(['id' => 'lrclib', 'policy' => 'no_limit'], new InMemoryStorage()),
             self::createStub(LrclibPauseInterface::class),
@@ -92,7 +79,8 @@ final class LrclibTransportSecurityTest extends TestCase
         return 'https://outbound.baander.app:' . $this->server->tlsPort . $path;
     }
 
-    private function client(bool $curl, bool $trust = true): HttpClientInterface
+    /** cURL is the one transport the images offer: with allow_url_fopen off, Symfony's stream client opens no URL. */
+    private function client(bool $trust = true): HttpClientInterface
     {
         $options = [
             'resolve' => array_fill_keys(['outbound.baander.app', 'mismatch.baander.app', 'private.baander.app'], '127.0.0.1'),
@@ -103,6 +91,7 @@ final class LrclibTransportSecurityTest extends TestCase
         if ($trust) {
             $options['cafile'] = $this->server->certificate;
         }
-        return $curl ? new CurlHttpClient($options) : new NativeHttpClient($options);
+
+        return new CurlHttpClient($options);
     }
 }

@@ -237,12 +237,13 @@ exhaustive taint analysis of logging or external observability.
 3. **Provider destination residual limits.** Metadata, radio-catalog and persisted
    push endpoints now use the public destination controls above. Their adapter,
    pinning, redirect and local TLS checks pass in the CI image; no live-provider or
-   deployment trust-store assessment is claimed. The historical
-   `Unit/Metadata/Infrastructure/Api/MetadataStreamRedirectTest.php` retains the raw
-   PHP stream reproduction: an HTTPS request follows a redirect to loopback HTTP;
-   CI PHP 8.5.2 also forwards Authorization while host PHP 8.5.11 strips it. That
-   fixture records the former transport's behavior, not a bypass of the new
-   adapters. Bounded helper execution removes native DNS from the coroutine
+   deployment trust-store assessment is claimed. PHP's own stream transport
+   followed a redirect from HTTPS to loopback HTTP. Every image now sets
+   `allow_url_fopen=Off`, and
+   `Unit/Metadata/Infrastructure/Api/MetadataStreamRedirectTest.php` checks in the
+   CI image that a file function opens no `https://`, `http://` or `ftp://` URL
+   and that the local peer receives no request. Bounded helper execution removes
+   native DNS from the coroutine
    worker and includes lookup in the caller's request budget. The dedicated
    network-isolated DNS drill and native lifecycle tests cover complete answers,
    stalled lookups, cancellation and cleanup; execution results belong to the
