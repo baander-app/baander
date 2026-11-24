@@ -4781,10 +4781,10 @@
             "recommended_disposition": "adopt-configured-cohort",
             "rationale": "Twig/Security/WebProfiler are registered and HttpClient/Messenger used. Port enabled integrations with proper service tags, reset priorities and readonly generator support.",
             "qualification": "Source-only recommendation; not a runtime proof or permission to change behavior.",
-            "current_local_sha256": "a02ec45c4e6a9cb0a09d3c0a9f59b160208ba8c62958745f50015ae734b8b0ba",
+            "current_local_sha256": "a3f7a3e3cd0a32087df96fdc87d594d316a6e87aad4ee9b786d21bf169844c54",
             "current_source_presence": "present",
             "final_disposition": "adopted-adapted",
-            "final_reason": "Separates mutable Twig profiler extension ownership and serializes real Profile using existing getServicePool()->get(), avoiding a new contextual proxy accessor. Collector path remains conditional with profiler disabled.",
+            "final_reason": "Separates mutable Twig profiler extension ownership and serializes real Profile using existing getServicePool()->get(), avoiding a new contextual proxy accessor. Collector path remains conditional with profiler disabled. The profiler extensions also carry the safe stateful tag: symfony/web-profiler-bundle 8.1.11 tags twig.extension.webprofiler with kernel.reset, and a pooled proxy is keyed by Twig under its generated class while compiled templates look it up under the wrapped class.",
             "source_review_status": "recorded",
             "runtime_qualification": {
                 "status": "pending-authoritative-gates",

@@ -12,6 +12,7 @@ use SwooleBundle\SwooleBundle\Bridge\Symfony\Bundle\DependencyInjection\Compiler
 use SwooleBundle\SwooleBundle\Bridge\Symfony\Bundle\DependencyInjection\ContainerConstants;
 use SwooleBundle\SwooleBundle\Bridge\Symfony\Container\ServicePool\ServicePoolContainer;
 use SwooleBundle\SwooleBundle\Bridge\Symfony\Container\SimpleResetter;
+use Symfony\Bundle\WebProfilerBundle\Twig\WebProfilerExtension;
 use Symfony\Component\Cache\Adapter\TraceableAdapter;
 use Symfony\Component\Config\Loader\LoaderInterface;
 use Symfony\Component\Config\Resource\FileResource;
@@ -31,6 +32,7 @@ use Symfony\Component\Security\Core\Authorization\AccessDecisionManager;
 use Symfony\Component\Security\Core\User\InMemoryUser;
 use Symfony\Contracts\HttpClient\HttpClientInterface;
 use Symfony\Contracts\Service\ResetInterface;
+use Twig\Environment;
 
 final class FrameworkIsolationPipelineTest extends TestCase
 {
@@ -120,6 +122,24 @@ final class FrameworkIsolationPipelineTest extends TestCase
         self::assertInstanceOf(Reference::class, $resetter);
         self::assertSame('swoole_bundle.coroutines_support.cache_traceable_adapter_resetter', (string) $resetter);
         self::assertSame(['clearCalls'], $container->getDefinition((string) $resetter)->getArgument(0));
+    }
+
+    #[RunInSeparateProcess]
+    #[PreserveGlobalState(false)]
+    public function testProfilerExtensionTaggedKernelResetIsNotPooledSoTwigKeysItByItsOwnClass(): void
+    {
+        $container = $this->container(['twig.extension.webprofiler' => ['reset']]);
+        $container->setDefinition('twig', new Definition(Environment::class));
+        $container->setDefinition('twig.extension.webprofiler', (new Definition(WebProfilerExtension::class))
+            ->addTag('kernel.reset', ['method' => 'reset']));
+
+        (new StatefulServicesPass())->process($container);
+
+        $extension = $container->getDefinition('twig.extension.webprofiler');
+        self::assertSame(WebProfilerExtension::class, $extension->getClass());
+        self::assertNull($extension->getFactory());
+        self::assertFalse($extension->isShared());
+        self::assertFalse($container->hasDefinition('twig.extension.webprofiler.swoole_coop.service_pool'));
     }
 
     /**

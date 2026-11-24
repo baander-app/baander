@@ -15,7 +15,9 @@ final class TwigProcessor implements CompileProcessor
     private const string DATA_COLLECTOR_ID = 'data_collector.twig';
     private const string ENVIRONMENT_ID = 'twig';
 
-    // Extensions use their concrete class as a compiled-template key, so they cannot be proxied.
+    // Twig keys an extension by the class of the object it receives, and the profiler node visitor
+    // compiles static::class into each template as the lookup key. A proxy gives its generated class
+    // for the first and the wrapped class for the second, so these must reach Twig unproxied.
     private const array PROFILER_EXTENSION_IDS = [
         'twig.extension.profiler',
         'twig.extension.webprofiler',
@@ -56,7 +58,11 @@ final class TwigProcessor implements CompileProcessor
                 continue;
             }
 
-            $container->getDefinition($extensionId)->setShared(false);
+            // Unshared, each pooled Environment builds its own instance. The safe tag stops the pass
+            // from pooling a definition tagged kernel.reset, which WebProfilerBundle's extension is.
+            $container->getDefinition($extensionId)
+                ->setShared(false)
+                ->addTag(ContainerConstants::TAG_SAFE_STATEFUL_SERVICE);
         }
     }
 }
