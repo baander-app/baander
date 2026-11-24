@@ -73,7 +73,7 @@ final class FrameworkIsolationDoctrineTest extends TestCase
         $resetter = $container->getDefinition('doctrine.debug_data_holder.swoole_coop.service_pool')->getArgument(5);
         self::assertInstanceOf(Definition::class, $resetter);
         self::assertSame(SimpleResetter::class, $resetter->getClass());
-        self::assertSame('reset', $resetter->getArgument(0));
+        self::assertSame(['reset'], $resetter->getArgument(0));
         self::assertArrayHasKey('doctrine.debug_data_holder', $container->getDefinition('services_resetter')->getArgument(1));
         self::assertNull($container->getDefinition('doctrine.debug_data_holder.swoole_coop.wrapped')->getFactory());
         $queryHistory = new BacktraceDebugDataHolder(['default']);

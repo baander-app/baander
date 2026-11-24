@@ -79,7 +79,7 @@ final class CacheAdapterProcessorTest extends TestCase
             ? ChainAdapter::class : PhpFilesAdapter::class;
         self::assertSame($expected, $definition->getClass());
         self::assertSame($factory, $definition->getFactory());
-        self::assertSame('reset', $this->resetMethod($container, $definition));
+        self::assertSame(['reset'], $this->resetMethods($container, $definition));
     }
 
     public function testIncompleteOptionalAndAbstractDefinitionsAreNotTagged(): void
@@ -119,7 +119,7 @@ final class CacheAdapterProcessorTest extends TestCase
 
             self::assertTrue($attempted);
             self::assertFalse($optional->hasTag(ContainerConstants::TAG_STATEFUL_SERVICE));
-            self::assertSame('clearCalls', $this->resetMethod($container, $valid));
+            self::assertSame(['clearCalls'], $this->resetMethods($container, $valid));
         } finally {
             spl_autoload_unregister($autoload);
         }
@@ -147,10 +147,11 @@ final class CacheAdapterProcessorTest extends TestCase
 
     private function resetter(ContainerBuilder $container, Definition $definition): SimpleResetter
     {
-        return new SimpleResetter($this->resetMethod($container, $definition));
+        return new SimpleResetter($this->resetMethods($container, $definition));
     }
 
-    private function resetMethod(ContainerBuilder $container, Definition $definition): string
+    /** @return list<string> */
+    private function resetMethods(ContainerBuilder $container, Definition $definition): array
     {
         $tags = $definition->getTag(ContainerConstants::TAG_STATEFUL_SERVICE);
         self::assertCount(1, $tags);

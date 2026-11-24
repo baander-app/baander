@@ -23,6 +23,44 @@ final class ProxifierPoolLifetimeTest extends TestCase
 {
     public function testRepeatedNonSharedLookupsKeepOneWorkerPoolAndResetEachAssignment(): void
     {
+        [$container, $registry] = $this->pooledProbe(['reset']);
+        $previous = null;
+
+        for ($index = 0; $index < 4; ++$index) {
+            $proxy = $container->get('probe');
+            self::assertNotSame($previous, $proxy);
+            self::assertSame('ready', $proxy->value());
+            $registry->releaseFromCoroutine(-1);
+            $previous = $proxy;
+        }
+
+        self::assertSame(1, $registry->count(), 'A nonshared proxy must not append a new worker pool on each lookup.');
+        self::assertSame(['reset', 'reset', 'reset', 'reset'], ProxifierPoolLifetimeService::$resets);
+        $pool = $registry->getPools()[0];
+        self::assertSame(0, $pool->getAssignedCount());
+        self::assertSame(1, $pool->getFreeCount());
+    }
+
+    public function testReleaseRunsEveryResetMethodInTheGivenOrder(): void
+    {
+        [$container, $registry] = $this->pooledProbe(['reset', 'forget']);
+        self::assertSame('ready', $container->get('probe')->value());
+
+        $registry->releaseFromCoroutine(-1);
+
+        self::assertSame(['reset', 'forget'], ProxifierPoolLifetimeService::$resets);
+        $pool = $registry->getPools()[0];
+        self::assertSame(0, $pool->getAssignedCount());
+        self::assertSame(1, $pool->getFreeCount());
+    }
+
+    /**
+     * @param list<string> $resetMethods
+     *
+     * @return array{ContainerBuilder, ServicePoolContainer}
+     */
+    private function pooledProbe(array $resetMethods): array
+    {
         self::assertTrue(extension_loaded('ffi'), 'FFI is required; this proof must not skip.');
         $container = new ContainerBuilder();
         $container->setParameter(ContainerConstants::PARAM_COROUTINES_MAX_SVC_INSTANCES, 5);
@@ -41,34 +79,22 @@ final class ProxifierPoolLifetimeTest extends TestCase
         });
         $container->register('probe', ProxifierPoolLifetimeService::class)->setPublic(true)->setShared(false);
         $proxifier = new Proxifier($container, new ClassModificationProcessor($container));
-        $proxifier->proxifyService('probe', 'reset');
+        $proxifier->proxifyService('probe', $resetMethods);
         foreach ($proxifier->getProxifiedServicePoolRefs() as $priority => $references) {
             foreach ($references as $reference) {
                 $registry->addPool($container->get((string) $reference), $priority);
             }
         }
-        $previous = null;
-        ProxifierPoolLifetimeService::$resetCount = 0;
+        ProxifierPoolLifetimeService::$resets = [];
 
-        for ($index = 0; $index < 4; ++$index) {
-            $proxy = $container->get('probe');
-            self::assertNotSame($previous, $proxy);
-            self::assertSame('ready', $proxy->value());
-            $registry->releaseFromCoroutine(-1);
-            $previous = $proxy;
-        }
-
-        self::assertSame(1, $registry->count(), 'A nonshared proxy must not append a new worker pool on each lookup.');
-        self::assertSame(4, ProxifierPoolLifetimeService::$resetCount);
-        $pool = $registry->getPools()[0];
-        self::assertSame(0, $pool->getAssignedCount());
-        self::assertSame(1, $pool->getFreeCount());
+        return [$container, $registry];
     }
 }
 
 class ProxifierPoolLifetimeService
 {
-    public static int $resetCount = 0;
+    /** @var list<string> */
+    public static array $resets = [];
 
     public function value(): string
     {
@@ -77,6 +103,11 @@ class ProxifierPoolLifetimeService
 
     public function reset(): void
     {
-        ++self::$resetCount;
+        self::$resets[] = __FUNCTION__;
+    }
+
+    public function forget(): void
+    {
+        self::$resets[] = __FUNCTION__;
     }
 }

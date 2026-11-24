@@ -50,7 +50,10 @@ final class Proxifier
         $this->stabilityCheckers = array_merge(self::DEFAULT_STABILITY_CHECKERS, $stabilityCheckers);
     }
 
-    public function proxifyService(string $serviceId, ?string $externalResetter = null, int $resetPriority = 0): void
+    /**
+     * @param list<string> $resetMethods run in order when a coroutine releases its instance
+     */
+    public function proxifyService(string $serviceId, array $resetMethods = [], int $resetPriority = 0): void
     {
         if (!$this->container->has($serviceId)) {
             throw new RuntimeException(sprintf('Service missing: %s', $serviceId));
@@ -67,12 +70,12 @@ final class Proxifier
         }
 
         if (!$tags->hasDecoratedStatefulServiceTag()) {
-            $this->doProxifyService($serviceId, $serviceDef, $externalResetter, $resetPriority);
+            $this->doProxifyService($serviceId, $serviceDef, $resetMethods, $resetPriority);
 
             return;
         }
 
-        $this->doProxifyDecoratedService($serviceId, $serviceDef, $externalResetter);
+        $this->doProxifyDecoratedService($serviceId, $serviceDef, $resetMethods);
     }
 
     /**
@@ -85,10 +88,13 @@ final class Proxifier
         return $this->proxifiedServicePoolRefs;
     }
 
+    /**
+     * @param list<string> $resetMethods
+     */
     private function doProxifyService(
         string $serviceId,
         Definition $serviceDef,
-        ?string $externalResetter = null,
+        array $resetMethods = [],
         int $resetPriority = 0,
     ): void {
         if (!$this->container->has($serviceId)) {
@@ -96,7 +102,7 @@ final class Proxifier
         }
 
         $wrappedServiceId = sprintf('%s.swoole_coop.wrapped', $serviceId);
-        $svcPoolDef = $this->prepareServicePool($wrappedServiceId, $serviceDef, $externalResetter);
+        $svcPoolDef = $this->prepareServicePool($wrappedServiceId, $serviceDef, $resetMethods);
         $svcPoolServiceId = sprintf('%s.swoole_coop.service_pool', $serviceId);
         $proxyDef = $this->prepareProxy($svcPoolServiceId, $serviceDef);
         $this->prepareProxifiedService($serviceDef);
@@ -109,10 +115,13 @@ final class Proxifier
         $this->registerProxifiedServicePoolRef(new Reference($svcPoolServiceId), $resetPriority);
     }
 
+    /**
+     * @param list<string> $resetMethods
+     */
     private function doProxifyDecoratedService(
         string $serviceId,
         Definition $serviceDef,
-        ?string $externalResetter = null,
+        array $resetMethods = [],
         int $resetPriority = 0,
     ): void {
         if ($serviceDef->innerServiceId === null) {
@@ -125,7 +134,7 @@ final class Proxifier
             $decoratedServiceDef = $this->container->findDefinition($decoratedServiceId);
 
             if ($this->isProxyfiable($decoratedServiceId, $decoratedServiceDef)) {
-                $this->doProxifyService($decoratedServiceId, $decoratedServiceDef, $externalResetter, $resetPriority);
+                $this->doProxifyService($decoratedServiceId, $decoratedServiceDef, $resetMethods, $resetPriority);
 
                 return;
             }
@@ -144,10 +153,13 @@ final class Proxifier
         $serviceDef->setShared(false);
     }
 
+    /**
+     * @param list<string> $resetMethods
+     */
     private function prepareServicePool(
         string $wrappedServiceId,
         Definition $serviceDef,
-        ?string $externalResetter = null,
+        array $resetMethods = [],
     ): Definition {
         $svcPoolDef = new Definition(DiServicePool::class);
         $svcPoolDef->setShared(true);
@@ -187,10 +199,10 @@ final class Proxifier
             $resetterDefOrRef = new Reference($customResetter);
         }
 
-        if ($resetterDefOrRef === null && $externalResetter !== null) {
+        if ($resetterDefOrRef === null && $resetMethods !== []) {
             $resetterDefOrRef = new Definition();
             $resetterDefOrRef->setClass(SimpleResetter::class);
-            $resetterDefOrRef->setArgument(0, $externalResetter);
+            $resetterDefOrRef->setArgument(0, $resetMethods);
         }
 
         if ($resetterDefOrRef) {

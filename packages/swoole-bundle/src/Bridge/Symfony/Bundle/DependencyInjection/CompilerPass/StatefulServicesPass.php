@@ -178,7 +178,7 @@ final class StatefulServicesPass implements CompilerPassInterface
     }
 
     /**
-     * @param array<string, string> $resetters
+     * @param array<string, list<string>> $resetters
      */
     private function proxifyKnownStatefulServices(
         ContainerBuilder $container,
@@ -208,44 +208,58 @@ final class StatefulServicesPass implements CompilerPassInterface
                 continue;
             }
 
-            $resetter = $resetters[$serviceId] ?? null;
+            $resetMethods = array_map(
+                fn(string $resetMethod): ?string => $this->resolveResetMethod($container, $serviceId, $resetMethod),
+                $resetters[$serviceId] ?? [],
+            ) |> array_filter(...) |> array_values(...);
 
-            if ($resetter !== null && str_starts_with($resetter, '?')) {
-                $definition = $container->findDefinition($serviceId);
-                $definitionClass = $definition->getClass();
-
-                if ($definitionClass !== null && interface_exists($definitionClass)) {
-                    $resetter = null;
-                } else {
-                    Assertion::classExists($definitionClass);
-                    $resetter = substr($resetter, 1);
-
-                    if (!method_exists($definitionClass, $resetter)) {
-                        $resetter = null;
-                    }
-                }
+            if ($resetMethods === []) {
+                $resetMethods = $this->resolveResetInterfaceResetter($container, $serviceId);
             }
 
-            $resetter ??= $this->resolveResetInterfaceResetter($container, $serviceId);
             $resetPriority = self::SERVICE_RESETTING_PRIORITIES[$serviceId] ?? 0;
-            $proxifier->proxifyService($serviceId, $resetter, $resetPriority);
+            $proxifier->proxifyService($serviceId, $resetMethods, $resetPriority);
         }
     }
 
-    private function resolveResetInterfaceResetter(ContainerBuilder $container, string $serviceId): ?string
+    /**
+     * Strips the `?` of an optional kernel.reset method; null when the service class does not declare the method.
+     */
+    private function resolveResetMethod(ContainerBuilder $container, string $serviceId, string $resetMethod): ?string
+    {
+        if (!str_starts_with($resetMethod, '?')) {
+            return $resetMethod;
+        }
+
+        $definitionClass = $container->findDefinition($serviceId)->getClass();
+
+        if ($definitionClass !== null && interface_exists($definitionClass)) {
+            return null;
+        }
+
+        Assertion::classExists($definitionClass);
+        $resetMethod = substr($resetMethod, 1);
+
+        return method_exists($definitionClass, $resetMethod) ? $resetMethod : null;
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function resolveResetInterfaceResetter(ContainerBuilder $container, string $serviceId): array
     {
         $class = $container->findDefinition($serviceId)->getClass();
 
         if ($class === null || !class_exists($class)) {
-            return null;
+            return [];
         }
 
         // Decoration can move kernel.reset to the outer wrapper while this inner service is pooled too.
-        return is_a($class, ResetInterface::class, true) ? 'reset' : null;
+        return is_a($class, ResetInterface::class, true) ? ['reset'] : [];
     }
 
     /**
-     * @param array<string, string> $resetters
+     * @param array<string, list<string>> $resetters
      */
     private function proxifyUnmanagedFactories(
         ContainerBuilder $container,
@@ -291,7 +305,7 @@ final class StatefulServicesPass implements CompilerPassInterface
     }
 
     /**
-     * @return array<string, string>
+     * @return array<string, list<string>> every kernel.reset method of each service, in tag order
      */
     private function getServiceResetters(ContainerBuilder $container): array
     {
@@ -299,7 +313,7 @@ final class StatefulServicesPass implements CompilerPassInterface
         /** @var array<string, list<string>> $resetters */
         $resetters = $resetterDef->getArgument(1);
 
-        return array_map(static fn(array $r): string => $r[0], $resetters);
+        return $resetters;
     }
 
     private function reduceServiceResetters(ContainerBuilder $container): void

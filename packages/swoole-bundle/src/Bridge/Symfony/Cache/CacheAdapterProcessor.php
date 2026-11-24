@@ -79,7 +79,7 @@ final class CacheAdapterProcessor implements CompileProcessor
         $resetterId = 'swoole_bundle.coroutines_support.' . $suffix;
         $definition->addTag(ContainerConstants::TAG_STATEFUL_SERVICE, ['resetter' => $resetterId]);
         if (!$container->hasDefinition($resetterId)) {
-            $container->setDefinition($resetterId, new Definition(SimpleResetter::class, [$method]));
+            $container->setDefinition($resetterId, new Definition(SimpleResetter::class, [[$method]]));
         }
     }
 }

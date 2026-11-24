@@ -14,6 +14,7 @@ use SwooleBundle\SwooleBundle\Bridge\Symfony\Container\Resetter;
 use SwooleBundle\SwooleBundle\Bridge\Symfony\Container\ServicePool\BaseServicePool;
 use SwooleBundle\SwooleBundle\Bridge\Symfony\Container\ServicePool\ServicePool;
 use SwooleBundle\SwooleBundle\Bridge\Symfony\Container\ServicePool\ServicePoolContainer;
+use SwooleBundle\SwooleBundle\Bridge\Symfony\Container\SimpleResetter;
 use SwooleBundle\SwooleBundle\Bridge\Symfony\Container\StabilityChecker;
 use SwooleBundle\SwooleBundle\Bridge\Swoole\Swoole;
 use SwooleBundle\SwooleBundle\Component\Locking\Mutex;
@@ -85,6 +86,34 @@ final class ServicePoolLifecycleTest extends TestCase
         yield 'runtime exception' => [new RuntimeException('reset failed')];
         yield 'logic exception' => [new LogicException('reset failed')];
         yield 'engine error' => [new Error('reset failed')];
+    }
+
+    public function testEveryResetMethodRunsInListOrderAndInstanceIsReused(): void
+    {
+        $pool = $this->resettablePool(['firstReset', 'secondReset']);
+        $service = $pool->get();
+
+        $pool->releaseFromCoroutine($this->cid());
+
+        self::assertSame(['firstReset', 'secondReset'], $service->calls);
+        self::assertSame(0, $pool->getAssignedCount());
+        self::assertSame(1, $pool->getFreeCount());
+        self::assertSame($service, $pool->get());
+        $pool->releaseFromCoroutine($this->cid());
+    }
+
+    public function testThrowingResetMethodDoesNotSkipLaterMethodsAndFirstFailureDiscardsInstance(): void
+    {
+        $pool = $this->resettablePool(['failingReset', 'secondReset', 'laterFailingReset']);
+        $service = $pool->get();
+
+        $log = $this->captureErrors(fn() => $pool->releaseFromCoroutine($this->cid()));
+
+        self::assertSame(['failingReset', 'secondReset', 'laterFailingReset'], $service->calls);
+        self::assertStringContainsString('RuntimeException: first reset failed', $log);
+        self::assertStringNotContainsString('later reset failed', $log);
+        self::assertSame(0, $pool->getAssignedCount());
+        self::assertSame(0, $pool->getFreeCount());
     }
 
     public function testStabilityFailureDiscardsAndUnlocksCapacity(): void
@@ -237,5 +266,50 @@ final class ServicePoolLifecycleTest extends TestCase
                 return (object) ['stable' => true];
             }
         };
+    }
+
+    /** @param list<string> $resetMethods */
+    private function resettablePool(array $resetMethods): ServicePoolLifecycleResettablePool
+    {
+        return new ServicePoolLifecycleResettablePool(new Swoole(), $this->createStub(Mutex::class), 50, new SimpleResetter($resetMethods));
+    }
+}
+
+/** @extends BaseServicePool<ServicePoolLifecycleResettable> */
+final class ServicePoolLifecycleResettablePool extends BaseServicePool
+{
+    protected function newServiceInstance(): ServicePoolLifecycleResettable
+    {
+        return new ServicePoolLifecycleResettable();
+    }
+}
+
+class ServicePoolLifecycleResettable
+{
+    /** @var list<string> */
+    public array $calls = [];
+
+    public function firstReset(): void
+    {
+        $this->calls[] = __FUNCTION__;
+    }
+
+    public function secondReset(): void
+    {
+        $this->calls[] = __FUNCTION__;
+    }
+
+    public function failingReset(): void
+    {
+        $this->calls[] = __FUNCTION__;
+
+        throw new RuntimeException('first reset failed');
+    }
+
+    public function laterFailingReset(): void
+    {
+        $this->calls[] = __FUNCTION__;
+
+        throw new LogicException('later reset failed');
     }
 }

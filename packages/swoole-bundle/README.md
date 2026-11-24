@@ -23,14 +23,22 @@ local to their coroutine. Hot reload stops its polling and delayed reload timers
 before worker-exit draining. The application kernel uses the bundle's initialization
 path so these rules apply on both cold and warm starts.
 
+A pooled service is reset with every `kernel.reset` method it is tagged with;
+[Service pooling](#service-pooling) gives the rules. The reviewed upstream revision
+passes only the first method to the pool (`$r[0]` in
+`StatefulServicesPass::getServiceResetters()`). Symfony's SecurityBundle tags
+`security.token_storage` with `disableUsageTracking` and then `setToken`, so one
+method per service leaves `setToken` out of its reset.
+
 Readonly proxy generation remains unsupported for the selected consumers. The
 comparison also records unconfigured table-session defects as deferred defects;
 Baander uses native Redis sessions. These exclusions are not claims of equivalent
 behavior or completed fixes.
 
-Upstream changes must preserve coroutine-specific service release, pool
-diagnostics, authenticated WebSocket handshakes, the application's ownership of
-`BeforeShutdown`, and errors on interrupted streaming responses. The
+Upstream changes must preserve coroutine-specific service release, the full list
+of reset methods of each pooled service, pool diagnostics, authenticated WebSocket
+handshakes, the application's ownership of `BeforeShutdown`, and errors on
+interrupted streaming responses. The
 [dependency policy](../baander-dev-dependencies/resources/php-dependencies.json) names the
 regression checks and upstream references for this fork and its dependencies.
 
@@ -267,6 +275,22 @@ When coroutines are enabled, the bundle replaces these services with proxies tha
 1. Check out an instance from a pool on first access in a coroutine.
 2. Return it to the pool when the coroutine finishes.
 3. Reset the instance between uses (via stability checkers and initializers).
+
+On release, the pool calls every `kernel.reset` method of the service, in the order
+of its tags. A method tagged `on_invalid: ignore` is left out when the service class
+does not declare it. Every method runs even when an earlier one throws; the first
+failure is then rethrown, and the pool logs it and discards the instance instead of
+reusing it. When no `kernel.reset` method remains, a service whose class implements
+`ResetInterface` is reset through `reset()`.
+
+A `resetter` service named on the `swoole_bundle.stateful_service` tag replaces the
+`kernel.reset` methods. The cache pools rely on this: a traceable adapter is reset
+through `clearCalls`, because its `reset()` would also reset the pool it wraps and
+erase the values a shared `ArrayAdapter` holds.
+
+`ServicePoolLifecycleTest`, `ProxifierPoolLifetimeTest` and
+`FrameworkIsolationPipelineTest` in the application's
+`tests/Unit/Shared/Infrastructure/Swoole/` cover these rules.
 
 **Container parameters:**
 
