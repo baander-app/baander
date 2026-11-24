@@ -31,6 +31,17 @@ The 2026-10-31 constraint audit included every manifest's production and develop
 requirements: each public direct constraint admitted its latest stable release.
 Constraint eligibility alone does not establish a compatible full development set.
 
+`composer.json` and `scripts/composer.json` set `minimum-stability` to `stable`.
+Each local path package is required with an explicit `@dev` flag, so only those
+packages may resolve to a development version. Composer reads stability flags from
+the root manifest alone, so a path package reached only through another path
+package fails the stable minimum. `scripts/composer.json` therefore requires
+`baander/configuration`, `baander/containers`, `baander/core`,
+`baander/filesystem` and `baander/process` directly, although other path packages
+already require them. Without those five entries, Composer 2.11.1 stopped on
+2026-11-24 with "found baander/configuration[dev-main] but it does not match your
+minimum-stability".
+
 ## Repeatable checks
 
 Install the [standalone loader](../../../dev-docs/workflow-packages.md)
@@ -113,7 +124,7 @@ prove that the local behavior is unnecessary.
 The exact z-engine 8.5.2 selection retains the PHP 8.5 ZTS initialization patch.
 Swoole runtime declarations, platform metadata and stubs agree on 6.2.4; their
 agreement does not establish the installed extension version. The Redis Messenger
-patch retains bounded, recoverable delayed promotion on Symfony 8.1.10. See the
+patch retains bounded, recoverable delayed promotion on Symfony 8.1.11. See the
 [patch guide](../../../patches/README.md) for upstream references, native limits and
 the owning regressions. Preserve those proofs when changing a pin or removing a
 patch.

@@ -24,13 +24,23 @@ new review and does not establish that a patch is obsolete.
 ## Symfony Redis Messenger delayed promotion
 
 `symfony-redis-messenger-recoverable-delays.patch` targets the locked
-`symfony/redis-messenger` 8.1.10, revision
-`484058b2e3055dc56be9b1463cf510e06228542c`. Composer Patches 2.0.0 applies it; the reviewed
+`symfony/redis-messenger` 8.1.11, revision
+`b4566dacd772a782a57d0006af02f24f0a252d10`. Composer Patches 2.0.0 applies it; the reviewed
 SHA-256 is recorded in `patches.lock.json`. Keep that lockfile available before
 Composer installation, including in production image builds. The upstream package
 retains its MIT license.
 
-Upstream 8.1.10 leases a due sorted-set member by moving its score forward before
+The patch file is the one reviewed for 8.1.10; its SHA-256 did not change. On
+2026-11-24 Composer Patches applied it to 8.1.11 twice in the application image:
+during the update that moved the lock, and during an install of that lock into an
+empty `vendor/` directory. GNU patch 2.8 and `git apply --check` both place the
+second hunk one line lower than the patch states, at line 480 of
+`Transport/Connection.php`. Between 8.1.10 and 8.1.11 upstream changed parameter
+attributes, connection error text and DSN parsing in that file. The rewritten
+cluster host loop in `Connection::fromDsn()` is one line longer, which accounts for
+the offset; none of the changes touches delayed promotion.
+
+Upstream 8.1.11 leases a due sorted-set member by moving its score forward before
 inserting it into the stream. That improves recovery over the previous removal-first
 algorithm, but does not provide Baander's bounded promotion and immediate retry
 behavior. The retained patch selects a due member without removing it and runs a

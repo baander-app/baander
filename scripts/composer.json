@@ -5,8 +5,13 @@
   "license": "Apache-2.0",
   "require": {
     "php": ">=8.5",
-    "baander/deployment": "dev-main",
-    "baander/images": "dev-main"
+    "baander/configuration": "dev-main@dev",
+    "baander/containers": "dev-main@dev",
+    "baander/core": "dev-main@dev",
+    "baander/deployment": "dev-main@dev",
+    "baander/filesystem": "dev-main@dev",
+    "baander/images": "dev-main@dev",
+    "baander/process": "dev-main@dev"
   },
   "config": {
     "allow-plugins": false,
@@ -158,13 +163,13 @@
     }
   ],
   "require-dev": {
-    "baander/dev-ci": "dev-main",
-    "baander/dev-dependencies": "dev-main",
-    "baander/dev-environment": "dev-main",
-    "baander/dev-qualification": "dev-main",
-    "baander/dev-registry": "dev-main",
-    "baander/dev-website": "dev-main"
+    "baander/dev-ci": "dev-main@dev",
+    "baander/dev-dependencies": "dev-main@dev",
+    "baander/dev-environment": "dev-main@dev",
+    "baander/dev-qualification": "dev-main@dev",
+    "baander/dev-registry": "dev-main@dev",
+    "baander/dev-website": "dev-main@dev"
   },
-  "minimum-stability": "dev",
+  "minimum-stability": "stable",
   "prefer-stable": true
 }
