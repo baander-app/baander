@@ -18,6 +18,8 @@ final class SecurityProcessor implements CompileProcessor
 {
     private const string ACCESS_DECISION_MANAGER_ID = 'security.access.decision_manager';
     private const string DEBUG_ACCESS_DECISION_MANAGER_ID = 'debug.security.access.decision_manager';
+    private const string UNTRACKED_TOKEN_STORAGE_ID = 'security.untracked_token_storage';
+    private const string AUTHORIZATION_CHECKER_ID = 'security.authorization_checker';
     private const string DEBUG_FIREWALL_LISTENER_ID = 'debug.security.firewall';
     private const string AUTHENTICATOR_RESETTER_ID = 'swoole_bundle.security.traceable_authenticator_resetter';
     private const string CONTEXT_LISTENER_RESETTER_ID
@@ -33,9 +35,28 @@ final class SecurityProcessor implements CompileProcessor
         }
 
         $this->processAccessDecisionManagerPair($container);
+        $this->processTokenStorageAndAuthorizationChecker($container);
         $this->processLazyFirewallContexts($container);
         $this->processContextListeners($container);
         $this->processTraceableAuthenticators($container);
+    }
+
+    private function processTokenStorageAndAuthorizationChecker(ContainerBuilder $container): void
+    {
+        // security.token_storage is pooled through its kernel.reset tags, but every pooled
+        // UsageTrackingTokenStorage wraps the untracked storage, which holds the token: shared, it
+        // hands one coroutine the token of another. The checker keeps the token and the decision of
+        // a running isGranted() call on stacks, which a second coroutine entering the same instance
+        // reads. No resetter is named: the pass resets the storage through ResetInterface, and the
+        // checker pops its stacks in finally blocks.
+        foreach ([self::UNTRACKED_TOKEN_STORAGE_ID, self::AUTHORIZATION_CHECKER_ID] as $serviceId) {
+            if (!$container->hasDefinition($serviceId)) {
+                continue;
+            }
+
+            $container->getDefinition($serviceId)
+                ->addTag(ContainerConstants::TAG_STATEFUL_SERVICE);
+        }
     }
 
     private function processTraceableAuthenticators(ContainerBuilder $container): void

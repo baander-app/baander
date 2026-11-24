@@ -17,6 +17,8 @@ use Symfony\Component\DependencyInjection\Definition;
 use Symfony\Component\EventDispatcher\EventDispatcher;
 use Symfony\Component\HttpClient\HttpClient;
 use Symfony\Component\HttpClient\TraceableHttpClient;
+use Symfony\Component\Security\Core\Authentication\Token\Storage\TokenStorage;
+use Symfony\Component\Security\Core\Authorization\AuthorizationChecker;
 use Symfony\Component\Security\Http\Authenticator\Debug\TraceableAuthenticator;
 use Symfony\Contracts\HttpClient\HttpClientInterface;
 use SwooleBundle\SwooleBundle\Bridge\Symfony\Security\TraceableAuthenticatorResetter;
@@ -73,6 +75,19 @@ final class FrameworkIsolationOwnershipTest extends TestCase
         $resetterId = $container->getDefinition('authenticator')->getTag(ContainerConstants::TAG_STATEFUL_SERVICE)[0]['resetter'];
         self::assertSame(TraceableAuthenticatorResetter::class, $container->getDefinition($resetterId)->getClass());
         self::assertFalse($container->getDefinition('authenticator.template')->hasTag(ContainerConstants::TAG_STATEFUL_SERVICE));
+    }
+
+    public function testInnerTokenStorageAndAuthorizationCheckerAreTaggedWithoutAResetterOfTheirOwn(): void
+    {
+        $container = new ContainerBuilder();
+        $container->setParameter('kernel.bundles', ['SecurityBundle' => 'Symfony\\Bundle\\SecurityBundle\\SecurityBundle']);
+        $container->setDefinition('security.untracked_token_storage', new Definition(TokenStorage::class));
+        $container->setDefinition('security.authorization_checker', new Definition(AuthorizationChecker::class));
+        (new SecurityProcessor())->process($container, $this->proxifier($container));
+        foreach (['security.untracked_token_storage', 'security.authorization_checker'] as $id) {
+            // No attributes: the pass then picks reset() for a ResetInterface class and no resetter otherwise.
+            self::assertSame([[]], $container->getDefinition($id)->getTag(ContainerConstants::TAG_STATEFUL_SERVICE), $id);
+        }
     }
 
     public function testReusedAuthenticatorDropsEarlierPassportAndFailureBeforeAnUnsupportedRequest(): void

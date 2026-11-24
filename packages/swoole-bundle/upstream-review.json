@@ -4222,10 +4222,10 @@
             "recommended_disposition": "adopt-configured-cohort",
             "rationale": "Twig/Security/WebProfiler are registered and HttpClient/Messenger used. Port enabled integrations with proper service tags, reset priorities and readonly generator support.",
             "qualification": "Source-only recommendation; not a runtime proof or permission to change behavior.",
-            "current_local_sha256": "7b001bbc00885a49964403ef41e8ac24ba4fe81b097813e2d9eb503b52519e9b",
+            "current_local_sha256": "5ce4e7b22c579f676c5cd7d23f8258135a0d7e47c52d691317f75246488f2b68",
             "current_source_presence": "present",
             "final_disposition": "adopted-adapted",
-            "final_reason": "Isolates access-decision manager/traceable authenticators; retains guarded context-listener/lazy-context fixes. Current authenticated API firewall is stateless, so session-context branches are conditional.",
+            "final_reason": "Isolates access-decision manager/traceable authenticators; retains guarded context-listener/lazy-context fixes. Current authenticated API firewall is stateless, so session-context branches are conditional. Locally tags security.untracked_token_storage and security.authorization_checker as stateful services, so each coroutine has its own security token and its own isGranted stacks: every pooled security.token_storage wraps the untracked storage, and the checker keeps the token and the decision of a running isGranted call on stacks. The pass gives the storage the resetter reset through its ResetInterface fallback and the checker none; the checker pops both stacks in finally blocks. Upstream v0.35.6 pools the same two services through OPTIONAL_SERVICES_TO_PROXIFY in StatefulServicesPass; the fork keeps the rule in the processor that owns security isolation. FrameworkIsolationSecurityTest proves with overlapping coroutines that a token and the isGranted stacks stay in their coroutine and that a released storage is handed on empty; PooledServiceResetCoverageTest proves both pools exist in the compiled production container.",
             "source_review_status": "recorded",
             "runtime_qualification": {
                 "status": "pending-authoritative-gates",

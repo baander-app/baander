@@ -16,6 +16,7 @@
   "tests/Unit/Shared/Infrastructure/Swoole/FrameworkIsolationErrorRegistryTest.php": "Redefines PHP error-handler functions through FFI and verifies isolated native coroutine handler stacks.",
   "tests/Unit/Shared/Infrastructure/Swoole/FrameworkIsolationMailerTest.php": "Compiles native SMTP contextual proxies and overlaps independent coroutine senders without networking.",
   "tests/Unit/Shared/Infrastructure/Swoole/FrameworkIsolationMimeTest.php": "Installs a generated contextual address validator and overlaps native coroutine validation.",
+  "tests/Unit/Shared/Infrastructure/Swoole/FrameworkIsolationSecurityTest.php": "Runs the stateful compiler pipeline with native class metadata changes and overlaps native coroutines on the pooled security services.",
   "tests/Unit/Shared/Infrastructure/Swoole/SerialQueueTest.php": "Exercises native channel backpressure, consumer scheduling and drain.",
   "tests/Unit/Shared/Infrastructure/Swoole/CoroutineSafeLoggingTest.php": "Checks stream writer coroutine ownership and contextual payload lifetimes.",
   "tests/Unit/Shared/Infrastructure/Swoole/UnmanagedFactoryGenerationLockTest.php": "Exercises concurrent native coroutines and generated proxy class ownership.",
