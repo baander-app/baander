@@ -254,7 +254,6 @@
       <excludeFolder url="file://$MODULE_DIR$/vendor/ergebnis/json-printer" />
       <excludeFolder url="file://$MODULE_DIR$/vendor/ergebnis/json-schema-validator" />
       <excludeFolder url="file://$MODULE_DIR$/vendor/justinrainbow/json-schema" />
-      <excludeFolder url="file://$MODULE_DIR$/vendor/localheinz/diff" />
       <excludeFolder url="file://$MODULE_DIR$/vendor/marc-mabe/php-enum" />
       <excludeFolder url="file://$MODULE_DIR$/vendor/dflydev/dot-access-data" />
       <excludeFolder url="file://$MODULE_DIR$/vendor/league/commonmark" />
@@ -282,6 +281,7 @@
       <excludeFolder url="file://$MODULE_DIR$/vendor/baander/filesystem" />
       <excludeFolder url="file://$MODULE_DIR$/vendor/baander/images" />
       <excludeFolder url="file://$MODULE_DIR$/vendor/baander/process" />
+      <excludeFolder url="file://$MODULE_DIR$/vendor/ergebnis/differ" />
     </content>
     <orderEntry type="inheritedJdk" />
     <orderEntry type="sourceFolder" forTests="false" />
