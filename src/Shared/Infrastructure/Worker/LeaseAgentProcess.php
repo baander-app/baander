@@ -37,7 +37,7 @@ final class LeaseAgentProcess
     public static function start(array $request, string $projectDirectory, float $now, float $timeoutSeconds = 2.0, ?array $environment = null): self
     {
         $request = self::validateRequest($request);
-        if (!is_finite($now) || $now < 0 || !is_finite($timeoutSeconds) || $timeoutSeconds <= 0 || $timeoutSeconds > 60 || !is_finite($now + $timeoutSeconds)) {
+        if (!is_finite($now) || $now < 0 || !is_finite($timeoutSeconds) || $timeoutSeconds <= 0 || $timeoutSeconds > 60) {
             throw new \InvalidArgumentException('Lease helper requires a monotonic start and a positive timeout of at most 60 seconds.');
         }
         $projectDirectory = rtrim($projectDirectory, '/');

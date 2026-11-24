@@ -122,7 +122,8 @@ final class Check
                 }
             }
         }
-        foreach ($inventory->policy['patches'] ?? [] as $fix) {
+        $patches = $inventory->policy['patches'] ?? [];
+        foreach ($patches as $fix) {
             $requests[$fix['package']] ??= [];
         }
         foreach ($requests as $name => $owners) {
@@ -149,7 +150,7 @@ final class Check
                 $newer = $current !== null && (str_starts_with($current, 'dev-') || version_compare(ltrim($latest['version'], 'v'), ltrim($current, 'v'), '>'));
                 $report->add($newer || $eligibility === false ? 'finding' : 'evidence', $owner['path'], 'stable-releases', $url, 'Independent latest stable release; installability requires solver evidence.', ['package' => $name, 'ownership' => $owner['ownership'], 'section' => $owner['section'], 'lockedSection' => $owner['lockedSection'], 'constraint' => $owner['constraint'], 'constraintEligible' => $eligibility, 'latest' => $latest, 'lockedVersion' => $current, 'lockedReference' => $locked['source']['reference'] ?? null]);
             }
-            foreach ([...array_values($inventory->policy['patches'] ?? []), ...array_map(static fn(string $package, array $fix): array => ['package' => $package, ...$fix], array_keys($inventory->policy['forks'] ?? []), array_values($inventory->policy['forks'] ?? []))] as $fix) {
+            foreach ([...array_values($patches), ...array_map(static fn(string $package, array $fix): array => ['package' => $package, ...$fix], array_keys($inventory->policy['forks'] ?? []), array_values($inventory->policy['forks'] ?? []))] as $fix) {
                 if (($fix['package'] ?? null) !== $name) {
                     continue;
                 }

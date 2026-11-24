@@ -104,6 +104,7 @@ final class Runtime
             fclose($socket);
         }
     }
+    /** @phpstan-impure */
     public static function now(): float
     {
         return hrtime(true) / 1000000000.0;

@@ -5,16 +5,16 @@ below are relative to this reference. Recheck them after dependency upgrades.
 
 ## Identify the environment
 
-[composer.lock](../../../../composer.lock) records DBAL 4.5.0, ORM 3.7.6,
-DoctrineBundle 3.3.4, Migrations 3.9.8 and MigrationsBundle 4.0.1. On 2026-11-14 the
+[composer.lock](../../../../composer.lock) records DBAL 4.6.0, ORM 3.8.0,
+DoctrineBundle 3.4.2, Migrations 3.9.9 and MigrationsBundle 4.0.1. On 2026-11-24 the
 installed vendor tree matched the lock for each of them. Inspect both; a fresh
 lockfile install and the current runtime need not match. Use
 `composer show --locked doctrine/orm` and `composer show doctrine/orm`, repeating
 for the relevant packages. Read installed implementation for generated SQL claims.
 
 DBAL's PostgreSQL exception converter
-(`vendor/doctrine/dbal/src/Driver/API/PostgreSQL/ExceptionConverter.php`, DBAL 4.5.0,
-read 2026-11-14) gives only some SQLSTATEs a class of their own:
+(`vendor/doctrine/dbal/src/Driver/API/PostgreSQL/ExceptionConverter.php`, DBAL 4.6.0,
+read 2026-11-24) gives only some SQLSTATEs a class of their own:
 
 - Deadlock `40P01` and serialization failure `40001` both become `DeadlockException`.
   Read in the converter. [DoctrineTransactionTest](../../../../tests/Unit/Shared/Infrastructure/Doctrine/DoctrineTransactionTest.php)
@@ -28,6 +28,10 @@ read 2026-11-14) gives only some SQLSTATEs a class of their own:
   asserted by the rollback case of
   [MusicBrainzMatchApplyTest](../../../../tests/Integration/MusicBrainzMatchApplyTest.php),
   which runs only in the CI image.
+- Restrict violation `23001` becomes `ForeignKeyConstraintViolationException`, as
+  `23503` does. DBAL 4.5.0 left it a generic `DriverException`. Read in both converters.
+  [SchedulerOccurrenceExecutionStoreTest](../../../../tests/Integration/SchedulerOccurrenceExecutionStoreTest.php)
+  asserts the SQLSTATE of a refused delete, not the exception class.
 
 Check `getSQLState()` and the installed converter when classifying database errors.
 Application code needs no DBAL exception type for a deadlock: the transaction port's
@@ -134,8 +138,8 @@ every partial index unsupported or add unrelated objects to the exclusion list.
 Check SchemaTool's actual unique-index deduplication when indexes share columns.
 See [extension checks](extensions.md) before accepting index deletion/recreation.
 
-DBAL 4.5.0 does not model generated columns either: its `Schema/Column.php` has no
-generated-column property (read 2026-11-14). PostgreSQL stores their expressions
+DBAL 4.6.0 does not model generated columns either: its `Schema/Column.php` has no
+generated-column property (read 2026-11-24). PostgreSQL stores their expressions
 in `pg_attrdef`, which DBAL would read as column defaults, so the platform's
 `getDefaultColumnValueSQLSnippet()` excludes rows with `attgenerated <> ''`. Map
 a stored generated column with `columnDefinition` (ignored by `columnsEqual`),

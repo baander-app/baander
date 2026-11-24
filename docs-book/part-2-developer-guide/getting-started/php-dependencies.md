@@ -90,25 +90,32 @@ host-selected candidate is not evidence that the application needs a downgrade.
 
 ## Remaining stable-release blockers
 
-On 2026-10-31, fresh authoritative Packagist metadata for 242 public packages was
-compared with all four locks, including development packages. Composer 2.11.1
-`why-not --locked` confirmed the blockers below against copies of those locks.
-The scripts, relay and TSDuck locks had no packages behind latest stable.
+On 2026-11-24 a full `composer update` moved the root, scripts and TSDuck locks to
+the newest releases Composer could select. Composer 2.11.1 `outdated --locked`,
+run afterwards in the application image, listed seven root packages behind their
+latest stable release, and `why-not --locked` named the requirement that holds each.
+The scripts and TSDuck locks had no packages behind latest stable; the relay lock
+holds no packages.
 
 | Root locked package | Locked | Latest stable | Blocking requirement |
 | --- | --- | --- | --- |
-| [monolog/monolog](https://repo.packagist.org/p2/monolog/monolog.json) | 3.10.0 | 3.12.1 | reli-prof requires exactly 3.10.0 |
-| [webmozart/assert](https://repo.packagist.org/p2/webmozart/assert.json) | 2.3.0 | 2.5.0 | reli-prof requires exactly 2.3.0 |
+| [monolog/monolog](https://repo.packagist.org/p2/monolog/monolog.json) | 3.10.0 | 3.13.0 | reli-prof requires exactly 3.10.0 |
+| [webmozart/assert](https://repo.packagist.org/p2/webmozart/assert.json) | 2.3.0 | 2.5.1 | reli-prof requires exactly 2.3.0 |
 | [amphp/amp](https://repo.packagist.org/p2/amphp/amp.json) | 3.1.1 | 3.1.3 | reli-prof requires exactly 3.1.1 |
 | [amphp/parallel](https://repo.packagist.org/p2/amphp/parallel.json) | 2.3.3 | 2.4.0 | reli-prof requires exactly 2.3.3 |
 | [symfony/monolog-bundle](https://repo.packagist.org/p2/symfony/monolog-bundle.json) | 4.0.2 | 4.1.0 | Latest requires Monolog ^3.12, conflicting with the profiler pin |
+| [jetbrains/phpstorm-stubs](https://repo.packagist.org/p2/jetbrains/phpstorm-stubs.json) | 2026.2 | 2026.3 | Deptrac 4.7.2 requires 2024.3, 2025.3, 2026.1 or 2026.2 |
+| [swoole/ide-helper](https://repo.packagist.org/p2/swoole/ide-helper.json) | 6.2.4 | 6.2.5 | The root manifest requires exactly 6.2.4, the selected Swoole version |
 
 [reli-prof 0.12.0's manifest](https://github.com/reliforp/reli-prof/blob/22ef419d0670cd257fdf7970efafbe0fa09464ae/composer.json)
-owns these exact requirements; 0.12.0 was also its
+owns the exact requirements behind the first five rows; 0.12.0 was also its
 [latest stable release](https://repo.packagist.org/p2/reliforp/reli-prof.json).
 The root constraints permit the newer stable packages. Recheck the profiler's
 requirements when upgrading it; raising root minimums cannot resolve these
-conflicts. This dated currency assessment does not establish that every rebuilt
+conflicts. Deptrac 4.7.2 was also its latest stable release, so no Deptrac update
+admits the newer PhpStorm stubs. The `swoole/ide-helper` stubs stay at the selected
+Swoole version; see [Local fixes and native pins](#local-fixes-and-native-pins).
+This dated currency assessment does not establish that every rebuilt
 image or application qualification gate has passed. Current acceptance evidence
 belongs in [ROADMAP.md](../../../ROADMAP.md).
 
