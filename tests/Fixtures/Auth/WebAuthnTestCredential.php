@@ -92,19 +92,21 @@ final class WebAuthnTestCredential
 
     /**
      * The credential a registration ceremony creates for the base64url challenge from the
-     * registration options, with a `none` attestation.
+     * registration options. Its attestation statement is empty, which is a complete statement
+     * for the `none` format only.
      *
      * @return array<string, mixed>
      */
-    public function attest(string $challenge, string $origin): array
+    public function attest(string $challenge, string $origin, string $format = 'none'): array
     {
         $clientData = json_encode(['type' => 'webauthn.create', 'challenge' => $challenge, 'origin' => $origin, 'crossOrigin' => false], JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES);
         // User present and verified, with attested credential data (0x45): a zero AAGUID, the
         // credential ID with its big-endian length, and the public key.
         $authenticatorData = hash('sha256', $this->rpId, true) . "\x45" . pack('N', $this->counter)
             . str_repeat("\0", 16) . pack('n', strlen($this->credentialId)) . $this->credentialId . $this->coseKey();
-        // CBOR map {fmt: "none", attStmt: {}, authData: bytes}.
-        $attestationObject = "\xA3" . "\x63fmt" . "\x64none" . "\x67attStmt" . "\xA0" . "\x68authData" . self::cborBytes($authenticatorData);
+        // CBOR map {fmt: text, attStmt: {}, authData: bytes}. A text string shorter than 24
+        // bytes carries its length in the initial byte.
+        $attestationObject = "\xA3" . "\x63fmt" . chr(0x60 + strlen($format)) . $format . "\x67attStmt" . "\xA0" . "\x68authData" . self::cborBytes($authenticatorData);
         $id = self::encode($this->credentialId);
 
         return [

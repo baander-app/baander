@@ -20,6 +20,7 @@ use Symfony\Component\Serializer\Encoder\JsonEncoder;
 use Webauthn\Counter\CounterChecker;
 use Webauthn\CredentialRecord;
 use Webauthn\Exception\AuthenticatorResponseVerificationException;
+use Webauthn\Exception\InvalidDataException;
 use Webauthn\PublicKeyCredentialRequestOptions;
 
 final class PasskeyServiceTest extends TestCase
@@ -231,6 +232,42 @@ final class PasskeyServiceTest extends TestCase
             return;
         }
         self::assertTrue($accepted, 'A registration from ' . $origin . ' must be refused.');
+    }
+
+    public function testARegistrationWithoutAnAttestationStatementIsVerified(): void
+    {
+        $issued = $this->service->createRegistrationOptions(self::USER_A, 'a@baander.app');
+        $attestation = new WebAuthnTestCredential(self::USER_A, 'localhost')->attest($issued['options']['challenge'], 'https://localhost');
+
+        $record = $this->service->verifyRegistrationResponse($attestation, $this->service->consumeRegistrationChallenge(self::USER_A, $issued['challengeKey']));
+
+        self::assertSame('none', $record->attestationType);
+        self::assertSame(self::USER_A, $record->userHandle);
+    }
+
+    /**
+     * The statement formats registration options never ask an authenticator for.
+     *
+     * @return iterable<string, array{string}>
+     */
+    public static function unrequestedAttestationFormats(): iterable
+    {
+        yield 'FIDO U2F' => ['fido-u2f'];
+        yield 'Android Key' => ['android-key'];
+        yield 'Apple' => ['apple'];
+        yield 'TPM' => ['tpm'];
+    }
+
+    #[DataProvider('unrequestedAttestationFormats')]
+    public function testARegistrationInAnUnrequestedAttestationFormatIsRefusedBeforeItsStatementIsRead(string $format): void
+    {
+        $issued = $this->service->createRegistrationOptions(self::USER_A, 'a@baander.app');
+        $attestation = new WebAuthnTestCredential(self::USER_A, 'localhost')->attest($issued['options']['challenge'], 'https://localhost', $format);
+        $expectedOptions = $this->service->consumeRegistrationChallenge(self::USER_A, $issued['challengeKey']);
+
+        $this->expectException(InvalidDataException::class);
+        $this->expectExceptionMessage('The attestation statement format "' . $format . '" is not supported.');
+        $this->service->verifyRegistrationResponse($attestation, $expectedOptions);
     }
 
     // --- Credential record serialization ---

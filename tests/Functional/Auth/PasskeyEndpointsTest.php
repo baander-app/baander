@@ -10,12 +10,15 @@ use App\Tests\Fixtures\Auth\WebAuthnTestCredential;
 use Monolog\Handler\TestHandler;
 use Monolog\Logger;
 use Monolog\LogRecord;
+use PHPUnit\Framework\Attributes\DataProvider;
 use Symfony\Component\HttpFoundation\Response;
 
 /**
  * Passkey sign-in options name no account and list no credential. The passkey check endpoint runs
  * the checks passkey sign-in runs and answers every refusal alike. Registration asks for a
- * discoverable credential and answers a refused ceremony without the verifier's text.
+ * discoverable credential and answers a refused ceremony without the verifier's text. It stores a
+ * credential that comes without an attestation statement and refuses the statement formats its
+ * options never request.
  */
 final class PasskeyEndpointsTest extends RateLimitTestCase
 {
@@ -123,14 +126,72 @@ final class PasskeyEndpointsTest extends RateLimitTestCase
         $error = $this->assertJsonResponse($response, 400, 'error')['error'];
         self::assertSame(['reason' => 'passkey_registration_failed'], $error['details'] ?? null);
         self::assertSame('Passkey registration verification failed.', $error['message']);
+        self::assertStringContainsString('origin', $this->loggedRefusal($logs)->getMessage());
+        self::assertSame([], $this->passkeys()->forUser($user->getId()));
+    }
+
+    public function testARegistrationWithoutAnAttestationStatementStoresThePasskey(): void
+    {
+        $user = $this->createTestUser(verified: true);
+        $options = $this->registrationOptions($user);
+        $relyingPartyId = $options['options']['rp']['id'];
+        $credential = new WebAuthnTestCredential($user->getPublicId()->toString(), $relyingPartyId);
+
+        $response = $this->authenticatedRequest('POST', '/api/auth/passkey/register', $user, [
+            'challengeKey' => $options['challengeKey'],
+            'response' => $credential->attest($options['options']['challenge'], 'https://' . $relyingPartyId),
+            'name' => 'Laptop',
+        ]);
+
+        $this->assertJsonResponse($response, 201, 'data');
+        self::assertCount(1, $this->passkeys()->forUser($user->getId()));
+    }
+
+    /**
+     * The statement formats registration options never ask an authenticator for.
+     *
+     * @return iterable<string, array{string}>
+     */
+    public static function unrequestedAttestationFormats(): iterable
+    {
+        yield 'FIDO U2F' => ['fido-u2f'];
+        yield 'Android Key' => ['android-key'];
+        yield 'Apple' => ['apple'];
+        yield 'TPM' => ['tpm'];
+    }
+
+    #[DataProvider('unrequestedAttestationFormats')]
+    public function testARegistrationInAnUnrequestedAttestationFormatIsRefused(string $format): void
+    {
+        $logs = $this->captureLogs();
+        $user = $this->createTestUser(verified: true);
+        $options = $this->registrationOptions($user);
+        $relyingPartyId = $options['options']['rp']['id'];
+        $credential = new WebAuthnTestCredential($user->getPublicId()->toString(), $relyingPartyId);
+
+        $response = $this->authenticatedRequest('POST', '/api/auth/passkey/register', $user, [
+            'challengeKey' => $options['challengeKey'],
+            'response' => $credential->attest($options['options']['challenge'], 'https://' . $relyingPartyId, $format),
+            'name' => 'Security key',
+        ]);
+
+        $error = $this->assertJsonResponse($response, 400, 'error')['error'];
+        self::assertSame(['reason' => 'passkey_registration_failed'], $error['details'] ?? null);
+        self::assertSame('The attestation statement format "' . $format . '" is not supported.', $this->loggedRefusal($logs)->getMessage());
+        self::assertSame([], $this->passkeys()->forUser($user->getId()));
+    }
+
+    /** The reason behind the one refused registration in the captured log. */
+    private function loggedRefusal(TestHandler $logs): \Throwable
+    {
         $refusals = $logs->getRecords()
             |> (static fn (array $records): array => array_filter($records, static fn (LogRecord $record): bool => $record->message === 'Passkey registration refused.'))
             |> array_values(...);
         self::assertCount(1, $refusals, 'Logged: ' . implode(' | ', array_map(static fn (LogRecord $record): string => $record->channel . ': ' . $record->message, $logs->getRecords())));
         $reason = $refusals[0]->context['exception'] ?? null;
         self::assertInstanceOf(\Throwable::class, $reason);
-        self::assertStringContainsString('origin', $reason->getMessage());
-        self::assertSame([], $this->passkeys()->forUser($user->getId()));
+
+        return $reason;
     }
 
     private function assertRefused(Response $response, string $case = ''): void

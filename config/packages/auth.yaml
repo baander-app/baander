@@ -146,7 +146,9 @@ parameters:
     # Passkey sign-in lists no credentials, so only a discoverable credential can sign in.
     auth.passkey.resident_key: 'required'
 
-    # Attestation conveyance preference: "none", "indirect", "direct", or "enterprise".
+    # Attestation conveyance preference. Baander requests no attestation: "none" is the
+    # only supported value, and registration accepts the "none" and "packed" attestation
+    # statement formats only.
     auth.passkey.attestation: 'none'
 
     # COSE algorithm identifiers to advertise during registration.
