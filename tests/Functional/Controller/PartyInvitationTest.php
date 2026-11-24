@@ -62,10 +62,6 @@ final class PartyInvitationTest extends TestCase
 
     public function testACallerWhoIsNotSignedInIsUnauthorized(): void
     {
-        // The reused kernel keeps the token of setUp's last request; clear it so these
-        // requests carry no identity.
-        self::getContainer()->get('security.token_storage')->setToken(null);
-
         foreach ($this->routes($this->party, $this->outsider->getPublicId()) as [$method, $uri]) {
             $this->assertJsonResponse($this->anonymousRequest($method, $uri), 401);
         }

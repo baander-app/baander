@@ -90,6 +90,8 @@ Functional tests live in `tests/Functional/` and extend `App\Tests\Functional\Te
 
 Tests do not use real JWT tokens or `loginUser()`. The `TestAuthenticator`, registered in `config/packages/test/security.yaml`, reads the `X-Baander-Test-User-Id` header and returns a `SecurityUser` for that user ID. `authenticatedRequest()` sets the header for you.
 
+A test sends all its requests through one kernel, which keeps a single token storage and never releases it. `App\Auth\Infrastructure\Security\StaleTokenListener` clears that storage when a main request starts, before the firewall runs. An `anonymousRequest()` that follows an `authenticatedRequest()` therefore carries no identity, and a test does not clear the storage itself. A token placed in the storage before a request does not reach the request either. That is the only way `loginUser()` could sign a user in on the stateless `api` firewall, so it has no effect here.
+
 By default the request counts as a first-party token, the kind Baander's own apps hold, with the user's full roles. To test what a third-party client may do, `delegatedRequest()` adds the `X-Baander-Test-Client-Scopes` header with the token's scopes, separated by spaces. The request then counts as a [delegated token](../development/api-authentication.md#first-party-and-delegated-tokens): the user authenticates with `ROLE_USER` alone, and the scope check answers `403` `insufficient_scope` on every route those scopes do not cover. An empty value models a delegated token with no scopes.
 
 ```php

@@ -32,6 +32,8 @@ use Doctrine\ORM\EntityManagerInterface;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
+use SwooleBundle\SwooleBundle\Bridge\Swoole\Swoole;
+use SwooleBundle\SwooleBundle\Bridge\Symfony\Container\ServicePool\ServicePoolContainer;
 use Symfony\Component\Filesystem\Filesystem;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -111,8 +113,12 @@ final class OAuthFirewallAcceptanceTest extends TestCase
     protected function tearDown(): void
     {
         if (isset($this->manager, $this->user, $this->token, $this->client) && $this->manager->isOpen()) {
+            // A pool release clears the EntityManager and detaches the rows setUp persisted.
+            $token = $this->manager->find(AccessTokenEntity::class, $this->token->getId());
             $user = $this->manager->find(UserEntity::class, $this->user->getId());
-            $this->manager->remove($this->token);
+            if ($token !== null) {
+                $this->manager->remove($token);
+            }
             if ($user !== null) {
                 $this->manager->remove($user);
             }
@@ -266,6 +272,37 @@ final class OAuthFirewallAcceptanceTest extends TestCase
         $jwt = $this->accessJwt();
         $response = $this->request($jwt, $this->proof->create($method, $uri, $jwt), $uri, $method);
         self::assertSame(401, $response->getStatusCode(), (string) $response->getContent());
+    }
+
+    /** @return iterable<string, array{string, int, bool}> path, status without credentials, whether the pools are released */
+    public static function requestsWithoutCredentialsAfterASignedInRequest(): iterable
+    {
+        $kernels = [
+            'pools released after the request, as the web server does' => true,
+            'pools never released, as in a kernel outside a coroutine' => false,
+        ];
+        foreach ($kernels as $kernel => $releasesPools) {
+            yield 'user administration, ' . $kernel => ['/api/admin/users', 401, $releasesPools];
+            // The profile route is public and answers 404 when nobody is signed in.
+            yield 'profile, ' . $kernel => ['/api/auth/me', 404, $releasesPools];
+        }
+    }
+
+    #[DataProvider('requestsWithoutCredentialsAfterASignedInRequest')]
+    public function testARequestWithoutCredentialsIsAnonymousAfterASignedInRequest(string $path, int $status, bool $releasesPools): void
+    {
+        $jwt = $this->accessJwt();
+        $signedIn = $this->request($jwt, $this->proof->create('GET', 'https://baander.app/api/auth/me', $jwt));
+        self::assertSame(200, $signedIn->getStatusCode(), (string) $signedIn->getContent());
+        if ($releasesPools) {
+            $this->releasePooledServices();
+        }
+
+        $request = Request::create('https://baander.app' . $path);
+        $response = $this->kernel->handle($request);
+        $this->kernel->terminate($request, $response);
+
+        self::assertSame($status, $response->getStatusCode(), (string) $response->getContent());
     }
 
     public function testAMemberCannotAdministerUsersOrRegisterAServer(): void
@@ -615,5 +652,16 @@ final class OAuthFirewallAcceptanceTest extends TestCase
         $this->kernel->terminate($request, $response);
 
         return $response;
+    }
+
+    /** Releases what a request took from the service pools, as the web server does when its coroutine ends. */
+    private function releasePooledServices(): void
+    {
+        $pools = $this->kernel->getContainer()->get('oauth.acceptance.service_pools');
+        self::assertInstanceOf(ServicePoolContainer::class, $pools);
+        $swoole = $this->kernel->getContainer()->get('oauth.acceptance.swoole');
+        self::assertInstanceOf(Swoole::class, $swoole);
+
+        $pools->releaseFromCoroutine($swoole->getCoroutineId());
     }
 }

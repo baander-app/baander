@@ -221,9 +221,6 @@ final class EmailVerificationDeliveryTest extends RateLimitTestCase
         $this->assertJsonResponse($this->authenticatedRequest('PUT', '/api/auth/me/email', $user, ['email' => $address, 'currentPassword' => 'password123']), 202);
         [, $token] = $this->linkFrom((string) $this->onlyEmail()->getTextBody());
         $addressHolder = $this->createTestUser($this->uniqueEmail());
-        // The reused kernel keeps the token of the last request; clear it so the next one
-        // carries no identity.
-        static::getContainer()->get('security.token_storage')->setToken(null);
 
         $signedOut = $this->requestFrom($this->ip(), 'POST', '/api/auth/email/verify', content: ['token' => $token]);
         $otherAccount = $this->verify($token, $addressHolder->getId()->toString());

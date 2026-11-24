@@ -73,10 +73,6 @@ final class PartySessionAccessTest extends TestCase
 
     public function testAnUnauthenticatedCallerIsUnauthorized(): void
     {
-        // The reused kernel keeps the token of setUp's last request; clear it so these
-        // requests carry no identity.
-        self::getContainer()->get('security.token_storage')->setToken(null);
-
         $this->assertJsonResponse($this->anonymousRequest('GET', self::URI), 401);
         $this->assertJsonResponse($this->anonymousRequest('POST', self::URI . $this->party . '/join'), 401);
         foreach ($this->requestsThatNameAParty($this->outsider) as $request => [$method, $path, $body]) {
