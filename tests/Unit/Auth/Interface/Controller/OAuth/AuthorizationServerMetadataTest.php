@@ -26,20 +26,21 @@ final class AuthorizationServerMetadataTest extends TestCase
         self::assertSame(ClientAssertionVerifier::SUPPORTED_ALGORITHMS, AuthorizationServerMetadataController::CLIENT_ASSERTION_SIGNING_ALGORITHMS);
     }
 
+    /** A proof is signed with an EC or Ed25519 key; a client assertion may also come from an RSA key. */
+    public function testProofsAreAdvertisedWithoutRsaAlgorithmsAndAssertionsWithThem(): void
+    {
+        $metadata = $this->metadata();
+
+        self::assertSame(['EdDSA', 'ES256', 'ES384', 'ES512'], $metadata['dpop_signing_alg_values_supported']);
+        self::assertSame(
+            ['EdDSA', 'ES256', 'ES384', 'ES512', 'PS256', 'RS256', 'RS384', 'RS512'],
+            $metadata['token_endpoint_auth_signing_alg_values_supported'],
+        );
+    }
+
     public function testEndpointsAreRootedAtTheIssuer(): void
     {
-        $paths = [
-            'oauth_token' => '/api/oauth/token',
-            'oauth_par' => '/api/oauth/par',
-            'oauth_revoke' => '/api/oauth/revoke',
-            'oauth_device_authorize' => '/api/oauth/device/authorize',
-            'jwks' => '/.well-known/jwks.json',
-        ];
-        $router = $this->createStub(UrlGeneratorInterface::class);
-        $router->method('generate')->willReturnCallback(static fn (string $route): string => $paths[$route]);
-
-        $response = (new AuthorizationServerMetadataController($router, 'https://music.baander.app/', 'https://music.baander.app/oauth/authorize', ['profile', 'library']))();
-        $metadata = json_decode((string) $response->getContent(), true, 512, JSON_THROW_ON_ERROR);
+        $metadata = $this->metadata();
 
         self::assertSame('https://music.baander.app/', $metadata['issuer']);
         self::assertSame('https://music.baander.app/oauth/authorize', $metadata['authorization_endpoint'], 'The web app consent page.');
@@ -54,5 +55,23 @@ final class AuthorizationServerMetadataTest extends TestCase
         self::assertSame(AuthorizationServerMetadataController::CLIENT_ASSERTION_SIGNING_ALGORITHMS, $metadata['token_endpoint_auth_signing_alg_values_supported']);
         self::assertArrayNotHasKey('introspection_endpoint', $metadata);
         self::assertArrayNotHasKey('revocation_endpoint', $metadata, 'The revocation route authenticates the user, not the client (RFC 7009 section 2.1).');
+    }
+
+    /** @return array<string, mixed> The document published for the issuer `https://music.baander.app/` */
+    private function metadata(): array
+    {
+        $paths = [
+            'oauth_token' => '/api/oauth/token',
+            'oauth_par' => '/api/oauth/par',
+            'oauth_revoke' => '/api/oauth/revoke',
+            'oauth_device_authorize' => '/api/oauth/device/authorize',
+            'jwks' => '/.well-known/jwks.json',
+        ];
+        $router = $this->createStub(UrlGeneratorInterface::class);
+        $router->method('generate')->willReturnCallback(static fn (string $route): string => $paths[$route]);
+
+        $response = (new AuthorizationServerMetadataController($router, 'https://music.baander.app/', 'https://music.baander.app/oauth/authorize', ['profile', 'library']))();
+
+        return json_decode((string) $response->getContent(), true, 512, JSON_THROW_ON_ERROR);
     }
 }

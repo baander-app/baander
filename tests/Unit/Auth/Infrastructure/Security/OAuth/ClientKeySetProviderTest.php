@@ -205,6 +205,8 @@ final class ClientKeySetProviderTest extends TestCase
     {
         yield 'private key member' => ['{"keys":[{"kty":"EC","crv":"P-256","x":"AA","y":"AA","d":"AA","kid":"key-1"}]}'];
         yield 'symmetric key' => ['{"keys":[{"kty":"oct","k":"AA","kid":"key-1"}]}'];
+        yield 'RSA key over 4096 bits' => ['{"keys":[{"kty":"RSA","n":"' . str_repeat('_', 1366) . '","e":"AQAB","kid":"key-1"}]}'];
+        yield 'RSA key with exponent 3' => ['{"keys":[{"kty":"RSA","n":"' . str_repeat('_', 342) . '","e":"Aw","kid":"key-1"}]}'];
         yield 'not JSON' => ['<html>keys</html>'];
         yield 'no keys' => ['{"keys":[]}'];
     }

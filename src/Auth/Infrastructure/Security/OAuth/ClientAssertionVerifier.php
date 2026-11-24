@@ -21,7 +21,8 @@ use Throwable;
 /**
  * Verifies `private_key_jwt` client assertions (RFC 7523 as updated by RFC 10070).
  *
- * - `alg` is one of the asymmetric algorithms DPoP proofs use; `none` and HMAC never are.
+ * - `alg` is one of the asymmetric algorithms in `SUPPORTED_ALGORITHMS`: those DPoP proofs
+ *   use and the RSA ones, which a proof may not name. `none` and HMAC never are.
  * - No `crit` header: no JWS extension is understood (RFC 7515 section 4.1.11).
  * - `typ` is absent or `client-authentication+jwt`, with or without the `application/`
  *   prefix and in any case; any other type, such as a DPoP proof's, is refused.
@@ -31,7 +32,8 @@ use Throwable;
  * - `exp` is required and lies at most the maximum lifetime (plus clock skew) ahead; when
  *   `iat` is present it may not lie in the future beyond the skew, and `exp - iat` may not
  *   exceed the maximum lifetime either. `nbf` is honored.
- * - The signature verifies with one of the client's registered keys, selected by `kid`.
+ * - The signature verifies with one of the client's registered keys, selected by `kid`. An
+ *   RSA key verifies only with a modulus of 2048 to 4096 bits and the public exponent 65537.
  * - `jti` is required and accepted once per client, recorded only for an assertion that
  *   passed every other check, for its remaining lifetime plus the skew and one second:
  *   times are checked in whole seconds, so the assertion stays acceptable to the end of
@@ -42,7 +44,7 @@ use Throwable;
 final readonly class ClientAssertionVerifier implements ClientAssertionVerifierInterface
 {
     /** The accepted signing algorithms; the metadata test pins the advertised copy to this list. */
-    public const array SUPPORTED_ALGORITHMS = JwkPublicKeyConverter::SIGNING_ALGORITHMS;
+    public const array SUPPORTED_ALGORITHMS = ['EdDSA', 'ES256', 'ES384', 'ES512', 'PS256', 'RS256', 'RS384', 'RS512'];
 
     private const string EXPLICIT_TYPE = 'client-authentication+jwt';
 

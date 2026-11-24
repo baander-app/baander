@@ -12,6 +12,7 @@ use App\Tests\Fixtures\Auth\SignedDpopProof;
 use App\Tests\Fixtures\Auth\LeadingZeroDpopKey;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
+use RuntimeException;
 use Symfony\Component\HttpFoundation\Request;
 
 final class DpopProofValidatorTest extends TestCase
@@ -216,6 +217,48 @@ final class DpopProofValidatorTest extends TestCase
         self::assertSame('invalid_dpop_proof', $result->getError());
     }
 
+    /** @return iterable<string, array{string}> */
+    public static function rsaAlgorithms(): iterable
+    {
+        yield 'PS256' => ['PS256'];
+        yield 'RS256' => ['RS256'];
+    }
+
+    /** A proof is signed with an EC or Ed25519 key; an RSA proof is refused by its `alg`, though its signature verifies. */
+    #[DataProvider('rsaAlgorithms')]
+    public function testAnRsaSignedProofIsRefusedAsAnUnsupportedAlgorithmBeforeTheReplayCheck(string $alg): void
+    {
+        $cache = $this->createMock(DpopJtiCacheInterface::class);
+        $cache->expects($this->never())->method('isReplay');
+        $validator = new DpopProofValidator($cache, new PublicOrigins(self::ORIGIN));
+
+        $result = $validator->validate(self::rsaSignedProof($alg, 'POST', self::LOGOUT_URI), Request::create(self::LOGOUT_URI, 'POST'));
+
+        self::assertFalse($result->isValid());
+        self::assertSame(sprintf('Unsupported algorithm "%s".', $alg), $result->getErrorDescription());
+    }
+
+    /** At 4096 bytes the header is still parsed; one byte more and it is not. */
+    public function testAProofOver4096BytesIsRefusedBeforeItIsParsed(): void
+    {
+        // A 43-character header, a 4048-character claims segment and the two dots leave three characters for the signature.
+        $nonce = str_repeat('n', 3024);
+        $atTheLimit = SignedDpopProof::encode('{"typ":"dpop+jwt","alg":"ES256"}') . '.'
+            . SignedDpopProof::encode(json_encode(['nonce' => $nonce], JSON_THROW_ON_ERROR)) . '.AAA';
+        $overTheLimit = $atTheLimit . 'A';
+        self::assertSame(4096, strlen($atTheLimit));
+        $cache = $this->createMock(DpopJtiCacheInterface::class);
+        $cache->expects($this->never())->method('isReplay');
+        $validator = new DpopProofValidator($cache, new PublicOrigins(self::ORIGIN));
+        $request = Request::create(self::LOGOUT_URI, 'POST');
+
+        self::assertSame($nonce, $validator->extractNonce($atTheLimit));
+        self::assertSame('DPoP proof must contain a "jwk" header.', $validator->validate($atTheLimit, $request)->getErrorDescription());
+
+        self::assertNull($validator->extractNonce($overTheLimit));
+        self::assertSame('DPoP proof is longer than 4096 bytes.', $validator->validate($overTheLimit, $request)->getErrorDescription());
+    }
+
     /**
      * The proof's `htu` names one of the deployment's public origins and the request path,
      * whatever scheme and host the request reached the application with.
@@ -275,6 +318,34 @@ final class DpopProofValidatorTest extends TestCase
     {
         $this->expectException(\InvalidArgumentException::class);
         new DpopProofValidator($this->createStub(DpopJtiCacheInterface::class), new PublicOrigins('https://baander.app', ['lan.baander.app:8443']));
+    }
+
+    /** A proof from a fresh 2048-bit RSA key whose signature is valid for the named algorithm. */
+    private static function rsaSignedProof(string $alg, string $method, string $uri): string
+    {
+        $key = openssl_pkey_new(['private_key_type' => OPENSSL_KEYTYPE_RSA, 'private_key_bits' => 2048]);
+        $details = $key === false ? false : openssl_pkey_get_details($key);
+        if ($key === false || $details === false) {
+            throw new RuntimeException('Cannot generate a disposable RSA key.');
+        }
+        $header = [
+            'typ' => 'dpop+jwt',
+            'alg' => $alg,
+            'jwk' => [
+                'kty' => 'RSA',
+                'n' => SignedDpopProof::encode($details['rsa']['n']),
+                'e' => SignedDpopProof::encode($details['rsa']['e']),
+            ],
+        ];
+        $claims = ['jti' => bin2hex(random_bytes(16)), 'htm' => $method, 'htu' => $uri, 'iat' => time()];
+        $body = SignedDpopProof::encode(json_encode($header, JSON_THROW_ON_ERROR)) . '.'
+            . SignedDpopProof::encode(json_encode($claims, JSON_THROW_ON_ERROR));
+        $padding = $alg === 'PS256' ? OPENSSL_PKCS1_PSS_PADDING : OPENSSL_PKCS1_PADDING;
+        if (!openssl_sign($body, $signature, $key, OPENSSL_ALGO_SHA256, $padding)) {
+            throw new RuntimeException('Cannot sign the RSA proof.');
+        }
+
+        return $body . '.' . SignedDpopProof::encode($signature);
     }
 
     /** A jti store that raises the outage signal on every call, as a refused Redis does. */

@@ -19,8 +19,17 @@ use Throwable;
 
 final class DpopProofValidator
 {
-    /** One list with client assertions; the metadata test pins the advertised copy to it. */
-    private const array SUPPORTED_ALGORITHMS = JwkPublicKeyConverter::SIGNING_ALGORITHMS;
+    /**
+     * No RSA algorithm: a proof is verified with the key in its own header, before anything
+     * has authenticated the sender. The metadata test pins the advertised copy to this list.
+     */
+    private const array SUPPORTED_ALGORITHMS = ['EdDSA', 'ES256', 'ES384', 'ES512'];
+
+    /**
+     * Caps what the parser decodes for that same sender. A proof from the largest accepted
+     * key, P-521, is about 800 bytes before its `htu`.
+     */
+    private const int MAX_PROOF_BYTES = 4096;
 
     private Parser $parser;
 
@@ -52,6 +61,10 @@ final class DpopProofValidator
      */
     public function extractNonce(string $dpopJwt): ?string
     {
+        if (self::isOversized($dpopJwt)) {
+            return null;
+        }
+
         try {
             $token = $this->parser->parse($dpopJwt);
         } catch (Throwable) {
@@ -83,6 +96,10 @@ final class DpopProofValidator
         bool $skipReplayCheckOnStoreFailure = false,
     ): DpopValidationResult
     {
+        if (self::isOversized($dpopJwt)) {
+            return DpopValidationResult::invalid('invalid_dpop_proof', sprintf('DPoP proof is longer than %d bytes.', self::MAX_PROOF_BYTES));
+        }
+
         // 1. Parse the JWT (structural check)
         try {
             $token = $this->parser->parse($dpopJwt);
@@ -228,6 +245,11 @@ final class DpopProofValidator
         }
 
         return DpopValidationResult::valid($jkt, replayUnchecked: $replayUnchecked);
+    }
+
+    private static function isOversized(string $dpopJwt): bool
+    {
+        return strlen($dpopJwt) > self::MAX_PROOF_BYTES;
     }
 
     /**

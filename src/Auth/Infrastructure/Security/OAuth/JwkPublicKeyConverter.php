@@ -6,8 +6,6 @@ namespace App\Auth\Infrastructure\Security\OAuth;
 
 use InvalidArgumentException;
 use Lcobucci\JWT\Signer;
-use Jose\Component\Core\JWK;
-use Jose\Component\Signature\Algorithm\PS256;
 use Lcobucci\JWT\Signer\Ecdsa\Sha256 as ES256;
 use Lcobucci\JWT\Signer\Ecdsa\Sha384 as ES384;
 use Lcobucci\JWT\Signer\Ecdsa\Sha512 as ES512;
@@ -21,15 +19,22 @@ use Lcobucci\JWT\Signer\Rsa\Sha512 as RS512;
  * Verifies JWS signatures made with a public JWK, for DPoP proofs and client assertions.
  *
  * Only asymmetric algorithms are supported; `none` and the HMAC algorithms never are,
- * so a public key can never be used as an HMAC secret.
+ * so a public key can never be used as an HMAC secret. `DpopProofValidator` and
+ * `ClientAssertionVerifier` each keep the list of algorithms they accept.
+ *
+ * Every verification runs in OpenSSL or libsodium. An RSA key has a modulus of 2048 to
+ * 4096 bits and the public exponent 65537, whichever RSA algorithm it verifies.
  */
 final class JwkPublicKeyConverter
 {
-    /** The signing algorithms DPoP proofs and client assertions may use. */
-    public const array SIGNING_ALGORITHMS = ['EdDSA', 'ES256', 'ES384', 'ES512', 'PS256', 'RS256', 'RS384', 'RS512'];
-
     /** JWK members that carry private key material (RFC 7518 section 6). */
     public const array PRIVATE_KEY_MEMBERS = ['d', 'p', 'q', 'dp', 'dq', 'qi'];
+
+    private const int MIN_RSA_MODULUS_BYTES = 256;
+    private const int MAX_RSA_MODULUS_BYTES = 512;
+
+    /** 65537 as the bytes a JWK `e` member decodes to. */
+    private const string RSA_PUBLIC_EXPONENT = "\x01\x00\x01";
 
     public static function signer(string $alg): ?Signer
     {
@@ -49,11 +54,11 @@ final class JwkPublicKeyConverter
      * Whether the base64url-encoded signature over the payload verifies with the JWK.
      *
      * @param array<string, mixed> $jwk
-     * @throws InvalidArgumentException when the JWK is malformed or of an unsupported type
+     * @throws InvalidArgumentException when the JWK is malformed, of an unsupported type, or an RSA key outside the bounds
      */
     public static function verify(array $jwk, string $alg, string $payload, string $encodedSignature): bool
     {
-        // lcobucci/jwt has no RSA-PSS signer; web-token's PS256 verifies against the JWK itself.
+        // lcobucci/jwt has no RSA-PSS signer, so PS256 goes to OpenSSL directly.
         if ($alg === 'PS256') {
             return self::verifyRsaPss($jwk, $payload, self::base64urlDecode($encodedSignature));
         }
@@ -64,6 +69,10 @@ final class JwkPublicKeyConverter
     }
 
     /**
+     * RSASSA-PSS with SHA-256 and MGF1 over SHA-256 (RFC 7518 section 3.5). OpenSSL reads the
+     * salt length off the signature, so a salt of another length than the 32 bytes the RFC
+     * fixes verifies too; forging one takes the private key all the same.
+     *
      * @param array<string, mixed> $jwk
      * @throws InvalidArgumentException when the JWK is not a usable RSA public key
      */
@@ -72,19 +81,15 @@ final class JwkPublicKeyConverter
         if (($jwk['kty'] ?? null) !== 'RSA') {
             throw new InvalidArgumentException('PS256 needs an RSA key.');
         }
-        // lcobucci/jwt refuses RSA keys under 2048 bits for the RS algorithms; PS256 holds the same floor.
-        if (strlen(ltrim(self::base64urlDecode(self::member($jwk, 'n')), "\0")) < 256) {
-            throw new InvalidArgumentException('RSA keys must be at least 2048 bits.');
-        }
 
-        return new PS256()->verify(new JWK(['kty' => 'RSA', 'n' => self::member($jwk, 'n'), 'e' => self::member($jwk, 'e')]), $payload, $signature);
+        return openssl_verify($payload, $signature, self::rsaToPem($jwk)->contents(), OPENSSL_ALGO_SHA256, OPENSSL_PKCS1_PSS_PADDING) === 1;
     }
 
     /**
      * Converts a JWK public key to a key suitable for lcobucci/jwt verification.
      *
      * @param array<string, mixed> $jwk
-     * @throws InvalidArgumentException when the JWK is malformed or of an unsupported type
+     * @throws InvalidArgumentException when the JWK is malformed, of an unsupported type, or an RSA key outside the bounds
      */
     public static function toVerificationKey(array $jwk): InMemory
     {
@@ -156,11 +161,26 @@ final class JwkPublicKeyConverter
         return self::pem("\x30" . self::encodeLength(strlen($spki)) . $spki);
     }
 
-    /** @param array<string, mixed> $jwk */
+    /**
+     * A verification raises the signature to the power `e` modulo `n`, and whoever presents
+     * the key chose both numbers. The bounds fix the cost of that before OpenSSL sees the key.
+     *
+     * @param array<string, mixed> $jwk
+     * @throws InvalidArgumentException when the modulus or the public exponent is outside the bounds
+     */
     private static function rsaToPem(array $jwk): InMemory
     {
-        $n = self::base64urlDecode(self::member($jwk, 'n'));
-        $e = self::base64urlDecode(self::member($jwk, 'e'));
+        $n = self::unsignedInteger($jwk, 'n');
+        $e = self::unsignedInteger($jwk, 'e');
+        if (strlen($n) < self::MIN_RSA_MODULUS_BYTES) {
+            throw new InvalidArgumentException('RSA keys must be at least 2048 bits.');
+        }
+        if (strlen($n) > self::MAX_RSA_MODULUS_BYTES) {
+            throw new InvalidArgumentException('RSA keys must be at most 4096 bits.');
+        }
+        if ($e !== self::RSA_PUBLIC_EXPONENT) {
+            throw new InvalidArgumentException('RSA keys must use the public exponent 65537.');
+        }
 
         // RSA public key DER: SEQUENCE { SEQUENCE { OID rsaEncryption, NULL }, BIT STRING { SEQUENCE { n, e } } }
         $rsaEncryptionOid = "\x30\x0d\x06\x09\x2a\x86\x48\x86\xf7\x0d\x01\x01\x01\x05\x00";
@@ -176,6 +196,16 @@ final class JwkPublicKeyConverter
     private static function pem(string $der): InMemory
     {
         return InMemory::plainText("-----BEGIN PUBLIC KEY-----\n" . chunk_split(base64_encode($der), 64, "\n") . "-----END PUBLIC KEY-----\n");
+    }
+
+    /**
+     * The big-endian bytes of a JWK integer member, without leading zero bytes.
+     *
+     * @param array<string, mixed> $jwk
+     */
+    private static function unsignedInteger(array $jwk, string $name): string
+    {
+        return ltrim(self::base64urlDecode(self::member($jwk, $name)), "\0");
     }
 
     /** @param array<string, mixed> $jwk */

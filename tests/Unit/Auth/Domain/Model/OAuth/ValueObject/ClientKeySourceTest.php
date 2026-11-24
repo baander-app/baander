@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Tests\Unit\Auth\Domain\Model\OAuth\ValueObject;
 
 use App\Auth\Domain\Model\OAuth\ValueObject\ClientKeySource;
+use App\Tests\Fixtures\Auth\SignedDpopProof;
 use InvalidArgumentException;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
@@ -71,6 +72,34 @@ final class ClientKeySourceTest extends TestCase
     /** @param array<string, string> $key */
     #[DataProvider('nonSigningOkpKeys')]
     public function testAnOkpKeyMustBeEd25519(array $key): void
+    {
+        $this->expectException(InvalidArgumentException::class);
+        ClientKeySource::fromJwks(['keys' => [$key]]);
+    }
+
+    public function testAnRsaKeyOf4096BitsIsKept(): void
+    {
+        $key = self::rsaKey('signing-1', modulusBytes: 512);
+
+        self::assertSame(['keys' => [$key]], ClientKeySource::fromJwks(['keys' => [$key]])->jwks());
+    }
+
+    /** @return iterable<string, array{array<string, string>}> */
+    public static function rsaKeysOutsideTheBounds(): iterable
+    {
+        yield 'a 4104-bit modulus' => [self::rsaKey('signing-1', modulusBytes: 513)];
+        yield 'an 8192-bit modulus' => [self::rsaKey('signing-1', modulusBytes: 1024)];
+        yield 'exponent 3' => [self::rsaKey('signing-1', exponent: "\x03")];
+        yield 'a 2048-bit exponent' => [self::rsaKey('signing-1', exponent: str_repeat("\xff", 256))];
+    }
+
+    /**
+     * No assertion verifies with such a key, so it is refused when it is registered or fetched.
+     *
+     * @param array<string, string> $key
+     */
+    #[DataProvider('rsaKeysOutsideTheBounds')]
+    public function testAnRsaKeyOutsideTheBoundsIsRejected(array $key): void
     {
         $this->expectException(InvalidArgumentException::class);
         ClientKeySource::fromJwks(['keys' => [$key]]);
@@ -161,9 +190,14 @@ final class ClientKeySourceTest extends TestCase
         ];
     }
 
-    /** @return array<string, string> */
-    private static function rsaKey(string $kid): array
+    /** @return array<string, string> A 2040-bit key with the exponent 65537 unless a test asks for another shape */
+    private static function rsaKey(string $kid, ?int $modulusBytes = null, string $exponent = "\x01\x00\x01"): array
     {
-        return ['kty' => 'RSA', 'kid' => $kid, 'e' => 'AQAB', 'n' => str_repeat('u1SU1LfVLPHCozMxH2Mo', 17)];
+        return [
+            'kty' => 'RSA',
+            'kid' => $kid,
+            'e' => SignedDpopProof::encode($exponent),
+            'n' => $modulusBytes === null ? str_repeat('u1SU1LfVLPHCozMxH2Mo', 17) : SignedDpopProof::encode(str_repeat("\xff", $modulusBytes)),
+        ];
     }
 }

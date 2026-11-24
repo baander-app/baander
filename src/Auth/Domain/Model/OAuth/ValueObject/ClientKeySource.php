@@ -11,7 +11,8 @@ use InvalidArgumentException;
  * Set or an https `jwks_uri`, never both (OpenID Connect Registration section 2).
  *
  * An inline set holds only public asymmetric keys, at most ten of them and at most
- * 64 KB encoded; an OKP key names the Ed25519 curve, the only one that signs here.
+ * 64 KB encoded; an OKP key names the Ed25519 curve, the only one that signs here,
+ * and an RSA key has a modulus of at most 4096 bits and the public exponent 65537.
  * When it holds more than one key, every key names a distinct `kid`, so an
  * assertion's `kid` header selects exactly one. A `jwks_uri` passes the syntactic
  * half of the outbound fetch policy: https on the default port, a dotted DNS name
@@ -24,6 +25,11 @@ final readonly class ClientKeySource
 
     /** JWK members that carry private or symmetric key material (RFC 7518 section 6). */
     private const array SECRET_MEMBERS = ['d', 'p', 'q', 'dp', 'dq', 'qi', 'oth', 'k'];
+
+    private const int MAX_RSA_MODULUS_BYTES = 512;
+
+    /** 65537 as the bytes a JWK `e` member decodes to. */
+    private const string RSA_PUBLIC_EXPONENT = "\x01\x00\x01";
 
     /** @param array{keys: list<array<string, mixed>>}|null $jwks */
     private function __construct(
@@ -109,6 +115,31 @@ final readonly class ClientKeySource
         if ($key['kty'] === 'OKP' && ($key['crv'] ?? null) !== 'Ed25519') {
             throw new InvalidArgumentException('An OKP client key must name the Ed25519 curve.');
         }
+        if ($key['kty'] === 'RSA') {
+            self::assertRsaWithinBounds($key);
+        }
+    }
+
+    /**
+     * The assertion verifier's ceiling on an RSA modulus and its one public exponent, so a
+     * key it refuses for either is refused when an administrator gives it or a fetch returns it.
+     *
+     * @param array<array-key, mixed> $key
+     */
+    private static function assertRsaWithinBounds(array $key): void
+    {
+        if (strlen(self::unsignedInteger($key['n'] ?? null)) > self::MAX_RSA_MODULUS_BYTES) {
+            throw new InvalidArgumentException('An RSA client key may have a modulus of at most 4096 bits.');
+        }
+        if (self::unsignedInteger($key['e'] ?? null) !== self::RSA_PUBLIC_EXPONENT) {
+            throw new InvalidArgumentException('An RSA client key must use the public exponent 65537.');
+        }
+    }
+
+    /** The big-endian bytes of a base64url JWK integer, without leading zero bytes; none when the member is not a string. */
+    private static function unsignedInteger(mixed $member): string
+    {
+        return is_string($member) ? ltrim(base64_decode(strtr($member, '-_', '+/')), "\0") : '';
     }
 
     /** @param list<array<string, mixed>> $keys */
