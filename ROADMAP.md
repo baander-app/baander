@@ -1,6 +1,6 @@
 # Baander roadmap
 
-Updated 2026-11-22. The roadmap records remaining work, decisions and acceptance
+Updated 2026-11-24. The roadmap records remaining work, decisions and acceptance
 gates. The linked guides describe current operating contracts. Git history
 keeps completed milestones and their verification evidence.
 
@@ -15,6 +15,31 @@ become actionable when their named environment, access or decision is available.
 Read [AGENTS.md](AGENTS.md) for workflow, [CONCEPTS.md](CONCEPTS.md) for shared terms
 and the [testing guide](docs-book/part-2-developer-guide/testing/README.md) for current
 runners and verification boundaries. Historical suite counts apply to their own trees.
+
+## Security audit, 2026-11-24: open
+
+The [security audit](SECURITY_FINDINGS.md) of `9524a6fd9` read the whole repository
+and attacked a disposable worktree preview. Nothing in it is fixed or planned yet. Its
+action points are the scope; these are the findings above low severity:
+
+- **C1, critical, reproduced.** A request without credentials runs as the last user
+  the web worker authenticated: with no credentials, `POST /api/admin/users` created
+  a super admin (`201`), in the `dev` and the `prod` environment. The swoole bundle
+  keeps one security token per worker and never clears it.
+- **H1, reproduced.** One unauthenticated `PS256` DPoP proof with a 2048-bit exponent
+  held a web worker for 206.6 s.
+- **H2, reproduced.** A DASH manifest named like a media file played media from
+  outside the member's library.
+- **H3, reproduced.** A text-padded library file was served from the application
+  origin as `text/xml` and ran script in Chromium and Firefox.
+- **H4, read.** One failed `GET /ready` leaves the registry answering `503`.
+- **H5.** `composer audit --locked` reports 38 advisories in 14 packages.
+- **M1 to M14.** Worker deployment pair stopped by one large tag (reproduced),
+  symlinked video transcoded outside its library (reproduced), admin `ftp://` path
+  (reproduced), unbounded sign-in fields (reproduced), IPv6 limiter keys, limiter
+  clearing by any admin (reproduced), push subscription count, the source
+  installation guide, preset trust boundaries, build inputs, member field sizes,
+  desktop renderer hardening, registry buffer and CA, production log volume.
 
 ## Security review findings
 
