@@ -23,7 +23,7 @@ execution: code
   - Source, tests and comments never cite this plan's IDs (AGENTS.md).
 - **Stop conditions:**
   - Stop and ask if U1 cannot run PhpStorm's inspection and the owner cannot run it either. The claim that the rules match the IDE rests on that run.
-  - Stop and re-plan if U1 shows PhpStorm disagreeing with the emulation on shapes other than the 63 listed in KTD4. That would mean the walk itself was read wrongly.
+  - Stop and re-plan if the rules, run over the base revision, disagree with U1's PhpStorm baseline (643 nested-call findings and one assignment chain). The rules would then not be the inspection.
   - Stop and ask if a finding cannot be fixed without changing behaviour or adding a PHPStan ignore.
   - Stop if a conversion would touch `packages/swoole-bundle` or a generated file.
 - **Open blockers:** None.
@@ -35,11 +35,11 @@ execution: code
 
 ### Summary
 
-Two PHPStan rules in `packages/baander-phpstan-rules` report what PhpStorm 2026.3's pipe-operator inspection reports, for both of its messages, and both PHPStan configurations run them. A one-time conversion fixes the 573 nested-call findings and the one assignment chain on the tree today. Each becomes a pipe, a named local, or a small helper where a local would change evaluation.
+Two PHPStan rules in `packages/baander-phpstan-rules` report what PhpStorm 2026.3's pipe-operator inspection reports, for both of its messages, and both PHPStan configurations run them. A one-time conversion fixes the 643 nested-call findings and the one assignment chain on the tree today. Each becomes a pipe, a named local, or a small helper where a local would change evaluation.
 
 ### Problem Frame
 
-The owner asked on 2026-11-14 and again on 2026-11-25 for PhpStorm's "Nested function calls can be replaced with a pipe operator" findings to be fixed. Both passes converted two-level calls such as `bin2hex(random_bytes(4))`, following an agent's reading of the inspection. PhpStorm 2026.3.0.1 (build 263.7307.352) reports only chains of three or more levels (`MIN_DEPTH = 3` in `PhpPipeOperatorCanBeUsedInspection`), and it never flags two-level calls. The passes therefore removed almost nothing the owner sees. On `d49e4d5c6` an emulation of the inspection finds 573 findings in 369 files, plus one chain of assignments. No check exists, so new code brings findings back unnoticed.
+The owner asked on 2026-11-14 and again on 2026-11-25 for PhpStorm's "Nested function calls can be replaced with a pipe operator" findings to be fixed. Both passes converted two-level calls such as `bin2hex(random_bytes(4))`, following an agent's reading of the inspection. PhpStorm 2026.3.0.1 (build 263.7307.352) reports only chains of three or more levels (`MIN_DEPTH = 3` in `PhpPipeOperatorCanBeUsedInspection`), and it never flags two-level calls. The passes therefore removed almost nothing the owner sees. On `d49e4d5c6` PhpStorm's own inspection, run headless, reports 643 nested-call findings in 402 files, plus one chain of assignments. No check exists, so new code brings findings back unnoticed.
 
 ### Key Decisions
 
@@ -88,7 +88,7 @@ The owner asked on 2026-11-14 and again on 2026-11-25 for PhpStorm's "Nested fun
 
 ### Outstanding Questions
 
-None block the work. U1 settles the five shapes in KTD4 before the rule fixtures are frozen.
+None block the work. U1 settled the shapes the bytecode alone could not decide (KTD4).
 
 ---
 
@@ -100,7 +100,7 @@ None block the work. U1 settles the five shapes in KTD4 before the rule fixtures
 
 - KTD2. **The nested-call walk mirrors the bytecode of `PhpPipeOperatorCanBeUsedInspection`.**
   1. A walk starts only at a plain function call. Variable callables such as `$f($x)` count.
-  2. The starting call needs at least one argument. It is rejected when any argument is a closure or arrow function, or a call that itself has arguments.
+  2. The starting call needs at least one argument. It is rejected when any argument is a call that itself has arguments. Closures and arrow functions never reject it: PSI wraps them, so the bytecode's closure check never fires. A first-class callable (`f(...)`, `$o->m(...)`, `C::m(...)`) is not a call: it is neither a start nor a level, it does not count as a call argument, and as an only argument it does not raise the starting depth.
   3. Depth starts at 2 when the call's only argument is an argument-less call, otherwise at 1.
   4. The walk climbs to the enclosing call while the current call sits in an argument list. It stops without reporting when that list holds more than one call argument, or when the list's owner is not a function, method or static call (`new`, an attribute).
   5. When the current call's parent is not an argument list, the rule reports the current call if depth is 3 or more.
@@ -109,20 +109,20 @@ None block the work. U1 settles the five shapes in KTD4 before the rule fixtures
 
 - KTD3. **The assignment-chain walk mirrors the same class.**
   1. A chain starts at a plain `=` statement whose previous statement does not assign the same variable. Compound assignments never start a chain.
-  2. The first value may not be a closure. If it is a call, it may not have a call argument or the variable itself as an argument.
+  2. The first value may be any expression, a closure included. If it is a call, it may not have a call argument (a first-class callable is not one) or the variable itself as an argument.
   3. The chain continues through following statements that assign the same variable. A `//`, `#` or `/* */` comment is skipped; a `/** */` docblock ends the chain.
   4. A continuation whose value is not a call, or whose call has a call argument or lacks the variable as a direct argument, abandons the whole chain with no report.
   5. A different statement ends the chain, and the chain is reported when it has 3 to 10 assignments.
   6. One error is reported per chain, at its first line. PhpStorm marks every assignment.
 
-- KTD4. **Where PhpStorm's PSI and php-parser may differ, the rules follow what U1 observes in the IDE.** The emulation infers five shapes:
-  - `exit(...)` as a level: 17 entry-script lines such as `exit(Cli::main(array_slice($_SERVER['argv'], 1)))` at `scripts/dev-environment.php:18`;
-  - first-class-callable arguments: 11 levels, e.g. `src/Auth/Interface/Console/CreateUserCommand.php:70`;
-  - named or spread call arguments: 19;
-  - variable-callable levels: 16;
-  - a statement-level `/** */` docblock between assignments.
+- KTD4. **The rules follow PhpStorm's own results, not the bytecode reading.** U1 ran the inspection headless (`inspect.sh`, PhpStorm 2026.3.0.1) over the base revision and over 45 probe cases. Its results corrected the two closure and first-class-callable rules in KTD2 and KTD3, which added 70 findings to the emulation's 573. They also settled five shapes the bytecode alone could not decide:
+  - `exit(...)` and `die(...)` are not levels: `exit(Cli::main(array_slice($_SERVER['argv'], 1)))` is not reported, and `exit(strlen(trim(strtolower($s))))` is reported on `strlen`;
+  - a first-class-callable argument inside a chain does not break it: `f(g(array_map(strval(...), $x)))` is reported, `g(array_map(strval(...), $x))` is not;
+  - named and spread arguments behave like plain arguments;
+  - variable callables are starts and levels, `$escape(implode(', ', array_column($rows, 'k')))` included;
+  - a `/** */` docblock between assignments ends the chain, while `//` and `/* */` comments do not.
 
-  Each shape gets a fixture whose expected result is the IDE's. If U1 shows PhpStorm reporting the `exit` lines, the conversion count grows by those sites.
+  Each shape and each corrected rule gets a fixture whose expected result is the IDE's. An emulator with the corrected rules matches the IDE on all 643 findings and the one chain.
 
 - KTD5. **The house shape for fixing a finding** (governs R7; R10 documents it). Apply in this order:
   1. Every single-argument level becomes a pipe stage with a first-class callable: `trim(...)`, `self::read(...)`, `$this->path(...)`.
@@ -149,9 +149,9 @@ None block the work. U1 settles the five shapes in KTD4 before the rule fixtures
 
   The conversion tooling stays out of the tracked tree. It lives where it survives the work; the session scratchpad does not qualify. It builds on php-parser 5.9.0's format-preserving printer with three guards: parenthesise a new arrow function on the right of `|>`, keep an argument's `unpack` flag (8 chains hold spread arguments), and never hoist into a file with `InlineHTML`.
 
-- KTD8. **The rules are registered last.** U2 and U3 build and test the rules without registering them, and each conversion unit runs them through a scratch configuration that includes a repository configuration and registers both rules. For the files that neither configuration analyses, it also names those paths and clears `excludePaths`. U8 registers the rules once the tree reports zero, so no commit leaves `make ci` red. Acceptance is zero findings on the rebased tip, not the 573 count. `master` moves while the work runs.
+- KTD8. **The rules are registered last.** U2 and U3 build and test the rules without registering them, and each conversion unit runs them through a scratch configuration that includes a repository configuration and registers both rules. For the files that neither configuration analyses, it also names those paths and clears `excludePaths`. U8 registers the rules once the tree reports zero, so no commit leaves `make ci` red. Acceptance is zero findings on the rebased tip, not the 643 count. `master` moves while the work runs.
 
-- KTD9. **`phpstan-tooling.neon` includes `vendor/baander/phpstan-rules/extension.neon` and gets its own `tmpDir`, `var/cache/phpstan-tooling`.** Today it has neither. Without the include the rules miss 94 tooling-package findings and the relay and script code. Without a `tmpDir`, runs from several checkouts share `/tmp/phpstan`, the hazard `phpstan.dist.neon:8-10` describes, and the two configurations would overwrite each other's result cache if they shared one directory.
+- KTD9. **`phpstan-tooling.neon` includes `vendor/baander/phpstan-rules/extension.neon` and gets its own `tmpDir`, `var/cache/phpstan-tooling`.** Today it has neither. Without the include the rules miss 110 tooling-package findings and the relay and script code. Without a `tmpDir`, runs from several checkouts share `/tmp/phpstan`, the hazard `phpstan.dist.neon:8-10` describes, and the two configurations would overwrite each other's result cache if they shared one directory.
 
 - KTD10. **Package metadata follows the rules' needs.** `packages/baander-phpstan-rules/composer.json` moves to `php: >=8.5` and `phpstan/phpstan: ^2.3`, like the other first-party packages, and the lock entry for the path package is refreshed.
 
@@ -226,7 +226,7 @@ U4 to U7 touch disjoint files and can run in parallel. U7 is its own commit beca
 
 | Risk | Mitigation |
 | --- | --- |
-| The IDE models a shape differently from the emulation (KTD4) | U1 runs the IDE's own inspection before fixtures are frozen; the rules follow the IDE |
+| The rules drift from the IDE | U1's baseline is the calibration target for both rules, and U8 repeats the headless run on the converted tip |
 | A PhpStorm upgrade changes the inspection | Docblocks name the mirrored build; the parity command in the developer guide (R10) shows drift after an upgrade |
 | A PHPStan upgrade changes `FileNode` contents or pipe reversal | Fixtures pin pipes in every form, so an upgrade that changes them fails the rule tests |
 | A hoist changes evaluation and the round trip passes | The KTD6 placement and name check, plus hand review of the three lists |
@@ -248,19 +248,19 @@ U4 to U7 touch disjoint files and can run in parallel. U7 is its own commit beca
 
 **Files:**
 - No tracked files.
-- A scratch file holds the five KTD4 shapes, plus a three-level chain and a two-level call as controls.
+- A scratch file holds the uncertain shapes, plus a three-level chain and a two-level call as controls.
 
 **Approach:**
 - Run `~/.local/share/JetBrains/Toolbox/apps/phpstorm/bin/inspect.sh` with a profile that enables only `PhpPipeOperatorCanBeUsedInspection`. Point it at the scratch file and at the paths the two PHPStan configurations analyse.
 - PhpStorm is running. Give the headless run its own configuration and system directories so it does not collide with the IDE; if that fails, ask the owner to run Inspect Code.
-- Compare the result with the emulation's 573 findings and one chain, shape by shape, and record the result for each KTD4 shape.
+- Compare the result with the emulation's findings, shape by shape, and record the result for each uncertain shape.
 
 **Test expectation:** none -- this unit is a measurement. Its output is the baseline the rule fixtures and U8's parity check use.
 
 **Verification:**
 - `packages/baander-deployment/src/Workers/Lifecycle.php:48` is reported.
 - `packages/baander-configuration/tests/InvocationConfigurationTest.php:16` is not.
-- Each KTD4 shape has a recorded IDE result.
+- Each uncertain shape has a recorded IDE result.
 
 ### U2. Nested-call rule
 
@@ -293,13 +293,15 @@ U4 to U7 touch disjoint files and can run in parallel. U7 is its own commit beca
 - `bin2hex(random_bytes(4))` is not reported.
 - `random_bytes(4) |> bin2hex(...)` and a multi-stage pipe with a `static fn` step are not reported.
 - `strtoupper(strtolower(trim($s |> ltrim(...))))` is reported: a pipe used as an argument does not reset the depth.
-- A chain whose innermost call takes a closure (`a(b(array_filter($x, fn ($v) => $v)))`) is not reported.
+- A chain whose innermost call takes a closure (`a(b(array_filter($x, fn ($v) => $v)))`) is reported, for `fn`, `static fn`, `function` and `static function` alike.
+- `array_fill_keys(array_map(strval(...), array_keys($x)), true)` is reported: a first-class-callable argument does not count as a call argument.
+- `g(f(strval(...)))` is not reported: a first-class callable is not a level.
 - `f(g(h($x)), k($y))` is not reported: the list holds two call arguments.
 - `new Foo(a(b(c($x))))` is not reported: the top list belongs to `new`.
 - A chain inside an attribute argument is not reported.
 - A depth-10 chain is reported. A depth-11 chain is not.
 - Top-level script code and a template file with `InlineHTML` are reported like code inside functions.
-- One fixture per KTD4 shape (`exit(...)`, a first-class-callable argument, named and spread arguments, a variable-callable level) expects what U1 recorded for the IDE.
+- One fixture per shape KTD4 settled (`exit(...)`, a first-class-callable argument, named and spread arguments, a variable-callable level) expects what U1 recorded for the IDE.
 - An `assert(is_array(json_decode(file_get_contents($p), true)))` chain is reported: the inspection has no function-name list.
 
 **Verification:** The `StaticAnalysisRules` suite passes. Run through a scratch configuration on `d49e4d5c6`, the rule lists the same sites as U1's baseline.
@@ -331,6 +333,8 @@ U4 to U7 touch disjoint files and can run in parallel. U7 is its own commit beca
 - A first value that is a call with a call argument is not a chain start.
 - An assignment to a different variable after three calls ends the chain, and the chain is reported.
 - A chain inside a closure body and a chain at the top level of a script are both reported.
+- A chain whose first value is a closure is reported.
+- A first-class-callable argument in the first value or in a continuation keeps the chain, and it is reported.
 
 **Verification:** The `StaticAnalysisRules` suite passes. Through a scratch configuration on `d49e4d5c6`, the rule reports exactly `src/Catalog/Domain/Service/TitleNormalizer.php:50`.
 
@@ -342,7 +346,7 @@ U4 to U7 touch disjoint files and can run in parallel. U7 is its own commit beca
 
 **Dependencies:** U2, U3.
 
-**Files:** The files with findings under `src/`: 91 findings in 72 files, including `src/Catalog/Domain/Service/TitleNormalizer.php`. Also `packages/baander-media-metadata` (15) and `packages/baander-image-processing` (3).
+**Files:** The files with findings under `src/`: 100 findings, including `src/Catalog/Domain/Service/TitleNormalizer.php`. Also `packages/baander-media-metadata` (15) and `packages/baander-image-processing` (3).
 
 **Approach:**
 - Convert in the KTD5 shape. The `TitleNormalizer` chain folds its single-argument steps into a pipe, and its first assignment gets its own name.
@@ -365,7 +369,7 @@ U4 to U7 touch disjoint files and can run in parallel. U7 is its own commit beca
 
 **Dependencies:** U2.
 
-**Files:** The files with findings under `tests/Unit` (199 findings, 107 files), `tests/Integration` (72, 47), `tests/Functional` (39, 29), `tests/Fixtures` (33, 23) and `tests/Support` (5, 5).
+**Files:** The files with findings under `tests/Unit` (221 findings), `tests/Integration` (89), `tests/Functional` (43), `tests/Fixtures` (35) and `tests/Support` (5): 393 in all.
 
 **Approach:**
 - Most findings end in an assertion (`->assertSame` 145, `->assertCount` 16). They get a local named for the actual value, so the assertion keeps its shape.
@@ -390,13 +394,13 @@ U4 to U7 touch disjoint files and can run in parallel. U7 is its own commit beca
 **Dependencies:** U2.
 
 **Files:**
-- The files with findings in the tooling packages: 94 findings in 63 files, mostly `baander-dev-qualification`, `baander-dev-environment`, `baander-deployment` and `baander-dev-website`.
+- The files with findings in the tooling packages: 110 findings, mostly `baander-dev-qualification`, `baander-dev-environment`, `baander-deployment` and `baander-dev-website`.
 - `relay/tests` and `relay/tools`: 10 findings.
 - `scripts/`: 3 findings outside `scripts/retain-build-evidence.php`.
 - `ui/site/templates/typography.php:18,85,101`.
-- `packages/baander-dev-qualification/resources/qualification/generate.php:109`, one of the 94 tooling-package findings, named here because neither configuration analyses it.
+- `packages/baander-dev-qualification/resources/qualification/generate.php:109`, one of the 110 tooling-package findings, named here because neither configuration analyses it.
 - `packages/baander-phpstan-rules/src/Rules/ConsistentOpenApiTagDescriptionRule.php:59`.
-- In total 111 findings: with U4's 109, U5's 348 and U7's 5, the 573 on `d49e4d5c6`.
+- In total 127 findings: with U4's 118, U5's 393 and U7's 5, the 643 PhpStorm reports on `d49e4d5c6`.
 
 **Approach:**
 - The two `typography.php` echoes clear with pipes alone (KTD6). Check any hoist there against the scope shared through `include`.
@@ -472,6 +476,7 @@ U4 to U7 touch disjoint files and can run in parallel. U7 is its own commit beca
 - It warns that PhpStorm's quick fix wraps multi-argument steps in untyped `fn($x)` steps, swallows the outer assertion, and can drop a by-reference write. Use the house shape instead.
 - It says that a docblock between assignments only hides a chain.
 - It gives the parity check: run `inspect.sh` with a one-inspection profile and compare it with PHPStan's JSON output filtered by the two identifiers, after a PhpStorm or PHPStan upgrade.
+- The parity procedure names the two traps U1 found. Each headless run needs a fresh system directory, because a reused one serves file contents cached by an earlier run. PhpStorm's Node.js project configurator must be off, because it runs `npm install` in every `package.json` of the project, `ui/rn` included.
 - The rule tips link to this section's anchor.
 - Run `prose-fix` on the changed prose.
 
