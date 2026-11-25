@@ -16,11 +16,13 @@ Read [AGENTS.md](AGENTS.md) for workflow, [CONCEPTS.md](CONCEPTS.md) for shared 
 and the [testing guide](docs-book/part-2-developer-guide/testing/README.md) for current
 runners and verification boundaries. Historical suite counts apply to their own trees.
 
-## Security audit, 2026-11-24: open
+## Security audit, 2026-11-24: in progress
 
 The [security audit](SECURITY_FINDINGS.md) of `9524a6fd9` read the whole repository
-and attacked a disposable worktree preview. Nothing in it is fixed or planned yet. Its
-action points are the scope; these are the findings above low severity:
+and attacked a disposable worktree preview. The
+[fix plan](docs/plans/2026-11-24-1754-fix-security-audit-findings-plan.md) resolves
+every finding in three phases. Phase 1 is on `master` at `02b09f172`; Phase 2 is in
+progress. These are the findings above low severity:
 
 - **C1, critical, reproduced.** A request without credentials runs as the last user
   the web worker authenticated: with no credentials, `POST /api/admin/users` created
@@ -40,6 +42,68 @@ action points are the scope; these are the findings above low severity:
   clearing by any admin (reproduced), push subscription count, the source
   installation guide, preset trust boundaries, build inputs, member field sizes,
   desktop renderer hardening, registry buffer and CA, production log volume.
+
+### Delivered: Phase 1
+
+- **C1.** The swoole bundle runs every `kernel.reset` method of a pooled service
+  (`fa098c23b`). The inner token storage and the authorization checker are
+  per-coroutine pooled services (`7e8e53ce0`). `StaleTokenListener` clears the token
+  at the start of every main request (`a167d2396`). The proof (`02b09f172`) is a drill
+  in the security runtime drill: it holds 12 connections on each side across four web
+  workers and reads each worker's request count, so it fails when a side misses a
+  worker. On `8b27243c2`, 12 of 12 connections without credentials answered `200` with
+  the admin's profile; now every one answers `401` and `404`. An interleave test
+  suspends one user's request while another user's request completes on the same
+  worker, and each response names its own user.
+- **H1.** DPoP proofs accept EC and EdDSA keys only. RSA client assertion keys are
+  bounded to 2048 to 4096 bits with exponent 65537 and are verified by OpenSSL, and a
+  proof larger than 4096 bytes is refused before it is parsed (`e4383d044`). The two
+  `PS256` probes in the security drill are refused within 1 s. The images carry
+  `ext-gmp` (`eea6b8e59`).
+- **H5.** The PHP locks are updated: `6ac55bc73` moves the packages with advisories and
+  `09261acc8` the remaining 50, and `composer audit --locked` is clean. The JavaScript
+  locks are updated inside their ranges, and Yarn installs no version younger than
+  three days (`88d561f70`). A nightly workflow audits every lock and fails on a new
+  advisory or an unreachable source (`42f48f9a4`). 22 JavaScript advisories under the
+  Vercel CLI and electron-builder have no in-range fix and carry reasoned exceptions.
+- **Admin `ftp://` path, network side.** PHP's URL wrappers are off in every image
+  (`eea6b8e59`). The confinement of metadata file reads is in Phase 2.
+- **Passkey attestation.** The device attestation formats are accepted only when
+  `auth.passkey.attestation` is not `none` (`498304855`, `8b27243c2`).
+- **Found on the way.** The Symfony update made the swoole bundle pool the profiler's
+  Twig extension, which broke every Twig render in `dev` and `test`; the extension is
+  kept out of the pool (`2e48bbdf2`). Two stale messaging inventories and an outbox
+  leak in the tests are repaired (`d1f34dd66`). The e2e manifests are back in the CI
+  image, where CI's dependency policy check reads them (`25a78848b`). The shutdown
+  drill runs the staged checkout again (`f4b5b7b0b`).
+
+Verification checkpoint: the full backend run on `45e5f744d` passed the native lane
+(995 tests) and both stack lanes (2,228 and 1,940 tests). The ordinary lane (9,401
+tests) failed one SQL convention scan on a health check message, fixed in `63da8ecc2`.
+The later commits were verified with the security runtime drill, the changed test
+files, the dependency checker's 84 tooling tests and the web, site and desktop checks
+named in their commit messages.
+
+### Decisions confirmed by the owner
+
+- 2026-11-24: DPoP refuses RSA proofs. URL wrappers are off in every image. The
+  passkey attestation formats follow the setting. A dependency update takes every
+  package inside its range, and Yarn installs no version younger than three days.
+- 2026-11-25: A signed original opened as a page downloads. Only super admins clear
+  rate limiters. Member content caps as the plan lists them, with 20 push
+  subscriptions per user. Six encode sessions per user, admins included. A start that
+  finds no free video slot may end another user's session only after 70 minutes
+  without a playback report. The radio station list returns at most 500 rows per
+  request, and the country catalogue is cached for six hours. Sign-in block records
+  are kept 30 days with fields of at most 255 characters. The unused `unplugin-info`
+  plugin leaves the desktop build.
+
+### Open
+
+- Phase 2 (U9 to U32) and Phase 3 (U33 to U44) of the plan.
+- `SchedulerWorkerRunnerTest` publishes two occurrences when the minute rolls over
+  between its seed and the worker's first pass; it fails the same way on `9524a6fd9`
+  when the seed is placed at second 59.9.
 
 ## Security review findings
 
