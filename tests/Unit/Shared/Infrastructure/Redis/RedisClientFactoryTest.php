@@ -334,6 +334,7 @@ final class RedisClientFactoryTest extends TestCase
     public static function credentialDsns(): iterable
     {
         yield 'named user, encoded password' => ['redis://baander:p%40ss%25word%3A1@redis.baander.app:6380', ['baander', 'p@ss%word:1']];
+        yield 'base64 password with an unencoded slash' => ['redis://baander:k9/Qz+w2=@redis.baander.app:6380', ['baander', 'k9/Qz+w2=']];
         yield 'encoded user' => ['redis://app%2Dusr:secret@redis.baander.app:6380', ['app-usr', 'secret']];
         yield 'password only' => ['redis://:secret@redis.baander.app:6380', 'secret'];
         yield 'no credentials' => ['redis://redis.baander.app:6380', null];

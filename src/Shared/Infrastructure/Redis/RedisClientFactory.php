@@ -72,7 +72,8 @@ class RedisClientFactory
         ?callable $getCidFn = null,
         ?callable $cidExistsFn = null,
     ) {
-        if (!preg_match('#^redis://(?:(?<user>[^:@/]*):(?<pass>[^@/]*)@)?(?<host>[^:@/]+):(?<port>\d+)$#D', $dsn, $m)) {
+        // Only @ ends the password, as in Symfony's Redis clients that read the same URL; an unencoded / is part of it.
+        if (!preg_match('#^redis://(?:(?<user>[^:@/]*):(?<pass>[^@]*)@)?(?<host>[^:@/]+):(?<port>\d+)$#D', $dsn, $m)) {
             throw new InvalidArgumentException('Cannot parse Redis DSN.');
         }
         $user = rawurldecode($m['user']);
