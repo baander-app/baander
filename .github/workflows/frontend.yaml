@@ -42,9 +42,9 @@ concurrency:
 
 jobs:
     quality:
-        runs-on: ${{ github.server_url == 'https://github.com' && 'ubuntu-latest' || 'docker-cli' }}
+        runs-on: ${{ github.server_url == 'https://github.com' && 'ubuntu-latest' || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository) && 'fork-pull-request' || 'docker-cli' }}
         container:
-            image: ${{ github.server_url == 'https://github.com' && 'ghcr.io' || vars.REGISTRY_URL }}/${{ github.server_url == 'https://github.com' && 'baander-app' || vars.REGISTRY_OWNER }}/baander-runner:latest
+            image: ${{ github.server_url == 'https://github.com' && 'ghcr.io' || vars.REGISTRY_URL }}/${{ github.server_url == 'https://github.com' && 'baander-app' || vars.REGISTRY_OWNER }}/baander-runner:7491ddcecfa546a1845ff79f85878649e6f79560
         permissions:
             contents: read
             # Restores the Yarn cache from Forgejo's package store, and
@@ -129,9 +129,9 @@ jobs:
                 run: yarn lint
 
     test:
-        runs-on: ${{ github.server_url == 'https://github.com' && 'ubuntu-latest' || 'docker-cli' }}
+        runs-on: ${{ github.server_url == 'https://github.com' && 'ubuntu-latest' || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository) && 'fork-pull-request' || 'docker-cli' }}
         container:
-            image: ${{ github.server_url == 'https://github.com' && 'ghcr.io' || vars.REGISTRY_URL }}/${{ github.server_url == 'https://github.com' && 'baander-app' || vars.REGISTRY_OWNER }}/baander-runner:latest
+            image: ${{ github.server_url == 'https://github.com' && 'ghcr.io' || vars.REGISTRY_URL }}/${{ github.server_url == 'https://github.com' && 'baander-app' || vars.REGISTRY_OWNER }}/baander-runner:7491ddcecfa546a1845ff79f85878649e6f79560
         env:
             # GitHub mounts a home directory owned by the runner user into a job
             # container that runs as root, and Firefox refuses to start there.
@@ -314,10 +314,10 @@ jobs:
                     key: yarn-cache-frontend-${{ github.sha }}
 
     build:
-        runs-on: ${{ github.server_url == 'https://github.com' && 'ubuntu-latest' || 'docker-cli' }}
+        runs-on: ${{ github.server_url == 'https://github.com' && 'ubuntu-latest' || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository) && 'fork-pull-request' || 'docker-cli' }}
         needs: [ quality, test ]
         container:
-            image: ${{ github.server_url == 'https://github.com' && 'ghcr.io' || vars.REGISTRY_URL }}/${{ github.server_url == 'https://github.com' && 'baander-app' || vars.REGISTRY_OWNER }}/baander-runner:latest
+            image: ${{ github.server_url == 'https://github.com' && 'ghcr.io' || vars.REGISTRY_URL }}/${{ github.server_url == 'https://github.com' && 'baander-app' || vars.REGISTRY_OWNER }}/baander-runner:7491ddcecfa546a1845ff79f85878649e6f79560
         permissions:
             contents: read
             # Restores the Yarn cache from Forgejo's package store, and

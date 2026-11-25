@@ -25,6 +25,9 @@ final class PublicationWorkflowTest extends TestCase
     private const string FORGEJO = 'https://forge.baander.app';
     private const string REPOSITORY = 'baander-app/baander';
     private const string FORK = 'contributor/baander';
+    /** The runner label a Forgejo pull request from a fork resolves to; no runner serves it. */
+    private const string FORK_LABEL = 'fork-pull-request';
+    private const string RUNS_ON = "\${{ github.server_url == 'https://github.com' && 'ubuntu-latest' || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository) && 'fork-pull-request' || 'docker-cli' }}";
     private const string UPLOAD_ARTIFACT = 'actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9';
     private const string FORGEJO_UPLOAD_ARTIFACT = './.github/actions/forgejo-upload-artifact';
     private const array GATE_WORKFLOWS = ['ci.yaml', 'frontend.yaml', 'website.yaml', 'dsp-analysis.yaml', 'registry-nightly.yaml', 'dependency-advisories.yaml'];
@@ -202,13 +205,16 @@ final class PublicationWorkflowTest extends TestCase
 
         $php = $this->step($job, 'PHP lock advisories');
         $javascript = $this->step($job, 'JavaScript lock advisories');
+        $drift = $this->step($job, 'Image digest drift');
         // The whole command: nothing after it can replace the checker's exit status.
         self::assertSame('php scripts/check-php-dependencies.php --advisories-only', $php['run']);
         self::assertSame('php scripts/check-js-dependencies.php --advisories-only', $javascript['run']);
+        self::assertSame('php scripts/check-php-dependencies.php --image-drift', $drift['run']);
         self::assertArrayNotHasKey('if', $php);
-        // A PHP finding that stays open must not stop the JavaScript locks from being audited.
+        // An open finding in one report must not keep the next one from running.
         self::assertSame('always()', $javascript['if']);
-        foreach ([$php, $javascript] as $step) {
+        self::assertSame('always()', $drift['if']);
+        foreach ([$php, $javascript, $drift] as $step) {
             self::assertArrayNotHasKey('continue-on-error', $step);
         }
     }
@@ -473,7 +479,7 @@ SH;
         yield 'host mount without forge guard' => [$workflow, $step(['name' => 'Clean', 'run' => 'docker run --rm -v /opt/ghc:/cleanup/ghc alpine true']), 'host paths'];
         yield 'checkout without safe directory' => [$workflow, $step(['name' => 'Checkout', 'run' => "git init -q\ngit fetch -q origin main"]), 'safe directory'];
         yield 'Playwright in a container without root home' => [$workflow, static function (array $document): array {
-            $document['jobs']['gate']['container'] = ['image' => 'ghcr.io/baander-app/baander-runner:latest'];
+            $document['jobs']['gate']['container'] = ['image' => 'ghcr.io/baander-app/baander-runner:' . str_repeat('a', 40)];
             $document['jobs']['gate']['steps'][] = ['name' => 'Browsers', 'run' => 'yarn exec playwright install --with-deps firefox'];
             return $document;
         }, 'HOME'];
@@ -504,6 +510,22 @@ SH;
             $document['jobs']['gate']['runs-on'] = 'docker-cli';
             return $document;
         }, 'runs-on'];
+        yield 'fork pull request on the socket runner' => [$workflow, static function (array $document): array {
+            $document['jobs']['gate']['runs-on'] = "\${{ github.server_url == 'https://github.com' && 'ubuntu-latest' || 'docker-cli' }}";
+            return $document;
+        }, 'runs-on'];
+        yield 'runner label from a repository variable' => [$workflow, static function (array $document): array {
+            $document['jobs']['gate']['runs-on'] = "\${{ github.server_url == 'https://github.com' && 'ubuntu-latest' || vars.RUNNER_LABEL }}";
+            return $document;
+        }, 'runs-on'];
+        yield 'job container by mutable tag' => [$workflow, static function (array $document): array {
+            $document['jobs']['gate']['container'] = ['image' => 'ghcr.io/baander-app/baander-runner:latest'];
+            return $document;
+        }, 'job container'];
+        yield 'job container by floating upstream tag' => [$workflow, static function (array $document): array {
+            $document['jobs']['gate']['container'] = 'docker:cli';
+            return $document;
+        }, 'job container'];
         yield 'unresolved timeout' => [$workflow, static function (array $document): array {
             $document['jobs']['gate']['timeout-minutes'] = '${{ vars.CI_TIMEOUT }}';
             return $document;
@@ -563,12 +585,31 @@ SH;
         self::assertSame('baander/' . $name, self::interpolate($workflow['env']['IMAGE_NAME'], $forgejo));
         foreach ($workflow['jobs'] as $job) {
             $image = $job['container']['image'] ?? null;
-            if ($image === null || $image === 'docker:cli') {
+            if ($image === null || str_starts_with($image, 'docker:cli@sha256:')) {
                 continue;
             }
-            self::assertSame('ghcr.io/baander-app/baander-runner:latest', self::interpolate($image, $github));
-            self::assertSame('registry.baander.app/baander/baander-runner:latest', self::interpolate($image, $forgejo));
+            self::assertMatchesRegularExpression('~^ghcr\.io/baander-app/baander-runner:[0-9a-f]{40}$~', self::interpolate($image, $github));
+            self::assertSame(str_replace('ghcr.io/baander-app/', 'registry.baander.app/baander/', self::interpolate($image, $github)), self::interpolate($image, $forgejo));
         }
+    }
+
+    public function testWorkflowsNameTheRunnerAndTheForgejoFfmpegCopyByCommitTag(): void
+    {
+        $runner = [];
+        foreach (self::documents(dirname(__DIR__, 5)) as $path => ['source' => $source]) {
+            preg_match_all('~baander-runner:([^\s"\'}]+)~', $source, $matches);
+            foreach ($matches[1] as $tag) {
+                $runner[$tag][] = $path;
+            }
+        }
+        self::assertCount(1, $runner, 'Every job names the runner image published from one commit: ' . json_encode($runner, JSON_THROW_ON_ERROR));
+        self::assertMatchesRegularExpression('~^[0-9a-f]{40}$~', array_key_first($runner));
+        self::assertMatchesRegularExpression(
+            '~^registry\.baander\.app/baander/ffmpeg-baander-static:[0-9a-f]{40}$~',
+            self::interpolate($this->workflow('ci.yaml')['env']['BAANDER_FFMPEG_IMAGE'], self::context(self::FORGEJO)),
+        );
+        self::assertSame('', self::interpolate($this->workflow('ci.yaml')['env']['BAANDER_FFMPEG_IMAGE'], self::context(self::GITHUB)));
+        self::assertStringContainsString('${{ github.sha }}', $this->step($this->workflow('runner.yaml')['jobs']['build'], 'Build runner image')['run'], 'runner.yaml tags each image with its commit');
     }
 
     /** @return iterable<string, array{string, string}> */
@@ -605,8 +646,20 @@ SH;
         }
     }
 
-    public function testForkPullRequestsRunEveryGateAndSkipEveryWriteStep(): void
+    public function testForkPullRequestsRunGatesOnGitHubOnlyAndSkipEveryWriteStep(): void
     {
+        $pullRequestWorkflows = array_keys(array_filter(self::documents(dirname(__DIR__, 5)), static fn(array $entry, string $path): bool => str_starts_with($path, '.github/workflows/') && isset($entry['document']['on']['pull_request']), ARRAY_FILTER_USE_BOTH));
+        self::assertSame(['.github/workflows/audio-core.yml', '.github/workflows/ci.yaml', '.github/workflows/dsp-analysis.yaml', '.github/workflows/frontend.yaml', '.github/workflows/website.yaml'], $pullRequestWorkflows);
+        foreach ($pullRequestWorkflows as $path) {
+            foreach ($this->workflow(basename($path))['jobs'] as $jobName => $job) {
+                $matrix = $job['strategy']['matrix']['include'][0] ?? [];
+                $where = $path . ' ' . $jobName;
+                self::assertSame(self::FORK_LABEL, self::interpolate($job['runs-on'], self::context(self::FORGEJO, 'pull_request', self::FORK, $matrix)), $where);
+                self::assertSame('docker-cli', self::interpolate($job['runs-on'], self::context(self::FORGEJO, 'pull_request', matrix: $matrix)), $where);
+                self::assertSame(self::interpolate($job['runs-on'], self::context(self::GITHUB, matrix: $matrix)), self::interpolate($job['runs-on'], self::context(self::GITHUB, 'pull_request', self::FORK, $matrix)), $where);
+            }
+        }
+
         $kinds = [];
         foreach (self::GATE_WORKFLOWS as $file) {
             foreach ($this->workflow($file)['jobs'] as $jobName => $job) {
@@ -741,7 +794,7 @@ SH;
             ])->mustRun();
             $arguments = file($log, FILE_IGNORE_NEW_LINES);
             self::assertSame(['run', '--rm'], array_slice($arguments, 0, 2));
-            self::assertContains('ghcr.io/baander-app/baander-runner:latest', $arguments);
+            self::assertContains(self::interpolate($workflow['jobs']['quality-gate']['container']['image'], $github), $arguments);
             foreach (['/usr/share/dotnet', '/usr/local/lib/android', '/opt/ghc', '/opt/hostedtoolcache'] as $directory) {
                 self::assertNotEmpty(preg_grep('~^' . preg_quote($directory, '~') . ':/~', $arguments), $directory);
             }
@@ -767,6 +820,7 @@ SH;
         foreach ($jobs as $name => $job) {
             self::assertStringContainsString(self::FORGE, $job['if'], $name);
             self::assertSame('docker-cli', self::interpolate($job['runs-on'], self::context(self::FORGEJO, matrix: ['os' => 'macos-latest'])), $name);
+            self::assertSame(self::FORK_LABEL, self::interpolate($job['runs-on'], self::context(self::FORGEJO, 'pull_request', self::FORK, ['os' => 'macos-latest'])), $name);
             self::assertFalse(self::condition($job['if'], self::context(self::FORGEJO)), $name);
         }
     }
@@ -983,7 +1037,7 @@ SH;
             'permissions' => ['contents' => 'read'],
             'concurrency' => ['group' => 'synthetic-${{ github.ref }}', 'cancel-in-progress' => self::CANCEL_PULL_REQUESTS],
             'jobs' => ['gate' => [
-                'runs-on' => "\${{ github.server_url == 'https://github.com' && 'ubuntu-latest' || 'docker-cli' }}",
+                'runs-on' => self::RUNS_ON,
                 'steps' => [['name' => 'Gate', 'run' => 'true']],
             ]],
         ];
@@ -1063,10 +1117,19 @@ SH;
             $matrix = $job['strategy']['matrix'] ?? [];
             $entries = $matrix['include'] ?? [array_map(static fn(mixed $value): mixed => is_array($value) ? $value[0] : $value, $matrix)];
             foreach ($entries as $entry) {
-                $github = self::interpolate($job['runs-on'] ?? '', self::context(self::GITHUB, matrix: $entry));
-                $forgejo = self::interpolate($job['runs-on'] ?? '', self::context(self::FORGEJO, matrix: $entry));
-                if (!is_string($github) || !preg_match('~^(?:ubuntu|windows|macos)-[\w.-]+$~', $github) || $forgejo !== 'docker-cli') {
-                    $violations[] = $where . ': runs-on must resolve to a hosted label on GitHub and docker-cli on Forgejo';
+                $label = static fn(string $server, string $event = 'push', ?string $head = null): mixed => self::interpolate($job['runs-on'] ?? '', self::context($server, $event, $head, $entry));
+                $github = $label(self::GITHUB);
+                if (!is_string($github) || !preg_match('~^(?:ubuntu|windows|macos)-[\w.-]+$~', $github) || $label(self::GITHUB, 'pull_request', self::FORK) !== $github
+                    || $label(self::FORGEJO) !== 'docker-cli' || $label(self::FORGEJO, 'pull_request') !== 'docker-cli' || $label(self::FORGEJO, 'pull_request', self::FORK) !== self::FORK_LABEL) {
+                    $violations[] = $where . ': runs-on must resolve to a hosted label on GitHub and to docker-cli on Forgejo, except a Forgejo pull request from a fork, which resolves to ' . self::FORK_LABEL . ' so no fork job reaches the runner that holds the Docker socket';
+                }
+            }
+            $container = $job['container'] ?? null;
+            $image = is_array($container) ? ($container['image'] ?? null) : $container;
+            foreach ($image === null ? [] : [self::GITHUB, self::FORGEJO] as $server) {
+                $resolved = self::interpolate($image, self::context($server, matrix: $entries[0] ?? []));
+                if (!is_string($resolved) || preg_match('~(?:@sha256:[0-9a-f]{64}|:[0-9a-f]{40})$~D', $resolved) !== 1) {
+                    $violations[] = $where . ': the job container must be pinned by digest or by a commit tag on ' . $server . ', because a mutable tag can change what the job runs';
                 }
             }
             foreach ([$job, ...$steps] as $subject) {
@@ -1323,6 +1386,7 @@ SH;
                 'startswith' => str_starts_with(strtolower($text[0]), strtolower($text[1])),
                 'endswith' => str_ends_with(strtolower($text[0]), strtolower($text[1])),
                 'contains' => str_contains(strtolower($text[0]), strtolower($text[1])),
+                'format' => preg_replace_callback('/\{(\d+)\}/', static fn(array $match): string => $text[(int) $match[1] + 1] ?? '', $text[0]),
                 default => self::fail('Unsupported expression function: ' . $token),
             };
         }

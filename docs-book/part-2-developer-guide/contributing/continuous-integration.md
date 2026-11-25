@@ -19,7 +19,7 @@ store. The workflows select them at run time; nothing is edited per forge.
 | `website.yaml` | Public website | Pushes to `master` and pull requests that touch the website paths | Builds, validates and browser-checks the static website, then keeps the archive |
 | `dsp-analysis.yaml` | DSP analysis qualification | Pushes to `master` and pull requests that touch the DSP paths | Builds and qualifies the analysis modules with the pinned Emscripten |
 | `registry-nightly.yaml` | Registry nightly qualification | `17 2 * * *` (02:17 UTC) and manual dispatch | Five-voter Registry qualification and parser fuzzing |
-| `dependency-advisories.yaml` | Dependency advisories | `41 4 * * *` (04:41 UTC) and manual dispatch | Audits every owned Composer, Yarn and npm lock for security advisories, see below |
+| `dependency-advisories.yaml` | Dependency advisories | `41 4 * * *` (04:41 UTC) and manual dispatch | Audits every owned Composer, Yarn and npm lock for security advisories and reports image digest drift, see below |
 | `runner.yaml` | Build Runner Image | Pushes to `master` that touch `docker/runner/**`, and dispatch | Publishes `baander-runner` |
 | `postgres.yaml` | Build PostgreSQL Image | Pushes to `master` that touch `docker/postgres/**`, and dispatch | Publishes `baander-postgres` |
 | `nginx.yaml` | Build Nginx Image | Pushes to `master` that touch `docker/nginx/**`, and dispatch | Publishes `baander-nginx` |
@@ -45,7 +45,18 @@ Each command exits `1` when a lock has an advisory and `2` when a lock could not
 audited. A run therefore fails when Packagist or the npm registry is unreachable.
 The JavaScript step carries `if: always()`, so it runs after a failed PHP step as
 well and an open PHP advisory does not keep a new JavaScript advisory from being
-reported. The job has no write step and keeps no artifact; the report is the step
+reported.
+
+The last step, `php scripts/check-php-dependencies.php --image-drift`, also carries
+`if: always()`. It asks each registry which digest the tag of every pinned image
+now names, and exits `1` when a tag has moved past its pin and `2` when a registry
+could not be read. A moved tag usually carries a rebuilt base with security fixes:
+review the new image, then move the digest in the Dockerfile, the image catalog or
+the workflow that pins it. The
+[PHP dependency page](../getting-started/php-dependencies.md#repeatable-checks)
+describes the build-input check that keeps every image pinned.
+
+The job has no write step and keeps no artifact; the report is the step
 log. The
 [PHP](../getting-started/php-dependencies.md#repeatable-checks) and
 [JavaScript](contributing.md#javascript-dependency-maintenance) dependency pages
@@ -119,7 +130,17 @@ not use it.
 The runner label never depends on a repository variable. A missing variable would
 otherwise produce a label that no runner serves, and the job would wait in the queue
 indefinitely. A fork pull request, which may not receive variables, therefore still
-resolves its runner label.
+resolves its runner label. Every job resolves it with the same expression:
+
+```yaml
+runs-on: ${{ github.server_url == 'https://github.com' && 'ubuntu-latest' || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository) && 'fork-pull-request' || 'docker-cli' }}
+```
+
+On Forgejo a pull request from a fork resolves to `fork-pull-request`, and every
+other run to `docker-cli`; the
+[next section](#trusted-runs-and-fork-pull-requests) explains why. The routing has to
+sit in `runs-on`: Forgejo evaluates a job's `if:` only after a runner has taken the
+job.
 
 ### The desktop lockfile and the codec package
 
@@ -136,8 +157,8 @@ caused it.
 
 | Concern | Forgejo | GitHub |
 | --- | --- | --- |
-| Runner label | `docker-cli` (self-hosted) | `ubuntu-latest` (hosted); `ubuntu-24.04` for the registry thread job, whose ThreadSanitizer cannot disable address randomization on the 26.04 runner |
-| Job container | `<REGISTRY_URL>/<REGISTRY_OWNER>/baander-runner:latest` | `ghcr.io/baander-app/baander-runner:latest` |
+| Runner label | `docker-cli` (self-hosted); `fork-pull-request`, which no runner serves, for a pull request from a fork | `ubuntu-latest` (hosted); `ubuntu-24.04` for the registry thread job, whose ThreadSanitizer cannot disable address randomization on the 26.04 runner |
+| Job container | `<REGISTRY_URL>/<REGISTRY_OWNER>/baander-runner:<commit>` | `ghcr.io/baander-app/baander-runner:<commit>` |
 | Registry and image owner | The `REGISTRY_URL` and `REGISTRY_OWNER` variables | `ghcr.io` and `baander-app` |
 | Registry login | The `REGISTRY_TOKEN` secret | The workflow token (`github.token`) |
 | Checkout credentials | `Authorization: token <workflow token>` | Basic authentication as `x-access-token` with the workflow token |
@@ -190,7 +211,12 @@ exists):
 - Give a step that differs by forge a twin, named `… on GitHub` and `… on Forgejo`,
   each guarded by the forge expression. The test checks the artifact, cache and
   baseline twins.
-- Make `runs-on` resolve to a hosted label on GitHub and to `docker-cli` on Forgejo.
+- Make `runs-on` resolve to a hosted label on GitHub and to `docker-cli` on Forgejo,
+  except a Forgejo pull request from a fork, which resolves to `fork-pull-request`.
+  Copy the expression under [Forge detection](#forge-detection).
+- Pin every job container by digest, or name the runner image by the commit tag the
+  other jobs use. A mutable tag such as `latest` or `cli` can change what a job runs
+  between two runs of the same commit.
 - Run `git config --global --add safe.directory "$PWD"` before a checkout script
   initialises the workspace.
 - Give a step that sources `emsdk_env.sh` `shell: bash`. GitHub runs steps in a job
@@ -217,9 +243,22 @@ exists):
 
 ## Trusted runs and fork pull requests
 
-Pull requests from forks run every gate. They receive no secrets and, on GitHub, a
-read-only workflow token, so every step that writes, publishes or comments carries
-the trusted-run condition:
+On GitHub, pull requests from forks run every gate on hosted runners. On Forgejo
+they run no job, because the `docker-cli` runner holds the Docker socket, which
+gives a job control of the host. Every job of a fork pull request resolves its label to
+`fork-pull-request`, no runner serves that label, and the jobs wait in the queue,
+so the pull request shows no passing gate. To qualify a fork's commits on Forgejo,
+review them and push them to a branch of this repository; the pull request from
+that branch runs every gate.
+
+For a `pull_request` event both forges take the workflow files from the pull
+request's own commit, so a fork that edits `.github/workflows` can name
+`docker-cli` itself. The label routing covers forks that leave the workflow tree
+alone. Forgejo can hold a fork's workflow runs until a maintainer approves them;
+approve none.
+
+Fork runs receive no secrets and, on GitHub, a read-only workflow token, so every
+step that writes, publishes or comments carries the trusted-run condition:
 
 ```yaml
 github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
@@ -311,13 +350,22 @@ refuse any server other than github.com.
 Each push tags the image `latest` and with the commit SHA. On GitHub the images are
 `ghcr.io/baander-app/<name>`.
 
+Every job names `baander-runner` by the commit tag of one runner build, never by
+`latest`, and `PublicationWorkflowTest` refuses a second tag or a mutable one. A
+change under `docker/runner/` therefore lands in two steps. Push the change on its
+own; `runner.yaml` publishes the image tagged with that push's commit on each forge,
+while the gate jobs of that push still run on the previous image. Once both forges
+have published the image for the same commit, replace the tag in every workflow in
+one commit.
+
 The application image copies `ffmpeg` and `ffprobe` from `ffmpeg-baander-static`
 through the `ffmpeg` role of the tooling image catalog
 (`packages/baander-configuration/resources/tooling-defaults.json`), passed to the build as
 `FFMPEG_IMAGE`. The role names the GHCR image by digest, so a new FFmpeg build reaches
 the application image only when that digest is updated. On Forgejo, `ci.yaml` sets
 `BAANDER_FFMPEG_IMAGE` to the copy in the Forgejo registry, which `ffmpeg.yaml`
-publishes there; a developer host sets the same variable to a local build. The
+publishes there, by the commit tag of the build the digest names. Move the tag
+together with the digest. A developer host sets the same variable to a local build. The
 FFmpeg image carries Bånder Audio Core from `packages/baander-audio-core`, fdk-aac and FFmpeg's built-in
 AAC codec, enables VAAPI, NVENC and QSV explicitly, and proves itself at build time:
 a smoke encodes and decodes with Bånder Audio Core, and `scripts/ffmpeg-capability-gate.sh`
@@ -340,7 +388,7 @@ acceptance](../../../ROADMAP.md#application-release-acceptance) still lists the
 notice, provenance and embedded-dependency gaps to close before a release image is
 qualified.
 
-The runner workflow builds inside the public `docker:cli` image. Every other job
+The runner workflow builds inside the public `docker:cli` image, pinned by digest. Every other job
 runs inside `baander-runner`, except the GitHub-only Audio Core binding jobs, which
 run directly on the hosted runners. The CI quality gate pulls `baander-postgres`,
 and the CI and production image builds copy from `ffmpeg-baander-static`, so all
@@ -370,6 +418,11 @@ Forgejo's registry already holds every image, so Forgejo needs no staging.
 - `BAANDER_TEST_DOCKER_SOCKET_PATH` is optional. The CI quality gate defaults it to
   `/var/run/docker.sock`; set it for a runner whose daemon socket lives elsewhere.
 - Keep a runner registered with the `docker-cli` label.
+- Register no runner with the `fork-pull-request` label. Jobs of pull requests from
+  forks resolve to it and wait in the queue, so they never reach the runner that
+  holds the Docker socket.
+- Do not approve the workflow runs of a pull request from a fork; push its reviewed
+  commits to a branch of this repository instead.
 
 ### GitHub settings
 

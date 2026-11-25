@@ -23,6 +23,7 @@
     "node/scripts/",
     "node/src/",
     "prebuilds/",
+    "prebuilds.sha256",
     "binding.gyp",
     "src/",
     "include/"
@@ -30,7 +31,7 @@
   "scripts": {
     "install": "node node/scripts/fetch-prebuilds.mjs --install",
     "prebuild:download": "node node/scripts/fetch-prebuilds.mjs",
-    "test": "node --test node/test/smoke.test.mjs"
+    "test": "node --test node/test/smoke.test.mjs node/test/fetch-prebuilds.test.mjs"
   },
   "dependencies": {
     "node-addon-api": "^8.9.2",

@@ -1,4 +1,8 @@
-FROM debian:trixie-slim AS tooling-build
+FROM debian:trixie-slim@sha256:8aa5a7bf5a1955bddbe7d74fcdd0b91ab30e74362a8b73af672b0481b35b44a0 AS debian-dist
+
+FROM node:24.22.2-trixie-slim@sha256:0820eaa85e07d0490446dd01d14707e17e6108a36988cf374899cd057eb3812d AS node-dist
+
+FROM debian-dist AS tooling-build
 
 ARG PHP_VERSION=8.5.12
 ARG PHP_SHA256=08bc2eba2a588654ade1357174aa646b761556c862dda0678345ee29ed481209
@@ -56,7 +60,7 @@ RUN curl -fsSL "https://pecl.php.net/get/yaml-${YAML_VERSION}.tgz" -o /tmp/yaml.
 
 RUN /opt/php/bin/php -r 'if (PHP_VERSION !== $argv[1] || PHP_ZTS || phpversion("swoole") !== $argv[2]) { exit(1); }' "$PHP_VERSION" "$SWOOLE_VERSION"
 
-FROM debian:trixie-slim AS tooling
+FROM debian-dist AS tooling
 
 # The CI package store transfers archives with curl and packs them with `tar --zstd`.
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -72,6 +76,10 @@ RUN php -v && php --ri swoole && php --ri yaml \
     && php -r 'foreach (["dom", "ffi", "mbstring", "openssl", "pdo_sqlite", "sockets", "sqlite3", "tokenizer", "xml", "xmlwriter", "zip", "zlib"] as $extension) { if (!extension_loaded($extension)) { throw new RuntimeException("Missing extension: " . $extension); } } $db = new SQLite3(":memory:"); $db->exec("CREATE VIRTUAL TABLE logs USING fts5(message, tokenize=trigram)");'
 
 FROM tooling AS runner
+
+ARG DOCKER_APT_GPG_SHA256=1500c1f56fa9e26b9b8f42452a553675796ade0807cdce11975eb98170b3a570
+ARG EMSDK_COMMIT=db04e88298d9916fc51fcd3743045ca3eb695127
+ARG EMSCRIPTEN_VERSION=6.0.3
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
         ca-certificates \
@@ -92,24 +100,35 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         zstd \
     && rm -rf /var/lib/apt/lists/*
 
-# Official Docker CLI
-RUN curl -fsSL https://download.docker.com/linux/debian/gpg \
-        | gpg --dearmor -o /usr/share/keyrings/docker.gpg \
+# Official Docker CLI. The repository key is pinned by SHA-256 (its primary key
+# fingerprint is 9DC8 5822 9FC7 DD38 854A E2D8 8D81 803C 0EBF CD88); apt checks
+# every Docker package against it.
+RUN curl -fsSL https://download.docker.com/linux/debian/gpg -o /tmp/docker.gpg \
+    && echo "${DOCKER_APT_GPG_SHA256}  /tmp/docker.gpg" | sha256sum -c - \
+    && gpg --dearmor -o /usr/share/keyrings/docker.gpg /tmp/docker.gpg \
+    && rm /tmp/docker.gpg \
     && echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/docker.gpg] https://download.docker.com/linux/debian $(. /etc/os-release && echo "$VERSION_CODENAME") stable" \
         > /etc/apt/sources.list.d/docker.list \
     && apt-get update \
     && apt-get install -y --no-install-recommends docker-ce-cli docker-buildx-plugin docker-compose-plugin \
     && rm -rf /var/lib/apt/lists/*
 
-RUN curl -fsSL https://deb.nodesource.com/setup_24.x | bash - \
-    && apt-get install -y --no-install-recommends nodejs \
-    && rm -rf /var/lib/apt/lists/* \
+# Node.js from the pinned node image, in the layout of Debian's nodejs package.
+COPY --from=node-dist /usr/local/bin/node /usr/bin/node
+COPY --from=node-dist /usr/local/lib/node_modules /usr/lib/node_modules
+COPY --from=node-dist /usr/local/include/node /usr/include/node
+RUN ln -s ../lib/node_modules/npm/bin/npm-cli.js /usr/bin/npm \
+    && ln -s ../lib/node_modules/npm/bin/npx-cli.js /usr/bin/npx \
+    && ln -s ../lib/node_modules/corepack/dist/corepack.js /usr/bin/corepack \
     && corepack enable
 
-# Emscripten SDK
-RUN git clone https://github.com/emscripten-core/emsdk.git /opt/emsdk \
-    && /opt/emsdk/emsdk install latest \
-    && /opt/emsdk/emsdk activate latest \
+# Emscripten SDK at the commit and release the DSP qualification jobs pin.
+RUN git init -q /opt/emsdk \
+    && git -C /opt/emsdk fetch -q --depth 1 https://github.com/emscripten-core/emsdk.git "${EMSDK_COMMIT}" \
+    && git -C /opt/emsdk checkout -q --detach FETCH_HEAD \
+    && test "$(git -C /opt/emsdk rev-parse HEAD)" = "${EMSDK_COMMIT}" \
+    && /opt/emsdk/emsdk install "${EMSCRIPTEN_VERSION}" \
+    && /opt/emsdk/emsdk activate "${EMSCRIPTEN_VERSION}" \
     && echo '. /opt/emsdk/emsdk_env.sh' >> /etc/bash.bashrc
 
 ENV PATH="/opt/emsdk:/opt/emsdk/upstream/bin:${PATH}"

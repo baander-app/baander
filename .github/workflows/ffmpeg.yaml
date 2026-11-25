@@ -23,10 +23,10 @@ concurrency:
 
 jobs:
     build:
-        runs-on: ${{ github.server_url == 'https://github.com' && 'ubuntu-latest' || 'docker-cli' }}
+        runs-on: ${{ github.server_url == 'https://github.com' && 'ubuntu-latest' || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository) && 'fork-pull-request' || 'docker-cli' }}
         timeout-minutes: 300
         container:
-            image: ${{ github.server_url == 'https://github.com' && 'ghcr.io' || vars.REGISTRY_URL }}/${{ github.server_url == 'https://github.com' && 'baander-app' || vars.REGISTRY_OWNER }}/baander-runner:latest
+            image: ${{ github.server_url == 'https://github.com' && 'ghcr.io' || vars.REGISTRY_URL }}/${{ github.server_url == 'https://github.com' && 'baander-app' || vars.REGISTRY_OWNER }}/baander-runner:7491ddcecfa546a1845ff79f85878649e6f79560
         permissions:
             contents: read
             packages: write
@@ -61,7 +61,7 @@ jobs:
                       -v /opt/hostedtoolcache:/cleanup/hostedtoolcache \
                       -v /:/host:ro \
                       --entrypoint /bin/sh \
-                      "$REGISTRY/${IMAGE_NAME%/*}/baander-runner:latest" \
+                      "$REGISTRY/${IMAGE_NAME%/*}/baander-runner:7491ddcecfa546a1845ff79f85878649e6f79560" \
                       -c 'find /cleanup -mindepth 2 -delete; df -h /host'
 
             -   name: Login to Container Registry

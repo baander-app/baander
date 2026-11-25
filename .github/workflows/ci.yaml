@@ -12,8 +12,10 @@ env:
     IMAGE_NAME: ${{ github.server_url == 'https://github.com' && 'baander-app' || vars.REGISTRY_OWNER }}/baander
     POSTGRES_IMAGE: ${{ github.server_url == 'https://github.com' && 'baander-app' || vars.REGISTRY_OWNER }}/baander-postgres
     # The application image copies FFmpeg from the static FFmpeg image. GitHub keeps the
-    # tooling catalog's reference (empty means unset); Forgejo reads its own registry copy.
-    BAANDER_FFMPEG_IMAGE: ${{ github.server_url != 'https://github.com' && format('{0}/{1}/ffmpeg-baander-static:latest', vars.REGISTRY_URL, vars.REGISTRY_OWNER) || '' }}
+    # tooling catalog's reference (empty means unset); Forgejo reads its own registry copy
+    # of the same build by the commit tag ffmpeg.yaml gave it, so the tag moves with the
+    # catalog's digest.
+    BAANDER_FFMPEG_IMAGE: ${{ github.server_url != 'https://github.com' && format('{0}/{1}/ffmpeg-baander-static:489926f682adb4aa21eb037121b027fc9e748c8c', vars.REGISTRY_URL, vars.REGISTRY_OWNER) || '' }}
     COVERAGE_PACKAGE: coverage-backend
     BUILDKIT_CACHE_PACKAGE: buildkit-cache-backend
     CI_IMAGE: baander-ci:${{ github.run_id }}-${{ github.run_attempt }}
@@ -27,12 +29,12 @@ concurrency:
 
 jobs:
     quality-gate:
-        runs-on: ${{ github.server_url == 'https://github.com' && 'ubuntu-latest' || 'docker-cli' }}
+        runs-on: ${{ github.server_url == 'https://github.com' && 'ubuntu-latest' || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository) && 'fork-pull-request' || 'docker-cli' }}
         env:
             BAANDER_TEST_DOCKER_SOCKET_PATH: ${{ vars.BAANDER_TEST_DOCKER_SOCKET_PATH || '/var/run/docker.sock' }}
             CI_BUILDER: baander-ci-${{ github.run_id }}-${{ github.run_attempt }}
         container:
-            image: ${{ github.server_url == 'https://github.com' && 'ghcr.io' || vars.REGISTRY_URL }}/${{ github.server_url == 'https://github.com' && 'baander-app' || vars.REGISTRY_OWNER }}/baander-runner:latest
+            image: ${{ github.server_url == 'https://github.com' && 'ghcr.io' || vars.REGISTRY_URL }}/${{ github.server_url == 'https://github.com' && 'baander-app' || vars.REGISTRY_OWNER }}/baander-runner:7491ddcecfa546a1845ff79f85878649e6f79560
         permissions:
             contents: read
             # Forgejo may scope its workflow token by these permissions, and
@@ -55,7 +57,7 @@ jobs:
                       -v /opt/hostedtoolcache:/cleanup/hostedtoolcache \
                       -v /:/host:ro \
                       --entrypoint /bin/sh \
-                      "$REGISTRY/${IMAGE_NAME%/*}/baander-runner:latest" \
+                      "$REGISTRY/${IMAGE_NAME%/*}/baander-runner:7491ddcecfa546a1845ff79f85878649e6f79560" \
                       -c 'find /cleanup -mindepth 2 -delete; df -h /host'
 
             -   name: Checkout
@@ -544,9 +546,9 @@ jobs:
                 run: docker buildx rm "$CI_BUILDER" 2>/dev/null || true
 
     frontend-quality:
-        runs-on: ${{ github.server_url == 'https://github.com' && 'ubuntu-latest' || 'docker-cli' }}
+        runs-on: ${{ github.server_url == 'https://github.com' && 'ubuntu-latest' || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository) && 'fork-pull-request' || 'docker-cli' }}
         container:
-            image: ${{ github.server_url == 'https://github.com' && 'ghcr.io' || vars.REGISTRY_URL }}/${{ github.server_url == 'https://github.com' && 'baander-app' || vars.REGISTRY_OWNER }}/baander-runner:latest
+            image: ${{ github.server_url == 'https://github.com' && 'ghcr.io' || vars.REGISTRY_URL }}/${{ github.server_url == 'https://github.com' && 'baander-app' || vars.REGISTRY_OWNER }}/baander-runner:7491ddcecfa546a1845ff79f85878649e6f79560
         env:
             # GitHub mounts a home directory owned by the runner user into a job
             # container that runs as root, and Firefox refuses to start there.
@@ -602,9 +604,9 @@ jobs:
                 run: yarn test:store-debug
 
     dsp-quality:
-        runs-on: ${{ github.server_url == 'https://github.com' && 'ubuntu-latest' || 'docker-cli' }}
+        runs-on: ${{ github.server_url == 'https://github.com' && 'ubuntu-latest' || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository) && 'fork-pull-request' || 'docker-cli' }}
         container:
-            image: ${{ github.server_url == 'https://github.com' && 'ghcr.io' || vars.REGISTRY_URL }}/${{ github.server_url == 'https://github.com' && 'baander-app' || vars.REGISTRY_OWNER }}/baander-runner:latest
+            image: ${{ github.server_url == 'https://github.com' && 'ghcr.io' || vars.REGISTRY_URL }}/${{ github.server_url == 'https://github.com' && 'baander-app' || vars.REGISTRY_OWNER }}/baander-runner:7491ddcecfa546a1845ff79f85878649e6f79560
         steps:
             -   name: Checkout
                 env:
@@ -636,13 +638,13 @@ jobs:
                     bash scripts/test-dsp-analysis.sh
 
     registry-quality:
-        runs-on: ${{ github.server_url == 'https://github.com' && 'ubuntu-latest' || 'docker-cli' }}
+        runs-on: ${{ github.server_url == 'https://github.com' && 'ubuntu-latest' || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository) && 'fork-pull-request' || 'docker-cli' }}
         timeout-minutes: 30
         strategy:
             matrix:
                 mode: [ release, sanitize ]
         container:
-            image: ${{ github.server_url == 'https://github.com' && 'ghcr.io' || vars.REGISTRY_URL }}/${{ github.server_url == 'https://github.com' && 'baander-app' || vars.REGISTRY_OWNER }}/baander-runner:latest
+            image: ${{ github.server_url == 'https://github.com' && 'ghcr.io' || vars.REGISTRY_URL }}/${{ github.server_url == 'https://github.com' && 'baander-app' || vars.REGISTRY_OWNER }}/baander-runner:7491ddcecfa546a1845ff79f85878649e6f79560
             options: --tmpfs /run/baander-registry-full-disk:rw,noexec,nosuid,nodev,size=128m,mode=0700
         env:
             REGISTRY_FULL_DISK_ROOT: /run/baander-registry-full-disk
@@ -674,10 +676,10 @@ jobs:
                 run: REGISTRY_SUBJECT_PYTHON=/usr/bin/python3 bash scripts/test-registry.sh ${{ matrix.mode }}
 
     registry-static-quality:
-        runs-on: ${{ github.server_url == 'https://github.com' && 'ubuntu-latest' || 'docker-cli' }}
+        runs-on: ${{ github.server_url == 'https://github.com' && 'ubuntu-latest' || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository) && 'fork-pull-request' || 'docker-cli' }}
         timeout-minutes: 30
         container:
-            image: ${{ github.server_url == 'https://github.com' && 'ghcr.io' || vars.REGISTRY_URL }}/${{ github.server_url == 'https://github.com' && 'baander-app' || vars.REGISTRY_OWNER }}/baander-runner:latest
+            image: ${{ github.server_url == 'https://github.com' && 'ghcr.io' || vars.REGISTRY_URL }}/${{ github.server_url == 'https://github.com' && 'baander-app' || vars.REGISTRY_OWNER }}/baander-runner:7491ddcecfa546a1845ff79f85878649e6f79560
         steps:
             -   name: Checkout
                 env:
@@ -706,12 +708,12 @@ jobs:
                 run: bash scripts/test-registry-static.sh
 
     registry-container-quality:
-        runs-on: ${{ github.server_url == 'https://github.com' && 'ubuntu-latest' || 'docker-cli' }}
+        runs-on: ${{ github.server_url == 'https://github.com' && 'ubuntu-latest' || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository) && 'fork-pull-request' || 'docker-cli' }}
         timeout-minutes: 45
         env:
             REGISTRY_INVENTORY_OUTPUT: var/test-runs/registry-inventory
         container:
-            image: ${{ github.server_url == 'https://github.com' && 'ghcr.io' || vars.REGISTRY_URL }}/${{ github.server_url == 'https://github.com' && 'baander-app' || vars.REGISTRY_OWNER }}/baander-runner:latest
+            image: ${{ github.server_url == 'https://github.com' && 'ghcr.io' || vars.REGISTRY_URL }}/${{ github.server_url == 'https://github.com' && 'baander-app' || vars.REGISTRY_OWNER }}/baander-runner:7491ddcecfa546a1845ff79f85878649e6f79560
         steps:
             -   name: Checkout
                 env:
@@ -762,10 +764,10 @@ jobs:
     # Ubuntu 26.04 runner refuses that personality() call, so this job stays on
     # 24.04 until it allows it.
     registry-thread-quality:
-        runs-on: ${{ github.server_url == 'https://github.com' && 'ubuntu-24.04' || 'docker-cli' }}
+        runs-on: ${{ github.server_url == 'https://github.com' && 'ubuntu-24.04' || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository) && 'fork-pull-request' || 'docker-cli' }}
         timeout-minutes: 30
         container:
-            image: ${{ github.server_url == 'https://github.com' && 'ghcr.io' || vars.REGISTRY_URL }}/${{ github.server_url == 'https://github.com' && 'baander-app' || vars.REGISTRY_OWNER }}/baander-runner:latest
+            image: ${{ github.server_url == 'https://github.com' && 'ghcr.io' || vars.REGISTRY_URL }}/${{ github.server_url == 'https://github.com' && 'baander-app' || vars.REGISTRY_OWNER }}/baander-runner:7491ddcecfa546a1845ff79f85878649e6f79560
         steps:
             -   name: Checkout
                 env:
@@ -797,10 +799,10 @@ jobs:
                 run: REGISTRY_SUBJECT_PYTHON=/usr/bin/python3 bash scripts/test-registry.sh thread
 
     registry-fuzz-quality:
-        runs-on: ${{ github.server_url == 'https://github.com' && 'ubuntu-latest' || 'docker-cli' }}
+        runs-on: ${{ github.server_url == 'https://github.com' && 'ubuntu-latest' || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository) && 'fork-pull-request' || 'docker-cli' }}
         timeout-minutes: 45
         container:
-            image: ${{ github.server_url == 'https://github.com' && 'ghcr.io' || vars.REGISTRY_URL }}/${{ github.server_url == 'https://github.com' && 'baander-app' || vars.REGISTRY_OWNER }}/baander-runner:latest
+            image: ${{ github.server_url == 'https://github.com' && 'ghcr.io' || vars.REGISTRY_URL }}/${{ github.server_url == 'https://github.com' && 'baander-app' || vars.REGISTRY_OWNER }}/baander-runner:7491ddcecfa546a1845ff79f85878649e6f79560
         steps:
             -   name: Checkout
                 env:
@@ -832,10 +834,10 @@ jobs:
                 run: REGISTRY_SUBJECT_PYTHON=/usr/bin/python3 bash scripts/test-registry.sh fuzz
 
     build-and-push:
-        runs-on: ${{ github.server_url == 'https://github.com' && 'ubuntu-latest' || 'docker-cli' }}
+        runs-on: ${{ github.server_url == 'https://github.com' && 'ubuntu-latest' || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository) && 'fork-pull-request' || 'docker-cli' }}
         needs: [ quality-gate, frontend-quality, dsp-quality, registry-quality, registry-container-quality, registry-thread-quality, registry-fuzz-quality, registry-static-quality ]
         container:
-            image: ${{ github.server_url == 'https://github.com' && 'ghcr.io' || vars.REGISTRY_URL }}/${{ github.server_url == 'https://github.com' && 'baander-app' || vars.REGISTRY_OWNER }}/baander-runner:latest
+            image: ${{ github.server_url == 'https://github.com' && 'ghcr.io' || vars.REGISTRY_URL }}/${{ github.server_url == 'https://github.com' && 'baander-app' || vars.REGISTRY_OWNER }}/baander-runner:7491ddcecfa546a1845ff79f85878649e6f79560
         permissions:
             contents: read
             packages: write
@@ -851,7 +853,7 @@ jobs:
                       -v /opt/hostedtoolcache:/cleanup/hostedtoolcache \
                       -v /:/host:ro \
                       --entrypoint /bin/sh \
-                      "$REGISTRY/${IMAGE_NAME%/*}/baander-runner:latest" \
+                      "$REGISTRY/${IMAGE_NAME%/*}/baander-runner:7491ddcecfa546a1845ff79f85878649e6f79560" \
                       -c 'find /cleanup -mindepth 2 -delete; df -h /host'
 
             -   name: Checkout

@@ -14,10 +14,10 @@ concurrency:
 
 jobs:
     audit:
-        runs-on: ${{ github.server_url == 'https://github.com' && 'ubuntu-latest' || 'docker-cli' }}
+        runs-on: ${{ github.server_url == 'https://github.com' && 'ubuntu-latest' || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository) && 'fork-pull-request' || 'docker-cli' }}
         timeout-minutes: 30
         container:
-            image: ${{ github.server_url == 'https://github.com' && 'ghcr.io' || vars.REGISTRY_URL }}/${{ github.server_url == 'https://github.com' && 'baander-app' || vars.REGISTRY_OWNER }}/baander-runner:latest
+            image: ${{ github.server_url == 'https://github.com' && 'ghcr.io' || vars.REGISTRY_URL }}/${{ github.server_url == 'https://github.com' && 'baander-app' || vars.REGISTRY_OWNER }}/baander-runner:7491ddcecfa546a1845ff79f85878649e6f79560
             options: --init
         steps:
             -   name: Checkout
@@ -46,3 +46,8 @@ jobs:
             -   name: JavaScript lock advisories
                 if: always()
                 run: php scripts/check-js-dependencies.php --advisories-only
+            # Exits 1 when a pinned tag now resolves to another digest and 2 when a registry
+            # could not be read; it pulls and runs no image.
+            -   name: Image digest drift
+                if: always()
+                run: php scripts/check-php-dependencies.php --image-drift

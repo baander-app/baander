@@ -6,6 +6,15 @@
             "reason": "Retained build and test evidence and disposable contexts, not repository-owned source projects."
         }
     },
+    "buildInputs": {
+        "catalog": "packages/baander-configuration/resources/tooling-defaults.json",
+        "locallyBuiltRoles": {
+            "application": "A project image built from this checkout and passed as BAANDER_TEST_IMAGE; the default names no published image.",
+            "postgres": "A project image built from docker/postgres and passed as BAANDER_TEST_POSTGRES_IMAGE; the default names no published image.",
+            "proxy": "A project test image passed as BAANDER_TEST_PROXY_IMAGE; the default names no published image."
+        },
+        "workflows": ".github/workflows"
+    },
     "projects": {
         "composer.json": {
             "kind": "locked",
@@ -255,7 +264,8 @@
             "declarations": [
                 {
                     "path": "Dockerfile",
-                    "kind": "swoole-install"
+                    "kind": "assignment",
+                    "key": "SWOOLE_VERSION"
                 },
                 {
                     "path": "docker/runner/Dockerfile",

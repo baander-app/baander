@@ -8,25 +8,38 @@
 
 # -----------------------------------------------------------------------------
 # Stage 1: base
-# System dependencies, Node.js, and the pie tool.
+# System dependencies and Node.js.
 # Provides the common foundation for both builder and runtime.
 # FFmpeg comes from the project's static image (docker/ffmpeg/Dockerfile),
 # selected through the FFMPEG_IMAGE build argument that the tooling fills
-# from its image catalog.
+# from its image catalog. Every external image is pinned by digest and every
+# downloaded source by SHA-256 or commit.
 # -----------------------------------------------------------------------------
 ARG OPERATOR_HELPER_IMAGE=scratch
 ARG FFMPEG_IMAGE=scratch
+ARG LIBURING_VERSION=2.13
+ARG LIBURING_SHA256=618e34dbea408fc9e33d7c4babd746036dbdedf7fce2496b1178ced0f9b5b357
 FROM ${FFMPEG_IMAGE} AS ffmpeg-dist
 
-FROM php:8.5.12-zts-trixie AS base
+FROM node:24.22.2-trixie-slim@sha256:0820eaa85e07d0490446dd01d14707e17e6108a36988cf374899cd057eb3812d AS node-dist
 
-ARG LIBURING_VERSION=2.13
+FROM php:8.5.12-zts-trixie@sha256:2ffa2b7471a9826f8a28f722ff21f83bc560367c0135372d88697f6c0666b5eb AS base
+
 ARG TARGETPLATFORM
+
+# Node.js keeps the layout of Debian's nodejs package, so /usr/bin/node and the
+# global npm and corepack under /usr/lib/node_modules stay where tooling expects them.
+COPY --from=node-dist /usr/local/bin/node /usr/bin/node
+COPY --from=node-dist /usr/local/lib/node_modules /usr/lib/node_modules
+COPY --from=node-dist /usr/local/include/node /usr/include/node
+RUN ln -s ../lib/node_modules/npm/bin/npm-cli.js /usr/bin/npm && \
+    ln -s ../lib/node_modules/npm/bin/npx-cli.js /usr/bin/npx && \
+    ln -s ../lib/node_modules/corepack/dist/corepack.js /usr/bin/corepack && \
+    node --version
 
 # Install system dependencies.
 # --mount=type=cache caches APT indices and packages across rebuilds.
 RUN set -xe && \
-    curl -sL https://deb.nodesource.com/setup_24.x | bash - && \
     DEBIAN_FRONTEND=noninteractive apt-get update -qq && \
     DEBIAN_FRONTEND=noninteractive apt-get upgrade -yqq && \
     DEBIAN_FRONTEND=noninteractive apt-get install -yqq -o=Dpkg::Use-Pty=0 \
@@ -40,7 +53,6 @@ RUN set -xe && \
         curl \
         wget \
         nano \
-        nodejs \
         procps \
         sudo \
         gnupg \
@@ -100,8 +112,6 @@ RUN set -xe && \
         libsrt-openssl-dev \
         libusb-1.0-0-dev
 
-COPY --from=ghcr.io/php/pie:bin /pie /bin/pie
-
 # The project's FFmpeg build replaces Debian's package at the path the native
 # execution daemon allows; its shared-library needs come from the list the
 # static image derived from the built binaries.
@@ -121,7 +131,8 @@ RUN set -xe && \
 # -----------------------------------------------------------------------------
 FROM base AS builder-php
 
-ARG LIBURING_VERSION=2.13
+ARG LIBURING_VERSION
+ARG LIBURING_SHA256
 
 # Configure PHP extensions
 RUN set -xe && \
@@ -151,7 +162,8 @@ RUN set -xe && \
 # --mount=type=cache preserves the build directory across rebuilds.
 COPY scripts/retain-build-evidence.php /usr/local/bin/retain-build-evidence.php
 RUN set -xe && \
-    wget https://github.com/axboe/liburing/archive/refs/tags/liburing-${LIBURING_VERSION}.tar.gz && \
+    curl -fsSL "https://github.com/axboe/liburing/archive/refs/tags/liburing-${LIBURING_VERSION}.tar.gz" -o "liburing-${LIBURING_VERSION}.tar.gz" && \
+    echo "${LIBURING_SHA256}  liburing-${LIBURING_VERSION}.tar.gz" | sha256sum -c - && \
     tar zxf liburing-${LIBURING_VERSION}.tar.gz && \
     cd liburing-liburing-${LIBURING_VERSION} && \
     ./configure && \
@@ -165,49 +177,59 @@ RUN set -xe && \
         --artifact '/usr/lib/liburing*' && \
     rm -rf "liburing-liburing-${LIBURING_VERSION}" && rm -f "liburing-${LIBURING_VERSION}.tar.gz"
 
-# Install PECL extensions.
-# --mount=type=cache,target=/tmp/pecl persists downloaded source across rebuilds.
+# Install PECL extensions from release archives pinned by version and SHA-256.
+# Each archive holds package.xml beside a <name>-<version>/ source directory;
+# both land in /tmp/pecl/<name>, the layout `pecl bundle` produced.
+# --mount=type=cache,target=/tmp/pecl keeps the build tree out of the layer.
 RUN --mount=type=cache,target=/tmp/pecl \
-    set -xe \
-    && pecl channel-update pecl.php.net \
-    && mkdir -p /tmp/pecl \
+    set -e \
+    && for archive in \
+        'imagick 3.8.1 3a3587c0a524c17d0dad9673a160b90cd776e836838474e173b549ed864352ee' \
+        'igbinary 3.2.17RC1 91da821443db125282a6aea039f24588dd28ff5d71e8187f6ecc41165bceafbc' \
+        'redis 6.3.0 0d5141f634bd1db6c1ddcda053d25ecf2c4fc1c395430d534fd3f8d51dd7f0b5' \
+        'mailparse 3.2.0 cc5111ae17bfa36efcc5ef23dcf75b6501593ac264c196aad3e39cd4ad765332' \
+        'inotify 3.0.1 fbb7240abae502ea8f4b3c68264c6425fb46647402a8f93916482845394ad124' \
+        'excimer 1.2.6 7b5fe1f68f2b1a62bd0394d4bf165eafe6b7ceb3fc20ab885e733d356db0d034' \
+        'yaml 2.3.0 bc8404807a3a4dc896b310af21a7f8063aa238424ff77f27eb6ffa88b5874b8a' \
+        'uv 0.3.1 1b18d961543f76eebae300893987b3f198874d9f039cf472ac6257f85a28db77'; do \
+        set -- $archive; \
+        rm -rf "/tmp/pecl/$1" "/tmp/pecl/$1.tgz"; \
+        curl -fsSL "https://pecl.php.net/get/$1-$2.tgz" -o "/tmp/pecl/$1.tgz"; \
+        echo "$3  /tmp/pecl/$1.tgz" | sha256sum -c -; \
+        mkdir "/tmp/pecl/$1"; \
+        tar -xzf "/tmp/pecl/$1.tgz" -C "/tmp/pecl/$1" --strip-components=1 "$1-$2"; \
+        tar -xzf "/tmp/pecl/$1.tgz" -C "/tmp/pecl/$1" package.xml; \
+    done \
+    && set -x \
     # imagick
-    && pecl bundle -d /tmp/pecl imagick \
     && docker-php-ext-configure /tmp/pecl/imagick \
     && docker-php-ext-install -j$(nproc) /tmp/pecl/imagick \
     # igbinary
-    && pecl bundle -d /tmp/pecl igbinary \
     && docker-php-ext-configure /tmp/pecl/igbinary \
     && docker-php-ext-install -j$(nproc) /tmp/pecl/igbinary \
     # redis
-    && pecl bundle -d /tmp/pecl redis \
     && docker-php-ext-configure /tmp/pecl/redis --enable-redis-igbinary --enable-redis-lzf --enable-redis-zstd --with-liblz4 \
     && docker-php-ext-install -j$(nproc) /tmp/pecl/redis \
     # mailparse
-    && pecl bundle -d /tmp/pecl mailparse \
     && docker-php-ext-configure /tmp/pecl/mailparse \
     && docker-php-ext-install -j$(nproc) /tmp/pecl/mailparse \
     # inotify
-    && pecl bundle -d /tmp/pecl inotify \
     && docker-php-ext-configure /tmp/pecl/inotify \
     && docker-php-ext-install -j$(nproc) /tmp/pecl/inotify \
     # excimer
-    && pecl bundle -d /tmp/pecl excimer \
     && docker-php-ext-configure /tmp/pecl/excimer \
     && docker-php-ext-install -j$(nproc) /tmp/pecl/excimer \
     # yaml
-    && pecl bundle -d /tmp/pecl yaml \
     && docker-php-ext-configure /tmp/pecl/yaml \
     && docker-php-ext-install -j$(nproc) /tmp/pecl/yaml \
     # uv
-    && pecl bundle -d /tmp/pecl uv \
     && docker-php-ext-configure /tmp/pecl/uv \
     && docker-php-ext-install -j$(nproc) /tmp/pecl/uv \
     && for extension in imagick igbinary redis mailparse inotify excimer yaml uv; do \
         php /usr/local/bin/retain-build-evidence.php collect \
             --output /tmp/build-evidence-php --id "pecl-${extension}" --name "${extension}" \
             --source-dir "/tmp/pecl/${extension}" --package-xml "/tmp/pecl/${extension}/package.xml" \
-            --source-url "https://pecl.php.net/package/${extension}" \
+            --source-url "https://pecl.php.net/package/${extension}" --source-archive "/tmp/pecl/${extension}.tgz" \
             --artifact "/usr/local/lib/php/extensions/*/${extension}.so"; \
     done
 
@@ -247,11 +269,15 @@ RUN chmod +x /usr/bin/composer
 # -----------------------------------------------------------------------------
 FROM base AS builder-swoole
 
-ARG LIBURING_VERSION=2.13
+ARG LIBURING_VERSION
+ARG LIBURING_SHA256
+ARG SWOOLE_VERSION=6.2.4
+ARG SWOOLE_SHA256=cb41348708cb3a360672cd4ffe84b9a6b4efee61773be7d76a11c39949b95334
 
 # Compile liburing (duplicated — avoids cross-stage dependency, ~30s build)
 RUN set -xe && \
-    wget https://github.com/axboe/liburing/archive/refs/tags/liburing-${LIBURING_VERSION}.tar.gz && \
+    curl -fsSL "https://github.com/axboe/liburing/archive/refs/tags/liburing-${LIBURING_VERSION}.tar.gz" -o "liburing-${LIBURING_VERSION}.tar.gz" && \
+    echo "${LIBURING_SHA256}  liburing-${LIBURING_VERSION}.tar.gz" | sha256sum -c - && \
     tar zxf liburing-${LIBURING_VERSION}.tar.gz && \
     cd liburing-liburing-${LIBURING_VERSION} && \
     ./configure && \
@@ -264,23 +290,22 @@ RUN set -xe && \
     docker-php-ext-install -j "$(nproc)" sockets
 
 # Match the exact native API required by Composer and the Swoole bundle stubs.
-# Install Swoole from source with custom flags.
+# Install Swoole from its PECL release archive with custom flags.
 # Keep the async thread file backend: io_uring requires syscalls denied by the
 # deployment container's default seccomp profile and has no runtime fallback.
-# --mount=type=cache persists pie's download and build cache.
 COPY scripts/retain-build-evidence.php /usr/local/bin/retain-build-evidence.php
-RUN --mount=type=cache,target=/root/.cache/pie \
-    set -xe && \
-    export PIE_WORKING_DIRECTORY=/tmp/pie-evidence && \
-    pie download swoole/swoole:6.2.4 && \
-    for source in /tmp/pie-evidence/php*/vendor/swoole/swoole; do \
-        php /usr/local/bin/retain-build-evidence.php collect \
-            --output /tmp/build-evidence-swoole --id swoole --name Swoole \
-            --source-dir "$source" --package-xml "$source/package.xml" \
-            --source-url https://github.com/swoole/swoole-src \
-            --artifact '/usr/local/lib/php/extensions/*/swoole.so'; \
-    done && \
-    pie install swoole/swoole:6.2.4 \
+RUN set -xe && \
+    curl -fsSL "https://pecl.php.net/get/swoole-${SWOOLE_VERSION}.tgz" -o /tmp/swoole.tgz && \
+    echo "${SWOOLE_SHA256}  /tmp/swoole.tgz" | sha256sum -c - && \
+    mkdir /tmp/swoole && \
+    tar -xzf /tmp/swoole.tgz -C /tmp/swoole --strip-components=1 "swoole-${SWOOLE_VERSION}" && \
+    tar -xzf /tmp/swoole.tgz -C /tmp/swoole package.xml && \
+    php /usr/local/bin/retain-build-evidence.php collect \
+        --output /tmp/build-evidence-swoole --id swoole --name Swoole \
+        --source-dir /tmp/swoole --package-xml /tmp/swoole/package.xml \
+        --source-url "https://pecl.php.net/get/swoole-${SWOOLE_VERSION}.tgz" --source-archive /tmp/swoole.tgz \
+        --artifact '/usr/local/lib/php/extensions/*/swoole.so' && \
+    docker-php-ext-configure /tmp/swoole \
         --enable-swoole-thread \
         --enable-sockets \
         --enable-swoole-curl \
@@ -288,9 +313,9 @@ RUN --mount=type=cache,target=/root/.cache/pie \
         --enable-swoole-pgsql \
         --enable-swoole-sqlite \
         --enable-zstd && \
-    # Ensure extension= directive exists — pie generates it but keep as safety net
-    { grep -q 'extension=swoole' /usr/local/etc/php/conf.d/docker-php-ext-swoole.ini || \
-        echo 'extension=swoole.so' > /usr/local/etc/php/conf.d/docker-php-ext-swoole.ini; }
+    docker-php-ext-install -j "$(nproc)" /tmp/swoole && \
+    php -r 'if (phpversion("swoole") !== $argv[1]) { exit(1); }' "${SWOOLE_VERSION}" && \
+    rm -rf /tmp/swoole /tmp/swoole.tgz
 
 # -----------------------------------------------------------------------------
 # Stage 2c: builder-tsduck
@@ -300,10 +325,12 @@ RUN --mount=type=cache,target=/root/.cache/pie \
 FROM base AS builder-tsduck
 
 ARG TSDUCK_VERSION=v3.43-4549
+ARG TSDUCK_COMMIT=a88644421b7a576fce1e9fde412459bc5cde6d43
 
 # Build TSDuck from source (shared library + CLI tools for PHP FFI bindings)
 RUN set -xe && \
     git clone --depth 1 --branch ${TSDUCK_VERSION} https://github.com/tsduck/tsduck.git /tmp/tsduck-src && \
+    test "$(git -C /tmp/tsduck-src rev-parse HEAD)" = "${TSDUCK_COMMIT}" && \
     cd /tmp/tsduck-src && \
     make -j$(nproc) NOSTATIC=true NOJAVA=true NOPYTHON=true NOPHP=true CXXFLAGS_EXTRA="-Wno-restrict -Wno-deprecated-copy" && \
     make -j$(nproc) NOTEST=true -C src install-tools && \
@@ -360,9 +387,6 @@ COPY --from=builder-tsduck /tmp/build-evidence-tsduck /tmp/build-evidence-tsduck
 RUN php /usr/local/bin/retain-build-evidence.php phar \
         --output /tmp/build-evidence-tools --id composer --name Composer \
         --archive /usr/bin/composer --artifact /usr/bin/composer && \
-    php /usr/local/bin/retain-build-evidence.php phar \
-        --output /tmp/build-evidence-tools --id pie --name PIE \
-        --archive /bin/pie --artifact /bin/pie && \
     php /usr/local/bin/retain-build-evidence.php finalize \
         --output /usr/share/baander-build-evidence \
         --input /tmp/build-evidence-php --input /tmp/build-evidence-swoole \
@@ -526,6 +550,7 @@ ARG HOST_UID=1000
 ARG HOST_GID=1000
 ARG XDEBUG_CONFIG=main
 ARG XDEBUG_VERSION=3.5.0
+ARG XDEBUG_SHA256=f6daf55a5c7adadb07dd2af25ff78b1cc9b1c58d6cc442a463eba015b678aabf
 
 ENV XDEBUG_CONFIG=$XDEBUG_CONFIG \
     XDEBUG_VERSION=$XDEBUG_VERSION
@@ -536,11 +561,15 @@ USER root
 # Copy Composer from builder
 COPY --from=builder /usr/bin/composer /usr/bin/composer
 
-# Install the requested archive directly, bypassing PECL REST metadata lookup.
-# --mount=type=cache persists PECL download/build across rebuilds.
+# Install the release archive pinned by version and SHA-256.
+# --mount=type=cache,target=/tmp/pecl keeps the build tree out of the layer.
 RUN --mount=type=cache,target=/tmp/pecl \
     set -xe && \
-    pecl bundle -d /tmp/pecl "https://pecl.php.net/get/xdebug-${XDEBUG_VERSION}.tgz" \
+    rm -rf /tmp/pecl/xdebug /tmp/pecl/xdebug.tgz && \
+    curl -fsSL "https://pecl.php.net/get/xdebug-${XDEBUG_VERSION}.tgz" -o /tmp/pecl/xdebug.tgz && \
+    echo "${XDEBUG_SHA256}  /tmp/pecl/xdebug.tgz" | sha256sum -c - && \
+    mkdir /tmp/pecl/xdebug && \
+    tar -xzf /tmp/pecl/xdebug.tgz -C /tmp/pecl/xdebug --strip-components=1 "xdebug-${XDEBUG_VERSION}" \
     && docker-php-ext-configure /tmp/pecl/xdebug \
     && docker-php-ext-install -j$(nproc) /tmp/pecl/xdebug
 
@@ -550,7 +579,7 @@ COPY --chmod=755 ./docker/dev/entrypoint.sh /usr/local/bin/entrypoint.sh
 # Copy Xdebug config directly to the correct location (one step)
 COPY ./docker/dev/xdebug-main.ini /usr/local/etc/php/conf.d/xdebug.ini
 
-# Copy Swoole config (runtime settings only — extension= is in docker-php-ext-swoole.ini from pie)
+# Copy Swoole config (runtime settings only — extension= is in the docker-php-ext-swoole.ini that docker-php-ext-install wrote)
 COPY ./docker/dev/swoole-runtime.ini /usr/local/etc/php/conf.d/swoole-runtime.ini
 
 # Set up HOST_UID/HOST_GID remapping
@@ -677,7 +706,7 @@ RUN COMPOSER_MEMORY_LIMIT=-1 composer install --optimize-autoloader --no-interac
 
 USER www-data
 
-FROM node:24.22.2-trixie-slim AS dev-tools
+FROM node-dist AS dev-tools
 RUN corepack enable && corepack prepare yarn@4.18.1 --activate && mkdir -p /work
 WORKDIR /work
 

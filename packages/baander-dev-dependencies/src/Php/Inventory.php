@@ -12,8 +12,9 @@ final readonly class Inventory
      * @param array<string,mixed> $policy
      * @param array<string,array<string,mixed>> $projects
      * @param list<array{path:string,reason:string}> $gaps
+     * @param list<string> $dockerfiles
      */
-    private function __construct(public array $policy, public array $projects, public array $gaps) {}
+    private function __construct(public array $policy, public array $projects, public array $gaps, public array $dockerfiles) {}
 
     public static function load(string $root): self
     {
@@ -35,7 +36,8 @@ final readonly class Inventory
             $excluded[] = $path;
         }
         $discovered = [];
-        self::discover($root, '', $discovered, $excluded);
+        $dockerfiles = [];
+        self::discover($root, '', $discovered, $dockerfiles, $excluded);
         $projects = [];
         $gaps = [];
         foreach (array_unique([...$discovered, ...array_keys($policy['projects'])]) as $path) {
@@ -82,7 +84,8 @@ final readonly class Inventory
             }
         }
         ksort($projects);
-        return new self($policy, $projects, $gaps);
+        sort($dockerfiles);
+        return new self($policy, $projects, $gaps, $dockerfiles);
     }
 
     /**
@@ -111,9 +114,10 @@ final readonly class Inventory
 
     /**
      * @param list<string> $paths
+     * @param list<string> $dockerfiles
      * @param list<string> $excluded
      */
-    private static function discover(string $root, string $relative, array &$paths, array $excluded): void
+    private static function discover(string $root, string $relative, array &$paths, array &$dockerfiles, array $excluded): void
     {
         $entries = scandir($root . ($relative === '' ? '' : '/' . $relative));
         if ($entries === false) {
@@ -129,9 +133,11 @@ final readonly class Inventory
                 continue;
             }
             if (is_dir($absolute)) {
-                self::discover($root, $path, $paths, $excluded);
+                self::discover($root, $path, $paths, $dockerfiles, $excluded);
             } elseif ($entry === 'composer.json') {
                 $paths[] = $path;
+            } elseif (preg_match('/^(?:Dockerfile(?:\..+)?|.+\.Dockerfile|Containerfile)$/D', $entry) === 1) {
+                $dockerfiles[] = $path;
             }
         }
     }

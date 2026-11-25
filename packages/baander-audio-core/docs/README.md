@@ -1580,29 +1580,51 @@ resolves it in this order and lists every path it tried when none loads:
 
 The package's `install` script (`node/scripts/fetch-prebuilds.mjs
 --install`) runs on every `npm install` and `yarn install`, including the
-copy the Electron app makes of this `file:` dependency. It asks the GitHub
-API of the repository in `package.json` for the release
-`audio-core-v<version>` of the package's own version, downloads
-`baander_audio_core-<platform>-<arch>.node` into `prebuilds/`, checks it against
-the release's `SHA256SUMS` and loads it once in a child process, which
-must report the same version. When any of that fails (offline, a proxy,
-no release yet) it builds from source with `node-gyp rebuild` instead, so
-a machine with a toolchain never depends on the network and a machine
-without one needs only the release. The script never fails the install:
-when neither route works it prints what to run later
-(`npm rebuild @baander/audio-core` or `yarn electron-rebuild`) and the
-loader reports the missing binding at first use. An existing prebuild is kept; `npm run prebuild:download
+copy the Electron app makes of this `file:` dependency. It trusts a
+download only through `prebuilds.sha256`, a hash list committed in this
+package. First it looks up
+`audio-core-v<version>/baander_audio_core-<platform>-<arch>.node`, for the
+package's own version, in that list; without a line there it requests
+nothing. With one, it asks the GitHub API of the repository in
+`package.json` for the release `audio-core-v<version>`, downloads the
+asset, and writes it into `prebuilds/` only when its SHA-256 equals the
+committed one. The release's own checksums are not read, because whoever
+can replace an asset can replace them as well. The script then loads the
+file once in a child process, which must report the same version. When
+any of that fails (no committed line, a hash that differs, offline, a
+proxy, no release yet) it builds from source with `node-gyp rebuild`
+instead, so a machine with a toolchain never depends on the network and a
+machine without one needs only the release and its committed hashes. The
+script never fails the install: when neither route works it prints what
+to run later (`npm rebuild @baander/audio-core` or `yarn electron-rebuild`)
+and the loader reports the missing binding at first use. Run without
+`--install` (`npm run prebuild:download`), the script builds nothing and
+exits nonzero on the same failures. An existing prebuild is kept; `npm run prebuild:download
 -- --force` replaces it, and `BAANDER_AUDIO_CORE_BUILD_FROM_SOURCE=1` (or
 npm's `--build-from-source`) skips the download. `GITHUB_TOKEN` is
 optional for a public repository; `BAANDER_AUDIO_CORE_PREBUILD_REPO`,
 `BAANDER_AUDIO_CORE_PREBUILD_TAG` and `BAANDER_AUDIO_CORE_PREBUILD_API` pin the
-repository, the release and the API host. Naming the script `install`
+repository, the release and the API host; a pinned tag is looked up in
+the hash list under that tag. Naming the script `install`
 (not `postinstall`) matters: npm and Yarn run an implicit `node-gyp
 rebuild` for a package with a `binding.gyp` only when it has no `install`
 script. Note that Yarn's lockfile hashes the packed contents of a `file:`
 dependency, `prebuilds/` included, so a prebuild downloaded into this
 source checkout changes `ui/electron/yarn.lock` on the next install;
 let the install script fetch it into `node_modules` instead.
+
+`prebuilds.sha256` holds one line per release asset in `sha256sum`
+format, with the release tag as the directory of the asset name:
+
+```text
+<64 lowercase hex>  audio-core-v<version>/baander_audio_core-<platform>-<arch>.node
+```
+
+Blank lines and lines that begin with `#` are skipped. Any other line of
+another shape, or one that repeats an asset, makes the script refuse the
+whole list, so a damaged list admits no binary. `npm test` runs the
+script's own test as well, against a stand-in GitHub API on the loopback
+interface.
 
 To produce a prebuild locally, build for the Electron the desktop app
 locks (`ui/electron/yarn.lock`) and copy the result into place; a plain
@@ -1626,8 +1648,10 @@ testbench required, runs `test_dsp` and the lossless suites on the two
 macOS runners against the kernels of their processors, and keeps each
 binary as a workflow artifact. Pushing a tag `audio-core-v<version>` (the version in
 `package.json`; the workflow refuses a mismatch) attaches the four
-binaries and `SHA256SUMS` to the GitHub release of that tag, creating
-the release when needed; nothing is committed. The desktop app's
+binaries to the GitHub release of that tag and prints their lines for
+`prebuilds.sha256`. The workflow commits nothing: a maintainer commits
+those lines in a follow-up commit, and until it lands, installs of that
+version build from source. The desktop app's
 `electron-builder.yml` bundles `prebuilds/<platform>-${arch}/*.node`
 per OS block next to the `build/Release` fallback and unpacks both from
 the asar archive, which `process.dlopen` cannot read.

@@ -10,8 +10,8 @@ RUN test -n "$APP_HOME"
 RUN apt-get update && apt-get install -y --no-install-recommends ffmpeg \
     && rm -rf /var/lib/apt/lists/*
 
-# The website block renderer runs node. Copy the application CI image's binary: the
-# NodeSource package that provides node in the runner stage depends on python3.
+# The website block renderer runs node. Copy the application CI image's binary
+# rather than build on the runner stage, which installs python3.
 COPY --from=application /usr/bin/node /usr/local/bin/node
 
 COPY --from=application --chown=1000:1000 ${APP_HOME} /app

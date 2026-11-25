@@ -139,16 +139,54 @@ final class Check
     }
 
     /**
+     * Compares every digest pin of the build inputs with what its tag resolves to now. Reads the
+     * registries through the selected Docker transport; pulls and runs nothing.
+     */
+    public function imageDrift(string $root): Report
+    {
+        $this->stopped = false;
+        $report = new Report(localOnly: false, imageDrift: true);
+        try {
+            $inventory = Inventory::load($root);
+            $images = BuildInputs::scan($root, $inventory->dockerfiles, $inventory->policy['buildInputs'] ?? [])['images'];
+        } catch (\Throwable $error) {
+            $report->add('gap', 'repository', 'build-inputs', 'source', $error->getMessage());
+            return $report;
+        }
+        if ($images === []) {
+            $report->add('evidence', 'repository', 'image-drift', 'source', 'No build input is pinned by digest.');
+            return $report;
+        }
+        $this->withHome($report, function (string $home) use ($images, $report): void {
+            $target = $this->source($report, 'repository', 'docker-target', 'docker', fn() => (new TargetResolver($this->executor, $this->environment))->resolve($this->configuration->docker, $home . '/docker'));
+            if ($target !== null) {
+                ImageDrift::assess($images, new DockerEvidence(new Client($this->executor, $target, $this->environment), $this->configuration->budgets->seconds('process')), $report);
+            }
+        });
+        return $report;
+    }
+
+    /**
      * Binds Composer to a private home for the duration of the collection and removes it afterwards.
      *
      * @param \Closure(ComposerEvidence, string): void $collect
      */
     private function withComposer(Report $report, \Closure $collect): void
     {
+        $this->withHome($report, fn(string $home) => $collect(new ComposerEvidence($this->executor, $this->configuration->budgets->seconds('process'), $this->environment, $home), $home));
+    }
+
+    /**
+     * Runs the collection with a private home directory and removes it afterwards.
+     *
+     * @param \Closure(string): void $collect
+     */
+    private function withHome(Report $report, \Closure $collect): void
+    {
         $home = sys_get_temp_dir() . '/baander-dependencies-' . bin2hex(random_bytes(12));
         try {
             PrivateDirectory::prepare($home);
-            $collect(new ComposerEvidence($this->executor, $this->configuration->budgets->seconds('process'), $this->environment, $home), $home);
+            $collect($home);
         } catch (\Throwable $error) {
             $report->add('gap', 'repository', 'collection', 'tooling', $error->getMessage());
         } finally {

@@ -2,19 +2,25 @@
 /* Fetches the prebuilt binding for this platform and architecture from the
  * GitHub release `audio-core-v<version>` of this package's version in the
  * repository named in package.json into
- * prebuilds/<platform>-<arch>/baander_audio_core.node, checks it against the
- * release's SHA256SUMS when the release carries one, and loads it once in
- * a child process to prove it is the right binary and version.
+ * prebuilds/<platform>-<arch>/baander_audio_core.node.  The download is
+ * trusted only through prebuilds.sha256, committed in this package: its
+ * SHA-256 must equal the line for `<release tag>/<asset name>`.  Without
+ * such a line nothing is requested, and bytes with another hash are never
+ * written.  Checksums published in the release itself are not read, since
+ * whoever can replace an asset can replace them too.  The verified file is
+ * then loaded once in a child process to prove it is the right binary and
+ * version.
  *
  *   node node/scripts/fetch-prebuilds.mjs [--force]
  *       Download; an existing binding is kept unless --force is given.
- *       Exits nonzero when nothing could be fetched.
+ *       Exits nonzero when nothing could be fetched and verified.
  *   node node/scripts/fetch-prebuilds.mjs --install
  *       The package's install script: the same, but when the download is
- *       not possible (offline, no release, a proxy) it builds the binding
- *       from source with node-gyp instead, so an install never depends on
- *       the network when a toolchain is present.  It always exits zero:
- *       when neither works it says so and leaves the binding to a later
+ *       not possible or not verified (offline, no release, a proxy, no
+ *       committed hash, a hash that differs) it builds the binding from
+ *       source with node-gyp instead, so an install never depends on the
+ *       network when a toolchain is present.  It always exits zero: when
+ *       neither works it says so and leaves the binding to a later
  *       `node-gyp rebuild` or `electron-rebuild`, instead of failing the
  *       whole install of the application that depends on this package.
  *
@@ -39,12 +45,15 @@ const target = `${process.platform}-${process.arch}`;
 const directory = join(root, 'prebuilds', target);
 const binding = join(directory, 'baander_audio_core.node');
 const assetName = `baander_audio_core-${target}.node`;
-const tagPrefix = 'audio-core-v';
+const hashList = 'prebuilds.sha256';
 
 const args = new Set(process.argv.slice(2));
 const installing = args.has('--install');
 const force = args.has('--force');
 const env = process.env;
+/* Unless pinned, the release of this package's version: a binary of another
+ * version may export another surface. */
+const releaseTag = env.BAANDER_AUDIO_CORE_PREBUILD_TAG || `audio-core-v${pkg.version}`;
 
 function log(message) {
   console.error(`@baander/audio-core: ${message}`);
@@ -72,43 +81,36 @@ async function github(url, accept, timeoutMs) {
   return response;
 }
 
+/* The committed hash of `key` (`<release tag>/<asset name>`) from
+ * prebuilds.sha256, whose lines are sha256sum's "<hex>  <name>" with the
+ * tag as a directory.  Blank lines and lines that begin with # are skipped;
+ * any other line that is not exactly that shape, or that repeats a name,
+ * refuses the whole list rather than being passed over. */
+function committedHash(key) {
+  const entries = new Map();
+  readFileSync(join(root, hashList), 'utf8')
+    .split(/\r?\n/)
+    .forEach((line, index) => {
+      if (line.trim() === '' || line.startsWith('#')) return;
+      const entry = /^([0-9a-f]{64}) {2}(audio-core-v[^\s/]+\/baander_audio_core-[^\s/]+\.node)$/.exec(line);
+      if (!entry) throw new Error(`${hashList} line ${index + 1} is not "<sha256>  <release tag>/<asset name>": ${line}`);
+      if (entries.has(entry[2])) throw new Error(`${hashList} line ${index + 1} repeats ${entry[2]}`);
+      entries.set(entry[2], entry[1]);
+    });
+  const hash = entries.get(key);
+  if (!hash) throw new Error(`${hashList} has no entry for ${key}`);
+  return hash;
+}
+
 async function findRelease(repo) {
   const api = `${(env.BAANDER_AUDIO_CORE_PREBUILD_API || 'https://api.github.com').replace(/\/$/, '')}/repos/${repo}/releases`;
-  const pinnedTag = env.BAANDER_AUDIO_CORE_PREBUILD_TAG;
-  if (pinnedTag) {
-    return (await github(`${api}/tags/${encodeURIComponent(pinnedTag)}`, 'application/vnd.github+json', 20000)).json();
+  if (env.BAANDER_AUDIO_CORE_PREBUILD_TAG) {
+    return (await github(`${api}/tags/${encodeURIComponent(releaseTag)}`, 'application/vnd.github+json', 20000)).json();
   }
-  /* The release of this package's version: a binary of another version
-   * may export another surface. */
-  const tag = `${tagPrefix}${pkg.version}`;
   const releases = await (await github(`${api}?per_page=100`, 'application/vnd.github+json', 20000)).json();
-  const release = releases.find((r) => !r.draft && r.tag_name === tag);
-  if (!release) throw new Error(`no release ${tag} in ${repo}`);
+  const release = releases.find((r) => !r.draft && r.tag_name === releaseTag);
+  if (!release) throw new Error(`no release ${releaseTag} in ${repo}`);
   return release;
-}
-
-async function downloadAsset(release, name, timeoutMs) {
-  const asset = (release.assets || []).find((a) => a.name === name);
-  if (!asset) return null;
-  return Buffer.from(await (await github(asset.url, 'application/octet-stream', timeoutMs)).arrayBuffer());
-}
-
-/* Checks the asset against the SHA256SUMS of the release (sha256sum format:
- * "<hex>  <name>" per line) when the release has one. */
-async function verifyChecksum(release, bytes) {
-  const sums = await downloadAsset(release, 'SHA256SUMS', 20000);
-  if (!sums) {
-    log('the release carries no SHA256SUMS; the download is not checked');
-    return;
-  }
-  const line = sums
-    .toString('utf8')
-    .split('\n')
-    .find((l) => l.trim().endsWith(` ${assetName}`) || l.trim().endsWith(`*${assetName}`));
-  if (!line) throw new Error(`SHA256SUMS has no entry for ${assetName}`);
-  const expected = line.trim().split(/\s+/)[0].toLowerCase();
-  const actual = createHash('sha256').update(bytes).digest('hex');
-  if (actual !== expected) throw new Error(`${assetName}: checksum ${actual} differs from ${expected}`);
 }
 
 /* Loads the binding in a child process, so that a wrong or damaged binary
@@ -130,11 +132,14 @@ function loadedVersion(path) {
 }
 
 async function download() {
+  const key = `${releaseTag}/${assetName}`;
+  const expected = committedHash(key);
   const repo = repository();
-  const release = await findRelease(repo);
-  const bytes = await downloadAsset(release, assetName, 120000);
-  if (!bytes) throw new Error(`release ${release.tag_name} of ${repo} has no ${assetName}`);
-  await verifyChecksum(release, bytes);
+  const asset = ((await findRelease(repo)).assets || []).find((a) => a.name === assetName);
+  if (!asset) throw new Error(`release ${releaseTag} of ${repo} has no ${assetName}`);
+  const bytes = Buffer.from(await (await github(asset.url, 'application/octet-stream', 120000)).arrayBuffer());
+  const actual = createHash('sha256').update(bytes).digest('hex');
+  if (actual !== expected) throw new Error(`${key}: sha256 ${actual} does not match the committed ${expected}`);
   mkdirSync(directory, { recursive: true });
   const partial = `${binding}.download`;
   writeFileSync(partial, bytes, { mode: 0o755 });
@@ -144,7 +149,7 @@ async function download() {
       throw new Error(`${assetName} reports version ${version}, this package is ${pkg.version}`);
     }
     renameSync(partial, binding);
-    log(`fetched ${assetName} ${version} from release ${release.tag_name} of ${repo}`);
+    log(`fetched ${assetName} ${version} from release ${releaseTag} of ${repo}`);
   } catch (error) {
     rmSync(partial, { force: true });
     throw error;

@@ -86,8 +86,8 @@ recipe before qualification; the full-disk contract cannot be skipped. CI mounts
 Run these modes in a disposable Linux amd64 container using the native CI runner
 image available to your environment. Set `RUNNER_IMAGE` to that existing image's
 reference; the CI job uses its configured registry and owner with
-`baander-runner:latest`. The example installs the same additional native tools as
-CI and runs the release recipe:
+`baander-runner` at the commit tag the workflows name. The example installs the same
+additional native tools as CI and runs the release recipe:
 
 ```sh
 docker run --rm --init --platform linux/amd64 --user 0 \

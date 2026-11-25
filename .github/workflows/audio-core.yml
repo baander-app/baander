@@ -8,7 +8,9 @@ name: Audio Core binding
 # macOS runners against the kernels of their processors, keeps one
 # prebuild per platform as a workflow artifact and, on an
 # `audio-core-v<version>` tag, attaches them to a GitHub release, where the
-# package's install script fetches them.  Nothing is committed.
+# package's install script fetches them.  The install script trusts only the
+# hashes in packages/baander-audio-core/prebuilds.sha256, so the release job
+# prints their lines for a maintainer to commit; it commits nothing itself.
 
 on:
     push:
@@ -41,7 +43,7 @@ jobs:
     build:
         name: ${{ matrix.target }}
         if: github.server_url == 'https://github.com'
-        runs-on: ${{ github.server_url == 'https://github.com' && matrix.os || 'docker-cli' }}
+        runs-on: ${{ github.server_url == 'https://github.com' && matrix.os || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository) && 'fork-pull-request' || 'docker-cli' }}
         timeout-minutes: 45
         strategy:
             fail-fast: false
@@ -282,7 +284,7 @@ jobs:
         name: Release assets
         if: github.server_url == 'https://github.com' && startsWith(github.ref, 'refs/tags/audio-core-v')
         needs: build
-        runs-on: ${{ github.server_url == 'https://github.com' && 'ubuntu-latest' || 'docker-cli' }}
+        runs-on: ${{ github.server_url == 'https://github.com' && 'ubuntu-latest' || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository) && 'fork-pull-request' || 'docker-cli' }}
         timeout-minutes: 15
         permissions:
             contents: write
@@ -315,15 +317,20 @@ jobs:
                     test "$(ls assets/*.node | wc -l)" -eq 4 || { echo "expected four prebuilds"; ls -l assets; exit 1; }
                     (cd assets && sha256sum baander_audio_core-*.node > SHA256SUMS)
                     cat assets/SHA256SUMS
+                    echo "Lines for packages/baander-audio-core/prebuilds.sha256:"
+                    (cd assets && sha256sum baander_audio_core-*.node) | sed "s|  |  $GITHUB_REF_NAME/|"
 
             -   name: Attach the assets to the release
+                # Uploads without --clobber, so an asset the release already
+                # serves is never replaced and the hashes committed for it keep
+                # naming its bytes; uploading over one fails the step.
                 env:
                     GH_TOKEN: ${{ github.token }}
                 run: |
                     if gh release view "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" > /dev/null 2>&1; then
-                      gh release upload "$GITHUB_REF_NAME" assets/* --repo "$GITHUB_REPOSITORY" --clobber
+                      gh release upload "$GITHUB_REF_NAME" assets/* --repo "$GITHUB_REPOSITORY"
                     else
                       gh release create "$GITHUB_REF_NAME" assets/* --repo "$GITHUB_REPOSITORY" --verify-tag \
                         --title "@baander/audio-core $VERSION" \
-                        --notes "Prebuilt Node-API binding of @baander/audio-core $VERSION for Electron $(node -p 'require("./ui/electron/package.json").devDependencies.electron'), one asset per platform; the package's install script fetches the one for the running platform."
+                        --notes "Prebuilt Node-API binding of @baander/audio-core $VERSION for Electron $(node -p 'require("./ui/electron/package.json").devDependencies.electron'), one asset per platform; the package's install script fetches the one for the running platform once packages/baander-audio-core/prebuilds.sha256 lists its hash."
                     fi

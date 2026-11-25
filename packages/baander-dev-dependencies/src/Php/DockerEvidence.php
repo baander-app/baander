@@ -51,4 +51,22 @@ final readonly class DockerEvidence
         ksort($versions);
         return $versions;
     }
+
+    /** The digest a tag resolves to in its registry now: the index digest of a multi-platform image. */
+    public function digest(string $reference): string
+    {
+        if (preg_match('~^[^\s@]+:[A-Za-z0-9_][A-Za-z0-9_.-]{0,127}$~D', $reference) !== 1 || !str_contains(substr($reference, (int) strrpos($reference, '/')), ':')) {
+            throw new \RuntimeException('A registry digest is read for a tagged reference without a digest.');
+        }
+        $result = $this->client->run(['buildx', 'imagetools', 'inspect', $reference, '--format', '{{json .Manifest}}'], timeout: $this->timeout);
+        if ($result->stderr !== '') {
+            throw new \RuntimeException('Registry manifest metadata emitted a diagnostic: ' . trim($result->stderr));
+        }
+        $manifest = json_decode($result->stdout, true, flags: JSON_THROW_ON_ERROR);
+        $digest = is_array($manifest) ? ($manifest['digest'] ?? null) : null;
+        if (!is_string($digest) || preg_match('/^sha256:[a-f0-9]{64}$/D', $digest) !== 1) {
+            throw new \RuntimeException('Registry manifest metadata has no digest.');
+        }
+        return $digest;
+    }
 }

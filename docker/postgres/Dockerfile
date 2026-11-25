@@ -1,17 +1,23 @@
+FROM postgres:18-trixie@sha256:c699303802144847d238196173655dbbecf7a96aeca1565f2b02eb671a1f0b6b AS postgres-dist
+
 # Builds the launcher that starts PostgreSQL with transparent huge pages
 # disabled; see postgres/thp-disabled-exec.c.
-FROM postgres:18-trixie AS thp-helper
+FROM postgres-dist AS thp-helper
 RUN apt-get update && apt-get install -y --no-install-recommends gcc libc6-dev \
     && rm -rf /var/lib/apt/lists/*
 COPY ./postgres/thp-disabled-exec.c /src/thp-disabled-exec.c
 RUN gcc -O2 -Wall -Wextra -Werror -o /thp-disabled-exec /src/thp-disabled-exec.c
 
-FROM postgres:18-trixie AS base
+FROM postgres-dist AS base
 
 # Set versions as build args for easy updates
 ARG PGROONGA_VERSION=4.1.0-1
 ARG POSTGRESQL_VERSION=18
 ARG PGBOUNCER_VERSION=1.26.1-1.pgdg13+1
+ARG ARROW_APT_SOURCE_VERSION=26.0.1-1
+ARG ARROW_APT_SOURCE_SHA256=4a83b9916a242e0267848f29bbb81303dac7ef1f2de654bf997194aefe693aaf
+ARG GROONGA_APT_SOURCE_VERSION=2026.04.28-1
+ARG GROONGA_APT_SOURCE_SHA256=3406de4b8965c44a0e793090efbb0996a1802930159e7aa3f31c97dbef127c34
 
 ENV PGROONGA_VERSION=${PGROONGA_VERSION}
 ENV POSTGRESQL_VERSION=${POSTGRESQL_VERSION}
@@ -24,15 +30,19 @@ RUN apt-get update && apt-get install -y -V \
     ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
-# Add Apache Arrow repository
-RUN wget -q https://apache.jfrog.io/artifactory/arrow/debian/apache-arrow-apt-source-latest-$(lsb_release --codename --short).deb \
-    && apt-get install -y -V ./apache-arrow-apt-source-latest-$(lsb_release --codename --short).deb \
-    && rm apache-arrow-apt-source-latest-$(lsb_release --codename --short).deb
+# Add the Apache Arrow repository. The apt-source package installs the signing
+# key apt then checks every Arrow package against, so it is pinned by version
+# and SHA-256 for the base image's Debian release.
+RUN wget -q -O /tmp/apache-arrow-apt-source.deb "https://apache.jfrog.io/artifactory/arrow/debian/pool/trixie/main/a/apache-arrow-apt-source/apache-arrow-apt-source_${ARROW_APT_SOURCE_VERSION}_all.deb" \
+    && echo "${ARROW_APT_SOURCE_SHA256}  /tmp/apache-arrow-apt-source.deb" | sha256sum -c - \
+    && apt-get install -y -V /tmp/apache-arrow-apt-source.deb \
+    && rm /tmp/apache-arrow-apt-source.deb
 
-# Add Groonga repository
-RUN wget -q https://packages.groonga.org/debian/groonga-apt-source-latest-$(lsb_release --codename --short).deb \
-    && apt-get install -y -V ./groonga-apt-source-latest-$(lsb_release --codename --short).deb \
-    && rm groonga-apt-source-latest-$(lsb_release --codename --short).deb
+# Add the Groonga repository, pinned the same way.
+RUN wget -q -O /tmp/groonga-apt-source.deb "https://packages.groonga.org/debian/pool/trixie/main/g/groonga-apt-source/groonga-apt-source_${GROONGA_APT_SOURCE_VERSION}_all.deb" \
+    && echo "${GROONGA_APT_SOURCE_SHA256}  /tmp/groonga-apt-source.deb" | sha256sum -c - \
+    && apt-get install -y -V /tmp/groonga-apt-source.deb \
+    && rm /tmp/groonga-apt-source.deb
 
 # Update package lists and install extensions
 RUN apt-get update && apt-get install -y -V \

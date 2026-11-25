@@ -848,30 +848,30 @@ $runner = new ProcessRunner();',
             'path' => 'packages/baander-configuration/tests/ImageCatalogTest.php',
             'rule' => 'default-image',
             'anchor' => '        $images = ToolingConfiguration::resolve()->images;
-        self::assertSame(\'redis:7-alpine\', $images->role(\'developmentRedis\')->reference);',
+        self::assertSame(\'redis:7-alpine@sha256:7f7d30b7fdd09467bac58198a1f166dd69789d348d4fe859cccb20e0cf287fbe\', $images->role(\'developmentRedis\')->reference);',
             'count' => 1,
             'reason' => 'Independent catalog or image-selection assertion checks the documented default.',
         ],
         [
             'path' => 'packages/baander-configuration/tests/ImageCatalogTest.php',
             'rule' => 'default-image',
-            'anchor' => '        self::assertSame(\'redis:7-alpine\', $images->role(\'developmentRedis\')->reference);
-        self::assertSame(\'redis/redis-stack-server:edge\', $images->role(\'fixtureRedis\')->reference);',
+            'anchor' => '        self::assertSame(\'redis:7-alpine@sha256:7f7d30b7fdd09467bac58198a1f166dd69789d348d4fe859cccb20e0cf287fbe\', $images->role(\'developmentRedis\')->reference);
+        self::assertSame(\'redis/redis-stack-server:edge@sha256:4225f5c02d336b1bac3a1b7d7be2258e2ff1c2e77c856e82e2e5723f77679825\', $images->role(\'fixtureRedis\')->reference);',
             'count' => 1,
             'reason' => 'Independent catalog or image-selection assertion checks the documented default.',
         ],
         [
             'path' => 'packages/baander-configuration/tests/ImageCatalogTest.php',
             'rule' => 'default-image',
-            'anchor' => '        self::assertSame(\'redis/redis-stack-server:edge\', $images->role(\'fixtureRedis\')->reference);
-        self::assertSame(\'mcr.microsoft.com/playwright:v1.64.1-noble\', $images->role(\'browser\')->reference);',
+            'anchor' => '        self::assertSame(\'redis/redis-stack-server:edge@sha256:4225f5c02d336b1bac3a1b7d7be2258e2ff1c2e77c856e82e2e5723f77679825\', $images->role(\'fixtureRedis\')->reference);
+        self::assertSame(\'mcr.microsoft.com/playwright:v1.64.1-noble@sha256:2f05f8a734509a7b3f26a912639488ee08f58a7b292d14d62271bcff9038768f\', $images->role(\'browser\')->reference);',
             'count' => 1,
             'reason' => 'Independent catalog or image-selection assertion checks the documented default.',
         ],
         [
             'path' => 'packages/baander-configuration/tests/ImageCatalogTest.php',
             'rule' => 'default-image',
-            'anchor' => '        self::assertSame(\'mcr.microsoft.com/playwright:v1.64.1-noble\', $images->role(\'browser\')->reference);
+            'anchor' => '        self::assertSame(\'mcr.microsoft.com/playwright:v1.64.1-noble@sha256:2f05f8a734509a7b3f26a912639488ee08f58a7b292d14d62271bcff9038768f\', $images->role(\'browser\')->reference);
         self::assertSame(\'ghcr.io/baander-app/ffmpeg-baander-static@sha256:4537b06f3e58f7bdf0c6c11d9ad494bf3cc851bcd23a7f7fd6f21c4b282a724a\', $images->role(\'ffmpeg\')->reference);',
             'count' => 1,
             'reason' => 'Independent catalog or image-selection assertion checks the documented default.',

@@ -55,6 +55,7 @@ composer run-script --timeout=720 check:php-dependencies:advisories
 php scripts/check-php-dependencies.php --local-only --format json
 php scripts/check-php-dependencies.php --format json
 php scripts/check-php-dependencies.php --advisories-only --format json
+php scripts/check-php-dependencies.php --image-drift --format json
 ```
 
 Local mode validates all classified manifests, reads both package sections of each owned
@@ -62,6 +63,31 @@ lock, compares runtime declarations, and checks patch metadata and the fork's
 reviewed source hashes. Missing vendor metadata does not remove locked development
 packages from the inventory. Local output explicitly excludes online currency,
 advisories and registry image metadata.
+
+Local and online mode also check the build inputs: every Dockerfile in the
+repository and the image catalog
+(`packages/baander-configuration/resources/tooling-defaults.json`). Each of these
+is a finding at its file and line:
+
+- an external image in `FROM`, `COPY --from` or a catalog role without an
+  `@sha256:` digest;
+- a fetched script piped into a shell, such as `curl … | bash`;
+- a `curl` or `wget` download whose `RUN` instruction has no `sha256sum -c` per
+  download, or no SHA-256 value written in the file;
+- a `git clone` or `git fetch` whose `RUN` instruction names no 40-character commit;
+- a PECL or PIE package fetched by name, and an `ADD` of a URL without `--checksum`.
+
+The check expands `ARG` defaults before it reads an instruction. A `FROM` that names
+a build argument passes when the argument defaults to `scratch`, a digest or a project
+image named `baander…`, because the build tooling fills it from the catalog. The
+`buildInputs` section of the dependency policy names the catalog and the roles the
+tooling builds itself (`application`, `postgres` and `proxy`), which need no digest.
+
+Image-drift mode resolves the tag of every digest pin in the Dockerfiles, the catalog
+and the workflow files with `docker buildx imagetools inspect`, and reports a pin
+whose tag now names another digest as a finding. It pulls and runs nothing. A pin
+without a tag, such as the catalog's FFmpeg image, has nothing to compare and is
+reported as evidence. A registry it cannot read is a gap.
 
 Online mode compares independent latest stable releases for every direct requirement
 and locked package, including indirect and development dependencies. It also collects
@@ -102,7 +128,7 @@ for budgets, environment handling and required interfaces.
 
 CI runs local mode on every push to `master` and every pull request. The
 [Dependency advisories workflow](../contributing/continuous-integration.md#dependency-advisories)
-runs advisories-only mode every day and on manual dispatch. The full online
+runs advisories-only mode and image-drift mode every day and on manual dispatch. The full online
 assessment remains an explicit maintenance action: it reports every package behind
 its latest stable release as a finding, so it cannot pass while the blockers listed
 [below](#remaining-stable-release-blockers) hold seven root packages back.

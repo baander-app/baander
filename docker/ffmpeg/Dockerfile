@@ -1,5 +1,5 @@
 # Stage: System dependencies + Rust toolchain (shared base for all builder stages)
-FROM buildpack-deps:trixie AS base-builder
+FROM buildpack-deps:trixie@sha256:086433f3c4cca3435eba355f585f55d593751a35c865745d88ce97e7258e3fc9 AS base-builder
 
 RUN set -xe \
     && DEBIAN_FRONTEND=noninteractive apt-get update -qq \
@@ -22,8 +22,11 @@ RUN set -xe \
 
 ENV RUSTUP_HOME=/usr/local/rustup \
     CARGO_HOME=/usr/local/cargo
-RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs \
-      | sh -s -- -y --profile minimal --no-modify-path \
+RUN curl -fsSL https://static.rust-lang.org/rustup/archive/1.29.3/x86_64-unknown-linux-gnu/rustup-init -o /tmp/rustup-init \
+    && echo 'b1c8cb14e30889e7e2999e6b69e62d9e9b9ffc0f4df8180564d306d9680e6c55  /tmp/rustup-init' | sha256sum -c - \
+    && chmod +x /tmp/rustup-init \
+    && /tmp/rustup-init -y --profile minimal --no-modify-path --default-toolchain 1.100.0 \
+    && rm /tmp/rustup-init \
     && ln -s /usr/local/cargo/bin/* /usr/local/bin/
 
 # Intermediate stage: shared env for library builds that install to /dist
@@ -37,6 +40,7 @@ FROM base-builder AS ffmpeg-base
 
 WORKDIR /usr/src
 RUN git clone --depth 1 --branch v1.59 https://github.com/markus-perl/ffmpeg-build-script.git \
+    && test "$(git -C ffmpeg-build-script rev-parse HEAD)" = d22553c89e1d403c058ebbb9060d2b848f83b36d \
     && cd ffmpeg-build-script \
     && ./build-ffmpeg --build --enable-gpl-and-non-free --skip-install
 
@@ -49,6 +53,7 @@ RUN git clone --depth 1 --branch v1.59 https://github.com/markus-perl/ffmpeg-bui
 FROM lib-builder AS librist-builder
 WORKDIR /build
 RUN git clone --depth 1 --branch v0.2.13 https://code.videolan.org/rist/librist.git \
+    && test "$(git -C librist rev-parse HEAD)" = b57c1ae18c343def47117b18131fe4077e18ccb0 \
     && cd librist \
     && meson setup build --prefix=/dist --buildtype=release --default-library=static --libdir=/dist/lib \
         -Dbuiltin_mbedtls=true -Dbuilt_tools=false -Dtest=false \
@@ -58,7 +63,8 @@ RUN git clone --depth 1 --branch v0.2.13 https://code.videolan.org/rist/librist.
 # --- libfribidi v1.0.16 ---
 FROM lib-builder AS libfribidi-builder
 WORKDIR /build
-RUN curl -sL -o fribidi.tar.gz https://github.com/fribidi/fribidi/archive/refs/tags/v1.0.16.tar.gz \
+RUN curl -fsSL https://github.com/fribidi/fribidi/archive/refs/tags/v1.0.16.tar.gz -o fribidi.tar.gz \
+    && echo '5a1d187a33daa58fcee2ad77f0eb9d136dd6fa4096239199ba31e850d397e8a8  fribidi.tar.gz' | sha256sum -c - \
     && mkdir fribidi && tar xzf fribidi.tar.gz -C fribidi --strip-components 1 \
     && cd fribidi \
     && meson setup build --prefix=/dist --buildtype=release --default-library=static --libdir=/dist/lib -Ddocs=false \
@@ -68,7 +74,8 @@ RUN curl -sL -o fribidi.tar.gz https://github.com/fribidi/fribidi/archive/refs/t
 # --- libharfbuzz 9.0.0 ---
 FROM lib-builder AS libharfbuzz-builder
 WORKDIR /build
-RUN curl -sL -o harfbuzz.tar.gz https://github.com/harfbuzz/harfbuzz/archive/refs/tags/9.0.0.tar.gz \
+RUN curl -fsSL https://github.com/harfbuzz/harfbuzz/archive/refs/tags/9.0.0.tar.gz -o harfbuzz.tar.gz \
+    && echo 'b7e481b109d19aefdba31e9f5888aa0cdfbe7608fed9a43494c060ce1f8a34d2  harfbuzz.tar.gz' | sha256sum -c - \
     && mkdir harfbuzz && tar xzf harfbuzz.tar.gz -C harfbuzz --strip-components 1 \
     && cd harfbuzz \
     && meson setup build --prefix=/dist --buildtype=release --default-library=static --libdir=/dist/lib \
@@ -81,7 +88,8 @@ FROM lib-builder AS libass-builder
 COPY --from=libfribidi-builder /dist/ /dist/
 COPY --from=libharfbuzz-builder /dist/ /dist/
 WORKDIR /build
-RUN curl -sL -o libass.tar.xz https://github.com/libass/libass/releases/download/0.17.3/libass-0.17.3.tar.xz \
+RUN curl -fsSL https://github.com/libass/libass/releases/download/0.17.3/libass-0.17.3.tar.xz -o libass.tar.xz \
+    && echo 'eae425da50f0015c21f7b3a9c7262a910f0218af469e22e2931462fed3c50959  libass.tar.xz' | sha256sum -c - \
     && mkdir libass && tar xf libass.tar.xz -C libass --strip-components 1 \
     && cd libass \
     && meson setup build --prefix=/dist --buildtype=release --default-library=static --libdir=/dist/lib \
@@ -91,7 +99,8 @@ RUN curl -sL -o libass.tar.xz https://github.com/libass/libass/releases/download
 # --- chromaprint 1.5.1 ---
 FROM lib-builder AS chromaprint-builder
 WORKDIR /build
-RUN curl -sL -o chromaprint.tar.gz https://github.com/acoustid/chromaprint/releases/download/v1.5.1/chromaprint-1.5.1.tar.gz \
+RUN curl -fsSL https://github.com/acoustid/chromaprint/releases/download/v1.5.1/chromaprint-1.5.1.tar.gz -o chromaprint.tar.gz \
+    && echo 'a1aad8fa3b8b18b78d3755b3767faff9abb67242e01b478ec9a64e190f335e1c  chromaprint.tar.gz' | sha256sum -c - \
     && mkdir chromaprint && tar xzf chromaprint.tar.gz -C chromaprint --strip-components 1 \
     && cd chromaprint && mkdir build && cd build \
     && cmake -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/dist -DCMAKE_INSTALL_LIBDIR=lib \
@@ -103,7 +112,8 @@ RUN curl -sL -o chromaprint.tar.gz https://github.com/acoustid/chromaprint/relea
 # --- libspeex 1.2.1 ---
 FROM lib-builder AS libspeex-builder
 WORKDIR /build
-RUN curl -sL -o speex.tar.gz https://ftp.osuosl.org/pub/xiph/releases/speex/speex-1.2.1.tar.gz \
+RUN curl -fsSL https://ftp.osuosl.org/pub/xiph/releases/speex/speex-1.2.1.tar.gz -o speex.tar.gz \
+    && echo '4b44d4f2b38a370a2d98a78329fefc56a0cf93d1c1be70029217baae6628feea  speex.tar.gz' | sha256sum -c - \
     && mkdir speex && tar xzf speex.tar.gz -C speex --strip-components 1 \
     && cd speex \
     && ./configure --prefix=/dist --disable-shared --enable-static \
@@ -113,7 +123,8 @@ RUN curl -sL -o speex.tar.gz https://ftp.osuosl.org/pub/xiph/releases/speex/spee
 # --- libtwolame 0.4.0 ---
 FROM lib-builder AS libtwolame-builder
 WORKDIR /build
-RUN curl -sL -o twolame.tar.gz "https://sourceforge.net/projects/twolame/files/twolame/0.4.0/twolame-0.4.0.tar.gz/download" \
+RUN curl -fsSL "https://sourceforge.net/projects/twolame/files/twolame/0.4.0/twolame-0.4.0.tar.gz/download" -o twolame.tar.gz \
+    && echo 'cc35424f6019a88c6f52570b63e1baf50f62963a3eac52a03a800bb070d7c87d  twolame.tar.gz' | sha256sum -c - \
     && mkdir twolame && tar xzf twolame.tar.gz -C twolame --strip-components 1 \
     && cd twolame \
     && ./configure --prefix=/dist --disable-shared --enable-static \
@@ -123,7 +134,8 @@ RUN curl -sL -o twolame.tar.gz "https://sourceforge.net/projects/twolame/files/t
 # --- libvmaf 3.0.0 ---
 FROM lib-builder AS libvmaf-builder
 WORKDIR /build
-RUN curl -sL -o vmaf.tar.gz https://github.com/Netflix/vmaf/archive/refs/tags/v3.0.0.tar.gz \
+RUN curl -fsSL https://github.com/Netflix/vmaf/archive/refs/tags/v3.0.0.tar.gz -o vmaf.tar.gz \
+    && echo '7178c4833639e6b989ecae73131d02f70735fdb3fc2c7d84bc36c9c3461d93b1  vmaf.tar.gz' | sha256sum -c - \
     && mkdir vmaf && tar xzf vmaf.tar.gz -C vmaf --strip-components 1 \
     && cd vmaf/libvmaf \
     && meson setup build --prefix=/dist --buildtype=release --default-library=static --libdir=/dist/lib \
@@ -133,7 +145,8 @@ RUN curl -sL -o vmaf.tar.gz https://github.com/Netflix/vmaf/archive/refs/tags/v3
 # --- libaribb24 1.0.3 ---
 FROM lib-builder AS libaribb24-builder
 WORKDIR /build
-RUN curl -sL -o libaribb24.tar.gz https://github.com/nkoriyama/aribb24/archive/refs/tags/v1.0.3.tar.gz \
+RUN curl -fsSL https://github.com/nkoriyama/aribb24/archive/refs/tags/v1.0.3.tar.gz -o libaribb24.tar.gz \
+    && echo 'f61560738926e57f9173510389634d8c06cabedfa857db4b28fb7704707ff128  libaribb24.tar.gz' | sha256sum -c - \
     && mkdir libaribb24 && tar xzf libaribb24.tar.gz -C libaribb24 --strip-components 1 \
     && cd libaribb24 \
     && autoreconf -fiv \
@@ -146,7 +159,8 @@ RUN curl -sL -o libaribb24.tar.gz https://github.com/nkoriyama/aribb24/archive/r
 # here; NVENC, NVDEC and CUVID need the headers alone.
 FROM lib-builder AS nvcodec-builder
 WORKDIR /build
-RUN curl -sL -o nvcodec.tar.gz https://github.com/FFmpeg/nv-codec-headers/releases/download/n13.0.19.0/nv-codec-headers-13.0.19.0.tar.gz \
+RUN curl -fsSL https://github.com/FFmpeg/nv-codec-headers/releases/download/n13.0.19.0/nv-codec-headers-13.0.19.0.tar.gz -o nvcodec.tar.gz \
+    && echo '13da39edb3a40ed9713ae390ca89faa2f1202c9dda869ef306a8d4383e242bee  nvcodec.tar.gz' | sha256sum -c - \
     && mkdir nvcodec && tar xzf nvcodec.tar.gz -C nvcodec --strip-components 1 \
     && cd nvcodec \
     && make install PREFIX=/dist
@@ -154,7 +168,8 @@ RUN curl -sL -o nvcodec.tar.gz https://github.com/FFmpeg/nv-codec-headers/releas
 # --- libvpl 2.15.0 (QSV dispatcher; the runtime is loaded on the host) ---
 FROM lib-builder AS libvpl-builder
 WORKDIR /build
-RUN curl -sL -o libvpl.tar.gz https://github.com/intel/libvpl/archive/refs/tags/v2.15.0.tar.gz \
+RUN curl -fsSL https://github.com/intel/libvpl/archive/refs/tags/v2.15.0.tar.gz -o libvpl.tar.gz \
+    && echo '7218c3b8206b123204c3827ce0cf7c008d5c693c1f58ab461958d05fe6f847b3  libvpl.tar.gz' | sha256sum -c - \
     && mkdir libvpl && tar xzf libvpl.tar.gz -C libvpl --strip-components 1 \
     && cmake -S libvpl -B libvpl/build -G Ninja -DCMAKE_BUILD_TYPE=Release \
         -DCMAKE_INSTALL_PREFIX=/dist -DCMAKE_INSTALL_LIBDIR=lib -DBUILD_SHARED_LIBS=OFF \
@@ -260,7 +275,7 @@ RUN set -xe \
 # ============================================================
 # Runtime image
 # ============================================================
-FROM debian:trixie-slim
+FROM debian:trixie-slim@sha256:8aa5a7bf5a1955bddbe7d74fcdd0b91ab30e74362a8b73af672b0481b35b44a0
 
 # The binaries link Debian's shared libva, libdrm and the libraries behind
 # the builder's -dev packages; the list is what ldd on the built binaries

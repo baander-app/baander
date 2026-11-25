@@ -1,0 +1,6 @@
+# The SHA-256 of each prebuilt binding node/scripts/fetch-prebuilds.mjs may
+# install, one line per release asset in sha256sum format:
+#   <64 lowercase hex>  audio-core-v<version>/baander_audio_core-<platform>-<arch>.node
+# The lines are copied from the output of the release job in
+# .github/workflows/audio-core.yml. Blank lines and lines that begin with #
+# are skipped; any other malformed line makes the script refuse the list.

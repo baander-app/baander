@@ -20,23 +20,27 @@ encoders=$("$FFMPEG" -hide_banner -encoders | awk 'NR > 10 || /^ [VAS]/ { print 
 decoders=$("$FFMPEG" -hide_banner -decoders | awk 'NR > 10 || /^ [VAS]/ { print $2 }')
 filters=$("$FFMPEG" -hide_banner -filters | awk 'NR > 8 { print $2 }')
 demuxers=$("$FFMPEG" -hide_banner -demuxers | awk '$1 ~ /D/ { print $2 }' | tr ',' '\n')
+# Here-strings, not `echo | grep -q`: grep -q exits at its first match, and under
+# pipefail the writer's SIGPIPE (141) would read as a missing capability.
 while read -r kind name; do
   case "$kind" in
     ''|'#'*) continue ;;
-    hwaccel) echo "$hwaccels" | grep -qx "$name" || { echo "gate: missing hwaccel $name" >&2; missing=1; } ;;
-    encoder) echo "$encoders" | grep -qx "$name" || { echo "gate: missing encoder $name" >&2; missing=1; } ;;
-    decoder) echo "$decoders" | grep -qx "$name" || { echo "gate: missing decoder $name" >&2; missing=1; } ;;
-    filter) echo "$filters" | grep -qx "$name" || { echo "gate: missing filter $name" >&2; missing=1; } ;;
-    demuxer) echo "$demuxers" | grep -qx "$name" || { echo "gate: missing demuxer $name" >&2; missing=1; } ;;
+    hwaccel) grep -qx "$name" <<<"$hwaccels" || { echo "gate: missing hwaccel $name" >&2; missing=1; } ;;
+    encoder) grep -qx "$name" <<<"$encoders" || { echo "gate: missing encoder $name" >&2; missing=1; } ;;
+    decoder) grep -qx "$name" <<<"$decoders" || { echo "gate: missing decoder $name" >&2; missing=1; } ;;
+    filter) grep -qx "$name" <<<"$filters" || { echo "gate: missing filter $name" >&2; missing=1; } ;;
+    demuxer) grep -qx "$name" <<<"$demuxers" || { echo "gate: missing demuxer $name" >&2; missing=1; } ;;
     *) echo "gate: unknown entry '$kind $name' in $EXPECTED" >&2; exit 2 ;;
   esac
 done < "$EXPECTED"
 
 for bin in "$FFMPEG" "$FFPROBE"; do
   [ -x "$bin" ] || { echo "gate: $bin is not executable" >&2; exit 2; }
-  if ldd "$bin" | grep -q 'not found'; then
+  # ldd exits 1 for a static binary, which has nothing to resolve.
+  libraries=$(ldd "$bin" || true)
+  if grep -q 'not found' <<<"$libraries"; then
     echo "gate: $bin has unresolved shared objects:" >&2
-    ldd "$bin" | grep 'not found' >&2
+    grep 'not found' <<<"$libraries" >&2
     missing=1
   fi
 done

@@ -14,26 +14,26 @@
             ]
         },
         "developmentRedis": {
-            "reference": "redis:7-alpine",
+            "reference": "redis:7-alpine@sha256:7f7d30b7fdd09467bac58198a1f166dd69789d348d4fe859cccb20e0cf287fbe",
             "capabilities": [
                 "redis"
             ]
         },
         "fixtureRedis": {
-            "reference": "redis/redis-stack-server:edge",
+            "reference": "redis/redis-stack-server:edge@sha256:4225f5c02d336b1bac3a1b7d7be2258e2ff1c2e77c856e82e2e5723f77679825",
             "capabilities": [
                 "redis",
                 "redis-search"
             ]
         },
         "nginx": {
-            "reference": "nginx:stable-alpine",
+            "reference": "nginx:stable-alpine@sha256:8eb2b5540eae779603cc3db84b3986a15ecb5308b54303146eee9837c137b51a",
             "capabilities": [
                 "http"
             ]
         },
         "mailpit": {
-            "reference": "axllent/mailpit:v1.31.4",
+            "reference": "axllent/mailpit:v1.31.4@sha256:b68349e3a014b90c5610bfb26b2ae36f3892d7b8cf25ee140c6c71c98d2fcf48",
             "capabilities": ["smtp", "http"]
         },
         "proxy": {
@@ -43,14 +43,14 @@
             ]
         },
         "browser": {
-            "reference": "mcr.microsoft.com/playwright:v1.64.1-noble",
+            "reference": "mcr.microsoft.com/playwright:v1.64.1-noble@sha256:2f05f8a734509a7b3f26a912639488ee08f58a7b292d14d62271bcff9038768f",
             "capabilities": [
                 "browser"
             ],
             "playwrightVersion": "1.64.1"
         },
         "operatorHelper": {
-            "reference": "docker:29.7.2-cli",
+            "reference": "docker:29.7.2-cli@sha256:3f4743208d2338c934d7b8bcfbe1bb54c0b2355c510ad5e0f31c0c4a54bd704e",
             "capabilities": [
                 "docker-cli"
             ]

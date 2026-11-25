@@ -23,15 +23,17 @@ case "$version" in
   *) fail "expected FFmpeg ${MAJOR}, got: $version" ;;
 esac
 
+# Here-strings, not `echo | grep -q`: grep -q exits at its first match, and under
+# pipefail the writer's SIGPIPE (141) would read as a missing codec.
 encoders=$("$FFMPEG" -hide_banner -encoders)
-echo "$encoders" | grep -q ' libbac ' || fail "libbac encoder missing"
+grep -q ' libbac ' <<<"$encoders" || fail "libbac encoder missing"
 step "libbac encoder present"
 decoders=$("$FFMPEG" -hide_banner -decoders)
-echo "$decoders" | grep -q ' libbac ' || fail "libbac decoder missing"
+grep -q ' libbac ' <<<"$decoders" || fail "libbac decoder missing"
 step "libbac decoder present"
 if [ "${SMOKE_EXPECT_FDK:-0}" = 1 ]; then
-  echo "$encoders" | grep -q ' libfdk_aac ' || fail "libfdk_aac encoder missing"
-  echo "$decoders" | grep -q ' libfdk_aac ' || fail "libfdk_aac decoder missing"
+  grep -q ' libfdk_aac ' <<<"$encoders" || fail "libfdk_aac encoder missing"
+  grep -q ' libfdk_aac ' <<<"$decoders" || fail "libfdk_aac decoder missing"
   step "libfdk_aac encoder and decoder present"
 fi
 

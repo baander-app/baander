@@ -26,6 +26,7 @@ final class LocalEvidence
             $report->add('evidence', $path, 'installed-state', $path, is_file($installed) ? 'Installed metadata exists; installed-state comparison is outside requested coverage.' : 'Installed metadata unavailable; lock inventory remains authoritative.');
         }
         $runtimes = self::runtimes($root, $inventory->policy['runtimes'] ?? [], $report);
+        self::buildInputs($root, $inventory, $report);
         self::patches($root, $inventory, $report);
         self::forks($root, $inventory, $report);
         return $runtimes;
@@ -74,6 +75,23 @@ final class LocalEvidence
         return $result;
     }
 
+    /** Each unpinned build input is a finding at its file and line. */
+    private static function buildInputs(string $root, Inventory $inventory, Report $report): void
+    {
+        try {
+            $scan = BuildInputs::scan($root, $inventory->dockerfiles, $inventory->policy['buildInputs'] ?? []);
+        } catch (\Throwable $error) {
+            $report->add('gap', 'repository', 'build-inputs', 'source', $error->getMessage());
+            return;
+        }
+        foreach ($scan['violations'] as $violation) {
+            $report->add('finding', $violation['path'], 'build-input', $violation['path'] . ':' . $violation['line'], $violation['reason'], ['rule' => $violation['rule'], 'instruction' => $violation['instruction']]);
+        }
+        if ($scan['violations'] === []) {
+            $report->add('evidence', 'repository', 'build-inputs', 'source', 'Every external image is pinned by digest and every fetched input by SHA-256 or commit.', ['dockerfiles' => $inventory->dockerfiles, 'pinnedImages' => count($scan['images'])]);
+        }
+    }
+
     /**
      * @param array<string,mixed> $declaration
      */
@@ -100,7 +118,6 @@ final class LocalEvidence
             'alpine-package' => '/^ARG\s+' . $key . '=(\d+\.\d+\.\d+)-r\d+\s*$/m',
             'php-image' => '/^FROM\s+php:(\d+\.\d+\.\d+)-[^\s]+/m',
             'composer-image' => '/(?:--from=|FROM\s+)composer:(\d+\.\d+\.\d+)(?:@sha256:[a-f0-9]{64})(?=\s)/m',
-            'swoole-install' => '/\bpie\s+install\s+swoole\/swoole:(\d+\.\d+\.\d+)\b/',
             default => throw new \RuntimeException('Unsupported runtime declaration kind.'),
         };
         if (preg_match_all($pattern, $text, $matches) !== 1) {

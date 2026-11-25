@@ -9,7 +9,7 @@ final class Report
     /** @var list<array<string,mixed>> */
     private array $records = [];
 
-    public function __construct(public readonly bool $localOnly, public readonly bool $advisoriesOnly = false) {}
+    public function __construct(public readonly bool $localOnly, public readonly bool $advisoriesOnly = false, public readonly bool $imageDrift = false) {}
 
     /** @param array<string,mixed> $details
      */
@@ -34,9 +34,10 @@ final class Report
         $records = $this->records;
         usort($records, static fn(array $a, array $b): int => [$a['project'], $a['kind'], $a['source'], $a['reason']] <=> [$b['project'], $b['kind'], $b['source'], $b['reason']]);
         [$mode, $requested, $excluded] = match (true) {
-            $this->advisoriesOnly => ['advisories-only', ['inventory', 'locks', 'advisories'], ['runtime-declarations', 'patches', 'composer-validation', 'online-currency', 'composer-image-php', 'upstream-references', 'installed-runtime', 'native-behavior']],
-            $this->localOnly => ['local-only', ['inventory', 'locks', 'runtime-declarations', 'patches', 'composer-validation'], ['online-currency', 'advisories', 'composer-image-php', 'upstream-references', 'installed-runtime', 'native-behavior']],
-            default => ['online', ['inventory', 'locks', 'runtime-declarations', 'patches', 'composer-validation', 'stable-releases', 'advisories', 'outdated', 'upstream-references', 'composer-image-php'], ['installed-runtime', 'native-behavior']],
+            $this->imageDrift => ['image-drift', ['inventory', 'build-inputs', 'image-drift'], ['locks', 'runtime-declarations', 'patches', 'composer-validation', 'online-currency', 'advisories', 'composer-image-php', 'upstream-references', 'installed-runtime', 'native-behavior']],
+            $this->advisoriesOnly => ['advisories-only', ['inventory', 'locks', 'advisories'], ['runtime-declarations', 'build-inputs', 'patches', 'composer-validation', 'online-currency', 'composer-image-php', 'image-drift', 'upstream-references', 'installed-runtime', 'native-behavior']],
+            $this->localOnly => ['local-only', ['inventory', 'locks', 'runtime-declarations', 'build-inputs', 'patches', 'composer-validation'], ['online-currency', 'advisories', 'composer-image-php', 'image-drift', 'upstream-references', 'installed-runtime', 'native-behavior']],
+            default => ['online', ['inventory', 'locks', 'runtime-declarations', 'build-inputs', 'patches', 'composer-validation', 'stable-releases', 'advisories', 'outdated', 'upstream-references', 'composer-image-php'], ['image-drift', 'installed-runtime', 'native-behavior']],
         };
         return [
             'mode' => $mode,
