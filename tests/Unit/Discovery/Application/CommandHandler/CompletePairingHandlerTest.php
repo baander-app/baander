@@ -99,6 +99,35 @@ final class CompletePairingHandlerTest extends TestCase
         $this->assertTrue($result->isCompleted());
     }
 
+    public function testRefusesCompletedSessionForAnotherServer(): void
+    {
+        $session = $this->createPendingSession(new PublicId());
+        $session->complete();
+        $this->discoveryPort->method('findByPairingCode')->willReturn($session);
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('does not belong to this server');
+
+        ($this->handler)(new CompletePairingCommand(
+            $session->getPairingCode()->toString(),
+            new PublicId(),
+        ));
+    }
+
+    public function testRefusesCompletedSessionPastItsExpiry(): void
+    {
+        $session = $this->createExpiredSession(new PublicId(), completedAt: new DateTimeImmutable('-5 minutes'));
+        $this->discoveryPort->method('findByPairingCode')->willReturn($session);
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('Pairing session has expired.');
+
+        ($this->handler)(new CompletePairingCommand(
+            $session->getPairingCode()->toString(),
+            $session->getServerPublicId(),
+        ));
+    }
+
     public function testThrowsWhenSessionNotFound(): void
     {
         $this->discoveryPort->method('findByPairingCode')->willReturn(null);
@@ -148,7 +177,7 @@ final class CompletePairingHandlerTest extends TestCase
         );
     }
 
-    private function createExpiredSession(PublicId $serverPublicId): PairingSession
+    private function createExpiredSession(PublicId $serverPublicId, ?DateTimeImmutable $completedAt = null): PairingSession
     {
         return PairingSession::reconstitute(new PairingSessionState(
             id: Uuid::v4(),
@@ -161,6 +190,7 @@ final class CompletePairingHandlerTest extends TestCase
             method: AuthenticationMethod::QrCode,
             expiresAt: new DateTimeImmutable('-1 minute'),
             createdAt: new DateTimeImmutable('-10 minutes'),
+            completedAt: $completedAt,
         ));
     }
 }

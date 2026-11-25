@@ -29,6 +29,8 @@ The Discovery context handles local-network server discovery and device pairing.
 
 `RegisterServerCommand` carries the URL, name and version; `RegisterServerHandler` generates the API key (64 hex characters from `random_bytes(32)`). The handler rejects a URL that is not a valid `http` or `https` URL, and a blank name or version, with `InvalidInputException` (HTTP 422, console exit `INVALID`). `ServerInstanceResource` does not include the API key, so neither the route nor the command returns it.
 
+`CompletePairingHandler` refuses a session past its expiry or one that belongs to another server, completed or not, because the response carries the server's URL. A completed session that passes both checks is returned again without a second `PairingCompleted`.
+
 ## Ports
 
 | Port | Purpose |

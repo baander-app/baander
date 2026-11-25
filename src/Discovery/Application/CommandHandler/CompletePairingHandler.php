@@ -28,16 +28,16 @@ final class CompletePairingHandler
             throw new RuntimeException('Pairing session not found.');
         }
 
-        if ($session->isCompleted()) {
-            return $session;
-        }
-
         if ($session->isExpired()) {
             throw new RuntimeException('Pairing session has expired.');
         }
 
         if (!$session->getServerPublicId()->equals($command->getServerPublicId())) {
             throw new RuntimeException('Pairing session does not belong to this server.');
+        }
+
+        if ($session->isCompleted()) {
+            return $session;
         }
 
         $this->discoveryPort->completePairing($session);
