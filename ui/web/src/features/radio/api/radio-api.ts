@@ -1,18 +1,14 @@
+import { apiPath } from '@/shared/api-client/api-path'
 import { AXIOS_INSTANCE } from '@/shared/api-client/axios-instance'
+import { readAllPages, type OffsetPage } from '@/shared/utils/read-all-pages'
+
+/** The largest page of the station list. */
+const STATION_PAGE_LIMIT = 500
+
+/** The most stations one station-list request names by public ID. */
+const STATION_IDS_PER_REQUEST = 100
 
 // --- Types ---
-
-export interface RadioSource {
-  publicId: string
-  name: string
-  type: string
-  syncUrl: string
-  syncConfig: Record<string, unknown>
-  syncSchedule: string | null
-  isActive: boolean
-  createdAt: string
-  updatedAt: string
-}
 
 export interface CountryInfo {
   code: string
@@ -68,13 +64,6 @@ export interface RadioSession {
   updatedAt: string
 }
 
-// --- Sources ---
-
-export async function getRadioSources(signal?: AbortSignal): Promise<RadioSource[]> {
-  const { data } = await AXIOS_INSTANCE.get('/api/radio/sources', { signal })
-  return data.data ?? []
-}
-
 // --- Countries ---
 
 export async function getAvailableCountries(signal?: AbortSignal): Promise<CountryInfo[]> {
@@ -98,22 +87,59 @@ export async function subscribeCountry(sourceId: string | null, countryCode: str
 }
 
 export async function unsubscribeCountry(sourceId: string, countryCode: string): Promise<void> {
-  await AXIOS_INSTANCE.delete(`/api/radio/subscriptions/${countryCode}`, { data: { sourceId } })
+  await AXIOS_INSTANCE.delete(apiPath`/api/radio/subscriptions/${countryCode}`, { data: { sourceId } })
 }
 
 export async function refreshCountry(countryCode: string): Promise<{ synced: number }> {
-  const { data } = await AXIOS_INSTANCE.post(`/api/radio/subscriptions/${countryCode}/refresh`)
+  const { data } = await AXIOS_INSTANCE.post(apiPath`/api/radio/subscriptions/${countryCode}/refresh`)
   return data.data
 }
 
 // --- Stations ---
 
+interface StationFilter {
+  country?: string
+  q?: string
+  publicIds?: string
+}
+
+/** One page of the station list and the number of stations that match the filter. */
+async function getStationPage(
+  filter: StationFilter,
+  offset: number,
+  limit: number,
+  signal?: AbortSignal,
+): Promise<OffsetPage<RadioStation>> {
+  const { data } = await AXIOS_INSTANCE.get<OffsetPage<RadioStation>>('/api/radio/stations', {
+    params: { ...filter, limit, offset },
+    signal,
+  })
+
+  return data
+}
+
+/** Every station that matches the country and search text, read page by page. */
 export async function getStations(country?: string, query?: string, signal?: AbortSignal): Promise<RadioStation[]> {
-  const params: Record<string, string> = {}
-  if (country) params.country = country
-  if (query) params.q = query
-  const { data } = await AXIOS_INSTANCE.get('/api/radio/stations', { params, signal })
-  return data.data ?? []
+  const filter: StationFilter = {}
+  if (country) filter.country = country
+  if (query) filter.q = query
+
+  return readAllPages((offset, limit) => getStationPage(filter, offset, limit, signal), STATION_PAGE_LIMIT)
+}
+
+/** The stations with these public IDs, a hundred IDs per request; unknown IDs are left out. */
+export async function getStationsByIds(publicIds: string[], signal?: AbortSignal): Promise<RadioStation[]> {
+  const chunks: string[][] = []
+  for (let start = 0; start < publicIds.length; start += STATION_IDS_PER_REQUEST) {
+    chunks.push(publicIds.slice(start, start + STATION_IDS_PER_REQUEST))
+  }
+  const pages = await Promise.all(chunks.map(async (chunk) => {
+    const page = await getStationPage({ publicIds: chunk.join(',') }, 0, chunk.length, signal)
+
+    return page.data ?? []
+  }))
+
+  return pages.flat()
 }
 
 // --- Starred ---
@@ -129,7 +155,7 @@ export async function starStation(stationId: string): Promise<StarredStation> {
 }
 
 export async function unstarStation(stationId: string): Promise<void> {
-  await AXIOS_INSTANCE.delete(`/api/radio/starred/${stationId}`)
+  await AXIOS_INSTANCE.delete(apiPath`/api/radio/starred/${stationId}`)
 }
 
 // --- Session ---

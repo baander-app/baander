@@ -13,6 +13,7 @@ use App\Radio\Infrastructure\Doctrine\Entity\RadioStationEntity;
 use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
 use Doctrine\ORM\EntityManagerInterface;
+use Doctrine\ORM\QueryBuilder;
 
 final class RadioStationDoctrineRepository implements RadioStationRepositoryInterface
 {
@@ -46,16 +47,6 @@ final class RadioStationDoctrineRepository implements RadioStationRepositoryInte
     }
 
     /** @return list<RadioStation> */
-    public function findByCountry(string $countryCode): array
-    {
-        $entities = $this->entityManager
-            ->getRepository(RadioStationEntity::class)
-            ->findBy(['country' => $countryCode]);
-
-        return array_map($this->toDomain(...), $entities);
-    }
-
-    /** @return list<RadioStation> */
     public function findBySourceAndCountry(Uuid $sourceId, string $countryCode): array
     {
         $entities = $this->entityManager
@@ -66,23 +57,48 @@ final class RadioStationDoctrineRepository implements RadioStationRepositoryInte
     }
 
     /** @return list<RadioStation> */
-    public function search(string $query, ?string $countryCode = null): array
+    public function findMatching(?string $countryCode, ?string $query, array $publicIds, int $limit, int $offset): array
     {
-        $qb = $this->entityManager
-            ->getRepository(RadioStationEntity::class)
-            ->createQueryBuilder('s');
-
-        $qb->where($qb->expr()->like('LOWER(s.name)', ':query'))
-            ->setParameter('query', '%' . mb_strtolower($query) . '%');
-
-        if ($countryCode !== null) {
-            $qb->andWhere('s.country = :country')
-                ->setParameter('country', $countryCode);
-        }
-
-        $entities = $qb->getQuery()->getResult();
+        /** @var list<RadioStationEntity> $entities */
+        $entities = $this->matching('s', $countryCode, $query, $publicIds)
+            ->orderBy('s.name', 'ASC')
+            ->addOrderBy('s.id', 'ASC')
+            ->setFirstResult($offset)
+            ->setMaxResults($limit)
+            ->getQuery()
+            ->getResult();
 
         return array_map($this->toDomain(...), $entities);
+    }
+
+    public function countMatching(?string $countryCode, ?string $query, array $publicIds): int
+    {
+        return (int) $this->matching('COUNT(s.id)', $countryCode, $query, $publicIds)
+            ->getQuery()
+            ->getSingleScalarResult();
+    }
+
+    /** @param list<PublicId> $publicIds */
+    private function matching(string $select, ?string $countryCode, ?string $query, array $publicIds): QueryBuilder
+    {
+        $builder = $this->entityManager->createQueryBuilder()
+            ->select($select)
+            ->from(RadioStationEntity::class, 's');
+
+        if ($countryCode !== null) {
+            $builder->andWhere('s.country = :country')->setParameter('country', $countryCode);
+        }
+        if ($query !== null) {
+            // Backslash escapes LIKE's wildcards, so the text matches as written.
+            $builder->andWhere("LOWER(s.name) LIKE :query ESCAPE '\\'")
+                ->setParameter('query', '%' . addcslashes(mb_strtolower($query), '%_\\') . '%');
+        }
+        if ($publicIds !== []) {
+            $builder->andWhere('s.publicId IN (:publicIds)')
+                ->setParameter('publicIds', array_map(static fn (PublicId $id): string => $id->toString(), $publicIds));
+        }
+
+        return $builder;
     }
 
     public function save(RadioStation $station): void

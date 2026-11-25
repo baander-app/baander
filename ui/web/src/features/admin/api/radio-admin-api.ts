@@ -1,5 +1,8 @@
 import { AXIOS_INSTANCE } from '@/shared/api-client/axios-instance'
 
+/** The largest page of the station list; the admin page shows one page and the total. */
+export const RADIO_ADMIN_STATION_LIMIT = 500
+
 export interface RadioStation {
   publicId: string
   sourceId: string
@@ -22,19 +25,21 @@ export interface RadioStation {
   updatedAt: string
 }
 
-export interface RadioSource {
-  publicId: string
-  name: string
-  type: string
-  url: string
-  isActive: boolean
+export interface RadioStationPage {
+  data: RadioStation[]
+  meta: {
+    total: number
+    limit: number
+    offset: number
+  }
 }
 
 export const radioAdminApi = {
   getStations: (params?: { country?: string; q?: string }, signal?: AbortSignal) =>
-    AXIOS_INSTANCE.get<{ data: RadioStation[] }>('/api/radio/stations', { signal, params }),
+    AXIOS_INSTANCE.get<RadioStationPage>('/api/radio/stations', {
+      signal,
+      params: { ...params, limit: RADIO_ADMIN_STATION_LIMIT },
+    }),
   getCountries: (signal?: AbortSignal) =>
     AXIOS_INSTANCE.get<{ data: { code: string; name: string }[] }>('/api/radio/countries', { signal }),
-  getSources: (signal?: AbortSignal) =>
-    AXIOS_INSTANCE.get<{ data: RadioSource[] }>('/api/radio/sources', { signal }),
 }

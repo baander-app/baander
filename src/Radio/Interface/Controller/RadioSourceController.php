@@ -33,6 +33,7 @@ final class RadioSourceController
     #[OA\Operation\Get(
         path: '/api/radio/sources',
         summary: 'List all radio sources',
+        description: 'Only administrators receive syncUrl and syncConfig.',
         responses: [
             new OA\Response(
                 response: '200',
@@ -54,17 +55,18 @@ final class RadioSourceController
                                         ),
                                         'name' => new OA\Schema(type: 'string'),
                                         'type' => new OA\Schema(type: 'string'),
-                                        'syncUrl' => new OA\Schema(type: 'string', format: 'uri'),
+                                        'syncUrl' => new OA\Schema(description: 'Administrators only', type: 'string', format: 'uri'),
+                                        'syncConfig' => new OA\Schema(description: 'Administrators only', type: 'object', additionalProperties: true),
                                         'syncSchedule' => new OA\Schema(type: 'string', nullable: true),
-                                        'lastSync' => new OA\Schema(
-                                            type: 'string',
-                                            format: 'date-time',
-                                            nullable: true,
-                                        ),
+                                        'isActive' => new OA\Schema(type: 'boolean'),
+                                        'createdAt' => new OA\Schema(type: 'string', format: 'date-time'),
+                                        'updatedAt' => new OA\Schema(type: 'string', format: 'date-time'),
                                     ],
+                                    required: ['publicId', 'name', 'type', 'syncSchedule', 'isActive', 'createdAt', 'updatedAt'],
                                 ),
                             ),
                         ],
+                        required: ['data'],
                     ),
                 ),
             ),
@@ -85,7 +87,7 @@ final class RadioSourceController
             return $this->unauthorized();
         }
 
-        return $this->successResponse($this->sourcePort->listSources());
+        return $this->successResponse($this->sourcePort->listSources($this->security->isGranted('ROLE_ADMIN')));
     }
 
     #[OA\Operation\Post(
@@ -94,20 +96,7 @@ final class RadioSourceController
         requestBody: new OA\RequestBody(
             required: true,
             content: new OA\MediaType\Json(
-                schema: new OA\Schema(
-                    type: 'object',
-                    properties: [
-                        'name' => new OA\Schema(type: 'string'),
-                        'type' => new OA\Schema(type: 'string'),
-                        'syncUrl' => new OA\Schema(type: 'string', format: 'uri'),
-                        'syncConfig' => new OA\Schema(
-                            type: 'array',
-                            items: new OA\Schema(),
-                        ),
-                        'syncSchedule' => new OA\Schema(type: 'string', nullable: true),
-                    ],
-                    required: ['name', 'type', 'syncUrl'],
-                ),
+                schema: new OA\Schema(ref: CreateRadioSourceRequest::class),
             ),
         ),
         responses: [
@@ -129,9 +118,17 @@ final class RadioSourceController
                                     ),
                                     'name' => new OA\Schema(type: 'string'),
                                     'type' => new OA\Schema(type: 'string'),
+                                    'syncUrl' => new OA\Schema(type: 'string', format: 'uri'),
+                                    'syncConfig' => new OA\Schema(type: 'object', additionalProperties: true),
+                                    'syncSchedule' => new OA\Schema(type: 'string', nullable: true),
+                                    'isActive' => new OA\Schema(type: 'boolean'),
+                                    'createdAt' => new OA\Schema(type: 'string', format: 'date-time'),
+                                    'updatedAt' => new OA\Schema(type: 'string', format: 'date-time'),
                                 ],
+                                required: ['publicId', 'name', 'type', 'syncUrl', 'syncConfig', 'syncSchedule', 'isActive', 'createdAt', 'updatedAt'],
                             ),
                         ],
+                        required: ['data'],
                     ),
                 ),
             ),

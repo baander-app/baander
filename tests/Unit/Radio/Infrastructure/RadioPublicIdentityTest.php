@@ -22,13 +22,14 @@ final class RadioPublicIdentityTest extends TestCase
         $externalId = (new Uuid())->toString();
         $station = RadioStation::create($source->getId(), $externalId, 'Station', 'DK', []);
         $stations = $this->createMock(RadioStationRepositoryInterface::class);
-        $stations->expects(self::once())->method('search')->with('')->willReturn([$station]);
+        $stations->expects(self::once())->method('findMatching')->with(null, null, [], 50, 0)->willReturn([$station]);
+        $stations->expects(self::once())->method('countMatching')->with(null, null, [])->willReturn(1);
         $stations->expects(self::once())->method('findByPublicId')->with($station->getPublicId())->willReturn($station);
         $sources = $this->createMock(RadioSourceRepositoryInterface::class);
         $sources->expects(self::once())->method('find')->with($source->getId())->willReturn($source);
         $service = new RadioStationService($stations, $sources, $this->createStub(StationSyncPortInterface::class));
 
-        $view = $service->listStations()[0];
+        $view = $service->listStations(null, null, [], 50, 0)->stations[0];
 
         self::assertSame($station, $service->findByPublicId($station->getPublicId()));
         self::assertSame($station->getPublicId()->toString(), $view['publicId']);

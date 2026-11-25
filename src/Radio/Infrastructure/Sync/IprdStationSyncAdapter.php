@@ -8,6 +8,10 @@ use App\Radio\Application\Port\StationSyncPortInterface;
 use RuntimeException;
 use Baander\HttpClient\PublicHttpClient;
 use Baander\HttpClient\ResponseTooLargeException;
+use Psr\Clock\ClockInterface;
+use Symfony\Component\DependencyInjection\Attribute\Autowire;
+use Symfony\Contracts\Cache\CacheInterface;
+use Symfony\Contracts\Cache\ItemInterface;
 use Symfony\Contracts\HttpClient\ResponseInterface;
 
 final class IprdStationSyncAdapter implements StationSyncPortInterface
@@ -16,6 +20,11 @@ final class IprdStationSyncAdapter implements StationSyncPortInterface
     private const CATALOG_URL = 'https://iprd-org.github.io/iprd/site_data/metadata/catalog.json';
     /** The catalog lists every station of every country in one document. */
     private const int MAX_CATALOG_BYTES = 64 * 1024 * 1024;
+
+    /** How long the country list and the catalog are reused before IPRD is asked again. */
+    private const int CATALOG_LIFETIME_SECONDS = 6 * 3600;
+
+    private const string COUNTRIES_CACHE_KEY = 'radio.iprd.countries';
 
     /**
      * ISO 3166-1 alpha-2 → English country name, built from IPRD catalog.
@@ -101,15 +110,30 @@ final class IprdStationSyncAdapter implements StationSyncPortInterface
         'ZM' => 'Zambia', 'ZW' => 'Zimbabwe',
     ];
 
-    /** @var array<string, mixed>|null Cached raw catalog data (only used during sync) */
+    /** @var array<string, mixed>|null The decoded catalog, reused by the syncs of one process */
     private ?array $cachedCatalog = null;
+
+    private ?\DateTimeImmutable $cachedCatalogExpiresAt = null;
 
     public function __construct(
         private readonly PublicHttpClient $httpClient,
+        #[Autowire(service: 'cache.app')]
+        private readonly CacheInterface $cache,
+        private readonly ClockInterface $clock,
     ) {
     }
 
     public function fetchCountries(): array
+    {
+        return $this->cache->get(self::COUNTRIES_CACHE_KEY, function (ItemInterface $item): array {
+            $item->expiresAfter(self::CATALOG_LIFETIME_SECONDS);
+
+            return $this->requestCountries();
+        });
+    }
+
+    /** @return list<array{name: string, code: string, station_count: int}> */
+    private function requestCountries(): array
     {
         $response = $this->httpClient->request('GET', self::SUMMARY_URL, ['iprd-org.github.io'], ['timeout' => 30]);
 
@@ -176,15 +200,18 @@ final class IprdStationSyncAdapter implements StationSyncPortInterface
     }
 
     /**
-     * Fetch the IPRD catalog (cached after first call within this process).
+     * The IPRD catalog, reused within this process until it is six hours old.
      *
      * @return array<string, mixed>
      */
     private function fetchCatalog(): array
     {
-        if ($this->cachedCatalog !== null) {
+        $now = $this->clock->now();
+        if ($this->cachedCatalog !== null && $now < $this->cachedCatalogExpiresAt) {
             return $this->cachedCatalog;
         }
+        // Frees the expired catalog before its successor is decoded beside it.
+        $this->cachedCatalog = null;
 
         $response = $this->httpClient->request('GET', self::CATALOG_URL, ['iprd-org.github.io'], ['timeout' => 30]);
 
@@ -195,6 +222,7 @@ final class IprdStationSyncAdapter implements StationSyncPortInterface
                 );
             }
             $this->cachedCatalog = $this->decode($response, self::MAX_CATALOG_BYTES);
+            $this->cachedCatalogExpiresAt = $now->modify(sprintf('+%d seconds', self::CATALOG_LIFETIME_SECONDS));
         } finally {
             $response->cancel();
         }

@@ -46,7 +46,7 @@ final class SyncSubscribedCountriesCommand extends Command
         $dryRun = $input->getOption('dry-run');
         $filterCountry = $input->getOption('country');
 
-        $sources = $this->sourcePort->listSources();
+        $sources = $this->sourcePort->listSources(administrator: true);
 
         if (empty($sources)) {
             if (!$input->getOption('init')) {

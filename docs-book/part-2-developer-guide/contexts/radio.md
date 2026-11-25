@@ -93,12 +93,18 @@ All endpoints are prefixed with `/api`.
 | GET | `/api/radio/sources` | List radio sources |
 | POST | `/api/radio/sources` | Create a radio source (administrators only) |
 
+A source's `syncUrl` and `syncConfig` can name an operator's endpoint or credentials, so only administrators receive them. A member's source list leaves both fields out. The create answer and `app:radio:source:create --json` carry them.
+
 ### Stations
 
 | Method | Path | Purpose |
 |--------|------|---------|
 | GET | `/api/radio/countries` | List available countries |
 | GET | `/api/radio/stations` | List stations |
+
+`IprdStationSyncAdapter` keeps the country list in `cache.app` for six hours, so one listing per six hours reaches IPRD. A sync process reuses the station catalog it downloaded, up to 64 MiB, for the same six hours and then downloads it again.
+
+The station list pages by `limit` and `offset`, with a `limit` of at most 500 (`RadioStationPortInterface::MAX_LIMIT`), and orders stations by name and then by id. Its `meta` object holds the number of matching stations as `total`. The filters combine: `country`, `q`, which matches part of the name case-insensitively with `%` and `_` taken literally, and `publicIds`, at most 100 comma-separated station public IDs. The web client reads a country's stations page by page to the end, and it reads starred stations by public ID.
 
 ### Starred Stations
 
@@ -132,7 +138,7 @@ All endpoints are prefixed with `/api`.
 |---------|---------|
 | `app:radio:country:list` (`RadioCountryListCommand`) | List the countries the radio station directory offers, with their station counts |
 | `app:radio:source:create` (`RadioSourceCreateCommand`) | Create a radio source that station data is synced from |
-| `app:radio:station:list` (`RadioStationListCommand`) | List the synced radio stations, optionally filtered by country or search text |
+| `app:radio:station:list` (`RadioStationListCommand`) | List one page of the synced radio stations, or all of them with `--all`, optionally filtered by country or search text |
 | `app:radio:sync` (`SyncSubscribedCountriesCommand`) | Sync stations for all subscribed countries |
 
 See the [Architecture](../architecture/overview.md#anti-corruption-layer) page for details on the station sync anti-corruption layer.

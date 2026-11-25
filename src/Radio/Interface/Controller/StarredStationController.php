@@ -52,21 +52,22 @@ final class StarredStationController
                                 items: new OA\Schema(
                                     type: 'object',
                                     properties: [
-                                        'stationId' => new OA\Schema(
+                                        'userId' => new OA\Schema(
                                             type: 'string',
                                             minLength: PublicId::LENGTH,
                                             maxLength: PublicId::LENGTH,
                                             pattern: PublicId::SCHEMA_PATTERN,
                                         ),
-                                        'name' => new OA\Schema(type: 'string'),
-                                        'countryCode' => new OA\Schema(type: 'string'),
-                                        'streamUrl' => new OA\Schema(
+                                        'stationId' => new OA\Schema(
+                                            description: 'The station public ID; GET /api/radio/stations?publicIds= reads the station',
                                             type: 'string',
-                                            format: 'uri',
-                                            nullable: true,
+                                            minLength: PublicId::LENGTH,
+                                            maxLength: PublicId::LENGTH,
+                                            pattern: PublicId::SCHEMA_PATTERN,
                                         ),
                                         'starredAt' => new OA\Schema(type: 'string', format: 'date-time'),
                                     ],
+                                    required: ['userId', 'stationId', 'starredAt'],
                                 ),
                             ),
                         ],

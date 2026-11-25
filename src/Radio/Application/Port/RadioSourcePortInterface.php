@@ -13,11 +13,16 @@ interface RadioSourcePortInterface
     public function findByPublicId(PublicId $publicId): ?RadioSource;
 
     /**
+     * Every source. Only an administrator's view carries the sync URL and configuration,
+     * which can hold an operator's endpoint or credentials.
+     *
      * @return list<array<string, mixed>>
      */
-    public function listSources(): array;
+    public function listSources(bool $administrator): array;
 
     /**
+     * The created source in the administrator's view.
+     *
      * @return array<string, mixed>
      * @param array<string, mixed> $syncConfig
      */

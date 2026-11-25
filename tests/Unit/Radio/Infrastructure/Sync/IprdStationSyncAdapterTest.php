@@ -10,6 +10,8 @@ use Baander\HttpClient\PublicHttpClient;
 use Baander\HttpClient\ResponseTooLargeException;
 use Baander\HttpClient\UnsafeDestinationException;
 use PHPUnit\Framework\TestCase;
+use Symfony\Component\Cache\Adapter\ArrayAdapter;
+use Symfony\Component\Clock\MockClock;
 use Symfony\Component\HttpClient\MockHttpClient;
 use Symfony\Component\HttpClient\Response\MockResponse;
 use Symfony\Contracts\HttpClient\HttpClientInterface;
@@ -19,11 +21,67 @@ final class IprdStationSyncAdapterTest extends TestCase
     /** @var list<string> the method and URL of every request sent */
     private array $requests = [];
 
+    private MockClock $clock;
+
+    protected function setUp(): void
+    {
+        $this->clock = new MockClock('2026-11-25 10:00:00');
+    }
+
+    public function testCountriesAreFetchedOnceInSixHours(): void
+    {
+        $adapter = $this->adapter($this->createResponse(200, ['countries' => [['code' => 'DK', 'count' => 42]]]));
+
+        $adapter->fetchCountries();
+        $this->clock->sleep(6 * 3600 - 1);
+        $countries = $adapter->fetchCountries();
+
+        self::assertSame([['code' => 'DK', 'name' => 'Denmark', 'station_count' => 42]], $countries);
+        self::assertCount(1, $this->requests);
+
+        $this->clock->sleep(2);
+        $adapter->fetchCountries();
+
+        self::assertCount(2, $this->requests);
+    }
+
+    public function testAFailedCountryFetchIsNotCached(): void
+    {
+        $responses = [$this->createResponse(503), $this->createResponse(200, ['countries' => [['code' => 'DK', 'count' => 42]]])];
+        $adapter = $this->adapterFor(static function () use (&$responses): MockResponse {
+            return array_shift($responses);
+        });
+
+        try {
+            $adapter->fetchCountries();
+            self::fail('A 503 answer must fail the fetch.');
+        } catch (\RuntimeException) {
+        }
+
+        self::assertSame('DK', $adapter->fetchCountries()[0]['code']);
+    }
+
+    public function testTheCatalogIsKeptForSixHours(): void
+    {
+        $adapter = $this->adapter($this->createResponse(200, self::CATALOG_DATA));
+
+        $adapter->fetchStationsByCountry('DE');
+        $this->clock->sleep(6 * 3600 - 1);
+        $adapter->fetchStationsByCountry('FR');
+
+        self::assertCount(1, $this->requests);
+
+        $this->clock->sleep(2);
+        self::assertCount(1, $adapter->fetchStationsByCountry('DE'));
+
+        self::assertCount(2, $this->requests);
+    }
+
     public function testSummaryCannotReachAnIpFromForbiddenDns(): void
     {
         $httpClient = $this->createMock(HttpClientInterface::class);
         $httpClient->expects($this->never())->method('request');
-        $adapter = new IprdStationSyncAdapter(new PublicHttpClient(
+        $adapter = $this->adapterOver(new PublicHttpClient(
             $httpClient, new PublicDestinationPolicy(static fn(string $host): array => ['127.0.0.1']),
         ));
         $this->expectException(UnsafeDestinationException::class);
@@ -40,7 +98,7 @@ final class IprdStationSyncAdapterTest extends TestCase
                 'http_code' => 302, 'response_headers' => ['Location: http://127.0.0.1/private'],
             ]);
         });
-        $adapter = new IprdStationSyncAdapter(new PublicHttpClient($raw, new PublicDestinationPolicy(static fn(string $host): array => ['1.1.1.1'])));
+        $adapter = $this->adapterOver(new PublicHttpClient($raw, new PublicDestinationPolicy(static fn(string $host): array => ['1.1.1.1'])));
         try {
             $adapter->fetchStationsByCountry('DE');
             self::fail('The catalog must not follow redirects.');
@@ -53,7 +111,7 @@ final class IprdStationSyncAdapterTest extends TestCase
     public function testACatalogOverItsSizeCapFailsTheSync(): void
     {
         $padded = json_encode(self::CATALOG_DATA, JSON_THROW_ON_ERROR) . str_repeat(' ', 64 * 1024 * 1024);
-        $adapter = new IprdStationSyncAdapter(new PublicHttpClient(
+        $adapter = $this->adapterOver(new PublicHttpClient(
             new MockHttpClient(new MockResponse($padded)),
             new PublicDestinationPolicy(static fn(string $host): array => ['1.1.1.1']),
         ));
@@ -176,7 +234,7 @@ final class IprdStationSyncAdapterTest extends TestCase
         // No HTTP calls expected — unknown code is rejected before fetching catalog
         $httpClient->expects($this->never())->method('request');
 
-        $adapter = new IprdStationSyncAdapter(new PublicHttpClient($httpClient, new PublicDestinationPolicy(static fn(string $host): array => ['1.1.1.1'])));
+        $adapter = $this->adapterOver(new PublicHttpClient($httpClient, new PublicDestinationPolicy(static fn(string $host): array => ['1.1.1.1'])));
         $stations = $adapter->fetchStationsByCountry('ZZ');
 
         $this->assertEmpty($stations);
@@ -234,13 +292,24 @@ final class IprdStationSyncAdapterTest extends TestCase
 
     private function adapter(MockResponse $response): IprdStationSyncAdapter
     {
-        return new IprdStationSyncAdapter(new PublicHttpClient(
-            new MockHttpClient(function (string $method, string $url) use ($response): MockResponse {
+        return $this->adapterFor(static fn (): MockResponse => $response);
+    }
+
+    /** @param \Closure(): MockResponse $respond */
+    private function adapterFor(\Closure $respond): IprdStationSyncAdapter
+    {
+        return $this->adapterOver(new PublicHttpClient(
+            new MockHttpClient(function (string $method, string $url) use ($respond): MockResponse {
                 $this->requests[] = $method . ' ' . $url;
 
-                return $response;
+                return $respond();
             }),
             new PublicDestinationPolicy(static fn(string $host): array => ['1.1.1.1']),
         ));
+    }
+
+    private function adapterOver(PublicHttpClient $httpClient): IprdStationSyncAdapter
+    {
+        return new IprdStationSyncAdapter($httpClient, new ArrayAdapter(clock: $this->clock), $this->clock);
     }
 }

@@ -23,11 +23,12 @@ final class RadioSourceService implements RadioSourcePortInterface
         return $this->repository->findByPublicId($publicId);
     }
 
-    public function listSources(): array
+    public function listSources(bool $administrator): array
     {
-        $sources = $this->repository->findAll();
-
-        return array_map($this->sourceToArray(...), $sources);
+        return array_map(
+            static fn (RadioSource $source): array => self::sourceToArray($source, $administrator),
+            $this->repository->findAll(),
+        );
     }
 
     /** @param array<string, mixed> $syncConfig */
@@ -45,22 +46,24 @@ final class RadioSourceService implements RadioSourcePortInterface
 
         $this->repository->save($source);
 
-        return $this->sourceToArray($source);
+        return self::sourceToArray($source, administrator: true);
     }
 
     /**
      * @return array<string, mixed>
      */
-    private function sourceToArray(RadioSource $source): array
+    private static function sourceToArray(RadioSource $source, bool $administrator): array
     {
         $syncConfig = $source->getSyncConfig();
+        $syncTarget = $administrator
+            ? ['syncUrl' => $syncConfig->syncUrl, 'syncConfig' => (object) $syncConfig->config]
+            : [];
 
         return [
             'publicId' => $source->getPublicId()->toString(),
             'name' => $source->getName(),
             'type' => $source->getType(),
-            'syncUrl' => $syncConfig->syncUrl,
-            'syncConfig' => $syncConfig->config,
+            ...$syncTarget,
             'syncSchedule' => $syncConfig->schedule,
             'isActive' => $source->isActive(),
             'createdAt' => $source->getCreatedAt()->format(\DateTimeInterface::ATOM),

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Radio\Infrastructure;
 
+use App\Radio\Application\DTO\RadioStationPage;
 use App\Radio\Application\Port\RadioStationPortInterface;
 use App\Radio\Application\Port\StationSyncPortInterface;
 use App\Radio\Domain\Model\RadioStation\RadioStation;
@@ -28,21 +29,12 @@ final class RadioStationService implements RadioStationPortInterface
         return $this->stationRepository->findByPublicId($publicId);
     }
 
-    public function listStations(?string $countryCode = null, ?string $query = null): array
+    public function listStations(?string $countryCode, ?string $query, array $publicIds, int $limit, int $offset): RadioStationPage
     {
-        if ($query !== null) {
-            $stations = $this->stationRepository->search($query, $countryCode);
-        } elseif ($countryCode !== null) {
-            $stations = $this->stationRepository->findByCountry($countryCode);
-        } else {
-            $qb = null;
-            // Return all — not ideal for production but matches the interface
-            $entities = [];
-            // Use a broader approach: get all via search with empty query
-            $stations = $this->stationRepository->search('');
-        }
-
-        return array_map($this->stationToArray(...), $stations);
+        return new RadioStationPage(
+            array_map($this->stationToArray(...), $this->stationRepository->findMatching($countryCode, $query, $publicIds, $limit, $offset)),
+            $this->stationRepository->countMatching($countryCode, $query, $publicIds),
+        );
     }
 
     public function getStation(Uuid $stationId): array

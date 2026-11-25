@@ -100,6 +100,12 @@ const EmptyText = styled.p`
   color: var(--color-muted-foreground);
 `
 
+const PartialNote = styled.p`
+  padding: 0.75rem 0.5rem;
+  ${textRole('caption')}
+  color: var(--color-muted-foreground);
+`
+
 const SkeletonStack = styled.div`
   display: flex;
   flex-direction: column;
@@ -109,20 +115,24 @@ const SkeletonStack = styled.div`
 export function RadioAdminPage() {
   const [countryFilter, setCountryFilter] = useState<string>('')
   const [search, setSearch] = useState('')
-  const { data: stations, isPending: isLoading } = useRadioStations({
+  const { data, isPending: isLoading } = useRadioStations({
     country: countryFilter || undefined,
     q: search || undefined,
   })
   const { data: countries } = useRadioCountries()
+  const stations = data?.stations
 
+  // The country and logo counts come from the rows shown, so they appear only when
+  // those rows are every matching station.
   const stats = useMemo(() => {
-    if (!stations) return null
+    if (!data) return null
+    const complete = data.stations.length >= data.total
     return {
-      total: stations.length,
-      withLogo: stations.filter((s) => s.logo).length,
-      countries: new Set(stations.map((s) => s.country)).size,
+      total: data.total,
+      withLogo: complete ? data.stations.filter((s) => s.logo).length : null,
+      countries: complete ? new Set(data.stations.map((s) => s.country)).size : null,
     }
-  }, [stations])
+  }, [data])
 
   return (
     <Container>
@@ -137,8 +147,12 @@ export function RadioAdminPage() {
         {stats ? (
           <>
             <StatDisplay label="Stations" value={stats.total.toLocaleString()} />
-            <StatDisplay label="Countries" value={stats.countries.toLocaleString()} />
-            <StatDisplay label="With Logo" value={stats.withLogo.toLocaleString()} />
+            {stats.countries !== null && (
+              <StatDisplay label="Countries" value={stats.countries.toLocaleString()} />
+            )}
+            {stats.withLogo !== null && (
+              <StatDisplay label="With Logo" value={stats.withLogo.toLocaleString()} />
+            )}
           </>
         ) : isLoading ? (
           <>
@@ -218,6 +232,12 @@ export function RadioAdminPage() {
               ))}
             </tbody>
           </StyledTable>
+          {data && data.total > data.stations.length && (
+            <PartialNote>
+              Showing the first {data.stations.length.toLocaleString()} of {data.total.toLocaleString()} stations.
+              Filter by country or search to narrow the list.
+            </PartialNote>
+          )}
         </TableWrapper>
       ) : (
         <EmptyText>

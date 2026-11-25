@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Radio\Interface\Console;
 
+use App\Radio\Application\DTO\RadioStationPage;
 use App\Radio\Application\Port\CountrySubscriptionPortInterface;
 use App\Radio\Application\Port\RadioSourcePortInterface;
 use App\Radio\Application\Port\RadioStationPortInterface;
@@ -29,7 +30,7 @@ final class RadioAdminCommandsTest extends TestCase
             'streams' => [['url' => 'https://radio.baander.app/p1', 'format' => 'mp3', 'bitrate' => 128, 'reliability' => 0.9]],
         ];
         $stations = $this->createMock(RadioStationPortInterface::class);
-        $stations->expects(self::exactly(2))->method('listStations')->with('DK', 'p1')->willReturn([$station]);
+        $stations->expects(self::exactly(2))->method('listStations')->with('DK', 'p1', [], 50, 0)->willReturn(new RadioStationPage([$station], 1));
         $tester = new CommandTester(new RadioStationListCommand($stations));
 
         self::assertSame(Command::SUCCESS, $tester->execute(['--country' => 'DK', '--query' => 'p1']));
@@ -39,14 +40,55 @@ final class RadioAdminCommandsTest extends TestCase
         self::assertSame([$station], json_decode($tester->getDisplay(), true, 512, JSON_THROW_ON_ERROR));
     }
 
-    public function testStationListWithoutFiltersListsEveryStation(): void
+    public function testStationListReadsTheApisPageAndSaysHowManyMatch(): void
     {
         $stations = $this->createMock(RadioStationPortInterface::class);
-        $stations->expects(self::once())->method('listStations')->with(null, null)->willReturn([]);
+        $stations->expects(self::once())->method('listStations')->with(null, null, [], 2, 4)->willReturn(new RadioStationPage([self::station('E'), self::station('F')], 9));
+        $tester = new CommandTester(new RadioStationListCommand($stations));
+
+        self::assertSame(Command::SUCCESS, $tester->execute(['--limit' => '2', '--offset' => '4']));
+        self::assertStringContainsString('Stations 5-6 of 9.', $tester->getDisplay());
+    }
+
+    public function testStationListWithAllReadsEveryPage(): void
+    {
+        $all = array_map(self::station(...), array_map(strval(...), range(1, 501)));
+        $stations = $this->createMock(RadioStationPortInterface::class);
+        $stations->expects(self::exactly(2))
+            ->method('listStations')
+            ->willReturnCallback(static fn (?string $country, ?string $query, array $publicIds, int $limit, int $offset): RadioStationPage => new RadioStationPage(array_slice($all, $offset, $limit), count($all)));
+        $tester = new CommandTester(new RadioStationListCommand($stations));
+
+        self::assertSame(Command::SUCCESS, $tester->execute(['--all' => true, '--json' => true]));
+        self::assertSame($all, json_decode($tester->getDisplay(), true, 512, JSON_THROW_ON_ERROR));
+    }
+
+    public function testStationListRefusesTheLimitsTheApiRefuses(): void
+    {
+        $stations = $this->createMock(RadioStationPortInterface::class);
+        $stations->expects(self::never())->method('listStations');
+        $tester = new CommandTester(new RadioStationListCommand($stations));
+
+        self::assertSame(Command::INVALID, $tester->execute(['--limit' => '501'], ['capture_stderr_separately' => true]));
+        self::assertStringContainsString('--limit must be between 1 and 500.', $tester->getErrorOutput());
+        self::assertSame(Command::INVALID, $tester->execute(['--offset' => '-1'], ['capture_stderr_separately' => true]));
+        self::assertStringContainsString('--offset must be 0 or more.', $tester->getErrorOutput());
+    }
+
+    public function testStationListWithoutMatchesSaysSo(): void
+    {
+        $stations = $this->createMock(RadioStationPortInterface::class);
+        $stations->expects(self::once())->method('listStations')->with(null, null, [], 50, 0)->willReturn(new RadioStationPage([], 0));
         $tester = new CommandTester(new RadioStationListCommand($stations));
 
         self::assertSame(Command::SUCCESS, $tester->execute([]));
         self::assertStringContainsString('No radio stations match.', $tester->getDisplay());
+    }
+
+    /** @return array<string, mixed> */
+    private static function station(string $name): array
+    {
+        return ['publicId' => str_pad($name, 21, '0'), 'name' => $name, 'country' => 'DK', 'genres' => [], 'streams' => []];
     }
 
     public function testCountryListPrintsTheSourcesCountries(): void

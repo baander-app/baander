@@ -1,4 +1,4 @@
-import { useStarredStations, useStations, useUnstarStation } from '../hooks/use-radio-stations'
+import { useStarredStations, useStationsByIds, useUnstarStation } from '../hooks/use-radio-stations'
 import styled from 'styled-components'
 import { StationCard } from './StationCard'
 import { Skeleton } from '@/shared/components/ui/skeleton'
@@ -26,11 +26,8 @@ const EmptyMessage = styled.p`
 export function StarredStations() {
   const starredQuery = useStarredStations()
   const starred = starredQuery.data ?? []
-  const stationsQuery = useStations('', '', starred.length > 0)
-  const starredIds = new Set(starred.map((item) => item.stationId))
-  const stations = (stationsQuery.data ?? []).filter(
-    (station) => starredIds.has(station.publicId),
-  )
+  const stationsQuery = useStationsByIds(starred.map((item) => item.stationId))
+  const stations = starred.length > 0 ? stationsQuery.data ?? [] : []
   const loading = starredQuery.isPending || (
     starred.length > 0 && stationsQuery.isFetching && stationsQuery.isPlaceholderData
   )

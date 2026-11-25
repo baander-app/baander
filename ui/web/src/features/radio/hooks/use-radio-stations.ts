@@ -4,6 +4,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
   type RadioStation,
   getStations,
+  getStationsByIds,
   getSubscriptions,
   getStarredStations,
   starStation,
@@ -14,11 +15,23 @@ const STATIONS_KEY = ['radio', 'stations'] as const
 const SUBSCRIPTIONS_KEY = ['radio', 'subscriptions'] as const
 const STARRED_KEY = ['radio', 'starred'] as const
 
+/** Every station of the country and search text; the list is read page by page. */
 export function useStations(country: string, query: string, enabled: boolean) {
   return useQuery<RadioStation[]>({
     queryKey: [...STATIONS_KEY, { country, query }],
     queryFn: ({ signal }) => getStations(country || undefined, query || undefined, signal),
     enabled,
+    placeholderData: [],
+    retry: false,
+  })
+}
+
+/** The stations with these public IDs, such as the user's starred ones. */
+export function useStationsByIds(publicIds: string[]) {
+  return useQuery<RadioStation[]>({
+    queryKey: [...STATIONS_KEY, { publicIds }],
+    queryFn: ({ signal }) => getStationsByIds(publicIds, signal),
+    enabled: publicIds.length > 0,
     placeholderData: [],
     retry: false,
   })

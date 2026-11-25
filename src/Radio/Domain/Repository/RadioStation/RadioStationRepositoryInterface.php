@@ -17,13 +17,20 @@ interface RadioStationRepositoryInterface
     public function findBySourceAndExternalId(Uuid $sourceId, string $externalId): ?RadioStation;
 
     /** @return list<RadioStation> */
-    public function findByCountry(string $countryCode): array;
-
-    /** @return list<RadioStation> */
     public function findBySourceAndCountry(Uuid $sourceId, string $countryCode): array;
 
-    /** @return list<RadioStation> */
-    public function search(string $query, ?string $countryCode = null): array;
+    /**
+     * A page of the stations that match every given filter, by name and then id. The
+     * search text matches part of the name, case-insensitively and literally.
+     *
+     * @param list<PublicId> $publicIds only these stations; an empty list does not filter
+     *
+     * @return list<RadioStation>
+     */
+    public function findMatching(?string $countryCode, ?string $query, array $publicIds, int $limit, int $offset): array;
+
+    /** @param list<PublicId> $publicIds */
+    public function countMatching(?string $countryCode, ?string $query, array $publicIds): int;
 
     public function save(RadioStation $station): void;
 

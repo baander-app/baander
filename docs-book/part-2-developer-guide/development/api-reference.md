@@ -88,7 +88,7 @@ Each paginated endpoint uses one of three strategies.
 
 A `page` below 1, a `page` that is not an integer, a `page` for which page × limit exceeds 2⁶³ − 1, the largest signed 64-bit integer, and a `limit` outside the range the OpenAPI document states answer `400`. A page past the last one returns an empty `data` array.
 
-**Limit and offset** is used for lists a client reads to the end, such as the playlist list (`GET /api/playlists/`), and for the activity history and the admin user and login-block lists. Pass `limit` and `offset`, the number of rows to skip, as query parameters; `QueryParameters::pagination()` reads them and answers `400` for a negative offset or a `limit` outside the endpoint's range. Each of these lists except the activity history answers with a `meta` object that holds `total`, `limit` and `offset`. A client that needs the whole list requests the next offset until it has read `total` rows.
+**Limit and offset** is used for lists a client reads to the end, such as the playlist list (`GET /api/playlists/`) and the radio station list (`GET /api/radio/stations`, up to 500 stations a page), and for the activity history and the admin user and login-block lists. Pass `limit` and `offset`, the number of rows to skip, as query parameters; `QueryParameters::pagination()` reads them and answers `400` for a negative offset or a `limit` outside the endpoint's range. Each of these lists except the activity history answers with a `meta` object that holds `total`, `limit` and `offset`. A client that needs the whole list requests the next offset until it has read `total` rows.
 
 ## Response Types
 
