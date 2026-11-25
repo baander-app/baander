@@ -178,7 +178,7 @@ final class HealthCheckService
                     'severity' => 'error',
                     'var' => 'allow_url_fopen',
                     'message' => 'PHP setting allow_url_fopen is on, so a file path can make the server connect to an http:// or ftp:// host.',
-                    'suggestion' => 'Set allow_url_fopen = Off in php.ini and in every conf.d file that sets it; the images ship it off.',
+                    'suggestion' => 'Turn allow_url_fopen off in php.ini and in every conf.d file that sets it; the images ship it off.',
                 ],
             ),
         ];
