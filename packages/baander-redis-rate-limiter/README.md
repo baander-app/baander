@@ -16,8 +16,13 @@ The bundle also registers the administration service and its interface alias.
 Application limiter names, capacities and intervals stay in application configuration.
 
 [`RedisRateLimiter`](src/Limiter/RedisRateLimiter.php) exposes Symfony's consume, reserve
-and reset operations. Redis scripts read and commit versioned snapshots; failed
-storage access raises `RateLimiterUnavailableException`.
+and reset operations. Under the window policies it can also refund tokens an attempt took
+and did not use, never below a count of zero, through
+[`RefundableLimiterInterface`](src/Limiter/RefundableLimiterInterface.php). Every factory
+the compiler pass registers implements
+[`RefundableRateLimiterFactoryInterface`](src/Limiter/RefundableRateLimiterFactoryInterface.php).
+Redis scripts read and commit versioned snapshots; failed storage access raises
+`RateLimiterUnavailableException`.
 [`RedisRateLimiterAdministration`](src/Administration/RedisRateLimiterAdministration.php) lists
 definitions and clears limiter generations. Application routes, console commands
 and error responses remain outside the package. See the current

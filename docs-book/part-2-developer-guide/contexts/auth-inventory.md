@@ -19,7 +19,7 @@ Use this reference to locate Auth models, handlers, ports and entry points. The 
 | `DeviceCode` | Device authorization request with its device code, user code, polling interval, and approval state |
 | `Passkey` | WebAuthn passkey credential |
 | `ThirdPartyCredential` | External provider credential |
-| `LoginBlock` | Honeypot login block record |
+| `LoginBlock` | A sign-in attempt that filled the honeypot field. Each field holds at most 255 characters of valid UTF-8, and storing a block deletes the blocks recorded more than 30 days before it |
 
 ### Value Objects
 
@@ -270,6 +270,7 @@ All routes under `/api/admin/login-blocks` (controller `AdminLoginBlockControlle
 | `RedisDpopJtiCache` | Cache | `DpopJtiCacheInterface` on Redis: one set-if-absent-with-expiry command per proof |
 | `DpopBindingListener` | Security | Requires a proof from the token's key on every API request made with an access token; answers an unavailable store with `DpopStoreUnavailableResponse` (`503`) |
 | `RateLimitListener` | Security | Per-IP, per-IP-and-email and per-refresh-token limits for the auth and OAuth endpoints, before authentication (see [Rate limiting](../../part-1-operator-guide/configuration/rate-limits.md#rate-limiting)) |
+| `AuthRequestBodyLimitListener` | Security | Answers a body over 64 KiB with `413` on the routes `RateLimitListener` charges, before that listener or an authenticator decodes it; the pushed authorization request endpoint refuses the same size itself |
 | `ScopeEnforcementListener` | Security | Answers a delegated token on a route `ScopeRouteMap` does not grant it with `403` `insufficient_scope` |
 | `UnverifiedAccountListener` | Security | Answers an account whose address is unverified with `403` `email_unverified` on every route outside its allowlist ([Unverified Accounts](auth-account-security.md#unverified-accounts)) |
 | `RateLimiterLoginFailureThrottle`, `RateLimiterStepUpAttemptThrottle`, `RateLimiterOAuthClientThrottle` | Security | The per-account login failure, per-account step-up and per-client OAuth limits, charged from inside the authenticator and the handlers |

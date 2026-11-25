@@ -46,9 +46,10 @@ use Symfony\Component\Serializer\Exception\NotEncodableValueException;
  *
  * Unknown, disabled and wrong-password accounts get the same answer after the same work:
  * an unknown address is checked against a dummy hash, and a disabled account is reported
- * only once its password matches. Each rejected password or code is charged to the address
- * whether or not an account holds it, and an address over its failure limit is refused
- * before any account is looked up.
+ * only once its password matches. Before any account is looked up, the attempt reserves a
+ * failure against the address, whether or not an account holds it; an address over its
+ * failure limit is refused there. The reservation stays charged for a wrong password or code
+ * and is refunded on every other outcome.
  */
 final class PasswordAuthenticator extends AbstractAuthenticator
 {
@@ -104,15 +105,16 @@ final class PasswordAuthenticator extends AbstractAuthenticator
         // An empty code is no code: the client is asked for one.
         $totpCode = $totpCode === '' ? null : $totpCode;
 
-        // Honeypot: bots auto-fill hidden fields
+        // Honeypot: bots auto-fill hidden fields. The log names the stored block, never the sender's input.
         if (!empty($data['username'])) {
-            $this->logger->warning('Login honeypot triggered.', ['email' => $email, 'ip' => $request->getClientIp()]);
-            $this->loginBlockRepository->save(LoginBlock::create(
+            $block = LoginBlock::create(
                 ipAddress: $request->getClientIp() ?? 'unknown',
                 email: $email,
                 fieldValue: (string) $data['username'],
                 userAgent: $request->headers->get('User-Agent', 'unknown'),
-            ));
+            );
+            $this->logger->warning('Login honeypot triggered.', ['block' => $block->getPublicId()->toString(), 'ip' => $request->getClientIp()]);
+            $this->loginBlockRepository->save($block);
             throw new BadCredentialsException(AuthenticationFailureMessage::INVALID_CREDENTIALS);
         }
 
@@ -126,16 +128,19 @@ final class PasswordAuthenticator extends AbstractAuthenticator
             throw new BadCredentialsException(AuthenticationFailureMessage::INVALID_CREDENTIALS);
         }
 
-        $this->refuseOverTheFailureLimit($address);
+        $this->reserveAFailure($address);
 
         try {
             $user = $this->verifiedUser($address, $password);
             $totpStep = $user->hasTotp() ? $this->matchTotpStep($user, $totpCode) : null;
-        } catch (BadCredentialsException $failure) {
-            $this->failureThrottle->recordFailure($address);
+        } catch (BadCredentialsException $wrongCredentials) {
+            throw $wrongCredentials;
+        } catch (\Throwable $notAFailedGuess) {
+            $this->failureThrottle->refund($address);
 
-            throw $failure;
+            throw $notAFailedGuess;
         }
+        $this->failureThrottle->refund($address);
 
         // The epoch comes from the same read as the password hash just checked, so a password
         // change committed after that read makes issuance refuse the login.
@@ -194,11 +199,14 @@ final class PasswordAuthenticator extends AbstractAuthenticator
     }
 
     /**
+     * Takes one failure from the address's allowance before the password is checked, so
+     * concurrent attempts cannot all pass a limit that none of them has charged yet.
+     *
      * @throws TooManyRequestsHttpException when the address has used up its failed logins
      */
-    private function refuseOverTheFailureLimit(Email $address): void
+    private function reserveAFailure(Email $address): void
     {
-        $retryAfter = $this->failureThrottle->retryAfter($address);
+        $retryAfter = $this->failureThrottle->reserve($address);
         if ($retryAfter === null) {
             return;
         }

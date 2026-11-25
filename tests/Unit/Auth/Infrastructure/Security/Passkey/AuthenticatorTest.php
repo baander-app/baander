@@ -10,6 +10,7 @@ use App\Auth\Application\Exception\TotpSecretUnavailableException;
 use App\Auth\Application\Port\DpopJtiCacheInterface;
 use App\Auth\Application\Port\PasswordHasherInterface;
 use App\Auth\Application\Port\TotpVerifierInterface;
+use App\Auth\Domain\Model\LoginBlock;
 use App\Auth\Domain\Model\User;
 use App\Auth\Domain\Model\UserState;
 use App\Auth\Domain\Repository\LoginBlockRepositoryInterface;
@@ -52,10 +53,22 @@ final class PasswordAuthenticatorTest extends TestCase
     private PasswordHasherInterface&Stub $passwordHasher;
     private Redis&Stub $redis;
     private RecordingLoginFailureThrottle $throttle;
+    /** @var list<LoginBlock> */
+    private array $blocks = [];
+    /** @var list<array{string, array<string, mixed>}> */
+    private array $warnings = [];
 
     protected function setUp(): void
     {
         $this->throttle = new RecordingLoginFailureThrottle();
+        $blocks = $this->createStub(LoginBlockRepositoryInterface::class);
+        $blocks->method('save')->willReturnCallback(function (LoginBlock $block): void {
+            $this->blocks[] = $block;
+        });
+        $logger = $this->createStub(LoggerInterface::class);
+        $logger->method('warning')->willReturnCallback(function (string $message, array $context = []): void {
+            $this->warnings[] = [$message, $context];
+        });
         $this->totpVerifier = $this->createStub(TotpVerifierInterface::class);
         $this->userRepository = $this->createStub(UserRepositoryInterface::class);
         $this->passwordHasher = $this->createStub(PasswordHasherInterface::class);
@@ -72,8 +85,8 @@ final class PasswordAuthenticatorTest extends TestCase
             $this->totpVerifier,
             $this->userRepository,
             $this->passwordHasher,
-            $this->createStub(LoginBlockRepositoryInterface::class),
-            $this->createStub(LoggerInterface::class),
+            $blocks,
+            $logger,
             new JsonEncoder(),
             AuthenticationFailureMessages::create(),
             new DpopTokenRequestVerifier(new DpopProofValidator($jtiCache, new PublicOrigins('https://baander.app')), new DpopNonceManager($factory)),
@@ -112,6 +125,32 @@ final class PasswordAuthenticatorTest extends TestCase
         $this->expectExceptionMessage('Invalid credentials.');
 
         $this->authenticator->authenticate($this->request($body));
+    }
+
+    /** The honeypot's record is bounded, and the log names the record instead of repeating the sender's input. */
+    public function testAFilledHoneypotIsStoredBoundedAndLoggedByItsRecord(): void
+    {
+        $request = $this->request([
+            'email' => str_repeat('a', 300) . '@baander.app',
+            'password' => 'secret',
+            'username' => str_repeat('b', 300),
+        ]);
+        $request->headers->set('User-Agent', str_repeat('c', 300));
+        $this->userRepository->method('findByEmail')->willReturnCallback(static fn (): never => self::fail('A filled honeypot must not look an account up.'));
+
+        $exception = $this->failure($request);
+
+        $this->assertInstanceOf(BadCredentialsException::class, $exception);
+        $this->assertCount(1, $this->blocks);
+        [$block] = $this->blocks;
+        $this->assertSame(str_repeat('a', 255), $block->getEmail());
+        $this->assertSame(str_repeat('b', 255), $block->getFieldValue());
+        $this->assertSame(str_repeat('c', 255), $block->getUserAgent());
+        $this->assertSame(
+            [['Login honeypot triggered.', ['block' => $block->getPublicId()->toString(), 'ip' => '127.0.0.1']]],
+            $this->warnings,
+        );
+        $this->assertSame([], $this->throttle->failures);
     }
 
     public function testAnUnknownUserIsInvalid(): void
@@ -177,6 +216,7 @@ final class PasswordAuthenticatorTest extends TestCase
             json_decode((string) $response->getContent(), true),
         );
         $this->assertSame([], $this->throttle->failures, 'A correct password is not a failed guess.');
+        $this->assertSame(1, $this->throttle->reservations);
     }
 
     /** @return iterable<string, array{?bool, bool}> whether the account exists and is disabled, and whether the password matches */
@@ -221,6 +261,40 @@ final class PasswordAuthenticatorTest extends TestCase
         $this->failure($this->request(['email' => 'alice@baander.app', 'password' => 'secret']));
 
         $this->assertSame([], $this->throttle->failures);
+        $this->assertSame(1, $this->throttle->reservations);
+    }
+
+    /** Concurrent sign-ins cannot all pass a limit that none of them has charged yet. */
+    public function testTheFailureIsReservedBeforeThePasswordIsChecked(): void
+    {
+        $this->userRepository->method('findByEmail')->willReturn($this->createUser());
+        $reservedAtTheCheck = null;
+        $this->passwordHasher->method('verify')->willReturnCallback(function () use (&$reservedAtTheCheck): bool {
+            $reservedAtTheCheck = $this->throttle->failures;
+
+            return false;
+        });
+
+        $this->failure($this->request(['email' => 'alice@baander.app', 'password' => 'wrong']));
+
+        $this->assertSame(['alice@baander.app'], $reservedAtTheCheck);
+        $this->assertSame(['alice@baander.app'], $this->throttle->failures);
+    }
+
+    /** A failed account lookup says nothing about the password. */
+    public function testAStoreFailureIsNotCharged(): void
+    {
+        $outage = new \RuntimeException('The user store is unavailable.');
+        $this->userRepository->method('findByEmail')->willThrowException($outage);
+
+        try {
+            $this->authenticator->authenticate($this->request(['email' => 'alice@baander.app', 'password' => 'secret']));
+            self::fail('The store failure must reach the caller.');
+        } catch (\RuntimeException $exception) {
+            self::assertSame($outage, $exception);
+        }
+        $this->assertSame([], $this->throttle->failures);
+        $this->assertSame(1, $this->throttle->reservations);
     }
 
     /** Once the address has used up its failures, even the right password waits, known account or not. */
@@ -237,6 +311,7 @@ final class PasswordAuthenticatorTest extends TestCase
             self::assertSame(['Retry-After' => 120], $exception->getHeaders());
         }
         $this->assertSame([], $this->throttle->failures);
+        $this->assertSame(0, $this->throttle->reservations);
     }
 
     public function testASuccessfulLoginIsNotCharged(): void
@@ -247,6 +322,7 @@ final class PasswordAuthenticatorTest extends TestCase
         $this->authenticator->authenticate($this->request(['email' => 'alice@baander.app', 'password' => 'secret']));
 
         $this->assertSame([], $this->throttle->failures);
+        $this->assertSame(1, $this->throttle->reservations);
     }
 
     public function testAPasswordSignsInAnAccountWithoutTotp(): void
@@ -331,6 +407,7 @@ final class PasswordAuthenticatorTest extends TestCase
             json_decode((string) $response->getContent(), true),
         );
         $this->assertFalse($request->attributes->has(VerifiedPasswordLogin::class));
+        $this->assertSame([], $this->throttle->failures, 'An unreadable secret is not a wrong code.');
     }
 
     /** A nonce challenge comes before the credentials, so the code stays unspent for the retry. */

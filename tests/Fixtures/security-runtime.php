@@ -117,6 +117,14 @@ foreach (['{', '{"email":[]}', '{"email":null}'] as $body) {
 $probe('invalid Content-Length', "POST /api/auth/login HTTP/1.1\r\nHost: baander.app\r\nContent-Length: invalid\r\nConnection: close\r\n\r\n", [0, 400]);
 $probe('invalid request line', "GET /live NOTHTTP\r\nHost: baander.app\r\nConnection: close\r\n\r\n", [0, 400]);
 $probe('oversized declared body', "POST /api/auth/login HTTP/1.1\r\nHost: baander.app\r\nContent-Length: 16777217\r\nConnection: close\r\n\r\n", [413]);
+// Swoole takes this body in full; the application refuses it before anything decodes it, and the counts compared below
+// show that no login block was stored for its filled honeypot.
+$signInBody = (static function (): string {
+    [$prefix, $suffix] = ['{"email":"user@baander.app","password":"wrong","username":"', '"}'];
+
+    return $prefix . str_repeat('a', 2_000_000 - strlen($prefix) - strlen($suffix)) . $suffix;
+})();
+$probe('oversized sign-in body', "POST /api/auth/login HTTP/1.1\r\nHost: baander.app\r\nContent-Type: application/json\r\nAccept: application/json\r\nConnection: close\r\nContent-Length: " . strlen($signInBody) . "\r\n\r\n" . $signInBody, [413]);
 // A worker that verifies an RSA proof in pure-PHP arithmetic is held for minutes by the first exponent and for over a second
 // by the second, the one ordinary keys have. The error named shows the nonce was accepted and the proof itself refused.
 $origin = new App\Shared\Application\Http\PublicOrigins((string) $kernel->getContainer()->getParameter('auth.oauth.issuer'))->primary;

@@ -6,30 +6,35 @@ namespace App\Auth\Infrastructure\Security;
 
 use App\Auth\Application\Port\LoginFailureThrottleInterface;
 use App\Shared\Domain\Model\Email;
-use Symfony\Component\RateLimiter\RateLimiterFactoryInterface;
+use Baander\RedisRateLimiter\Limiter\RefundableLimiterInterface;
+use Baander\RedisRateLimiter\Limiter\RefundableRateLimiterFactoryInterface;
 
 final readonly class RateLimiterLoginFailureThrottle implements LoginFailureThrottleInterface
 {
     public function __construct(
-        private RateLimiterFactoryInterface $authLoginEmailFailuresLimiter,
+        private RefundableRateLimiterFactoryInterface $authLoginEmailFailuresLimiter,
     ) {
     }
 
-    public function retryAfter(Email $email): ?int
+    public function reserve(Email $email): ?int
     {
-        // Consuming nothing reads the bucket without charging it; such a read is always
-        // accepted, so the remaining count is what tells an exhausted bucket apart.
-        $limit = $this->authLoginEmailFailuresLimiter->create($email->toString())->consume(0);
-        if ($limit->getRemainingTokens() > 0) {
+        // One compare-and-set takes the failure, so no two sign-ins can take the last one.
+        $limit = $this->limiter($email)->consume(1);
+        if ($limit->isAccepted()) {
             return null;
         }
 
         return max(1, $limit->getRetryAfter()->getTimestamp() - time());
     }
 
-    public function recordFailure(Email $email): void
+    public function refund(Email $email): void
+    {
+        $this->limiter($email)->refund(1);
+    }
+
+    private function limiter(Email $email): RefundableLimiterInterface
     {
         // Email lower-cases the address, so case variants share one bucket.
-        $this->authLoginEmailFailuresLimiter->create($email->toString())->consume(1);
+        return $this->authLoginEmailFailuresLimiter->create($email->toString());
     }
 }

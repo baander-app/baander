@@ -7,21 +7,34 @@ namespace App\Tests\Fixtures\Auth;
 use App\Auth\Application\Port\LoginFailureThrottleInterface;
 use App\Shared\Domain\Model\Email;
 
-/** Records charged failures and answers a configurable wait. */
+/** Records reserved and refunded failures and answers a configurable wait. */
 final class RecordingLoginFailureThrottle implements LoginFailureThrottleInterface
 {
     public ?int $retryAfter = null;
 
-    /** @var list<string> */
+    /** @var list<string> the addresses whose reserved failure is still charged */
     public array $failures = [];
 
-    public function retryAfter(Email $email): ?int
+    public int $reservations = 0;
+
+    public function reserve(Email $email): ?int
     {
-        return $this->retryAfter;
+        if ($this->retryAfter !== null) {
+            return $this->retryAfter;
+        }
+        $this->failures[] = $email->toString();
+        ++$this->reservations;
+
+        return null;
     }
 
-    public function recordFailure(Email $email): void
+    public function refund(Email $email): void
     {
-        $this->failures[] = $email->toString();
+        $charged = array_search($email->toString(), $this->failures, true);
+        if ($charged === false) {
+            throw new \LogicException('A refund must follow a reservation of the same address.');
+        }
+        unset($this->failures[$charged]);
+        $this->failures = array_values($this->failures);
     }
 }

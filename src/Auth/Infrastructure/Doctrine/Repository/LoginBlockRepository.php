@@ -8,6 +8,7 @@ use App\Auth\Domain\Model\LoginBlock;
 use App\Auth\Domain\Repository\LoginBlockRepositoryInterface;
 use App\Auth\Infrastructure\Doctrine\Entity\LoginBlockEntity;
 use App\Shared\Domain\Model\PublicId;
+use Doctrine\DBAL\Types\Types;
 use Doctrine\ORM\EntityManagerInterface;
 
 final class LoginBlockRepository implements LoginBlockRepositoryInterface
@@ -28,8 +29,15 @@ final class LoginBlockRepository implements LoginBlockRepositoryInterface
             createdAt: $block->getCreatedAt(),
         );
 
-        $this->entityManager->persist($entity);
-        $this->entityManager->flush();
+        $this->entityManager->wrapInTransaction(static function (EntityManagerInterface $manager) use ($block, $entity): void {
+            $manager->createQueryBuilder()
+                ->delete(LoginBlockEntity::class, 'block')
+                ->where('block.createdAt < :retainedSince')
+                ->setParameter('retainedSince', $block->retainedSince(), Types::DATETIME_IMMUTABLE)
+                ->getQuery()
+                ->execute();
+            $manager->persist($entity);
+        });
     }
 
     public function findRecent(int $limit = 50, int $offset = 0): array

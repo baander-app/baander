@@ -12,12 +12,14 @@ use Baander\RedisRateLimiter\Exception\RateLimiterUnavailableException;
 use Symfony\Component\DependencyInjection\Attribute\Exclude;
 use Symfony\Component\RateLimiter\LimiterInterface;
 use Symfony\Component\RateLimiter\Exception\MaxWaitDurationExceededException;
+use Symfony\Component\RateLimiter\Policy\SlidingWindow;
+use Symfony\Component\RateLimiter\Policy\Window;
 use Symfony\Component\RateLimiter\RateLimit;
 use Symfony\Component\RateLimiter\RateLimiterFactory;
 use Symfony\Component\RateLimiter\Reservation;
 
 #[Exclude]
-final readonly class RedisRateLimiter implements LimiterInterface
+final readonly class RedisRateLimiter implements RefundableLimiterInterface
 {
     /** @param array<string, mixed> $config */
     public function __construct(private array $config, private string $subject, private RedisRateLimiterStore $store) {}
@@ -43,7 +45,50 @@ final readonly class RedisRateLimiter implements LimiterInterface
         $this->store->reset($this->config['id'], $this->subject);
     }
 
+    /**
+     * The tokens come off the hit count of the stored window, the one the earlier attempt
+     * charged unless another attempt has rolled it over since; Symfony's `add()` clamps that
+     * count at zero. A window that ended more than an interval ago is gone and is not written.
+     */
+    public function refund(int $tokens = 1): void
+    {
+        if ($this->config['policy'] === 'token_bucket') {
+            throw new \LogicException('A token bucket counts no hits to give back.');
+        }
+        $this->update($tokens, static function (SnapshotRateLimiterStorage $storage, string $id) use ($tokens): null {
+            $window = $storage->fetch($id);
+            if ($tokens === 0 || !($window instanceof Window || $window instanceof SlidingWindow)) {
+                return null;
+            }
+            $window->add(-$tokens);
+            if ($window->getExpirationTime() >= 1) {
+                $storage->save($window);
+            }
+
+            return null;
+        });
+    }
+
     private function evaluate(string $operation, int $tokens, ?float $maxTime): RateLimit|Reservation
+    {
+        return $this->update($tokens, function (SnapshotRateLimiterStorage $storage, string $id) use ($operation, $tokens, $maxTime): RateLimit|Reservation {
+            $policy = $this->policy($storage, $id);
+
+            return $operation === 'consume' ? $policy->consume($tokens) : $policy->reserve($tokens, $maxTime);
+        });
+    }
+
+    /**
+     * Runs $step on a private copy of the subject's state and commits what it saved, reading
+     * again when another writer committed first. Nothing is written when $step saves nothing.
+     *
+     * @template T
+     *
+     * @param callable(SnapshotRateLimiterStorage, string): T $step
+     *
+     * @return T
+     */
+    private function update(int $tokens, callable $step): mixed
     {
         if ($tokens < 0 || $tokens > $this->config['limit']) {
             throw new \InvalidArgumentException('Token count must be between zero and the limiter capacity.');
@@ -55,9 +100,8 @@ final readonly class RedisRateLimiter implements LimiterInterface
             $snapshot = $this->store->read($this->config['id'], $this->subject);
             $this->checkDeadline($started);
             $storage = new SnapshotRateLimiterStorage($id, $codec->decode($snapshot->payload));
-            $policy = $this->policy($storage, $id);
             try {
-                $result = $operation === 'consume' ? $policy->consume($tokens) : $policy->reserve($tokens, $maxTime);
+                $result = $step($storage, $id);
             } catch (MaxWaitDurationExceededException $exception) {
                 $this->checkDeadline($started);
                 throw $exception;

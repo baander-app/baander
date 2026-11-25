@@ -10,17 +10,22 @@ use App\Shared\Domain\Model\Email;
  * Limits failed password logins per account, keyed by the normalized email address,
  * whichever addresses the attempts come from.
  *
- * Only failed attempts are charged, and the address is charged whether or not an account
- * holds it, so the limit itself reveals nothing about which accounts exist.
+ * A sign-in reserves a failure before its credentials are checked, so concurrent attempts
+ * cannot all pass a limit that none of them has charged yet. The reservation is refunded
+ * unless the password or the code was wrong, so only failed attempts stay charged. The address
+ * is charged whether or not an account holds it, so the limit itself reveals nothing about
+ * which accounts exist.
  */
 interface LoginFailureThrottleInterface
 {
     /**
-     * @return int|null seconds until the address may try again once it has used up its
-     *                  failures for the current window, or null while it has failures left
+     * Takes one failure from the address's allowance.
+     *
+     * @return int|null null once the failure is reserved; otherwise the seconds until the
+     *                  address may try again, and nothing was taken
      */
-    public function retryAfter(Email $email): ?int;
+    public function reserve(Email $email): ?int;
 
-    /** Records one failed login for the address. */
-    public function recordFailure(Email $email): void;
+    /** Gives back a failure reserve() took, for a sign-in that was not a wrong password or code. */
+    public function refund(Email $email): void;
 }

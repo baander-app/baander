@@ -8,12 +8,10 @@ use Baander\RedisRateLimiter\Storage\RedisRateLimiterStore;
 use Baander\RedisRateLimiter\Storage\SnapshotRateLimiterStorage;
 
 use Symfony\Component\DependencyInjection\Attribute\Exclude;
-use Symfony\Component\RateLimiter\LimiterInterface;
 use Symfony\Component\RateLimiter\RateLimiterFactory;
-use Symfony\Component\RateLimiter\RateLimiterFactoryInterface;
 
 #[Exclude]
-final readonly class RedisRateLimiterFactory implements RateLimiterFactoryInterface
+final readonly class RedisRateLimiterFactory implements RefundableRateLimiterFactoryInterface
 {
     /** Policies the atomic Redis store evaluates; others would bypass it. */
     public const array POLICIES = ['fixed_window', 'sliding_window', 'token_bucket'];
@@ -57,7 +55,7 @@ final readonly class RedisRateLimiterFactory implements RateLimiterFactoryInterf
         return is_int($amount) && $amount >= 1;
     }
 
-    public function create(?string $key = null): LimiterInterface
+    public function create(?string $key = null): RedisRateLimiter
     {
         return new RedisRateLimiter($this->config, hash('sha256', serialize($this->config) . "\0" . ($key ?? '')), $this->store);
     }

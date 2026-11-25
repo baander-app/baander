@@ -9,6 +9,10 @@ use App\Shared\Domain\Model\PublicId;
 
 interface LoginBlockRepositoryInterface
 {
+    /**
+     * Stores the block and, in the same transaction, deletes every block recorded before
+     * $block->retainedSince(). The per-address sign-in limit bounds how often that runs.
+     */
     public function save(LoginBlock $block): void;
 
     /**

@@ -15,6 +15,7 @@ use Doctrine\ORM\Mapping as ORM;
 #[ORM\UniqueConstraint(name: 'uniq_login_blocks_public_id', columns: ['public_id'])]
 #[ORM\Index(name: 'idx_login_blocks_email', columns: ['email'])]
 #[ORM\Index(name: 'idx_login_blocks_ip_address_created_at', columns: ['ip_address', 'created_at'])]
+#[ORM\Index(name: 'idx_login_blocks_created_at', columns: ['created_at'])]
 class LoginBlockEntity
 {
     #[ORM\Id]

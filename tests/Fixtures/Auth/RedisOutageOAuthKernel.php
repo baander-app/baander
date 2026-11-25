@@ -6,12 +6,11 @@ namespace App\Tests\Fixtures\Auth;
 
 use Baander\RedisRateLimiter\Limiter\RedisRateLimiterFactory;
 use App\Shared\Infrastructure\Redis\RedisClientFactory;
+use App\Tests\Fixtures\RateLimiter\InMemoryRateLimiterStore;
 use Symfony\Component\DependencyInjection\Compiler\CompilerPassInterface;
 use Symfony\Component\DependencyInjection\ContainerBuilder;
 use Symfony\Component\DependencyInjection\Definition;
 use Symfony\Component\DependencyInjection\Reference;
-use Symfony\Component\RateLimiter\RateLimiterFactory;
-use Symfony\Component\RateLimiter\Storage\InMemoryStorage;
 
 /**
  * Grant-path OAuth kernel for the DPoP store outage tests.
@@ -24,8 +23,9 @@ use Symfony\Component\RateLimiter\Storage\InMemoryStorage;
  * BorrowLimitingRedisClientFactory, published as the REDIS service, so a test can
  * fail one chosen Redis call of a request.
  *
- * Explicit limiter isolation retains Symfony's policies in local memory so a
- * DPoP-specific outage test reaches the nonce/replay store even when Redis is paused.
+ * Explicit limiter isolation keeps the atomic limiters and their policies on an
+ * in-memory store, so a DPoP-specific outage test reaches the nonce/replay store
+ * even when Redis is paused.
  * Logout and revoke outage tests leave isolation disabled to exercise both stores.
  * Each variant needs its own directory with the signing keys in it.
  */
@@ -54,11 +54,10 @@ final class RedisOutageOAuthKernel extends GrantPathOAuthKernel
                 if ($this->isolateRateLimiters) {
                     // These tests target DPoP failures, including a whole-server pause.
                     // Keep the configured policies while isolating their unrelated storage.
-                    $container->setDefinition('oauth.outage.limiter_storage', new Definition(InMemoryStorage::class));
+                    $container->setDefinition('oauth.outage.limiter_store', new Definition(InMemoryRateLimiterStore::class));
                     foreach ($container->getDefinitions() as $id => $definition) {
                         if (str_starts_with($id, 'limiter.') && $definition->getClass() === RedisRateLimiterFactory::class) {
-                            $definition->setClass(RateLimiterFactory::class);
-                            $definition->setArgument(1, new Reference('oauth.outage.limiter_storage'));
+                            $definition->setArgument(1, new Reference('oauth.outage.limiter_store'));
                         }
                     }
                 }

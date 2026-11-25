@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Shared\Infrastructure\Security;
 
+use App\Auth\Infrastructure\Security\AuthRequestBodyLimitListener;
 use App\Auth\Infrastructure\Security\RateLimitListener;
 use App\Catalog\Infrastructure\EventListener\AdminRateLimitListener;
 use App\Discovery\Infrastructure\EventListener\DiscoveryRateLimitListener;
@@ -22,7 +23,9 @@ use Symfony\Component\Routing\RouteCollection;
  * The auth, discovery and cover-extraction limits charge requests by the name of the route
  * they reach. A renamed route would drop its limit without any other test noticing, so every
  * limited route must exist with the method and path its limit was written for, and every
- * route-name constant (`*_ROUTE`) a limiting listener declares must be listed here.
+ * route-name constant (`*_ROUTE`) a limiting listener declares must be listed here. Every route
+ * the auth limits charge also caps its request body, except the pushed authorization request
+ * endpoint, which caps its own.
  *
  * The routes come from `config/routes.yaml` through the routing component's own loaders;
  * compiling the container would exceed the unit suite's memory budget.
@@ -86,16 +89,19 @@ final class LimitedRouteInventoryTest extends TestCase
 
     public function testTheInventoryListsEveryRouteALimiterNames(): void
     {
-        $declared = [];
-        foreach (self::LISTENERS as $listener) {
-            foreach (new \ReflectionClass($listener)->getReflectionConstants() as $constant) {
-                if ($constant->isPublic() && str_ends_with($constant->getName(), '_ROUTE')) {
-                    $declared[] = $constant->getValue();
-                }
-            }
-        }
+        $declared = array_merge(...array_map(self::routeConstants(...), self::LISTENERS));
 
         self::assertEqualsCanonicalizing(array_keys(self::LIMITED_ROUTES), $declared);
+    }
+
+    public function testEveryRouteTheAuthLimitsChargeCapsItsBodyExceptPushedRequests(): void
+    {
+        $charged = self::routeConstants(RateLimitListener::class);
+
+        self::assertEqualsCanonicalizing(
+            array_values(array_diff($charged, [RateLimitListener::PAR_ROUTE])),
+            AuthRequestBodyLimitListener::ROUTES,
+        );
     }
 
     public function testARenamedLimitedRouteFails(): void
@@ -107,6 +113,23 @@ final class LimitedRouteInventoryTest extends TestCase
         $routes->add('auth_sign_up', $register);
 
         self::assertSame(['Limited route "auth_register" does not exist.'], self::violations($routes));
+    }
+
+    /**
+     * @param class-string $listener
+     *
+     * @return list<string> the route names the listener declares as `*_ROUTE` constants
+     */
+    private static function routeConstants(string $listener): array
+    {
+        $routes = [];
+        foreach (new \ReflectionClass($listener)->getReflectionConstants() as $constant) {
+            if ($constant->isPublic() && str_ends_with($constant->getName(), '_ROUTE')) {
+                $routes[] = $constant->getValue();
+            }
+        }
+
+        return $routes;
     }
 
     /** @return list<string> */
