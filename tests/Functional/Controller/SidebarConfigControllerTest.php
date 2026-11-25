@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Tests\Functional\Controller;
 
 use App\Tests\Functional\TestCase;
+use PHPUnit\Framework\Attributes\DataProvider;
 
 /**
  * Functional tests for sidebar configuration management.
@@ -109,6 +110,29 @@ final class SidebarConfigControllerTest extends TestCase
 
         $this->assertSame('music', $data['data']['mediaType']);
         $this->assertNotEmpty($data['data']['sections']);
+    }
+
+    /** @return iterable<string, array{array<string, mixed>}> */
+    public static function refusedLayouts(): iterable
+    {
+        yield 'item that is not an object' => [['sections' => [['id' => 's', 'items' => ['home']]]]];
+        yield 'item id that is a list' => [['sections' => [['id' => 's', 'items' => [['id' => [], 'type' => 'page_link', 'label' => 'Home', 'icon' => 'home']]]]]];
+        yield 'sections that are a string' => [['sections' => 'music']];
+        yield '101 sections' => [['sections' => array_fill(0, 101, ['id' => 's', 'items' => []])]];
+        yield 'layout over 16 KiB' => [['sections' => [['id' => 's', 'label' => str_repeat('l', 16384), 'items' => []]]]];
+    }
+
+    /** @param array<string, mixed> $body */
+    #[DataProvider('refusedLayouts')]
+    public function testALayoutOutsideItsBoundsIsRefusedAndTheDefaultsRemain(array $body): void
+    {
+        $user = $this->createTestUser();
+
+        $this->assertJsonResponse($this->authenticatedRequest('PUT', '/api/user/sidebar-config/music', $user, $body), 422, 'error');
+        $this->assertSame(0, (int) $this->entityManager->getConnection()->fetchOne(
+            'SELECT count(*) FROM user_sidebar_configs WHERE user_id = ?',
+            [$user->getId()->toString()],
+        ));
     }
 
     // ---------------------------------------------------------------

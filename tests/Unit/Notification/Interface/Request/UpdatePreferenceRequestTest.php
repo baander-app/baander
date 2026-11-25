@@ -92,4 +92,16 @@ final class UpdatePreferenceRequestTest extends TestCase
 
         return new UpdatePreferenceRequest($decoded['preferences']);
     }
+
+    public function testAtMost64PreferencesAreAccepted(): void
+    {
+        $validator = Validation::createValidatorBuilder()->enableAttributeMapping()->getValidator();
+        $preference = ['category' => 'security', 'channel' => 'push', 'enabled' => true];
+
+        self::assertCount(0, $validator->validate(new UpdatePreferenceRequest(array_fill(0, 64, $preference))));
+
+        $violations = $validator->validate(new UpdatePreferenceRequest(array_fill(0, 65, $preference)));
+        self::assertCount(1, $violations);
+        self::assertSame('preferences', $violations[0]->getPropertyPath());
+    }
 }

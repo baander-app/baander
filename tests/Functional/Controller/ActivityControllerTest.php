@@ -37,6 +37,25 @@ final class ActivityControllerTest extends TestCase
         $this->assertStringNotContainsString($user->getId()->toString(), (string) $response->getContent());
     }
 
+    public function testAPlatformOrPlayerOver64CharactersIsRefusedAndNoPlayIsRecorded(): void
+    {
+        $user = $this->createTestUser();
+        $songId = $this->createSongFixture($user);
+
+        $response = $this->authenticatedRequest('POST', '/api/activity/play', $user, [
+            'songId' => $songId,
+            'platform' => str_repeat('p', 65),
+            'player' => str_repeat('p', 65),
+        ]);
+
+        $error = $this->assertJsonResponse($response, 422, 'error');
+        $this->assertSame(['platform', 'player'], array_keys($error['error']['details']));
+        $this->assertSame(0, (int) $this->entityManager->getConnection()->fetchOne(
+            'SELECT count(*) FROM media_activities WHERE user_id = ?',
+            [$user->getId()->toString()],
+        ));
+    }
+
     public function testHistoryReturnsEmptyList(): void
     {
         $user = $this->createTestUser();

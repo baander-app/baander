@@ -4,9 +4,12 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\UserPreference\Infrastructure;
 
+use App\Shared\Application\Port\TransactionPortInterface;
 use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
+use App\UserPreference\Application\Exception\EqDeviceProfileLimitReached;
 use App\UserPreference\Application\Exception\EqDeviceProfileNotFound;
+use App\UserPreference\Application\UserPreferenceLimits;
 use App\UserPreference\Domain\Model\EqDeviceProfile;
 use App\UserPreference\Domain\Repository\EqDeviceProfileRepositoryInterface;
 use App\UserPreference\Infrastructure\EqDeviceProfileAdapter;
@@ -15,6 +18,8 @@ use PHPUnit\Framework\TestCase;
 
 final class EqDeviceProfileAdapterTest extends TestCase
 {
+    private bool $inTransaction = false;
+
     /** @return iterable<string, array{string, bool}> */
     public static function inaccessibleProfiles(): iterable
     {
@@ -34,7 +39,7 @@ final class EqDeviceProfileAdapterTest extends TestCase
         $repository->expects($this->once())->method('findByPublicId')->with($profileId)->willReturn($profile);
         $repository->expects($this->never())->method('save');
         $repository->expects($this->never())->method('delete');
-        $adapter = new EqDeviceProfileAdapter($repository);
+        $adapter = $this->adapter($repository);
         try {
             $this->operate($adapter, $method, $userId, $profileId);
             self::fail('An inaccessible profile must be rejected.');
@@ -57,7 +62,7 @@ final class EqDeviceProfileAdapterTest extends TestCase
         $repository->expects($this->exactly(3))->method('findByPublicId')->with($profile->getPublicId())->willReturn($profile);
         $repository->expects($this->once())->method('save')->with($profile);
         $repository->expects($this->never())->method('delete');
-        $adapter = new EqDeviceProfileAdapter($repository);
+        $adapter = $this->adapter($repository);
         self::assertSame('Owned profile', $adapter->getProfile($userId, $profile->getPublicId())['name']);
         $updated = $adapter->updateProfile($userId, $profile->getPublicId(), 'Updated', null, null, ['gain' => 6], null);
         self::assertSame('Updated', $updated['name']);
@@ -72,7 +77,7 @@ final class EqDeviceProfileAdapterTest extends TestCase
         $repository = $this->createMock(EqDeviceProfileRepositoryInterface::class);
         $repository->expects($this->once())->method('findByPublicId')->with($profile->getPublicId())->willReturn($profile);
         $repository->expects($this->once())->method('delete')->with($profile);
-        $adapter = new EqDeviceProfileAdapter($repository);
+        $adapter = $this->adapter($repository);
         $adapter->deleteProfile($userId, $profile->getPublicId());
     }
 
@@ -83,7 +88,7 @@ final class EqDeviceProfileAdapterTest extends TestCase
         $repository = $this->createMock(EqDeviceProfileRepositoryInterface::class);
         $repository->expects($this->exactly(2))->method('findByPublicId')->with($profile->getPublicId())->willReturn($profile);
         $repository->expects($this->never())->method('delete');
-        $adapter = new EqDeviceProfileAdapter($repository);
+        $adapter = $this->adapter($repository);
         try {
             $adapter->deleteProfile(Uuid::generate(), $profile->getPublicId());
             self::fail('Foreign default profile must remain inaccessible.');
@@ -104,11 +109,75 @@ final class EqDeviceProfileAdapterTest extends TestCase
             static fn (EqDeviceProfile $profile): bool => $profile->getDeviceId() === $token,
         ));
 
-        $result = (new EqDeviceProfileAdapter($repository))->createProfile($owner, 'Headphones', 'headphones', $token, []);
+        $result = $this->adapter($repository)->createProfile($owner, 'Headphones', 'headphones', $token, []);
 
         self::assertSame($token, $result['deviceId']);
         self::assertArrayNotHasKey('id', $result);
         self::assertSame($result['publicId'], PublicId::fromString($result['publicId'])->toString());
+    }
+
+    public function testCreationCountsTheProfilesUnderTheUsersLockAndRefusesOneOverTheCap(): void
+    {
+        $owner = new Uuid();
+        $existing = array_map(
+            static fn (int $order): EqDeviceProfile => EqDeviceProfile::create($owner, 'Profile ' . $order, sortOrder: $order),
+            range(0, UserPreferenceLimits::EQ_PROFILES_PER_USER - 1),
+        );
+        $calls = [];
+        $repository = $this->createMock(EqDeviceProfileRepositoryInterface::class);
+        $repository->expects(self::once())->method('lockUserProfiles')->with($owner)->willReturnCallback(
+            function () use (&$calls): void {
+                self::assertTrue($this->inTransaction, 'The lock must be taken inside the creating transaction.');
+                $calls[] = 'lock';
+            },
+        );
+        $repository->expects(self::once())->method('findByUserId')->with($owner)->willReturnCallback(
+            static function () use (&$calls, $existing): array {
+                $calls[] = 'read';
+
+                return $existing;
+            },
+        );
+        $repository->expects(self::never())->method('save');
+
+        try {
+            $this->adapter($repository)->createProfile($owner, 'One too many', 'custom', null, []);
+            self::fail('A profile over the cap must be refused.');
+        } catch (EqDeviceProfileLimitReached $refusal) {
+            self::assertSame(['reason' => 'eq_profile_limit', 'limit' => 50], $refusal->details);
+        }
+        self::assertSame(['lock', 'read'], $calls);
+    }
+
+    public function testCreationBelowTheCapTakesTheNextSortOrder(): void
+    {
+        $owner = new Uuid();
+        $existing = [
+            EqDeviceProfile::create($owner, 'First', sortOrder: 4),
+            EqDeviceProfile::create($owner, 'Second', sortOrder: 1),
+        ];
+        $repository = $this->createMock(EqDeviceProfileRepositoryInterface::class);
+        $repository->method('findByUserId')->willReturn($existing);
+        $repository->expects(self::once())->method('save')->with(self::callback(
+            static fn (EqDeviceProfile $profile): bool => $profile->getSortOrder() === 5,
+        ));
+
+        self::assertSame(5, $this->adapter($repository)->createProfile($owner, 'Third', 'custom', null, [])['sortOrder']);
+    }
+
+    private function adapter(EqDeviceProfileRepositoryInterface $repository): EqDeviceProfileAdapter
+    {
+        $transaction = $this->createStub(TransactionPortInterface::class);
+        $transaction->method('run')->willReturnCallback(function (callable $operation): mixed {
+            $this->inTransaction = true;
+            try {
+                return $operation();
+            } finally {
+                $this->inTransaction = false;
+            }
+        });
+
+        return new EqDeviceProfileAdapter($repository, $transaction);
     }
 
     private function operate(EqDeviceProfileAdapter $adapter, string $method, Uuid $userId, PublicId $profileId): void

@@ -7,8 +7,10 @@ namespace App\Tests\Fixtures\Playlist;
 use App\Catalog\Application\Port\SongLookupInterface;
 use App\Catalog\Application\Port\SongLyricSignature;
 use App\Playlist\Application\Command\AddCollaboratorCommand;
+use App\Playlist\Application\Command\CreatePlaylistCommand;
 use App\Playlist\Application\Command\ReorderSongsCommand;
 use App\Playlist\Application\CommandHandler\AddCollaboratorHandler;
+use App\Playlist\Application\CommandHandler\CreatePlaylistHandler;
 use App\Playlist\Application\CommandHandler\ReorderSongsHandler;
 use App\Playlist\Application\Port\PlaylistCollaboratorResolverInterface;
 use App\Playlist\Infrastructure\Doctrine\Repository\PlaylistRepository;
@@ -27,6 +29,7 @@ use Doctrine\ORM\Mapping\UnderscoreNamingStrategy;
 use Doctrine\ORM\ORMSetup;
 use Doctrine\Persistence\AbstractManagerRegistry;
 use SwooleBundle\SwooleBundle\Bridge\Swoole\Swoole;
+use Symfony\Component\EventDispatcher\EventDispatcher;
 
 require_once dirname(__DIR__, 3) . '/vendor/autoload.php';
 
@@ -84,7 +87,12 @@ final class PlaylistWriteRace
         return new EntityManager($connection, $configuration);
     }
 
-    public static function repository(EntityManager $manager): PlaylistRepository
+    public static function creator(EntityManager $manager): CreatePlaylistHandler
+    {
+        return new CreatePlaylistHandler(self::repository($manager), new EventDispatcher(), self::transaction($manager));
+    }
+
+    public static function transaction(EntityManager $manager): DoctrineTransaction
     {
         $registry = new class ($manager) extends AbstractManagerRegistry {
             public function __construct(private EntityManager $manager)
@@ -102,6 +110,12 @@ final class PlaylistWriteRace
                 $this->manager = PlaylistWriteRace::manager($this->manager->getConnection());
             }
         };
+
+        return new DoctrineTransaction($registry, new Swoole());
+    }
+
+    public static function repository(EntityManager $manager): PlaylistRepository
+    {
         $songs = new class implements SongLookupInterface {
             public function findVisibleSongId(PublicId $publicId, LibraryReadScope $scope): ?Uuid
             {
@@ -129,7 +143,7 @@ final class PlaylistWriteRace
             }
         };
 
-        return new PlaylistRepository($manager, $songs, new DoctrineTransaction($registry, new Swoole()));
+        return new PlaylistRepository($manager, $songs, self::transaction($manager));
     }
 }
 
@@ -151,6 +165,7 @@ if (realpath($_SERVER['SCRIPT_FILENAME'] ?? '') === __FILE__) {
     try {
         match ($action) {
             'handler-collaborator' => PlaylistWriteRace::collaboratorHandler($repository, $connection)(new AddCollaboratorCommand($playlist->getId(), PublicId::fromString($target), $playlist->getUserId())),
+            'create' => PlaylistWriteRace::creator($manager)(new CreatePlaylistCommand('Child', $playlist->getUserId())),
             'handler-reorder' => (new ReorderSongsHandler($repository))(new ReorderSongsCommand($playlist->getId(), $playlist->getUserId(), array_map(Uuid::fromString(...), explode(',', $target)), $expectedRevision)),
             'delete' => $repository->delete($playlist),
             'cascade-song' => $connection->executeStatement('DELETE FROM songs WHERE id = ?', [$target]),

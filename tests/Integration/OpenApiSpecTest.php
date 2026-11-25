@@ -343,6 +343,48 @@ final class OpenApiSpecTest extends KernelTestCase
         self::assertArrayHasKey('409', $spec['paths']['/api/playlists/{publicId}/collaborators/{userPublicId}']['put']['responses']);
     }
 
+    public function test_member_input_schemas_document_their_bounds(): void
+    {
+        $spec = $this->getSpec();
+        $schemas = $spec['components']['schemas'];
+        $body = static fn (string $path, string $method): array => $spec['paths'][$path][$method]['requestBody']['content']['application/json']['schema'];
+
+        self::assertSame(['$ref' => '#/components/schemas/CreatePlaylistRequest'], $body('/api/playlists/', 'post'));
+        self::assertSame(['$ref' => '#/components/schemas/UpdatePlaylistRequest'], $body('/api/playlists/{publicId}', 'patch'));
+        foreach (['CreatePlaylistRequest', 'UpdatePlaylistRequest'] as $request) {
+            self::assertSame(255, $schemas[$request]['properties']['name']['maxLength'], $request);
+            self::assertSame(2000, $schemas[$request]['properties']['description']['maxLength'], $request);
+        }
+        $rules = $schemas['CreatePlaylistRequest']['properties']['smartRules'];
+        self::assertSame(50, $rules['maxItems']);
+        self::assertSame(['field', 'operator'], $rules['items']['required']);
+        self::assertFalse($rules['items']['additionalProperties']);
+        self::assertSame(255, $rules['items']['properties']['value']['maxLength']);
+        self::assertSame(10000, $schemas['ReorderSongsRequest']['properties']['songIds']['maxItems']);
+        self::assertArrayHasKey('409', $spec['paths']['/api/playlists/']['post']['responses']);
+        self::assertArrayHasKey('409', $spec['paths']['/api/playlists/{publicId}/songs']['post']['responses']);
+
+        foreach (['platform', 'player'] as $field) {
+            self::assertSame(64, $schemas['PlayActivityRequest']['properties'][$field]['maxLength']);
+        }
+        self::assertSame(['$ref' => '#/components/schemas/CreateEqDeviceProfileRequest'], $body('/api/user/eq-profiles/', 'post'));
+        self::assertSame(['$ref' => '#/components/schemas/UpdateEqDeviceProfileRequest'], $body('/api/user/eq-profiles/{id}', 'put'));
+        self::assertSame(255, $schemas['CreateEqDeviceProfileRequest']['properties']['deviceId']['maxLength']);
+        self::assertSame(255, $schemas['UpdateEqDeviceProfileRequest']['properties']['deviceId']['maxLength']);
+        self::assertArrayHasKey('409', $spec['paths']['/api/user/eq-profiles/']['post']['responses']);
+        self::assertSame(['$ref' => '#/components/schemas/UpdateSidebarSectionsRequest'], $body('/api/user/sidebar-config/{mediaType}', 'put'));
+        $sections = $schemas['UpdateSidebarSectionsRequest']['properties']['sections'];
+        self::assertSame(100, $sections['maxItems']);
+        self::assertSame(100, $sections['items']['properties']['items']['maxItems']);
+        self::assertSame(['$ref' => '#/components/schemas/UpdatePreferenceRequest'], $body('/api/notifications/preferences/', 'put'));
+        self::assertSame(64, $schemas['UpdatePreferenceRequest']['properties']['preferences']['maxItems']);
+        self::assertSame(10000, $schemas['ControlPlaybackRequest']['properties']['queue']['maxItems']);
+        self::assertSame(2048, $schemas['StartRadioRequest']['properties']['streamUrl']['maxLength']);
+        foreach (['containers', 'videoCodecs', 'audioCodecs', 'transports', 'pixelFormats'] as $capability) {
+            self::assertSame(32, $schemas['DeliveryRequest']['properties'][$capability]['items']['maxLength'], $capability);
+        }
+    }
+
     /** @param array<string, mixed> $schema */
     private function assertPublicIdentifierSchema(array $schema): void
     {

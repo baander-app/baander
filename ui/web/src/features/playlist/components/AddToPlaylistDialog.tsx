@@ -11,6 +11,8 @@ import {
   DialogFooter,
 } from '@/shared/components/ui/dialog'
 import { Input } from '@/shared/components/ui/input'
+import { parseApiError } from '@/features/auth/lib/parse-api-error'
+import { PLAYLIST_NAME_MAX_LENGTH } from '../lib/playlist-limits'
 import { Button } from '@/shared/components/ui/button'
 import { Skeleton } from '@/shared/components/ui/skeleton'
 import { useGetPlaylistIndex } from '@/shared/api-client/gen/endpoints'
@@ -104,9 +106,9 @@ export function AddToPlaylistDialog({ open, onOpenChange, songId }: AddToPlaylis
       if (!isCurrentOwnership(owner)) return
       toast.success('Added to playlist')
       onOpenChange(false)
-    } catch {
+    } catch (failure: unknown) {
       if (!isCurrentOwnership(owner)) return
-      toast.error('Failed to add song to playlist')
+      toast.error(parseApiError(failure, 'Failed to add song to playlist').message)
     }
   }
 
@@ -133,9 +135,9 @@ export function AddToPlaylistDialog({ open, onOpenChange, songId }: AddToPlaylis
       }
       setNewName('')
       onOpenChange(false)
-    } catch {
+    } catch (failure: unknown) {
       if (!isCurrentOwnership(owner)) return
-      toast.error('Failed to create playlist')
+      toast.error(parseApiError(failure, 'Failed to create playlist').message)
     } finally {
       if (isCurrentOwnership(owner)) setCreating(false)
     }
@@ -183,6 +185,7 @@ export function AddToPlaylistDialog({ open, onOpenChange, songId }: AddToPlaylis
           <CreateRow>
             <Input
               placeholder="New playlist name"
+              maxLength={PLAYLIST_NAME_MAX_LENGTH}
               value={newName}
               onChange={(e) => setNewName(e.target.value)}
               onKeyDown={(e) => {

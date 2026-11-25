@@ -184,11 +184,13 @@ final class ActivityController
                             description: 'Playback platform (e.g. web, mobile, desktop)',
                             type: 'string',
                             nullable: true,
+                            maxLength: PlayActivityRequest::LABEL_LENGTH,
                         ),
                         'player' => new OA\Schema(
                             description: 'Player application name',
                             type: 'string',
                             nullable: true,
+                            maxLength: PlayActivityRequest::LABEL_LENGTH,
                         ),
                     ],
                 ),

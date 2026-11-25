@@ -25,6 +25,13 @@ use Doctrine\ORM\QueryBuilder;
 
 final class PlaylistRepository implements PlaylistRepositoryInterface
 {
+    /**
+     * Seed of hashtextextended(<owner id>, seed) for the lock that serializes an owner's playlist
+     * creations. Its own seed keeps it apart from the application's other advisory locks; a hash
+     * collision only makes unrelated work wait.
+     */
+    private const int OWNER_PLAYLISTS_LOCK_SEED = 20261125141000;
+
     public function __construct(
         private readonly EntityManagerInterface $entityManager,
         private readonly SongLookupInterface $songs,
@@ -56,6 +63,35 @@ final class PlaylistRepository implements PlaylistRepositoryInterface
 
         // An enclosing transaction still owns its final commit; after rollback callers reload.
         $playlist->markPersisted($version);
+    }
+
+    public function lockOwnerPlaylists(Uuid $ownerId): void
+    {
+        $connection = $this->entityManager->getConnection();
+        if (!$connection->isTransactionActive()) {
+            // Outside a transaction the lock would end with its own statement and serialize nothing.
+            throw new \LogicException('Lock an owner\'s playlists inside the transaction that creates the playlist.');
+        }
+
+        // SQL because DQL has no advisory lock. Not a row lock on the owner: sign-in takes
+        // FOR NO KEY UPDATE on the user row, and a create must not queue behind it.
+        $connection->executeQuery(
+            'SELECT pg_advisory_xact_lock(hashtextextended(:owner, ' . self::OWNER_PLAYLISTS_LOCK_SEED . '))',
+            ['owner' => $ownerId->toString()],
+        )->free();
+    }
+
+    public function countOwnedBy(Uuid $ownerId): int
+    {
+        // A statement of its own after the lock: under READ COMMITTED it sees what the lock's
+        // previous holder committed.
+        return (int) $this->entityManager->createQueryBuilder()
+            ->select('COUNT(p.id)')
+            ->from(PlaylistEntity::class, 'p')
+            ->where('IDENTITY(p.user) = :owner')
+            ->setParameter('owner', $ownerId, 'uuid')
+            ->getQuery()
+            ->getSingleScalarResult();
     }
 
     public function findByUuid(Uuid $uuid): ?Playlist

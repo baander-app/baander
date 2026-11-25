@@ -18,7 +18,6 @@ use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpKernel\Attribute\AsController;
 use Symfony\Component\Routing\Attribute\Route;
 use Symfony\Component\Security\Http\Attribute\IsGranted;
-use Symfony\Component\Serializer\Encoder\JsonEncoder;
 use Symfony\Component\Validator\Constraints as Assert;
 use Symfony\Component\Validator\Validator\ValidatorInterface;
 
@@ -33,7 +32,6 @@ final class PushSubscriptionController
     public function __construct(
         private readonly PushSubscriptionRegistrationPortInterface $subscriptionRegistration,
         private readonly ValidatorInterface $validator,
-        private readonly JsonEncoder $jsonEncoder,
         private readonly Security $security,
         private readonly PushSubscriptionRemovalPortInterface $subscriptionRemoval,
         private readonly array $allowedPushDomains,
@@ -103,6 +101,13 @@ final class PushSubscriptionController
                     ),
                 ),
             ),
+            new OA\Response(
+                response: '400',
+                description: 'The body is not a JSON object',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
+            ),
             new OA\Response(response: '401', description: 'Authentication required'),
             new OA\Response(
                 response: '409',
@@ -124,7 +129,7 @@ final class PushSubscriptionController
     #[IsGranted('IS_AUTHENTICATED_FULLY')]
     public function subscribe(Request $request): JsonResponse
     {
-        $data = $this->jsonEncoder->decode((string)$request->getContent(), 'json');
+        $data = $request->toArray();
 
         $errors = $this->validateSubscription($data);
         if ($errors !== []) {
@@ -183,6 +188,13 @@ final class PushSubscriptionController
         ),
         responses: [
             new OA\Response(response: '204', description: 'Unsubscribed'),
+            new OA\Response(
+                response: '400',
+                description: 'The body is not a JSON object',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
+            ),
             new OA\Response(response: '401', description: 'Authentication required'),
             new OA\Response(response: '422', description: 'Invalid endpoint'),
         ],
@@ -191,7 +203,7 @@ final class PushSubscriptionController
     #[IsGranted('IS_AUTHENTICATED_FULLY')]
     public function unsubscribe(Request $request): JsonResponse
     {
-        $data = $this->jsonEncoder->decode((string)$request->getContent(), 'json');
+        $data = $request->toArray();
 
         if (!isset($data['endpoint']) || !is_string($data['endpoint'])) {
             return $this->errorResponse('Endpoint is required.', 422);
@@ -239,12 +251,12 @@ final class PushSubscriptionController
     private function validateSubscription(array $data): array
     {
         $constraints = new Assert\Collection([
-            'endpoint'        => [new Assert\NotBlank(), new Assert\Url()],
+            'endpoint'        => new Assert\Sequentially([new Assert\Type('string'), new Assert\NotBlank(), new Assert\Url()]),
             'keys'            => new Assert\Collection([
-                'p256dh' => [new Assert\NotBlank()],
-                'auth'   => [new Assert\NotBlank()],
+                'p256dh' => new Assert\Sequentially([new Assert\Type('string'), new Assert\NotBlank()]),
+                'auth'   => new Assert\Sequentially([new Assert\Type('string'), new Assert\NotBlank()]),
             ]),
-            'contentEncoding' => [new Assert\NotBlank(), new Assert\Choice(choices: ['aesgcm', 'aes128gcm'])],
+            'contentEncoding' => new Assert\Sequentially([new Assert\Type('string'), new Assert\NotBlank(), new Assert\Choice(choices: ['aesgcm', 'aes128gcm'])]),
         ]);
 
         $violations = $this->validator->validate($data, $constraints);

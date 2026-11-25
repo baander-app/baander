@@ -11,6 +11,7 @@ import {
 } from '@/shared/components/ui/dropdown-menu'
 import { Badge } from '@/shared/components/ui/badge'
 import { textRole } from '@/shared/theme'
+import { SMART_RULE_LIMIT, SMART_RULE_VALUE_MAX_LENGTH } from '../lib/playlist-limits'
 
 const EditorContainer = styled.div`
   display: flex;
@@ -98,10 +99,13 @@ const OPERATORS = [
   { value: 'is_not_empty', label: 'Is not empty', needsValue: false },
 ] as const
 
+export type SmartRuleField = (typeof FIELDS)[number]['value']
+export type SmartRuleOperator = (typeof OPERATORS)[number]['value']
+
 export interface SmartRule {
   id: string
-  field: string
-  operator: string
+  field: SmartRuleField
+  operator: SmartRuleOperator
   value: string
 }
 
@@ -117,7 +121,10 @@ function generateId(): string {
 }
 
 export function SmartPlaylistEditor({ rules, onChange, disabled }: SmartPlaylistEditorProps) {
+  const atLimit = rules.length >= SMART_RULE_LIMIT
+
   const addRule = useCallback(() => {
+    if (rules.length >= SMART_RULE_LIMIT) return
     onChange([...rules, { id: generateId(), field: 'genre', operator: 'equals', value: '' }])
   }, [rules, onChange])
 
@@ -139,13 +146,15 @@ export function SmartPlaylistEditor({ rules, onChange, disabled }: SmartPlaylist
     <EditorContainer>
       <Header>
         <HintText>
-          Rules are combined with AND logic. Songs must match all rules.
+          {atLimit
+            ? `A smart playlist holds at most ${SMART_RULE_LIMIT} rules.`
+            : 'Rules are combined with AND logic. Songs must match all rules.'}
         </HintText>
         <Button
           variant="ghost"
           size="xs"
           onClick={addRule}
-          disabled={disabled}
+          disabled={disabled || atLimit}
         >
           <Plus size={12} />
           Add rule
@@ -210,6 +219,7 @@ export function SmartPlaylistEditor({ rules, onChange, disabled }: SmartPlaylist
                   value={rule.value}
                   onChange={(e) => updateRule(rule.id, { value: e.target.value })}
                   placeholder="Value..."
+                  maxLength={SMART_RULE_VALUE_MAX_LENGTH}
                   disabled={disabled}
                 />
               )}

@@ -9,7 +9,9 @@ use App\Notification\Domain\Model\NotificationPreference;
 use App\Notification\Domain\Repository\NotificationPreferenceRepositoryInterface;
 use App\Notification\Domain\ValueObject\NotificationCategory;
 use App\Notification\Domain\ValueObject\NotificationChannel;
+use App\Shared\Application\Http\BaanderHeader;
 use App\Tests\Functional\TestCase;
+use PHPUnit\Framework\Attributes\DataProvider;
 
 final class NotificationPreferenceControllerTest extends TestCase
 {
@@ -25,6 +27,38 @@ final class NotificationPreferenceControllerTest extends TestCase
         $this->assertJsonResponse($this->anonymousRequest('PUT', self::ROUTE, [
             'preferences' => [['category' => 'security', 'channel' => 'email', 'enabled' => false]],
         ]), 401);
+    }
+
+    public function testMoreThan64PreferencesAreRefusedAndNoneIsStored(): void
+    {
+        $user = $this->createTestUser();
+        $preference = ['category' => 'security', 'channel' => 'email', 'enabled' => false];
+
+        $this->assertJsonResponse($this->authenticatedRequest('PUT', self::ROUTE, $user, [
+            'preferences' => array_fill(0, 65, $preference),
+        ]), 422);
+        $this->assertSame(0, $this->storedPreferences($user));
+    }
+
+    /** @return iterable<string, array{string, int}> */
+    public static function malformedBodies(): iterable
+    {
+        yield 'preferences that are a string' => ['{"preferences": "all"}', 422];
+        yield 'preference that is a string' => ['{"preferences": ["security"]}', 422];
+        yield 'malformed json' => ['{"preferences":', 400];
+    }
+
+    #[DataProvider('malformedBodies')]
+    public function testAMalformedBodyAnswersAClientError(string $body, int $status): void
+    {
+        $user = $this->createTestUser();
+        $this->client->request('PUT', self::ROUTE, [], [], [
+            'CONTENT_TYPE' => 'application/json',
+            BaanderHeader::TestUserId->serverKey() => $user->getId()->toString(),
+        ], $body);
+
+        $this->assertJsonResponse($this->client->getResponse(), $status, 'error');
+        $this->assertSame(0, $this->storedPreferences($user));
     }
 
     public function testIndexWithoutStoredPreferencesReturnsEveryDefaultCombination(): void
@@ -161,5 +195,13 @@ final class NotificationPreferenceControllerTest extends TestCase
         }
 
         return $preferences;
+    }
+
+    private function storedPreferences(User $user): int
+    {
+        return (int) $this->entityManager->getConnection()->fetchOne(
+            'SELECT count(*) FROM notification_preferences WHERE user_id = ?',
+            [$user->getId()->toString()],
+        );
     }
 }

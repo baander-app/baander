@@ -12,12 +12,10 @@ use App\UserPreference\Interface\Request\UpdateSidebarSectionsRequest;
 use OpenApi\Spec as OA;
 use Symfony\Bundle\SecurityBundle\Security;
 use Symfony\Component\HttpFoundation\JsonResponse;
-use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpKernel\Attribute\AsController;
+use Symfony\Component\HttpKernel\Attribute\MapRequestPayload;
 use Symfony\Component\Routing\Attribute\Route;
 use Symfony\Component\Security\Http\Attribute\IsGranted;
-use Symfony\Component\Serializer\Encoder\JsonEncoder;
-use Symfony\Component\Validator\Validator\ValidatorInterface;
 
 #[AsController]
 #[OA\Tag(name: 'User Preferences', description: 'User preference management endpoints')]
@@ -30,8 +28,6 @@ final class SidebarConfigController
 
     public function __construct(
         private readonly SidebarConfigPortInterface $sidebarConfigPort,
-        private readonly ValidatorInterface $validator,
-        private readonly JsonEncoder $jsonEncoder,
         private readonly Security $security,
     ) {
     }
@@ -124,36 +120,7 @@ final class SidebarConfigController
             required: true,
             content: new OA\MediaType(
                 mediaType: 'application/json',
-                schema: new OA\Schema(
-                    type: 'object',
-                    properties: [
-                        'sections' => new OA\Schema(
-                            type: 'array',
-                            items: new OA\Schema(
-                                type: 'object',
-                                properties: [
-                                    'id' => new OA\Schema(type: 'string'),
-                                    'label' => new OA\Schema(type: 'string'),
-                                    'type' => new OA\Schema(type: 'string'),
-                                    'items' => new OA\Schema(
-                                        type: 'array',
-                                        items: new OA\Schema(
-                                            type: 'object',
-                                            properties: [
-                                                'id' => new OA\Schema(type: 'string'),
-                                                'type' => new OA\Schema(type: 'string'),
-                                                'label' => new OA\Schema(type: 'string'),
-                                                'icon' => new OA\Schema(type: 'string'),
-                                                'config' => new OA\Schema(type: 'object'),
-                                            ],
-                                        ),
-                                    ),
-                                ],
-                            ),
-                        ),
-                    ],
-                    required: ['sections'],
-                ),
+                schema: new OA\Schema(ref: UpdateSidebarSectionsRequest::class),
             ),
         ),
         responses: [
@@ -200,6 +167,13 @@ final class SidebarConfigController
                 ),
             ),
             new OA\Response(
+                response: '400',
+                description: 'The body is not a JSON object',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
+            ),
+            new OA\Response(
                 response: '401',
                 description: 'Not authenticated',
                 content: new OA\MediaType\Json(
@@ -217,7 +191,7 @@ final class SidebarConfigController
     )]
     #[Route('/{mediaType}', name: 'update', methods: ['PUT'])]
     #[IsGranted('IS_AUTHENTICATED_FULLY')]
-    public function update(Request $request, string $mediaType): JsonResponse
+    public function update(string $mediaType, #[MapRequestPayload] UpdateSidebarSectionsRequest $dto): JsonResponse
     {
         $error = $this->validateMediaType($mediaType);
         if ($error !== null) {
@@ -227,14 +201,6 @@ final class SidebarConfigController
         /** @var SecurityUser $user */
         $user = $this->security->getUser();
         $userId = Uuid::fromString($user->getId());
-
-        $data = $this->jsonEncoder->decode((string) $request->getContent(), 'json');
-        $dto = new UpdateSidebarSectionsRequest($data['sections'] ?? []);
-
-        $errors = $this->validator->validate($dto);
-        if (count($errors) > 0) {
-            return $this->errorResponse('Invalid sidebar configuration.', 422);
-        }
 
         $config = $this->sidebarConfigPort->updateConfig($userId, $mediaType, $dto->sections);
 

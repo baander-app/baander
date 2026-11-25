@@ -1,4 +1,7 @@
-import { cleanup, screen, within } from '@testing-library/react'
+import { cleanup, screen, waitFor, within } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
+import { AxiosError, AxiosHeaders } from 'axios'
+import { toast } from 'sonner'
 import { MemoryRouter } from 'react-router-dom'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -10,6 +13,10 @@ import { PlaylistsPage } from '../PlaylistsPage'
 
 vi.mock('@/shared/api-client/axios-instance', () => ({
   customInstance: vi.fn(),
+}))
+
+vi.mock('sonner', () => ({
+  toast: { success: vi.fn(), error: vi.fn() },
 }))
 
 const mockRequest = vi.mocked(customInstance)
@@ -80,5 +87,51 @@ describe('PlaylistsPage shared badge', () => {
     expect(within(theirs).getByText('Shared with you')).toBeInTheDocument()
     expect(within(mine).queryByText('Shared with you')).not.toBeInTheDocument()
     expect(screen.getAllByText('Shared with you')).toHaveLength(1)
+  })
+})
+
+describe('PlaylistsPage create form', () => {
+  beforeEach(() => {
+    mockRequest.mockReset()
+    vi.mocked(toast.error).mockReset()
+    mockRequest.mockImplementation(async (url: string, options?: { method?: string }) => {
+      if (url === '/api/playlists/' && options?.method === 'POST') {
+        const config = { headers: new AxiosHeaders() }
+        throw new AxiosError('Request failed with status code 409', 'ERR_BAD_REQUEST', config, undefined, {
+          data: { error: { code: 409, message: 'An owner may keep at most 1000 playlists.', details: { reason: 'playlist_limit', limit: 1000 } } },
+          status: 409,
+          statusText: 'Conflict',
+          headers: {},
+          config,
+        })
+      }
+      if (url === '/api/playlists/') return { data: [MINE] }
+
+      throw new Error(`Unexpected request ${url}`)
+    })
+    useAuthStore.setState({
+      user: { publicId: VIEWER, email: 'viewer@baander.app', name: 'Viewer', roles: ['ROLE_USER'] },
+      isAuthenticated: true,
+    })
+  })
+
+  afterEach(() => {
+    cleanup()
+    useAuthStore.setState(initialAuthState, true)
+  })
+
+  it('bounds the name and description and shows the server refusal', async () => {
+    const user = userEvent.setup()
+    renderPage()
+    await screen.findByRole('link', { name: /Mine/ })
+
+    await user.click(screen.getByRole('button', { name: 'Create playlist' }))
+    const name = screen.getByPlaceholderText('Playlist name')
+    expect(name).toHaveAttribute('maxLength', '255')
+    expect(screen.getByPlaceholderText('Description (optional)')).toHaveAttribute('maxLength', '2000')
+    await user.type(name, 'One too many')
+    await user.click(screen.getByRole('button', { name: 'Create' }))
+
+    await waitFor(() => expect(toast.error).toHaveBeenCalledWith('An owner may keep at most 1000 playlists.'))
   })
 })

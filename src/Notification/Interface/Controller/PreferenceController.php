@@ -16,12 +16,10 @@ use App\Shared\Interface\Controller\ApiResponsesTrait;
 use OpenApi\Spec as OA;
 use Symfony\Bundle\SecurityBundle\Security;
 use Symfony\Component\HttpFoundation\JsonResponse;
-use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpKernel\Attribute\AsController;
+use Symfony\Component\HttpKernel\Attribute\MapRequestPayload;
 use Symfony\Component\Routing\Attribute\Route;
 use Symfony\Component\Security\Http\Attribute\IsGranted;
-use Symfony\Component\Serializer\Encoder\JsonEncoder;
-use Symfony\Component\Validator\Validator\ValidatorInterface;
 
 #[AsController]
 #[OA\Tag(
@@ -35,8 +33,6 @@ final class PreferenceController
 
     public function __construct(
         private readonly NotificationPreferenceRepositoryInterface $preferenceRepository,
-        private readonly ValidatorInterface $validator,
-        private readonly JsonEncoder $jsonEncoder,
         private readonly Security $security,
     ) {
     }
@@ -122,30 +118,7 @@ final class PreferenceController
             required: true,
             content: new OA\MediaType(
                 mediaType: 'application/json',
-                schema: new OA\Schema(
-                    type: 'object',
-                    properties: [
-                        'preferences' => new OA\Schema(
-                            type: 'array',
-                            items: new OA\Schema(
-                                type: 'object',
-                                properties: [
-                                    'category' => new OA\Schema(
-                                        type: 'string',
-                                        enum: ['security', 'background_jobs', 'media_changes'],
-                                    ),
-                                    'channel' => new OA\Schema(
-                                        type: 'string',
-                                        enum: ['in_app', 'email', 'push', 'webhook'],
-                                    ),
-                                    'enabled' => new OA\Schema(type: 'boolean'),
-                                ],
-                                required: ['category', 'channel', 'enabled'],
-                            ),
-                        ),
-                    ],
-                    required: ['preferences'],
-                ),
+                schema: new OA\Schema(ref: UpdatePreferenceRequest::class),
             ),
         ),
         responses: [
@@ -162,6 +135,13 @@ final class PreferenceController
                 ),
             ),
             new OA\Response(
+                response: '400',
+                description: 'The body is not a JSON object',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
+            ),
+            new OA\Response(
                 response: '422',
                 description: 'Invalid input',
                 content: new OA\MediaType\Json(
@@ -172,19 +152,11 @@ final class PreferenceController
     )]
     #[Route('/', name: 'update', methods: ['PUT'])]
     #[IsGranted('IS_AUTHENTICATED_FULLY')]
-    public function update(Request $request): JsonResponse
+    public function update(#[MapRequestPayload] UpdatePreferenceRequest $dto): JsonResponse
     {
         /** @var SecurityUser $user */
         $user = $this->security->getUser();
         $userId = Uuid::fromString($user->getId());
-
-        $data = $this->jsonEncoder->decode((string)$request->getContent(), 'json');
-        $dto = new UpdatePreferenceRequest($data['preferences'] ?? []);
-
-        $errors = $this->validator->validate($dto);
-        if (count($errors) > 0) {
-            return $this->errorResponse('Invalid preference data.', 422);
-        }
 
         foreach ($dto->preferences as $item) {
             $category = NotificationCategory::from($item['category']);

@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace App\Playlist\Application\CommandHandler;
 
 use App\Playlist\Application\Command\AddCollaboratorCommand;
+use App\Playlist\Application\Exception\PlaylistLimitReachedException;
+use App\Playlist\Application\PlaylistLimits;
 use App\Playlist\Application\Port\PlaylistCollaboratorResolverInterface;
 use App\Playlist\Domain\Repository\PlaylistRepositoryInterface;
 use App\Shared\Application\Exception\InvalidInputException;
@@ -26,8 +28,9 @@ final class AddCollaboratorHandler
     }
 
     /**
-     * @throws NotFoundException     when no user has the public id
-     * @throws InvalidInputException when the public id is the owner's own
+     * @throws NotFoundException             when no user has the public id
+     * @throws InvalidInputException         when the public id is the owner's own
+     * @throws PlaylistLimitReachedException when the playlist already has the most collaborators allowed
      */
     #[AsMessageHandler]
     public function __invoke(AddCollaboratorCommand $command): void
@@ -51,6 +54,11 @@ final class AddCollaboratorHandler
             }
             if ($playlist->isCollaborator($userId)) {
                 return;
+            }
+            // The save compares the collaborators it read with the rows, so a concurrent
+            // addition conflicts and the retry counts again.
+            if (count($playlist->collaboratorIds()) >= PlaylistLimits::COLLABORATORS_PER_PLAYLIST) {
+                throw PlaylistLimitReachedException::collaborators();
             }
 
             $playlist->addCollaborator($userId);

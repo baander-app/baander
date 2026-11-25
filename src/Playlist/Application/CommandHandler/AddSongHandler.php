@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace App\Playlist\Application\CommandHandler;
 
 use App\Playlist\Application\Command\AddSongCommand;
+use App\Playlist\Application\Exception\PlaylistLimitReachedException;
+use App\Playlist\Application\PlaylistLimits;
 use App\Playlist\Application\Port\PlaylistSongVisibilityInterface;
 use App\Playlist\Domain\Model\Playlist;
 use App\Playlist\Domain\Repository\PlaylistRepositoryInterface;
@@ -21,7 +23,8 @@ final class AddSongHandler
     }
 
     /**
-     * @throws NotFoundException when the song does not exist or the acting user cannot see it
+     * @throws NotFoundException             when the song does not exist or the acting user cannot see it
+     * @throws PlaylistLimitReachedException when the playlist already holds the most songs allowed
      */
     #[AsMessageHandler]
     public function __invoke(AddSongCommand $command): Playlist
@@ -44,6 +47,12 @@ final class AddSongHandler
         // Idempotent: if the song already exists in the playlist, return as-is
         if (array_any($playlist->getSongs(), fn($song) => $song->getSongId()->equals($command->getSongId()))) {
             return $playlist;
+        }
+
+        // The save compares the entries it read with the rows, so a concurrent addition
+        // conflicts instead of passing the cap.
+        if (count($playlist->getSongs()) >= PlaylistLimits::SONGS_PER_PLAYLIST) {
+            throw PlaylistLimitReachedException::songs();
         }
 
         $playlist->appendSong($command->getSongId());

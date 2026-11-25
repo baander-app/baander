@@ -15,12 +15,10 @@ use App\UserPreference\Interface\Request\UpdateEqDeviceProfileRequest;
 use OpenApi\Spec as OA;
 use Symfony\Bundle\SecurityBundle\Security;
 use Symfony\Component\HttpFoundation\JsonResponse;
-use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpKernel\Attribute\AsController;
+use Symfony\Component\HttpKernel\Attribute\MapRequestPayload;
 use Symfony\Component\Routing\Attribute\Route;
 use Symfony\Component\Security\Http\Attribute\IsGranted;
-use Symfony\Component\Serializer\Encoder\JsonEncoder;
-use Symfony\Component\Validator\Validator\ValidatorInterface;
 
 #[AsController]
 #[OA\Tag(name: 'EQ Device Profiles', description: 'Named device EQ profile management')]
@@ -31,8 +29,6 @@ final class EqDeviceProfileController
 
     public function __construct(
         private readonly EqDeviceProfilePortInterface $profilePort,
-        private readonly ValidatorInterface $validator,
-        private readonly JsonEncoder $jsonEncoder,
         private readonly Security $security,
     ) {
     }
@@ -92,22 +88,28 @@ final class EqDeviceProfileController
             required: true,
             content: new OA\MediaType(
                 mediaType: 'application/json',
-                schema: new OA\Schema(
-                    type: 'object',
-                    properties: [
-                        'name' => new OA\Schema(type: 'string'),
-                        'icon' => new OA\Schema(type: 'string'),
-                        'deviceId' => new OA\Schema(type: 'string', nullable: true),
-                    ],
-                    required: ['name', 'icon'],
-                ),
+                schema: new OA\Schema(ref: CreateEqDeviceProfileRequest::class),
             ),
         ),
         responses: [
             new OA\Response(response: '201', description: 'Profile created'),
             new OA\Response(
+                response: '400',
+                description: 'The body is not a JSON object',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
+            ),
+            new OA\Response(
                 response: '401',
                 description: 'Not authenticated',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
+            ),
+            new OA\Response(
+                response: '409',
+                description: 'The user already keeps the most profiles a user may keep (reason eq_profile_limit)',
                 content: new OA\MediaType\Json(
                     schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
                 ),
@@ -123,24 +125,10 @@ final class EqDeviceProfileController
     )]
     #[Route('/', name: 'create', methods: ['POST'])]
     #[IsGranted('IS_AUTHENTICATED_FULLY')]
-    public function create(Request $request): JsonResponse
+    public function create(#[MapRequestPayload] CreateEqDeviceProfileRequest $dto): JsonResponse
     {
-        $userId = $this->getUserId();
-        $data = $this->jsonEncoder->decode((string) $request->getContent(), 'json');
-
-        $dto = new CreateEqDeviceProfileRequest(
-            name: $data['name'] ?? '',
-            icon: $data['icon'] ?? 'custom',
-            deviceId: $data['deviceId'] ?? null,
-        );
-
-        $errors = $this->validator->validate($dto);
-        if (count($errors) > 0) {
-            return $this->validationErrorResponse($errors);
-        }
-
         $profile = $this->profilePort->createProfile(
-            $userId,
+            $this->getUserId(),
             $dto->name,
             $dto->icon,
             $dto->deviceId,
@@ -202,16 +190,7 @@ final class EqDeviceProfileController
             required: true,
             content: new OA\MediaType(
                 mediaType: 'application/json',
-                schema: new OA\Schema(
-                    type: 'object',
-                    properties: [
-                        'name' => new OA\Schema(type: 'string'),
-                        'icon' => new OA\Schema(type: 'string'),
-                        'deviceId' => new OA\Schema(type: 'string', nullable: true),
-                        'payload' => new OA\Schema(type: 'object'),
-                        'sortOrder' => new OA\Schema(type: 'integer'),
-                    ],
-                ),
+                schema: new OA\Schema(ref: UpdateEqDeviceProfileRequest::class),
             ),
         ),
         responses: [
@@ -225,6 +204,13 @@ final class EqDeviceProfileController
                             'data' => new OA\Schema(ref: \App\UserPreference\Interface\Resource\EqDeviceProfileResource::class),
                         ],
                     ),
+                ),
+            ),
+            new OA\Response(
+                response: '400',
+                description: 'The body is not a JSON object',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
                 ),
             ),
             new OA\Response(
@@ -252,23 +238,8 @@ final class EqDeviceProfileController
     )]
     #[Route('/{id}', name: 'update', methods: ['PUT'])]
     #[IsGranted('IS_AUTHENTICATED_FULLY')]
-    public function update(Request $request, string $id): JsonResponse
+    public function update(string $id, #[MapRequestPayload] UpdateEqDeviceProfileRequest $dto): JsonResponse
     {
-        $data = $this->jsonEncoder->decode((string) $request->getContent(), 'json');
-
-        $dto = new UpdateEqDeviceProfileRequest(
-            name: $data['name'] ?? null,
-            icon: $data['icon'] ?? null,
-            deviceId: $data['deviceId'] ?? null,
-            payload: $data['payload'] ?? null,
-            sortOrder: $data['sortOrder'] ?? null,
-        );
-
-        $errors = $this->validator->validate($dto);
-        if (count($errors) > 0) {
-            return $this->validationErrorResponse($errors);
-        }
-
         try {
             $profile = $this->profilePort->updateProfile(
                 $this->getUserId(),

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\UserPreference\Interface\Request;
 
+use App\UserPreference\Application\UserPreferenceLimits;
 use OpenApi\Spec as OA;
 use Symfony\Component\Validator\Constraints as Assert;
 
@@ -26,6 +27,7 @@ use Symfony\Component\Validator\Constraints as Assert;
             description: 'Client audio-output token, independent of database identity',
             type: 'string',
             nullable: true,
+            maxLength: UserPreferenceLimits::EQ_DEVICE_ID_LENGTH,
             example: 'audio-output-group-abc',
             default: null,
         ),
@@ -44,6 +46,7 @@ final readonly class CreateEqDeviceProfileRequest
         #[Assert\Choice(choices: ['headphones', 'speakers', 'hifi-speaker', 'wireless-speaker', 'car', 'tv', 'monitor', 'custom'], message: 'Invalid icon.')]
         public string $icon = 'custom',
 
+        #[Assert\Length(max: UserPreferenceLimits::EQ_DEVICE_ID_LENGTH)]
         public ?string $deviceId = null,
     ) {
     }

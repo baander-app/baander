@@ -14,6 +14,13 @@ use Doctrine\ORM\EntityManagerInterface;
 
 final class EqDeviceProfileDoctrineRepository implements EqDeviceProfileRepositoryInterface
 {
+    /**
+     * Seed of hashtextextended(<user id>, seed) for the lock that serializes a user's profile
+     * creations. Its own seed keeps it apart from the application's other advisory locks; a hash
+     * collision only makes unrelated work wait.
+     */
+    private const int USER_PROFILES_LOCK_SEED = 20261125141100;
+
     public function __construct(
         private readonly EntityManagerInterface $entityManager,
     ) {
@@ -72,6 +79,21 @@ final class EqDeviceProfileDoctrineRepository implements EqDeviceProfileReposito
         $this->syncToEntity($model, $entity);
         $this->entityManager->persist($entity);
         $this->entityManager->flush();
+    }
+
+    public function lockUserProfiles(Uuid $userId): void
+    {
+        $connection = $this->entityManager->getConnection();
+        if (!$connection->isTransactionActive()) {
+            // Outside a transaction the lock would end with its own statement and serialize nothing.
+            throw new \LogicException('Lock a user\'s EQ profiles inside the transaction that creates the profile.');
+        }
+
+        // SQL because DQL has no advisory lock.
+        $connection->executeQuery(
+            'SELECT pg_advisory_xact_lock(hashtextextended(:user, ' . self::USER_PROFILES_LOCK_SEED . '))',
+            ['user' => $userId->toString()],
+        )->free();
     }
 
     public function delete(EqDeviceProfile $model): void

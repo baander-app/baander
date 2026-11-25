@@ -26,6 +26,7 @@ use Symfony\Component\Validator\Constraints as Assert;
                 ],
                 required: ['category', 'channel', 'enabled'],
             ),
+            maxItems: UpdatePreferenceRequest::MAX_PREFERENCES,
             default: [],
         ),
     ],
@@ -34,12 +35,15 @@ use Symfony\Component\Validator\Constraints as Assert;
 )]
 final readonly class UpdatePreferenceRequest
 {
+    public const int MAX_PREFERENCES = 64;
+
     /**
      * @param list<array{category: string, channel: string, enabled: bool}> $preferences
      */
     public function __construct(
         #[Assert\NotBlank(message: 'Preferences are required.')]
         #[Assert\Type(type: 'array')]
+        #[Assert\Count(max: self::MAX_PREFERENCES)]
         #[Assert\All([
             new Assert\Collection([
                 'category' => [

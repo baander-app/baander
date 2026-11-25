@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Tests\Functional\Controller;
 
 use App\Auth\Domain\Model\User;
+use App\Shared\Application\Http\BaanderHeader;
 use App\Tests\Functional\TestCase;
 use App\UserPreference\Application\Port\EqDeviceProfilePortInterface;
 use PHPUnit\Framework\Attributes\DataProvider;
@@ -112,6 +113,43 @@ final class EqDeviceProfileControllerTest extends TestCase
         $response = $this->createProfile($user, 'Custom Device', 'custom');
 
         $this->assertSame(201, $response->getStatusCode(), $response->getContent());
+    }
+
+    /** @return iterable<string, array{string, int}> */
+    public static function malformedCreateBodies(): iterable
+    {
+        yield 'name is a list' => ['{"name": [], "icon": "custom"}', 422];
+        yield 'device id is an object' => ['{"name": "Headphones", "icon": "custom", "deviceId": {"a": 1}}', 422];
+        yield 'device id over 255 characters' => [json_encode(['name' => 'Headphones', 'icon' => 'custom', 'deviceId' => str_repeat('d', 256)], JSON_THROW_ON_ERROR), 422];
+        yield 'malformed json' => ['{"name":', 400];
+        yield 'empty body' => ['', 400];
+    }
+
+    #[DataProvider('malformedCreateBodies')]
+    public function testMalformedCreateAnswersAClientErrorAndStoresNothing(string $body, int $status): void
+    {
+        $user = $this->createTestUser();
+
+        $this->assertJsonResponse($this->rawRequest('POST', '/api/user/eq-profiles/', $user, $body), $status, 'error');
+        $this->assertSame(0, $this->storedProfiles($user));
+    }
+
+    public function testThe51stProfileIsRefused(): void
+    {
+        $user = $this->createTestUser();
+        $this->entityManager->getConnection()->executeStatement(
+            <<<'SQL'
+                INSERT INTO eq_device_profiles (id, public_id, user_id, name, sort_order)
+                SELECT gen_random_uuid(), 'eqp' || lpad(i::text, 18, '0'), ?, 'Profile ' || i, i
+                FROM generate_series(1, 50) AS i
+                SQL,
+            [$user->getId()->toString()],
+        );
+
+        $error = $this->assertJsonResponse($this->createProfile($user, 'One too many', 'custom'), 409, 'error');
+
+        $this->assertSame(['reason' => 'eq_profile_limit', 'limit' => 50], $error['error']['details']);
+        $this->assertSame(50, $this->storedProfiles($user));
     }
 
     // ---------------------------------------------------------------
@@ -311,6 +349,50 @@ final class EqDeviceProfileControllerTest extends TestCase
     // ---------------------------------------------------------------
     // Helpers
     // ---------------------------------------------------------------
+
+    public function testAPayloadOver16KibIsRefusedAndTheProfileIsUnchanged(): void
+    {
+        $user = $this->createTestUser();
+        $created = $this->assertJsonResponse($this->createProfile($user, 'Speakers', 'speakers'), 201, 'data');
+        $id = $created['data']['publicId'];
+
+        $response = $this->authenticatedRequest('PUT', '/api/user/eq-profiles/' . $id, $user, [
+            'payload' => ['bands' => str_repeat('b', 16384)],
+        ]);
+
+        $error = $this->assertJsonResponse($response, 422, 'error');
+        $this->assertArrayHasKey('payload', $error['error']['details']);
+        $shown = $this->assertJsonResponse($this->authenticatedRequest('GET', '/api/user/eq-profiles/' . $id, $user), 200, 'data');
+        $this->assertSame([], $shown['data']['payload']);
+    }
+
+    public function testAMalformedUpdateAnswers422(): void
+    {
+        $user = $this->createTestUser();
+        $created = $this->assertJsonResponse($this->createProfile($user, 'Speakers', 'speakers'), 201, 'data');
+
+        $response = $this->rawRequest('PUT', '/api/user/eq-profiles/' . $created['data']['publicId'], $user, '{"payload": "flat", "sortOrder": "first"}');
+
+        $this->assertJsonResponse($response, 422, 'error');
+    }
+
+    private function rawRequest(string $method, string $uri, User $user, string $body): Response
+    {
+        $this->client->request($method, $uri, [], [], [
+            'CONTENT_TYPE' => 'application/json',
+            BaanderHeader::TestUserId->serverKey() => $user->getId()->toString(),
+        ], $body);
+
+        return $this->client->getResponse();
+    }
+
+    private function storedProfiles(User $user): int
+    {
+        return (int) $this->entityManager->getConnection()->fetchOne(
+            'SELECT count(*) FROM eq_device_profiles WHERE user_id = ?',
+            [$user->getId()->toString()],
+        );
+    }
 
     private function createProfile(User $user, string $name, string $icon, ?string $deviceId = null): Response
     {

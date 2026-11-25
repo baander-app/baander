@@ -18,19 +18,28 @@ use Symfony\Component\Validator\Constraints as Assert;
         'id' => new OA\Schema(type: 'string'),
         'containers' => new OA\Schema(
             type: 'array',
-            items: new OA\Schema(type: 'string'),
+            items: new OA\Schema(
+                type: 'string',
+                maxLength: DeliveryRequest::CAPABILITY_LENGTH,
+            ),
             minItems: 1,
             maxItems: 32,
         ),
         'videoCodecs' => new OA\Schema(
             type: 'array',
-            items: new OA\Schema(type: 'string'),
+            items: new OA\Schema(
+                type: 'string',
+                maxLength: DeliveryRequest::CAPABILITY_LENGTH,
+            ),
             maxItems: 32,
             default: [],
         ),
         'audioCodecs' => new OA\Schema(
             type: 'array',
-            items: new OA\Schema(type: 'string'),
+            items: new OA\Schema(
+                type: 'string',
+                maxLength: DeliveryRequest::CAPABILITY_LENGTH,
+            ),
             maxItems: 32,
             default: [],
         ),
@@ -64,7 +73,11 @@ use Symfony\Component\Validator\Constraints as Assert;
         'subtitleBurnIn' => new OA\Schema(type: 'boolean', default: false),
         'transports' => new OA\Schema(
             type: 'array',
-            items: new OA\Schema(type: 'string'),
+            items: new OA\Schema(
+                type: 'string',
+                maxLength: DeliveryRequest::CAPABILITY_LENGTH,
+            ),
+            maxItems: 32,
             default: ['file'],
         ),
         'maxBitDepth' => new OA\Schema(
@@ -76,7 +89,10 @@ use Symfony\Component\Validator\Constraints as Assert;
         'supportsHdr' => new OA\Schema(type: 'boolean', default: false),
         'pixelFormats' => new OA\Schema(
             type: 'array',
-            items: new OA\Schema(type: 'string'),
+            items: new OA\Schema(
+                type: 'string',
+                maxLength: DeliveryRequest::CAPABILITY_LENGTH,
+            ),
             maxItems: 32,
             default: ['yuv420p', 'yuvj420p', 'nv12'],
         ),
@@ -104,6 +120,9 @@ use Symfony\Component\Validator\Constraints as Assert;
 )]
 final readonly class DeliveryRequest
 {
+    /** The longest container, codec, pixel format or transport name a capability list may carry. */
+    public const int CAPABILITY_LENGTH = 32;
+
     /**
      * @param list<string> $containers
      * @param list<string> $videoCodecs
@@ -117,10 +136,13 @@ final readonly class DeliveryRequest
         #[Assert\NotBlank]
         public string $id,
         #[Assert\Count(min: 1, max: 32)]
+        #[Assert\All([new Assert\Type('string'), new Assert\Length(max: self::CAPABILITY_LENGTH)])]
         public array $containers,
         #[Assert\Count(max: 32)]
+        #[Assert\All([new Assert\Type('string'), new Assert\Length(max: self::CAPABILITY_LENGTH)])]
         public array $videoCodecs = [],
         #[Assert\Count(max: 32)]
+        #[Assert\All([new Assert\Type('string'), new Assert\Length(max: self::CAPABILITY_LENGTH)])]
         public array $audioCodecs = [],
         #[Assert\Positive]
         public ?int $maxWidth = null,
@@ -131,11 +153,14 @@ final readonly class DeliveryRequest
         #[Assert\PositiveOrZero]
         public ?int $audioStreamIndex = null,
         public bool $subtitleBurnIn = false,
+        #[Assert\Count(max: 32)]
+        #[Assert\All([new Assert\Type('string'), new Assert\Length(max: self::CAPABILITY_LENGTH)])]
         public array $transports = ['file'],
         #[Assert\Range(min: 8, max: 16)]
         public int $maxBitDepth = 8,
         public bool $supportsHdr = false,
         #[Assert\Count(max: 32)]
+        #[Assert\All([new Assert\Type('string'), new Assert\Length(max: self::CAPABILITY_LENGTH)])]
         public array $pixelFormats = ['yuv420p', 'yuvj420p', 'nv12'],
         #[Assert\Uuid]
         public ?string $requestId = null,

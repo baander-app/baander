@@ -49,7 +49,13 @@ use Symfony\Component\Validator\Constraints as Assert;
         'queue' => new OA\Schema(
             type: 'array',
             nullable: true,
-            items: new OA\Schema(type: 'string'),
+            items: new OA\Schema(
+                type: 'string',
+                minLength: PublicId::LENGTH,
+                maxLength: PublicId::LENGTH,
+                pattern: PublicId::SCHEMA_PATTERN,
+            ),
+            maxItems: ControlPlaybackRequest::MAX_QUEUE,
             default: null,
         ),
         'currentTrackIndex' => new OA\Schema(
@@ -83,6 +89,8 @@ use Symfony\Component\Validator\Constraints as Assert;
 )]
 final readonly class ControlPlaybackRequest
 {
+    public const int MAX_QUEUE = 10000;
+
     /**
      * @param array{kind:string,publicId:string}|null $media
      * @param list<string>|null $queue
@@ -98,6 +106,8 @@ final readonly class ControlPlaybackRequest
         public ?float $position = null,
         #[Assert\Collection(fields: ['kind' => new Assert\Choice(choices: ['song', 'video']), 'publicId' => new Assert\Regex(pattern: PublicId::REGEX)])]
         public ?array $media = null,
+        #[Assert\Type('list')]
+        #[Assert\Count(max: self::MAX_QUEUE)]
         #[Assert\All(constraints: [new Assert\Regex(pattern: PublicId::REGEX)])]
         public ?array $queue = null,
         #[Assert\PositiveOrZero]

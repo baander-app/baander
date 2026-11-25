@@ -4,10 +4,12 @@ declare(strict_types=1);
 
 namespace App\Tests\Functional\Controller;
 
+use App\Auth\Domain\Model\User;
 use App\Library\Application\Port\LibraryAccessPortInterface;
 use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
 use App\Tests\Functional\TestCase;
+use PHPUnit\Framework\Attributes\DataProvider;
 
 final class PlaylistControllerTest extends TestCase
 {
@@ -120,6 +122,141 @@ final class PlaylistControllerTest extends TestCase
 
         $this->assertSame('Renamed', $show['data']['name']);
         $this->assertCount(1, $show['data']['songs'], 'Metadata update must not drop persisted songs.');
+    }
+
+    public function testAThreeMillionCharacterDescriptionIsRefusedAndNothingIsStored(): void
+    {
+        $user = $this->createTestUser();
+
+        $response = $this->authenticatedRequest('POST', '/api/playlists/', $user, [
+            'name' => 'Oversized',
+            'description' => str_repeat('a', 3_000_000),
+        ]);
+
+        $error = $this->assertJsonResponse($response, 422, 'error');
+        $this->assertArrayHasKey('description', $error['error']['details']);
+        $this->assertSame(0, $this->ownedPlaylists($user->getId()));
+    }
+
+    public function testRenamingToA256CharacterNameIsRefused(): void
+    {
+        $user = $this->createTestUser();
+        $publicId = $this->createPlaylist($user, 'Original');
+
+        $response = $this->authenticatedRequest('PATCH', '/api/playlists/' . $publicId, $user, [
+            'name' => str_repeat('a', 256),
+        ]);
+
+        $this->assertJsonResponse($response, 422);
+        $show = $this->assertJsonResponse($this->authenticatedRequest('GET', '/api/playlists/' . $publicId, $user), 200, 'data');
+        $this->assertSame('Original', $show['data']['name']);
+    }
+
+    /** @return iterable<string, array{list<array<string, mixed>>}> */
+    public static function refusedSmartRules(): iterable
+    {
+        yield '51 rules' => [array_fill(0, 51, ['field' => 'genre', 'operator' => 'equals', 'value' => 'Jazz'])];
+        yield 'unknown field' => [[['field' => 'path', 'operator' => 'contains', 'value' => '/']]];
+    }
+
+    /** @param list<array<string, mixed>> $rules */
+    #[DataProvider('refusedSmartRules')]
+    public function testSmartRulesOutsideTheEditorsShapeAreRefused(array $rules): void
+    {
+        $user = $this->createTestUser();
+
+        $response = $this->authenticatedRequest('POST', '/api/playlists/', $user, [
+            'name' => 'Smart',
+            'isSmart' => true,
+            'smartRules' => $rules,
+        ]);
+
+        $this->assertJsonResponse($response, 422);
+        $this->assertSame(0, $this->ownedPlaylists($user->getId()));
+    }
+
+    public function testTheThousandAndFirstPlaylistIsRefused(): void
+    {
+        $user = $this->createTestUser();
+        $this->entityManager->getConnection()->executeStatement(
+            <<<'SQL'
+                INSERT INTO playlists (id, public_id, user_id, name, created_at, updated_at)
+                SELECT gen_random_uuid(), 'cap' || lpad(i::text, 18, '0'), ?, 'Playlist ' || i, now(), now()
+                FROM generate_series(1, 999) AS i
+                SQL,
+            [$user->getId()->toString()],
+        );
+
+        $this->createPlaylist($user, 'The thousandth');
+        $response = $this->authenticatedRequest('POST', '/api/playlists/', $user, ['name' => 'One too many']);
+
+        $error = $this->assertJsonResponse($response, 409, 'error');
+        $this->assertSame(['reason' => 'playlist_limit', 'limit' => 1000], $error['error']['details']);
+        $this->assertSame(1000, $this->ownedPlaylists($user->getId()));
+    }
+
+    public function testTheFiftyFirstCollaboratorIsRefused(): void
+    {
+        $owner = $this->createTestUser();
+        $publicId = $this->createPlaylist($owner, 'Shared');
+        $connection = $this->entityManager->getConnection();
+        $playlistId = $connection->fetchOne('SELECT id FROM playlists WHERE public_id = ?', [$publicId]);
+        $connection->executeStatement(
+            <<<'SQL'
+                WITH collaborators AS (
+                    INSERT INTO users (id, public_id, name, email, password, created_at, updated_at)
+                    SELECT gen_random_uuid(), 'col' || lpad(i::text, 18, '0'), 'Collaborator ' || i,
+                           'collaborator-' || i || '@baander.app', 'hash', now(), now()
+                    FROM generate_series(1, 50) AS i
+                    RETURNING id
+                )
+                INSERT INTO playlist_collaborators (id, playlist_id, user_id, created_at, updated_at)
+                SELECT gen_random_uuid(), ?, id, now(), now() FROM collaborators
+                SQL,
+            [$playlistId],
+        );
+        $fiftyFirst = $this->createTestUser('fifty-first@baander.app');
+
+        $response = $this->authenticatedRequest('PUT', '/api/playlists/' . $publicId . '/collaborators/' . $fiftyFirst->getPublicId()->toString(), $owner);
+
+        $error = $this->assertJsonResponse($response, 409, 'error');
+        $this->assertSame(['reason' => 'collaborator_limit', 'limit' => 50], $error['error']['details']);
+        $this->assertSame(50, (int) $connection->fetchOne('SELECT count(*) FROM playlist_collaborators WHERE playlist_id = ?', [$playlistId]));
+    }
+
+    public function testAPlaylistStoredBeforeItsBoundsStaysReadableAndDeletable(): void
+    {
+        $user = $this->createTestUser();
+        $publicId = $this->createPlaylist($user, 'Stored earlier');
+        $description = str_repeat('d', 5000);
+        $connection = $this->entityManager->getConnection();
+        // Recreates the state the migration leaves: a row over the bound under a NOT VALID check.
+        $connection->executeStatement('ALTER TABLE playlists DROP CONSTRAINT chk_playlists_description_length');
+        $connection->executeStatement('UPDATE playlists SET description = ? WHERE public_id = ?', [$description, $publicId]);
+        $connection->executeStatement('ALTER TABLE playlists ADD CONSTRAINT chk_playlists_description_length CHECK (char_length(description) <= 2000) NOT VALID');
+
+        $show = $this->assertJsonResponse($this->authenticatedRequest('GET', '/api/playlists/' . $publicId, $user), 200, 'data');
+        $this->assertSame($description, $show['data']['description']);
+        $index = $this->assertJsonResponse($this->authenticatedRequest('GET', '/api/playlists/', $user), 200, 'data');
+        $this->assertSame($description, $index['data'][0]['description']);
+
+        $this->assertSame(204, $this->authenticatedRequest('DELETE', '/api/playlists/' . $publicId, $user)->getStatusCode());
+        $this->assertSame(0, $this->ownedPlaylists($user->getId()));
+    }
+
+    private function createPlaylist(User $user, string $name): string
+    {
+        $created = $this->assertJsonResponse($this->authenticatedRequest('POST', '/api/playlists/', $user, ['name' => $name]), 201);
+
+        return $created['publicId'];
+    }
+
+    private function ownedPlaylists(Uuid $userId): int
+    {
+        return (int) $this->entityManager->getConnection()->fetchOne(
+            'SELECT count(*) FROM playlists WHERE user_id = ?',
+            [$userId->toString()],
+        );
     }
 
     private function createLibraryFixture(Uuid $userId): Uuid

@@ -14,6 +14,15 @@ interface PlaylistRepositoryInterface
 {
     public function save(Playlist $playlist): void;
 
+    /**
+     * Makes the owner's playlist creations take turns until the caller's transaction ends.
+     * Requires an open transaction.
+     */
+    public function lockOwnerPlaylists(Uuid $ownerId): void;
+
+    /** The number of playlists the user owns, as committed when the statement runs. */
+    public function countOwnedBy(Uuid $ownerId): int;
+
     public function findByUuid(Uuid $uuid): ?Playlist;
 
     public function findByPublicId(PublicId $publicId): ?Playlist;

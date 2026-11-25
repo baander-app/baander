@@ -16,13 +16,18 @@ use Symfony\Component\Validator\Constraints as Assert;
             minLength: PublicId::LENGTH,
             maxLength: PublicId::LENGTH,
         ),
-        'streamUrl' => new OA\Schema(type: 'string'),
+        'streamUrl' => new OA\Schema(
+            type: 'string',
+            maxLength: StartRadioRequest::STREAM_URL_LENGTH,
+        ),
     ],
     required: ['stationId', 'streamUrl'],
     component: 'StartRadioRequest',
 )]
 final readonly class StartRadioRequest
 {
+    public const int STREAM_URL_LENGTH = 2048;
+
     public function __construct(
         #[Assert\NotBlank]
         #[Assert\Length(exactly: PublicId::LENGTH)]
@@ -30,6 +35,7 @@ final readonly class StartRadioRequest
         public string $stationId,
 
         #[Assert\NotBlank]
+        #[Assert\Length(max: self::STREAM_URL_LENGTH)]
         #[Assert\Url]
         public string $streamUrl,
     ) {

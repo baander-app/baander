@@ -10,6 +10,8 @@ use App\Catalog\Infrastructure\Doctrine\Entity\SongEntity;
 use App\Library\Infrastructure\Doctrine\Entity\LibraryEntity;
 use App\Playlist\Application\Command\AddCollaboratorCommand;
 use App\Playlist\Application\Command\AddSongCommand;
+use App\Playlist\Application\Command\CreatePlaylistCommand;
+use App\Playlist\Application\Exception\PlaylistLimitReachedException;
 use App\Playlist\Application\CommandHandler\AddSongHandler;
 use App\Playlist\Application\Port\PlaylistSongVisibilityInterface;
 use App\Playlist\Application\Command\ReorderSongsCommand;
@@ -414,6 +416,31 @@ final class PlaylistConcurrencyTest extends TestCase
         } catch (PlaylistWriteConflictException) {
             self::assertSame($before, $this->storedState());
         }
+    }
+
+    public function testConcurrentCreatesAtTheCapLeaveAThousandPlaylists(): void
+    {
+        // setUp stored the owner's first playlist; these bring the owner to one below the cap.
+        $this->observer->executeStatement(
+            <<<'SQL'
+                INSERT INTO playlists (id, public_id, user_id, name, created_at, updated_at)
+                SELECT gen_random_uuid(), 'cap' || lpad(i::text, 18, '0'), ?, 'Playlist ' || i, now(), now()
+                FROM generate_series(1, 998) AS i
+                SQL,
+            [$this->ownerId->toString()],
+        );
+        $child = $this->startChild('create');
+        $manager = $this->manager();
+        $connection = $manager->getConnection();
+        $connection->beginTransaction();
+        PlaylistWriteRace::creator($manager)(new CreatePlaylistCommand('Parent', $this->ownerId));
+        $this->release($child);
+        $this->awaitLockWait($child, $connection);
+        $connection->commit();
+
+        self::assertSame(['outcome' => 'conflict', 'exception' => PlaylistLimitReachedException::class], $this->finish($child));
+        self::assertSame(1000, (int) $this->observer->fetchOne('SELECT count(*) FROM playlists WHERE user_id = ?', [$this->ownerId->toString()]));
+        self::assertSame(1, (int) $this->observer->fetchOne("SELECT count(*) FROM playlists WHERE name = 'Parent'"));
     }
 
     public function testRolledBackWinnerAllowsTheWaitingOriginalSnapshotToSave(): void

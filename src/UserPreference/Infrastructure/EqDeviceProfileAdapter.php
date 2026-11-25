@@ -6,8 +6,11 @@ namespace App\UserPreference\Infrastructure;
 
 use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
+use App\Shared\Application\Port\TransactionPortInterface;
+use App\UserPreference\Application\Exception\EqDeviceProfileLimitReached;
 use App\UserPreference\Application\Exception\EqDeviceProfileNotFound;
 use App\UserPreference\Application\Port\EqDeviceProfilePortInterface;
+use App\UserPreference\Application\UserPreferenceLimits;
 use App\UserPreference\Domain\Model\EqDeviceProfile;
 use App\UserPreference\Domain\Repository\EqDeviceProfileRepositoryInterface;
 
@@ -18,6 +21,7 @@ final class EqDeviceProfileAdapter implements EqDeviceProfilePortInterface
 {
     public function __construct(
         private readonly EqDeviceProfileRepositoryInterface $repository,
+        private readonly TransactionPortInterface $transaction,
     ) {
     }
 
@@ -44,29 +48,45 @@ final class EqDeviceProfileAdapter implements EqDeviceProfilePortInterface
     /**
      * @param array<array-key, mixed> $payload
      * @return ProfileData
+     *
+     * @throws EqDeviceProfileLimitReached when the user already keeps the most profiles allowed
      */
     public function createProfile(Uuid $userId, string $name, string $icon, ?string $deviceId, array $payload, bool $isDefault = false): array
     {
-        $maxOrder = 0;
-        foreach ($this->repository->findByUserId($userId) as $existing) {
-            if ($existing->getSortOrder() >= $maxOrder) {
-                $maxOrder = $existing->getSortOrder() + 1;
+        // The user's lock makes concurrent creates read the profiles in turn, so none passes the
+        // cap; the list is read in a statement after the lock and sees the previous holder's commit.
+        $model = $this->transaction->run(function () use ($userId, $name, $icon, $deviceId, $payload, $isDefault): EqDeviceProfile {
+            $this->repository->lockUserProfiles($userId);
+            $existing = $this->repository->findByUserId($userId);
+            if (count($existing) >= UserPreferenceLimits::EQ_PROFILES_PER_USER) {
+                throw new EqDeviceProfileLimitReached();
             }
-        }
 
-        $model = EqDeviceProfile::create(
-            userId: $userId,
-            name: $name,
-            icon: $icon,
-            deviceId: $deviceId,
-            payload: $payload,
-            isDefault: $isDefault,
-            sortOrder: $maxOrder,
-        );
+            $model = EqDeviceProfile::create(
+                userId: $userId,
+                name: $name,
+                icon: $icon,
+                deviceId: $deviceId,
+                payload: $payload,
+                isDefault: $isDefault,
+                sortOrder: self::nextSortOrder($existing),
+            );
+            $this->repository->save($model);
 
-        $this->repository->save($model);
+            return $model;
+        });
 
         return $this->toArray($model);
+    }
+
+    /** @param array<EqDeviceProfile> $profiles */
+    private static function nextSortOrder(array $profiles): int
+    {
+        return array_reduce(
+            $profiles,
+            static fn (int $next, EqDeviceProfile $profile): int => max($next, $profile->getSortOrder() + 1),
+            0,
+        );
     }
 
     /**

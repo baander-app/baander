@@ -128,21 +128,7 @@ final class PlaylistController
             required: true,
             content: new OA\MediaType(
                 mediaType: 'application/json',
-                schema: new OA\Schema(
-                    type: 'object',
-                    properties: [
-                        'name' => new OA\Schema(type: 'string'),
-                        'description' => new OA\Schema(type: 'string', nullable: true),
-                        'isPublic' => new OA\Schema(type: 'boolean'),
-                        'isCollaborative' => new OA\Schema(type: 'boolean'),
-                        'isSmart' => new OA\Schema(type: 'boolean'),
-                        'smartRules' => new OA\Schema(
-                            type: 'array',
-                            items: new OA\Schema(),
-                        ),
-                    ],
-                    required: ['name'],
-                ),
+                schema: new OA\Schema(ref: CreatePlaylistRequest::class),
             ),
         ),
         responses: [
@@ -156,6 +142,13 @@ final class PlaylistController
             new OA\Response(
                 response: '401',
                 description: 'Not authenticated',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
+            ),
+            new OA\Response(
+                response: '409',
+                description: 'The caller already owns the most playlists an owner may keep (reason playlist_limit)',
                 content: new OA\MediaType\Json(
                     schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
                 ),
@@ -429,19 +422,7 @@ final class PlaylistController
             required: true,
             content: new OA\MediaType(
                 mediaType: 'application/json',
-                schema: new OA\Schema(
-                    type: 'object',
-                    properties: [
-                        'name' => new OA\Schema(type: 'string', nullable: true),
-                        'description' => new OA\Schema(type: 'string', nullable: true),
-                        'isPublic' => new OA\Schema(type: 'boolean', nullable: true),
-                        'isCollaborative' => new OA\Schema(
-                            description: "The owner's switch for collaborator editing; collaborators keep viewing while it is off",
-                            type: 'boolean',
-                            nullable: true,
-                        ),
-                    ],
-                ),
+                schema: new OA\Schema(ref: UpdatePlaylistRequest::class),
             ),
         ),
         responses: [
@@ -659,6 +640,13 @@ final class PlaylistController
                 ),
             ),
             new OA\Response(
+                response: '409',
+                description: 'The playlist changed meanwhile, or it already holds the most songs a playlist may hold (reason song_limit)',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
+            ),
+            new OA\Response(
                 response: '422',
                 description: 'Validation error',
                 content: new OA\MediaType\Json(
@@ -858,7 +846,7 @@ final class PlaylistController
             ),
             new OA\Response(
                 response: '409',
-                description: 'The playlist kept changing during the addition',
+                description: 'The playlist kept changing during the addition, or it already has the most collaborators a playlist may have (reason collaborator_limit)',
                 content: new OA\MediaType\Json(
                     schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
                 ),

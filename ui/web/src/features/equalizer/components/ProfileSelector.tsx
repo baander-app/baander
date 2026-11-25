@@ -12,8 +12,18 @@ import { textRole } from '@/shared/theme'
 import { ContentText } from '@/shared/typography'
 import { createLogger } from '@/shared/lib/logger'
 import { toast } from 'sonner'
+import { isAxiosError } from 'axios'
+import { parseApiError } from '@/features/auth/lib/parse-api-error'
 
 const logger = createLogger('ProfileSelector')
+
+/** The server's bound on a profile name. */
+const PROFILE_NAME_MAX_LENGTH = 255
+
+/** The server answered and refused the change, so a local copy would only diverge from it. */
+function isServerRefusal(error: unknown): boolean {
+  return isAxiosError(error) && error.response !== undefined && error.response.status < 500
+}
 
 const ICON_LABEL: Record<EqProfileIcon, string> = {
   headphones: 'HP',
@@ -221,8 +231,12 @@ export function ProfileSelector() {
       addProfile(profile)
       setShowCreate(false)
       setNewName('')
-    } catch {
+    } catch (error) {
       if (!isCurrentOwnership(owner)) return
+      if (isServerRefusal(error)) {
+        toast.error(parseApiError(error, 'The profile could not be created.').message)
+        return
+      }
       // Offline fallback: create locally
       toast.warning('Could not reach server — profile saved locally.')
       const local: EqProfile = {
@@ -250,8 +264,12 @@ export function ProfileSelector() {
       const updated = await apiUpdateProfile(id, { payload })
       if (!isCurrentOwnership(owner)) return
       updateProfile(id, { payload: updated.payload, version: updated.version })
-    } catch {
+    } catch (error) {
       if (!isCurrentOwnership(owner)) return
+      if (isServerRefusal(error)) {
+        toast.error(parseApiError(error, 'The profile could not be saved.').message)
+        return
+      }
       toast.warning('Could not reach server — profile saved locally.')
       updateProfile(id, { payload })
     } finally {
@@ -309,6 +327,7 @@ export function ProfileSelector() {
           <CreateForm>
             <NameInput
               type="text"
+              maxLength={PROFILE_NAME_MAX_LENGTH}
               value={newName}
               onChange={(e) => setNewName(e.target.value)}
               placeholder="Profile name"

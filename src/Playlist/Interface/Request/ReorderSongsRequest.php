@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Playlist\Interface\Request;
 
+use App\Playlist\Application\PlaylistLimits;
 use App\Shared\Domain\Model\PublicId;
 use OpenApi\Spec as OA;
 use Symfony\Component\Validator\Constraints\NotBlank;
@@ -31,6 +32,7 @@ use Symfony\Component\Validator\Constraints\Regex;
                 pattern: PublicId::SCHEMA_PATTERN,
             ),
             minItems: 1,
+            maxItems: PlaylistLimits::SONGS_PER_PLAYLIST,
             example: ['aB3dE5fG7hJ9kL1mN3pQr', 'bB3dE5fG7hJ9kL1mN3pQr'],
             default: [],
         ),
@@ -45,7 +47,7 @@ final readonly class ReorderSongsRequest
      */
     public function __construct(
         #[NotBlank(message: 'Song IDs are required.')]
-        #[Count(min: 1, minMessage: 'The "song_ids" field must not be empty.')]
+        #[Count(min: 1, max: PlaylistLimits::SONGS_PER_PLAYLIST, minMessage: 'The "song_ids" field must not be empty.')]
         public array $songIds = [],
         #[NotBlank(message: 'The playlist revision is required.')]
         #[Regex(pattern: '/^[a-f0-9]{64}$/D', message: 'The playlist revision must be 64 lowercase hexadecimal characters.')]

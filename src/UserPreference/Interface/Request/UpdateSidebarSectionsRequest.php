@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\UserPreference\Interface\Request;
 
+use App\Shared\Interface\Validator\JsonEncodedSize;
+use App\UserPreference\Application\UserPreferenceLimits;
 use OpenApi\Spec as OA;
 use Symfony\Component\Validator\Constraints as Assert;
 
@@ -11,6 +13,7 @@ use Symfony\Component\Validator\Constraints as Assert;
     type: 'object',
     properties: [
         'sections' => new OA\Schema(
+            description: 'At most 16384 bytes as compact JSON',
             type: 'array',
             items: new OA\Schema(
                 properties: [
@@ -31,10 +34,13 @@ use Symfony\Component\Validator\Constraints as Assert;
                                 'icon' => new OA\Schema(type: 'string', example: 'home'),
                                 'config' => new OA\Schema(type: 'object'),
                             ],
+                            required: ['id', 'type', 'label', 'icon'],
                         ),
+                        maxItems: UserPreferenceLimits::SIDEBAR_ITEMS_PER_SECTION,
                     ),
                 ],
             ),
+            maxItems: UserPreferenceLimits::SIDEBAR_SECTIONS,
             default: [],
         ),
     ],
@@ -46,7 +52,31 @@ final readonly class UpdateSidebarSectionsRequest
     /** @param array<array-key, mixed> $sections */
     public function __construct(
         #[Assert\NotBlank(message: 'Sections are required.')]
-        #[Assert\Type(type: 'array')]
+        #[Assert\Count(max: UserPreferenceLimits::SIDEBAR_SECTIONS)]
+        #[Assert\All([
+            new Assert\Collection(
+                fields: [
+                    'items' => new Assert\Optional([
+                        new Assert\Type('array'),
+                        new Assert\Count(max: UserPreferenceLimits::SIDEBAR_ITEMS_PER_SECTION),
+                        new Assert\All([
+                            new Assert\Collection(
+                                fields: [
+                                    'id' => new Assert\Type('string'),
+                                    'type' => new Assert\Choice(choices: ['page_link', 'smart_filter', 'panel_action']),
+                                    'label' => new Assert\Type('string'),
+                                    'icon' => new Assert\Type('string'),
+                                    'config' => new Assert\Optional(new Assert\Type('array')),
+                                ],
+                                allowExtraFields: true,
+                            ),
+                        ]),
+                    ]),
+                ],
+                allowExtraFields: true,
+            ),
+        ])]
+        #[JsonEncodedSize(max: UserPreferenceLimits::SIDEBAR_BYTES)]
         public array $sections = [],
     ) {
     }

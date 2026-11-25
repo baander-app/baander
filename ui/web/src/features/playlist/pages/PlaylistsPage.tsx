@@ -14,6 +14,8 @@ import { Button } from '@/shared/components/ui/button'
 import { Input } from '@/shared/components/ui/input'
 import { Plus, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
+import { parseApiError } from '@/features/auth/lib/parse-api-error'
+import { PLAYLIST_DESCRIPTION_MAX_LENGTH, PLAYLIST_NAME_MAX_LENGTH } from '../lib/playlist-limits'
 
 const PageContainer = styled.div`
   display: flex;
@@ -228,9 +230,9 @@ export function PlaylistsPage() {
       setNewDescription('')
       setIsSmart(false)
       setSmartRules([])
-    } catch {
+    } catch (failure: unknown) {
       if (!isCurrentOwnership(owner)) return
-      toast.error('Failed to create playlist')
+      toast.error(parseApiError(failure, 'Failed to create playlist').message)
     }
   }
 
@@ -269,6 +271,7 @@ export function PlaylistsPage() {
             <CreateFormInner>
               <SmallInput
                 placeholder="Playlist name"
+                maxLength={PLAYLIST_NAME_MAX_LENGTH}
                 value={newName}
                 onChange={(e) => {
                   draftRevision.current++
@@ -278,6 +281,7 @@ export function PlaylistsPage() {
               />
               <SmallInput
                 placeholder="Description (optional)"
+                maxLength={PLAYLIST_DESCRIPTION_MAX_LENGTH}
                 value={newDescription}
                 onChange={(e) => {
                   draftRevision.current++

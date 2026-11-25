@@ -25,5 +25,11 @@ interface EqDeviceProfileRepositoryInterface
 
     public function save(EqDeviceProfile $model): void;
 
+    /**
+     * Makes the user's profile creations take turns until the caller's transaction ends.
+     * Requires an open transaction.
+     */
+    public function lockUserProfiles(Uuid $userId): void;
+
     public function delete(EqDeviceProfile $model): void;
 }

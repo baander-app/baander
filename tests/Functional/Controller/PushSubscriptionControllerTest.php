@@ -5,7 +5,10 @@ declare(strict_types=1);
 namespace App\Tests\Functional\Controller;
 
 use App\Auth\Domain\Model\User;
+use App\Shared\Application\Http\BaanderHeader;
 use App\Tests\Functional\TestCase;
+use PHPUnit\Framework\Attributes\DataProvider;
+use Symfony\Component\HttpFoundation\Response;
 
 /**
  * Functional tests for browser push-subscription management.
@@ -116,6 +119,33 @@ final class PushSubscriptionControllerTest extends TestCase
         $this->assertJsonResponse($response, 422);
     }
 
+    /** @return iterable<string, array{string, int}> */
+    public static function malformedSubscribeBodies(): iterable
+    {
+        yield 'endpoint that is a list' => ['{"endpoint": [], "keys": {"p256dh": "key", "auth": "auth"}, "contentEncoding": "aes128gcm"}', 422];
+        yield 'keys that are a string' => ['{"endpoint": "https://push.baander.app/a", "keys": "keys", "contentEncoding": "aes128gcm"}', 422];
+        yield 'key that is an object' => ['{"endpoint": "https://push.baander.app/a", "keys": {"p256dh": {"x": 1}, "auth": "auth"}, "contentEncoding": "aes128gcm"}', 422];
+        yield 'body that is a string' => ['"subscribe"', 400];
+        yield 'malformed json' => ['{"endpoint":', 400];
+        yield 'empty body' => ['', 400];
+    }
+
+    #[DataProvider('malformedSubscribeBodies')]
+    public function testAMalformedSubscribeBodyAnswersAClientErrorAndStoresNothing(string $body, int $status): void
+    {
+        $user = $this->createTestUser();
+
+        $this->assertJsonResponse($this->rawRequest('POST', '/api/push/subscribe', $user, $body), $status, 'error');
+        $this->assertSame(0, $this->storedSubscriptions($user));
+    }
+
+    public function testAMalformedUnsubscribeBodyAnswers400(): void
+    {
+        $user = $this->createTestUser();
+
+        $this->assertJsonResponse($this->rawRequest('DELETE', '/api/push/subscribe', $user, '{"endpoint":'), 400, 'error');
+    }
+
     // ---------------------------------------------------------------
     // DELETE /api/push/subscribe
     // ---------------------------------------------------------------
@@ -203,6 +233,24 @@ final class PushSubscriptionControllerTest extends TestCase
     // ---------------------------------------------------------------
     // Helpers
     // ---------------------------------------------------------------
+
+    private function rawRequest(string $method, string $uri, User $user, string $body): Response
+    {
+        $this->client->request($method, $uri, [], [], [
+            'CONTENT_TYPE' => 'application/json',
+            BaanderHeader::TestUserId->serverKey() => $user->getId()->toString(),
+        ], $body);
+
+        return $this->client->getResponse();
+    }
+
+    private function storedSubscriptions(User $user): int
+    {
+        return (int) $this->entityManager->getConnection()->fetchOne(
+            'SELECT count(*) FROM push_subscriptions WHERE user_id = ?',
+            [$user->getId()->toString()],
+        );
+    }
 
     private function fcmEndpoint(): string
     {
