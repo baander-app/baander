@@ -88,7 +88,7 @@ jobs:
             -   name: Install package dependencies
                 # The install script would fetch an older prebuild; this job
                 # builds the binding itself.
-                run: npm install --ignore-scripts --no-package-lock --no-audit --no-fund
+                run: npm ci --ignore-scripts --no-audit --no-fund
 
             -   name: Build the binding against the Electron headers
                 # A Node-API binding is ABI-stable, so a binary built against

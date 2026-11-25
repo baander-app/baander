@@ -2,7 +2,6 @@
 build/
 cmake-build*/
 node_modules/
-package-lock.json
 
 # Object files (from accidental in-tree builds)
 *.o

@@ -2,7 +2,7 @@
   "name": "@baander/desktop",
   "version": "1.0.0",
   "private": true,
-  "packageManager": "yarn@4.14.1",
+  "packageManager": "yarn@4.18.1",
   "description": "Baander Desktop — a fast, privacy-respecting music player for your self-hosted Baander server.",
   "author": "Martin Christiansen <code@juul.xyz>",
   "repository": {
@@ -49,7 +49,6 @@
     "sass-embedded": "^1.97.3",
     "tsx": "^4.21.0",
     "typescript": "^6.0.3",
-    "unplugin-info": "^1.3.2",
     "vite": "^8.0.12",
     "vite-plugin-electron": "^0.29.1",
     "vite-plugin-electron-renderer": "^0.14.7",

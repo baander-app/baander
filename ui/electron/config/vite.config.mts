@@ -3,7 +3,6 @@ import react from '@vitejs/plugin-react';
 import { fileURLToPath } from 'node:url';
 import { resolve } from 'node:path';
 import electron from 'vite-plugin-electron/simple';
-import Info from 'unplugin-info/vite';
 import richSvg from 'vite-plugin-react-rich-svg';
 import { copyAssets } from './vite-plugin-copy-assets';
 import { writeWasmHashes } from './vite-plugin-copy-wasm-hashes';
@@ -80,7 +79,6 @@ export default defineConfig(({mode}) => {
     plugins: [
       react(),
       richSvg(),
-      Info(),
       copyAssets(),
       electron({
         main: {

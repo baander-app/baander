@@ -9844,6 +9844,26 @@ export type DeleteUserSettingsReset200 = {
 type SecondParameter<T extends (...args: never) => unknown> = Parameters<T>[1];
 
 
+const getHeaders = (...sources: (RequestInit['headers'] | Record<string, string | undefined>)[]) => {
+  const seen = new Set<string>();
+  const layers: [string, string | readonly string[]][][] = [];
+  for (const source of sources.reverse()) {
+    if (!source) continue;
+    const entries = source instanceof Headers
+      ? source.entries()
+      : Symbol.iterator in source
+        ? Array.from(source as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string])
+        : Object.entries<string | readonly string[] | undefined>(source);
+    const layer: [string, string | readonly string[]][] = [];
+    for (const [name, value] of entries) {
+      if (value !== undefined && !seen.has(name.toLowerCase())) layer.push([name, value]);
+    }
+    for (const [name] of layer) seen.add(name.toLowerCase());
+    layers.push(layer);
+  }
+  return Object.fromEntries(layers.reverse().flat()) as Extract<RequestInit['headers'], Record<string, unknown>>;
+};
+
 
 const withQueryKey = <T extends object, K>(query: T, queryKey: K): T & { queryKey: K } => {
   const result = { queryKey } as T & { queryKey: K };
@@ -9922,6 +9942,7 @@ export type GetMovieDirectorIndexQueryResult = NonNullable<Awaited<ReturnType<ty
 export type GetMovieDirectorIndexQueryError = ErrorType<unknown>
 
 
+/** @summary List directors of accessible movies */
 export function useGetMovieDirectorIndex<TData = Awaited<ReturnType<typeof getMovieDirectorIndex>>, TError = ErrorType<unknown>>(
  params: undefined |  GetMovieDirectorIndexParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getMovieDirectorIndex>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
@@ -9932,6 +9953,7 @@ export function useGetMovieDirectorIndex<TData = Awaited<ReturnType<typeof getMo
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/** @summary List directors of accessible movies */
 export function useGetMovieDirectorIndex<TData = Awaited<ReturnType<typeof getMovieDirectorIndex>>, TError = ErrorType<unknown>>(
  params?: GetMovieDirectorIndexParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getMovieDirectorIndex>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
@@ -9942,14 +9964,12 @@ export function useGetMovieDirectorIndex<TData = Awaited<ReturnType<typeof getMo
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/** @summary List directors of accessible movies */
 export function useGetMovieDirectorIndex<TData = Awaited<ReturnType<typeof getMovieDirectorIndex>>, TError = ErrorType<unknown>>(
  params?: GetMovieDirectorIndexParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getMovieDirectorIndex>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-/**
- * @summary List directors of accessible movies
- */
-
+/** @summary List directors of accessible movies */
 export function useGetMovieDirectorIndex<TData = Awaited<ReturnType<typeof getMovieDirectorIndex>>, TError = ErrorType<unknown>>(
  params?: GetMovieDirectorIndexParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getMovieDirectorIndex>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
@@ -10023,6 +10043,7 @@ export type GetMovieDirectorShowQueryResult = NonNullable<Awaited<ReturnType<typ
 export type GetMovieDirectorShowQueryError = ErrorType<void>
 
 
+/** @summary Get a director of accessible movies */
 export function useGetMovieDirectorShow<TData = Awaited<ReturnType<typeof getMovieDirectorShow>>, TError = ErrorType<void>>(
  publicId: string, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getMovieDirectorShow>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
@@ -10033,6 +10054,7 @@ export function useGetMovieDirectorShow<TData = Awaited<ReturnType<typeof getMov
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/** @summary Get a director of accessible movies */
 export function useGetMovieDirectorShow<TData = Awaited<ReturnType<typeof getMovieDirectorShow>>, TError = ErrorType<void>>(
  publicId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getMovieDirectorShow>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
@@ -10043,14 +10065,12 @@ export function useGetMovieDirectorShow<TData = Awaited<ReturnType<typeof getMov
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/** @summary Get a director of accessible movies */
 export function useGetMovieDirectorShow<TData = Awaited<ReturnType<typeof getMovieDirectorShow>>, TError = ErrorType<void>>(
  publicId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getMovieDirectorShow>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-/**
- * @summary Get a director of accessible movies
- */
-
+/** @summary Get a director of accessible movies */
 export function useGetMovieDirectorShow<TData = Awaited<ReturnType<typeof getMovieDirectorShow>>, TError = ErrorType<void>>(
  publicId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getMovieDirectorShow>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
@@ -10135,6 +10155,7 @@ export type GetMovieDirectorMoviesQueryResult = NonNullable<Awaited<ReturnType<t
 export type GetMovieDirectorMoviesQueryError = ErrorType<void>
 
 
+/** @summary List accessible movies by a director */
 export function useGetMovieDirectorMovies<TData = Awaited<ReturnType<typeof getMovieDirectorMovies>>, TError = ErrorType<void>>(
  publicId: string,
     params: undefined |  GetMovieDirectorMoviesParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getMovieDirectorMovies>>, TError, TData>> & Pick<
@@ -10146,6 +10167,7 @@ export function useGetMovieDirectorMovies<TData = Awaited<ReturnType<typeof getM
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/** @summary List accessible movies by a director */
 export function useGetMovieDirectorMovies<TData = Awaited<ReturnType<typeof getMovieDirectorMovies>>, TError = ErrorType<void>>(
  publicId: string,
     params?: GetMovieDirectorMoviesParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getMovieDirectorMovies>>, TError, TData>> & Pick<
@@ -10157,15 +10179,13 @@ export function useGetMovieDirectorMovies<TData = Awaited<ReturnType<typeof getM
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/** @summary List accessible movies by a director */
 export function useGetMovieDirectorMovies<TData = Awaited<ReturnType<typeof getMovieDirectorMovies>>, TError = ErrorType<void>>(
  publicId: string,
     params?: GetMovieDirectorMoviesParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getMovieDirectorMovies>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-/**
- * @summary List accessible movies by a director
- */
-
+/** @summary List accessible movies by a director */
 export function useGetMovieDirectorMovies<TData = Awaited<ReturnType<typeof getMovieDirectorMovies>>, TError = ErrorType<void>>(
  publicId: string,
     params?: GetMovieDirectorMoviesParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getMovieDirectorMovies>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
@@ -10240,6 +10260,7 @@ export type GetTranscodeJobIndexQueryResult = NonNullable<Awaited<ReturnType<typ
 export type GetTranscodeJobIndexQueryError = ErrorType<unknown>
 
 
+/** @summary List the caller's orphaned transcode jobs in accessible libraries; administrators see every user's */
 export function useGetTranscodeJobIndex<TData = Awaited<ReturnType<typeof getTranscodeJobIndex>>, TError = ErrorType<unknown>>(
   options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getTranscodeJobIndex>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
@@ -10250,6 +10271,7 @@ export function useGetTranscodeJobIndex<TData = Awaited<ReturnType<typeof getTra
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/** @summary List the caller's orphaned transcode jobs in accessible libraries; administrators see every user's */
 export function useGetTranscodeJobIndex<TData = Awaited<ReturnType<typeof getTranscodeJobIndex>>, TError = ErrorType<unknown>>(
   options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getTranscodeJobIndex>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
@@ -10260,14 +10282,12 @@ export function useGetTranscodeJobIndex<TData = Awaited<ReturnType<typeof getTra
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/** @summary List the caller's orphaned transcode jobs in accessible libraries; administrators see every user's */
 export function useGetTranscodeJobIndex<TData = Awaited<ReturnType<typeof getTranscodeJobIndex>>, TError = ErrorType<unknown>>(
   options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getTranscodeJobIndex>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-/**
- * @summary List the caller's orphaned transcode jobs in accessible libraries; administrators see every user's
- */
-
+/** @summary List the caller's orphaned transcode jobs in accessible libraries; administrators see every user's */
 export function useGetTranscodeJobIndex<TData = Awaited<ReturnType<typeof getTranscodeJobIndex>>, TError = ErrorType<unknown>>(
   options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getTranscodeJobIndex>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
@@ -10341,6 +10361,7 @@ export type GetTranscodeJobShowQueryResult = NonNullable<Awaited<ReturnType<type
 export type GetTranscodeJobShowQueryError = ErrorType<ApiError>
 
 
+/** @summary Get one of the caller's transcode jobs by public ID; administrators may read any user's */
 export function useGetTranscodeJobShow<TData = Awaited<ReturnType<typeof getTranscodeJobShow>>, TError = ErrorType<ApiError>>(
  publicId: string, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getTranscodeJobShow>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
@@ -10351,6 +10372,7 @@ export function useGetTranscodeJobShow<TData = Awaited<ReturnType<typeof getTran
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/** @summary Get one of the caller's transcode jobs by public ID; administrators may read any user's */
 export function useGetTranscodeJobShow<TData = Awaited<ReturnType<typeof getTranscodeJobShow>>, TError = ErrorType<ApiError>>(
  publicId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getTranscodeJobShow>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
@@ -10361,14 +10383,12 @@ export function useGetTranscodeJobShow<TData = Awaited<ReturnType<typeof getTran
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/** @summary Get one of the caller's transcode jobs by public ID; administrators may read any user's */
 export function useGetTranscodeJobShow<TData = Awaited<ReturnType<typeof getTranscodeJobShow>>, TError = ErrorType<ApiError>>(
  publicId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getTranscodeJobShow>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-/**
- * @summary Get one of the caller's transcode jobs by public ID; administrators may read any user's
- */
-
+/** @summary Get one of the caller's transcode jobs by public ID; administrators may read any user's */
 export function useGetTranscodeJobShow<TData = Awaited<ReturnType<typeof getTranscodeJobShow>>, TError = ErrorType<ApiError>>(
  publicId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getTranscodeJobShow>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
@@ -10447,9 +10467,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type PostTranscodeJobCleanupMutationError = ErrorType<ApiError>
 
 
-    /**
- * @summary Expire stale transcode sessions and clean up orphaned transcode jobs (no active sessions)
- */
+    /** @summary Expire stale transcode sessions and clean up orphaned transcode jobs (no active sessions) */
 export const usePostTranscodeJobCleanup = <TError = ErrorType<ApiError>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postTranscodeJobCleanup>>, TError,void, TContext>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient): UseMutationResult<
@@ -10516,6 +10534,7 @@ export type GetTranscodeJobMetricsQueryResult = NonNullable<Awaited<ReturnType<t
 export type GetTranscodeJobMetricsQueryError = ErrorType<ApiError>
 
 
+/** @summary Get the metrics of one of the caller's transcode jobs; administrators may read any user's */
 export function useGetTranscodeJobMetrics<TData = Awaited<ReturnType<typeof getTranscodeJobMetrics>>, TError = ErrorType<ApiError>>(
  publicId: string, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getTranscodeJobMetrics>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
@@ -10526,6 +10545,7 @@ export function useGetTranscodeJobMetrics<TData = Awaited<ReturnType<typeof getT
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/** @summary Get the metrics of one of the caller's transcode jobs; administrators may read any user's */
 export function useGetTranscodeJobMetrics<TData = Awaited<ReturnType<typeof getTranscodeJobMetrics>>, TError = ErrorType<ApiError>>(
  publicId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getTranscodeJobMetrics>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
@@ -10536,14 +10556,12 @@ export function useGetTranscodeJobMetrics<TData = Awaited<ReturnType<typeof getT
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/** @summary Get the metrics of one of the caller's transcode jobs; administrators may read any user's */
 export function useGetTranscodeJobMetrics<TData = Awaited<ReturnType<typeof getTranscodeJobMetrics>>, TError = ErrorType<ApiError>>(
  publicId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getTranscodeJobMetrics>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-/**
- * @summary Get the metrics of one of the caller's transcode jobs; administrators may read any user's
- */
-
+/** @summary Get the metrics of one of the caller's transcode jobs; administrators may read any user's */
 export function useGetTranscodeJobMetrics<TData = Awaited<ReturnType<typeof getTranscodeJobMetrics>>, TError = ErrorType<ApiError>>(
  publicId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getTranscodeJobMetrics>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
@@ -10617,6 +10635,7 @@ export type GetTranscodeJobListQueryResult = NonNullable<Awaited<ReturnType<type
 export type GetTranscodeJobListQueryError = ErrorType<ApiError>
 
 
+/** @summary List transcode jobs for the authenticated user */
 export function useGetTranscodeJobList<TData = Awaited<ReturnType<typeof getTranscodeJobList>>, TError = ErrorType<ApiError>>(
   options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getTranscodeJobList>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
@@ -10627,6 +10646,7 @@ export function useGetTranscodeJobList<TData = Awaited<ReturnType<typeof getTran
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/** @summary List transcode jobs for the authenticated user */
 export function useGetTranscodeJobList<TData = Awaited<ReturnType<typeof getTranscodeJobList>>, TError = ErrorType<ApiError>>(
   options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getTranscodeJobList>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
@@ -10637,14 +10657,12 @@ export function useGetTranscodeJobList<TData = Awaited<ReturnType<typeof getTran
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/** @summary List transcode jobs for the authenticated user */
 export function useGetTranscodeJobList<TData = Awaited<ReturnType<typeof getTranscodeJobList>>, TError = ErrorType<ApiError>>(
   options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getTranscodeJobList>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-/**
- * @summary List transcode jobs for the authenticated user
- */
-
+/** @summary List transcode jobs for the authenticated user */
 export function useGetTranscodeJobList<TData = Awaited<ReturnType<typeof getTranscodeJobList>>, TError = ErrorType<ApiError>>(
   options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getTranscodeJobList>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
@@ -10676,25 +10694,11 @@ export const getPostTranscodeSessionCreateUrl = () => {
  */
 export const postTranscodeSessionCreate = async (postTranscodeSessionCreateBody: PostTranscodeSessionCreateBody, options?: Parameters<typeof customInstance>[1]): Promise<TranscodeSessionResource> => {
 
-    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
-    if (!h) return {};
-    if (h instanceof Headers) return Object.fromEntries(h.entries());
-    if (Symbol.iterator in h) {
-      return Object.fromEntries(
-        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
-      );
-    }
-    const headers: Record<string, string | readonly string[]> = {};
-    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
-      if (value !== undefined) headers[name] = value;
-    }
-    return headers;
-  };
-return customInstance<TranscodeSessionResource>(getPostTranscodeSessionCreateUrl(),
+  return customInstance<TranscodeSessionResource>(getPostTranscodeSessionCreateUrl(),
   {
     ...options,
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    headers: getHeaders({ 'Content-Type': 'application/json' }, options?.headers),
     body: JSON.stringify(postTranscodeSessionCreateBody)
   }
 );}
@@ -10737,9 +10741,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type PostTranscodeSessionCreateMutationError = ErrorType<ApiError | ValidationError>
     export type PostTranscodeSessionCreateMutationVariables = {data: BodyType<PostTranscodeSessionCreateBody>}
 
-    /**
- * @summary Create a new transcode session
- */
+    /** @summary Create a new transcode session */
 export const usePostTranscodeSessionCreate = <TError = ErrorType<ApiError | ValidationError>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postTranscodeSessionCreate>>, TError,PostTranscodeSessionCreateMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient): UseMutationResult<
@@ -10806,6 +10808,7 @@ export type GetTranscodeSessionIndexQueryResult = NonNullable<Awaited<ReturnType
 export type GetTranscodeSessionIndexQueryError = ErrorType<ApiError>
 
 
+/** @summary List active transcode sessions for the authenticated user */
 export function useGetTranscodeSessionIndex<TData = Awaited<ReturnType<typeof getTranscodeSessionIndex>>, TError = ErrorType<ApiError>>(
   options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getTranscodeSessionIndex>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
@@ -10816,6 +10819,7 @@ export function useGetTranscodeSessionIndex<TData = Awaited<ReturnType<typeof ge
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/** @summary List active transcode sessions for the authenticated user */
 export function useGetTranscodeSessionIndex<TData = Awaited<ReturnType<typeof getTranscodeSessionIndex>>, TError = ErrorType<ApiError>>(
   options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getTranscodeSessionIndex>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
@@ -10826,14 +10830,12 @@ export function useGetTranscodeSessionIndex<TData = Awaited<ReturnType<typeof ge
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/** @summary List active transcode sessions for the authenticated user */
 export function useGetTranscodeSessionIndex<TData = Awaited<ReturnType<typeof getTranscodeSessionIndex>>, TError = ErrorType<ApiError>>(
   options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getTranscodeSessionIndex>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-/**
- * @summary List active transcode sessions for the authenticated user
- */
-
+/** @summary List active transcode sessions for the authenticated user */
 export function useGetTranscodeSessionIndex<TData = Awaited<ReturnType<typeof getTranscodeSessionIndex>>, TError = ErrorType<ApiError>>(
   options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getTranscodeSessionIndex>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
@@ -10907,6 +10909,7 @@ export type GetTranscodeSessionShowQueryResult = NonNullable<Awaited<ReturnType<
 export type GetTranscodeSessionShowQueryError = ErrorType<ApiError>
 
 
+/** @summary Get a transcode session by public identifier */
 export function useGetTranscodeSessionShow<TData = Awaited<ReturnType<typeof getTranscodeSessionShow>>, TError = ErrorType<ApiError>>(
  publicId: string, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getTranscodeSessionShow>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
@@ -10917,6 +10920,7 @@ export function useGetTranscodeSessionShow<TData = Awaited<ReturnType<typeof get
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/** @summary Get a transcode session by public identifier */
 export function useGetTranscodeSessionShow<TData = Awaited<ReturnType<typeof getTranscodeSessionShow>>, TError = ErrorType<ApiError>>(
  publicId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getTranscodeSessionShow>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
@@ -10927,14 +10931,12 @@ export function useGetTranscodeSessionShow<TData = Awaited<ReturnType<typeof get
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/** @summary Get a transcode session by public identifier */
 export function useGetTranscodeSessionShow<TData = Awaited<ReturnType<typeof getTranscodeSessionShow>>, TError = ErrorType<ApiError>>(
  publicId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getTranscodeSessionShow>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-/**
- * @summary Get a transcode session by public identifier
- */
-
+/** @summary Get a transcode session by public identifier */
 export function useGetTranscodeSessionShow<TData = Awaited<ReturnType<typeof getTranscodeSessionShow>>, TError = ErrorType<ApiError>>(
  publicId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getTranscodeSessionShow>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
@@ -11013,9 +11015,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type DeleteTranscodeSessionCancelMutationError = ErrorType<ApiError>
     export type DeleteTranscodeSessionCancelMutationVariables = {publicId: string}
 
-    /**
- * @summary Cancel a transcode session
- */
+    /** @summary Cancel a transcode session */
 export const useDeleteTranscodeSessionCancel = <TError = ErrorType<ApiError>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteTranscodeSessionCancel>>, TError,DeleteTranscodeSessionCancelMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient): UseMutationResult<
@@ -11041,25 +11041,11 @@ export const getPatchTranscodeSessionUpdateUrl = (publicId: string,) => {
 export const patchTranscodeSessionUpdate = async (publicId: string,
     patchTranscodeSessionUpdateBody: PatchTranscodeSessionUpdateBody, options?: Parameters<typeof customInstance>[1]): Promise<PatchTranscodeSessionUpdate200> => {
 
-    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
-    if (!h) return {};
-    if (h instanceof Headers) return Object.fromEntries(h.entries());
-    if (Symbol.iterator in h) {
-      return Object.fromEntries(
-        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
-      );
-    }
-    const headers: Record<string, string | readonly string[]> = {};
-    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
-      if (value !== undefined) headers[name] = value;
-    }
-    return headers;
-  };
-return customInstance<PatchTranscodeSessionUpdate200>(getPatchTranscodeSessionUpdateUrl(publicId),
+  return customInstance<PatchTranscodeSessionUpdate200>(getPatchTranscodeSessionUpdateUrl(publicId),
   {
     ...options,
     method: 'PATCH',
-    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    headers: getHeaders({ 'Content-Type': 'application/json' }, options?.headers),
     body: JSON.stringify(patchTranscodeSessionUpdateBody)
   }
 );}
@@ -11102,9 +11088,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type PatchTranscodeSessionUpdateMutationError = ErrorType<ApiError>
     export type PatchTranscodeSessionUpdateMutationVariables = {publicId: string;data: BodyType<PatchTranscodeSessionUpdateBody>}
 
-    /**
- * @summary Update a transcode session
- */
+    /** @summary Update a transcode session */
 export const usePatchTranscodeSessionUpdate = <TError = ErrorType<ApiError>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof patchTranscodeSessionUpdate>>, TError,PatchTranscodeSessionUpdateMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient): UseMutationResult<
@@ -11176,9 +11160,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type PatchTranscodeSessionPauseMutationError = ErrorType<ApiError>
     export type PatchTranscodeSessionPauseMutationVariables = {publicId: string}
 
-    /**
- * @summary Pause a transcode session
- */
+    /** @summary Pause a transcode session */
 export const usePatchTranscodeSessionPause = <TError = ErrorType<ApiError>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof patchTranscodeSessionPause>>, TError,PatchTranscodeSessionPauseMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient): UseMutationResult<
@@ -11250,9 +11232,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type PatchTranscodeSessionResumeMutationError = ErrorType<ApiError>
     export type PatchTranscodeSessionResumeMutationVariables = {publicId: string}
 
-    /**
- * @summary Resume a paused transcode session
- */
+    /** @summary Resume a paused transcode session */
 export const usePatchTranscodeSessionResume = <TError = ErrorType<ApiError>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof patchTranscodeSessionResume>>, TError,PatchTranscodeSessionResumeMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient): UseMutationResult<
@@ -11319,6 +11299,7 @@ export type GetTranscodeSessionListQueryResult = NonNullable<Awaited<ReturnType<
 export type GetTranscodeSessionListQueryError = ErrorType<ApiError>
 
 
+/** @summary List all transcode sessions for the authenticated user */
 export function useGetTranscodeSessionList<TData = Awaited<ReturnType<typeof getTranscodeSessionList>>, TError = ErrorType<ApiError>>(
   options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getTranscodeSessionList>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
@@ -11329,6 +11310,7 @@ export function useGetTranscodeSessionList<TData = Awaited<ReturnType<typeof get
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/** @summary List all transcode sessions for the authenticated user */
 export function useGetTranscodeSessionList<TData = Awaited<ReturnType<typeof getTranscodeSessionList>>, TError = ErrorType<ApiError>>(
   options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getTranscodeSessionList>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
@@ -11339,14 +11321,12 @@ export function useGetTranscodeSessionList<TData = Awaited<ReturnType<typeof get
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/** @summary List all transcode sessions for the authenticated user */
 export function useGetTranscodeSessionList<TData = Awaited<ReturnType<typeof getTranscodeSessionList>>, TError = ErrorType<ApiError>>(
   options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getTranscodeSessionList>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-/**
- * @summary List all transcode sessions for the authenticated user
- */
-
+/** @summary List all transcode sessions for the authenticated user */
 export function useGetTranscodeSessionList<TData = Awaited<ReturnType<typeof getTranscodeSessionList>>, TError = ErrorType<ApiError>>(
   options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getTranscodeSessionList>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
@@ -11379,25 +11359,11 @@ export const getPostTranscodeSessionPositionUrl = (publicId: string,) => {
 export const postTranscodeSessionPosition = async (publicId: string,
     postTranscodeSessionPositionBody: PostTranscodeSessionPositionBody, options?: Parameters<typeof customInstance>[1]): Promise<PostTranscodeSessionPosition200> => {
 
-    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
-    if (!h) return {};
-    if (h instanceof Headers) return Object.fromEntries(h.entries());
-    if (Symbol.iterator in h) {
-      return Object.fromEntries(
-        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
-      );
-    }
-    const headers: Record<string, string | readonly string[]> = {};
-    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
-      if (value !== undefined) headers[name] = value;
-    }
-    return headers;
-  };
-return customInstance<PostTranscodeSessionPosition200>(getPostTranscodeSessionPositionUrl(publicId),
+  return customInstance<PostTranscodeSessionPosition200>(getPostTranscodeSessionPositionUrl(publicId),
   {
     ...options,
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    headers: getHeaders({ 'Content-Type': 'application/json' }, options?.headers),
     body: JSON.stringify(postTranscodeSessionPositionBody)
   }
 );}
@@ -11440,9 +11406,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type PostTranscodeSessionPositionMutationError = ErrorType<unknown>
     export type PostTranscodeSessionPositionMutationVariables = {publicId: string;data: BodyType<PostTranscodeSessionPositionBody>}
 
-    /**
- * @summary Update transcode session playback position
- */
+    /** @summary Update transcode session playback position */
 export const usePostTranscodeSessionPosition = <TError = ErrorType<unknown>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postTranscodeSessionPosition>>, TError,PostTranscodeSessionPositionMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient): UseMutationResult<
@@ -11516,6 +11480,7 @@ export type GetAdminActivitySummaryQueryResult = NonNullable<Awaited<ReturnType<
 export type GetAdminActivitySummaryQueryError = ErrorType<ApiError>
 
 
+/** @summary Get activity summary statistics */
 export function useGetAdminActivitySummary<TData = Awaited<ReturnType<typeof getAdminActivitySummary>>, TError = ErrorType<ApiError>>(
  params: undefined |  GetAdminActivitySummaryParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAdminActivitySummary>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
@@ -11526,6 +11491,7 @@ export function useGetAdminActivitySummary<TData = Awaited<ReturnType<typeof get
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/** @summary Get activity summary statistics */
 export function useGetAdminActivitySummary<TData = Awaited<ReturnType<typeof getAdminActivitySummary>>, TError = ErrorType<ApiError>>(
  params?: GetAdminActivitySummaryParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAdminActivitySummary>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
@@ -11536,14 +11502,12 @@ export function useGetAdminActivitySummary<TData = Awaited<ReturnType<typeof get
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/** @summary Get activity summary statistics */
 export function useGetAdminActivitySummary<TData = Awaited<ReturnType<typeof getAdminActivitySummary>>, TError = ErrorType<ApiError>>(
  params?: GetAdminActivitySummaryParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAdminActivitySummary>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-/**
- * @summary Get activity summary statistics
- */
-
+/** @summary Get activity summary statistics */
 export function useGetAdminActivitySummary<TData = Awaited<ReturnType<typeof getAdminActivitySummary>>, TError = ErrorType<ApiError>>(
  params?: GetAdminActivitySummaryParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAdminActivitySummary>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
@@ -11624,6 +11588,7 @@ export type GetAdminActivityTopTracksQueryResult = NonNullable<Awaited<ReturnTyp
 export type GetAdminActivityTopTracksQueryError = ErrorType<ApiError>
 
 
+/** @summary Get top tracks by play count */
 export function useGetAdminActivityTopTracks<TData = Awaited<ReturnType<typeof getAdminActivityTopTracks>>, TError = ErrorType<ApiError>>(
  params: undefined |  GetAdminActivityTopTracksParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAdminActivityTopTracks>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
@@ -11634,6 +11599,7 @@ export function useGetAdminActivityTopTracks<TData = Awaited<ReturnType<typeof g
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/** @summary Get top tracks by play count */
 export function useGetAdminActivityTopTracks<TData = Awaited<ReturnType<typeof getAdminActivityTopTracks>>, TError = ErrorType<ApiError>>(
  params?: GetAdminActivityTopTracksParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAdminActivityTopTracks>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
@@ -11644,14 +11610,12 @@ export function useGetAdminActivityTopTracks<TData = Awaited<ReturnType<typeof g
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/** @summary Get top tracks by play count */
 export function useGetAdminActivityTopTracks<TData = Awaited<ReturnType<typeof getAdminActivityTopTracks>>, TError = ErrorType<ApiError>>(
  params?: GetAdminActivityTopTracksParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAdminActivityTopTracks>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-/**
- * @summary Get top tracks by play count
- */
-
+/** @summary Get top tracks by play count */
 export function useGetAdminActivityTopTracks<TData = Awaited<ReturnType<typeof getAdminActivityTopTracks>>, TError = ErrorType<ApiError>>(
  params?: GetAdminActivityTopTracksParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAdminActivityTopTracks>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
@@ -11732,6 +11696,7 @@ export type GetAdminActivityTopArtistsQueryResult = NonNullable<Awaited<ReturnTy
 export type GetAdminActivityTopArtistsQueryError = ErrorType<ApiError>
 
 
+/** @summary Get top artists by play count */
 export function useGetAdminActivityTopArtists<TData = Awaited<ReturnType<typeof getAdminActivityTopArtists>>, TError = ErrorType<ApiError>>(
  params: undefined |  GetAdminActivityTopArtistsParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAdminActivityTopArtists>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
@@ -11742,6 +11707,7 @@ export function useGetAdminActivityTopArtists<TData = Awaited<ReturnType<typeof 
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/** @summary Get top artists by play count */
 export function useGetAdminActivityTopArtists<TData = Awaited<ReturnType<typeof getAdminActivityTopArtists>>, TError = ErrorType<ApiError>>(
  params?: GetAdminActivityTopArtistsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAdminActivityTopArtists>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
@@ -11752,14 +11718,12 @@ export function useGetAdminActivityTopArtists<TData = Awaited<ReturnType<typeof 
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/** @summary Get top artists by play count */
 export function useGetAdminActivityTopArtists<TData = Awaited<ReturnType<typeof getAdminActivityTopArtists>>, TError = ErrorType<ApiError>>(
  params?: GetAdminActivityTopArtistsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAdminActivityTopArtists>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-/**
- * @summary Get top artists by play count
- */
-
+/** @summary Get top artists by play count */
 export function useGetAdminActivityTopArtists<TData = Awaited<ReturnType<typeof getAdminActivityTopArtists>>, TError = ErrorType<ApiError>>(
  params?: GetAdminActivityTopArtistsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAdminActivityTopArtists>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
@@ -11840,6 +11804,7 @@ export type GetAdminActivityEngagementQueryResult = NonNullable<Awaited<ReturnTy
 export type GetAdminActivityEngagementQueryError = ErrorType<ApiError>
 
 
+/** @summary Get user engagement metrics */
 export function useGetAdminActivityEngagement<TData = Awaited<ReturnType<typeof getAdminActivityEngagement>>, TError = ErrorType<ApiError>>(
  params: undefined |  GetAdminActivityEngagementParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAdminActivityEngagement>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
@@ -11850,6 +11815,7 @@ export function useGetAdminActivityEngagement<TData = Awaited<ReturnType<typeof 
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/** @summary Get user engagement metrics */
 export function useGetAdminActivityEngagement<TData = Awaited<ReturnType<typeof getAdminActivityEngagement>>, TError = ErrorType<ApiError>>(
  params?: GetAdminActivityEngagementParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAdminActivityEngagement>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
@@ -11860,14 +11826,12 @@ export function useGetAdminActivityEngagement<TData = Awaited<ReturnType<typeof 
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/** @summary Get user engagement metrics */
 export function useGetAdminActivityEngagement<TData = Awaited<ReturnType<typeof getAdminActivityEngagement>>, TError = ErrorType<ApiError>>(
  params?: GetAdminActivityEngagementParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAdminActivityEngagement>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-/**
- * @summary Get user engagement metrics
- */
-
+/** @summary Get user engagement metrics */
 export function useGetAdminActivityEngagement<TData = Awaited<ReturnType<typeof getAdminActivityEngagement>>, TError = ErrorType<ApiError>>(
  params?: GetAdminActivityEngagementParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAdminActivityEngagement>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
@@ -11948,6 +11912,7 @@ export type GetActivityHistoryQueryResult = NonNullable<Awaited<ReturnType<typeo
 export type GetActivityHistoryQueryError = ErrorType<ApiError>
 
 
+/** @summary Get the authenticated user's activity history */
 export function useGetActivityHistory<TData = Awaited<ReturnType<typeof getActivityHistory>>, TError = ErrorType<ApiError>>(
  params: undefined |  GetActivityHistoryParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getActivityHistory>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
@@ -11958,6 +11923,7 @@ export function useGetActivityHistory<TData = Awaited<ReturnType<typeof getActiv
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/** @summary Get the authenticated user's activity history */
 export function useGetActivityHistory<TData = Awaited<ReturnType<typeof getActivityHistory>>, TError = ErrorType<ApiError>>(
  params?: GetActivityHistoryParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getActivityHistory>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
@@ -11968,14 +11934,12 @@ export function useGetActivityHistory<TData = Awaited<ReturnType<typeof getActiv
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/** @summary Get the authenticated user's activity history */
 export function useGetActivityHistory<TData = Awaited<ReturnType<typeof getActivityHistory>>, TError = ErrorType<ApiError>>(
  params?: GetActivityHistoryParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getActivityHistory>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-/**
- * @summary Get the authenticated user's activity history
- */
-
+/** @summary Get the authenticated user's activity history */
 export function useGetActivityHistory<TData = Awaited<ReturnType<typeof getActivityHistory>>, TError = ErrorType<ApiError>>(
  params?: GetActivityHistoryParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getActivityHistory>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
@@ -12007,25 +11971,11 @@ export const getPostActivityPlayUrl = () => {
  */
 export const postActivityPlay = async (postActivityPlayBody: PostActivityPlayBody, options?: Parameters<typeof customInstance>[1]): Promise<PostActivityPlay200 | PostActivityPlay201> => {
 
-    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
-    if (!h) return {};
-    if (h instanceof Headers) return Object.fromEntries(h.entries());
-    if (Symbol.iterator in h) {
-      return Object.fromEntries(
-        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
-      );
-    }
-    const headers: Record<string, string | readonly string[]> = {};
-    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
-      if (value !== undefined) headers[name] = value;
-    }
-    return headers;
-  };
-return customInstance<PostActivityPlay200 | PostActivityPlay201>(getPostActivityPlayUrl(),
+  return customInstance<PostActivityPlay200 | PostActivityPlay201>(getPostActivityPlayUrl(),
   {
     ...options,
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    headers: getHeaders({ 'Content-Type': 'application/json' }, options?.headers),
     body: JSON.stringify(postActivityPlayBody)
   }
 );}
@@ -12068,9 +12018,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type PostActivityPlayMutationError = ErrorType<ApiError | ValidationError>
     export type PostActivityPlayMutationVariables = {data: BodyType<PostActivityPlayBody>}
 
-    /**
- * @summary Record a play event for a song or movie
- */
+    /** @summary Record a play event for a song or movie */
 export const usePostActivityPlay = <TError = ErrorType<ApiError | ValidationError>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postActivityPlay>>, TError,PostActivityPlayMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient): UseMutationResult<
@@ -12142,9 +12090,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type PostActivityLoveMutationError = ErrorType<ApiError>
     export type PostActivityLoveMutationVariables = {publicId: string}
 
-    /**
- * @summary Toggle love on an activity
- */
+    /** @summary Toggle love on an activity */
 export const usePostActivityLove = <TError = ErrorType<ApiError>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postActivityLove>>, TError,PostActivityLoveMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient): UseMutationResult<
@@ -12211,6 +12157,7 @@ export type GetActivityLovedQueryResult = NonNullable<Awaited<ReturnType<typeof 
 export type GetActivityLovedQueryError = ErrorType<ApiError>
 
 
+/** @summary Get the authenticated user's loved items */
 export function useGetActivityLoved<TData = Awaited<ReturnType<typeof getActivityLoved>>, TError = ErrorType<ApiError>>(
   options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getActivityLoved>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
@@ -12221,6 +12168,7 @@ export function useGetActivityLoved<TData = Awaited<ReturnType<typeof getActivit
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/** @summary Get the authenticated user's loved items */
 export function useGetActivityLoved<TData = Awaited<ReturnType<typeof getActivityLoved>>, TError = ErrorType<ApiError>>(
   options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getActivityLoved>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
@@ -12231,14 +12179,12 @@ export function useGetActivityLoved<TData = Awaited<ReturnType<typeof getActivit
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/** @summary Get the authenticated user's loved items */
 export function useGetActivityLoved<TData = Awaited<ReturnType<typeof getActivityLoved>>, TError = ErrorType<ApiError>>(
   options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getActivityLoved>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-/**
- * @summary Get the authenticated user's loved items
- */
-
+/** @summary Get the authenticated user's loved items */
 export function useGetActivityLoved<TData = Awaited<ReturnType<typeof getActivityLoved>>, TError = ErrorType<ApiError>>(
   options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getActivityLoved>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
@@ -12319,6 +12265,7 @@ export type GetUserRecentQueryResult = NonNullable<Awaited<ReturnType<typeof get
 export type GetUserRecentQueryError = ErrorType<ApiError>
 
 
+/** @summary Get recently played items */
 export function useGetUserRecent<TData = Awaited<ReturnType<typeof getUserRecent>>, TError = ErrorType<ApiError>>(
  params: undefined |  GetUserRecentParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getUserRecent>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
@@ -12329,6 +12276,7 @@ export function useGetUserRecent<TData = Awaited<ReturnType<typeof getUserRecent
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/** @summary Get recently played items */
 export function useGetUserRecent<TData = Awaited<ReturnType<typeof getUserRecent>>, TError = ErrorType<ApiError>>(
  params?: GetUserRecentParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getUserRecent>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
@@ -12339,14 +12287,12 @@ export function useGetUserRecent<TData = Awaited<ReturnType<typeof getUserRecent
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/** @summary Get recently played items */
 export function useGetUserRecent<TData = Awaited<ReturnType<typeof getUserRecent>>, TError = ErrorType<ApiError>>(
  params?: GetUserRecentParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getUserRecent>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-/**
- * @summary Get recently played items
- */
-
+/** @summary Get recently played items */
 export function useGetUserRecent<TData = Awaited<ReturnType<typeof getUserRecent>>, TError = ErrorType<ApiError>>(
  params?: GetUserRecentParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getUserRecent>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
@@ -12427,6 +12373,7 @@ export type GetAdminLoginBlocksListQueryResult = NonNullable<Awaited<ReturnType<
 export type GetAdminLoginBlocksListQueryError = ErrorType<ApiError>
 
 
+/** @summary List recent honeypot blocks (paginated) */
 export function useGetAdminLoginBlocksList<TData = Awaited<ReturnType<typeof getAdminLoginBlocksList>>, TError = ErrorType<ApiError>>(
  params: undefined |  GetAdminLoginBlocksListParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAdminLoginBlocksList>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
@@ -12437,6 +12384,7 @@ export function useGetAdminLoginBlocksList<TData = Awaited<ReturnType<typeof get
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/** @summary List recent honeypot blocks (paginated) */
 export function useGetAdminLoginBlocksList<TData = Awaited<ReturnType<typeof getAdminLoginBlocksList>>, TError = ErrorType<ApiError>>(
  params?: GetAdminLoginBlocksListParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAdminLoginBlocksList>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
@@ -12447,14 +12395,12 @@ export function useGetAdminLoginBlocksList<TData = Awaited<ReturnType<typeof get
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/** @summary List recent honeypot blocks (paginated) */
 export function useGetAdminLoginBlocksList<TData = Awaited<ReturnType<typeof getAdminLoginBlocksList>>, TError = ErrorType<ApiError>>(
  params?: GetAdminLoginBlocksListParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAdminLoginBlocksList>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-/**
- * @summary List recent honeypot blocks (paginated)
- */
-
+/** @summary List recent honeypot blocks (paginated) */
 export function useGetAdminLoginBlocksList<TData = Awaited<ReturnType<typeof getAdminLoginBlocksList>>, TError = ErrorType<ApiError>>(
  params?: GetAdminLoginBlocksListParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAdminLoginBlocksList>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
@@ -12533,9 +12479,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type DeleteAdminLoginBlocksDeleteAllMutationError = ErrorType<unknown>
 
 
-    /**
- * @summary Delete all blocks
- */
+    /** @summary Delete all blocks */
 export const useDeleteAdminLoginBlocksDeleteAll = <TError = ErrorType<unknown>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteAdminLoginBlocksDeleteAll>>, TError,void, TContext>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient): UseMutationResult<
@@ -12607,9 +12551,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type DeleteAdminLoginBlocksDeleteMutationError = ErrorType<ApiError>
     export type DeleteAdminLoginBlocksDeleteMutationVariables = {publicId: string}
 
-    /**
- * @summary Delete a single block
- */
+    /** @summary Delete a single block */
 export const useDeleteAdminLoginBlocksDelete = <TError = ErrorType<ApiError>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteAdminLoginBlocksDelete>>, TError,DeleteAdminLoginBlocksDeleteMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient): UseMutationResult<
@@ -12677,6 +12619,10 @@ export type GetAdminOauthClientsListQueryResult = NonNullable<Awaited<ReturnType
 export type GetAdminOauthClientsListQueryError = ErrorType<ApiError>
 
 
+/**
+ * Every client except users' personal access clients, revoked ones included, newest first. The first-party login client is listed with type first_party and cannot be changed here.
+ * @summary List OAuth clients
+ */
 export function useGetAdminOauthClientsList<TData = Awaited<ReturnType<typeof getAdminOauthClientsList>>, TError = ErrorType<ApiError>>(
   options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAdminOauthClientsList>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
@@ -12687,6 +12633,10 @@ export function useGetAdminOauthClientsList<TData = Awaited<ReturnType<typeof ge
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * Every client except users' personal access clients, revoked ones included, newest first. The first-party login client is listed with type first_party and cannot be changed here.
+ * @summary List OAuth clients
+ */
 export function useGetAdminOauthClientsList<TData = Awaited<ReturnType<typeof getAdminOauthClientsList>>, TError = ErrorType<ApiError>>(
   options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAdminOauthClientsList>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
@@ -12697,14 +12647,18 @@ export function useGetAdminOauthClientsList<TData = Awaited<ReturnType<typeof ge
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * Every client except users' personal access clients, revoked ones included, newest first. The first-party login client is listed with type first_party and cannot be changed here.
+ * @summary List OAuth clients
+ */
 export function useGetAdminOauthClientsList<TData = Awaited<ReturnType<typeof getAdminOauthClientsList>>, TError = ErrorType<ApiError>>(
   options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAdminOauthClientsList>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 /**
+ * Every client except users' personal access clients, revoked ones included, newest first. The first-party login client is listed with type first_party and cannot be changed here.
  * @summary List OAuth clients
  */
-
 export function useGetAdminOauthClientsList<TData = Awaited<ReturnType<typeof getAdminOauthClientsList>>, TError = ErrorType<ApiError>>(
   options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAdminOauthClientsList>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
@@ -12737,25 +12691,11 @@ export const getPostAdminOauthClientsCreateUrl = () => {
  */
 export const postAdminOauthClientsCreate = async (adminCreateOAuthClientRequest: AdminCreateOAuthClientRequest, options?: Parameters<typeof customInstance>[1]): Promise<PostAdminOauthClientsCreate201> => {
 
-    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
-    if (!h) return {};
-    if (h instanceof Headers) return Object.fromEntries(h.entries());
-    if (Symbol.iterator in h) {
-      return Object.fromEntries(
-        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
-      );
-    }
-    const headers: Record<string, string | readonly string[]> = {};
-    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
-      if (value !== undefined) headers[name] = value;
-    }
-    return headers;
-  };
-return customInstance<PostAdminOauthClientsCreate201>(getPostAdminOauthClientsCreateUrl(),
+  return customInstance<PostAdminOauthClientsCreate201>(getPostAdminOauthClientsCreateUrl(),
   {
     ...options,
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    headers: getHeaders({ 'Content-Type': 'application/json' }, options?.headers),
     body: JSON.stringify(adminCreateOAuthClientRequest)
   }
 );}
@@ -12799,6 +12739,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type PostAdminOauthClientsCreateMutationVariables = {data: BodyType<AdminCreateOAuthClientRequest>}
 
     /**
+ * Registers a device client (public, device authorization grant), a public client (authorization code with PKCE) or a confidential client (authorization code with client authentication). A confidential client authenticates with a generated secret (client_secret_post, the default), which is in this response only, or with its own signing keys (private_key_jwt), given as exactly one of an inline JWK Set and a jwks_uri.
  * @summary Register an OAuth client
  */
 export const usePostAdminOauthClientsCreate = <TError = ErrorType<ApiError | ValidationError>,
@@ -12874,6 +12815,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type PostAdminOauthClientsRotateSecretMutationVariables = {clientId: string}
 
     /**
+ * Clients that authenticate with client_secret_post only. The old secret stops working at once; tokens already issued stay valid. The new secret is in this response only.
  * @summary Rotate a client's secret
  */
 export const usePostAdminOauthClientsRotateSecret = <TError = ErrorType<ApiError>,
@@ -12902,25 +12844,11 @@ export const getPostAdminOauthClientsReplaceKeysUrl = (clientId: string,) => {
 export const postAdminOauthClientsReplaceKeys = async (clientId: string,
     adminReplaceOAuthClientKeysRequest: AdminReplaceOAuthClientKeysRequest, options?: Parameters<typeof customInstance>[1]): Promise<PostAdminOauthClientsReplaceKeys200> => {
 
-    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
-    if (!h) return {};
-    if (h instanceof Headers) return Object.fromEntries(h.entries());
-    if (Symbol.iterator in h) {
-      return Object.fromEntries(
-        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
-      );
-    }
-    const headers: Record<string, string | readonly string[]> = {};
-    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
-      if (value !== undefined) headers[name] = value;
-    }
-    return headers;
-  };
-return customInstance<PostAdminOauthClientsReplaceKeys200>(getPostAdminOauthClientsReplaceKeysUrl(clientId),
+  return customInstance<PostAdminOauthClientsReplaceKeys200>(getPostAdminOauthClientsReplaceKeysUrl(clientId),
   {
     ...options,
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    headers: getHeaders({ 'Content-Type': 'application/json' }, options?.headers),
     body: JSON.stringify(adminReplaceOAuthClientKeysRequest)
   }
 );}
@@ -12964,6 +12892,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type PostAdminOauthClientsReplaceKeysMutationVariables = {clientId: string;data: BodyType<AdminReplaceOAuthClientKeysRequest>}
 
     /**
+ * Clients that authenticate with private_key_jwt only. Replaces the inline JWK Set or the jwks_uri; the new source may be of the other kind. Assertions signed with the old keys stop working at once; tokens already issued stay valid.
  * @summary Replace a client's public keys
  */
 export const usePostAdminOauthClientsReplaceKeys = <TError = ErrorType<ApiError | ValidationError>,
@@ -13039,6 +12968,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type PostAdminOauthClientsRevokeMutationVariables = {clientId: string}
 
     /**
+ * Revokes the client together with every access and refresh token issued to it. Revoking a revoked client succeeds again.
  * @summary Revoke an OAuth client
  */
 export const usePostAdminOauthClientsRevoke = <TError = ErrorType<ApiError>,
@@ -13114,6 +13044,7 @@ export type GetAdminUsersListQueryResult = NonNullable<Awaited<ReturnType<typeof
 export type GetAdminUsersListQueryError = ErrorType<ApiError>
 
 
+/** @summary List all users (paginated) */
 export function useGetAdminUsersList<TData = Awaited<ReturnType<typeof getAdminUsersList>>, TError = ErrorType<ApiError>>(
  params: undefined |  GetAdminUsersListParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAdminUsersList>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
@@ -13124,6 +13055,7 @@ export function useGetAdminUsersList<TData = Awaited<ReturnType<typeof getAdminU
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/** @summary List all users (paginated) */
 export function useGetAdminUsersList<TData = Awaited<ReturnType<typeof getAdminUsersList>>, TError = ErrorType<ApiError>>(
  params?: GetAdminUsersListParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAdminUsersList>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
@@ -13134,14 +13066,12 @@ export function useGetAdminUsersList<TData = Awaited<ReturnType<typeof getAdminU
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/** @summary List all users (paginated) */
 export function useGetAdminUsersList<TData = Awaited<ReturnType<typeof getAdminUsersList>>, TError = ErrorType<ApiError>>(
  params?: GetAdminUsersListParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAdminUsersList>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-/**
- * @summary List all users (paginated)
- */
-
+/** @summary List all users (paginated) */
 export function useGetAdminUsersList<TData = Awaited<ReturnType<typeof getAdminUsersList>>, TError = ErrorType<ApiError>>(
  params?: GetAdminUsersListParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAdminUsersList>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
@@ -13174,25 +13104,11 @@ export const getPostAdminUsersCreateUrl = () => {
  */
 export const postAdminUsersCreate = async (adminCreateUserRequest: AdminCreateUserRequest, options?: Parameters<typeof customInstance>[1]): Promise<PostAdminUsersCreate201> => {
 
-    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
-    if (!h) return {};
-    if (h instanceof Headers) return Object.fromEntries(h.entries());
-    if (Symbol.iterator in h) {
-      return Object.fromEntries(
-        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
-      );
-    }
-    const headers: Record<string, string | readonly string[]> = {};
-    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
-      if (value !== undefined) headers[name] = value;
-    }
-    return headers;
-  };
-return customInstance<PostAdminUsersCreate201>(getPostAdminUsersCreateUrl(),
+  return customInstance<PostAdminUsersCreate201>(getPostAdminUsersCreateUrl(),
   {
     ...options,
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    headers: getHeaders({ 'Content-Type': 'application/json' }, options?.headers),
     body: JSON.stringify(adminCreateUserRequest)
   }
 );}
@@ -13236,6 +13152,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type PostAdminUsersCreateMutationVariables = {data: BodyType<AdminCreateUserRequest>}
 
     /**
+ * Super admins may create any user. Admins may create users with ROLE_USER only, and only while the admin.can_create_users setting is on.
  * @summary Create a new user
  */
 export const usePostAdminUsersCreate = <TError = ErrorType<ApiError | ValidationError>,
@@ -13264,25 +13181,11 @@ export const getPatchAdminUsersUpdateUrl = (publicId: string,) => {
 export const patchAdminUsersUpdate = async (publicId: string,
     adminUpdateUserRequest: AdminUpdateUserRequest, options?: Parameters<typeof customInstance>[1]): Promise<PatchAdminUsersUpdate200> => {
 
-    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
-    if (!h) return {};
-    if (h instanceof Headers) return Object.fromEntries(h.entries());
-    if (Symbol.iterator in h) {
-      return Object.fromEntries(
-        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
-      );
-    }
-    const headers: Record<string, string | readonly string[]> = {};
-    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
-      if (value !== undefined) headers[name] = value;
-    }
-    return headers;
-  };
-return customInstance<PatchAdminUsersUpdate200>(getPatchAdminUsersUpdateUrl(publicId),
+  return customInstance<PatchAdminUsersUpdate200>(getPatchAdminUsersUpdateUrl(publicId),
   {
     ...options,
     method: 'PATCH',
-    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    headers: getHeaders({ 'Content-Type': 'application/json' }, options?.headers),
     body: JSON.stringify(adminUpdateUserRequest)
   }
 );}
@@ -13326,6 +13229,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type PatchAdminUsersUpdateMutationVariables = {publicId: string;data: BodyType<AdminUpdateUserRequest>}
 
     /**
+ * A new email address takes effect at once, counts as verified and replaces a change the user had pending; the previous address is told of the change. The CLI counterparts are app:user:rename and app:user:change-email.
  * @summary Update a user
  */
 export const usePatchAdminUsersUpdate = <TError = ErrorType<ApiError | ValidationError>,
@@ -13399,9 +13303,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type DeleteAdminUsersDeleteMutationError = ErrorType<ApiError>
     export type DeleteAdminUsersDeleteMutationVariables = {publicId: string}
 
-    /**
- * @summary Delete a user
- */
+    /** @summary Delete a user */
 export const useDeleteAdminUsersDelete = <TError = ErrorType<ApiError>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteAdminUsersDelete>>, TError,DeleteAdminUsersDeleteMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient): UseMutationResult<
@@ -13427,25 +13329,11 @@ export const getPostAdminUsersAssignRolesUrl = (publicId: string,) => {
 export const postAdminUsersAssignRoles = async (publicId: string,
     adminAssignRolesRequest: AdminAssignRolesRequest, options?: Parameters<typeof customInstance>[1]): Promise<PostAdminUsersAssignRoles200> => {
 
-    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
-    if (!h) return {};
-    if (h instanceof Headers) return Object.fromEntries(h.entries());
-    if (Symbol.iterator in h) {
-      return Object.fromEntries(
-        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
-      );
-    }
-    const headers: Record<string, string | readonly string[]> = {};
-    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
-      if (value !== undefined) headers[name] = value;
-    }
-    return headers;
-  };
-return customInstance<PostAdminUsersAssignRoles200>(getPostAdminUsersAssignRolesUrl(publicId),
+  return customInstance<PostAdminUsersAssignRoles200>(getPostAdminUsersAssignRolesUrl(publicId),
   {
     ...options,
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    headers: getHeaders({ 'Content-Type': 'application/json' }, options?.headers),
     body: JSON.stringify(adminAssignRolesRequest)
   }
 );}
@@ -13488,9 +13376,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type PostAdminUsersAssignRolesMutationError = ErrorType<ApiError | ValidationError>
     export type PostAdminUsersAssignRolesMutationVariables = {publicId: string;data: BodyType<AdminAssignRolesRequest>}
 
-    /**
- * @summary Assign roles to a user
- */
+    /** @summary Assign roles to a user */
 export const usePostAdminUsersAssignRoles = <TError = ErrorType<ApiError | ValidationError>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postAdminUsersAssignRoles>>, TError,PostAdminUsersAssignRolesMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient): UseMutationResult<
@@ -13517,25 +13403,11 @@ export const getPostAdminUsersResetPasswordUrl = (publicId: string,) => {
 export const postAdminUsersResetPassword = async (publicId: string,
     adminResetPasswordRequest: AdminResetPasswordRequest, options?: Parameters<typeof customInstance>[1]): Promise<PostAdminUsersResetPassword200> => {
 
-    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
-    if (!h) return {};
-    if (h instanceof Headers) return Object.fromEntries(h.entries());
-    if (Symbol.iterator in h) {
-      return Object.fromEntries(
-        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
-      );
-    }
-    const headers: Record<string, string | readonly string[]> = {};
-    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
-      if (value !== undefined) headers[name] = value;
-    }
-    return headers;
-  };
-return customInstance<PostAdminUsersResetPassword200>(getPostAdminUsersResetPasswordUrl(publicId),
+  return customInstance<PostAdminUsersResetPassword200>(getPostAdminUsersResetPasswordUrl(publicId),
   {
     ...options,
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    headers: getHeaders({ 'Content-Type': 'application/json' }, options?.headers),
     body: JSON.stringify(adminResetPasswordRequest)
   }
 );}
@@ -13579,6 +13451,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type PostAdminUsersResetPasswordMutationVariables = {publicId: string;data: BodyType<AdminResetPasswordRequest>}
 
     /**
+ * Sets the password and signs the user out of every session.
  * @summary Reset a user password
  */
 export const usePostAdminUsersResetPassword = <TError = ErrorType<ApiError>,
@@ -13654,6 +13527,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type PostAdminUsersResetTotpMutationVariables = {publicId: string}
 
     /**
+ * Removes the stored TOTP secret without reading it and signs the user out of every session, so they sign in with their password alone.
  * @summary Turn off a user's TOTP
  */
 export const usePostAdminUsersResetTotp = <TError = ErrorType<ApiError>,
@@ -13729,6 +13603,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type PostAdminUsersVerifyEmailMutationVariables = {publicId: string}
 
     /**
+ * Marks the current address verified, as redeeming its verification link would; a verified address stays as it is. A pending email change is left alone. The CLI counterpart is app:user:mark-email-verified.
  * @summary Mark a user's email address verified
  */
 export const usePostAdminUsersVerifyEmail = <TError = ErrorType<ApiError>,
@@ -13802,9 +13677,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type PostAdminUsersDisableMutationError = ErrorType<ApiError>
     export type PostAdminUsersDisableMutationVariables = {publicId: string}
 
-    /**
- * @summary Disable a user
- */
+    /** @summary Disable a user */
 export const usePostAdminUsersDisable = <TError = ErrorType<ApiError>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postAdminUsersDisable>>, TError,PostAdminUsersDisableMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient): UseMutationResult<
@@ -13876,9 +13749,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type PostAdminUsersEnableMutationError = ErrorType<ApiError>
     export type PostAdminUsersEnableMutationVariables = {publicId: string}
 
-    /**
- * @summary Enable a user
- */
+    /** @summary Enable a user */
 export const usePostAdminUsersEnable = <TError = ErrorType<ApiError>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postAdminUsersEnable>>, TError,PostAdminUsersEnableMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient): UseMutationResult<
@@ -13946,6 +13817,10 @@ export type GetAdminUserSettingsIndexQueryResult = NonNullable<Awaited<ReturnTyp
 export type GetAdminUserSettingsIndexQueryError = ErrorType<ApiError>
 
 
+/**
+ * A stored value that is no longer allowed is returned with storedValueValid false.
+ * @summary List a user's settings
+ */
 export function useGetAdminUserSettingsIndex<TData = Awaited<ReturnType<typeof getAdminUserSettingsIndex>>, TError = ErrorType<ApiError>>(
  publicId: string, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAdminUserSettingsIndex>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
@@ -13956,6 +13831,10 @@ export function useGetAdminUserSettingsIndex<TData = Awaited<ReturnType<typeof g
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * A stored value that is no longer allowed is returned with storedValueValid false.
+ * @summary List a user's settings
+ */
 export function useGetAdminUserSettingsIndex<TData = Awaited<ReturnType<typeof getAdminUserSettingsIndex>>, TError = ErrorType<ApiError>>(
  publicId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAdminUserSettingsIndex>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
@@ -13966,14 +13845,18 @@ export function useGetAdminUserSettingsIndex<TData = Awaited<ReturnType<typeof g
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * A stored value that is no longer allowed is returned with storedValueValid false.
+ * @summary List a user's settings
+ */
 export function useGetAdminUserSettingsIndex<TData = Awaited<ReturnType<typeof getAdminUserSettingsIndex>>, TError = ErrorType<ApiError>>(
  publicId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAdminUserSettingsIndex>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 /**
+ * A stored value that is no longer allowed is returned with storedValueValid false.
  * @summary List a user's settings
  */
-
 export function useGetAdminUserSettingsIndex<TData = Awaited<ReturnType<typeof getAdminUserSettingsIndex>>, TError = ErrorType<ApiError>>(
  publicId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAdminUserSettingsIndex>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
@@ -14009,25 +13892,11 @@ export const putAdminUserSettingsSet = async (publicId: string,
     key: string,
     setAdminUserSettingRequest: SetAdminUserSettingRequest, options?: Parameters<typeof customInstance>[1]): Promise<PutAdminUserSettingsSet200> => {
 
-    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
-    if (!h) return {};
-    if (h instanceof Headers) return Object.fromEntries(h.entries());
-    if (Symbol.iterator in h) {
-      return Object.fromEntries(
-        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
-      );
-    }
-    const headers: Record<string, string | readonly string[]> = {};
-    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
-      if (value !== undefined) headers[name] = value;
-    }
-    return headers;
-  };
-return customInstance<PutAdminUserSettingsSet200>(getPutAdminUserSettingsSetUrl(publicId,key),
+  return customInstance<PutAdminUserSettingsSet200>(getPutAdminUserSettingsSetUrl(publicId,key),
   {
     ...options,
     method: 'PUT',
-    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    headers: getHeaders({ 'Content-Type': 'application/json' }, options?.headers),
     body: JSON.stringify(setAdminUserSettingRequest)
   }
 );}
@@ -14071,6 +13940,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type PutAdminUserSettingsSetMutationVariables = {publicId: string;key: string;data: BodyType<SetAdminUserSettingRequest>}
 
     /**
+ * Works for every user setting, including ones users cannot change themselves. The change is logged.
  * @summary Set a user's choice for a setting
  */
 export const usePutAdminUserSettingsSet = <TError = ErrorType<ApiError | ValidationError>,
@@ -14148,6 +14018,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type DeleteAdminUserSettingsResetMutationVariables = {publicId: string;key: string}
 
     /**
+ * The change is logged.
  * @summary Remove a user's choice so the setting follows its default
  */
 export const useDeleteAdminUserSettingsReset = <TError = ErrorType<ApiError>,
@@ -14216,6 +14087,7 @@ export type GetLiveRecoveryQueryResult = NonNullable<Awaited<ReturnType<typeof g
 export type GetLiveRecoveryQueryError = ErrorType<void>
 
 
+/** @summary Recover current live update authorization and health */
 export function useGetLiveRecovery<TData = Awaited<ReturnType<typeof getLiveRecovery>>, TError = ErrorType<void>>(
   options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getLiveRecovery>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
@@ -14226,6 +14098,7 @@ export function useGetLiveRecovery<TData = Awaited<ReturnType<typeof getLiveReco
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/** @summary Recover current live update authorization and health */
 export function useGetLiveRecovery<TData = Awaited<ReturnType<typeof getLiveRecovery>>, TError = ErrorType<void>>(
   options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getLiveRecovery>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
@@ -14236,14 +14109,12 @@ export function useGetLiveRecovery<TData = Awaited<ReturnType<typeof getLiveReco
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/** @summary Recover current live update authorization and health */
 export function useGetLiveRecovery<TData = Awaited<ReturnType<typeof getLiveRecovery>>, TError = ErrorType<void>>(
   options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getLiveRecovery>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-/**
- * @summary Recover current live update authorization and health
- */
-
+/** @summary Recover current live update authorization and health */
 export function useGetLiveRecovery<TData = Awaited<ReturnType<typeof getLiveRecovery>>, TError = ErrorType<void>>(
   options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getLiveRecovery>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
@@ -14317,6 +14188,7 @@ export type GetOauthClientsIndexQueryResult = NonNullable<Awaited<ReturnType<typ
 export type GetOauthClientsIndexQueryError = ErrorType<ApiError>
 
 
+/** @summary List personal access clients */
 export function useGetOauthClientsIndex<TData = Awaited<ReturnType<typeof getOauthClientsIndex>>, TError = ErrorType<ApiError>>(
   options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getOauthClientsIndex>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
@@ -14327,6 +14199,7 @@ export function useGetOauthClientsIndex<TData = Awaited<ReturnType<typeof getOau
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/** @summary List personal access clients */
 export function useGetOauthClientsIndex<TData = Awaited<ReturnType<typeof getOauthClientsIndex>>, TError = ErrorType<ApiError>>(
   options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getOauthClientsIndex>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
@@ -14337,14 +14210,12 @@ export function useGetOauthClientsIndex<TData = Awaited<ReturnType<typeof getOau
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/** @summary List personal access clients */
 export function useGetOauthClientsIndex<TData = Awaited<ReturnType<typeof getOauthClientsIndex>>, TError = ErrorType<ApiError>>(
   options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getOauthClientsIndex>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-/**
- * @summary List personal access clients
- */
-
+/** @summary List personal access clients */
 export function useGetOauthClientsIndex<TData = Awaited<ReturnType<typeof getOauthClientsIndex>>, TError = ErrorType<ApiError>>(
   options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getOauthClientsIndex>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
@@ -14376,25 +14247,11 @@ export const getPostOauthClientsCreateUrl = () => {
  */
 export const postOauthClientsCreate = async (postOauthClientsCreateBody: PostOauthClientsCreateBody, options?: Parameters<typeof customInstance>[1]): Promise<PostOauthClientsCreate201> => {
 
-    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
-    if (!h) return {};
-    if (h instanceof Headers) return Object.fromEntries(h.entries());
-    if (Symbol.iterator in h) {
-      return Object.fromEntries(
-        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
-      );
-    }
-    const headers: Record<string, string | readonly string[]> = {};
-    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
-      if (value !== undefined) headers[name] = value;
-    }
-    return headers;
-  };
-return customInstance<PostOauthClientsCreate201>(getPostOauthClientsCreateUrl(),
+  return customInstance<PostOauthClientsCreate201>(getPostOauthClientsCreateUrl(),
   {
     ...options,
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    headers: getHeaders({ 'Content-Type': 'application/json' }, options?.headers),
     body: JSON.stringify(postOauthClientsCreateBody)
   }
 );}
@@ -14437,9 +14294,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type PostOauthClientsCreateMutationError = ErrorType<ApiError | ValidationError>
     export type PostOauthClientsCreateMutationVariables = {data: BodyType<PostOauthClientsCreateBody>}
 
-    /**
- * @summary Create a new personal access client
- */
+    /** @summary Create a new personal access client */
 export const usePostOauthClientsCreate = <TError = ErrorType<ApiError | ValidationError>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postOauthClientsCreate>>, TError,PostOauthClientsCreateMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient): UseMutationResult<
@@ -14511,9 +14366,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type DeleteOauthClientsRevokeMutationError = ErrorType<ApiError>
     export type DeleteOauthClientsRevokeMutationVariables = {publicId: string}
 
-    /**
- * @summary Revoke an OAuth client
- */
+    /** @summary Revoke an OAuth client */
 export const useDeleteOauthClientsRevoke = <TError = ErrorType<ApiError>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteOauthClientsRevoke>>, TError,DeleteOauthClientsRevokeMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient): UseMutationResult<
@@ -14588,6 +14441,10 @@ export type GetOauthAuthorizeQueryResult = NonNullable<Awaited<ReturnType<typeof
 export type GetOauthAuthorizeQueryError = ErrorType<AuthorizationErrorResource | ApiError>
 
 
+/**
+ * Backs the consent page at `APP_URL/oauth/authorize`, which RFC 8414 metadata advertises as the authorization endpoint. The client pushed its request to the pushed authorization request endpoint first; the page passes on only `client_id` and `request_uri`, and this endpoint describes the pushed request for the signed-in user. Looking it up does not use it up. It never redirects. When the client is invalid, or the pushed request is unknown, expired, already used or another client's (`invalid_request_uri`), the error has no `redirect_uri`: show it to the user. Any other error carries `redirect_uri`, the pushed redirect URI with `error`, `error_description`, the pushed `state` and `iss` (RFC 6749 section 4.1.2.1, RFC 9207); navigate there.
+ * @summary Look up a pushed authorization request (RFC 9126 section 4)
+ */
 export function useGetOauthAuthorize<TData = Awaited<ReturnType<typeof getOauthAuthorize>>, TError = ErrorType<AuthorizationErrorResource | ApiError>>(
  params: GetOauthAuthorizeParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getOauthAuthorize>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
@@ -14598,6 +14455,10 @@ export function useGetOauthAuthorize<TData = Awaited<ReturnType<typeof getOauthA
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * Backs the consent page at `APP_URL/oauth/authorize`, which RFC 8414 metadata advertises as the authorization endpoint. The client pushed its request to the pushed authorization request endpoint first; the page passes on only `client_id` and `request_uri`, and this endpoint describes the pushed request for the signed-in user. Looking it up does not use it up. It never redirects. When the client is invalid, or the pushed request is unknown, expired, already used or another client's (`invalid_request_uri`), the error has no `redirect_uri`: show it to the user. Any other error carries `redirect_uri`, the pushed redirect URI with `error`, `error_description`, the pushed `state` and `iss` (RFC 6749 section 4.1.2.1, RFC 9207); navigate there.
+ * @summary Look up a pushed authorization request (RFC 9126 section 4)
+ */
 export function useGetOauthAuthorize<TData = Awaited<ReturnType<typeof getOauthAuthorize>>, TError = ErrorType<AuthorizationErrorResource | ApiError>>(
  params: GetOauthAuthorizeParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getOauthAuthorize>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
@@ -14608,14 +14469,18 @@ export function useGetOauthAuthorize<TData = Awaited<ReturnType<typeof getOauthA
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * Backs the consent page at `APP_URL/oauth/authorize`, which RFC 8414 metadata advertises as the authorization endpoint. The client pushed its request to the pushed authorization request endpoint first; the page passes on only `client_id` and `request_uri`, and this endpoint describes the pushed request for the signed-in user. Looking it up does not use it up. It never redirects. When the client is invalid, or the pushed request is unknown, expired, already used or another client's (`invalid_request_uri`), the error has no `redirect_uri`: show it to the user. Any other error carries `redirect_uri`, the pushed redirect URI with `error`, `error_description`, the pushed `state` and `iss` (RFC 6749 section 4.1.2.1, RFC 9207); navigate there.
+ * @summary Look up a pushed authorization request (RFC 9126 section 4)
+ */
 export function useGetOauthAuthorize<TData = Awaited<ReturnType<typeof getOauthAuthorize>>, TError = ErrorType<AuthorizationErrorResource | ApiError>>(
  params: GetOauthAuthorizeParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getOauthAuthorize>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 /**
+ * Backs the consent page at `APP_URL/oauth/authorize`, which RFC 8414 metadata advertises as the authorization endpoint. The client pushed its request to the pushed authorization request endpoint first; the page passes on only `client_id` and `request_uri`, and this endpoint describes the pushed request for the signed-in user. Looking it up does not use it up. It never redirects. When the client is invalid, or the pushed request is unknown, expired, already used or another client's (`invalid_request_uri`), the error has no `redirect_uri`: show it to the user. Any other error carries `redirect_uri`, the pushed redirect URI with `error`, `error_description`, the pushed `state` and `iss` (RFC 6749 section 4.1.2.1, RFC 9207); navigate there.
  * @summary Look up a pushed authorization request (RFC 9126 section 4)
  */
-
 export function useGetOauthAuthorize<TData = Awaited<ReturnType<typeof getOauthAuthorize>>, TError = ErrorType<AuthorizationErrorResource | ApiError>>(
  params: GetOauthAuthorizeParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getOauthAuthorize>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
@@ -14648,25 +14513,11 @@ export const getPostOauthAuthorizeDecisionUrl = () => {
  */
 export const postOauthAuthorizeDecision = async (authorizationDecisionRequest: AuthorizationDecisionRequest, options?: Parameters<typeof customInstance>[1]): Promise<AuthorizationRedirectResource> => {
 
-    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
-    if (!h) return {};
-    if (h instanceof Headers) return Object.fromEntries(h.entries());
-    if (Symbol.iterator in h) {
-      return Object.fromEntries(
-        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
-      );
-    }
-    const headers: Record<string, string | readonly string[]> = {};
-    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
-      if (value !== undefined) headers[name] = value;
-    }
-    return headers;
-  };
-return customInstance<AuthorizationRedirectResource>(getPostOauthAuthorizeDecisionUrl(),
+  return customInstance<AuthorizationRedirectResource>(getPostOauthAuthorizeDecisionUrl(),
   {
     ...options,
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    headers: getHeaders({ 'Content-Type': 'application/json' }, options?.headers),
     body: JSON.stringify(authorizationDecisionRequest)
   }
 );}
@@ -14710,6 +14561,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type PostOauthAuthorizeDecisionMutationVariables = {data: BodyType<AuthorizationDecisionRequest>}
 
     /**
+ * Records the signed-in user's decision on the pushed request the consent page showed, named by the same `client_id` and `request_uri`. Either decision uses the request up. Approval answers with the pushed redirect URI carrying `code`, the pushed `state` and `iss` (RFC 9207); denial with `error=access_denied`, the pushed `state` and `iss`. The page navigates to `redirect_uri`. Errors follow GET; a request another decision already used answers `invalid_request_uri`.
  * @summary Approve or deny a pushed authorization request (RFC 6749 section 4.1.2)
  */
 export const usePostOauthAuthorizeDecision = <TError = ErrorType<AuthorizationErrorResource | ApiError>,
@@ -14737,25 +14589,11 @@ export const getPostOauthParUrl = () => {
  */
 export const postOauthPar = async (postOauthParBody: PostOauthParBody, options?: Parameters<typeof customInstance>[1]): Promise<PushedAuthorizationRequestResource> => {
 
-    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
-    if (!h) return {};
-    if (h instanceof Headers) return Object.fromEntries(h.entries());
-    if (Symbol.iterator in h) {
-      return Object.fromEntries(
-        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
-      );
-    }
-    const headers: Record<string, string | readonly string[]> = {};
-    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
-      if (value !== undefined) headers[name] = value;
-    }
-    return headers;
-  };
-return customInstance<PushedAuthorizationRequestResource>(getPostOauthParUrl(),
+  return customInstance<PushedAuthorizationRequestResource>(getPostOauthParUrl(),
   {
     ...options,
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    headers: getHeaders({ 'Content-Type': 'application/json' }, options?.headers),
     body: JSON.stringify(postOauthParBody)
   }
 );}
@@ -14799,6 +14637,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type PostOauthParMutationVariables = {data: BodyType<PostOauthParBody>}
 
     /**
+ * Every authorization request is pushed here first. The client authenticates as at the token endpoint and binds the request to its DPoP key (RFC 9449 section 10.1) with a `DPoP` proof header carrying a server-issued nonce, the `dpop_jkt` parameter, or both naming the same key; the authorization code is later bound to that key. A proof is checked as at the token endpoint: `use_dpop_nonce` and `invalid_dpop_proof` answers carry a `DPoP-Nonce` header, and every answer to a verified proof carries the next nonce. Send the browser to the authorization endpoint with only `client_id` and the returned `request_uri`. Baander's first-party client gets `unauthorized_client`. Parameters may be form-encoded (RFC 9126) or JSON. Answers carry `Cache-Control: no-store`.
  * @summary Push an authorization request (RFC 9126 section 2)
  */
 export const usePostOauthPar = <TError = ErrorType<OAuthError | ApiError>,
@@ -14826,25 +14665,11 @@ export const getPostOauthTokenUrl = () => {
  */
 export const postOauthToken = async (postOauthTokenBody: PostOauthTokenBody, options?: Parameters<typeof customInstance>[1]): Promise<OAuthTokenResource> => {
 
-    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
-    if (!h) return {};
-    if (h instanceof Headers) return Object.fromEntries(h.entries());
-    if (Symbol.iterator in h) {
-      return Object.fromEntries(
-        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
-      );
-    }
-    const headers: Record<string, string | readonly string[]> = {};
-    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
-      if (value !== undefined) headers[name] = value;
-    }
-    return headers;
-  };
-return customInstance<OAuthTokenResource>(getPostOauthTokenUrl(),
+  return customInstance<OAuthTokenResource>(getPostOauthTokenUrl(),
   {
     ...options,
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    headers: getHeaders({ 'Content-Type': 'application/json' }, options?.headers),
     body: JSON.stringify(postOauthTokenBody)
   }
 );}
@@ -14888,6 +14713,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type PostOauthTokenMutationVariables = {data: BodyType<PostOauthTokenBody>}
 
     /**
+ * Requires a DPoP proof carrying a server-issued nonce. A missing or invalid proof is answered with `invalid_dpop_proof`, a proof without a fresh nonce with `use_dpop_nonce`; both carry a `DPoP-Nonce` header. Every answer carries the nonce for the next proof and `Cache-Control: no-store`. The issued tokens are bound to the proof key, and to the `X-Baander-Client-Fingerprint` header when it is sent. Parameters may be form-encoded (RFC 6749) or JSON. Every request names its client in `client_id` or in an HTTP Basic `Authorization` header. Public clients authenticate with `client_id` alone; confidential clients add `client_secret`, or `client_assertion` with `client_assertion_type`, by the one method they were registered with. Baander's first-party client gets `unauthorized_client` for every grant; it refreshes at `/api/auth/refresh`. A secret client sends its secret in the body or, with its client ID, in HTTP Basic (`client_secret_basic`, each part form-urlencoded first), never both; a failed Basic authentication is answered with a `WWW-Authenticate: Basic` challenge. A client assertion (RFC 7523 as updated by RFC 10070) is a JWT signed with one of the client's registered keys: `iss` and `sub` are the `client_id`, `aud` is the issuer identifier as its sole value, `exp` and `jti` are required, it lives at most 300 seconds by default, and its `jti` is accepted once. Its `typ` header is `client-authentication+jwt` or absent.
  * @summary OAuth 2.0 token endpoint (RFC 6749 section 3.2)
  */
 export const usePostOauthToken = <TError = ErrorType<OAuthError | ApiError>,
@@ -14914,25 +14740,11 @@ export const getPostOauthRevokeUrl = () => {
  */
 export const postOauthRevoke = async (postOauthRevokeBody: PostOauthRevokeBody, options?: Parameters<typeof customInstance>[1]): Promise<unknown> => {
 
-    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
-    if (!h) return {};
-    if (h instanceof Headers) return Object.fromEntries(h.entries());
-    if (Symbol.iterator in h) {
-      return Object.fromEntries(
-        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
-      );
-    }
-    const headers: Record<string, string | readonly string[]> = {};
-    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
-      if (value !== undefined) headers[name] = value;
-    }
-    return headers;
-  };
-return customInstance<unknown>(getPostOauthRevokeUrl(),
+  return customInstance<unknown>(getPostOauthRevokeUrl(),
   {
     ...options,
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    headers: getHeaders({ 'Content-Type': 'application/json' }, options?.headers),
     body: JSON.stringify(postOauthRevokeBody)
   }
 );}
@@ -14975,9 +14787,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type PostOauthRevokeMutationError = ErrorType<ValidationError | ApiError>
     export type PostOauthRevokeMutationVariables = {data: BodyType<PostOauthRevokeBody>}
 
-    /**
- * @summary Revoke an access or refresh token of the signed-in user and its chain (RFC 7009)
- */
+    /** @summary Revoke an access or refresh token of the signed-in user and its chain (RFC 7009) */
 export const usePostOauthRevoke = <TError = ErrorType<ValidationError | ApiError>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postOauthRevoke>>, TError,PostOauthRevokeMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient): UseMutationResult<
@@ -15003,25 +14813,11 @@ export const getPostOauthDeviceAuthorizeUrl = () => {
  */
 export const postOauthDeviceAuthorize = async (postOauthDeviceAuthorizeBody: PostOauthDeviceAuthorizeBody, options?: Parameters<typeof customInstance>[1]): Promise<DeviceAuthorizationResource> => {
 
-    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
-    if (!h) return {};
-    if (h instanceof Headers) return Object.fromEntries(h.entries());
-    if (Symbol.iterator in h) {
-      return Object.fromEntries(
-        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
-      );
-    }
-    const headers: Record<string, string | readonly string[]> = {};
-    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
-      if (value !== undefined) headers[name] = value;
-    }
-    return headers;
-  };
-return customInstance<DeviceAuthorizationResource>(getPostOauthDeviceAuthorizeUrl(),
+  return customInstance<DeviceAuthorizationResource>(getPostOauthDeviceAuthorizeUrl(),
   {
     ...options,
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    headers: getHeaders({ 'Content-Type': 'application/json' }, options?.headers),
     body: JSON.stringify(postOauthDeviceAuthorizeBody)
   }
 );}
@@ -15065,6 +14861,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type PostOauthDeviceAuthorizeMutationVariables = {data: BodyType<PostOauthDeviceAuthorizeBody>}
 
     /**
+ * Only clients registered as device clients may start the device flow. A confidential client authenticates as at the token endpoint. Parameters may be form-encoded (RFC 8628) or JSON. Show the user code and `verification_uri` (or encode `verification_uri_complete` in a QR code), then poll the token endpoint with the device code no faster than `interval` seconds.
  * @summary Device authorization request (RFC 8628 section 3.1)
  */
 export const usePostOauthDeviceAuthorize = <TError = ErrorType<OAuthError | ApiError>,
@@ -15141,6 +14938,10 @@ export type GetOauthDeviceVerifyQueryResult = NonNullable<Awaited<ReturnType<typ
 export type GetOauthDeviceVerifyQueryError = ErrorType<ApiError>
 
 
+/**
+ * Backs the device page at `APP_URL/device`. Shows the signed-in user which client a user code belongs to before they approve or deny it. Case, spaces and dashes in the code do not matter. `scopes` are the scopes the issued token would carry.
+ * @summary Look up a pending device authorization request (RFC 8628 section 3.3)
+ */
 export function useGetOauthDeviceVerify<TData = Awaited<ReturnType<typeof getOauthDeviceVerify>>, TError = ErrorType<ApiError>>(
  params: GetOauthDeviceVerifyParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getOauthDeviceVerify>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
@@ -15151,6 +14952,10 @@ export function useGetOauthDeviceVerify<TData = Awaited<ReturnType<typeof getOau
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * Backs the device page at `APP_URL/device`. Shows the signed-in user which client a user code belongs to before they approve or deny it. Case, spaces and dashes in the code do not matter. `scopes` are the scopes the issued token would carry.
+ * @summary Look up a pending device authorization request (RFC 8628 section 3.3)
+ */
 export function useGetOauthDeviceVerify<TData = Awaited<ReturnType<typeof getOauthDeviceVerify>>, TError = ErrorType<ApiError>>(
  params: GetOauthDeviceVerifyParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getOauthDeviceVerify>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
@@ -15161,14 +14966,18 @@ export function useGetOauthDeviceVerify<TData = Awaited<ReturnType<typeof getOau
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * Backs the device page at `APP_URL/device`. Shows the signed-in user which client a user code belongs to before they approve or deny it. Case, spaces and dashes in the code do not matter. `scopes` are the scopes the issued token would carry.
+ * @summary Look up a pending device authorization request (RFC 8628 section 3.3)
+ */
 export function useGetOauthDeviceVerify<TData = Awaited<ReturnType<typeof getOauthDeviceVerify>>, TError = ErrorType<ApiError>>(
  params: GetOauthDeviceVerifyParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getOauthDeviceVerify>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 /**
+ * Backs the device page at `APP_URL/device`. Shows the signed-in user which client a user code belongs to before they approve or deny it. Case, spaces and dashes in the code do not matter. `scopes` are the scopes the issued token would carry.
  * @summary Look up a pending device authorization request (RFC 8628 section 3.3)
  */
-
 export function useGetOauthDeviceVerify<TData = Awaited<ReturnType<typeof getOauthDeviceVerify>>, TError = ErrorType<ApiError>>(
  params: GetOauthDeviceVerifyParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getOauthDeviceVerify>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
@@ -15201,25 +15010,11 @@ export const getPostOauthDeviceApproveUrl = () => {
  */
 export const postOauthDeviceApprove = async (deviceApproveRequest: DeviceApproveRequest, options?: Parameters<typeof customInstance>[1]): Promise<PostOauthDeviceApprove200> => {
 
-    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
-    if (!h) return {};
-    if (h instanceof Headers) return Object.fromEntries(h.entries());
-    if (Symbol.iterator in h) {
-      return Object.fromEntries(
-        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
-      );
-    }
-    const headers: Record<string, string | readonly string[]> = {};
-    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
-      if (value !== undefined) headers[name] = value;
-    }
-    return headers;
-  };
-return customInstance<PostOauthDeviceApprove200>(getPostOauthDeviceApproveUrl(),
+  return customInstance<PostOauthDeviceApprove200>(getPostOauthDeviceApproveUrl(),
   {
     ...options,
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    headers: getHeaders({ 'Content-Type': 'application/json' }, options?.headers),
     body: JSON.stringify(deviceApproveRequest)
   }
 );}
@@ -15263,6 +15058,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type PostOauthDeviceApproveMutationVariables = {data: BodyType<DeviceApproveRequest>}
 
     /**
+ * Records the signed-in user's decision. Approval gives the device a token pair for this user at its next poll and notifies the user. Denial makes the next poll answer `access_denied`.
  * @summary Approve or deny a device authorization request (RFC 8628 section 3.3)
  */
 export const usePostOauthDeviceApprove = <TError = ErrorType<ApiError | ValidationError>,
@@ -15331,6 +15127,7 @@ export type GetPasskeyListQueryResult = NonNullable<Awaited<ReturnType<typeof ge
 export type GetPasskeyListQueryError = ErrorType<ApiError>
 
 
+/** @summary List registered passkeys for the current user */
 export function useGetPasskeyList<TData = Awaited<ReturnType<typeof getPasskeyList>>, TError = ErrorType<ApiError>>(
   options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getPasskeyList>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
@@ -15341,6 +15138,7 @@ export function useGetPasskeyList<TData = Awaited<ReturnType<typeof getPasskeyLi
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/** @summary List registered passkeys for the current user */
 export function useGetPasskeyList<TData = Awaited<ReturnType<typeof getPasskeyList>>, TError = ErrorType<ApiError>>(
   options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getPasskeyList>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
@@ -15351,14 +15149,12 @@ export function useGetPasskeyList<TData = Awaited<ReturnType<typeof getPasskeyLi
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/** @summary List registered passkeys for the current user */
 export function useGetPasskeyList<TData = Awaited<ReturnType<typeof getPasskeyList>>, TError = ErrorType<ApiError>>(
   options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getPasskeyList>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-/**
- * @summary List registered passkeys for the current user
- */
-
+/** @summary List registered passkeys for the current user */
 export function useGetPasskeyList<TData = Awaited<ReturnType<typeof getPasskeyList>>, TError = ErrorType<ApiError>>(
   options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getPasskeyList>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
@@ -15391,25 +15187,11 @@ export const getPostPasskeyOptionsUrl = () => {
  */
 export const postPasskeyOptions = async (passkeyRegistrationOptionsRequest: PasskeyRegistrationOptionsRequest, options?: Parameters<typeof customInstance>[1]): Promise<PostPasskeyOptions200> => {
 
-    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
-    if (!h) return {};
-    if (h instanceof Headers) return Object.fromEntries(h.entries());
-    if (Symbol.iterator in h) {
-      return Object.fromEntries(
-        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
-      );
-    }
-    const headers: Record<string, string | readonly string[]> = {};
-    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
-      if (value !== undefined) headers[name] = value;
-    }
-    return headers;
-  };
-return customInstance<PostPasskeyOptions200>(getPostPasskeyOptionsUrl(),
+  return customInstance<PostPasskeyOptions200>(getPostPasskeyOptionsUrl(),
   {
     ...options,
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    headers: getHeaders({ 'Content-Type': 'application/json' }, options?.headers),
     body: JSON.stringify(passkeyRegistrationOptionsRequest)
   }
 );}
@@ -15453,6 +15235,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type PostPasskeyOptionsMutationVariables = {data: BodyType<PasskeyRegistrationOptionsRequest>}
 
     /**
+ * Needs a verified email address, answered otherwise with 403 and `details.reason` `email_unverified`. Needs the current password, plus a current TOTP code when TOTP is on; a wrong password and a missing or wrong code get the same 422 with `details.reason` `step_up_failed`. The challenge is bound to the signed-in user and expires after 5 minutes.
  * @summary Get WebAuthn registration options
  */
 export const usePostPasskeyOptions = <TError = ErrorType<ApiError | ValidationError>,
@@ -15480,25 +15263,11 @@ export const getPostPasskeyRegisterUrl = () => {
  */
 export const postPasskeyRegister = async (postPasskeyRegisterBody: PostPasskeyRegisterBody, options?: Parameters<typeof customInstance>[1]): Promise<PostPasskeyRegister201> => {
 
-    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
-    if (!h) return {};
-    if (h instanceof Headers) return Object.fromEntries(h.entries());
-    if (Symbol.iterator in h) {
-      return Object.fromEntries(
-        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
-      );
-    }
-    const headers: Record<string, string | readonly string[]> = {};
-    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
-      if (value !== undefined) headers[name] = value;
-    }
-    return headers;
-  };
-return customInstance<PostPasskeyRegister201>(getPostPasskeyRegisterUrl(),
+  return customInstance<PostPasskeyRegister201>(getPostPasskeyRegisterUrl(),
   {
     ...options,
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    headers: getHeaders({ 'Content-Type': 'application/json' }, options?.headers),
     body: JSON.stringify(postPasskeyRegisterBody)
   }
 );}
@@ -15542,6 +15311,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type PostPasskeyRegisterMutationVariables = {data: BodyType<PostPasskeyRegisterBody>}
 
     /**
+ * Signs the account out of every other session, paired devices and third-party apps included; the session that completes the registration stays signed in.
  * @summary Register a new passkey
  */
 export const usePostPasskeyRegister = <TError = ErrorType<ApiError | ValidationError>,
@@ -15617,6 +15387,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
 
     /**
+ * Passkey sign-in is discoverable: the options name no account and list no credential, so the authenticator offers the passkeys it holds for this relying party. The challenge is spent by the first sign-in or check that presents it and expires after 5 minutes.
  * @summary Get WebAuthn authentication options
  */
 export const usePostPasskeyAuthenticateOptions = <TError = ErrorType<ApiError>,
@@ -15644,25 +15415,11 @@ export const getPostPasskeyAuthenticateUrl = () => {
  */
 export const postPasskeyAuthenticate = async (verifyPasskeyChallengeRequest: VerifyPasskeyChallengeRequest, options?: Parameters<typeof customInstance>[1]): Promise<PostPasskeyAuthenticate200> => {
 
-    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
-    if (!h) return {};
-    if (h instanceof Headers) return Object.fromEntries(h.entries());
-    if (Symbol.iterator in h) {
-      return Object.fromEntries(
-        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
-      );
-    }
-    const headers: Record<string, string | readonly string[]> = {};
-    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
-      if (value !== undefined) headers[name] = value;
-    }
-    return headers;
-  };
-return customInstance<PostPasskeyAuthenticate200>(getPostPasskeyAuthenticateUrl(),
+  return customInstance<PostPasskeyAuthenticate200>(getPostPasskeyAuthenticateUrl(),
   {
     ...options,
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    headers: getHeaders({ 'Content-Type': 'application/json' }, options?.headers),
     body: JSON.stringify(verifyPasskeyChallengeRequest)
   }
 );}
@@ -15706,6 +15463,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type PostPasskeyAuthenticateMutationVariables = {data: BodyType<VerifyPasskeyChallengeRequest>}
 
     /**
+ * Runs the checks passkey sign-in runs and names the account the assertion proves, without issuing tokens; sign-in itself is `POST /api/auth/login/passkey`. The challenge is spent once; the signature counter must increase unless the authenticator keeps none; an account with TOTP on needs a passkey that verified the user; a disabled account is refused.
  * @summary Check a passkey assertion without signing in
  */
 export const usePostPasskeyAuthenticate = <TError = ErrorType<ApiError | ValidationError>,
@@ -15734,25 +15492,11 @@ export const getDeletePasskeyDeleteUrl = (publicId: string,) => {
 export const deletePasskeyDelete = async (publicId: string,
     deletePasskeyRequest: DeletePasskeyRequest, options?: Parameters<typeof customInstance>[1]): Promise<DeletePasskeyDelete200> => {
 
-    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
-    if (!h) return {};
-    if (h instanceof Headers) return Object.fromEntries(h.entries());
-    if (Symbol.iterator in h) {
-      return Object.fromEntries(
-        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
-      );
-    }
-    const headers: Record<string, string | readonly string[]> = {};
-    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
-      if (value !== undefined) headers[name] = value;
-    }
-    return headers;
-  };
-return customInstance<DeletePasskeyDelete200>(getDeletePasskeyDeleteUrl(publicId),
+  return customInstance<DeletePasskeyDelete200>(getDeletePasskeyDeleteUrl(publicId),
   {
     ...options,
     method: 'DELETE',
-    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    headers: getHeaders({ 'Content-Type': 'application/json' }, options?.headers),
     body: JSON.stringify(deletePasskeyRequest)
   }
 );}
@@ -15796,6 +15540,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type DeletePasskeyDeleteMutationVariables = {publicId: string;data: BodyType<DeletePasskeyRequest>}
 
     /**
+ * Needs the current password, plus a current TOTP code when TOTP is on; a wrong password and a missing or wrong code get the same 422 with `details.reason` `step_up_failed`. An unknown passkey answers 404 before any step-up attempt is spent. Signs the account out of every other session, paired devices and third-party apps included; the session that made the request stays signed in.
  * @summary Delete a passkey
  */
 export const useDeletePasskeyDelete = <TError = ErrorType<ApiError | ValidationError>,
@@ -15823,25 +15568,11 @@ export const getPostAuthPasskeyLoginPasskeyUrl = () => {
  */
 export const postAuthPasskeyLoginPasskey = async (postAuthPasskeyLoginPasskeyBody: PostAuthPasskeyLoginPasskeyBody, options?: Parameters<typeof customInstance>[1]): Promise<TokenResource> => {
 
-    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
-    if (!h) return {};
-    if (h instanceof Headers) return Object.fromEntries(h.entries());
-    if (Symbol.iterator in h) {
-      return Object.fromEntries(
-        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
-      );
-    }
-    const headers: Record<string, string | readonly string[]> = {};
-    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
-      if (value !== undefined) headers[name] = value;
-    }
-    return headers;
-  };
-return customInstance<TokenResource>(getPostAuthPasskeyLoginPasskeyUrl(),
+  return customInstance<TokenResource>(getPostAuthPasskeyLoginPasskeyUrl(),
   {
     ...options,
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    headers: getHeaders({ 'Content-Type': 'application/json' }, options?.headers),
     body: JSON.stringify(postAuthPasskeyLoginPasskeyBody)
   }
 );}
@@ -15885,6 +15616,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type PostAuthPasskeyLoginPasskeyMutationVariables = {data: BodyType<PostAuthPasskeyLoginPasskeyBody>}
 
     /**
+ * Requires a DPoP proof carrying a server-issued nonce, as password login does. The proof is checked before the assertion, so a nonce challenge leaves the assertion valid for a retry. The issued tokens are bound to the proof key.
  * @summary Authenticate with a WebAuthn passkey
  */
 export const usePostAuthPasskeyLoginPasskey = <TError = ErrorType<OAuthError | ApiError>,
@@ -15912,25 +15644,11 @@ export const getPostTotpSetupUrl = () => {
  */
 export const postTotpSetup = async (startTotpSetupRequest: StartTotpSetupRequest, options?: Parameters<typeof customInstance>[1]): Promise<PostTotpSetup200> => {
 
-    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
-    if (!h) return {};
-    if (h instanceof Headers) return Object.fromEntries(h.entries());
-    if (Symbol.iterator in h) {
-      return Object.fromEntries(
-        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
-      );
-    }
-    const headers: Record<string, string | readonly string[]> = {};
-    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
-      if (value !== undefined) headers[name] = value;
-    }
-    return headers;
-  };
-return customInstance<PostTotpSetup200>(getPostTotpSetupUrl(),
+  return customInstance<PostTotpSetup200>(getPostTotpSetupUrl(),
   {
     ...options,
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    headers: getHeaders({ 'Content-Type': 'application/json' }, options?.headers),
     body: JSON.stringify(startTotpSetupRequest)
   }
 );}
@@ -15974,6 +15692,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type PostTotpSetupMutationVariables = {data: BodyType<StartTotpSetupRequest>}
 
     /**
+ * Refused while TOTP is on, and for an unverified email address with 403 and `details.reason` `email_unverified`. Needs the current password; a wrong one gets 422 with `details.reason` `step_up_failed`. Each setup replaces the pending secret of the previous one; it expires after 10 minutes.
  * @summary Generate TOTP secret and provisioning URI
  */
 export const usePostTotpSetup = <TError = ErrorType<ApiError | ValidationError>,
@@ -16001,25 +15720,11 @@ export const getPostTotpEnableUrl = () => {
  */
 export const postTotpEnable = async (enableTotpRequest: EnableTotpRequest, options?: Parameters<typeof customInstance>[1]): Promise<PostTotpEnable200> => {
 
-    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
-    if (!h) return {};
-    if (h instanceof Headers) return Object.fromEntries(h.entries());
-    if (Symbol.iterator in h) {
-      return Object.fromEntries(
-        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
-      );
-    }
-    const headers: Record<string, string | readonly string[]> = {};
-    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
-      if (value !== undefined) headers[name] = value;
-    }
-    return headers;
-  };
-return customInstance<PostTotpEnable200>(getPostTotpEnableUrl(),
+  return customInstance<PostTotpEnable200>(getPostTotpEnableUrl(),
   {
     ...options,
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    headers: getHeaders({ 'Content-Type': 'application/json' }, options?.headers),
     body: JSON.stringify(enableTotpRequest)
   }
 );}
@@ -16063,6 +15768,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type PostTotpEnableMutationVariables = {data: BodyType<EnableTotpRequest>}
 
     /**
+ * Signs the account out of every other session, paired devices and third-party apps included; the session that sent the code stays signed in.
  * @summary Enable TOTP after verifying a code from the authenticator app
  */
 export const usePostTotpEnable = <TError = ErrorType<ApiError | ValidationError>,
@@ -16090,25 +15796,11 @@ export const getPostTotpDisableUrl = () => {
  */
 export const postTotpDisable = async (disableTotpRequest: DisableTotpRequest, options?: Parameters<typeof customInstance>[1]): Promise<PostTotpDisable200> => {
 
-    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
-    if (!h) return {};
-    if (h instanceof Headers) return Object.fromEntries(h.entries());
-    if (Symbol.iterator in h) {
-      return Object.fromEntries(
-        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
-      );
-    }
-    const headers: Record<string, string | readonly string[]> = {};
-    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
-      if (value !== undefined) headers[name] = value;
-    }
-    return headers;
-  };
-return customInstance<PostTotpDisable200>(getPostTotpDisableUrl(),
+  return customInstance<PostTotpDisable200>(getPostTotpDisableUrl(),
   {
     ...options,
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    headers: getHeaders({ 'Content-Type': 'application/json' }, options?.headers),
     body: JSON.stringify(disableTotpRequest)
   }
 );}
@@ -16152,6 +15844,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type PostTotpDisableMutationVariables = {data: BodyType<DisableTotpRequest>}
 
     /**
+ * Refused with 400 while TOTP is off, before any step-up attempt is spent. Needs the current password and a current TOTP code; a missing or wrong password or code gets the same 422 with `details.reason` `step_up_failed`. Signs the account out of every other session, paired devices and third-party apps included; the session that made the request stays signed in.
  * @summary Disable TOTP
  */
 export const usePostTotpDisable = <TError = ErrorType<ApiError | ValidationError>,
@@ -16178,25 +15871,11 @@ export const getPostAuthRegisterUrl = () => {
  */
 export const postAuthRegister = async (postAuthRegisterBody: PostAuthRegisterBody, options?: Parameters<typeof customInstance>[1]): Promise<PostAuthRegister202> => {
 
-    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
-    if (!h) return {};
-    if (h instanceof Headers) return Object.fromEntries(h.entries());
-    if (Symbol.iterator in h) {
-      return Object.fromEntries(
-        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
-      );
-    }
-    const headers: Record<string, string | readonly string[]> = {};
-    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
-      if (value !== undefined) headers[name] = value;
-    }
-    return headers;
-  };
-return customInstance<PostAuthRegister202>(getPostAuthRegisterUrl(),
+  return customInstance<PostAuthRegister202>(getPostAuthRegisterUrl(),
   {
     ...options,
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    headers: getHeaders({ 'Content-Type': 'application/json' }, options?.headers),
     body: JSON.stringify(postAuthRegisterBody)
   }
 );}
@@ -16239,9 +15918,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type PostAuthRegisterMutationError = ErrorType<ApiError | ValidationError>
     export type PostAuthRegisterMutationVariables = {data: BodyType<PostAuthRegisterBody>}
 
-    /**
- * @summary Register a new user
- */
+    /** @summary Register a new user */
 export const usePostAuthRegister = <TError = ErrorType<ApiError | ValidationError>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postAuthRegister>>, TError,PostAuthRegisterMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient): UseMutationResult<
@@ -16309,6 +15986,10 @@ export type GetAuthRegistrationQueryResult = NonNullable<Awaited<ReturnType<type
 export type GetAuthRegistrationQueryError = ErrorType<unknown>
 
 
+/**
+ * Lets the sign-up page show whether it takes registrations. Operators open and close self-registration with the `auth.registration_open` server setting.
+ * @summary Whether self-registration is open
+ */
 export function useGetAuthRegistration<TData = Awaited<ReturnType<typeof getAuthRegistration>>, TError = ErrorType<unknown>>(
   options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAuthRegistration>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
@@ -16319,6 +16000,10 @@ export function useGetAuthRegistration<TData = Awaited<ReturnType<typeof getAuth
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * Lets the sign-up page show whether it takes registrations. Operators open and close self-registration with the `auth.registration_open` server setting.
+ * @summary Whether self-registration is open
+ */
 export function useGetAuthRegistration<TData = Awaited<ReturnType<typeof getAuthRegistration>>, TError = ErrorType<unknown>>(
   options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAuthRegistration>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
@@ -16329,14 +16014,18 @@ export function useGetAuthRegistration<TData = Awaited<ReturnType<typeof getAuth
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * Lets the sign-up page show whether it takes registrations. Operators open and close self-registration with the `auth.registration_open` server setting.
+ * @summary Whether self-registration is open
+ */
 export function useGetAuthRegistration<TData = Awaited<ReturnType<typeof getAuthRegistration>>, TError = ErrorType<unknown>>(
   options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAuthRegistration>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 /**
+ * Lets the sign-up page show whether it takes registrations. Operators open and close self-registration with the `auth.registration_open` server setting.
  * @summary Whether self-registration is open
  */
-
 export function useGetAuthRegistration<TData = Awaited<ReturnType<typeof getAuthRegistration>>, TError = ErrorType<unknown>>(
   options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAuthRegistration>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
@@ -16415,9 +16104,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type PostAuthLogoutMutationError = ErrorType<ApiError>
 
 
-    /**
- * @summary End the session: revoke the chain of the presented access token
- */
+    /** @summary End the session: revoke the chain of the presented access token */
 export const usePostAuthLogout = <TError = ErrorType<ApiError>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postAuthLogout>>, TError,void, TContext>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient): UseMutationResult<
@@ -16442,25 +16129,11 @@ export const getPostAuthRefreshUrl = () => {
  */
 export const postAuthRefresh = async (postAuthRefreshBody: PostAuthRefreshBody, options?: Parameters<typeof customInstance>[1]): Promise<PostAuthRefresh200> => {
 
-    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
-    if (!h) return {};
-    if (h instanceof Headers) return Object.fromEntries(h.entries());
-    if (Symbol.iterator in h) {
-      return Object.fromEntries(
-        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
-      );
-    }
-    const headers: Record<string, string | readonly string[]> = {};
-    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
-      if (value !== undefined) headers[name] = value;
-    }
-    return headers;
-  };
-return customInstance<PostAuthRefresh200>(getPostAuthRefreshUrl(),
+  return customInstance<PostAuthRefresh200>(getPostAuthRefreshUrl(),
   {
     ...options,
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    headers: getHeaders({ 'Content-Type': 'application/json' }, options?.headers),
     body: JSON.stringify(postAuthRefreshBody)
   }
 );}
@@ -16503,9 +16176,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type PostAuthRefreshMutationError = ErrorType<ApiError | ValidationError>
     export type PostAuthRefreshMutationVariables = {data: BodyType<PostAuthRefreshBody>}
 
-    /**
- * @summary Refresh an access token
- */
+    /** @summary Refresh an access token */
 export const usePostAuthRefresh = <TError = ErrorType<ApiError | ValidationError>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postAuthRefresh>>, TError,PostAuthRefreshMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient): UseMutationResult<
@@ -16530,25 +16201,11 @@ export const getPostAuthPasswordResetRequestUrl = () => {
  */
 export const postAuthPasswordResetRequest = async (postAuthPasswordResetRequestBody: PostAuthPasswordResetRequestBody, options?: Parameters<typeof customInstance>[1]): Promise<PostAuthPasswordResetRequest200> => {
 
-    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
-    if (!h) return {};
-    if (h instanceof Headers) return Object.fromEntries(h.entries());
-    if (Symbol.iterator in h) {
-      return Object.fromEntries(
-        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
-      );
-    }
-    const headers: Record<string, string | readonly string[]> = {};
-    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
-      if (value !== undefined) headers[name] = value;
-    }
-    return headers;
-  };
-return customInstance<PostAuthPasswordResetRequest200>(getPostAuthPasswordResetRequestUrl(),
+  return customInstance<PostAuthPasswordResetRequest200>(getPostAuthPasswordResetRequestUrl(),
   {
     ...options,
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    headers: getHeaders({ 'Content-Type': 'application/json' }, options?.headers),
     body: JSON.stringify(postAuthPasswordResetRequestBody)
   }
 );}
@@ -16591,9 +16248,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type PostAuthPasswordResetRequestMutationError = ErrorType<ValidationError | ApiError>
     export type PostAuthPasswordResetRequestMutationVariables = {data: BodyType<PostAuthPasswordResetRequestBody>}
 
-    /**
- * @summary Request a password reset email
- */
+    /** @summary Request a password reset email */
 export const usePostAuthPasswordResetRequest = <TError = ErrorType<ValidationError | ApiError>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postAuthPasswordResetRequest>>, TError,PostAuthPasswordResetRequestMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient): UseMutationResult<
@@ -16619,25 +16274,11 @@ export const getPostAuthPasswordResetUrl = () => {
  */
 export const postAuthPasswordReset = async (resetPasswordRequest: ResetPasswordRequest, options?: Parameters<typeof customInstance>[1]): Promise<PostAuthPasswordReset200> => {
 
-    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
-    if (!h) return {};
-    if (h instanceof Headers) return Object.fromEntries(h.entries());
-    if (Symbol.iterator in h) {
-      return Object.fromEntries(
-        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
-      );
-    }
-    const headers: Record<string, string | readonly string[]> = {};
-    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
-      if (value !== undefined) headers[name] = value;
-    }
-    return headers;
-  };
-return customInstance<PostAuthPasswordReset200>(getPostAuthPasswordResetUrl(),
+  return customInstance<PostAuthPasswordReset200>(getPostAuthPasswordResetUrl(),
   {
     ...options,
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    headers: getHeaders({ 'Content-Type': 'application/json' }, options?.headers),
     body: JSON.stringify(resetPasswordRequest)
   }
 );}
@@ -16681,6 +16322,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type PostAuthPasswordResetMutationVariables = {data: BodyType<ResetPasswordRequest>}
 
     /**
+ * Redeems the token once and signs the account out of every session.
  * @summary Set a new password with a password reset token
  */
 export const usePostAuthPasswordReset = <TError = ErrorType<ApiError | ValidationError>,
@@ -16749,6 +16391,7 @@ export type GetAuthMeQueryResult = NonNullable<Awaited<ReturnType<typeof getAuth
 export type GetAuthMeQueryError = ErrorType<ApiError>
 
 
+/** @summary Get the current authenticated user profile */
 export function useGetAuthMe<TData = Awaited<ReturnType<typeof getAuthMe>>, TError = ErrorType<ApiError>>(
   options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAuthMe>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
@@ -16759,6 +16402,7 @@ export function useGetAuthMe<TData = Awaited<ReturnType<typeof getAuthMe>>, TErr
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/** @summary Get the current authenticated user profile */
 export function useGetAuthMe<TData = Awaited<ReturnType<typeof getAuthMe>>, TError = ErrorType<ApiError>>(
   options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAuthMe>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
@@ -16769,14 +16413,12 @@ export function useGetAuthMe<TData = Awaited<ReturnType<typeof getAuthMe>>, TErr
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/** @summary Get the current authenticated user profile */
 export function useGetAuthMe<TData = Awaited<ReturnType<typeof getAuthMe>>, TError = ErrorType<ApiError>>(
   options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAuthMe>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-/**
- * @summary Get the current authenticated user profile
- */
-
+/** @summary Get the current authenticated user profile */
 export function useGetAuthMe<TData = Awaited<ReturnType<typeof getAuthMe>>, TError = ErrorType<ApiError>>(
   options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAuthMe>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
@@ -16808,25 +16450,11 @@ export const getPutAuthMeUpdateUrl = () => {
  */
 export const putAuthMeUpdate = async (putAuthMeUpdateBody: PutAuthMeUpdateBody, options?: Parameters<typeof customInstance>[1]): Promise<PutAuthMeUpdate200> => {
 
-    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
-    if (!h) return {};
-    if (h instanceof Headers) return Object.fromEntries(h.entries());
-    if (Symbol.iterator in h) {
-      return Object.fromEntries(
-        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
-      );
-    }
-    const headers: Record<string, string | readonly string[]> = {};
-    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
-      if (value !== undefined) headers[name] = value;
-    }
-    return headers;
-  };
-return customInstance<PutAuthMeUpdate200>(getPutAuthMeUpdateUrl(),
+  return customInstance<PutAuthMeUpdate200>(getPutAuthMeUpdateUrl(),
   {
     ...options,
     method: 'PUT',
-    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    headers: getHeaders({ 'Content-Type': 'application/json' }, options?.headers),
     body: JSON.stringify(putAuthMeUpdateBody)
   }
 );}
@@ -16869,9 +16497,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type PutAuthMeUpdateMutationError = ErrorType<ApiError | ValidationError>
     export type PutAuthMeUpdateMutationVariables = {data: BodyType<PutAuthMeUpdateBody>}
 
-    /**
- * @summary Update the current user profile
- */
+    /** @summary Update the current user profile */
 export const usePutAuthMeUpdate = <TError = ErrorType<ApiError | ValidationError>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof putAuthMeUpdate>>, TError,PutAuthMeUpdateMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient): UseMutationResult<
@@ -16897,25 +16523,11 @@ export const getPostAuthEmailVerifyUrl = () => {
  */
 export const postAuthEmailVerify = async (verifyEmailRequest: VerifyEmailRequest, options?: Parameters<typeof customInstance>[1]): Promise<PostAuthEmailVerify200> => {
 
-    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
-    if (!h) return {};
-    if (h instanceof Headers) return Object.fromEntries(h.entries());
-    if (Symbol.iterator in h) {
-      return Object.fromEntries(
-        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
-      );
-    }
-    const headers: Record<string, string | readonly string[]> = {};
-    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
-      if (value !== undefined) headers[name] = value;
-    }
-    return headers;
-  };
-return customInstance<PostAuthEmailVerify200>(getPostAuthEmailVerifyUrl(),
+  return customInstance<PostAuthEmailVerify200>(getPostAuthEmailVerifyUrl(),
   {
     ...options,
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    headers: getHeaders({ 'Content-Type': 'application/json' }, options?.headers),
     body: JSON.stringify(verifyEmailRequest)
   }
 );}
@@ -16959,6 +16571,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type PostAuthEmailVerifyMutationVariables = {data: BodyType<VerifyEmailRequest>}
 
     /**
+ * Redeems the token from a verification email once, in a signed-in session of the account it was sent for. The token verifies only the address it was sent to, while the account still has that address. A token for a pending email change makes that address the account's address and signs the account out of every other session; the session that made the request stays signed in.
  * @summary Verify an email address with a token
  */
 export const usePostAuthEmailVerify = <TError = ErrorType<ApiError | ValidationError>,
@@ -17034,6 +16647,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
 
     /**
+ * Emails the current user a new verification link and ends the one sent earlier. The answer is the same whether or not an email was sent: nothing is sent when the address is already verified or the user has used up their resend allowance.
  * @summary Send a new verification email
  */
 export const usePostAuthMeEmailVerification = <TError = ErrorType<ApiError>,
@@ -17061,25 +16675,11 @@ export const getPutAuthMeEmailUrl = () => {
  */
 export const putAuthMeEmail = async (changeEmailRequest: ChangeEmailRequest, options?: Parameters<typeof customInstance>[1]): Promise<PutAuthMeEmail202> => {
 
-    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
-    if (!h) return {};
-    if (h instanceof Headers) return Object.fromEntries(h.entries());
-    if (Symbol.iterator in h) {
-      return Object.fromEntries(
-        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
-      );
-    }
-    const headers: Record<string, string | readonly string[]> = {};
-    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
-      if (value !== undefined) headers[name] = value;
-    }
-    return headers;
-  };
-return customInstance<PutAuthMeEmail202>(getPutAuthMeEmailUrl(),
+  return customInstance<PutAuthMeEmail202>(getPutAuthMeEmailUrl(),
   {
     ...options,
     method: 'PUT',
-    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    headers: getHeaders({ 'Content-Type': 'application/json' }, options?.headers),
     body: JSON.stringify(changeEmailRequest)
   }
 );}
@@ -17123,6 +16723,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type PutAuthMeEmailMutationVariables = {data: BodyType<ChangeEmailRequest>}
 
     /**
+ * Needs the current password, plus a current TOTP code when TOTP is on; a wrong password and a missing or wrong code get the same 422 with `details.reason` `step_up_failed`. The new address is held as `pendingEmail` and sent a verification link; the account keeps its address until that link is used. The answer is the same whether or not another account uses the new address: the link then fails. Asking for the current address drops a pending change.
  * @summary Ask to change the current user email
  */
 export const usePutAuthMeEmail = <TError = ErrorType<ApiError | ValidationError>,
@@ -17150,25 +16751,11 @@ export const getPutAuthMePasswordUrl = () => {
  */
 export const putAuthMePassword = async (changePasswordRequest: ChangePasswordRequest, options?: Parameters<typeof customInstance>[1]): Promise<PutAuthMePassword200> => {
 
-    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
-    if (!h) return {};
-    if (h instanceof Headers) return Object.fromEntries(h.entries());
-    if (Symbol.iterator in h) {
-      return Object.fromEntries(
-        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
-      );
-    }
-    const headers: Record<string, string | readonly string[]> = {};
-    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
-      if (value !== undefined) headers[name] = value;
-    }
-    return headers;
-  };
-return customInstance<PutAuthMePassword200>(getPutAuthMePasswordUrl(),
+  return customInstance<PutAuthMePassword200>(getPutAuthMePasswordUrl(),
   {
     ...options,
     method: 'PUT',
-    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    headers: getHeaders({ 'Content-Type': 'application/json' }, options?.headers),
     body: JSON.stringify(changePasswordRequest)
   }
 );}
@@ -17212,6 +16799,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type PutAuthMePasswordMutationVariables = {data: BodyType<ChangePasswordRequest>}
 
     /**
+ * Needs the current password, plus a current TOTP code when TOTP is on; a wrong password and a missing or wrong code get the same 422 with `details.reason` `step_up_failed`. A new password outside the length policy is refused before any step-up attempt is spent. Signs the account out of every other session, paired devices and third-party apps included; the session that made the request stays signed in.
  * @summary Change the current user password
  */
 export const usePutAuthMePassword = <TError = ErrorType<ApiError | ValidationError>,
@@ -17238,25 +16826,11 @@ export const getPostAuthLoginLoginUrl = () => {
  */
 export const postAuthLoginLogin = async (loginRequest: LoginRequest, options?: Parameters<typeof customInstance>[1]): Promise<TokenResource> => {
 
-    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
-    if (!h) return {};
-    if (h instanceof Headers) return Object.fromEntries(h.entries());
-    if (Symbol.iterator in h) {
-      return Object.fromEntries(
-        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
-      );
-    }
-    const headers: Record<string, string | readonly string[]> = {};
-    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
-      if (value !== undefined) headers[name] = value;
-    }
-    return headers;
-  };
-return customInstance<TokenResource>(getPostAuthLoginLoginUrl(),
+  return customInstance<TokenResource>(getPostAuthLoginLoginUrl(),
   {
     ...options,
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    headers: getHeaders({ 'Content-Type': 'application/json' }, options?.headers),
     body: JSON.stringify(loginRequest)
   }
 );}
@@ -17299,9 +16873,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type PostAuthLoginLoginMutationError = ErrorType<ApiError>
     export type PostAuthLoginLoginMutationVariables = {data: BodyType<LoginRequest>}
 
-    /**
- * @summary Authenticate with email and password
- */
+    /** @summary Authenticate with email and password */
 export const usePostAuthLoginLogin = <TError = ErrorType<ApiError>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postAuthLoginLogin>>, TError,PostAuthLoginLoginMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient): UseMutationResult<
@@ -17373,9 +16945,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type PostAuthWebsocketTicketMutationError = ErrorType<ApiError>
 
 
-    /**
- * @summary Issue a single-use WebSocket handshake ticket
- */
+    /** @summary Issue a single-use WebSocket handshake ticket */
 export const usePostAuthWebsocketTicket = <TError = ErrorType<ApiError>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postAuthWebsocketTicket>>, TError,void, TContext>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient): UseMutationResult<
@@ -17453,6 +17023,7 @@ export type GetAdminAlbumDeletePreviewQueryResult = NonNullable<Awaited<ReturnTy
 export type GetAdminAlbumDeletePreviewQueryError = ErrorType<ApiError | ValidationError>
 
 
+/** @summary Preview what will be deleted when deleting an album */
 export function useGetAdminAlbumDeletePreview<TData = Awaited<ReturnType<typeof getAdminAlbumDeletePreview>>, TError = ErrorType<ApiError | ValidationError>>(
  publicId: string,
     params: undefined |  GetAdminAlbumDeletePreviewParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAdminAlbumDeletePreview>>, TError, TData>> & Pick<
@@ -17464,6 +17035,7 @@ export function useGetAdminAlbumDeletePreview<TData = Awaited<ReturnType<typeof 
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/** @summary Preview what will be deleted when deleting an album */
 export function useGetAdminAlbumDeletePreview<TData = Awaited<ReturnType<typeof getAdminAlbumDeletePreview>>, TError = ErrorType<ApiError | ValidationError>>(
  publicId: string,
     params?: GetAdminAlbumDeletePreviewParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAdminAlbumDeletePreview>>, TError, TData>> & Pick<
@@ -17475,15 +17047,13 @@ export function useGetAdminAlbumDeletePreview<TData = Awaited<ReturnType<typeof 
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/** @summary Preview what will be deleted when deleting an album */
 export function useGetAdminAlbumDeletePreview<TData = Awaited<ReturnType<typeof getAdminAlbumDeletePreview>>, TError = ErrorType<ApiError | ValidationError>>(
  publicId: string,
     params?: GetAdminAlbumDeletePreviewParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAdminAlbumDeletePreview>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-/**
- * @summary Preview what will be deleted when deleting an album
- */
-
+/** @summary Preview what will be deleted when deleting an album */
 export function useGetAdminAlbumDeletePreview<TData = Awaited<ReturnType<typeof getAdminAlbumDeletePreview>>, TError = ErrorType<ApiError | ValidationError>>(
  publicId: string,
     params?: GetAdminAlbumDeletePreviewParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAdminAlbumDeletePreview>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
@@ -17572,9 +17142,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type DeleteAdminAlbumDeleteMutationError = ErrorType<ApiError | ValidationError>
     export type DeleteAdminAlbumDeleteMutationVariables = {publicId: string;params?: DeleteAdminAlbumDeleteParams}
 
-    /**
- * @summary Delete an album with optional file deletion
- */
+    /** @summary Delete an album with optional file deletion */
 export const useDeleteAdminAlbumDelete = <TError = ErrorType<ApiError | ValidationError>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteAdminAlbumDelete>>, TError,DeleteAdminAlbumDeleteMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient): UseMutationResult<
@@ -17652,6 +17220,7 @@ export type GetAdminSongDeletePreviewQueryResult = NonNullable<Awaited<ReturnTyp
 export type GetAdminSongDeletePreviewQueryError = ErrorType<ApiError | ValidationError>
 
 
+/** @summary Preview what will be deleted when deleting a song */
 export function useGetAdminSongDeletePreview<TData = Awaited<ReturnType<typeof getAdminSongDeletePreview>>, TError = ErrorType<ApiError | ValidationError>>(
  publicId: string,
     params: undefined |  GetAdminSongDeletePreviewParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAdminSongDeletePreview>>, TError, TData>> & Pick<
@@ -17663,6 +17232,7 @@ export function useGetAdminSongDeletePreview<TData = Awaited<ReturnType<typeof g
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/** @summary Preview what will be deleted when deleting a song */
 export function useGetAdminSongDeletePreview<TData = Awaited<ReturnType<typeof getAdminSongDeletePreview>>, TError = ErrorType<ApiError | ValidationError>>(
  publicId: string,
     params?: GetAdminSongDeletePreviewParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAdminSongDeletePreview>>, TError, TData>> & Pick<
@@ -17674,15 +17244,13 @@ export function useGetAdminSongDeletePreview<TData = Awaited<ReturnType<typeof g
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/** @summary Preview what will be deleted when deleting a song */
 export function useGetAdminSongDeletePreview<TData = Awaited<ReturnType<typeof getAdminSongDeletePreview>>, TError = ErrorType<ApiError | ValidationError>>(
  publicId: string,
     params?: GetAdminSongDeletePreviewParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAdminSongDeletePreview>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-/**
- * @summary Preview what will be deleted when deleting a song
- */
-
+/** @summary Preview what will be deleted when deleting a song */
 export function useGetAdminSongDeletePreview<TData = Awaited<ReturnType<typeof getAdminSongDeletePreview>>, TError = ErrorType<ApiError | ValidationError>>(
  publicId: string,
     params?: GetAdminSongDeletePreviewParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAdminSongDeletePreview>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
@@ -17771,9 +17339,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type DeleteAdminSongDeleteMutationError = ErrorType<ApiError | ValidationError>
     export type DeleteAdminSongDeleteMutationVariables = {publicId: string;params?: DeleteAdminSongDeleteParams}
 
-    /**
- * @summary Delete a song with optional file deletion
- */
+    /** @summary Delete a song with optional file deletion */
 export const useDeleteAdminSongDelete = <TError = ErrorType<ApiError | ValidationError>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteAdminSongDelete>>, TError,DeleteAdminSongDeleteMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient): UseMutationResult<
@@ -17847,6 +17413,7 @@ export type GetAlbumIndexQueryResult = NonNullable<Awaited<ReturnType<typeof get
 export type GetAlbumIndexQueryError = ErrorType<unknown>
 
 
+/** @summary List albums (paginated) */
 export function useGetAlbumIndex<TData = Awaited<ReturnType<typeof getAlbumIndex>>, TError = ErrorType<unknown>>(
  params: undefined |  GetAlbumIndexParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAlbumIndex>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
@@ -17857,6 +17424,7 @@ export function useGetAlbumIndex<TData = Awaited<ReturnType<typeof getAlbumIndex
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/** @summary List albums (paginated) */
 export function useGetAlbumIndex<TData = Awaited<ReturnType<typeof getAlbumIndex>>, TError = ErrorType<unknown>>(
  params?: GetAlbumIndexParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAlbumIndex>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
@@ -17867,14 +17435,12 @@ export function useGetAlbumIndex<TData = Awaited<ReturnType<typeof getAlbumIndex
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/** @summary List albums (paginated) */
 export function useGetAlbumIndex<TData = Awaited<ReturnType<typeof getAlbumIndex>>, TError = ErrorType<unknown>>(
  params?: GetAlbumIndexParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAlbumIndex>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-/**
- * @summary List albums (paginated)
- */
-
+/** @summary List albums (paginated) */
 export function useGetAlbumIndex<TData = Awaited<ReturnType<typeof getAlbumIndex>>, TError = ErrorType<unknown>>(
  params?: GetAlbumIndexParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAlbumIndex>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
@@ -17948,6 +17514,7 @@ export type GetAlbumShowQueryResult = NonNullable<Awaited<ReturnType<typeof getA
 export type GetAlbumShowQueryError = ErrorType<ApiError>
 
 
+/** @summary Get a single album with its songs */
 export function useGetAlbumShow<TData = Awaited<ReturnType<typeof getAlbumShow>>, TError = ErrorType<ApiError>>(
  publicId: string, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAlbumShow>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
@@ -17958,6 +17525,7 @@ export function useGetAlbumShow<TData = Awaited<ReturnType<typeof getAlbumShow>>
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/** @summary Get a single album with its songs */
 export function useGetAlbumShow<TData = Awaited<ReturnType<typeof getAlbumShow>>, TError = ErrorType<ApiError>>(
  publicId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAlbumShow>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
@@ -17968,14 +17536,12 @@ export function useGetAlbumShow<TData = Awaited<ReturnType<typeof getAlbumShow>>
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/** @summary Get a single album with its songs */
 export function useGetAlbumShow<TData = Awaited<ReturnType<typeof getAlbumShow>>, TError = ErrorType<ApiError>>(
  publicId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAlbumShow>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-/**
- * @summary Get a single album with its songs
- */
-
+/** @summary Get a single album with its songs */
 export function useGetAlbumShow<TData = Awaited<ReturnType<typeof getAlbumShow>>, TError = ErrorType<ApiError>>(
  publicId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAlbumShow>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
@@ -18008,25 +17574,11 @@ export const getPatchAlbumUpdateUrl = (publicId: string,) => {
 export const patchAlbumUpdate = async (publicId: string,
     patchAlbumUpdateBody: PatchAlbumUpdateBody, options?: Parameters<typeof customInstance>[1]): Promise<PatchAlbumUpdate200> => {
 
-    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
-    if (!h) return {};
-    if (h instanceof Headers) return Object.fromEntries(h.entries());
-    if (Symbol.iterator in h) {
-      return Object.fromEntries(
-        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
-      );
-    }
-    const headers: Record<string, string | readonly string[]> = {};
-    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
-      if (value !== undefined) headers[name] = value;
-    }
-    return headers;
-  };
-return customInstance<PatchAlbumUpdate200>(getPatchAlbumUpdateUrl(publicId),
+  return customInstance<PatchAlbumUpdate200>(getPatchAlbumUpdateUrl(publicId),
   {
     ...options,
     method: 'PATCH',
-    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    headers: getHeaders({ 'Content-Type': 'application/json' }, options?.headers),
     body: JSON.stringify(patchAlbumUpdateBody)
   }
 );}
@@ -18069,9 +17621,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type PatchAlbumUpdateMutationError = ErrorType<ApiError | ValidationError>
     export type PatchAlbumUpdateMutationVariables = {publicId: string;data: BodyType<PatchAlbumUpdateBody>}
 
-    /**
- * @summary Update an album
- */
+    /** @summary Update an album */
 export const usePatchAlbumUpdate = <TError = ErrorType<ApiError | ValidationError>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof patchAlbumUpdate>>, TError,PatchAlbumUpdateMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient): UseMutationResult<
@@ -18143,9 +17693,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type DeleteAlbumDestroyMutationError = ErrorType<ApiError | ValidationError>
     export type DeleteAlbumDestroyMutationVariables = {publicId: string}
 
-    /**
- * @summary Delete an album
- */
+    /** @summary Delete an album */
 export const useDeleteAlbumDestroy = <TError = ErrorType<ApiError | ValidationError>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteAlbumDestroy>>, TError,DeleteAlbumDestroyMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient): UseMutationResult<
@@ -18212,6 +17760,7 @@ export type GetAlbumCoverQueryResult = NonNullable<Awaited<ReturnType<typeof get
 export type GetAlbumCoverQueryError = ErrorType<void | ApiError>
 
 
+/** @summary Get album cover image */
 export function useGetAlbumCover<TData = Awaited<ReturnType<typeof getAlbumCover>>, TError = ErrorType<void | ApiError>>(
  publicId: string, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAlbumCover>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
@@ -18222,6 +17771,7 @@ export function useGetAlbumCover<TData = Awaited<ReturnType<typeof getAlbumCover
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/** @summary Get album cover image */
 export function useGetAlbumCover<TData = Awaited<ReturnType<typeof getAlbumCover>>, TError = ErrorType<void | ApiError>>(
  publicId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAlbumCover>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
@@ -18232,14 +17782,12 @@ export function useGetAlbumCover<TData = Awaited<ReturnType<typeof getAlbumCover
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/** @summary Get album cover image */
 export function useGetAlbumCover<TData = Awaited<ReturnType<typeof getAlbumCover>>, TError = ErrorType<void | ApiError>>(
  publicId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAlbumCover>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-/**
- * @summary Get album cover image
- */
-
+/** @summary Get album cover image */
 export function useGetAlbumCover<TData = Awaited<ReturnType<typeof getAlbumCover>>, TError = ErrorType<void | ApiError>>(
  publicId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAlbumCover>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
@@ -18321,9 +17869,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type PostAlbumCoverUploadMutationError = ErrorType<ApiError | ValidationError>
     export type PostAlbumCoverUploadMutationVariables = {publicId: string;data: BodyType<PostAlbumCoverUploadBody>}
 
-    /**
- * @summary Upload a cover image for an album
- */
+    /** @summary Upload a cover image for an album */
 export const usePostAlbumCoverUpload = <TError = ErrorType<ApiError | ValidationError>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postAlbumCoverUpload>>, TError,PostAlbumCoverUploadMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient): UseMutationResult<
@@ -18395,9 +17941,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type DeleteAlbumCoverDeleteMutationError = ErrorType<ApiError>
     export type DeleteAlbumCoverDeleteMutationVariables = {publicId: string}
 
-    /**
- * @summary Delete the cover image from an album
- */
+    /** @summary Delete the cover image from an album */
 export const useDeleteAlbumCoverDelete = <TError = ErrorType<ApiError>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteAlbumCoverDelete>>, TError,DeleteAlbumCoverDeleteMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient): UseMutationResult<
@@ -18464,6 +18008,7 @@ export type GetAlbumDuplicatesQueryResult = NonNullable<Awaited<ReturnType<typeo
 export type GetAlbumDuplicatesQueryError = ErrorType<ApiError>
 
 
+/** @summary Get duplicate albums for a specific album */
 export function useGetAlbumDuplicates<TData = Awaited<ReturnType<typeof getAlbumDuplicates>>, TError = ErrorType<ApiError>>(
  publicId: string, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAlbumDuplicates>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
@@ -18474,6 +18019,7 @@ export function useGetAlbumDuplicates<TData = Awaited<ReturnType<typeof getAlbum
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/** @summary Get duplicate albums for a specific album */
 export function useGetAlbumDuplicates<TData = Awaited<ReturnType<typeof getAlbumDuplicates>>, TError = ErrorType<ApiError>>(
  publicId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAlbumDuplicates>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
@@ -18484,14 +18030,12 @@ export function useGetAlbumDuplicates<TData = Awaited<ReturnType<typeof getAlbum
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/** @summary Get duplicate albums for a specific album */
 export function useGetAlbumDuplicates<TData = Awaited<ReturnType<typeof getAlbumDuplicates>>, TError = ErrorType<ApiError>>(
  publicId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAlbumDuplicates>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-/**
- * @summary Get duplicate albums for a specific album
- */
-
+/** @summary Get duplicate albums for a specific album */
 export function useGetAlbumDuplicates<TData = Awaited<ReturnType<typeof getAlbumDuplicates>>, TError = ErrorType<ApiError>>(
  publicId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAlbumDuplicates>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
@@ -18523,25 +18067,11 @@ export const getPostAlbumMergeUrl = () => {
  */
 export const postAlbumMerge = async (mergeAlbumsRequest: MergeAlbumsRequest, options?: Parameters<typeof customInstance>[1]): Promise<PostAlbumMerge200> => {
 
-    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
-    if (!h) return {};
-    if (h instanceof Headers) return Object.fromEntries(h.entries());
-    if (Symbol.iterator in h) {
-      return Object.fromEntries(
-        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
-      );
-    }
-    const headers: Record<string, string | readonly string[]> = {};
-    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
-      if (value !== undefined) headers[name] = value;
-    }
-    return headers;
-  };
-return customInstance<PostAlbumMerge200>(getPostAlbumMergeUrl(),
+  return customInstance<PostAlbumMerge200>(getPostAlbumMergeUrl(),
   {
     ...options,
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    headers: getHeaders({ 'Content-Type': 'application/json' }, options?.headers),
     body: JSON.stringify(mergeAlbumsRequest)
   }
 );}
@@ -18584,9 +18114,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type PostAlbumMergeMutationError = ErrorType<ApiError | ValidationError>
     export type PostAlbumMergeMutationVariables = {data: BodyType<MergeAlbumsRequest>}
 
-    /**
- * @summary Merge a source album into a target album
- */
+    /** @summary Merge a source album into a target album */
 export const usePostAlbumMerge = <TError = ErrorType<ApiError | ValidationError>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postAlbumMerge>>, TError,PostAlbumMergeMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient): UseMutationResult<
@@ -18660,6 +18188,7 @@ export type GetAdminAlbumsDuplicatesQueryResult = NonNullable<Awaited<ReturnType
 export type GetAdminAlbumsDuplicatesQueryError = ErrorType<ApiError>
 
 
+/** @summary List all duplicate album groups in the library */
 export function useGetAdminAlbumsDuplicates<TData = Awaited<ReturnType<typeof getAdminAlbumsDuplicates>>, TError = ErrorType<ApiError>>(
  params: GetAdminAlbumsDuplicatesParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAdminAlbumsDuplicates>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
@@ -18670,6 +18199,7 @@ export function useGetAdminAlbumsDuplicates<TData = Awaited<ReturnType<typeof ge
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/** @summary List all duplicate album groups in the library */
 export function useGetAdminAlbumsDuplicates<TData = Awaited<ReturnType<typeof getAdminAlbumsDuplicates>>, TError = ErrorType<ApiError>>(
  params: GetAdminAlbumsDuplicatesParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAdminAlbumsDuplicates>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
@@ -18680,14 +18210,12 @@ export function useGetAdminAlbumsDuplicates<TData = Awaited<ReturnType<typeof ge
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/** @summary List all duplicate album groups in the library */
 export function useGetAdminAlbumsDuplicates<TData = Awaited<ReturnType<typeof getAdminAlbumsDuplicates>>, TError = ErrorType<ApiError>>(
  params: GetAdminAlbumsDuplicatesParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAdminAlbumsDuplicates>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-/**
- * @summary List all duplicate album groups in the library
- */
-
+/** @summary List all duplicate album groups in the library */
 export function useGetAdminAlbumsDuplicates<TData = Awaited<ReturnType<typeof getAdminAlbumsDuplicates>>, TError = ErrorType<ApiError>>(
  params: GetAdminAlbumsDuplicatesParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAdminAlbumsDuplicates>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
@@ -18719,25 +18247,11 @@ export const getPostArtistStoreUrl = () => {
  */
 export const postArtistStore = async (postArtistStoreBody: PostArtistStoreBody, options?: Parameters<typeof customInstance>[1]): Promise<PostArtistStore201> => {
 
-    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
-    if (!h) return {};
-    if (h instanceof Headers) return Object.fromEntries(h.entries());
-    if (Symbol.iterator in h) {
-      return Object.fromEntries(
-        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
-      );
-    }
-    const headers: Record<string, string | readonly string[]> = {};
-    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
-      if (value !== undefined) headers[name] = value;
-    }
-    return headers;
-  };
-return customInstance<PostArtistStore201>(getPostArtistStoreUrl(),
+  return customInstance<PostArtistStore201>(getPostArtistStoreUrl(),
   {
     ...options,
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    headers: getHeaders({ 'Content-Type': 'application/json' }, options?.headers),
     body: JSON.stringify(postArtistStoreBody)
   }
 );}
@@ -18780,9 +18294,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type PostArtistStoreMutationError = ErrorType<ValidationError>
     export type PostArtistStoreMutationVariables = {data: BodyType<PostArtistStoreBody>}
 
-    /**
- * @summary Create a new artist
- */
+    /** @summary Create a new artist */
 export const usePostArtistStore = <TError = ErrorType<ValidationError>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postArtistStore>>, TError,PostArtistStoreMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient): UseMutationResult<
@@ -18856,6 +18368,7 @@ export type GetArtistIndexQueryResult = NonNullable<Awaited<ReturnType<typeof ge
 export type GetArtistIndexQueryError = ErrorType<unknown>
 
 
+/** @summary List artists (paginated) */
 export function useGetArtistIndex<TData = Awaited<ReturnType<typeof getArtistIndex>>, TError = ErrorType<unknown>>(
  params: undefined |  GetArtistIndexParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getArtistIndex>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
@@ -18866,6 +18379,7 @@ export function useGetArtistIndex<TData = Awaited<ReturnType<typeof getArtistInd
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/** @summary List artists (paginated) */
 export function useGetArtistIndex<TData = Awaited<ReturnType<typeof getArtistIndex>>, TError = ErrorType<unknown>>(
  params?: GetArtistIndexParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getArtistIndex>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
@@ -18876,14 +18390,12 @@ export function useGetArtistIndex<TData = Awaited<ReturnType<typeof getArtistInd
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/** @summary List artists (paginated) */
 export function useGetArtistIndex<TData = Awaited<ReturnType<typeof getArtistIndex>>, TError = ErrorType<unknown>>(
  params?: GetArtistIndexParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getArtistIndex>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-/**
- * @summary List artists (paginated)
- */
-
+/** @summary List artists (paginated) */
 export function useGetArtistIndex<TData = Awaited<ReturnType<typeof getArtistIndex>>, TError = ErrorType<unknown>>(
  params?: GetArtistIndexParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getArtistIndex>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
@@ -18957,6 +18469,7 @@ export type GetArtistShowQueryResult = NonNullable<Awaited<ReturnType<typeof get
 export type GetArtistShowQueryError = ErrorType<ApiError>
 
 
+/** @summary Get a single artist */
 export function useGetArtistShow<TData = Awaited<ReturnType<typeof getArtistShow>>, TError = ErrorType<ApiError>>(
  publicId: string, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getArtistShow>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
@@ -18967,6 +18480,7 @@ export function useGetArtistShow<TData = Awaited<ReturnType<typeof getArtistShow
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/** @summary Get a single artist */
 export function useGetArtistShow<TData = Awaited<ReturnType<typeof getArtistShow>>, TError = ErrorType<ApiError>>(
  publicId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getArtistShow>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
@@ -18977,14 +18491,12 @@ export function useGetArtistShow<TData = Awaited<ReturnType<typeof getArtistShow
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/** @summary Get a single artist */
 export function useGetArtistShow<TData = Awaited<ReturnType<typeof getArtistShow>>, TError = ErrorType<ApiError>>(
  publicId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getArtistShow>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-/**
- * @summary Get a single artist
- */
-
+/** @summary Get a single artist */
 export function useGetArtistShow<TData = Awaited<ReturnType<typeof getArtistShow>>, TError = ErrorType<ApiError>>(
  publicId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getArtistShow>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
@@ -19017,25 +18529,11 @@ export const getPatchArtistUpdateUrl = (publicId: string,) => {
 export const patchArtistUpdate = async (publicId: string,
     patchArtistUpdateBody: PatchArtistUpdateBody, options?: Parameters<typeof customInstance>[1]): Promise<PatchArtistUpdate200> => {
 
-    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
-    if (!h) return {};
-    if (h instanceof Headers) return Object.fromEntries(h.entries());
-    if (Symbol.iterator in h) {
-      return Object.fromEntries(
-        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
-      );
-    }
-    const headers: Record<string, string | readonly string[]> = {};
-    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
-      if (value !== undefined) headers[name] = value;
-    }
-    return headers;
-  };
-return customInstance<PatchArtistUpdate200>(getPatchArtistUpdateUrl(publicId),
+  return customInstance<PatchArtistUpdate200>(getPatchArtistUpdateUrl(publicId),
   {
     ...options,
     method: 'PATCH',
-    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    headers: getHeaders({ 'Content-Type': 'application/json' }, options?.headers),
     body: JSON.stringify(patchArtistUpdateBody)
   }
 );}
@@ -19078,9 +18576,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type PatchArtistUpdateMutationError = ErrorType<ApiError | ValidationError>
     export type PatchArtistUpdateMutationVariables = {publicId: string;data: BodyType<PatchArtistUpdateBody>}
 
-    /**
- * @summary Update an artist
- */
+    /** @summary Update an artist */
 export const usePatchArtistUpdate = <TError = ErrorType<ApiError | ValidationError>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof patchArtistUpdate>>, TError,PatchArtistUpdateMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient): UseMutationResult<
@@ -19152,9 +18648,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type DeleteArtistDestroyMutationError = ErrorType<ApiError | ValidationError>
     export type DeleteArtistDestroyMutationVariables = {publicId: string}
 
-    /**
- * @summary Delete an artist
- */
+    /** @summary Delete an artist */
 export const useDeleteArtistDestroy = <TError = ErrorType<ApiError | ValidationError>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteArtistDestroy>>, TError,DeleteArtistDestroyMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient): UseMutationResult<
@@ -19180,25 +18674,11 @@ export const getPostArtistAddSongUrl = (publicId: string,) => {
 export const postArtistAddSong = async (publicId: string,
     postArtistAddSongBody: PostArtistAddSongBody, options?: Parameters<typeof customInstance>[1]): Promise<void> => {
 
-    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
-    if (!h) return {};
-    if (h instanceof Headers) return Object.fromEntries(h.entries());
-    if (Symbol.iterator in h) {
-      return Object.fromEntries(
-        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
-      );
-    }
-    const headers: Record<string, string | readonly string[]> = {};
-    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
-      if (value !== undefined) headers[name] = value;
-    }
-    return headers;
-  };
-return customInstance<void>(getPostArtistAddSongUrl(publicId),
+  return customInstance<void>(getPostArtistAddSongUrl(publicId),
   {
     ...options,
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    headers: getHeaders({ 'Content-Type': 'application/json' }, options?.headers),
     body: JSON.stringify(postArtistAddSongBody)
   }
 );}
@@ -19241,9 +18721,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type PostArtistAddSongMutationError = ErrorType<ApiError | ValidationError>
     export type PostArtistAddSongMutationVariables = {publicId: string;data: BodyType<PostArtistAddSongBody>}
 
-    /**
- * @summary Add a song to an artist
- */
+    /** @summary Add a song to an artist */
 export const usePostArtistAddSong = <TError = ErrorType<ApiError | ValidationError>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postArtistAddSong>>, TError,PostArtistAddSongMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient): UseMutationResult<
@@ -19317,9 +18795,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type DeleteArtistRemoveSongMutationError = ErrorType<ApiError | ValidationError>
     export type DeleteArtistRemoveSongMutationVariables = {publicId: string;songId: string}
 
-    /**
- * @summary Remove a song from an artist
- */
+    /** @summary Remove a song from an artist */
 export const useDeleteArtistRemoveSong = <TError = ErrorType<ApiError | ValidationError>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteArtistRemoveSong>>, TError,DeleteArtistRemoveSongMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient): UseMutationResult<
@@ -19347,25 +18823,11 @@ export const patchArtistUpdateSongRole = async (publicId: string,
     songId: string,
     patchArtistUpdateSongRoleBody: PatchArtistUpdateSongRoleBody, options?: Parameters<typeof customInstance>[1]): Promise<void> => {
 
-    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
-    if (!h) return {};
-    if (h instanceof Headers) return Object.fromEntries(h.entries());
-    if (Symbol.iterator in h) {
-      return Object.fromEntries(
-        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
-      );
-    }
-    const headers: Record<string, string | readonly string[]> = {};
-    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
-      if (value !== undefined) headers[name] = value;
-    }
-    return headers;
-  };
-return customInstance<void>(getPatchArtistUpdateSongRoleUrl(publicId,songId),
+  return customInstance<void>(getPatchArtistUpdateSongRoleUrl(publicId,songId),
   {
     ...options,
     method: 'PATCH',
-    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    headers: getHeaders({ 'Content-Type': 'application/json' }, options?.headers),
     body: JSON.stringify(patchArtistUpdateSongRoleBody)
   }
 );}
@@ -19408,9 +18870,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type PatchArtistUpdateSongRoleMutationError = ErrorType<ApiError | ValidationError>
     export type PatchArtistUpdateSongRoleMutationVariables = {publicId: string;songId: string;data: BodyType<PatchArtistUpdateSongRoleBody>}
 
-    /**
- * @summary Update artist role on a song
- */
+    /** @summary Update artist role on a song */
 export const usePatchArtistUpdateSongRole = <TError = ErrorType<ApiError | ValidationError>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof patchArtistUpdateSongRole>>, TError,PatchArtistUpdateSongRoleMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient): UseMutationResult<
@@ -19436,25 +18896,11 @@ export const getPostArtistAddAlbumUrl = (publicId: string,) => {
 export const postArtistAddAlbum = async (publicId: string,
     postArtistAddAlbumBody: PostArtistAddAlbumBody, options?: Parameters<typeof customInstance>[1]): Promise<void> => {
 
-    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
-    if (!h) return {};
-    if (h instanceof Headers) return Object.fromEntries(h.entries());
-    if (Symbol.iterator in h) {
-      return Object.fromEntries(
-        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
-      );
-    }
-    const headers: Record<string, string | readonly string[]> = {};
-    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
-      if (value !== undefined) headers[name] = value;
-    }
-    return headers;
-  };
-return customInstance<void>(getPostArtistAddAlbumUrl(publicId),
+  return customInstance<void>(getPostArtistAddAlbumUrl(publicId),
   {
     ...options,
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    headers: getHeaders({ 'Content-Type': 'application/json' }, options?.headers),
     body: JSON.stringify(postArtistAddAlbumBody)
   }
 );}
@@ -19497,9 +18943,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type PostArtistAddAlbumMutationError = ErrorType<ApiError | ValidationError>
     export type PostArtistAddAlbumMutationVariables = {publicId: string;data: BodyType<PostArtistAddAlbumBody>}
 
-    /**
- * @summary Add an album to an artist
- */
+    /** @summary Add an album to an artist */
 export const usePostArtistAddAlbum = <TError = ErrorType<ApiError | ValidationError>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postArtistAddAlbum>>, TError,PostArtistAddAlbumMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient): UseMutationResult<
@@ -19573,9 +19017,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type DeleteArtistRemoveAlbumMutationError = ErrorType<ApiError | ValidationError>
     export type DeleteArtistRemoveAlbumMutationVariables = {publicId: string;albumId: string}
 
-    /**
- * @summary Remove an album from an artist
- */
+    /** @summary Remove an album from an artist */
 export const useDeleteArtistRemoveAlbum = <TError = ErrorType<ApiError | ValidationError>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteArtistRemoveAlbum>>, TError,DeleteArtistRemoveAlbumMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient): UseMutationResult<
@@ -19603,25 +19045,11 @@ export const patchArtistUpdateAlbumRole = async (publicId: string,
     albumId: string,
     patchArtistUpdateAlbumRoleBody: PatchArtistUpdateAlbumRoleBody, options?: Parameters<typeof customInstance>[1]): Promise<void> => {
 
-    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
-    if (!h) return {};
-    if (h instanceof Headers) return Object.fromEntries(h.entries());
-    if (Symbol.iterator in h) {
-      return Object.fromEntries(
-        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
-      );
-    }
-    const headers: Record<string, string | readonly string[]> = {};
-    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
-      if (value !== undefined) headers[name] = value;
-    }
-    return headers;
-  };
-return customInstance<void>(getPatchArtistUpdateAlbumRoleUrl(publicId,albumId),
+  return customInstance<void>(getPatchArtistUpdateAlbumRoleUrl(publicId,albumId),
   {
     ...options,
     method: 'PATCH',
-    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    headers: getHeaders({ 'Content-Type': 'application/json' }, options?.headers),
     body: JSON.stringify(patchArtistUpdateAlbumRoleBody)
   }
 );}
@@ -19664,9 +19092,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type PatchArtistUpdateAlbumRoleMutationError = ErrorType<ApiError | ValidationError>
     export type PatchArtistUpdateAlbumRoleMutationVariables = {publicId: string;albumId: string;data: BodyType<PatchArtistUpdateAlbumRoleBody>}
 
-    /**
- * @summary Update artist role on an album
- */
+    /** @summary Update artist role on an album */
 export const usePatchArtistUpdateAlbumRole = <TError = ErrorType<ApiError | ValidationError>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof patchArtistUpdateAlbumRole>>, TError,PatchArtistUpdateAlbumRoleMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient): UseMutationResult<
@@ -19741,9 +19167,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type PostArtistCoverUploadMutationError = ErrorType<ApiError | ValidationError>
     export type PostArtistCoverUploadMutationVariables = {publicId: string;data: BodyType<PostArtistCoverUploadBody>}
 
-    /**
- * @summary Upload a cover image for an artist
- */
+    /** @summary Upload a cover image for an artist */
 export const usePostArtistCoverUpload = <TError = ErrorType<ApiError | ValidationError>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postArtistCoverUpload>>, TError,PostArtistCoverUploadMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient): UseMutationResult<
@@ -19815,9 +19239,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type DeleteArtistCoverDeleteMutationError = ErrorType<ApiError>
     export type DeleteArtistCoverDeleteMutationVariables = {publicId: string}
 
-    /**
- * @summary Delete the cover image from an artist
- */
+    /** @summary Delete the cover image from an artist */
 export const useDeleteArtistCoverDelete = <TError = ErrorType<ApiError>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteArtistCoverDelete>>, TError,DeleteArtistCoverDeleteMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient): UseMutationResult<
@@ -19891,6 +19313,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
 
     /**
+ * Queues individual extraction jobs for embedded cover art from audio files for all albums without a cover image.
  * @summary Extract cover art for all albums missing one
  */
 export const usePostAlbumCoversExtract = <TError = ErrorType<ApiError>,
@@ -19966,6 +19389,7 @@ export type GetGenreIndexQueryResult = NonNullable<Awaited<ReturnType<typeof get
 export type GetGenreIndexQueryError = ErrorType<unknown>
 
 
+/** @summary List all genres (flat list) */
 export function useGetGenreIndex<TData = Awaited<ReturnType<typeof getGenreIndex>>, TError = ErrorType<unknown>>(
  params: undefined |  GetGenreIndexParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getGenreIndex>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
@@ -19976,6 +19400,7 @@ export function useGetGenreIndex<TData = Awaited<ReturnType<typeof getGenreIndex
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/** @summary List all genres (flat list) */
 export function useGetGenreIndex<TData = Awaited<ReturnType<typeof getGenreIndex>>, TError = ErrorType<unknown>>(
  params?: GetGenreIndexParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getGenreIndex>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
@@ -19986,14 +19411,12 @@ export function useGetGenreIndex<TData = Awaited<ReturnType<typeof getGenreIndex
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/** @summary List all genres (flat list) */
 export function useGetGenreIndex<TData = Awaited<ReturnType<typeof getGenreIndex>>, TError = ErrorType<unknown>>(
  params?: GetGenreIndexParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getGenreIndex>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-/**
- * @summary List all genres (flat list)
- */
-
+/** @summary List all genres (flat list) */
 export function useGetGenreIndex<TData = Awaited<ReturnType<typeof getGenreIndex>>, TError = ErrorType<unknown>>(
  params?: GetGenreIndexParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getGenreIndex>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
@@ -20025,25 +19448,11 @@ export const getPostGenreStoreUrl = () => {
  */
 export const postGenreStore = async (postGenreStoreBody: PostGenreStoreBody, options?: Parameters<typeof customInstance>[1]): Promise<PostGenreStore201> => {
 
-    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
-    if (!h) return {};
-    if (h instanceof Headers) return Object.fromEntries(h.entries());
-    if (Symbol.iterator in h) {
-      return Object.fromEntries(
-        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
-      );
-    }
-    const headers: Record<string, string | readonly string[]> = {};
-    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
-      if (value !== undefined) headers[name] = value;
-    }
-    return headers;
-  };
-return customInstance<PostGenreStore201>(getPostGenreStoreUrl(),
+  return customInstance<PostGenreStore201>(getPostGenreStoreUrl(),
   {
     ...options,
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    headers: getHeaders({ 'Content-Type': 'application/json' }, options?.headers),
     body: JSON.stringify(postGenreStoreBody)
   }
 );}
@@ -20086,9 +19495,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type PostGenreStoreMutationError = ErrorType<ApiError | ValidationError>
     export type PostGenreStoreMutationVariables = {data: BodyType<PostGenreStoreBody>}
 
-    /**
- * @summary Create a new genre
- */
+    /** @summary Create a new genre */
 export const usePostGenreStore = <TError = ErrorType<ApiError | ValidationError>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postGenreStore>>, TError,PostGenreStoreMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient): UseMutationResult<
@@ -20155,6 +19562,7 @@ export type GetGenreShowQueryResult = NonNullable<Awaited<ReturnType<typeof getG
 export type GetGenreShowQueryError = ErrorType<ApiError>
 
 
+/** @summary Get a single genre with its children */
 export function useGetGenreShow<TData = Awaited<ReturnType<typeof getGenreShow>>, TError = ErrorType<ApiError>>(
  slug: string, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getGenreShow>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
@@ -20165,6 +19573,7 @@ export function useGetGenreShow<TData = Awaited<ReturnType<typeof getGenreShow>>
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/** @summary Get a single genre with its children */
 export function useGetGenreShow<TData = Awaited<ReturnType<typeof getGenreShow>>, TError = ErrorType<ApiError>>(
  slug: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getGenreShow>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
@@ -20175,14 +19584,12 @@ export function useGetGenreShow<TData = Awaited<ReturnType<typeof getGenreShow>>
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/** @summary Get a single genre with its children */
 export function useGetGenreShow<TData = Awaited<ReturnType<typeof getGenreShow>>, TError = ErrorType<ApiError>>(
  slug: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getGenreShow>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-/**
- * @summary Get a single genre with its children
- */
-
+/** @summary Get a single genre with its children */
 export function useGetGenreShow<TData = Awaited<ReturnType<typeof getGenreShow>>, TError = ErrorType<ApiError>>(
  slug: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getGenreShow>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
@@ -20215,25 +19622,11 @@ export const getPatchGenreUpdateUrl = (slug: string,) => {
 export const patchGenreUpdate = async (slug: string,
     patchGenreUpdateBody: PatchGenreUpdateBody, options?: Parameters<typeof customInstance>[1]): Promise<PatchGenreUpdate200> => {
 
-    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
-    if (!h) return {};
-    if (h instanceof Headers) return Object.fromEntries(h.entries());
-    if (Symbol.iterator in h) {
-      return Object.fromEntries(
-        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
-      );
-    }
-    const headers: Record<string, string | readonly string[]> = {};
-    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
-      if (value !== undefined) headers[name] = value;
-    }
-    return headers;
-  };
-return customInstance<PatchGenreUpdate200>(getPatchGenreUpdateUrl(slug),
+  return customInstance<PatchGenreUpdate200>(getPatchGenreUpdateUrl(slug),
   {
     ...options,
     method: 'PATCH',
-    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    headers: getHeaders({ 'Content-Type': 'application/json' }, options?.headers),
     body: JSON.stringify(patchGenreUpdateBody)
   }
 );}
@@ -20276,9 +19669,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type PatchGenreUpdateMutationError = ErrorType<ApiError | ValidationError>
     export type PatchGenreUpdateMutationVariables = {slug: string;data: BodyType<PatchGenreUpdateBody>}
 
-    /**
- * @summary Update a genre
- */
+    /** @summary Update a genre */
 export const usePatchGenreUpdate = <TError = ErrorType<ApiError | ValidationError>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof patchGenreUpdate>>, TError,PatchGenreUpdateMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient): UseMutationResult<
@@ -20350,9 +19741,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type DeleteGenreDestroyMutationError = ErrorType<ApiError>
     export type DeleteGenreDestroyMutationVariables = {slug: string}
 
-    /**
- * @summary Delete a genre
- */
+    /** @summary Delete a genre */
 export const useDeleteGenreDestroy = <TError = ErrorType<ApiError>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteGenreDestroy>>, TError,DeleteGenreDestroyMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient): UseMutationResult<
@@ -20378,25 +19767,11 @@ export const getPostGenreAddSongUrl = (slug: string,) => {
 export const postGenreAddSong = async (slug: string,
     postGenreAddSongBody: PostGenreAddSongBody, options?: Parameters<typeof customInstance>[1]): Promise<void> => {
 
-    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
-    if (!h) return {};
-    if (h instanceof Headers) return Object.fromEntries(h.entries());
-    if (Symbol.iterator in h) {
-      return Object.fromEntries(
-        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
-      );
-    }
-    const headers: Record<string, string | readonly string[]> = {};
-    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
-      if (value !== undefined) headers[name] = value;
-    }
-    return headers;
-  };
-return customInstance<void>(getPostGenreAddSongUrl(slug),
+  return customInstance<void>(getPostGenreAddSongUrl(slug),
   {
     ...options,
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    headers: getHeaders({ 'Content-Type': 'application/json' }, options?.headers),
     body: JSON.stringify(postGenreAddSongBody)
   }
 );}
@@ -20439,9 +19814,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type PostGenreAddSongMutationError = ErrorType<ApiError>
     export type PostGenreAddSongMutationVariables = {slug: string;data: BodyType<PostGenreAddSongBody>}
 
-    /**
- * @summary Assign a genre to a song
- */
+    /** @summary Assign a genre to a song */
 export const usePostGenreAddSong = <TError = ErrorType<ApiError>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postGenreAddSong>>, TError,PostGenreAddSongMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient): UseMutationResult<
@@ -20515,9 +19888,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type DeleteGenreRemoveSongMutationError = ErrorType<ApiError>
     export type DeleteGenreRemoveSongMutationVariables = {slug: string;songId: string}
 
-    /**
- * @summary Remove a song from a genre
- */
+    /** @summary Remove a song from a genre */
 export const useDeleteGenreRemoveSong = <TError = ErrorType<ApiError>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteGenreRemoveSong>>, TError,DeleteGenreRemoveSongMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient): UseMutationResult<
@@ -20543,25 +19914,11 @@ export const getPostGenreAddAlbumUrl = (slug: string,) => {
 export const postGenreAddAlbum = async (slug: string,
     postGenreAddAlbumBody: PostGenreAddAlbumBody, options?: Parameters<typeof customInstance>[1]): Promise<void> => {
 
-    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
-    if (!h) return {};
-    if (h instanceof Headers) return Object.fromEntries(h.entries());
-    if (Symbol.iterator in h) {
-      return Object.fromEntries(
-        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
-      );
-    }
-    const headers: Record<string, string | readonly string[]> = {};
-    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
-      if (value !== undefined) headers[name] = value;
-    }
-    return headers;
-  };
-return customInstance<void>(getPostGenreAddAlbumUrl(slug),
+  return customInstance<void>(getPostGenreAddAlbumUrl(slug),
   {
     ...options,
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    headers: getHeaders({ 'Content-Type': 'application/json' }, options?.headers),
     body: JSON.stringify(postGenreAddAlbumBody)
   }
 );}
@@ -20604,9 +19961,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type PostGenreAddAlbumMutationError = ErrorType<ApiError>
     export type PostGenreAddAlbumMutationVariables = {slug: string;data: BodyType<PostGenreAddAlbumBody>}
 
-    /**
- * @summary Assign a genre to an album
- */
+    /** @summary Assign a genre to an album */
 export const usePostGenreAddAlbum = <TError = ErrorType<ApiError>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postGenreAddAlbum>>, TError,PostGenreAddAlbumMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient): UseMutationResult<
@@ -20680,9 +20035,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type DeleteGenreRemoveAlbumMutationError = ErrorType<ApiError>
     export type DeleteGenreRemoveAlbumMutationVariables = {slug: string;albumId: string}
 
-    /**
- * @summary Remove an album from a genre
- */
+    /** @summary Remove an album from a genre */
 export const useDeleteGenreRemoveAlbum = <TError = ErrorType<ApiError>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteGenreRemoveAlbum>>, TError,DeleteGenreRemoveAlbumMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient): UseMutationResult<
@@ -20756,6 +20109,7 @@ export type GetMovieIndexQueryResult = NonNullable<Awaited<ReturnType<typeof get
 export type GetMovieIndexQueryError = ErrorType<unknown>
 
 
+/** @summary List movies (paginated) */
 export function useGetMovieIndex<TData = Awaited<ReturnType<typeof getMovieIndex>>, TError = ErrorType<unknown>>(
  params: undefined |  GetMovieIndexParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getMovieIndex>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
@@ -20766,6 +20120,7 @@ export function useGetMovieIndex<TData = Awaited<ReturnType<typeof getMovieIndex
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/** @summary List movies (paginated) */
 export function useGetMovieIndex<TData = Awaited<ReturnType<typeof getMovieIndex>>, TError = ErrorType<unknown>>(
  params?: GetMovieIndexParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getMovieIndex>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
@@ -20776,14 +20131,12 @@ export function useGetMovieIndex<TData = Awaited<ReturnType<typeof getMovieIndex
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/** @summary List movies (paginated) */
 export function useGetMovieIndex<TData = Awaited<ReturnType<typeof getMovieIndex>>, TError = ErrorType<unknown>>(
  params?: GetMovieIndexParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getMovieIndex>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-/**
- * @summary List movies (paginated)
- */
-
+/** @summary List movies (paginated) */
 export function useGetMovieIndex<TData = Awaited<ReturnType<typeof getMovieIndex>>, TError = ErrorType<unknown>>(
  params?: GetMovieIndexParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getMovieIndex>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
@@ -20857,6 +20210,7 @@ export type GetMovieShowQueryResult = NonNullable<Awaited<ReturnType<typeof getM
 export type GetMovieShowQueryError = ErrorType<ApiError>
 
 
+/** @summary Get a single movie */
 export function useGetMovieShow<TData = Awaited<ReturnType<typeof getMovieShow>>, TError = ErrorType<ApiError>>(
  publicId: string, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getMovieShow>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
@@ -20867,6 +20221,7 @@ export function useGetMovieShow<TData = Awaited<ReturnType<typeof getMovieShow>>
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/** @summary Get a single movie */
 export function useGetMovieShow<TData = Awaited<ReturnType<typeof getMovieShow>>, TError = ErrorType<ApiError>>(
  publicId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getMovieShow>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
@@ -20877,14 +20232,12 @@ export function useGetMovieShow<TData = Awaited<ReturnType<typeof getMovieShow>>
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/** @summary Get a single movie */
 export function useGetMovieShow<TData = Awaited<ReturnType<typeof getMovieShow>>, TError = ErrorType<ApiError>>(
  publicId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getMovieShow>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-/**
- * @summary Get a single movie
- */
-
+/** @summary Get a single movie */
 export function useGetMovieShow<TData = Awaited<ReturnType<typeof getMovieShow>>, TError = ErrorType<ApiError>>(
  publicId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getMovieShow>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
@@ -20917,25 +20270,11 @@ export const getPatchMovieUpdateUrl = (publicId: string,) => {
 export const patchMovieUpdate = async (publicId: string,
     patchMovieUpdateBody: PatchMovieUpdateBody, options?: Parameters<typeof customInstance>[1]): Promise<PatchMovieUpdate200> => {
 
-    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
-    if (!h) return {};
-    if (h instanceof Headers) return Object.fromEntries(h.entries());
-    if (Symbol.iterator in h) {
-      return Object.fromEntries(
-        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
-      );
-    }
-    const headers: Record<string, string | readonly string[]> = {};
-    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
-      if (value !== undefined) headers[name] = value;
-    }
-    return headers;
-  };
-return customInstance<PatchMovieUpdate200>(getPatchMovieUpdateUrl(publicId),
+  return customInstance<PatchMovieUpdate200>(getPatchMovieUpdateUrl(publicId),
   {
     ...options,
     method: 'PATCH',
-    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    headers: getHeaders({ 'Content-Type': 'application/json' }, options?.headers),
     body: JSON.stringify(patchMovieUpdateBody)
   }
 );}
@@ -20978,9 +20317,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type PatchMovieUpdateMutationError = ErrorType<ApiError | ValidationError>
     export type PatchMovieUpdateMutationVariables = {publicId: string;data: BodyType<PatchMovieUpdateBody>}
 
-    /**
- * @summary Update a movie
- */
+    /** @summary Update a movie */
 export const usePatchMovieUpdate = <TError = ErrorType<ApiError | ValidationError>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof patchMovieUpdate>>, TError,PatchMovieUpdateMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient): UseMutationResult<
@@ -21052,9 +20389,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type DeleteMovieDestroyMutationError = ErrorType<ApiError | ValidationError>
     export type DeleteMovieDestroyMutationVariables = {publicId: string}
 
-    /**
- * @summary Delete a movie
- */
+    /** @summary Delete a movie */
 export const useDeleteMovieDestroy = <TError = ErrorType<ApiError | ValidationError>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteMovieDestroy>>, TError,DeleteMovieDestroyMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient): UseMutationResult<
@@ -21129,6 +20464,10 @@ export type GetAdminMetadataMatchReviewsQueryResult = NonNullable<Awaited<Return
 export type GetAdminMetadataMatchReviewsQueryError = ErrorType<ApiError>
 
 
+/**
+ * Albums marked as needing a MusicBrainz match review, the most recently checked first. Pass `next_cursor` back as `cursor` for the next page.
+ * @summary List albums that need a MusicBrainz match review
+ */
 export function useGetAdminMetadataMatchReviews<TData = Awaited<ReturnType<typeof getAdminMetadataMatchReviews>>, TError = ErrorType<ApiError>>(
  params: undefined |  GetAdminMetadataMatchReviewsParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAdminMetadataMatchReviews>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
@@ -21139,6 +20478,10 @@ export function useGetAdminMetadataMatchReviews<TData = Awaited<ReturnType<typeo
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * Albums marked as needing a MusicBrainz match review, the most recently checked first. Pass `next_cursor` back as `cursor` for the next page.
+ * @summary List albums that need a MusicBrainz match review
+ */
 export function useGetAdminMetadataMatchReviews<TData = Awaited<ReturnType<typeof getAdminMetadataMatchReviews>>, TError = ErrorType<ApiError>>(
  params?: GetAdminMetadataMatchReviewsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAdminMetadataMatchReviews>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
@@ -21149,14 +20492,18 @@ export function useGetAdminMetadataMatchReviews<TData = Awaited<ReturnType<typeo
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * Albums marked as needing a MusicBrainz match review, the most recently checked first. Pass `next_cursor` back as `cursor` for the next page.
+ * @summary List albums that need a MusicBrainz match review
+ */
 export function useGetAdminMetadataMatchReviews<TData = Awaited<ReturnType<typeof getAdminMetadataMatchReviews>>, TError = ErrorType<ApiError>>(
  params?: GetAdminMetadataMatchReviewsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAdminMetadataMatchReviews>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 /**
+ * Albums marked as needing a MusicBrainz match review, the most recently checked first. Pass `next_cursor` back as `cursor` for the next page.
  * @summary List albums that need a MusicBrainz match review
  */
-
 export function useGetAdminMetadataMatchReviews<TData = Awaited<ReturnType<typeof getAdminMetadataMatchReviews>>, TError = ErrorType<ApiError>>(
  params?: GetAdminMetadataMatchReviewsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAdminMetadataMatchReviews>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
@@ -21246,6 +20593,10 @@ export type GetAdminMetadataMatchCandidatesQueryResult = NonNullable<Awaited<Ret
 export type GetAdminMetadataMatchCandidatesQueryError = ErrorType<ApiError>
 
 
+/**
+ * Searches MusicBrainz for the item's title (an artist's name) and primary artist, or for the edited `title` and `artist`, and lists at most five candidates with a fit score from 0 to 100, best first: releases for an album, recordings for a song, artists for an artist. A blank `title` counts as none; an empty `artist` searches by the title alone, while the score still compares each candidate with the item's own artist. An album's own title that finds no release and ends in a comma-separated list in square brackets is searched once more without the list; an edited `title` is searched as given, once.
+ * @summary List MusicBrainz candidates for an album, song or artist
+ */
 export function useGetAdminMetadataMatchCandidates<TData = Awaited<ReturnType<typeof getAdminMetadataMatchCandidates>>, TError = ErrorType<ApiError>>(
  type: 'album' | 'song' | 'artist',
     publicId: string,
@@ -21258,6 +20609,10 @@ export function useGetAdminMetadataMatchCandidates<TData = Awaited<ReturnType<ty
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * Searches MusicBrainz for the item's title (an artist's name) and primary artist, or for the edited `title` and `artist`, and lists at most five candidates with a fit score from 0 to 100, best first: releases for an album, recordings for a song, artists for an artist. A blank `title` counts as none; an empty `artist` searches by the title alone, while the score still compares each candidate with the item's own artist. An album's own title that finds no release and ends in a comma-separated list in square brackets is searched once more without the list; an edited `title` is searched as given, once.
+ * @summary List MusicBrainz candidates for an album, song or artist
+ */
 export function useGetAdminMetadataMatchCandidates<TData = Awaited<ReturnType<typeof getAdminMetadataMatchCandidates>>, TError = ErrorType<ApiError>>(
  type: 'album' | 'song' | 'artist',
     publicId: string,
@@ -21270,6 +20625,10 @@ export function useGetAdminMetadataMatchCandidates<TData = Awaited<ReturnType<ty
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * Searches MusicBrainz for the item's title (an artist's name) and primary artist, or for the edited `title` and `artist`, and lists at most five candidates with a fit score from 0 to 100, best first: releases for an album, recordings for a song, artists for an artist. A blank `title` counts as none; an empty `artist` searches by the title alone, while the score still compares each candidate with the item's own artist. An album's own title that finds no release and ends in a comma-separated list in square brackets is searched once more without the list; an edited `title` is searched as given, once.
+ * @summary List MusicBrainz candidates for an album, song or artist
+ */
 export function useGetAdminMetadataMatchCandidates<TData = Awaited<ReturnType<typeof getAdminMetadataMatchCandidates>>, TError = ErrorType<ApiError>>(
  type: 'album' | 'song' | 'artist',
     publicId: string,
@@ -21277,9 +20636,9 @@ export function useGetAdminMetadataMatchCandidates<TData = Awaited<ReturnType<ty
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 /**
+ * Searches MusicBrainz for the item's title (an artist's name) and primary artist, or for the edited `title` and `artist`, and lists at most five candidates with a fit score from 0 to 100, best first: releases for an album, recordings for a song, artists for an artist. A blank `title` counts as none; an empty `artist` searches by the title alone, while the score still compares each candidate with the item's own artist. An album's own title that finds no release and ends in a comma-separated list in square brackets is searched once more without the list; an edited `title` is searched as given, once.
  * @summary List MusicBrainz candidates for an album, song or artist
  */
-
 export function useGetAdminMetadataMatchCandidates<TData = Awaited<ReturnType<typeof getAdminMetadataMatchCandidates>>, TError = ErrorType<ApiError>>(
  type: 'album' | 'song' | 'artist',
     publicId: string,
@@ -21371,6 +20730,10 @@ export type GetAdminMetadataMatchComparisonQueryResult = NonNullable<Awaited<Ret
 export type GetAdminMetadataMatchComparisonQueryError = ErrorType<ApiError>
 
 
+/**
+ * Looks the candidate up in MusicBrainz and shows, field by field and, for an album, track by track, the value the item holds and the value a match would set, with the default tick of each row and the artists the ticked credits would merge or remove. Each row has a key an apply names it by.
+ * @summary Compare an album, song or artist with a MusicBrainz candidate
+ */
 export function useGetAdminMetadataMatchComparison<TData = Awaited<ReturnType<typeof getAdminMetadataMatchComparison>>, TError = ErrorType<ApiError>>(
  type: 'album' | 'song' | 'artist',
     publicId: string,
@@ -21383,6 +20746,10 @@ export function useGetAdminMetadataMatchComparison<TData = Awaited<ReturnType<ty
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * Looks the candidate up in MusicBrainz and shows, field by field and, for an album, track by track, the value the item holds and the value a match would set, with the default tick of each row and the artists the ticked credits would merge or remove. Each row has a key an apply names it by.
+ * @summary Compare an album, song or artist with a MusicBrainz candidate
+ */
 export function useGetAdminMetadataMatchComparison<TData = Awaited<ReturnType<typeof getAdminMetadataMatchComparison>>, TError = ErrorType<ApiError>>(
  type: 'album' | 'song' | 'artist',
     publicId: string,
@@ -21395,6 +20762,10 @@ export function useGetAdminMetadataMatchComparison<TData = Awaited<ReturnType<ty
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * Looks the candidate up in MusicBrainz and shows, field by field and, for an album, track by track, the value the item holds and the value a match would set, with the default tick of each row and the artists the ticked credits would merge or remove. Each row has a key an apply names it by.
+ * @summary Compare an album, song or artist with a MusicBrainz candidate
+ */
 export function useGetAdminMetadataMatchComparison<TData = Awaited<ReturnType<typeof getAdminMetadataMatchComparison>>, TError = ErrorType<ApiError>>(
  type: 'album' | 'song' | 'artist',
     publicId: string,
@@ -21402,9 +20773,9 @@ export function useGetAdminMetadataMatchComparison<TData = Awaited<ReturnType<ty
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 /**
+ * Looks the candidate up in MusicBrainz and shows, field by field and, for an album, track by track, the value the item holds and the value a match would set, with the default tick of each row and the artists the ticked credits would merge or remove. Each row has a key an apply names it by.
  * @summary Compare an album, song or artist with a MusicBrainz candidate
  */
-
 export function useGetAdminMetadataMatchComparison<TData = Awaited<ReturnType<typeof getAdminMetadataMatchComparison>>, TError = ErrorType<ApiError>>(
  type: 'album' | 'song' | 'artist',
     publicId: string,
@@ -21442,25 +20813,11 @@ export const postAdminMetadataMatchApply = async (type: 'album' | 'song' | 'arti
     publicId: string,
     applyMatchRequest: ApplyMatchRequest, options?: Parameters<typeof customInstance>[1]): Promise<PostAdminMetadataMatchApply200> => {
 
-    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
-    if (!h) return {};
-    if (h instanceof Headers) return Object.fromEntries(h.entries());
-    if (Symbol.iterator in h) {
-      return Object.fromEntries(
-        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
-      );
-    }
-    const headers: Record<string, string | readonly string[]> = {};
-    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
-      if (value !== undefined) headers[name] = value;
-    }
-    return headers;
-  };
-return customInstance<PostAdminMetadataMatchApply200>(getPostAdminMetadataMatchApplyUrl(type,publicId),
+  return customInstance<PostAdminMetadataMatchApply200>(getPostAdminMetadataMatchApplyUrl(type,publicId),
   {
     ...options,
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    headers: getHeaders({ 'Content-Type': 'application/json' }, options?.headers),
     body: JSON.stringify(applyMatchRequest)
   }
 );}
@@ -21504,6 +20861,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type PostAdminMetadataMatchApplyMutationVariables = {type: 'album' | 'song' | 'artist';publicId: string;data: BodyType<ApplyMatchRequest>}
 
     /**
+ * Writes the ticked rows of the comparison of the item with the candidate, named by the keys the comparison gave them, each with the current value it showed. Every merge or removal the comparison lists must appear in `artistActions` (applied) or `keptArtists` (left as it is). A row that no longer shows what the admin saw, a merge or removal the request does not name, or a deadlock with another writer answers 409 and writes nothing.
  * @summary Apply a MusicBrainz match to an album, song or artist
  */
 export const usePostAdminMetadataMatchApply = <TError = ErrorType<ApiError>,
@@ -21579,6 +20937,7 @@ export type PersonIndexQueryResult = NonNullable<Awaited<ReturnType<typeof perso
 export type PersonIndexQueryError = ErrorType<void>
 
 
+/** @summary List people with accessible credits */
 export function usePersonIndex<TData = Awaited<ReturnType<typeof personIndex>>, TError = ErrorType<void>>(
  params: undefined |  PersonIndexParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof personIndex>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
@@ -21589,6 +20948,7 @@ export function usePersonIndex<TData = Awaited<ReturnType<typeof personIndex>>, 
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/** @summary List people with accessible credits */
 export function usePersonIndex<TData = Awaited<ReturnType<typeof personIndex>>, TError = ErrorType<void>>(
  params?: PersonIndexParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof personIndex>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
@@ -21599,14 +20959,12 @@ export function usePersonIndex<TData = Awaited<ReturnType<typeof personIndex>>, 
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/** @summary List people with accessible credits */
 export function usePersonIndex<TData = Awaited<ReturnType<typeof personIndex>>, TError = ErrorType<void>>(
  params?: PersonIndexParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof personIndex>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-/**
- * @summary List people with accessible credits
- */
-
+/** @summary List people with accessible credits */
 export function usePersonIndex<TData = Awaited<ReturnType<typeof personIndex>>, TError = ErrorType<void>>(
  params?: PersonIndexParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof personIndex>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
@@ -21680,6 +21038,7 @@ export type PersonShowQueryResult = NonNullable<Awaited<ReturnType<typeof person
 export type PersonShowQueryError = ErrorType<void>
 
 
+/** @summary Get a person with accessible credits */
 export function usePersonShow<TData = Awaited<ReturnType<typeof personShow>>, TError = ErrorType<void>>(
  publicId: string, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof personShow>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
@@ -21690,6 +21049,7 @@ export function usePersonShow<TData = Awaited<ReturnType<typeof personShow>>, TE
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/** @summary Get a person with accessible credits */
 export function usePersonShow<TData = Awaited<ReturnType<typeof personShow>>, TError = ErrorType<void>>(
  publicId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof personShow>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
@@ -21700,14 +21060,12 @@ export function usePersonShow<TData = Awaited<ReturnType<typeof personShow>>, TE
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/** @summary Get a person with accessible credits */
 export function usePersonShow<TData = Awaited<ReturnType<typeof personShow>>, TError = ErrorType<void>>(
  publicId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof personShow>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-/**
- * @summary Get a person with accessible credits
- */
-
+/** @summary Get a person with accessible credits */
 export function usePersonShow<TData = Awaited<ReturnType<typeof personShow>>, TError = ErrorType<void>>(
  publicId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof personShow>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
@@ -21792,6 +21150,7 @@ export type PersonCreditsQueryResult = NonNullable<Awaited<ReturnType<typeof per
 export type PersonCreditsQueryError = ErrorType<void>
 
 
+/** @summary List accessible works credited to a person */
 export function usePersonCredits<TData = Awaited<ReturnType<typeof personCredits>>, TError = ErrorType<void>>(
  publicId: string,
     params: undefined |  PersonCreditsParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof personCredits>>, TError, TData>> & Pick<
@@ -21803,6 +21162,7 @@ export function usePersonCredits<TData = Awaited<ReturnType<typeof personCredits
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/** @summary List accessible works credited to a person */
 export function usePersonCredits<TData = Awaited<ReturnType<typeof personCredits>>, TError = ErrorType<void>>(
  publicId: string,
     params?: PersonCreditsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof personCredits>>, TError, TData>> & Pick<
@@ -21814,15 +21174,13 @@ export function usePersonCredits<TData = Awaited<ReturnType<typeof personCredits
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/** @summary List accessible works credited to a person */
 export function usePersonCredits<TData = Awaited<ReturnType<typeof personCredits>>, TError = ErrorType<void>>(
  publicId: string,
     params?: PersonCreditsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof personCredits>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-/**
- * @summary List accessible works credited to a person
- */
-
+/** @summary List accessible works credited to a person */
 export function usePersonCredits<TData = Awaited<ReturnType<typeof personCredits>>, TError = ErrorType<void>>(
  publicId: string,
     params?: PersonCreditsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof personCredits>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
@@ -21908,6 +21266,7 @@ export type PersonMovieCreditsQueryResult = NonNullable<Awaited<ReturnType<typeo
 export type PersonMovieCreditsQueryError = ErrorType<void>
 
 
+/** @summary List people credited to an accessible movie */
 export function usePersonMovieCredits<TData = Awaited<ReturnType<typeof personMovieCredits>>, TError = ErrorType<void>>(
  publicId: string,
     params: undefined |  PersonMovieCreditsParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof personMovieCredits>>, TError, TData>> & Pick<
@@ -21919,6 +21278,7 @@ export function usePersonMovieCredits<TData = Awaited<ReturnType<typeof personMo
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/** @summary List people credited to an accessible movie */
 export function usePersonMovieCredits<TData = Awaited<ReturnType<typeof personMovieCredits>>, TError = ErrorType<void>>(
  publicId: string,
     params?: PersonMovieCreditsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof personMovieCredits>>, TError, TData>> & Pick<
@@ -21930,15 +21290,13 @@ export function usePersonMovieCredits<TData = Awaited<ReturnType<typeof personMo
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/** @summary List people credited to an accessible movie */
 export function usePersonMovieCredits<TData = Awaited<ReturnType<typeof personMovieCredits>>, TError = ErrorType<void>>(
  publicId: string,
     params?: PersonMovieCreditsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof personMovieCredits>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-/**
- * @summary List people credited to an accessible movie
- */
-
+/** @summary List people credited to an accessible movie */
 export function usePersonMovieCredits<TData = Awaited<ReturnType<typeof personMovieCredits>>, TError = ErrorType<void>>(
  publicId: string,
     params?: PersonMovieCreditsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof personMovieCredits>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
@@ -22013,6 +21371,7 @@ export type PersonArtistQueryResult = NonNullable<Awaited<ReturnType<typeof pers
 export type PersonArtistQueryError = ErrorType<void>
 
 
+/** @summary Get the person linked to an accessible artist */
 export function usePersonArtist<TData = Awaited<ReturnType<typeof personArtist>>, TError = ErrorType<void>>(
  publicId: string, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof personArtist>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
@@ -22023,6 +21382,7 @@ export function usePersonArtist<TData = Awaited<ReturnType<typeof personArtist>>
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/** @summary Get the person linked to an accessible artist */
 export function usePersonArtist<TData = Awaited<ReturnType<typeof personArtist>>, TError = ErrorType<void>>(
  publicId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof personArtist>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
@@ -22033,14 +21393,12 @@ export function usePersonArtist<TData = Awaited<ReturnType<typeof personArtist>>
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/** @summary Get the person linked to an accessible artist */
 export function usePersonArtist<TData = Awaited<ReturnType<typeof personArtist>>, TError = ErrorType<void>>(
  publicId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof personArtist>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-/**
- * @summary Get the person linked to an accessible artist
- */
-
+/** @summary Get the person linked to an accessible artist */
 export function usePersonArtist<TData = Awaited<ReturnType<typeof personArtist>>, TError = ErrorType<void>>(
  publicId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof personArtist>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
@@ -22121,6 +21479,7 @@ export type GetSongIndexQueryResult = NonNullable<Awaited<ReturnType<typeof getS
 export type GetSongIndexQueryError = ErrorType<ApiError>
 
 
+/** @summary List songs (cursor-paginated) */
 export function useGetSongIndex<TData = Awaited<ReturnType<typeof getSongIndex>>, TError = ErrorType<ApiError>>(
  params: undefined |  GetSongIndexParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getSongIndex>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
@@ -22131,6 +21490,7 @@ export function useGetSongIndex<TData = Awaited<ReturnType<typeof getSongIndex>>
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/** @summary List songs (cursor-paginated) */
 export function useGetSongIndex<TData = Awaited<ReturnType<typeof getSongIndex>>, TError = ErrorType<ApiError>>(
  params?: GetSongIndexParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getSongIndex>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
@@ -22141,14 +21501,12 @@ export function useGetSongIndex<TData = Awaited<ReturnType<typeof getSongIndex>>
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/** @summary List songs (cursor-paginated) */
 export function useGetSongIndex<TData = Awaited<ReturnType<typeof getSongIndex>>, TError = ErrorType<ApiError>>(
  params?: GetSongIndexParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getSongIndex>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-/**
- * @summary List songs (cursor-paginated)
- */
-
+/** @summary List songs (cursor-paginated) */
 export function useGetSongIndex<TData = Awaited<ReturnType<typeof getSongIndex>>, TError = ErrorType<ApiError>>(
  params?: GetSongIndexParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getSongIndex>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
@@ -22222,6 +21580,7 @@ export type GetSongShowQueryResult = NonNullable<Awaited<ReturnType<typeof getSo
 export type GetSongShowQueryError = ErrorType<ApiError>
 
 
+/** @summary Get a single song */
 export function useGetSongShow<TData = Awaited<ReturnType<typeof getSongShow>>, TError = ErrorType<ApiError>>(
  publicId: string, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getSongShow>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
@@ -22232,6 +21591,7 @@ export function useGetSongShow<TData = Awaited<ReturnType<typeof getSongShow>>, 
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/** @summary Get a single song */
 export function useGetSongShow<TData = Awaited<ReturnType<typeof getSongShow>>, TError = ErrorType<ApiError>>(
  publicId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getSongShow>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
@@ -22242,14 +21602,12 @@ export function useGetSongShow<TData = Awaited<ReturnType<typeof getSongShow>>, 
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/** @summary Get a single song */
 export function useGetSongShow<TData = Awaited<ReturnType<typeof getSongShow>>, TError = ErrorType<ApiError>>(
  publicId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getSongShow>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-/**
- * @summary Get a single song
- */
-
+/** @summary Get a single song */
 export function useGetSongShow<TData = Awaited<ReturnType<typeof getSongShow>>, TError = ErrorType<ApiError>>(
  publicId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getSongShow>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
@@ -22282,25 +21640,11 @@ export const getPatchSongUpdateUrl = (publicId: string,) => {
 export const patchSongUpdate = async (publicId: string,
     patchSongUpdateBody: PatchSongUpdateBody, options?: Parameters<typeof customInstance>[1]): Promise<PatchSongUpdate200> => {
 
-    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
-    if (!h) return {};
-    if (h instanceof Headers) return Object.fromEntries(h.entries());
-    if (Symbol.iterator in h) {
-      return Object.fromEntries(
-        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
-      );
-    }
-    const headers: Record<string, string | readonly string[]> = {};
-    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
-      if (value !== undefined) headers[name] = value;
-    }
-    return headers;
-  };
-return customInstance<PatchSongUpdate200>(getPatchSongUpdateUrl(publicId),
+  return customInstance<PatchSongUpdate200>(getPatchSongUpdateUrl(publicId),
   {
     ...options,
     method: 'PATCH',
-    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    headers: getHeaders({ 'Content-Type': 'application/json' }, options?.headers),
     body: JSON.stringify(patchSongUpdateBody)
   }
 );}
@@ -22343,9 +21687,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type PatchSongUpdateMutationError = ErrorType<ApiError | ValidationError>
     export type PatchSongUpdateMutationVariables = {publicId: string;data: BodyType<PatchSongUpdateBody>}
 
-    /**
- * @summary Update a song
- */
+    /** @summary Update a song */
 export const usePatchSongUpdate = <TError = ErrorType<ApiError | ValidationError>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof patchSongUpdate>>, TError,PatchSongUpdateMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient): UseMutationResult<
@@ -22417,9 +21759,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type DeleteSongDestroyMutationError = ErrorType<ApiError | ValidationError>
     export type DeleteSongDestroyMutationVariables = {publicId: string}
 
-    /**
- * @summary Delete a song
- */
+    /** @summary Delete a song */
 export const useDeleteSongDestroy = <TError = ErrorType<ApiError | ValidationError>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteSongDestroy>>, TError,DeleteSongDestroyMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient): UseMutationResult<
@@ -22493,6 +21833,7 @@ export type TvSeriesIndexQueryResult = NonNullable<Awaited<ReturnType<typeof tvS
 export type TvSeriesIndexQueryError = ErrorType<void>
 
 
+/** @summary List accessible television series */
 export function useTvSeriesIndex<TData = Awaited<ReturnType<typeof tvSeriesIndex>>, TError = ErrorType<void>>(
  params: undefined |  TvSeriesIndexParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof tvSeriesIndex>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
@@ -22503,6 +21844,7 @@ export function useTvSeriesIndex<TData = Awaited<ReturnType<typeof tvSeriesIndex
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/** @summary List accessible television series */
 export function useTvSeriesIndex<TData = Awaited<ReturnType<typeof tvSeriesIndex>>, TError = ErrorType<void>>(
  params?: TvSeriesIndexParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof tvSeriesIndex>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
@@ -22513,14 +21855,12 @@ export function useTvSeriesIndex<TData = Awaited<ReturnType<typeof tvSeriesIndex
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/** @summary List accessible television series */
 export function useTvSeriesIndex<TData = Awaited<ReturnType<typeof tvSeriesIndex>>, TError = ErrorType<void>>(
  params?: TvSeriesIndexParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof tvSeriesIndex>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-/**
- * @summary List accessible television series
- */
-
+/** @summary List accessible television series */
 export function useTvSeriesIndex<TData = Awaited<ReturnType<typeof tvSeriesIndex>>, TError = ErrorType<void>>(
  params?: TvSeriesIndexParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof tvSeriesIndex>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
@@ -22594,6 +21934,7 @@ export type TvSeriesShowQueryResult = NonNullable<Awaited<ReturnType<typeof tvSe
 export type TvSeriesShowQueryError = ErrorType<void>
 
 
+/** @summary Get an accessible television series */
 export function useTvSeriesShow<TData = Awaited<ReturnType<typeof tvSeriesShow>>, TError = ErrorType<void>>(
  publicId: string, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof tvSeriesShow>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
@@ -22604,6 +21945,7 @@ export function useTvSeriesShow<TData = Awaited<ReturnType<typeof tvSeriesShow>>
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/** @summary Get an accessible television series */
 export function useTvSeriesShow<TData = Awaited<ReturnType<typeof tvSeriesShow>>, TError = ErrorType<void>>(
  publicId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof tvSeriesShow>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
@@ -22614,14 +21956,12 @@ export function useTvSeriesShow<TData = Awaited<ReturnType<typeof tvSeriesShow>>
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/** @summary Get an accessible television series */
 export function useTvSeriesShow<TData = Awaited<ReturnType<typeof tvSeriesShow>>, TError = ErrorType<void>>(
  publicId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof tvSeriesShow>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-/**
- * @summary Get an accessible television series
- */
-
+/** @summary Get an accessible television series */
 export function useTvSeriesShow<TData = Awaited<ReturnType<typeof tvSeriesShow>>, TError = ErrorType<void>>(
  publicId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof tvSeriesShow>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
@@ -22706,6 +22046,7 @@ export type TvSeriesEpisodesQueryResult = NonNullable<Awaited<ReturnType<typeof 
 export type TvSeriesEpisodesQueryError = ErrorType<void>
 
 
+/** @summary List registered episodes of an accessible series */
 export function useTvSeriesEpisodes<TData = Awaited<ReturnType<typeof tvSeriesEpisodes>>, TError = ErrorType<void>>(
  publicId: string,
     params: undefined |  TvSeriesEpisodesParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof tvSeriesEpisodes>>, TError, TData>> & Pick<
@@ -22717,6 +22058,7 @@ export function useTvSeriesEpisodes<TData = Awaited<ReturnType<typeof tvSeriesEp
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/** @summary List registered episodes of an accessible series */
 export function useTvSeriesEpisodes<TData = Awaited<ReturnType<typeof tvSeriesEpisodes>>, TError = ErrorType<void>>(
  publicId: string,
     params?: TvSeriesEpisodesParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof tvSeriesEpisodes>>, TError, TData>> & Pick<
@@ -22728,15 +22070,13 @@ export function useTvSeriesEpisodes<TData = Awaited<ReturnType<typeof tvSeriesEp
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/** @summary List registered episodes of an accessible series */
 export function useTvSeriesEpisodes<TData = Awaited<ReturnType<typeof tvSeriesEpisodes>>, TError = ErrorType<void>>(
  publicId: string,
     params?: TvSeriesEpisodesParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof tvSeriesEpisodes>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-/**
- * @summary List registered episodes of an accessible series
- */
-
+/** @summary List registered episodes of an accessible series */
 export function useTvSeriesEpisodes<TData = Awaited<ReturnType<typeof tvSeriesEpisodes>>, TError = ErrorType<void>>(
  publicId: string,
     params?: TvSeriesEpisodesParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof tvSeriesEpisodes>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
@@ -22811,6 +22151,7 @@ export type TvEpisodeShowQueryResult = NonNullable<Awaited<ReturnType<typeof tvE
 export type TvEpisodeShowQueryError = ErrorType<void>
 
 
+/** @summary Get an accessible television episode */
 export function useTvEpisodeShow<TData = Awaited<ReturnType<typeof tvEpisodeShow>>, TError = ErrorType<void>>(
  publicId: string, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof tvEpisodeShow>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
@@ -22821,6 +22162,7 @@ export function useTvEpisodeShow<TData = Awaited<ReturnType<typeof tvEpisodeShow
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/** @summary Get an accessible television episode */
 export function useTvEpisodeShow<TData = Awaited<ReturnType<typeof tvEpisodeShow>>, TError = ErrorType<void>>(
  publicId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof tvEpisodeShow>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
@@ -22831,14 +22173,12 @@ export function useTvEpisodeShow<TData = Awaited<ReturnType<typeof tvEpisodeShow
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/** @summary Get an accessible television episode */
 export function useTvEpisodeShow<TData = Awaited<ReturnType<typeof tvEpisodeShow>>, TError = ErrorType<void>>(
  publicId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof tvEpisodeShow>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-/**
- * @summary Get an accessible television episode
- */
-
+/** @summary Get an accessible television episode */
 export function useTvEpisodeShow<TData = Awaited<ReturnType<typeof tvEpisodeShow>>, TError = ErrorType<void>>(
  publicId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof tvEpisodeShow>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
@@ -22923,6 +22263,7 @@ export type TvSeriesCreditsQueryResult = NonNullable<Awaited<ReturnType<typeof t
 export type TvSeriesCreditsQueryError = ErrorType<void>
 
 
+/** @summary List people credited to an accessible series */
 export function useTvSeriesCredits<TData = Awaited<ReturnType<typeof tvSeriesCredits>>, TError = ErrorType<void>>(
  publicId: string,
     params: undefined |  TvSeriesCreditsParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof tvSeriesCredits>>, TError, TData>> & Pick<
@@ -22934,6 +22275,7 @@ export function useTvSeriesCredits<TData = Awaited<ReturnType<typeof tvSeriesCre
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/** @summary List people credited to an accessible series */
 export function useTvSeriesCredits<TData = Awaited<ReturnType<typeof tvSeriesCredits>>, TError = ErrorType<void>>(
  publicId: string,
     params?: TvSeriesCreditsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof tvSeriesCredits>>, TError, TData>> & Pick<
@@ -22945,15 +22287,13 @@ export function useTvSeriesCredits<TData = Awaited<ReturnType<typeof tvSeriesCre
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/** @summary List people credited to an accessible series */
 export function useTvSeriesCredits<TData = Awaited<ReturnType<typeof tvSeriesCredits>>, TError = ErrorType<void>>(
  publicId: string,
     params?: TvSeriesCreditsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof tvSeriesCredits>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-/**
- * @summary List people credited to an accessible series
- */
-
+/** @summary List people credited to an accessible series */
 export function useTvSeriesCredits<TData = Awaited<ReturnType<typeof tvSeriesCredits>>, TError = ErrorType<void>>(
  publicId: string,
     params?: TvSeriesCreditsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof tvSeriesCredits>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
@@ -23039,6 +22379,7 @@ export type TvEpisodeCreditsQueryResult = NonNullable<Awaited<ReturnType<typeof 
 export type TvEpisodeCreditsQueryError = ErrorType<void>
 
 
+/** @summary List people credited to an accessible episode */
 export function useTvEpisodeCredits<TData = Awaited<ReturnType<typeof tvEpisodeCredits>>, TError = ErrorType<void>>(
  publicId: string,
     params: undefined |  TvEpisodeCreditsParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof tvEpisodeCredits>>, TError, TData>> & Pick<
@@ -23050,6 +22391,7 @@ export function useTvEpisodeCredits<TData = Awaited<ReturnType<typeof tvEpisodeC
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/** @summary List people credited to an accessible episode */
 export function useTvEpisodeCredits<TData = Awaited<ReturnType<typeof tvEpisodeCredits>>, TError = ErrorType<void>>(
  publicId: string,
     params?: TvEpisodeCreditsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof tvEpisodeCredits>>, TError, TData>> & Pick<
@@ -23061,15 +22403,13 @@ export function useTvEpisodeCredits<TData = Awaited<ReturnType<typeof tvEpisodeC
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/** @summary List people credited to an accessible episode */
 export function useTvEpisodeCredits<TData = Awaited<ReturnType<typeof tvEpisodeCredits>>, TError = ErrorType<void>>(
  publicId: string,
     params?: TvEpisodeCreditsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof tvEpisodeCredits>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-/**
- * @summary List people credited to an accessible episode
- */
-
+/** @summary List people credited to an accessible episode */
 export function useTvEpisodeCredits<TData = Awaited<ReturnType<typeof tvEpisodeCredits>>, TError = ErrorType<void>>(
  publicId: string,
     params?: TvEpisodeCreditsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof tvEpisodeCredits>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
@@ -23144,6 +22484,7 @@ export type GetVideoPlaybackInformationQueryResult = NonNullable<Awaited<ReturnT
 export type GetVideoPlaybackInformationQueryError = ErrorType<void>
 
 
+/** @summary Get available video tracks, chapters and timeline previews */
 export function useGetVideoPlaybackInformation<TData = Awaited<ReturnType<typeof getVideoPlaybackInformation>>, TError = ErrorType<void>>(
  publicId: string, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getVideoPlaybackInformation>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
@@ -23154,6 +22495,7 @@ export function useGetVideoPlaybackInformation<TData = Awaited<ReturnType<typeof
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/** @summary Get available video tracks, chapters and timeline previews */
 export function useGetVideoPlaybackInformation<TData = Awaited<ReturnType<typeof getVideoPlaybackInformation>>, TError = ErrorType<void>>(
  publicId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getVideoPlaybackInformation>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
@@ -23164,14 +22506,12 @@ export function useGetVideoPlaybackInformation<TData = Awaited<ReturnType<typeof
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/** @summary Get available video tracks, chapters and timeline previews */
 export function useGetVideoPlaybackInformation<TData = Awaited<ReturnType<typeof getVideoPlaybackInformation>>, TError = ErrorType<void>>(
  publicId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getVideoPlaybackInformation>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-/**
- * @summary Get available video tracks, chapters and timeline previews
- */
-
+/** @summary Get available video tracks, chapters and timeline previews */
 export function useGetVideoPlaybackInformation<TData = Awaited<ReturnType<typeof getVideoPlaybackInformation>>, TError = ErrorType<void>>(
  publicId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getVideoPlaybackInformation>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
@@ -23245,6 +22585,7 @@ export type GetVideoPlaybackPreviewQueryResult = NonNullable<Awaited<ReturnType<
 export type GetVideoPlaybackPreviewQueryError = ErrorType<void>
 
 
+/** @summary Get an authorized video timeline contact sheet */
 export function useGetVideoPlaybackPreview<TData = Awaited<ReturnType<typeof getVideoPlaybackPreview>>, TError = ErrorType<void>>(
  publicId: string, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getVideoPlaybackPreview>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
@@ -23255,6 +22596,7 @@ export function useGetVideoPlaybackPreview<TData = Awaited<ReturnType<typeof get
       >, request?: SecondParameter<typeof blobInstance>}
  , queryClient?: QueryClient
   ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/** @summary Get an authorized video timeline contact sheet */
 export function useGetVideoPlaybackPreview<TData = Awaited<ReturnType<typeof getVideoPlaybackPreview>>, TError = ErrorType<void>>(
  publicId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getVideoPlaybackPreview>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
@@ -23265,14 +22607,12 @@ export function useGetVideoPlaybackPreview<TData = Awaited<ReturnType<typeof get
       >, request?: SecondParameter<typeof blobInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/** @summary Get an authorized video timeline contact sheet */
 export function useGetVideoPlaybackPreview<TData = Awaited<ReturnType<typeof getVideoPlaybackPreview>>, TError = ErrorType<void>>(
  publicId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getVideoPlaybackPreview>>, TError, TData>>, request?: SecondParameter<typeof blobInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-/**
- * @summary Get an authorized video timeline contact sheet
- */
-
+/** @summary Get an authorized video timeline contact sheet */
 export function useGetVideoPlaybackPreview<TData = Awaited<ReturnType<typeof getVideoPlaybackPreview>>, TError = ErrorType<void>>(
  publicId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getVideoPlaybackPreview>>, TError, TData>>, request?: SecondParameter<typeof blobInstance>}
  , queryClient?: QueryClient
@@ -23304,25 +22644,11 @@ export const getPostDiscoveryRegisterUrl = () => {
  */
 export const postDiscoveryRegister = async (postDiscoveryRegisterBody: PostDiscoveryRegisterBody, options?: Parameters<typeof customInstance>[1]): Promise<PostDiscoveryRegister201> => {
 
-    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
-    if (!h) return {};
-    if (h instanceof Headers) return Object.fromEntries(h.entries());
-    if (Symbol.iterator in h) {
-      return Object.fromEntries(
-        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
-      );
-    }
-    const headers: Record<string, string | readonly string[]> = {};
-    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
-      if (value !== undefined) headers[name] = value;
-    }
-    return headers;
-  };
-return customInstance<PostDiscoveryRegister201>(getPostDiscoveryRegisterUrl(),
+  return customInstance<PostDiscoveryRegister201>(getPostDiscoveryRegisterUrl(),
   {
     ...options,
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    headers: getHeaders({ 'Content-Type': 'application/json' }, options?.headers),
     body: JSON.stringify(postDiscoveryRegisterBody)
   }
 );}
@@ -23365,9 +22691,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type PostDiscoveryRegisterMutationError = ErrorType<unknown>
     export type PostDiscoveryRegisterMutationVariables = {data: BodyType<PostDiscoveryRegisterBody>}
 
-    /**
- * @summary Register a self-hosted server
- */
+    /** @summary Register a self-hosted server */
 export const usePostDiscoveryRegister = <TError = ErrorType<unknown>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postDiscoveryRegister>>, TError,PostDiscoveryRegisterMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient): UseMutationResult<
@@ -23392,25 +22716,11 @@ export const getPostDiscoveryPairingCodeUrl = () => {
  */
 export const postDiscoveryPairingCode = async (postDiscoveryPairingCodeBody: PostDiscoveryPairingCodeBody, options?: Parameters<typeof customInstance>[1]): Promise<PairingSessionResource> => {
 
-    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
-    if (!h) return {};
-    if (h instanceof Headers) return Object.fromEntries(h.entries());
-    if (Symbol.iterator in h) {
-      return Object.fromEntries(
-        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
-      );
-    }
-    const headers: Record<string, string | readonly string[]> = {};
-    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
-      if (value !== undefined) headers[name] = value;
-    }
-    return headers;
-  };
-return customInstance<PairingSessionResource>(getPostDiscoveryPairingCodeUrl(),
+  return customInstance<PairingSessionResource>(getPostDiscoveryPairingCodeUrl(),
   {
     ...options,
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    headers: getHeaders({ 'Content-Type': 'application/json' }, options?.headers),
     body: JSON.stringify(postDiscoveryPairingCodeBody)
   }
 );}
@@ -23453,9 +22763,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type PostDiscoveryPairingCodeMutationError = ErrorType<unknown>
     export type PostDiscoveryPairingCodeMutationVariables = {data: BodyType<PostDiscoveryPairingCodeBody>}
 
-    /**
- * @summary Create a pairing code for a server
- */
+    /** @summary Create a pairing code for a server */
 export const usePostDiscoveryPairingCode = <TError = ErrorType<unknown>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postDiscoveryPairingCode>>, TError,PostDiscoveryPairingCodeMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient): UseMutationResult<
@@ -23527,9 +22835,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type PostDiscoveryQrPayloadMutationError = ErrorType<unknown>
     export type PostDiscoveryQrPayloadMutationVariables = {serverPublicId: string}
 
-    /**
- * @summary Create a QR code pairing session and return its payload
- */
+    /** @summary Create a QR code pairing session and return its payload */
 export const usePostDiscoveryQrPayload = <TError = ErrorType<unknown>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postDiscoveryQrPayload>>, TError,PostDiscoveryQrPayloadMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient): UseMutationResult<
@@ -23554,25 +22860,11 @@ export const getPostDiscoveryCompletePairingUrl = () => {
  */
 export const postDiscoveryCompletePairing = async (postDiscoveryCompletePairingBody: PostDiscoveryCompletePairingBody, options?: Parameters<typeof customInstance>[1]): Promise<PostDiscoveryCompletePairing200> => {
 
-    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
-    if (!h) return {};
-    if (h instanceof Headers) return Object.fromEntries(h.entries());
-    if (Symbol.iterator in h) {
-      return Object.fromEntries(
-        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
-      );
-    }
-    const headers: Record<string, string | readonly string[]> = {};
-    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
-      if (value !== undefined) headers[name] = value;
-    }
-    return headers;
-  };
-return customInstance<PostDiscoveryCompletePairing200>(getPostDiscoveryCompletePairingUrl(),
+  return customInstance<PostDiscoveryCompletePairing200>(getPostDiscoveryCompletePairingUrl(),
   {
     ...options,
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    headers: getHeaders({ 'Content-Type': 'application/json' }, options?.headers),
     body: JSON.stringify(postDiscoveryCompletePairingBody)
   }
 );}
@@ -23615,9 +22907,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type PostDiscoveryCompletePairingMutationError = ErrorType<unknown>
     export type PostDiscoveryCompletePairingMutationVariables = {data: BodyType<PostDiscoveryCompletePairingBody>}
 
-    /**
- * @summary Complete a pairing session
- */
+    /** @summary Complete a pairing session */
 export const usePostDiscoveryCompletePairing = <TError = ErrorType<unknown>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postDiscoveryCompletePairing>>, TError,PostDiscoveryCompletePairingMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient): UseMutationResult<
@@ -23691,6 +22981,7 @@ export type GetFavoritesIndexQueryResult = NonNullable<Awaited<ReturnType<typeof
 export type GetFavoritesIndexQueryError = ErrorType<unknown>
 
 
+/** @summary List user favorites */
 export function useGetFavoritesIndex<TData = Awaited<ReturnType<typeof getFavoritesIndex>>, TError = ErrorType<unknown>>(
  params: undefined |  GetFavoritesIndexParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getFavoritesIndex>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
@@ -23701,6 +22992,7 @@ export function useGetFavoritesIndex<TData = Awaited<ReturnType<typeof getFavori
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/** @summary List user favorites */
 export function useGetFavoritesIndex<TData = Awaited<ReturnType<typeof getFavoritesIndex>>, TError = ErrorType<unknown>>(
  params?: GetFavoritesIndexParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getFavoritesIndex>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
@@ -23711,14 +23003,12 @@ export function useGetFavoritesIndex<TData = Awaited<ReturnType<typeof getFavori
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/** @summary List user favorites */
 export function useGetFavoritesIndex<TData = Awaited<ReturnType<typeof getFavoritesIndex>>, TError = ErrorType<unknown>>(
  params?: GetFavoritesIndexParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getFavoritesIndex>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-/**
- * @summary List user favorites
- */
-
+/** @summary List user favorites */
 export function useGetFavoritesIndex<TData = Awaited<ReturnType<typeof getFavoritesIndex>>, TError = ErrorType<unknown>>(
  params?: GetFavoritesIndexParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getFavoritesIndex>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
@@ -23750,25 +23040,11 @@ export const getPostFavoritesAddUrl = () => {
  */
 export const postFavoritesAdd = async (postFavoritesAddBody: PostFavoritesAddBody, options?: Parameters<typeof customInstance>[1]): Promise<PostFavoritesAdd201> => {
 
-    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
-    if (!h) return {};
-    if (h instanceof Headers) return Object.fromEntries(h.entries());
-    if (Symbol.iterator in h) {
-      return Object.fromEntries(
-        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
-      );
-    }
-    const headers: Record<string, string | readonly string[]> = {};
-    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
-      if (value !== undefined) headers[name] = value;
-    }
-    return headers;
-  };
-return customInstance<PostFavoritesAdd201>(getPostFavoritesAddUrl(),
+  return customInstance<PostFavoritesAdd201>(getPostFavoritesAddUrl(),
   {
     ...options,
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    headers: getHeaders({ 'Content-Type': 'application/json' }, options?.headers),
     body: JSON.stringify(postFavoritesAddBody)
   }
 );}
@@ -23811,9 +23087,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type PostFavoritesAddMutationError = ErrorType<void>
     export type PostFavoritesAddMutationVariables = {data: BodyType<PostFavoritesAddBody>}
 
-    /**
- * @summary Add a favorite
- */
+    /** @summary Add a favorite */
 export const usePostFavoritesAdd = <TError = ErrorType<void>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postFavoritesAdd>>, TError,PostFavoritesAddMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient): UseMutationResult<
@@ -23885,9 +23159,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type DeleteFavoritesRemoveMutationError = ErrorType<unknown>
     export type DeleteFavoritesRemoveMutationVariables = {publicId: string}
 
-    /**
- * @summary Remove a favorite
- */
+    /** @summary Remove a favorite */
 export const useDeleteFavoritesRemove = <TError = ErrorType<unknown>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteFavoritesRemove>>, TError,DeleteFavoritesRemoveMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient): UseMutationResult<
@@ -23954,6 +23226,7 @@ export type GetAdminUserLibrariesIndexQueryResult = NonNullable<Awaited<ReturnTy
 export type GetAdminUserLibrariesIndexQueryError = ErrorType<ApiError>
 
 
+/** @summary List every library with the user's access to it */
 export function useGetAdminUserLibrariesIndex<TData = Awaited<ReturnType<typeof getAdminUserLibrariesIndex>>, TError = ErrorType<ApiError>>(
  userId: string, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAdminUserLibrariesIndex>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
@@ -23964,6 +23237,7 @@ export function useGetAdminUserLibrariesIndex<TData = Awaited<ReturnType<typeof 
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/** @summary List every library with the user's access to it */
 export function useGetAdminUserLibrariesIndex<TData = Awaited<ReturnType<typeof getAdminUserLibrariesIndex>>, TError = ErrorType<ApiError>>(
  userId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAdminUserLibrariesIndex>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
@@ -23974,14 +23248,12 @@ export function useGetAdminUserLibrariesIndex<TData = Awaited<ReturnType<typeof 
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/** @summary List every library with the user's access to it */
 export function useGetAdminUserLibrariesIndex<TData = Awaited<ReturnType<typeof getAdminUserLibrariesIndex>>, TError = ErrorType<ApiError>>(
  userId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAdminUserLibrariesIndex>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-/**
- * @summary List every library with the user's access to it
- */
-
+/** @summary List every library with the user's access to it */
 export function useGetAdminUserLibrariesIndex<TData = Awaited<ReturnType<typeof getAdminUserLibrariesIndex>>, TError = ErrorType<ApiError>>(
  userId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAdminUserLibrariesIndex>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
@@ -24064,6 +23336,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type PutAdminUserLibrariesGrantMutationVariables = {userId: string;libraryId: string}
 
     /**
+ * Granting access the user already has changes nothing.
  * @summary Let the user see a library
  */
 export const usePutAdminUserLibrariesGrant = <TError = ErrorType<ApiError>,
@@ -24141,6 +23414,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type DeleteAdminUserLibrariesRevokeMutationVariables = {userId: string;libraryId: string}
 
     /**
+ * Revoking access the user lacks changes nothing. The user's next request is refused; signed media URLs already issued stay valid until they expire.
  * @summary Stop the user seeing a library
  */
 export const useDeleteAdminUserLibrariesRevoke = <TError = ErrorType<ApiError>,
@@ -24216,6 +23490,7 @@ export type GetLibraryIndexQueryResult = NonNullable<Awaited<ReturnType<typeof g
 export type GetLibraryIndexQueryError = ErrorType<ApiError>
 
 
+/** @summary List all libraries */
 export function useGetLibraryIndex<TData = Awaited<ReturnType<typeof getLibraryIndex>>, TError = ErrorType<ApiError>>(
  params: undefined |  GetLibraryIndexParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getLibraryIndex>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
@@ -24226,6 +23501,7 @@ export function useGetLibraryIndex<TData = Awaited<ReturnType<typeof getLibraryI
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/** @summary List all libraries */
 export function useGetLibraryIndex<TData = Awaited<ReturnType<typeof getLibraryIndex>>, TError = ErrorType<ApiError>>(
  params?: GetLibraryIndexParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getLibraryIndex>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
@@ -24236,14 +23512,12 @@ export function useGetLibraryIndex<TData = Awaited<ReturnType<typeof getLibraryI
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/** @summary List all libraries */
 export function useGetLibraryIndex<TData = Awaited<ReturnType<typeof getLibraryIndex>>, TError = ErrorType<ApiError>>(
  params?: GetLibraryIndexParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getLibraryIndex>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-/**
- * @summary List all libraries
- */
-
+/** @summary List all libraries */
 export function useGetLibraryIndex<TData = Awaited<ReturnType<typeof getLibraryIndex>>, TError = ErrorType<ApiError>>(
  params?: GetLibraryIndexParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getLibraryIndex>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
@@ -24275,25 +23549,11 @@ export const getPostLibraryStoreUrl = () => {
  */
 export const postLibraryStore = async (postLibraryStoreBody: PostLibraryStoreBody, options?: Parameters<typeof customInstance>[1]): Promise<PostLibraryStore201> => {
 
-    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
-    if (!h) return {};
-    if (h instanceof Headers) return Object.fromEntries(h.entries());
-    if (Symbol.iterator in h) {
-      return Object.fromEntries(
-        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
-      );
-    }
-    const headers: Record<string, string | readonly string[]> = {};
-    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
-      if (value !== undefined) headers[name] = value;
-    }
-    return headers;
-  };
-return customInstance<PostLibraryStore201>(getPostLibraryStoreUrl(),
+  return customInstance<PostLibraryStore201>(getPostLibraryStoreUrl(),
   {
     ...options,
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    headers: getHeaders({ 'Content-Type': 'application/json' }, options?.headers),
     body: JSON.stringify(postLibraryStoreBody)
   }
 );}
@@ -24336,9 +23596,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type PostLibraryStoreMutationError = ErrorType<ApiError | ValidationError>
     export type PostLibraryStoreMutationVariables = {data: BodyType<PostLibraryStoreBody>}
 
-    /**
- * @summary Create a new library (admin)
- */
+    /** @summary Create a new library (admin) */
 export const usePostLibraryStore = <TError = ErrorType<ApiError | ValidationError>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postLibraryStore>>, TError,PostLibraryStoreMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient): UseMutationResult<
@@ -24405,6 +23663,7 @@ export type GetLibraryShowQueryResult = NonNullable<Awaited<ReturnType<typeof ge
 export type GetLibraryShowQueryError = ErrorType<ApiError>
 
 
+/** @summary Get a single library */
 export function useGetLibraryShow<TData = Awaited<ReturnType<typeof getLibraryShow>>, TError = ErrorType<ApiError>>(
  id: string, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getLibraryShow>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
@@ -24415,6 +23674,7 @@ export function useGetLibraryShow<TData = Awaited<ReturnType<typeof getLibrarySh
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/** @summary Get a single library */
 export function useGetLibraryShow<TData = Awaited<ReturnType<typeof getLibraryShow>>, TError = ErrorType<ApiError>>(
  id: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getLibraryShow>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
@@ -24425,14 +23685,12 @@ export function useGetLibraryShow<TData = Awaited<ReturnType<typeof getLibrarySh
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/** @summary Get a single library */
 export function useGetLibraryShow<TData = Awaited<ReturnType<typeof getLibraryShow>>, TError = ErrorType<ApiError>>(
  id: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getLibraryShow>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-/**
- * @summary Get a single library
- */
-
+/** @summary Get a single library */
 export function useGetLibraryShow<TData = Awaited<ReturnType<typeof getLibraryShow>>, TError = ErrorType<ApiError>>(
  id: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getLibraryShow>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
@@ -24465,25 +23723,11 @@ export const getPatchLibraryUpdateUrl = (id: string,) => {
 export const patchLibraryUpdate = async (id: string,
     patchLibraryUpdateBody: PatchLibraryUpdateBody, options?: Parameters<typeof customInstance>[1]): Promise<PatchLibraryUpdate200> => {
 
-    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
-    if (!h) return {};
-    if (h instanceof Headers) return Object.fromEntries(h.entries());
-    if (Symbol.iterator in h) {
-      return Object.fromEntries(
-        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
-      );
-    }
-    const headers: Record<string, string | readonly string[]> = {};
-    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
-      if (value !== undefined) headers[name] = value;
-    }
-    return headers;
-  };
-return customInstance<PatchLibraryUpdate200>(getPatchLibraryUpdateUrl(id),
+  return customInstance<PatchLibraryUpdate200>(getPatchLibraryUpdateUrl(id),
   {
     ...options,
     method: 'PATCH',
-    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    headers: getHeaders({ 'Content-Type': 'application/json' }, options?.headers),
     body: JSON.stringify(patchLibraryUpdateBody)
   }
 );}
@@ -24526,9 +23770,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type PatchLibraryUpdateMutationError = ErrorType<ApiError | ValidationError>
     export type PatchLibraryUpdateMutationVariables = {id: string;data: BodyType<PatchLibraryUpdateBody>}
 
-    /**
- * @summary Rename or reorder a library (admin)
- */
+    /** @summary Rename or reorder a library (admin) */
 export const usePatchLibraryUpdate = <TError = ErrorType<ApiError | ValidationError>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof patchLibraryUpdate>>, TError,PatchLibraryUpdateMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient): UseMutationResult<
@@ -24600,9 +23842,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type DeleteLibraryDeleteMutationError = ErrorType<ApiError>
     export type DeleteLibraryDeleteMutationVariables = {id: string}
 
-    /**
- * @summary Delete a library (admin)
- */
+    /** @summary Delete a library (admin) */
 export const useDeleteLibraryDelete = <TError = ErrorType<ApiError>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteLibraryDelete>>, TError,DeleteLibraryDeleteMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient): UseMutationResult<
@@ -24676,6 +23916,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type PostLibraryScanMutationVariables = {id: string}
 
     /**
+ * Claims the library for a scan and dispatches an asynchronous scan job. The scan runs in the background; follow it in the job monitor and in the scan status of the library. A library that is already scanning answers 409.
  * @summary Trigger a library scan (admin)
  */
 export const usePostLibraryScan = <TError = ErrorType<ApiError>,
@@ -24744,6 +23985,7 @@ export type GetLibraryStatsQueryResult = NonNullable<Awaited<ReturnType<typeof g
 export type GetLibraryStatsQueryError = ErrorType<ApiError>
 
 
+/** @summary Get library statistics */
 export function useGetLibraryStats<TData = Awaited<ReturnType<typeof getLibraryStats>>, TError = ErrorType<ApiError>>(
  id: string, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getLibraryStats>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
@@ -24754,6 +23996,7 @@ export function useGetLibraryStats<TData = Awaited<ReturnType<typeof getLibraryS
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/** @summary Get library statistics */
 export function useGetLibraryStats<TData = Awaited<ReturnType<typeof getLibraryStats>>, TError = ErrorType<ApiError>>(
  id: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getLibraryStats>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
@@ -24764,14 +24007,12 @@ export function useGetLibraryStats<TData = Awaited<ReturnType<typeof getLibraryS
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/** @summary Get library statistics */
 export function useGetLibraryStats<TData = Awaited<ReturnType<typeof getLibraryStats>>, TError = ErrorType<ApiError>>(
  id: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getLibraryStats>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-/**
- * @summary Get library statistics
- */
-
+/** @summary Get library statistics */
 export function useGetLibraryStats<TData = Awaited<ReturnType<typeof getLibraryStats>>, TError = ErrorType<ApiError>>(
  id: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getLibraryStats>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
@@ -24804,25 +24045,11 @@ export const getPostLibraryValidatePathUrl = () => {
  */
 export const postLibraryValidatePath = async (postLibraryValidatePathBody: PostLibraryValidatePathBody, options?: Parameters<typeof customInstance>[1]): Promise<PostLibraryValidatePath200> => {
 
-    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
-    if (!h) return {};
-    if (h instanceof Headers) return Object.fromEntries(h.entries());
-    if (Symbol.iterator in h) {
-      return Object.fromEntries(
-        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
-      );
-    }
-    const headers: Record<string, string | readonly string[]> = {};
-    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
-      if (value !== undefined) headers[name] = value;
-    }
-    return headers;
-  };
-return customInstance<PostLibraryValidatePath200>(getPostLibraryValidatePathUrl(),
+  return customInstance<PostLibraryValidatePath200>(getPostLibraryValidatePathUrl(),
   {
     ...options,
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    headers: getHeaders({ 'Content-Type': 'application/json' }, options?.headers),
     body: JSON.stringify(postLibraryValidatePathBody)
   }
 );}
@@ -24866,6 +24093,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type PostLibraryValidatePathMutationVariables = {data: BodyType<PostLibraryValidatePathBody>}
 
     /**
+ * Checks whether a filesystem path exists and is readable. Use before creating a library. Requires the administrator role.
  * @summary Validate a library path (admin)
  */
 export const usePostLibraryValidatePath = <TError = ErrorType<ApiError>,
@@ -24941,6 +24169,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
 
     /**
+ * Dispatches an asynchronous scan job for every library. Skips libraries already scanning.
  * @summary Trigger scan for all libraries (admin)
  */
 export const usePostLibraryScanAll = <TError = ErrorType<ApiError>,
@@ -25009,6 +24238,7 @@ export type GetAdminLyricsCoverageQueryResult = NonNullable<Awaited<ReturnType<t
 export type GetAdminLyricsCoverageQueryError = ErrorType<ApiError>
 
 
+/** @summary Get lyrics coverage stats */
 export function useGetAdminLyricsCoverage<TData = Awaited<ReturnType<typeof getAdminLyricsCoverage>>, TError = ErrorType<ApiError>>(
   options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAdminLyricsCoverage>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
@@ -25019,6 +24249,7 @@ export function useGetAdminLyricsCoverage<TData = Awaited<ReturnType<typeof getA
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/** @summary Get lyrics coverage stats */
 export function useGetAdminLyricsCoverage<TData = Awaited<ReturnType<typeof getAdminLyricsCoverage>>, TError = ErrorType<ApiError>>(
   options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAdminLyricsCoverage>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
@@ -25029,14 +24260,12 @@ export function useGetAdminLyricsCoverage<TData = Awaited<ReturnType<typeof getA
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/** @summary Get lyrics coverage stats */
 export function useGetAdminLyricsCoverage<TData = Awaited<ReturnType<typeof getAdminLyricsCoverage>>, TError = ErrorType<ApiError>>(
   options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAdminLyricsCoverage>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-/**
- * @summary Get lyrics coverage stats
- */
-
+/** @summary Get lyrics coverage stats */
 export function useGetAdminLyricsCoverage<TData = Awaited<ReturnType<typeof getAdminLyricsCoverage>>, TError = ErrorType<ApiError>>(
   options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAdminLyricsCoverage>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
@@ -25068,25 +24297,11 @@ export const getPostAdminLyricsBulkFetchUrl = () => {
  */
 export const postAdminLyricsBulkFetch = async (postAdminLyricsBulkFetchBody?: PostAdminLyricsBulkFetchBody, options?: Parameters<typeof customInstance>[1]): Promise<PostAdminLyricsBulkFetch200> => {
 
-    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
-    if (!h) return {};
-    if (h instanceof Headers) return Object.fromEntries(h.entries());
-    if (Symbol.iterator in h) {
-      return Object.fromEntries(
-        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
-      );
-    }
-    const headers: Record<string, string | readonly string[]> = {};
-    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
-      if (value !== undefined) headers[name] = value;
-    }
-    return headers;
-  };
-return customInstance<PostAdminLyricsBulkFetch200>(getPostAdminLyricsBulkFetchUrl(),
+  return customInstance<PostAdminLyricsBulkFetch200>(getPostAdminLyricsBulkFetchUrl(),
   {
     ...options,
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    headers: getHeaders({ 'Content-Type': 'application/json' }, options?.headers),
     body: JSON.stringify(postAdminLyricsBulkFetchBody)
   }
 );}
@@ -25129,9 +24344,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type PostAdminLyricsBulkFetchMutationError = ErrorType<ApiError>
     export type PostAdminLyricsBulkFetchMutationVariables = {data?: BodyType<PostAdminLyricsBulkFetchBody>}
 
-    /**
- * @summary Queue a lyrics fetch for every song without lyrics (SUPER_ADMIN only)
- */
+    /** @summary Queue a lyrics fetch for every song without lyrics (SUPER_ADMIN only) */
 export const usePostAdminLyricsBulkFetch = <TError = ErrorType<ApiError>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postAdminLyricsBulkFetch>>, TError,PostAdminLyricsBulkFetchMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient): UseMutationResult<
@@ -25198,6 +24411,7 @@ export type GetAdminLyricsSyncStatusQueryResult = NonNullable<Awaited<ReturnType
 export type GetAdminLyricsSyncStatusQueryError = ErrorType<ApiError>
 
 
+/** @summary Get lyrics sync job status and the latest bulk fetch run */
 export function useGetAdminLyricsSyncStatus<TData = Awaited<ReturnType<typeof getAdminLyricsSyncStatus>>, TError = ErrorType<ApiError>>(
   options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAdminLyricsSyncStatus>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
@@ -25208,6 +24422,7 @@ export function useGetAdminLyricsSyncStatus<TData = Awaited<ReturnType<typeof ge
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/** @summary Get lyrics sync job status and the latest bulk fetch run */
 export function useGetAdminLyricsSyncStatus<TData = Awaited<ReturnType<typeof getAdminLyricsSyncStatus>>, TError = ErrorType<ApiError>>(
   options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAdminLyricsSyncStatus>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
@@ -25218,14 +24433,12 @@ export function useGetAdminLyricsSyncStatus<TData = Awaited<ReturnType<typeof ge
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/** @summary Get lyrics sync job status and the latest bulk fetch run */
 export function useGetAdminLyricsSyncStatus<TData = Awaited<ReturnType<typeof getAdminLyricsSyncStatus>>, TError = ErrorType<ApiError>>(
   options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAdminLyricsSyncStatus>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-/**
- * @summary Get lyrics sync job status and the latest bulk fetch run
- */
-
+/** @summary Get lyrics sync job status and the latest bulk fetch run */
 export function useGetAdminLyricsSyncStatus<TData = Awaited<ReturnType<typeof getAdminLyricsSyncStatus>>, TError = ErrorType<ApiError>>(
   options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAdminLyricsSyncStatus>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
@@ -25299,6 +24512,7 @@ export type GetLyricsSongLyricsQueryResult = NonNullable<Awaited<ReturnType<type
 export type GetLyricsSongLyricsQueryError = ErrorType<void | ApiError>
 
 
+/** @summary Get cached lyrics for a song */
 export function useGetLyricsSongLyrics<TData = Awaited<ReturnType<typeof getLyricsSongLyrics>>, TError = ErrorType<void | ApiError>>(
  publicId: string, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getLyricsSongLyrics>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
@@ -25309,6 +24523,7 @@ export function useGetLyricsSongLyrics<TData = Awaited<ReturnType<typeof getLyri
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/** @summary Get cached lyrics for a song */
 export function useGetLyricsSongLyrics<TData = Awaited<ReturnType<typeof getLyricsSongLyrics>>, TError = ErrorType<void | ApiError>>(
  publicId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getLyricsSongLyrics>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
@@ -25319,14 +24534,12 @@ export function useGetLyricsSongLyrics<TData = Awaited<ReturnType<typeof getLyri
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/** @summary Get cached lyrics for a song */
 export function useGetLyricsSongLyrics<TData = Awaited<ReturnType<typeof getLyricsSongLyrics>>, TError = ErrorType<void | ApiError>>(
  publicId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getLyricsSongLyrics>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-/**
- * @summary Get cached lyrics for a song
- */
-
+/** @summary Get cached lyrics for a song */
 export function useGetLyricsSongLyrics<TData = Awaited<ReturnType<typeof getLyricsSongLyrics>>, TError = ErrorType<void | ApiError>>(
  publicId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getLyricsSongLyrics>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
@@ -25409,6 +24622,9 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type PostLyricsSongLyricsFetchMutationVariables = {publicId: string}
 
     /**
+ * A song that has lyrics keeps them, and the response returns them without asking LRCLIB.
+ * A song without an artist or a positive length is not looked up, and that cause, like a
+ * request LRCLIB rejects, is a conflict whose `details.reason` names it.
  * @summary Fetch lyrics from LRCLIB for a song
  */
 export const usePostLyricsSongLyricsFetch = <TError = ErrorType<void | ApiError>,
@@ -25486,6 +24702,11 @@ export type GetLyricsSearchQueryResult = NonNullable<Awaited<ReturnType<typeof g
 export type GetLyricsSearchQueryError = ErrorType<void | ApiError>
 
 
+/**
+ * The route requires the administrator role, as fetch and apply do: the whole server
+ * sends LRCLIB one request every two seconds, and each search is one of them.
+ * @summary Search LRCLIB for lyrics
+ */
 export function useGetLyricsSearch<TData = Awaited<ReturnType<typeof getLyricsSearch>>, TError = ErrorType<void | ApiError>>(
  params: GetLyricsSearchParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getLyricsSearch>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
@@ -25496,6 +24717,11 @@ export function useGetLyricsSearch<TData = Awaited<ReturnType<typeof getLyricsSe
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * The route requires the administrator role, as fetch and apply do: the whole server
+ * sends LRCLIB one request every two seconds, and each search is one of them.
+ * @summary Search LRCLIB for lyrics
+ */
 export function useGetLyricsSearch<TData = Awaited<ReturnType<typeof getLyricsSearch>>, TError = ErrorType<void | ApiError>>(
  params: GetLyricsSearchParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getLyricsSearch>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
@@ -25506,14 +24732,20 @@ export function useGetLyricsSearch<TData = Awaited<ReturnType<typeof getLyricsSe
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * The route requires the administrator role, as fetch and apply do: the whole server
+ * sends LRCLIB one request every two seconds, and each search is one of them.
+ * @summary Search LRCLIB for lyrics
+ */
 export function useGetLyricsSearch<TData = Awaited<ReturnType<typeof getLyricsSearch>>, TError = ErrorType<void | ApiError>>(
  params: GetLyricsSearchParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getLyricsSearch>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 /**
+ * The route requires the administrator role, as fetch and apply do: the whole server
+ * sends LRCLIB one request every two seconds, and each search is one of them.
  * @summary Search LRCLIB for lyrics
  */
-
 export function useGetLyricsSearch<TData = Awaited<ReturnType<typeof getLyricsSearch>>, TError = ErrorType<void | ApiError>>(
  params: GetLyricsSearchParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getLyricsSearch>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
@@ -25546,25 +24778,11 @@ export const getPostLyricsApplyUrl = (resultId: number,) => {
 export const postLyricsApply = async (resultId: number,
     applyLyricsRequest: ApplyLyricsRequest, options?: Parameters<typeof customInstance>[1]): Promise<PostLyricsApply200> => {
 
-    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
-    if (!h) return {};
-    if (h instanceof Headers) return Object.fromEntries(h.entries());
-    if (Symbol.iterator in h) {
-      return Object.fromEntries(
-        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
-      );
-    }
-    const headers: Record<string, string | readonly string[]> = {};
-    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
-      if (value !== undefined) headers[name] = value;
-    }
-    return headers;
-  };
-return customInstance<PostLyricsApply200>(getPostLyricsApplyUrl(resultId),
+  return customInstance<PostLyricsApply200>(getPostLyricsApplyUrl(resultId),
   {
     ...options,
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    headers: getHeaders({ 'Content-Type': 'application/json' }, options?.headers),
     body: JSON.stringify(applyLyricsRequest)
   }
 );}
@@ -25607,9 +24825,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type PostLyricsApplyMutationError = ErrorType<void | ApiError>
     export type PostLyricsApplyMutationVariables = {resultId: number;data: BodyType<ApplyLyricsRequest>}
 
-    /**
- * @summary Apply an LRCLIB search result to a song
- */
+    /** @summary Apply an LRCLIB search result to a song */
 export const usePostLyricsApply = <TError = ErrorType<void | ApiError>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postLyricsApply>>, TError,PostLyricsApplyMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient): UseMutationResult<
@@ -25634,25 +24850,11 @@ export const getPostStreamDeliveryUrl = () => {
  */
 export const postStreamDelivery = async (deliveryRequest: DeliveryRequest, options?: Parameters<typeof customInstance>[1]): Promise<DeliveryResource> => {
 
-    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
-    if (!h) return {};
-    if (h instanceof Headers) return Object.fromEntries(h.entries());
-    if (Symbol.iterator in h) {
-      return Object.fromEntries(
-        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
-      );
-    }
-    const headers: Record<string, string | readonly string[]> = {};
-    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
-      if (value !== undefined) headers[name] = value;
-    }
-    return headers;
-  };
-return customInstance<DeliveryResource>(getPostStreamDeliveryUrl(),
+  return customInstance<DeliveryResource>(getPostStreamDeliveryUrl(),
   {
     ...options,
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    headers: getHeaders({ 'Content-Type': 'application/json' }, options?.headers),
     body: JSON.stringify(deliveryRequest)
   }
 );}
@@ -25695,9 +24897,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type PostStreamDeliveryMutationError = ErrorType<void>
     export type PostStreamDeliveryMutationVariables = {data: BodyType<DeliveryRequest>}
 
-    /**
- * @summary Choose compatible delivery for the destination before loading media
- */
+    /** @summary Choose compatible delivery for the destination before loading media */
 export const usePostStreamDelivery = <TError = ErrorType<void>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postStreamDelivery>>, TError,PostStreamDeliveryMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient): UseMutationResult<
@@ -25764,6 +24964,7 @@ export type GetImageShowQueryResult = NonNullable<Awaited<ReturnType<typeof getI
 export type GetImageShowQueryError = ErrorType<ApiError>
 
 
+/** @summary Get image metadata by public ID */
 export function useGetImageShow<TData = Awaited<ReturnType<typeof getImageShow>>, TError = ErrorType<ApiError>>(
  publicId: string, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getImageShow>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
@@ -25774,6 +24975,7 @@ export function useGetImageShow<TData = Awaited<ReturnType<typeof getImageShow>>
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/** @summary Get image metadata by public ID */
 export function useGetImageShow<TData = Awaited<ReturnType<typeof getImageShow>>, TError = ErrorType<ApiError>>(
  publicId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getImageShow>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
@@ -25784,14 +24986,12 @@ export function useGetImageShow<TData = Awaited<ReturnType<typeof getImageShow>>
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/** @summary Get image metadata by public ID */
 export function useGetImageShow<TData = Awaited<ReturnType<typeof getImageShow>>, TError = ErrorType<ApiError>>(
  publicId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getImageShow>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-/**
- * @summary Get image metadata by public ID
- */
-
+/** @summary Get image metadata by public ID */
 export function useGetImageShow<TData = Awaited<ReturnType<typeof getImageShow>>, TError = ErrorType<ApiError>>(
  publicId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getImageShow>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
@@ -25876,6 +25076,7 @@ export type GetImageFileQueryResult = NonNullable<Awaited<ReturnType<typeof getI
 export type GetImageFileQueryError = ErrorType<ApiError>
 
 
+/** @summary Serve the image file binary data */
 export function useGetImageFile<TData = Awaited<ReturnType<typeof getImageFile>>, TError = ErrorType<ApiError>>(
  publicId: string,
     params: undefined |  GetImageFileParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getImageFile>>, TError, TData>> & Pick<
@@ -25887,6 +25088,7 @@ export function useGetImageFile<TData = Awaited<ReturnType<typeof getImageFile>>
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/** @summary Serve the image file binary data */
 export function useGetImageFile<TData = Awaited<ReturnType<typeof getImageFile>>, TError = ErrorType<ApiError>>(
  publicId: string,
     params?: GetImageFileParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getImageFile>>, TError, TData>> & Pick<
@@ -25898,15 +25100,13 @@ export function useGetImageFile<TData = Awaited<ReturnType<typeof getImageFile>>
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/** @summary Serve the image file binary data */
 export function useGetImageFile<TData = Awaited<ReturnType<typeof getImageFile>>, TError = ErrorType<ApiError>>(
  publicId: string,
     params?: GetImageFileParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getImageFile>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-/**
- * @summary Serve the image file binary data
- */
-
+/** @summary Serve the image file binary data */
 export function useGetImageFile<TData = Awaited<ReturnType<typeof getImageFile>>, TError = ErrorType<ApiError>>(
  publicId: string,
     params?: GetImageFileParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getImageFile>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
@@ -25981,6 +25181,7 @@ export type GetImageBlurhashQueryResult = NonNullable<Awaited<ReturnType<typeof 
 export type GetImageBlurhashQueryError = ErrorType<ApiError>
 
 
+/** @summary Get the blurhash representation of an image */
 export function useGetImageBlurhash<TData = Awaited<ReturnType<typeof getImageBlurhash>>, TError = ErrorType<ApiError>>(
  publicId: string, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getImageBlurhash>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
@@ -25991,6 +25192,7 @@ export function useGetImageBlurhash<TData = Awaited<ReturnType<typeof getImageBl
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/** @summary Get the blurhash representation of an image */
 export function useGetImageBlurhash<TData = Awaited<ReturnType<typeof getImageBlurhash>>, TError = ErrorType<ApiError>>(
  publicId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getImageBlurhash>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
@@ -26001,14 +25203,12 @@ export function useGetImageBlurhash<TData = Awaited<ReturnType<typeof getImageBl
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/** @summary Get the blurhash representation of an image */
 export function useGetImageBlurhash<TData = Awaited<ReturnType<typeof getImageBlurhash>>, TError = ErrorType<ApiError>>(
  publicId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getImageBlurhash>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-/**
- * @summary Get the blurhash representation of an image
- */
-
+/** @summary Get the blurhash representation of an image */
 export function useGetImageBlurhash<TData = Awaited<ReturnType<typeof getImageBlurhash>>, TError = ErrorType<ApiError>>(
  publicId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getImageBlurhash>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
@@ -26082,6 +25282,7 @@ export type GetAdminMediaStorageStatsQueryResult = NonNullable<Awaited<ReturnTyp
 export type GetAdminMediaStorageStatsQueryError = ErrorType<ApiError>
 
 
+/** @summary Get image storage statistics */
 export function useGetAdminMediaStorageStats<TData = Awaited<ReturnType<typeof getAdminMediaStorageStats>>, TError = ErrorType<ApiError>>(
   options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAdminMediaStorageStats>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
@@ -26092,6 +25293,7 @@ export function useGetAdminMediaStorageStats<TData = Awaited<ReturnType<typeof g
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/** @summary Get image storage statistics */
 export function useGetAdminMediaStorageStats<TData = Awaited<ReturnType<typeof getAdminMediaStorageStats>>, TError = ErrorType<ApiError>>(
   options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAdminMediaStorageStats>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
@@ -26102,14 +25304,12 @@ export function useGetAdminMediaStorageStats<TData = Awaited<ReturnType<typeof g
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/** @summary Get image storage statistics */
 export function useGetAdminMediaStorageStats<TData = Awaited<ReturnType<typeof getAdminMediaStorageStats>>, TError = ErrorType<ApiError>>(
   options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAdminMediaStorageStats>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-/**
- * @summary Get image storage statistics
- */
-
+/** @summary Get image storage statistics */
 export function useGetAdminMediaStorageStats<TData = Awaited<ReturnType<typeof getAdminMediaStorageStats>>, TError = ErrorType<ApiError>>(
   options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAdminMediaStorageStats>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
@@ -26188,9 +25388,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type PostAdminMediaPruneMissingMutationError = ErrorType<ApiError>
 
 
-    /**
- * @summary Dispatch async job to prune image records whose files no longer exist on disk
- */
+    /** @summary Dispatch async job to prune image records whose files no longer exist on disk */
 export const usePostAdminMediaPruneMissing = <TError = ErrorType<ApiError>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postAdminMediaPruneMissing>>, TError,void, TContext>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient): UseMutationResult<
@@ -26257,6 +25455,7 @@ export type GetAdminMediaMissingCheckQueryResult = NonNullable<Awaited<ReturnTyp
 export type GetAdminMediaMissingCheckQueryError = ErrorType<ApiError>
 
 
+/** @summary Check how many images have missing files (dry-run) */
 export function useGetAdminMediaMissingCheck<TData = Awaited<ReturnType<typeof getAdminMediaMissingCheck>>, TError = ErrorType<ApiError>>(
   options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAdminMediaMissingCheck>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
@@ -26267,6 +25466,7 @@ export function useGetAdminMediaMissingCheck<TData = Awaited<ReturnType<typeof g
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/** @summary Check how many images have missing files (dry-run) */
 export function useGetAdminMediaMissingCheck<TData = Awaited<ReturnType<typeof getAdminMediaMissingCheck>>, TError = ErrorType<ApiError>>(
   options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAdminMediaMissingCheck>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
@@ -26277,14 +25477,12 @@ export function useGetAdminMediaMissingCheck<TData = Awaited<ReturnType<typeof g
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/** @summary Check how many images have missing files (dry-run) */
 export function useGetAdminMediaMissingCheck<TData = Awaited<ReturnType<typeof getAdminMediaMissingCheck>>, TError = ErrorType<ApiError>>(
   options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAdminMediaMissingCheck>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-/**
- * @summary Check how many images have missing files (dry-run)
- */
-
+/** @summary Check how many images have missing files (dry-run) */
 export function useGetAdminMediaMissingCheck<TData = Awaited<ReturnType<typeof getAdminMediaMissingCheck>>, TError = ErrorType<ApiError>>(
   options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAdminMediaMissingCheck>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
@@ -26365,6 +25563,7 @@ export type GetStreamOriginalVideoQueryResult = NonNullable<Awaited<ReturnType<t
 export type GetStreamOriginalVideoQueryError = ErrorType<ApiError>
 
 
+/** @summary Deliver an authorized original video with byte ranges */
 export function useGetStreamOriginalVideo<TData = Awaited<ReturnType<typeof getStreamOriginalVideo>>, TError = ErrorType<ApiError>>(
  params: GetStreamOriginalVideoParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getStreamOriginalVideo>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
@@ -26375,6 +25574,7 @@ export function useGetStreamOriginalVideo<TData = Awaited<ReturnType<typeof getS
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/** @summary Deliver an authorized original video with byte ranges */
 export function useGetStreamOriginalVideo<TData = Awaited<ReturnType<typeof getStreamOriginalVideo>>, TError = ErrorType<ApiError>>(
  params: GetStreamOriginalVideoParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getStreamOriginalVideo>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
@@ -26385,14 +25585,12 @@ export function useGetStreamOriginalVideo<TData = Awaited<ReturnType<typeof getS
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/** @summary Deliver an authorized original video with byte ranges */
 export function useGetStreamOriginalVideo<TData = Awaited<ReturnType<typeof getStreamOriginalVideo>>, TError = ErrorType<ApiError>>(
  params: GetStreamOriginalVideoParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getStreamOriginalVideo>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-/**
- * @summary Deliver an authorized original video with byte ranges
- */
-
+/** @summary Deliver an authorized original video with byte ranges */
 export function useGetStreamOriginalVideo<TData = Awaited<ReturnType<typeof getStreamOriginalVideo>>, TError = ErrorType<ApiError>>(
  params: GetStreamOriginalVideoParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getStreamOriginalVideo>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
@@ -26478,9 +25676,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type HeadStreamOriginalVideoMutationError = ErrorType<ApiError>
     export type HeadStreamOriginalVideoMutationVariables = {params: HeadStreamOriginalVideoParams}
 
-    /**
- * @summary Return the original video response headers without a body
- */
+    /** @summary Return the original video response headers without a body */
 export const useHeadStreamOriginalVideo = <TError = ErrorType<ApiError>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof headStreamOriginalVideo>>, TError,HeadStreamOriginalVideoMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient): UseMutationResult<
@@ -26554,6 +25750,7 @@ export type GetStreamOriginalTrackQueryResult = NonNullable<Awaited<ReturnType<t
 export type GetStreamOriginalTrackQueryError = ErrorType<ApiError>
 
 
+/** @summary Deliver authorized track audio with byte ranges */
 export function useGetStreamOriginalTrack<TData = Awaited<ReturnType<typeof getStreamOriginalTrack>>, TError = ErrorType<ApiError>>(
  params: GetStreamOriginalTrackParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getStreamOriginalTrack>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
@@ -26564,6 +25761,7 @@ export function useGetStreamOriginalTrack<TData = Awaited<ReturnType<typeof getS
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/** @summary Deliver authorized track audio with byte ranges */
 export function useGetStreamOriginalTrack<TData = Awaited<ReturnType<typeof getStreamOriginalTrack>>, TError = ErrorType<ApiError>>(
  params: GetStreamOriginalTrackParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getStreamOriginalTrack>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
@@ -26574,14 +25772,12 @@ export function useGetStreamOriginalTrack<TData = Awaited<ReturnType<typeof getS
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/** @summary Deliver authorized track audio with byte ranges */
 export function useGetStreamOriginalTrack<TData = Awaited<ReturnType<typeof getStreamOriginalTrack>>, TError = ErrorType<ApiError>>(
  params: GetStreamOriginalTrackParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getStreamOriginalTrack>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-/**
- * @summary Deliver authorized track audio with byte ranges
- */
-
+/** @summary Deliver authorized track audio with byte ranges */
 export function useGetStreamOriginalTrack<TData = Awaited<ReturnType<typeof getStreamOriginalTrack>>, TError = ErrorType<ApiError>>(
  params: GetStreamOriginalTrackParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getStreamOriginalTrack>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
@@ -26667,9 +25863,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type HeadStreamOriginalTrackMutationError = ErrorType<ApiError>
     export type HeadStreamOriginalTrackMutationVariables = {params: HeadStreamOriginalTrackParams}
 
-    /**
- * @summary Return the track audio response headers without a body
- */
+    /** @summary Return the track audio response headers without a body */
 export const useHeadStreamOriginalTrack = <TError = ErrorType<ApiError>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof headStreamOriginalTrack>>, TError,HeadStreamOriginalTrackMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient): UseMutationResult<
@@ -26746,6 +25940,12 @@ export type GetStreamTrackQueryResult = NonNullable<Awaited<ReturnType<typeof ge
 export type GetStreamTrackQueryError = ErrorType<ApiError | void>
 
 
+/**
+ * With `format` (and optionally `bitrate`) the track is transcoded. A cached
+ * rendition streams with Range support; otherwise the response streams the
+ * encode while it runs, without byte ranges.
+ * @summary Stream a track by PublicId with HTTP Range support
+ */
 export function useGetStreamTrack<TData = Awaited<ReturnType<typeof getStreamTrack>>, TError = ErrorType<ApiError | void>>(
  params: GetStreamTrackParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getStreamTrack>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
@@ -26756,6 +25956,12 @@ export function useGetStreamTrack<TData = Awaited<ReturnType<typeof getStreamTra
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * With `format` (and optionally `bitrate`) the track is transcoded. A cached
+ * rendition streams with Range support; otherwise the response streams the
+ * encode while it runs, without byte ranges.
+ * @summary Stream a track by PublicId with HTTP Range support
+ */
 export function useGetStreamTrack<TData = Awaited<ReturnType<typeof getStreamTrack>>, TError = ErrorType<ApiError | void>>(
  params: GetStreamTrackParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getStreamTrack>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
@@ -26766,14 +25972,22 @@ export function useGetStreamTrack<TData = Awaited<ReturnType<typeof getStreamTra
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * With `format` (and optionally `bitrate`) the track is transcoded. A cached
+ * rendition streams with Range support; otherwise the response streams the
+ * encode while it runs, without byte ranges.
+ * @summary Stream a track by PublicId with HTTP Range support
+ */
 export function useGetStreamTrack<TData = Awaited<ReturnType<typeof getStreamTrack>>, TError = ErrorType<ApiError | void>>(
  params: GetStreamTrackParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getStreamTrack>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 /**
+ * With `format` (and optionally `bitrate`) the track is transcoded. A cached
+ * rendition streams with Range support; otherwise the response streams the
+ * encode while it runs, without byte ranges.
  * @summary Stream a track by PublicId with HTTP Range support
  */
-
 export function useGetStreamTrack<TData = Awaited<ReturnType<typeof getStreamTrack>>, TError = ErrorType<ApiError | void>>(
  params: GetStreamTrackParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getStreamTrack>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
@@ -26847,6 +26061,7 @@ export type GetAdminMetadataSyncStatusQueryResult = NonNullable<Awaited<ReturnTy
 export type GetAdminMetadataSyncStatusQueryError = ErrorType<ApiError>
 
 
+/** @summary Get metadata sync status */
 export function useGetAdminMetadataSyncStatus<TData = Awaited<ReturnType<typeof getAdminMetadataSyncStatus>>, TError = ErrorType<ApiError>>(
   options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAdminMetadataSyncStatus>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
@@ -26857,6 +26072,7 @@ export function useGetAdminMetadataSyncStatus<TData = Awaited<ReturnType<typeof 
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/** @summary Get metadata sync status */
 export function useGetAdminMetadataSyncStatus<TData = Awaited<ReturnType<typeof getAdminMetadataSyncStatus>>, TError = ErrorType<ApiError>>(
   options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAdminMetadataSyncStatus>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
@@ -26867,14 +26083,12 @@ export function useGetAdminMetadataSyncStatus<TData = Awaited<ReturnType<typeof 
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/** @summary Get metadata sync status */
 export function useGetAdminMetadataSyncStatus<TData = Awaited<ReturnType<typeof getAdminMetadataSyncStatus>>, TError = ErrorType<ApiError>>(
   options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAdminMetadataSyncStatus>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-/**
- * @summary Get metadata sync status
- */
-
+/** @summary Get metadata sync status */
 export function useGetAdminMetadataSyncStatus<TData = Awaited<ReturnType<typeof getAdminMetadataSyncStatus>>, TError = ErrorType<ApiError>>(
   options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAdminMetadataSyncStatus>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
@@ -26906,25 +26120,11 @@ export const getPostAdminMetadataTriggerSyncUrl = () => {
  */
 export const postAdminMetadataTriggerSync = async (postAdminMetadataTriggerSyncBody?: PostAdminMetadataTriggerSyncBody, options?: Parameters<typeof customInstance>[1]): Promise<PostAdminMetadataTriggerSync200> => {
 
-    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
-    if (!h) return {};
-    if (h instanceof Headers) return Object.fromEntries(h.entries());
-    if (Symbol.iterator in h) {
-      return Object.fromEntries(
-        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
-      );
-    }
-    const headers: Record<string, string | readonly string[]> = {};
-    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
-      if (value !== undefined) headers[name] = value;
-    }
-    return headers;
-  };
-return customInstance<PostAdminMetadataTriggerSync200>(getPostAdminMetadataTriggerSyncUrl(),
+  return customInstance<PostAdminMetadataTriggerSync200>(getPostAdminMetadataTriggerSyncUrl(),
   {
     ...options,
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    headers: getHeaders({ 'Content-Type': 'application/json' }, options?.headers),
     body: JSON.stringify(postAdminMetadataTriggerSyncBody)
   }
 );}
@@ -26967,9 +26167,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type PostAdminMetadataTriggerSyncMutationError = ErrorType<ApiError>
     export type PostAdminMetadataTriggerSyncMutationVariables = {data?: BodyType<PostAdminMetadataTriggerSyncBody>}
 
-    /**
- * @summary Trigger metadata sync
- */
+    /** @summary Trigger metadata sync */
 export const usePostAdminMetadataTriggerSync = <TError = ErrorType<ApiError>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postAdminMetadataTriggerSync>>, TError,PostAdminMetadataTriggerSyncMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient): UseMutationResult<
@@ -27036,6 +26234,7 @@ export type GetAdminMetadataProvidersQueryResult = NonNullable<Awaited<ReturnTyp
 export type GetAdminMetadataProvidersQueryError = ErrorType<ApiError>
 
 
+/** @summary List metadata providers with configuration status */
 export function useGetAdminMetadataProviders<TData = Awaited<ReturnType<typeof getAdminMetadataProviders>>, TError = ErrorType<ApiError>>(
   options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAdminMetadataProviders>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
@@ -27046,6 +26245,7 @@ export function useGetAdminMetadataProviders<TData = Awaited<ReturnType<typeof g
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/** @summary List metadata providers with configuration status */
 export function useGetAdminMetadataProviders<TData = Awaited<ReturnType<typeof getAdminMetadataProviders>>, TError = ErrorType<ApiError>>(
   options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAdminMetadataProviders>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
@@ -27056,14 +26256,12 @@ export function useGetAdminMetadataProviders<TData = Awaited<ReturnType<typeof g
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/** @summary List metadata providers with configuration status */
 export function useGetAdminMetadataProviders<TData = Awaited<ReturnType<typeof getAdminMetadataProviders>>, TError = ErrorType<ApiError>>(
   options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAdminMetadataProviders>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-/**
- * @summary List metadata providers with configuration status
- */
-
+/** @summary List metadata providers with configuration status */
 export function useGetAdminMetadataProviders<TData = Awaited<ReturnType<typeof getAdminMetadataProviders>>, TError = ErrorType<ApiError>>(
   options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAdminMetadataProviders>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
@@ -27137,6 +26335,7 @@ export type GetMetadataBrowseArtistQueryResult = NonNullable<Awaited<ReturnType<
 export type GetMetadataBrowseArtistQueryError = ErrorType<ApiError>
 
 
+/** @summary Browse artist details from MusicBrainz, enriched with Last.fm data */
 export function useGetMetadataBrowseArtist<TData = Awaited<ReturnType<typeof getMetadataBrowseArtist>>, TError = ErrorType<ApiError>>(
  mbid: string, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getMetadataBrowseArtist>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
@@ -27147,6 +26346,7 @@ export function useGetMetadataBrowseArtist<TData = Awaited<ReturnType<typeof get
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/** @summary Browse artist details from MusicBrainz, enriched with Last.fm data */
 export function useGetMetadataBrowseArtist<TData = Awaited<ReturnType<typeof getMetadataBrowseArtist>>, TError = ErrorType<ApiError>>(
  mbid: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getMetadataBrowseArtist>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
@@ -27157,14 +26357,12 @@ export function useGetMetadataBrowseArtist<TData = Awaited<ReturnType<typeof get
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/** @summary Browse artist details from MusicBrainz, enriched with Last.fm data */
 export function useGetMetadataBrowseArtist<TData = Awaited<ReturnType<typeof getMetadataBrowseArtist>>, TError = ErrorType<ApiError>>(
  mbid: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getMetadataBrowseArtist>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-/**
- * @summary Browse artist details from MusicBrainz, enriched with Last.fm data
- */
-
+/** @summary Browse artist details from MusicBrainz, enriched with Last.fm data */
 export function useGetMetadataBrowseArtist<TData = Awaited<ReturnType<typeof getMetadataBrowseArtist>>, TError = ErrorType<ApiError>>(
  mbid: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getMetadataBrowseArtist>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
@@ -27238,6 +26436,7 @@ export type GetMetadataBrowseReleaseGroupQueryResult = NonNullable<Awaited<Retur
 export type GetMetadataBrowseReleaseGroupQueryError = ErrorType<ApiError>
 
 
+/** @summary Browse release group details from MusicBrainz */
 export function useGetMetadataBrowseReleaseGroup<TData = Awaited<ReturnType<typeof getMetadataBrowseReleaseGroup>>, TError = ErrorType<ApiError>>(
  mbid: string, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getMetadataBrowseReleaseGroup>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
@@ -27248,6 +26447,7 @@ export function useGetMetadataBrowseReleaseGroup<TData = Awaited<ReturnType<type
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/** @summary Browse release group details from MusicBrainz */
 export function useGetMetadataBrowseReleaseGroup<TData = Awaited<ReturnType<typeof getMetadataBrowseReleaseGroup>>, TError = ErrorType<ApiError>>(
  mbid: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getMetadataBrowseReleaseGroup>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
@@ -27258,14 +26458,12 @@ export function useGetMetadataBrowseReleaseGroup<TData = Awaited<ReturnType<type
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/** @summary Browse release group details from MusicBrainz */
 export function useGetMetadataBrowseReleaseGroup<TData = Awaited<ReturnType<typeof getMetadataBrowseReleaseGroup>>, TError = ErrorType<ApiError>>(
  mbid: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getMetadataBrowseReleaseGroup>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-/**
- * @summary Browse release group details from MusicBrainz
- */
-
+/** @summary Browse release group details from MusicBrainz */
 export function useGetMetadataBrowseReleaseGroup<TData = Awaited<ReturnType<typeof getMetadataBrowseReleaseGroup>>, TError = ErrorType<ApiError>>(
  mbid: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getMetadataBrowseReleaseGroup>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
@@ -27346,6 +26544,7 @@ export type GetMetadataSearchArtistQueryResult = NonNullable<Awaited<ReturnType<
 export type GetMetadataSearchArtistQueryError = ErrorType<ApiError>
 
 
+/** @summary Search for artists across external sources */
 export function useGetMetadataSearchArtist<TData = Awaited<ReturnType<typeof getMetadataSearchArtist>>, TError = ErrorType<ApiError>>(
  params: GetMetadataSearchArtistParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getMetadataSearchArtist>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
@@ -27356,6 +26555,7 @@ export function useGetMetadataSearchArtist<TData = Awaited<ReturnType<typeof get
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/** @summary Search for artists across external sources */
 export function useGetMetadataSearchArtist<TData = Awaited<ReturnType<typeof getMetadataSearchArtist>>, TError = ErrorType<ApiError>>(
  params: GetMetadataSearchArtistParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getMetadataSearchArtist>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
@@ -27366,14 +26566,12 @@ export function useGetMetadataSearchArtist<TData = Awaited<ReturnType<typeof get
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/** @summary Search for artists across external sources */
 export function useGetMetadataSearchArtist<TData = Awaited<ReturnType<typeof getMetadataSearchArtist>>, TError = ErrorType<ApiError>>(
  params: GetMetadataSearchArtistParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getMetadataSearchArtist>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-/**
- * @summary Search for artists across external sources
- */
-
+/** @summary Search for artists across external sources */
 export function useGetMetadataSearchArtist<TData = Awaited<ReturnType<typeof getMetadataSearchArtist>>, TError = ErrorType<ApiError>>(
  params: GetMetadataSearchArtistParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getMetadataSearchArtist>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
@@ -27454,6 +26652,7 @@ export type GetMetadataSearchAlbumQueryResult = NonNullable<Awaited<ReturnType<t
 export type GetMetadataSearchAlbumQueryError = ErrorType<ApiError>
 
 
+/** @summary Search for albums/release groups across external sources */
 export function useGetMetadataSearchAlbum<TData = Awaited<ReturnType<typeof getMetadataSearchAlbum>>, TError = ErrorType<ApiError>>(
  params: GetMetadataSearchAlbumParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getMetadataSearchAlbum>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
@@ -27464,6 +26663,7 @@ export function useGetMetadataSearchAlbum<TData = Awaited<ReturnType<typeof getM
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/** @summary Search for albums/release groups across external sources */
 export function useGetMetadataSearchAlbum<TData = Awaited<ReturnType<typeof getMetadataSearchAlbum>>, TError = ErrorType<ApiError>>(
  params: GetMetadataSearchAlbumParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getMetadataSearchAlbum>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
@@ -27474,14 +26674,12 @@ export function useGetMetadataSearchAlbum<TData = Awaited<ReturnType<typeof getM
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/** @summary Search for albums/release groups across external sources */
 export function useGetMetadataSearchAlbum<TData = Awaited<ReturnType<typeof getMetadataSearchAlbum>>, TError = ErrorType<ApiError>>(
  params: GetMetadataSearchAlbumParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getMetadataSearchAlbum>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-/**
- * @summary Search for albums/release groups across external sources
- */
-
+/** @summary Search for albums/release groups across external sources */
 export function useGetMetadataSearchAlbum<TData = Awaited<ReturnType<typeof getMetadataSearchAlbum>>, TError = ErrorType<ApiError>>(
  params: GetMetadataSearchAlbumParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getMetadataSearchAlbum>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
@@ -27562,6 +26760,7 @@ export type GetMetadataSearchSongQueryResult = NonNullable<Awaited<ReturnType<ty
 export type GetMetadataSearchSongQueryError = ErrorType<ApiError>
 
 
+/** @summary Search for songs/recordings across external sources */
 export function useGetMetadataSearchSong<TData = Awaited<ReturnType<typeof getMetadataSearchSong>>, TError = ErrorType<ApiError>>(
  params: GetMetadataSearchSongParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getMetadataSearchSong>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
@@ -27572,6 +26771,7 @@ export function useGetMetadataSearchSong<TData = Awaited<ReturnType<typeof getMe
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/** @summary Search for songs/recordings across external sources */
 export function useGetMetadataSearchSong<TData = Awaited<ReturnType<typeof getMetadataSearchSong>>, TError = ErrorType<ApiError>>(
  params: GetMetadataSearchSongParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getMetadataSearchSong>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
@@ -27582,14 +26782,12 @@ export function useGetMetadataSearchSong<TData = Awaited<ReturnType<typeof getMe
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/** @summary Search for songs/recordings across external sources */
 export function useGetMetadataSearchSong<TData = Awaited<ReturnType<typeof getMetadataSearchSong>>, TError = ErrorType<ApiError>>(
  params: GetMetadataSearchSongParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getMetadataSearchSong>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-/**
- * @summary Search for songs/recordings across external sources
- */
-
+/** @summary Search for songs/recordings across external sources */
 export function useGetMetadataSearchSong<TData = Awaited<ReturnType<typeof getMetadataSearchSong>>, TError = ErrorType<ApiError>>(
  params: GetMetadataSearchSongParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getMetadataSearchSong>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
@@ -27621,25 +26819,11 @@ export const getPostMetadataExtractUrl = () => {
  */
 export const postMetadataExtract = async (postMetadataExtractBody: PostMetadataExtractBody, options?: Parameters<typeof customInstance>[1]): Promise<PostMetadataExtract200> => {
 
-    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
-    if (!h) return {};
-    if (h instanceof Headers) return Object.fromEntries(h.entries());
-    if (Symbol.iterator in h) {
-      return Object.fromEntries(
-        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
-      );
-    }
-    const headers: Record<string, string | readonly string[]> = {};
-    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
-      if (value !== undefined) headers[name] = value;
-    }
-    return headers;
-  };
-return customInstance<PostMetadataExtract200>(getPostMetadataExtractUrl(),
+  return customInstance<PostMetadataExtract200>(getPostMetadataExtractUrl(),
   {
     ...options,
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    headers: getHeaders({ 'Content-Type': 'application/json' }, options?.headers),
     body: JSON.stringify(postMetadataExtractBody)
   }
 );}
@@ -27682,9 +26866,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type PostMetadataExtractMutationError = ErrorType<void | ValidationError>
     export type PostMetadataExtractMutationVariables = {data: BodyType<PostMetadataExtractBody>}
 
-    /**
- * @summary Extract embedded metadata from a local media file
- */
+    /** @summary Extract embedded metadata from a local media file */
 export const usePostMetadataExtract = <TError = ErrorType<void | ValidationError>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postMetadataExtract>>, TError,PostMetadataExtractMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient): UseMutationResult<
@@ -27709,25 +26891,11 @@ export const getPostMetadataMatchUrl = () => {
  */
 export const postMetadataMatch = async (postMetadataMatchBody: PostMetadataMatchBody, options?: Parameters<typeof customInstance>[1]): Promise<PostMetadataMatch200> => {
 
-    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
-    if (!h) return {};
-    if (h instanceof Headers) return Object.fromEntries(h.entries());
-    if (Symbol.iterator in h) {
-      return Object.fromEntries(
-        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
-      );
-    }
-    const headers: Record<string, string | readonly string[]> = {};
-    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
-      if (value !== undefined) headers[name] = value;
-    }
-    return headers;
-  };
-return customInstance<PostMetadataMatch200>(getPostMetadataMatchUrl(),
+  return customInstance<PostMetadataMatch200>(getPostMetadataMatchUrl(),
   {
     ...options,
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    headers: getHeaders({ 'Content-Type': 'application/json' }, options?.headers),
     body: JSON.stringify(postMetadataMatchBody)
   }
 );}
@@ -27770,9 +26938,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type PostMetadataMatchMutationError = ErrorType<void | ValidationError>
     export type PostMetadataMatchMutationVariables = {data: BodyType<PostMetadataMatchBody>}
 
-    /**
- * @summary Match extracted metadata against candidate sources
- */
+    /** @summary Match extracted metadata against candidate sources */
 export const usePostMetadataMatch = <TError = ErrorType<void | ValidationError>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postMetadataMatch>>, TError,PostMetadataMatchMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient): UseMutationResult<
@@ -27846,6 +27012,7 @@ export type GetNotificationIndexQueryResult = NonNullable<Awaited<ReturnType<typ
 export type GetNotificationIndexQueryError = ErrorType<ApiError>
 
 
+/** @summary List notifications */
 export function useGetNotificationIndex<TData = Awaited<ReturnType<typeof getNotificationIndex>>, TError = ErrorType<ApiError>>(
  params: undefined |  GetNotificationIndexParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getNotificationIndex>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
@@ -27856,6 +27023,7 @@ export function useGetNotificationIndex<TData = Awaited<ReturnType<typeof getNot
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/** @summary List notifications */
 export function useGetNotificationIndex<TData = Awaited<ReturnType<typeof getNotificationIndex>>, TError = ErrorType<ApiError>>(
  params?: GetNotificationIndexParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getNotificationIndex>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
@@ -27866,14 +27034,12 @@ export function useGetNotificationIndex<TData = Awaited<ReturnType<typeof getNot
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/** @summary List notifications */
 export function useGetNotificationIndex<TData = Awaited<ReturnType<typeof getNotificationIndex>>, TError = ErrorType<ApiError>>(
  params?: GetNotificationIndexParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getNotificationIndex>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-/**
- * @summary List notifications
- */
-
+/** @summary List notifications */
 export function useGetNotificationIndex<TData = Awaited<ReturnType<typeof getNotificationIndex>>, TError = ErrorType<ApiError>>(
  params?: GetNotificationIndexParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getNotificationIndex>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
@@ -27947,6 +27113,7 @@ export type GetNotificationUnreadCountQueryResult = NonNullable<Awaited<ReturnTy
 export type GetNotificationUnreadCountQueryError = ErrorType<unknown>
 
 
+/** @summary Get unread notification count */
 export function useGetNotificationUnreadCount<TData = Awaited<ReturnType<typeof getNotificationUnreadCount>>, TError = ErrorType<unknown>>(
   options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getNotificationUnreadCount>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
@@ -27957,6 +27124,7 @@ export function useGetNotificationUnreadCount<TData = Awaited<ReturnType<typeof 
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/** @summary Get unread notification count */
 export function useGetNotificationUnreadCount<TData = Awaited<ReturnType<typeof getNotificationUnreadCount>>, TError = ErrorType<unknown>>(
   options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getNotificationUnreadCount>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
@@ -27967,14 +27135,12 @@ export function useGetNotificationUnreadCount<TData = Awaited<ReturnType<typeof 
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/** @summary Get unread notification count */
 export function useGetNotificationUnreadCount<TData = Awaited<ReturnType<typeof getNotificationUnreadCount>>, TError = ErrorType<unknown>>(
   options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getNotificationUnreadCount>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-/**
- * @summary Get unread notification count
- */
-
+/** @summary Get unread notification count */
 export function useGetNotificationUnreadCount<TData = Awaited<ReturnType<typeof getNotificationUnreadCount>>, TError = ErrorType<unknown>>(
   options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getNotificationUnreadCount>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
@@ -28053,9 +27219,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type PatchNotificationMarkReadMutationError = ErrorType<ApiError>
     export type PatchNotificationMarkReadMutationVariables = {publicId: string}
 
-    /**
- * @summary Mark notification as read
- */
+    /** @summary Mark notification as read */
 export const usePatchNotificationMarkRead = <TError = ErrorType<ApiError>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof patchNotificationMarkRead>>, TError,PatchNotificationMarkReadMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient): UseMutationResult<
@@ -28127,9 +27291,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type PatchNotificationMarkAllReadMutationError = ErrorType<unknown>
 
 
-    /**
- * @summary Mark all notifications as read
- */
+    /** @summary Mark all notifications as read */
 export const usePatchNotificationMarkAllRead = <TError = ErrorType<unknown>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof patchNotificationMarkAllRead>>, TError,void, TContext>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient): UseMutationResult<
@@ -28201,9 +27363,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type DeleteNotificationDeleteMutationError = ErrorType<ApiError>
     export type DeleteNotificationDeleteMutationVariables = {publicId: string}
 
-    /**
- * @summary Delete a notification
- */
+    /** @summary Delete a notification */
 export const useDeleteNotificationDelete = <TError = ErrorType<ApiError>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteNotificationDelete>>, TError,DeleteNotificationDeleteMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient): UseMutationResult<
@@ -28271,6 +27431,10 @@ export type GetNotificationPreferenceIndexQueryResult = NonNullable<Awaited<Retu
 export type GetNotificationPreferenceIndexQueryError = ErrorType<unknown>
 
 
+/**
+ * Returns all category × channel preference combinations for the authenticated user.
+ * @summary Get notification preferences
+ */
 export function useGetNotificationPreferenceIndex<TData = Awaited<ReturnType<typeof getNotificationPreferenceIndex>>, TError = ErrorType<unknown>>(
   options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getNotificationPreferenceIndex>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
@@ -28281,6 +27445,10 @@ export function useGetNotificationPreferenceIndex<TData = Awaited<ReturnType<typ
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * Returns all category × channel preference combinations for the authenticated user.
+ * @summary Get notification preferences
+ */
 export function useGetNotificationPreferenceIndex<TData = Awaited<ReturnType<typeof getNotificationPreferenceIndex>>, TError = ErrorType<unknown>>(
   options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getNotificationPreferenceIndex>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
@@ -28291,14 +27459,18 @@ export function useGetNotificationPreferenceIndex<TData = Awaited<ReturnType<typ
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * Returns all category × channel preference combinations for the authenticated user.
+ * @summary Get notification preferences
+ */
 export function useGetNotificationPreferenceIndex<TData = Awaited<ReturnType<typeof getNotificationPreferenceIndex>>, TError = ErrorType<unknown>>(
   options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getNotificationPreferenceIndex>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 /**
+ * Returns all category × channel preference combinations for the authenticated user.
  * @summary Get notification preferences
  */
-
 export function useGetNotificationPreferenceIndex<TData = Awaited<ReturnType<typeof getNotificationPreferenceIndex>>, TError = ErrorType<unknown>>(
   options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getNotificationPreferenceIndex>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
@@ -28330,25 +27502,11 @@ export const getPutNotificationPreferenceUpdateUrl = () => {
  */
 export const putNotificationPreferenceUpdate = async (putNotificationPreferenceUpdateBody: PutNotificationPreferenceUpdateBody, options?: Parameters<typeof customInstance>[1]): Promise<PutNotificationPreferenceUpdate200> => {
 
-    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
-    if (!h) return {};
-    if (h instanceof Headers) return Object.fromEntries(h.entries());
-    if (Symbol.iterator in h) {
-      return Object.fromEntries(
-        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
-      );
-    }
-    const headers: Record<string, string | readonly string[]> = {};
-    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
-      if (value !== undefined) headers[name] = value;
-    }
-    return headers;
-  };
-return customInstance<PutNotificationPreferenceUpdate200>(getPutNotificationPreferenceUpdateUrl(),
+  return customInstance<PutNotificationPreferenceUpdate200>(getPutNotificationPreferenceUpdateUrl(),
   {
     ...options,
     method: 'PUT',
-    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    headers: getHeaders({ 'Content-Type': 'application/json' }, options?.headers),
     body: JSON.stringify(putNotificationPreferenceUpdateBody)
   }
 );}
@@ -28391,9 +27549,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type PutNotificationPreferenceUpdateMutationError = ErrorType<ValidationError>
     export type PutNotificationPreferenceUpdateMutationVariables = {data: BodyType<PutNotificationPreferenceUpdateBody>}
 
-    /**
- * @summary Update notification preferences
- */
+    /** @summary Update notification preferences */
 export const usePutNotificationPreferenceUpdate = <TError = ErrorType<ValidationError>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof putNotificationPreferenceUpdate>>, TError,PutNotificationPreferenceUpdateMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient): UseMutationResult<
@@ -28418,25 +27574,11 @@ export const getPostPushSubscribeUrl = () => {
  */
 export const postPushSubscribe = async (postPushSubscribeBody: PostPushSubscribeBody, options?: Parameters<typeof customInstance>[1]): Promise<PostPushSubscribe200 | PostPushSubscribe201> => {
 
-    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
-    if (!h) return {};
-    if (h instanceof Headers) return Object.fromEntries(h.entries());
-    if (Symbol.iterator in h) {
-      return Object.fromEntries(
-        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
-      );
-    }
-    const headers: Record<string, string | readonly string[]> = {};
-    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
-      if (value !== undefined) headers[name] = value;
-    }
-    return headers;
-  };
-return customInstance<PostPushSubscribe200 | PostPushSubscribe201>(getPostPushSubscribeUrl(),
+  return customInstance<PostPushSubscribe200 | PostPushSubscribe201>(getPostPushSubscribeUrl(),
   {
     ...options,
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    headers: getHeaders({ 'Content-Type': 'application/json' }, options?.headers),
     body: JSON.stringify(postPushSubscribeBody)
   }
 );}
@@ -28479,9 +27621,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type PostPushSubscribeMutationError = ErrorType<void | ApiError | ValidationError>
     export type PostPushSubscribeMutationVariables = {data: BodyType<PostPushSubscribeBody>}
 
-    /**
- * @summary Subscribe to push notifications
- */
+    /** @summary Subscribe to push notifications */
 export const usePostPushSubscribe = <TError = ErrorType<void | ApiError | ValidationError>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postPushSubscribe>>, TError,PostPushSubscribeMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient): UseMutationResult<
@@ -28506,25 +27646,11 @@ export const getDeletePushUnsubscribeUrl = () => {
  */
 export const deletePushUnsubscribe = async (deletePushUnsubscribeBody: DeletePushUnsubscribeBody, options?: Parameters<typeof customInstance>[1]): Promise<void> => {
 
-    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
-    if (!h) return {};
-    if (h instanceof Headers) return Object.fromEntries(h.entries());
-    if (Symbol.iterator in h) {
-      return Object.fromEntries(
-        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
-      );
-    }
-    const headers: Record<string, string | readonly string[]> = {};
-    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
-      if (value !== undefined) headers[name] = value;
-    }
-    return headers;
-  };
-return customInstance<void>(getDeletePushUnsubscribeUrl(),
+  return customInstance<void>(getDeletePushUnsubscribeUrl(),
   {
     ...options,
     method: 'DELETE',
-    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    headers: getHeaders({ 'Content-Type': 'application/json' }, options?.headers),
     body: JSON.stringify(deletePushUnsubscribeBody)
   }
 );}
@@ -28567,9 +27693,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type DeletePushUnsubscribeMutationError = ErrorType<void>
     export type DeletePushUnsubscribeMutationVariables = {data: BodyType<DeletePushUnsubscribeBody>}
 
-    /**
- * @summary Unsubscribe from push notifications
- */
+    /** @summary Unsubscribe from push notifications */
 export const useDeletePushUnsubscribe = <TError = ErrorType<void>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deletePushUnsubscribe>>, TError,DeletePushUnsubscribeMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient): UseMutationResult<
@@ -28641,9 +27765,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type DeletePushRemoveAllMutationError = ErrorType<void>
 
 
-    /**
- * @summary Remove all push subscriptions
- */
+    /** @summary Remove all push subscriptions */
 export const useDeletePushRemoveAll = <TError = ErrorType<void>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deletePushRemoveAll>>, TError,void, TContext>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient): UseMutationResult<
@@ -28710,6 +27832,7 @@ export type GetWebhookIndexQueryResult = NonNullable<Awaited<ReturnType<typeof g
 export type GetWebhookIndexQueryError = ErrorType<ApiError>
 
 
+/** @summary List all webhooks */
 export function useGetWebhookIndex<TData = Awaited<ReturnType<typeof getWebhookIndex>>, TError = ErrorType<ApiError>>(
   options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getWebhookIndex>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
@@ -28720,6 +27843,7 @@ export function useGetWebhookIndex<TData = Awaited<ReturnType<typeof getWebhookI
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/** @summary List all webhooks */
 export function useGetWebhookIndex<TData = Awaited<ReturnType<typeof getWebhookIndex>>, TError = ErrorType<ApiError>>(
   options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getWebhookIndex>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
@@ -28730,14 +27854,12 @@ export function useGetWebhookIndex<TData = Awaited<ReturnType<typeof getWebhookI
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/** @summary List all webhooks */
 export function useGetWebhookIndex<TData = Awaited<ReturnType<typeof getWebhookIndex>>, TError = ErrorType<ApiError>>(
   options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getWebhookIndex>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-/**
- * @summary List all webhooks
- */
-
+/** @summary List all webhooks */
 export function useGetWebhookIndex<TData = Awaited<ReturnType<typeof getWebhookIndex>>, TError = ErrorType<ApiError>>(
   options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getWebhookIndex>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
@@ -28769,25 +27891,11 @@ export const getPostWebhookCreateUrl = () => {
  */
 export const postWebhookCreate = async (postWebhookCreateBody: PostWebhookCreateBody, options?: Parameters<typeof customInstance>[1]): Promise<PostWebhookCreate201> => {
 
-    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
-    if (!h) return {};
-    if (h instanceof Headers) return Object.fromEntries(h.entries());
-    if (Symbol.iterator in h) {
-      return Object.fromEntries(
-        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
-      );
-    }
-    const headers: Record<string, string | readonly string[]> = {};
-    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
-      if (value !== undefined) headers[name] = value;
-    }
-    return headers;
-  };
-return customInstance<PostWebhookCreate201>(getPostWebhookCreateUrl(),
+  return customInstance<PostWebhookCreate201>(getPostWebhookCreateUrl(),
   {
     ...options,
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    headers: getHeaders({ 'Content-Type': 'application/json' }, options?.headers),
     body: JSON.stringify(postWebhookCreateBody)
   }
 );}
@@ -28830,9 +27938,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type PostWebhookCreateMutationError = ErrorType<ApiError | ValidationError>
     export type PostWebhookCreateMutationVariables = {data: BodyType<PostWebhookCreateBody>}
 
-    /**
- * @summary Create a webhook
- */
+    /** @summary Create a webhook */
 export const usePostWebhookCreate = <TError = ErrorType<ApiError | ValidationError>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postWebhookCreate>>, TError,PostWebhookCreateMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient): UseMutationResult<
@@ -28858,25 +27964,11 @@ export const getPutWebhookUpdateUrl = (id: string,) => {
 export const putWebhookUpdate = async (id: string,
     putWebhookUpdateBody: PutWebhookUpdateBody, options?: Parameters<typeof customInstance>[1]): Promise<PutWebhookUpdate200> => {
 
-    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
-    if (!h) return {};
-    if (h instanceof Headers) return Object.fromEntries(h.entries());
-    if (Symbol.iterator in h) {
-      return Object.fromEntries(
-        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
-      );
-    }
-    const headers: Record<string, string | readonly string[]> = {};
-    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
-      if (value !== undefined) headers[name] = value;
-    }
-    return headers;
-  };
-return customInstance<PutWebhookUpdate200>(getPutWebhookUpdateUrl(id),
+  return customInstance<PutWebhookUpdate200>(getPutWebhookUpdateUrl(id),
   {
     ...options,
     method: 'PUT',
-    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    headers: getHeaders({ 'Content-Type': 'application/json' }, options?.headers),
     body: JSON.stringify(putWebhookUpdateBody)
   }
 );}
@@ -28919,9 +28011,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type PutWebhookUpdateMutationError = ErrorType<ApiError | ValidationError>
     export type PutWebhookUpdateMutationVariables = {id: string;data: BodyType<PutWebhookUpdateBody>}
 
-    /**
- * @summary Update a webhook
- */
+    /** @summary Update a webhook */
 export const usePutWebhookUpdate = <TError = ErrorType<ApiError | ValidationError>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof putWebhookUpdate>>, TError,PutWebhookUpdateMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient): UseMutationResult<
@@ -28993,9 +28083,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type DeleteWebhookDeleteMutationError = ErrorType<ApiError | ValidationError>
     export type DeleteWebhookDeleteMutationVariables = {id: string}
 
-    /**
- * @summary Delete a webhook
- */
+    /** @summary Delete a webhook */
 export const useDeleteWebhookDelete = <TError = ErrorType<ApiError | ValidationError>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteWebhookDelete>>, TError,DeleteWebhookDeleteMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient): UseMutationResult<
@@ -29067,9 +28155,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type PostWebhookRotateSecretMutationError = ErrorType<ApiError | ValidationError>
     export type PostWebhookRotateSecretMutationVariables = {id: string}
 
-    /**
- * @summary Rotate a webhook secret; the webhook keeps its signature version
- */
+    /** @summary Rotate a webhook secret; the webhook keeps its signature version */
 export const usePostWebhookRotateSecret = <TError = ErrorType<ApiError | ValidationError>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postWebhookRotateSecret>>, TError,PostWebhookRotateSecretMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient): UseMutationResult<
@@ -29137,6 +28223,10 @@ export type GetPartyInvitationIndexQueryResult = NonNullable<Awaited<ReturnType<
 export type GetPartyInvitationIndexQueryError = ErrorType<ApiError>
 
 
+/**
+ * Only the host may list the invitations. They are ordered oldest first.
+ * @summary List the invitations of a party session
+ */
 export function useGetPartyInvitationIndex<TData = Awaited<ReturnType<typeof getPartyInvitationIndex>>, TError = ErrorType<ApiError>>(
  publicId: string, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getPartyInvitationIndex>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
@@ -29147,6 +28237,10 @@ export function useGetPartyInvitationIndex<TData = Awaited<ReturnType<typeof get
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * Only the host may list the invitations. They are ordered oldest first.
+ * @summary List the invitations of a party session
+ */
 export function useGetPartyInvitationIndex<TData = Awaited<ReturnType<typeof getPartyInvitationIndex>>, TError = ErrorType<ApiError>>(
  publicId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getPartyInvitationIndex>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
@@ -29157,14 +28251,18 @@ export function useGetPartyInvitationIndex<TData = Awaited<ReturnType<typeof get
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * Only the host may list the invitations. They are ordered oldest first.
+ * @summary List the invitations of a party session
+ */
 export function useGetPartyInvitationIndex<TData = Awaited<ReturnType<typeof getPartyInvitationIndex>>, TError = ErrorType<ApiError>>(
  publicId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getPartyInvitationIndex>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 /**
+ * Only the host may list the invitations. They are ordered oldest first.
  * @summary List the invitations of a party session
  */
-
 export function useGetPartyInvitationIndex<TData = Awaited<ReturnType<typeof getPartyInvitationIndex>>, TError = ErrorType<ApiError>>(
  publicId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getPartyInvitationIndex>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
@@ -29247,6 +28345,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type PutPartyInvitationInviteMutationVariables = {publicId: string;userPublicId: string}
 
     /**
+ * Only the host may invite. Inviting a user who is invited already changes nothing.
  * @summary Invite a user to a party session
  */
 export const usePutPartyInvitationInvite = <TError = ErrorType<ApiError>,
@@ -29324,6 +28423,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type DeletePartyInvitationRevokeMutationVariables = {publicId: string;userPublicId: string}
 
     /**
+ * Only the host may revoke. A revoked user who had joined stops being a member of the session. Revoking a user who is not invited changes nothing.
  * @summary Revoke a user's invitation to a party session
  */
 export const useDeletePartyInvitationRevoke = <TError = ErrorType<ApiError>,
@@ -29392,6 +28492,7 @@ export type GetPartyMemberIndexQueryResult = NonNullable<Awaited<ReturnType<type
 export type GetPartyMemberIndexQueryError = ErrorType<ApiError>
 
 
+/** @summary List members for a party session */
 export function useGetPartyMemberIndex<TData = Awaited<ReturnType<typeof getPartyMemberIndex>>, TError = ErrorType<ApiError>>(
  publicId: string, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getPartyMemberIndex>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
@@ -29402,6 +28503,7 @@ export function useGetPartyMemberIndex<TData = Awaited<ReturnType<typeof getPart
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/** @summary List members for a party session */
 export function useGetPartyMemberIndex<TData = Awaited<ReturnType<typeof getPartyMemberIndex>>, TError = ErrorType<ApiError>>(
  publicId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getPartyMemberIndex>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
@@ -29412,14 +28514,12 @@ export function useGetPartyMemberIndex<TData = Awaited<ReturnType<typeof getPart
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/** @summary List members for a party session */
 export function useGetPartyMemberIndex<TData = Awaited<ReturnType<typeof getPartyMemberIndex>>, TError = ErrorType<ApiError>>(
  publicId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getPartyMemberIndex>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-/**
- * @summary List members for a party session
- */
-
+/** @summary List members for a party session */
 export function useGetPartyMemberIndex<TData = Awaited<ReturnType<typeof getPartyMemberIndex>>, TError = ErrorType<ApiError>>(
  publicId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getPartyMemberIndex>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
@@ -29452,25 +28552,11 @@ export const getPatchPartyMemberUpdateMeUrl = (publicId: string,) => {
 export const patchPartyMemberUpdateMe = async (publicId: string,
     patchPartyMemberUpdateMeBody: PatchPartyMemberUpdateMeBody, options?: Parameters<typeof customInstance>[1]): Promise<PatchPartyMemberUpdateMe200> => {
 
-    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
-    if (!h) return {};
-    if (h instanceof Headers) return Object.fromEntries(h.entries());
-    if (Symbol.iterator in h) {
-      return Object.fromEntries(
-        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
-      );
-    }
-    const headers: Record<string, string | readonly string[]> = {};
-    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
-      if (value !== undefined) headers[name] = value;
-    }
-    return headers;
-  };
-return customInstance<PatchPartyMemberUpdateMe200>(getPatchPartyMemberUpdateMeUrl(publicId),
+  return customInstance<PatchPartyMemberUpdateMe200>(getPatchPartyMemberUpdateMeUrl(publicId),
   {
     ...options,
     method: 'PATCH',
-    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    headers: getHeaders({ 'Content-Type': 'application/json' }, options?.headers),
     body: JSON.stringify(patchPartyMemberUpdateMeBody)
   }
 );}
@@ -29513,9 +28599,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type PatchPartyMemberUpdateMeMutationError = ErrorType<ApiError>
     export type PatchPartyMemberUpdateMeMutationVariables = {publicId: string;data: BodyType<PatchPartyMemberUpdateMeBody>}
 
-    /**
- * @summary Update current user member preferences
- */
+    /** @summary Update current user member preferences */
 export const usePatchPartyMemberUpdateMe = <TError = ErrorType<ApiError>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof patchPartyMemberUpdateMe>>, TError,PatchPartyMemberUpdateMeMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient): UseMutationResult<
@@ -29541,25 +28625,11 @@ export const getPostPartyMemberTransferHostUrl = (publicId: string,) => {
 export const postPartyMemberTransferHost = async (publicId: string,
     postPartyMemberTransferHostBody: PostPartyMemberTransferHostBody, options?: Parameters<typeof customInstance>[1]): Promise<PostPartyMemberTransferHost200> => {
 
-    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
-    if (!h) return {};
-    if (h instanceof Headers) return Object.fromEntries(h.entries());
-    if (Symbol.iterator in h) {
-      return Object.fromEntries(
-        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
-      );
-    }
-    const headers: Record<string, string | readonly string[]> = {};
-    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
-      if (value !== undefined) headers[name] = value;
-    }
-    return headers;
-  };
-return customInstance<PostPartyMemberTransferHost200>(getPostPartyMemberTransferHostUrl(publicId),
+  return customInstance<PostPartyMemberTransferHost200>(getPostPartyMemberTransferHostUrl(publicId),
   {
     ...options,
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    headers: getHeaders({ 'Content-Type': 'application/json' }, options?.headers),
     body: JSON.stringify(postPartyMemberTransferHostBody)
   }
 );}
@@ -29602,9 +28672,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type PostPartyMemberTransferHostMutationError = ErrorType<ApiError>
     export type PostPartyMemberTransferHostMutationVariables = {publicId: string;data: BodyType<PostPartyMemberTransferHostBody>}
 
-    /**
- * @summary Transfer host role to another member
- */
+    /** @summary Transfer host role to another member */
 export const usePostPartyMemberTransferHost = <TError = ErrorType<ApiError>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postPartyMemberTransferHost>>, TError,PostPartyMemberTransferHostMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient): UseMutationResult<
@@ -29629,25 +28697,11 @@ export const getPostPartySessionCreateUrl = () => {
  */
 export const postPartySessionCreate = async (createPartySessionRequest: CreatePartySessionRequest, options?: Parameters<typeof customInstance>[1]): Promise<PostPartySessionCreate201> => {
 
-    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
-    if (!h) return {};
-    if (h instanceof Headers) return Object.fromEntries(h.entries());
-    if (Symbol.iterator in h) {
-      return Object.fromEntries(
-        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
-      );
-    }
-    const headers: Record<string, string | readonly string[]> = {};
-    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
-      if (value !== undefined) headers[name] = value;
-    }
-    return headers;
-  };
-return customInstance<PostPartySessionCreate201>(getPostPartySessionCreateUrl(),
+  return customInstance<PostPartySessionCreate201>(getPostPartySessionCreateUrl(),
   {
     ...options,
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    headers: getHeaders({ 'Content-Type': 'application/json' }, options?.headers),
     body: JSON.stringify(createPartySessionRequest)
   }
 );}
@@ -29690,9 +28744,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type PostPartySessionCreateMutationError = ErrorType<ApiError | ValidationError>
     export type PostPartySessionCreateMutationVariables = {data: BodyType<CreatePartySessionRequest>}
 
-    /**
- * @summary Create a new watch party session
- */
+    /** @summary Create a new watch party session */
 export const usePostPartySessionCreate = <TError = ErrorType<ApiError | ValidationError>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postPartySessionCreate>>, TError,PostPartySessionCreateMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient): UseMutationResult<
@@ -29760,6 +28812,10 @@ export type GetPartySessionIndexQueryResult = NonNullable<Awaited<ReturnType<typ
 export type GetPartySessionIndexQueryError = ErrorType<ApiError>
 
 
+/**
+ * Lists only the active parties the caller hosts or has joined. A party's host invites the users who may join it; an invited user finds the party here once they have joined.
+ * @summary List the caller's active party sessions
+ */
 export function useGetPartySessionIndex<TData = Awaited<ReturnType<typeof getPartySessionIndex>>, TError = ErrorType<ApiError>>(
   options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getPartySessionIndex>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
@@ -29770,6 +28826,10 @@ export function useGetPartySessionIndex<TData = Awaited<ReturnType<typeof getPar
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * Lists only the active parties the caller hosts or has joined. A party's host invites the users who may join it; an invited user finds the party here once they have joined.
+ * @summary List the caller's active party sessions
+ */
 export function useGetPartySessionIndex<TData = Awaited<ReturnType<typeof getPartySessionIndex>>, TError = ErrorType<ApiError>>(
   options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getPartySessionIndex>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
@@ -29780,14 +28840,18 @@ export function useGetPartySessionIndex<TData = Awaited<ReturnType<typeof getPar
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * Lists only the active parties the caller hosts or has joined. A party's host invites the users who may join it; an invited user finds the party here once they have joined.
+ * @summary List the caller's active party sessions
+ */
 export function useGetPartySessionIndex<TData = Awaited<ReturnType<typeof getPartySessionIndex>>, TError = ErrorType<ApiError>>(
   options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getPartySessionIndex>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 /**
+ * Lists only the active parties the caller hosts or has joined. A party's host invites the users who may join it; an invited user finds the party here once they have joined.
  * @summary List the caller's active party sessions
  */
-
 export function useGetPartySessionIndex<TData = Awaited<ReturnType<typeof getPartySessionIndex>>, TError = ErrorType<ApiError>>(
   options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getPartySessionIndex>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
@@ -29862,6 +28926,10 @@ export type GetPartySessionShowQueryResult = NonNullable<Awaited<ReturnType<type
 export type GetPartySessionShowQueryError = ErrorType<ApiError>
 
 
+/**
+ * Returns the session and its members to the session's host and members only. Live updates arrive over the application WebSocket: request a single-use ticket from `POST /api/ws/tickets`, upgrade at `/api/ws`, then send `party.join` with the session public ID as `sessionId` to enter its room.
+ * @summary Get a party session
+ */
 export function useGetPartySessionShow<TData = Awaited<ReturnType<typeof getPartySessionShow>>, TError = ErrorType<ApiError>>(
  publicId: string, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getPartySessionShow>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
@@ -29872,6 +28940,10 @@ export function useGetPartySessionShow<TData = Awaited<ReturnType<typeof getPart
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * Returns the session and its members to the session's host and members only. Live updates arrive over the application WebSocket: request a single-use ticket from `POST /api/ws/tickets`, upgrade at `/api/ws`, then send `party.join` with the session public ID as `sessionId` to enter its room.
+ * @summary Get a party session
+ */
 export function useGetPartySessionShow<TData = Awaited<ReturnType<typeof getPartySessionShow>>, TError = ErrorType<ApiError>>(
  publicId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getPartySessionShow>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
@@ -29882,14 +28954,18 @@ export function useGetPartySessionShow<TData = Awaited<ReturnType<typeof getPart
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * Returns the session and its members to the session's host and members only. Live updates arrive over the application WebSocket: request a single-use ticket from `POST /api/ws/tickets`, upgrade at `/api/ws`, then send `party.join` with the session public ID as `sessionId` to enter its room.
+ * @summary Get a party session
+ */
 export function useGetPartySessionShow<TData = Awaited<ReturnType<typeof getPartySessionShow>>, TError = ErrorType<ApiError>>(
  publicId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getPartySessionShow>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 /**
+ * Returns the session and its members to the session's host and members only. Live updates arrive over the application WebSocket: request a single-use ticket from `POST /api/ws/tickets`, upgrade at `/api/ws`, then send `party.join` with the session public ID as `sessionId` to enter its room.
  * @summary Get a party session
  */
-
 export function useGetPartySessionShow<TData = Awaited<ReturnType<typeof getPartySessionShow>>, TError = ErrorType<ApiError>>(
  publicId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getPartySessionShow>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
@@ -29968,9 +29044,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type DeletePartySessionEndMutationError = ErrorType<ApiError>
     export type DeletePartySessionEndMutationVariables = {publicId: string}
 
-    /**
- * @summary End a party session (host only)
- */
+    /** @summary End a party session (host only) */
 export const useDeletePartySessionEnd = <TError = ErrorType<ApiError>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deletePartySessionEnd>>, TError,DeletePartySessionEndMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient): UseMutationResult<
@@ -30044,6 +29118,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type PostPartySessionJoinMutationVariables = {publicId: string}
 
     /**
+ * Only a member of the session and a user its host has invited may join. A member who joins again keeps their place, also when the session is full. Every other caller gets the answer an unknown session gets.
  * @summary Join a party session
  */
 export const usePostPartySessionJoin = <TError = ErrorType<ApiError>,
@@ -30117,9 +29192,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type PostPartySessionLeaveMutationError = ErrorType<ApiError>
     export type PostPartySessionLeaveMutationVariables = {publicId: string}
 
-    /**
- * @summary Leave a party session
- */
+    /** @summary Leave a party session */
 export const usePostPartySessionLeave = <TError = ErrorType<ApiError>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postPartySessionLeave>>, TError,PostPartySessionLeaveMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient): UseMutationResult<
@@ -30145,25 +29218,11 @@ export const getPostPartySessionSyncUrl = (publicId: string,) => {
 export const postPartySessionSync = async (publicId: string,
     syncPlaybackRequest: SyncPlaybackRequest, options?: Parameters<typeof customInstance>[1]): Promise<PostPartySessionSync200> => {
 
-    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
-    if (!h) return {};
-    if (h instanceof Headers) return Object.fromEntries(h.entries());
-    if (Symbol.iterator in h) {
-      return Object.fromEntries(
-        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
-      );
-    }
-    const headers: Record<string, string | readonly string[]> = {};
-    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
-      if (value !== undefined) headers[name] = value;
-    }
-    return headers;
-  };
-return customInstance<PostPartySessionSync200>(getPostPartySessionSyncUrl(publicId),
+  return customInstance<PostPartySessionSync200>(getPostPartySessionSyncUrl(publicId),
   {
     ...options,
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    headers: getHeaders({ 'Content-Type': 'application/json' }, options?.headers),
     body: JSON.stringify(syncPlaybackRequest)
   }
 );}
@@ -30206,9 +29265,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type PostPartySessionSyncMutationError = ErrorType<ApiError>
     export type PostPartySessionSyncMutationVariables = {publicId: string;data: BodyType<SyncPlaybackRequest>}
 
-    /**
- * @summary Synchronize playback position
- */
+    /** @summary Synchronize playback position */
 export const usePostPartySessionSync = <TError = ErrorType<ApiError>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postPartySessionSync>>, TError,PostPartySessionSyncMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient): UseMutationResult<
@@ -30276,6 +29333,10 @@ export type GetPlaylistIndexQueryResult = NonNullable<Awaited<ReturnType<typeof 
 export type GetPlaylistIndexQueryError = ErrorType<ApiError>
 
 
+/**
+ * Each playlist carries the owner's public id and the number of songs the caller can see.
+ * @summary List the playlists the authenticated user owns or collaborates on
+ */
 export function useGetPlaylistIndex<TData = Awaited<ReturnType<typeof getPlaylistIndex>>, TError = ErrorType<ApiError>>(
   options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getPlaylistIndex>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
@@ -30286,6 +29347,10 @@ export function useGetPlaylistIndex<TData = Awaited<ReturnType<typeof getPlaylis
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * Each playlist carries the owner's public id and the number of songs the caller can see.
+ * @summary List the playlists the authenticated user owns or collaborates on
+ */
 export function useGetPlaylistIndex<TData = Awaited<ReturnType<typeof getPlaylistIndex>>, TError = ErrorType<ApiError>>(
   options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getPlaylistIndex>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
@@ -30296,14 +29361,18 @@ export function useGetPlaylistIndex<TData = Awaited<ReturnType<typeof getPlaylis
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * Each playlist carries the owner's public id and the number of songs the caller can see.
+ * @summary List the playlists the authenticated user owns or collaborates on
+ */
 export function useGetPlaylistIndex<TData = Awaited<ReturnType<typeof getPlaylistIndex>>, TError = ErrorType<ApiError>>(
   options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getPlaylistIndex>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 /**
+ * Each playlist carries the owner's public id and the number of songs the caller can see.
  * @summary List the playlists the authenticated user owns or collaborates on
  */
-
 export function useGetPlaylistIndex<TData = Awaited<ReturnType<typeof getPlaylistIndex>>, TError = ErrorType<ApiError>>(
   options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getPlaylistIndex>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
@@ -30335,25 +29404,11 @@ export const getPostPlaylistStoreUrl = () => {
  */
 export const postPlaylistStore = async (postPlaylistStoreBody: PostPlaylistStoreBody, options?: Parameters<typeof customInstance>[1]): Promise<PlaylistResource> => {
 
-    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
-    if (!h) return {};
-    if (h instanceof Headers) return Object.fromEntries(h.entries());
-    if (Symbol.iterator in h) {
-      return Object.fromEntries(
-        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
-      );
-    }
-    const headers: Record<string, string | readonly string[]> = {};
-    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
-      if (value !== undefined) headers[name] = value;
-    }
-    return headers;
-  };
-return customInstance<PlaylistResource>(getPostPlaylistStoreUrl(),
+  return customInstance<PlaylistResource>(getPostPlaylistStoreUrl(),
   {
     ...options,
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    headers: getHeaders({ 'Content-Type': 'application/json' }, options?.headers),
     body: JSON.stringify(postPlaylistStoreBody)
   }
 );}
@@ -30396,9 +29451,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type PostPlaylistStoreMutationError = ErrorType<ApiError | ValidationError>
     export type PostPlaylistStoreMutationVariables = {data: BodyType<PostPlaylistStoreBody>}
 
-    /**
- * @summary Create a new playlist
- */
+    /** @summary Create a new playlist */
 export const usePostPlaylistStore = <TError = ErrorType<ApiError | ValidationError>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postPlaylistStore>>, TError,PostPlaylistStoreMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient): UseMutationResult<
@@ -30465,6 +29518,7 @@ export type GetPlaylistShowQueryResult = NonNullable<Awaited<ReturnType<typeof g
 export type GetPlaylistShowQueryError = ErrorType<ApiError>
 
 
+/** @summary Get a playlist and its accessible songs (owner, collaborators and administrators) */
 export function useGetPlaylistShow<TData = Awaited<ReturnType<typeof getPlaylistShow>>, TError = ErrorType<ApiError>>(
  publicId: string, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getPlaylistShow>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
@@ -30475,6 +29529,7 @@ export function useGetPlaylistShow<TData = Awaited<ReturnType<typeof getPlaylist
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/** @summary Get a playlist and its accessible songs (owner, collaborators and administrators) */
 export function useGetPlaylistShow<TData = Awaited<ReturnType<typeof getPlaylistShow>>, TError = ErrorType<ApiError>>(
  publicId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getPlaylistShow>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
@@ -30485,14 +29540,12 @@ export function useGetPlaylistShow<TData = Awaited<ReturnType<typeof getPlaylist
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/** @summary Get a playlist and its accessible songs (owner, collaborators and administrators) */
 export function useGetPlaylistShow<TData = Awaited<ReturnType<typeof getPlaylistShow>>, TError = ErrorType<ApiError>>(
  publicId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getPlaylistShow>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-/**
- * @summary Get a playlist and its accessible songs (owner, collaborators and administrators)
- */
-
+/** @summary Get a playlist and its accessible songs (owner, collaborators and administrators) */
 export function useGetPlaylistShow<TData = Awaited<ReturnType<typeof getPlaylistShow>>, TError = ErrorType<ApiError>>(
  publicId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getPlaylistShow>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
@@ -30525,25 +29578,11 @@ export const getPatchPlaylistUpdateUrl = (publicId: string,) => {
 export const patchPlaylistUpdate = async (publicId: string,
     patchPlaylistUpdateBody: PatchPlaylistUpdateBody, options?: Parameters<typeof customInstance>[1]): Promise<PatchPlaylistUpdate200> => {
 
-    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
-    if (!h) return {};
-    if (h instanceof Headers) return Object.fromEntries(h.entries());
-    if (Symbol.iterator in h) {
-      return Object.fromEntries(
-        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
-      );
-    }
-    const headers: Record<string, string | readonly string[]> = {};
-    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
-      if (value !== undefined) headers[name] = value;
-    }
-    return headers;
-  };
-return customInstance<PatchPlaylistUpdate200>(getPatchPlaylistUpdateUrl(publicId),
+  return customInstance<PatchPlaylistUpdate200>(getPatchPlaylistUpdateUrl(publicId),
   {
     ...options,
     method: 'PATCH',
-    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    headers: getHeaders({ 'Content-Type': 'application/json' }, options?.headers),
     body: JSON.stringify(patchPlaylistUpdateBody)
   }
 );}
@@ -30586,9 +29625,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type PatchPlaylistUpdateMutationError = ErrorType<ApiError | ValidationError>
     export type PatchPlaylistUpdateMutationVariables = {publicId: string;data: BodyType<PatchPlaylistUpdateBody>}
 
-    /**
- * @summary Update playlist metadata
- */
+    /** @summary Update playlist metadata */
 export const usePatchPlaylistUpdate = <TError = ErrorType<ApiError | ValidationError>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof patchPlaylistUpdate>>, TError,PatchPlaylistUpdateMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient): UseMutationResult<
@@ -30660,9 +29697,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type DeletePlaylistDestroyMutationError = ErrorType<ApiError>
     export type DeletePlaylistDestroyMutationVariables = {publicId: string}
 
-    /**
- * @summary Delete a playlist
- */
+    /** @summary Delete a playlist */
 export const useDeletePlaylistDestroy = <TError = ErrorType<ApiError>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deletePlaylistDestroy>>, TError,DeletePlaylistDestroyMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient): UseMutationResult<
@@ -30688,25 +29723,11 @@ export const getPostPlaylistAddSongUrl = (publicId: string,) => {
 export const postPlaylistAddSong = async (publicId: string,
     postPlaylistAddSongBody: PostPlaylistAddSongBody, options?: Parameters<typeof customInstance>[1]): Promise<PostPlaylistAddSong201> => {
 
-    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
-    if (!h) return {};
-    if (h instanceof Headers) return Object.fromEntries(h.entries());
-    if (Symbol.iterator in h) {
-      return Object.fromEntries(
-        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
-      );
-    }
-    const headers: Record<string, string | readonly string[]> = {};
-    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
-      if (value !== undefined) headers[name] = value;
-    }
-    return headers;
-  };
-return customInstance<PostPlaylistAddSong201>(getPostPlaylistAddSongUrl(publicId),
+  return customInstance<PostPlaylistAddSong201>(getPostPlaylistAddSongUrl(publicId),
   {
     ...options,
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    headers: getHeaders({ 'Content-Type': 'application/json' }, options?.headers),
     body: JSON.stringify(postPlaylistAddSongBody)
   }
 );}
@@ -30749,9 +29770,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type PostPlaylistAddSongMutationError = ErrorType<ApiError | ValidationError>
     export type PostPlaylistAddSongMutationVariables = {publicId: string;data: BodyType<PostPlaylistAddSongBody>}
 
-    /**
- * @summary Add a song to a playlist
- */
+    /** @summary Add a song to a playlist */
 export const usePostPlaylistAddSong = <TError = ErrorType<ApiError | ValidationError>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postPlaylistAddSong>>, TError,PostPlaylistAddSongMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient): UseMutationResult<
@@ -30825,9 +29844,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type DeletePlaylistRemoveSongMutationError = ErrorType<ApiError>
     export type DeletePlaylistRemoveSongMutationVariables = {publicId: string;songId: string}
 
-    /**
- * @summary Remove a song from a playlist
- */
+    /** @summary Remove a song from a playlist */
 export const useDeletePlaylistRemoveSong = <TError = ErrorType<ApiError>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deletePlaylistRemoveSong>>, TError,DeletePlaylistRemoveSongMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient): UseMutationResult<
@@ -30903,6 +29920,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type PutPlaylistAddCollaboratorMutationVariables = {publicId: string;userPublicId: string}
 
     /**
+ * Only the owner may add collaborators. A collaborator may view the playlist, and may change its songs while the playlist is collaborative. Adding a user who already collaborates changes nothing.
  * @summary Add a collaborator to a playlist
  */
 export const usePutPlaylistAddCollaborator = <TError = ErrorType<ApiError>,
@@ -30980,6 +29998,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type DeletePlaylistRemoveCollaboratorMutationVariables = {publicId: string;userPublicId: string}
 
     /**
+ * The owner may remove any collaborator; a collaborator may remove their own row to leave. Removing a user who does not collaborate changes nothing.
  * @summary Remove a collaborator from a playlist
  */
 export const useDeletePlaylistRemoveCollaborator = <TError = ErrorType<ApiError>,
@@ -31007,25 +30026,11 @@ export const getPostPlaylistReorderUrl = (publicId: string,) => {
 export const postPlaylistReorder = async (publicId: string,
     postPlaylistReorderBody: PostPlaylistReorderBody, options?: Parameters<typeof customInstance>[1]): Promise<PostPlaylistReorder200> => {
 
-    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
-    if (!h) return {};
-    if (h instanceof Headers) return Object.fromEntries(h.entries());
-    if (Symbol.iterator in h) {
-      return Object.fromEntries(
-        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
-      );
-    }
-    const headers: Record<string, string | readonly string[]> = {};
-    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
-      if (value !== undefined) headers[name] = value;
-    }
-    return headers;
-  };
-return customInstance<PostPlaylistReorder200>(getPostPlaylistReorderUrl(publicId),
+  return customInstance<PostPlaylistReorder200>(getPostPlaylistReorderUrl(publicId),
   {
     ...options,
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    headers: getHeaders({ 'Content-Type': 'application/json' }, options?.headers),
     body: JSON.stringify(postPlaylistReorderBody)
   }
 );}
@@ -31068,9 +30073,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type PostPlaylistReorderMutationError = ErrorType<ApiError | ValidationError>
     export type PostPlaylistReorderMutationVariables = {publicId: string;data: BodyType<PostPlaylistReorderBody>}
 
-    /**
- * @summary Reorder songs in a playlist
- */
+    /** @summary Reorder songs in a playlist */
 export const usePostPlaylistReorder = <TError = ErrorType<ApiError | ValidationError>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postPlaylistReorder>>, TError,PostPlaylistReorderMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient): UseMutationResult<
@@ -31137,6 +30140,7 @@ export type GetAdminQolStatusQueryResult = NonNullable<Awaited<ReturnType<typeof
 export type GetAdminQolStatusQueryError = ErrorType<ApiError>
 
 
+/** @summary Get the stream governor status of every web server worker */
 export function useGetAdminQolStatus<TData = Awaited<ReturnType<typeof getAdminQolStatus>>, TError = ErrorType<ApiError>>(
   options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAdminQolStatus>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
@@ -31147,6 +30151,7 @@ export function useGetAdminQolStatus<TData = Awaited<ReturnType<typeof getAdminQ
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/** @summary Get the stream governor status of every web server worker */
 export function useGetAdminQolStatus<TData = Awaited<ReturnType<typeof getAdminQolStatus>>, TError = ErrorType<ApiError>>(
   options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAdminQolStatus>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
@@ -31157,14 +30162,12 @@ export function useGetAdminQolStatus<TData = Awaited<ReturnType<typeof getAdminQ
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/** @summary Get the stream governor status of every web server worker */
 export function useGetAdminQolStatus<TData = Awaited<ReturnType<typeof getAdminQolStatus>>, TError = ErrorType<ApiError>>(
   options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAdminQolStatus>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-/**
- * @summary Get the stream governor status of every web server worker
- */
-
+/** @summary Get the stream governor status of every web server worker */
 export function useGetAdminQolStatus<TData = Awaited<ReturnType<typeof getAdminQolStatus>>, TError = ErrorType<ApiError>>(
   options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAdminQolStatus>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
@@ -31238,6 +30241,7 @@ export type GetAdminQolStreamsQueryResult = NonNullable<Awaited<ReturnType<typeo
 export type GetAdminQolStreamsQueryError = ErrorType<ApiError>
 
 
+/** @summary List the active streams of every web server worker with their budget allocations */
 export function useGetAdminQolStreams<TData = Awaited<ReturnType<typeof getAdminQolStreams>>, TError = ErrorType<ApiError>>(
   options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAdminQolStreams>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
@@ -31248,6 +30252,7 @@ export function useGetAdminQolStreams<TData = Awaited<ReturnType<typeof getAdmin
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/** @summary List the active streams of every web server worker with their budget allocations */
 export function useGetAdminQolStreams<TData = Awaited<ReturnType<typeof getAdminQolStreams>>, TError = ErrorType<ApiError>>(
   options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAdminQolStreams>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
@@ -31258,14 +30263,12 @@ export function useGetAdminQolStreams<TData = Awaited<ReturnType<typeof getAdmin
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/** @summary List the active streams of every web server worker with their budget allocations */
 export function useGetAdminQolStreams<TData = Awaited<ReturnType<typeof getAdminQolStreams>>, TError = ErrorType<ApiError>>(
   options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAdminQolStreams>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-/**
- * @summary List the active streams of every web server worker with their budget allocations
- */
-
+/** @summary List the active streams of every web server worker with their budget allocations */
 export function useGetAdminQolStreams<TData = Awaited<ReturnType<typeof getAdminQolStreams>>, TError = ErrorType<ApiError>>(
   options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAdminQolStreams>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
@@ -31297,25 +30300,11 @@ export const getPatchAdminQolProfileUrl = () => {
  */
 export const patchAdminQolProfile = async (patchAdminQolProfileBody?: PatchAdminQolProfileBody, options?: Parameters<typeof customInstance>[1]): Promise<void> => {
 
-    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
-    if (!h) return {};
-    if (h instanceof Headers) return Object.fromEntries(h.entries());
-    if (Symbol.iterator in h) {
-      return Object.fromEntries(
-        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
-      );
-    }
-    const headers: Record<string, string | readonly string[]> = {};
-    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
-      if (value !== undefined) headers[name] = value;
-    }
-    return headers;
-  };
-return customInstance<void>(getPatchAdminQolProfileUrl(),
+  return customInstance<void>(getPatchAdminQolProfileUrl(),
   {
     ...options,
     method: 'PATCH',
-    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    headers: getHeaders({ 'Content-Type': 'application/json' }, options?.headers),
     body: JSON.stringify(patchAdminQolProfileBody)
   }
 );}
@@ -31358,9 +30347,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type PatchAdminQolProfileMutationError = ErrorType<ApiError>
     export type PatchAdminQolProfileMutationVariables = {data?: BodyType<PatchAdminQolProfileBody>}
 
-    /**
- * @summary Set the algorithm profile in every web server worker
- */
+    /** @summary Set the algorithm profile in every web server worker */
 export const usePatchAdminQolProfile = <TError = ErrorType<ApiError>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof patchAdminQolProfile>>, TError,PatchAdminQolProfileMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient): UseMutationResult<
@@ -31432,9 +30419,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type PostAdminQolResetMutationError = ErrorType<ApiError>
 
 
-    /**
- * @summary Reset learning data in every web server worker and return each to the Learning state
- */
+    /** @summary Reset learning data in every web server worker and return each to the Learning state */
 export const usePostAdminQolReset = <TError = ErrorType<ApiError>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postAdminQolReset>>, TError,void, TContext>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient): UseMutationResult<
@@ -31501,6 +30486,7 @@ export type GetRadioSubscriptionListQueryResult = NonNullable<Awaited<ReturnType
 export type GetRadioSubscriptionListQueryError = ErrorType<ApiError>
 
 
+/** @summary List user's country subscriptions */
 export function useGetRadioSubscriptionList<TData = Awaited<ReturnType<typeof getRadioSubscriptionList>>, TError = ErrorType<ApiError>>(
   options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getRadioSubscriptionList>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
@@ -31511,6 +30497,7 @@ export function useGetRadioSubscriptionList<TData = Awaited<ReturnType<typeof ge
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/** @summary List user's country subscriptions */
 export function useGetRadioSubscriptionList<TData = Awaited<ReturnType<typeof getRadioSubscriptionList>>, TError = ErrorType<ApiError>>(
   options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getRadioSubscriptionList>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
@@ -31521,14 +30508,12 @@ export function useGetRadioSubscriptionList<TData = Awaited<ReturnType<typeof ge
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/** @summary List user's country subscriptions */
 export function useGetRadioSubscriptionList<TData = Awaited<ReturnType<typeof getRadioSubscriptionList>>, TError = ErrorType<ApiError>>(
   options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getRadioSubscriptionList>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-/**
- * @summary List user's country subscriptions
- */
-
+/** @summary List user's country subscriptions */
 export function useGetRadioSubscriptionList<TData = Awaited<ReturnType<typeof getRadioSubscriptionList>>, TError = ErrorType<ApiError>>(
   options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getRadioSubscriptionList>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
@@ -31560,25 +30545,11 @@ export const getPostRadioSubscriptionSubscribeUrl = () => {
  */
 export const postRadioSubscriptionSubscribe = async (postRadioSubscriptionSubscribeBody: PostRadioSubscriptionSubscribeBody, options?: Parameters<typeof customInstance>[1]): Promise<PostRadioSubscriptionSubscribe201> => {
 
-    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
-    if (!h) return {};
-    if (h instanceof Headers) return Object.fromEntries(h.entries());
-    if (Symbol.iterator in h) {
-      return Object.fromEntries(
-        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
-      );
-    }
-    const headers: Record<string, string | readonly string[]> = {};
-    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
-      if (value !== undefined) headers[name] = value;
-    }
-    return headers;
-  };
-return customInstance<PostRadioSubscriptionSubscribe201>(getPostRadioSubscriptionSubscribeUrl(),
+  return customInstance<PostRadioSubscriptionSubscribe201>(getPostRadioSubscriptionSubscribeUrl(),
   {
     ...options,
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    headers: getHeaders({ 'Content-Type': 'application/json' }, options?.headers),
     body: JSON.stringify(postRadioSubscriptionSubscribeBody)
   }
 );}
@@ -31621,9 +30592,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type PostRadioSubscriptionSubscribeMutationError = ErrorType<ApiError | ValidationError>
     export type PostRadioSubscriptionSubscribeMutationVariables = {data: BodyType<PostRadioSubscriptionSubscribeBody>}
 
-    /**
- * @summary Subscribe to a country
- */
+    /** @summary Subscribe to a country */
 export const usePostRadioSubscriptionSubscribe = <TError = ErrorType<ApiError | ValidationError>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postRadioSubscriptionSubscribe>>, TError,PostRadioSubscriptionSubscribeMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient): UseMutationResult<
@@ -31695,9 +30664,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type DeleteRadioSubscriptionUnsubscribeMutationError = ErrorType<ApiError>
     export type DeleteRadioSubscriptionUnsubscribeMutationVariables = {countryCode: string}
 
-    /**
- * @summary Unsubscribe from a country
- */
+    /** @summary Unsubscribe from a country */
 export const useDeleteRadioSubscriptionUnsubscribe = <TError = ErrorType<ApiError>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteRadioSubscriptionUnsubscribe>>, TError,DeleteRadioSubscriptionUnsubscribeMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient): UseMutationResult<
@@ -31769,9 +30736,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type PostRadioSubscriptionRefreshMutationError = ErrorType<ApiError>
     export type PostRadioSubscriptionRefreshMutationVariables = {countryCode: string}
 
-    /**
- * @summary Manual refresh of country stations
- */
+    /** @summary Manual refresh of country stations */
 export const usePostRadioSubscriptionRefresh = <TError = ErrorType<ApiError>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postRadioSubscriptionRefresh>>, TError,PostRadioSubscriptionRefreshMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient): UseMutationResult<
@@ -31838,6 +30803,7 @@ export type GetRadioSessionGetQueryResult = NonNullable<Awaited<ReturnType<typeo
 export type GetRadioSessionGetQueryError = ErrorType<ApiError>
 
 
+/** @summary Get current radio session */
 export function useGetRadioSessionGet<TData = Awaited<ReturnType<typeof getRadioSessionGet>>, TError = ErrorType<ApiError>>(
   options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getRadioSessionGet>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
@@ -31848,6 +30814,7 @@ export function useGetRadioSessionGet<TData = Awaited<ReturnType<typeof getRadio
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/** @summary Get current radio session */
 export function useGetRadioSessionGet<TData = Awaited<ReturnType<typeof getRadioSessionGet>>, TError = ErrorType<ApiError>>(
   options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getRadioSessionGet>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
@@ -31858,14 +30825,12 @@ export function useGetRadioSessionGet<TData = Awaited<ReturnType<typeof getRadio
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/** @summary Get current radio session */
 export function useGetRadioSessionGet<TData = Awaited<ReturnType<typeof getRadioSessionGet>>, TError = ErrorType<ApiError>>(
   options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getRadioSessionGet>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-/**
- * @summary Get current radio session
- */
-
+/** @summary Get current radio session */
 export function useGetRadioSessionGet<TData = Awaited<ReturnType<typeof getRadioSessionGet>>, TError = ErrorType<ApiError>>(
   options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getRadioSessionGet>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
@@ -31897,25 +30862,11 @@ export const getPostRadioSessionStartUrl = () => {
  */
 export const postRadioSessionStart = async (postRadioSessionStartBody: PostRadioSessionStartBody, options?: Parameters<typeof customInstance>[1]): Promise<PostRadioSessionStart200> => {
 
-    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
-    if (!h) return {};
-    if (h instanceof Headers) return Object.fromEntries(h.entries());
-    if (Symbol.iterator in h) {
-      return Object.fromEntries(
-        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
-      );
-    }
-    const headers: Record<string, string | readonly string[]> = {};
-    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
-      if (value !== undefined) headers[name] = value;
-    }
-    return headers;
-  };
-return customInstance<PostRadioSessionStart200>(getPostRadioSessionStartUrl(),
+  return customInstance<PostRadioSessionStart200>(getPostRadioSessionStartUrl(),
   {
     ...options,
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    headers: getHeaders({ 'Content-Type': 'application/json' }, options?.headers),
     body: JSON.stringify(postRadioSessionStartBody)
   }
 );}
@@ -31958,9 +30909,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type PostRadioSessionStartMutationError = ErrorType<ApiError | ValidationError>
     export type PostRadioSessionStartMutationVariables = {data: BodyType<PostRadioSessionStartBody>}
 
-    /**
- * @summary Start playing a radio station
- */
+    /** @summary Start playing a radio station */
 export const usePostRadioSessionStart = <TError = ErrorType<ApiError | ValidationError>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postRadioSessionStart>>, TError,PostRadioSessionStartMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient): UseMutationResult<
@@ -32032,9 +30981,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type PostRadioSessionStopMutationError = ErrorType<ApiError>
 
 
-    /**
- * @summary Stop radio playback
- */
+    /** @summary Stop radio playback */
 export const usePostRadioSessionStop = <TError = ErrorType<ApiError>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postRadioSessionStop>>, TError,void, TContext>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient): UseMutationResult<
@@ -32101,6 +31048,7 @@ export type GetRadioSourceListQueryResult = NonNullable<Awaited<ReturnType<typeo
 export type GetRadioSourceListQueryError = ErrorType<ApiError>
 
 
+/** @summary List all radio sources */
 export function useGetRadioSourceList<TData = Awaited<ReturnType<typeof getRadioSourceList>>, TError = ErrorType<ApiError>>(
   options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getRadioSourceList>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
@@ -32111,6 +31059,7 @@ export function useGetRadioSourceList<TData = Awaited<ReturnType<typeof getRadio
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/** @summary List all radio sources */
 export function useGetRadioSourceList<TData = Awaited<ReturnType<typeof getRadioSourceList>>, TError = ErrorType<ApiError>>(
   options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getRadioSourceList>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
@@ -32121,14 +31070,12 @@ export function useGetRadioSourceList<TData = Awaited<ReturnType<typeof getRadio
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/** @summary List all radio sources */
 export function useGetRadioSourceList<TData = Awaited<ReturnType<typeof getRadioSourceList>>, TError = ErrorType<ApiError>>(
   options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getRadioSourceList>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-/**
- * @summary List all radio sources
- */
-
+/** @summary List all radio sources */
 export function useGetRadioSourceList<TData = Awaited<ReturnType<typeof getRadioSourceList>>, TError = ErrorType<ApiError>>(
   options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getRadioSourceList>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
@@ -32160,25 +31107,11 @@ export const getPostRadioSourceCreateUrl = () => {
  */
 export const postRadioSourceCreate = async (postRadioSourceCreateBody: PostRadioSourceCreateBody, options?: Parameters<typeof customInstance>[1]): Promise<PostRadioSourceCreate201> => {
 
-    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
-    if (!h) return {};
-    if (h instanceof Headers) return Object.fromEntries(h.entries());
-    if (Symbol.iterator in h) {
-      return Object.fromEntries(
-        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
-      );
-    }
-    const headers: Record<string, string | readonly string[]> = {};
-    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
-      if (value !== undefined) headers[name] = value;
-    }
-    return headers;
-  };
-return customInstance<PostRadioSourceCreate201>(getPostRadioSourceCreateUrl(),
+  return customInstance<PostRadioSourceCreate201>(getPostRadioSourceCreateUrl(),
   {
     ...options,
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    headers: getHeaders({ 'Content-Type': 'application/json' }, options?.headers),
     body: JSON.stringify(postRadioSourceCreateBody)
   }
 );}
@@ -32221,9 +31154,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type PostRadioSourceCreateMutationError = ErrorType<ApiError | ValidationError>
     export type PostRadioSourceCreateMutationVariables = {data: BodyType<PostRadioSourceCreateBody>}
 
-    /**
- * @summary Create a radio source (admin)
- */
+    /** @summary Create a radio source (admin) */
 export const usePostRadioSourceCreate = <TError = ErrorType<ApiError | ValidationError>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postRadioSourceCreate>>, TError,PostRadioSourceCreateMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient): UseMutationResult<
@@ -32290,6 +31221,7 @@ export type GetRadioCountriesQueryResult = NonNullable<Awaited<ReturnType<typeof
 export type GetRadioCountriesQueryError = ErrorType<ApiError>
 
 
+/** @summary List available countries from IPRD */
 export function useGetRadioCountries<TData = Awaited<ReturnType<typeof getRadioCountries>>, TError = ErrorType<ApiError>>(
   options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getRadioCountries>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
@@ -32300,6 +31232,7 @@ export function useGetRadioCountries<TData = Awaited<ReturnType<typeof getRadioC
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/** @summary List available countries from IPRD */
 export function useGetRadioCountries<TData = Awaited<ReturnType<typeof getRadioCountries>>, TError = ErrorType<ApiError>>(
   options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getRadioCountries>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
@@ -32310,14 +31243,12 @@ export function useGetRadioCountries<TData = Awaited<ReturnType<typeof getRadioC
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/** @summary List available countries from IPRD */
 export function useGetRadioCountries<TData = Awaited<ReturnType<typeof getRadioCountries>>, TError = ErrorType<ApiError>>(
   options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getRadioCountries>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-/**
- * @summary List available countries from IPRD
- */
-
+/** @summary List available countries from IPRD */
 export function useGetRadioCountries<TData = Awaited<ReturnType<typeof getRadioCountries>>, TError = ErrorType<ApiError>>(
   options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getRadioCountries>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
@@ -32398,6 +31329,7 @@ export type GetRadioStationsQueryResult = NonNullable<Awaited<ReturnType<typeof 
 export type GetRadioStationsQueryError = ErrorType<ApiError>
 
 
+/** @summary Browse/search stations */
 export function useGetRadioStations<TData = Awaited<ReturnType<typeof getRadioStations>>, TError = ErrorType<ApiError>>(
  params: undefined |  GetRadioStationsParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getRadioStations>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
@@ -32408,6 +31340,7 @@ export function useGetRadioStations<TData = Awaited<ReturnType<typeof getRadioSt
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/** @summary Browse/search stations */
 export function useGetRadioStations<TData = Awaited<ReturnType<typeof getRadioStations>>, TError = ErrorType<ApiError>>(
  params?: GetRadioStationsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getRadioStations>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
@@ -32418,14 +31351,12 @@ export function useGetRadioStations<TData = Awaited<ReturnType<typeof getRadioSt
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/** @summary Browse/search stations */
 export function useGetRadioStations<TData = Awaited<ReturnType<typeof getRadioStations>>, TError = ErrorType<ApiError>>(
  params?: GetRadioStationsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getRadioStations>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-/**
- * @summary Browse/search stations
- */
-
+/** @summary Browse/search stations */
 export function useGetRadioStations<TData = Awaited<ReturnType<typeof getRadioStations>>, TError = ErrorType<ApiError>>(
  params?: GetRadioStationsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getRadioStations>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
@@ -32499,6 +31430,7 @@ export type GetRadioStarredListQueryResult = NonNullable<Awaited<ReturnType<type
 export type GetRadioStarredListQueryError = ErrorType<ApiError>
 
 
+/** @summary List starred stations */
 export function useGetRadioStarredList<TData = Awaited<ReturnType<typeof getRadioStarredList>>, TError = ErrorType<ApiError>>(
   options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getRadioStarredList>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
@@ -32509,6 +31441,7 @@ export function useGetRadioStarredList<TData = Awaited<ReturnType<typeof getRadi
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/** @summary List starred stations */
 export function useGetRadioStarredList<TData = Awaited<ReturnType<typeof getRadioStarredList>>, TError = ErrorType<ApiError>>(
   options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getRadioStarredList>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
@@ -32519,14 +31452,12 @@ export function useGetRadioStarredList<TData = Awaited<ReturnType<typeof getRadi
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/** @summary List starred stations */
 export function useGetRadioStarredList<TData = Awaited<ReturnType<typeof getRadioStarredList>>, TError = ErrorType<ApiError>>(
   options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getRadioStarredList>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-/**
- * @summary List starred stations
- */
-
+/** @summary List starred stations */
 export function useGetRadioStarredList<TData = Awaited<ReturnType<typeof getRadioStarredList>>, TError = ErrorType<ApiError>>(
   options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getRadioStarredList>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
@@ -32558,25 +31489,11 @@ export const getPostRadioStarredStarUrl = () => {
  */
 export const postRadioStarredStar = async (postRadioStarredStarBody: PostRadioStarredStarBody, options?: Parameters<typeof customInstance>[1]): Promise<PostRadioStarredStar201> => {
 
-    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
-    if (!h) return {};
-    if (h instanceof Headers) return Object.fromEntries(h.entries());
-    if (Symbol.iterator in h) {
-      return Object.fromEntries(
-        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
-      );
-    }
-    const headers: Record<string, string | readonly string[]> = {};
-    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
-      if (value !== undefined) headers[name] = value;
-    }
-    return headers;
-  };
-return customInstance<PostRadioStarredStar201>(getPostRadioStarredStarUrl(),
+  return customInstance<PostRadioStarredStar201>(getPostRadioStarredStarUrl(),
   {
     ...options,
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    headers: getHeaders({ 'Content-Type': 'application/json' }, options?.headers),
     body: JSON.stringify(postRadioStarredStarBody)
   }
 );}
@@ -32619,9 +31536,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type PostRadioStarredStarMutationError = ErrorType<ApiError | ValidationError>
     export type PostRadioStarredStarMutationVariables = {data: BodyType<PostRadioStarredStarBody>}
 
-    /**
- * @summary Star a station
- */
+    /** @summary Star a station */
 export const usePostRadioStarredStar = <TError = ErrorType<ApiError | ValidationError>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postRadioStarredStar>>, TError,PostRadioStarredStarMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient): UseMutationResult<
@@ -32693,9 +31608,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type DeleteRadioStarredUnstarMutationError = ErrorType<ApiError>
     export type DeleteRadioStarredUnstarMutationVariables = {stationId: string}
 
-    /**
- * @summary Unstar a station
- */
+    /** @summary Unstar a station */
 export const useDeleteRadioStarredUnstar = <TError = ErrorType<ApiError>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteRadioStarredUnstar>>, TError,DeleteRadioStarredUnstarMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient): UseMutationResult<
@@ -32762,6 +31675,7 @@ export type GetAdminRecommendationsCoverageQueryResult = NonNullable<Awaited<Ret
 export type GetAdminRecommendationsCoverageQueryError = ErrorType<ApiError>
 
 
+/** @summary Get recommendation coverage statistics */
 export function useGetAdminRecommendationsCoverage<TData = Awaited<ReturnType<typeof getAdminRecommendationsCoverage>>, TError = ErrorType<ApiError>>(
   options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAdminRecommendationsCoverage>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
@@ -32772,6 +31686,7 @@ export function useGetAdminRecommendationsCoverage<TData = Awaited<ReturnType<ty
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/** @summary Get recommendation coverage statistics */
 export function useGetAdminRecommendationsCoverage<TData = Awaited<ReturnType<typeof getAdminRecommendationsCoverage>>, TError = ErrorType<ApiError>>(
   options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAdminRecommendationsCoverage>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
@@ -32782,14 +31697,12 @@ export function useGetAdminRecommendationsCoverage<TData = Awaited<ReturnType<ty
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/** @summary Get recommendation coverage statistics */
 export function useGetAdminRecommendationsCoverage<TData = Awaited<ReturnType<typeof getAdminRecommendationsCoverage>>, TError = ErrorType<ApiError>>(
   options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAdminRecommendationsCoverage>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-/**
- * @summary Get recommendation coverage statistics
- */
-
+/** @summary Get recommendation coverage statistics */
 export function useGetAdminRecommendationsCoverage<TData = Awaited<ReturnType<typeof getAdminRecommendationsCoverage>>, TError = ErrorType<ApiError>>(
   options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAdminRecommendationsCoverage>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
@@ -32863,6 +31776,7 @@ export type GetAdminRecommendationsSourceQualityQueryResult = NonNullable<Awaite
 export type GetAdminRecommendationsSourceQualityQueryError = ErrorType<ApiError>
 
 
+/** @summary Get recommendation source quality breakdown */
 export function useGetAdminRecommendationsSourceQuality<TData = Awaited<ReturnType<typeof getAdminRecommendationsSourceQuality>>, TError = ErrorType<ApiError>>(
   options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAdminRecommendationsSourceQuality>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
@@ -32873,6 +31787,7 @@ export function useGetAdminRecommendationsSourceQuality<TData = Awaited<ReturnTy
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/** @summary Get recommendation source quality breakdown */
 export function useGetAdminRecommendationsSourceQuality<TData = Awaited<ReturnType<typeof getAdminRecommendationsSourceQuality>>, TError = ErrorType<ApiError>>(
   options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAdminRecommendationsSourceQuality>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
@@ -32883,14 +31798,12 @@ export function useGetAdminRecommendationsSourceQuality<TData = Awaited<ReturnTy
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/** @summary Get recommendation source quality breakdown */
 export function useGetAdminRecommendationsSourceQuality<TData = Awaited<ReturnType<typeof getAdminRecommendationsSourceQuality>>, TError = ErrorType<ApiError>>(
   options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAdminRecommendationsSourceQuality>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-/**
- * @summary Get recommendation source quality breakdown
- */
-
+/** @summary Get recommendation source quality breakdown */
 export function useGetAdminRecommendationsSourceQuality<TData = Awaited<ReturnType<typeof getAdminRecommendationsSourceQuality>>, TError = ErrorType<ApiError>>(
   options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAdminRecommendationsSourceQuality>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
@@ -32964,6 +31877,7 @@ export type GetAdminRecommendationsFreshnessQueryResult = NonNullable<Awaited<Re
 export type GetAdminRecommendationsFreshnessQueryError = ErrorType<ApiError>
 
 
+/** @summary Get recommendation freshness metrics */
 export function useGetAdminRecommendationsFreshness<TData = Awaited<ReturnType<typeof getAdminRecommendationsFreshness>>, TError = ErrorType<ApiError>>(
   options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAdminRecommendationsFreshness>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
@@ -32974,6 +31888,7 @@ export function useGetAdminRecommendationsFreshness<TData = Awaited<ReturnType<t
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/** @summary Get recommendation freshness metrics */
 export function useGetAdminRecommendationsFreshness<TData = Awaited<ReturnType<typeof getAdminRecommendationsFreshness>>, TError = ErrorType<ApiError>>(
   options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAdminRecommendationsFreshness>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
@@ -32984,14 +31899,12 @@ export function useGetAdminRecommendationsFreshness<TData = Awaited<ReturnType<t
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/** @summary Get recommendation freshness metrics */
 export function useGetAdminRecommendationsFreshness<TData = Awaited<ReturnType<typeof getAdminRecommendationsFreshness>>, TError = ErrorType<ApiError>>(
   options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAdminRecommendationsFreshness>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-/**
- * @summary Get recommendation freshness metrics
- */
-
+/** @summary Get recommendation freshness metrics */
 export function useGetAdminRecommendationsFreshness<TData = Awaited<ReturnType<typeof getAdminRecommendationsFreshness>>, TError = ErrorType<ApiError>>(
   options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAdminRecommendationsFreshness>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
@@ -33072,6 +31985,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
 
     /**
+ * Creates a recommendation job. In the web server the job runs on the CPU process pool and the response returns at once with the pending job; without the pool the job runs during the request and the response carries its counts.
  * @summary Trigger recommendation generation
  */
 export const usePostAdminRecommendationsGenerate = <TError = ErrorType<ApiError>,
@@ -33140,6 +32054,7 @@ export type GetAdminRecommendationsJobStatusQueryResult = NonNullable<Awaited<Re
 export type GetAdminRecommendationsJobStatusQueryError = ErrorType<ApiError>
 
 
+/** @summary Get recommendation job status */
 export function useGetAdminRecommendationsJobStatus<TData = Awaited<ReturnType<typeof getAdminRecommendationsJobStatus>>, TError = ErrorType<ApiError>>(
  publicId: string, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAdminRecommendationsJobStatus>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
@@ -33150,6 +32065,7 @@ export function useGetAdminRecommendationsJobStatus<TData = Awaited<ReturnType<t
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/** @summary Get recommendation job status */
 export function useGetAdminRecommendationsJobStatus<TData = Awaited<ReturnType<typeof getAdminRecommendationsJobStatus>>, TError = ErrorType<ApiError>>(
  publicId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAdminRecommendationsJobStatus>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
@@ -33160,14 +32076,12 @@ export function useGetAdminRecommendationsJobStatus<TData = Awaited<ReturnType<t
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/** @summary Get recommendation job status */
 export function useGetAdminRecommendationsJobStatus<TData = Awaited<ReturnType<typeof getAdminRecommendationsJobStatus>>, TError = ErrorType<ApiError>>(
  publicId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAdminRecommendationsJobStatus>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-/**
- * @summary Get recommendation job status
- */
-
+/** @summary Get recommendation job status */
 export function useGetAdminRecommendationsJobStatus<TData = Awaited<ReturnType<typeof getAdminRecommendationsJobStatus>>, TError = ErrorType<ApiError>>(
  publicId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAdminRecommendationsJobStatus>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
@@ -33248,6 +32162,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type DeleteAdminRecommendationsJobCancelMutationVariables = {publicId: string}
 
     /**
+ * Cancelling a cancelled job succeeds without change.
  * @summary Cancel a recommendation job
  */
 export const useDeleteAdminRecommendationsJobCancel = <TError = ErrorType<ApiError>,
@@ -33323,6 +32238,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type PostAdminRecommendationsJobRequeueMutationVariables = {publicId: string}
 
     /**
+ * Creates a new job with the same parameters as the original and starts it like a generated job.
  * @summary Requeue a failed or cancelled recommendation job
  */
 export const usePostAdminRecommendationsJobRequeue = <TError = ErrorType<ApiError>,
@@ -33398,6 +32314,7 @@ export type GetAdminRecommendationsJobsListQueryResult = NonNullable<Awaited<Ret
 export type GetAdminRecommendationsJobsListQueryError = ErrorType<ApiError>
 
 
+/** @summary List recent recommendation jobs */
 export function useGetAdminRecommendationsJobsList<TData = Awaited<ReturnType<typeof getAdminRecommendationsJobsList>>, TError = ErrorType<ApiError>>(
  params: undefined |  GetAdminRecommendationsJobsListParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAdminRecommendationsJobsList>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
@@ -33408,6 +32325,7 @@ export function useGetAdminRecommendationsJobsList<TData = Awaited<ReturnType<ty
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/** @summary List recent recommendation jobs */
 export function useGetAdminRecommendationsJobsList<TData = Awaited<ReturnType<typeof getAdminRecommendationsJobsList>>, TError = ErrorType<ApiError>>(
  params?: GetAdminRecommendationsJobsListParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAdminRecommendationsJobsList>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
@@ -33418,14 +32336,12 @@ export function useGetAdminRecommendationsJobsList<TData = Awaited<ReturnType<ty
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/** @summary List recent recommendation jobs */
 export function useGetAdminRecommendationsJobsList<TData = Awaited<ReturnType<typeof getAdminRecommendationsJobsList>>, TError = ErrorType<ApiError>>(
  params?: GetAdminRecommendationsJobsListParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAdminRecommendationsJobsList>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-/**
- * @summary List recent recommendation jobs
- */
-
+/** @summary List recent recommendation jobs */
 export function useGetAdminRecommendationsJobsList<TData = Awaited<ReturnType<typeof getAdminRecommendationsJobsList>>, TError = ErrorType<ApiError>>(
  params?: GetAdminRecommendationsJobsListParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAdminRecommendationsJobsList>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
@@ -33506,6 +32422,7 @@ export type GetRecommendationIndexQueryResult = NonNullable<Awaited<ReturnType<t
 export type GetRecommendationIndexQueryError = ErrorType<ApiError>
 
 
+/** @summary Get personalized recommendations for the authenticated user */
 export function useGetRecommendationIndex<TData = Awaited<ReturnType<typeof getRecommendationIndex>>, TError = ErrorType<ApiError>>(
  params: undefined |  GetRecommendationIndexParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getRecommendationIndex>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
@@ -33516,6 +32433,7 @@ export function useGetRecommendationIndex<TData = Awaited<ReturnType<typeof getR
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/** @summary Get personalized recommendations for the authenticated user */
 export function useGetRecommendationIndex<TData = Awaited<ReturnType<typeof getRecommendationIndex>>, TError = ErrorType<ApiError>>(
  params?: GetRecommendationIndexParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getRecommendationIndex>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
@@ -33526,14 +32444,12 @@ export function useGetRecommendationIndex<TData = Awaited<ReturnType<typeof getR
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/** @summary Get personalized recommendations for the authenticated user */
 export function useGetRecommendationIndex<TData = Awaited<ReturnType<typeof getRecommendationIndex>>, TError = ErrorType<ApiError>>(
  params?: GetRecommendationIndexParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getRecommendationIndex>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-/**
- * @summary Get personalized recommendations for the authenticated user
- */
-
+/** @summary Get personalized recommendations for the authenticated user */
 export function useGetRecommendationIndex<TData = Awaited<ReturnType<typeof getRecommendationIndex>>, TError = ErrorType<ApiError>>(
  params?: GetRecommendationIndexParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getRecommendationIndex>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
@@ -33565,25 +32481,11 @@ export const getPostRecommendationStoreUrl = () => {
  */
 export const postRecommendationStore = async (postRecommendationStoreBody?: PostRecommendationStoreBody, options?: Parameters<typeof customInstance>[1]): Promise<PostRecommendationStore201> => {
 
-    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
-    if (!h) return {};
-    if (h instanceof Headers) return Object.fromEntries(h.entries());
-    if (Symbol.iterator in h) {
-      return Object.fromEntries(
-        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
-      );
-    }
-    const headers: Record<string, string | readonly string[]> = {};
-    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
-      if (value !== undefined) headers[name] = value;
-    }
-    return headers;
-  };
-return customInstance<PostRecommendationStore201>(getPostRecommendationStoreUrl(),
+  return customInstance<PostRecommendationStore201>(getPostRecommendationStoreUrl(),
   {
     ...options,
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    headers: getHeaders({ 'Content-Type': 'application/json' }, options?.headers),
     body: JSON.stringify(postRecommendationStoreBody)
   }
 );}
@@ -33626,9 +32528,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type PostRecommendationStoreMutationError = ErrorType<ApiError | ValidationError>
     export type PostRecommendationStoreMutationVariables = {data?: BodyType<PostRecommendationStoreBody>}
 
-    /**
- * @summary Create a recommendation
- */
+    /** @summary Create a recommendation */
 export const usePostRecommendationStore = <TError = ErrorType<ApiError | ValidationError>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postRecommendationStore>>, TError,PostRecommendationStoreMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient): UseMutationResult<
@@ -33703,6 +32603,10 @@ export type GetRecommendationForYouQueryResult = NonNullable<Awaited<ReturnType<
 export type GetRecommendationForYouQueryError = ErrorType<ApiError>
 
 
+/**
+ * Returns aggregated recommendations with one-line explanations and per-strategy scores
+ * @summary Get personalized recommendations with explanation breakdown
+ */
 export function useGetRecommendationForYou<TData = Awaited<ReturnType<typeof getRecommendationForYou>>, TError = ErrorType<ApiError>>(
  params: undefined |  GetRecommendationForYouParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getRecommendationForYou>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
@@ -33713,6 +32617,10 @@ export function useGetRecommendationForYou<TData = Awaited<ReturnType<typeof get
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * Returns aggregated recommendations with one-line explanations and per-strategy scores
+ * @summary Get personalized recommendations with explanation breakdown
+ */
 export function useGetRecommendationForYou<TData = Awaited<ReturnType<typeof getRecommendationForYou>>, TError = ErrorType<ApiError>>(
  params?: GetRecommendationForYouParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getRecommendationForYou>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
@@ -33723,14 +32631,18 @@ export function useGetRecommendationForYou<TData = Awaited<ReturnType<typeof get
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * Returns aggregated recommendations with one-line explanations and per-strategy scores
+ * @summary Get personalized recommendations with explanation breakdown
+ */
 export function useGetRecommendationForYou<TData = Awaited<ReturnType<typeof getRecommendationForYou>>, TError = ErrorType<ApiError>>(
  params?: GetRecommendationForYouParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getRecommendationForYou>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 /**
+ * Returns aggregated recommendations with one-line explanations and per-strategy scores
  * @summary Get personalized recommendations with explanation breakdown
  */
-
 export function useGetRecommendationForYou<TData = Awaited<ReturnType<typeof getRecommendationForYou>>, TError = ErrorType<ApiError>>(
  params?: GetRecommendationForYouParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getRecommendationForYou>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
@@ -33819,6 +32731,7 @@ export type GetRecommendationBySourceQueryResult = NonNullable<Awaited<ReturnTyp
 export type GetRecommendationBySourceQueryError = ErrorType<unknown>
 
 
+/** @summary Get recommendations for a source entity */
 export function useGetRecommendationBySource<TData = Awaited<ReturnType<typeof getRecommendationBySource>>, TError = ErrorType<unknown>>(
  sourceType: 'song' | 'album' | 'artist' | 'movie' | 'video',
     sourceId: string,
@@ -33831,6 +32744,7 @@ export function useGetRecommendationBySource<TData = Awaited<ReturnType<typeof g
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/** @summary Get recommendations for a source entity */
 export function useGetRecommendationBySource<TData = Awaited<ReturnType<typeof getRecommendationBySource>>, TError = ErrorType<unknown>>(
  sourceType: 'song' | 'album' | 'artist' | 'movie' | 'video',
     sourceId: string,
@@ -33843,16 +32757,14 @@ export function useGetRecommendationBySource<TData = Awaited<ReturnType<typeof g
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/** @summary Get recommendations for a source entity */
 export function useGetRecommendationBySource<TData = Awaited<ReturnType<typeof getRecommendationBySource>>, TError = ErrorType<unknown>>(
  sourceType: 'song' | 'album' | 'artist' | 'movie' | 'video',
     sourceId: string,
     params?: GetRecommendationBySourceParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getRecommendationBySource>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-/**
- * @summary Get recommendations for a source entity
- */
-
+/** @summary Get recommendations for a source entity */
 export function useGetRecommendationBySource<TData = Awaited<ReturnType<typeof getRecommendationBySource>>, TError = ErrorType<unknown>>(
  sourceType: 'song' | 'album' | 'artist' | 'movie' | 'video',
     sourceId: string,
@@ -33935,9 +32847,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type DeleteRecommendationDestroyBySourceMutationError = ErrorType<ApiError>
     export type DeleteRecommendationDestroyBySourceMutationVariables = {sourceType: 'song' | 'album' | 'artist' | 'movie' | 'video';sourceId: string}
 
-    /**
- * @summary Delete all recommendations for a source entity
- */
+    /** @summary Delete all recommendations for a source entity */
 export const useDeleteRecommendationDestroyBySource = <TError = ErrorType<ApiError>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteRecommendationDestroyBySource>>, TError,DeleteRecommendationDestroyBySourceMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient): UseMutationResult<
@@ -34019,6 +32929,7 @@ export type GetRecommendationTargetingQueryResult = NonNullable<Awaited<ReturnTy
 export type GetRecommendationTargetingQueryError = ErrorType<unknown>
 
 
+/** @summary Get recommendations targeting an entity */
 export function useGetRecommendationTargeting<TData = Awaited<ReturnType<typeof getRecommendationTargeting>>, TError = ErrorType<unknown>>(
  targetType: 'song' | 'album' | 'artist' | 'movie' | 'video',
     targetId: string,
@@ -34031,6 +32942,7 @@ export function useGetRecommendationTargeting<TData = Awaited<ReturnType<typeof 
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/** @summary Get recommendations targeting an entity */
 export function useGetRecommendationTargeting<TData = Awaited<ReturnType<typeof getRecommendationTargeting>>, TError = ErrorType<unknown>>(
  targetType: 'song' | 'album' | 'artist' | 'movie' | 'video',
     targetId: string,
@@ -34043,16 +32955,14 @@ export function useGetRecommendationTargeting<TData = Awaited<ReturnType<typeof 
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/** @summary Get recommendations targeting an entity */
 export function useGetRecommendationTargeting<TData = Awaited<ReturnType<typeof getRecommendationTargeting>>, TError = ErrorType<unknown>>(
  targetType: 'song' | 'album' | 'artist' | 'movie' | 'video',
     targetId: string,
     params?: GetRecommendationTargetingParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getRecommendationTargeting>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-/**
- * @summary Get recommendations targeting an entity
- */
-
+/** @summary Get recommendations targeting an entity */
 export function useGetRecommendationTargeting<TData = Awaited<ReturnType<typeof getRecommendationTargeting>>, TError = ErrorType<unknown>>(
  targetType: 'song' | 'album' | 'artist' | 'movie' | 'video',
     targetId: string,
@@ -34133,9 +33043,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type DeleteRecommendationDestroyMutationError = ErrorType<ApiError>
     export type DeleteRecommendationDestroyMutationVariables = {publicId: string}
 
-    /**
- * @summary Delete a recommendation
- */
+    /** @summary Delete a recommendation */
 export const useDeleteRecommendationDestroy = <TError = ErrorType<ApiError>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteRecommendationDestroy>>, TError,DeleteRecommendationDestroyMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient): UseMutationResult<
@@ -34202,6 +33110,7 @@ export type GetAdminSchedulerListQueryResult = NonNullable<Awaited<ReturnType<ty
 export type GetAdminSchedulerListQueryError = ErrorType<unknown>
 
 
+/** @summary List all scheduled jobs */
 export function useGetAdminSchedulerList<TData = Awaited<ReturnType<typeof getAdminSchedulerList>>, TError = ErrorType<unknown>>(
   options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAdminSchedulerList>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
@@ -34212,6 +33121,7 @@ export function useGetAdminSchedulerList<TData = Awaited<ReturnType<typeof getAd
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/** @summary List all scheduled jobs */
 export function useGetAdminSchedulerList<TData = Awaited<ReturnType<typeof getAdminSchedulerList>>, TError = ErrorType<unknown>>(
   options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAdminSchedulerList>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
@@ -34222,14 +33132,12 @@ export function useGetAdminSchedulerList<TData = Awaited<ReturnType<typeof getAd
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/** @summary List all scheduled jobs */
 export function useGetAdminSchedulerList<TData = Awaited<ReturnType<typeof getAdminSchedulerList>>, TError = ErrorType<unknown>>(
   options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAdminSchedulerList>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-/**
- * @summary List all scheduled jobs
- */
-
+/** @summary List all scheduled jobs */
 export function useGetAdminSchedulerList<TData = Awaited<ReturnType<typeof getAdminSchedulerList>>, TError = ErrorType<unknown>>(
   options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAdminSchedulerList>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
@@ -34261,25 +33169,11 @@ export const getPostAdminSchedulerCreateUrl = () => {
  */
 export const postAdminSchedulerCreate = async (createScheduledJobRequest: CreateScheduledJobRequest, options?: Parameters<typeof customInstance>[1]): Promise<PostAdminSchedulerCreate201> => {
 
-    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
-    if (!h) return {};
-    if (h instanceof Headers) return Object.fromEntries(h.entries());
-    if (Symbol.iterator in h) {
-      return Object.fromEntries(
-        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
-      );
-    }
-    const headers: Record<string, string | readonly string[]> = {};
-    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
-      if (value !== undefined) headers[name] = value;
-    }
-    return headers;
-  };
-return customInstance<PostAdminSchedulerCreate201>(getPostAdminSchedulerCreateUrl(),
+  return customInstance<PostAdminSchedulerCreate201>(getPostAdminSchedulerCreateUrl(),
   {
     ...options,
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    headers: getHeaders({ 'Content-Type': 'application/json' }, options?.headers),
     body: JSON.stringify(createScheduledJobRequest)
   }
 );}
@@ -34322,9 +33216,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type PostAdminSchedulerCreateMutationError = ErrorType<ApiError>
     export type PostAdminSchedulerCreateMutationVariables = {data: BodyType<CreateScheduledJobRequest>}
 
-    /**
- * @summary Create a scheduled job
- */
+    /** @summary Create a scheduled job */
 export const usePostAdminSchedulerCreate = <TError = ErrorType<ApiError>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postAdminSchedulerCreate>>, TError,PostAdminSchedulerCreateMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient): UseMutationResult<
@@ -34391,6 +33283,7 @@ export type GetAdminSchedulerShowQueryResult = NonNullable<Awaited<ReturnType<ty
 export type GetAdminSchedulerShowQueryError = ErrorType<ApiError>
 
 
+/** @summary Get a scheduled job */
 export function useGetAdminSchedulerShow<TData = Awaited<ReturnType<typeof getAdminSchedulerShow>>, TError = ErrorType<ApiError>>(
  id: string, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAdminSchedulerShow>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
@@ -34401,6 +33294,7 @@ export function useGetAdminSchedulerShow<TData = Awaited<ReturnType<typeof getAd
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/** @summary Get a scheduled job */
 export function useGetAdminSchedulerShow<TData = Awaited<ReturnType<typeof getAdminSchedulerShow>>, TError = ErrorType<ApiError>>(
  id: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAdminSchedulerShow>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
@@ -34411,14 +33305,12 @@ export function useGetAdminSchedulerShow<TData = Awaited<ReturnType<typeof getAd
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/** @summary Get a scheduled job */
 export function useGetAdminSchedulerShow<TData = Awaited<ReturnType<typeof getAdminSchedulerShow>>, TError = ErrorType<ApiError>>(
  id: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAdminSchedulerShow>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-/**
- * @summary Get a scheduled job
- */
-
+/** @summary Get a scheduled job */
 export function useGetAdminSchedulerShow<TData = Awaited<ReturnType<typeof getAdminSchedulerShow>>, TError = ErrorType<ApiError>>(
  id: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAdminSchedulerShow>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
@@ -34451,25 +33343,11 @@ export const getPutAdminSchedulerUpdateUrl = (id: string,) => {
 export const putAdminSchedulerUpdate = async (id: string,
     updateScheduledJobRequest: UpdateScheduledJobRequest, options?: Parameters<typeof customInstance>[1]): Promise<PutAdminSchedulerUpdate200> => {
 
-    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
-    if (!h) return {};
-    if (h instanceof Headers) return Object.fromEntries(h.entries());
-    if (Symbol.iterator in h) {
-      return Object.fromEntries(
-        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
-      );
-    }
-    const headers: Record<string, string | readonly string[]> = {};
-    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
-      if (value !== undefined) headers[name] = value;
-    }
-    return headers;
-  };
-return customInstance<PutAdminSchedulerUpdate200>(getPutAdminSchedulerUpdateUrl(id),
+  return customInstance<PutAdminSchedulerUpdate200>(getPutAdminSchedulerUpdateUrl(id),
   {
     ...options,
     method: 'PUT',
-    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    headers: getHeaders({ 'Content-Type': 'application/json' }, options?.headers),
     body: JSON.stringify(updateScheduledJobRequest)
   }
 );}
@@ -34512,9 +33390,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type PutAdminSchedulerUpdateMutationError = ErrorType<ApiError>
     export type PutAdminSchedulerUpdateMutationVariables = {id: string;data: BodyType<UpdateScheduledJobRequest>}
 
-    /**
- * @summary Update a scheduled job
- */
+    /** @summary Update a scheduled job */
 export const usePutAdminSchedulerUpdate = <TError = ErrorType<ApiError>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof putAdminSchedulerUpdate>>, TError,PutAdminSchedulerUpdateMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient): UseMutationResult<
@@ -34586,9 +33462,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type DeleteAdminSchedulerDeleteMutationError = ErrorType<ApiError>
     export type DeleteAdminSchedulerDeleteMutationVariables = {id: string}
 
-    /**
- * @summary Delete a scheduled job
- */
+    /** @summary Delete a scheduled job */
 export const useDeleteAdminSchedulerDelete = <TError = ErrorType<ApiError>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteAdminSchedulerDelete>>, TError,DeleteAdminSchedulerDeleteMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient): UseMutationResult<
@@ -34660,9 +33534,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type PostAdminSchedulerPauseMutationError = ErrorType<ApiError>
     export type PostAdminSchedulerPauseMutationVariables = {id: string}
 
-    /**
- * @summary Pause a scheduled job
- */
+    /** @summary Pause a scheduled job */
 export const usePostAdminSchedulerPause = <TError = ErrorType<ApiError>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postAdminSchedulerPause>>, TError,PostAdminSchedulerPauseMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient): UseMutationResult<
@@ -34734,9 +33606,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type PostAdminSchedulerResumeMutationError = ErrorType<ApiError>
     export type PostAdminSchedulerResumeMutationVariables = {id: string}
 
-    /**
- * @summary Resume a paused scheduled job
- */
+    /** @summary Resume a paused scheduled job */
 export const usePostAdminSchedulerResume = <TError = ErrorType<ApiError>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postAdminSchedulerResume>>, TError,PostAdminSchedulerResumeMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient): UseMutationResult<
@@ -34808,9 +33678,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type PostAdminSchedulerTriggerMutationError = ErrorType<ApiError>
     export type PostAdminSchedulerTriggerMutationVariables = {id: string}
 
-    /**
- * @summary Record a durable manual scheduled job request
- */
+    /** @summary Record a durable manual scheduled job request */
 export const usePostAdminSchedulerTrigger = <TError = ErrorType<ApiError>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postAdminSchedulerTrigger>>, TError,PostAdminSchedulerTriggerMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient): UseMutationResult<
@@ -34882,9 +33750,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type PostAdminSchedulerEnableMutationError = ErrorType<ApiError>
     export type PostAdminSchedulerEnableMutationVariables = {id: string}
 
-    /**
- * @summary Enable a disabled scheduled job
- */
+    /** @summary Enable a disabled scheduled job */
 export const usePostAdminSchedulerEnable = <TError = ErrorType<ApiError>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postAdminSchedulerEnable>>, TError,PostAdminSchedulerEnableMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient): UseMutationResult<
@@ -34956,9 +33822,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type PostAdminSchedulerDisableMutationError = ErrorType<ApiError>
     export type PostAdminSchedulerDisableMutationVariables = {id: string}
 
-    /**
- * @summary Disable a scheduled job
- */
+    /** @summary Disable a scheduled job */
 export const usePostAdminSchedulerDisable = <TError = ErrorType<ApiError>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postAdminSchedulerDisable>>, TError,PostAdminSchedulerDisableMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient): UseMutationResult<
@@ -35025,6 +33889,7 @@ export type GetAdminSchedulerCommandsQueryResult = NonNullable<Awaited<ReturnTyp
 export type GetAdminSchedulerCommandsQueryError = ErrorType<unknown>
 
 
+/** @summary List available schedulable commands */
 export function useGetAdminSchedulerCommands<TData = Awaited<ReturnType<typeof getAdminSchedulerCommands>>, TError = ErrorType<unknown>>(
   options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAdminSchedulerCommands>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
@@ -35035,6 +33900,7 @@ export function useGetAdminSchedulerCommands<TData = Awaited<ReturnType<typeof g
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/** @summary List available schedulable commands */
 export function useGetAdminSchedulerCommands<TData = Awaited<ReturnType<typeof getAdminSchedulerCommands>>, TError = ErrorType<unknown>>(
   options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAdminSchedulerCommands>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
@@ -35045,14 +33911,12 @@ export function useGetAdminSchedulerCommands<TData = Awaited<ReturnType<typeof g
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/** @summary List available schedulable commands */
 export function useGetAdminSchedulerCommands<TData = Awaited<ReturnType<typeof getAdminSchedulerCommands>>, TError = ErrorType<unknown>>(
   options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAdminSchedulerCommands>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-/**
- * @summary List available schedulable commands
- */
-
+/** @summary List available schedulable commands */
 export function useGetAdminSchedulerCommands<TData = Awaited<ReturnType<typeof getAdminSchedulerCommands>>, TError = ErrorType<unknown>>(
   options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAdminSchedulerCommands>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
@@ -35084,25 +33948,11 @@ export const getPostDeviceRegisterUrl = () => {
  */
 export const postDeviceRegister = async (registerDeviceRequest: RegisterDeviceRequest, options?: Parameters<typeof customInstance>[1]): Promise<PostDeviceRegister200> => {
 
-    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
-    if (!h) return {};
-    if (h instanceof Headers) return Object.fromEntries(h.entries());
-    if (Symbol.iterator in h) {
-      return Object.fromEntries(
-        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
-      );
-    }
-    const headers: Record<string, string | readonly string[]> = {};
-    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
-      if (value !== undefined) headers[name] = value;
-    }
-    return headers;
-  };
-return customInstance<PostDeviceRegister200>(getPostDeviceRegisterUrl(),
+  return customInstance<PostDeviceRegister200>(getPostDeviceRegisterUrl(),
   {
     ...options,
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    headers: getHeaders({ 'Content-Type': 'application/json' }, options?.headers),
     body: JSON.stringify(registerDeviceRequest)
   }
 );}
@@ -35145,9 +33995,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type PostDeviceRegisterMutationError = ErrorType<ApiError | ValidationError>
     export type PostDeviceRegisterMutationVariables = {data: BodyType<RegisterDeviceRequest>}
 
-    /**
- * @summary Register or touch a device (upsert)
- */
+    /** @summary Register or touch a device (upsert) */
 export const usePostDeviceRegister = <TError = ErrorType<ApiError | ValidationError>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postDeviceRegister>>, TError,PostDeviceRegisterMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient): UseMutationResult<
@@ -35214,6 +34062,7 @@ export type GetDeviceListQueryResult = NonNullable<Awaited<ReturnType<typeof get
 export type GetDeviceListQueryError = ErrorType<ApiError>
 
 
+/** @summary List all devices registered for the current user */
 export function useGetDeviceList<TData = Awaited<ReturnType<typeof getDeviceList>>, TError = ErrorType<ApiError>>(
   options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getDeviceList>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
@@ -35224,6 +34073,7 @@ export function useGetDeviceList<TData = Awaited<ReturnType<typeof getDeviceList
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/** @summary List all devices registered for the current user */
 export function useGetDeviceList<TData = Awaited<ReturnType<typeof getDeviceList>>, TError = ErrorType<ApiError>>(
   options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getDeviceList>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
@@ -35234,14 +34084,12 @@ export function useGetDeviceList<TData = Awaited<ReturnType<typeof getDeviceList
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/** @summary List all devices registered for the current user */
 export function useGetDeviceList<TData = Awaited<ReturnType<typeof getDeviceList>>, TError = ErrorType<ApiError>>(
   options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getDeviceList>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-/**
- * @summary List all devices registered for the current user
- */
-
+/** @summary List all devices registered for the current user */
 export function useGetDeviceList<TData = Awaited<ReturnType<typeof getDeviceList>>, TError = ErrorType<ApiError>>(
   options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getDeviceList>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
@@ -35274,25 +34122,11 @@ export const getPutDeviceRenameUrl = (deviceId: string,) => {
 export const putDeviceRename = async (deviceId: string,
     putDeviceRenameBody: PutDeviceRenameBody, options?: Parameters<typeof customInstance>[1]): Promise<PutDeviceRename200> => {
 
-    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
-    if (!h) return {};
-    if (h instanceof Headers) return Object.fromEntries(h.entries());
-    if (Symbol.iterator in h) {
-      return Object.fromEntries(
-        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
-      );
-    }
-    const headers: Record<string, string | readonly string[]> = {};
-    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
-      if (value !== undefined) headers[name] = value;
-    }
-    return headers;
-  };
-return customInstance<PutDeviceRename200>(getPutDeviceRenameUrl(deviceId),
+  return customInstance<PutDeviceRename200>(getPutDeviceRenameUrl(deviceId),
   {
     ...options,
     method: 'PUT',
-    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    headers: getHeaders({ 'Content-Type': 'application/json' }, options?.headers),
     body: JSON.stringify(putDeviceRenameBody)
   }
 );}
@@ -35335,9 +34169,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type PutDeviceRenameMutationError = ErrorType<ApiError | ValidationError>
     export type PutDeviceRenameMutationVariables = {deviceId: string;data: BodyType<PutDeviceRenameBody>}
 
-    /**
- * @summary Rename a device
- */
+    /** @summary Rename a device */
 export const usePutDeviceRename = <TError = ErrorType<ApiError | ValidationError>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof putDeviceRename>>, TError,PutDeviceRenameMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient): UseMutationResult<
@@ -35409,9 +34241,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type DeleteDeviceForgetMutationError = ErrorType<ApiError>
     export type DeleteDeviceForgetMutationVariables = {deviceId: string}
 
-    /**
- * @summary Forget (remove) a device
- */
+    /** @summary Forget (remove) a device */
 export const useDeleteDeviceForget = <TError = ErrorType<ApiError>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteDeviceForget>>, TError,DeleteDeviceForgetMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient): UseMutationResult<
@@ -35436,25 +34266,11 @@ export const getPostPlaybackEndpointUrl = () => {
  */
 export const postPlaybackEndpoint = async (registerPlaybackEndpointRequest: RegisterPlaybackEndpointRequest, options?: Parameters<typeof customInstance>[1]): Promise<PostPlaybackEndpoint200> => {
 
-    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
-    if (!h) return {};
-    if (h instanceof Headers) return Object.fromEntries(h.entries());
-    if (Symbol.iterator in h) {
-      return Object.fromEntries(
-        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
-      );
-    }
-    const headers: Record<string, string | readonly string[]> = {};
-    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
-      if (value !== undefined) headers[name] = value;
-    }
-    return headers;
-  };
-return customInstance<PostPlaybackEndpoint200>(getPostPlaybackEndpointUrl(),
+  return customInstance<PostPlaybackEndpoint200>(getPostPlaybackEndpointUrl(),
   {
     ...options,
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    headers: getHeaders({ 'Content-Type': 'application/json' }, options?.headers),
     body: JSON.stringify(registerPlaybackEndpointRequest)
   }
 );}
@@ -35497,9 +34313,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type PostPlaybackEndpointMutationError = ErrorType<ApiError>
     export type PostPlaybackEndpointMutationVariables = {data: BodyType<RegisterPlaybackEndpointRequest>}
 
-    /**
- * @summary Register a fresh playback endpoint incarnation
- */
+    /** @summary Register a fresh playback endpoint incarnation */
 export const usePostPlaybackEndpoint = <TError = ErrorType<ApiError>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postPlaybackEndpoint>>, TError,PostPlaybackEndpointMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient): UseMutationResult<
@@ -35524,25 +34338,11 @@ export const getPostPlaybackTransferUrl = () => {
  */
 export const postPlaybackTransfer = async (transferPlaybackRequest: TransferPlaybackRequest, options?: Parameters<typeof customInstance>[1]): Promise<PostPlaybackTransfer200> => {
 
-    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
-    if (!h) return {};
-    if (h instanceof Headers) return Object.fromEntries(h.entries());
-    if (Symbol.iterator in h) {
-      return Object.fromEntries(
-        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
-      );
-    }
-    const headers: Record<string, string | readonly string[]> = {};
-    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
-      if (value !== undefined) headers[name] = value;
-    }
-    return headers;
-  };
-return customInstance<PostPlaybackTransfer200>(getPostPlaybackTransferUrl(),
+  return customInstance<PostPlaybackTransfer200>(getPostPlaybackTransferUrl(),
   {
     ...options,
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    headers: getHeaders({ 'Content-Type': 'application/json' }, options?.headers),
     body: JSON.stringify(transferPlaybackRequest)
   }
 );}
@@ -35585,9 +34385,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type PostPlaybackTransferMutationError = ErrorType<ApiError>
     export type PostPlaybackTransferMutationVariables = {data: BodyType<TransferPlaybackRequest>}
 
-    /**
- * @summary Begin an acknowledged playback transfer
- */
+    /** @summary Begin an acknowledged playback transfer */
 export const usePostPlaybackTransfer = <TError = ErrorType<ApiError>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postPlaybackTransfer>>, TError,PostPlaybackTransferMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient): UseMutationResult<
@@ -35612,25 +34410,11 @@ export const getPostPlaybackAckUrl = () => {
  */
 export const postPlaybackAck = async (acknowledgePlaybackRequest: AcknowledgePlaybackRequest, options?: Parameters<typeof customInstance>[1]): Promise<PostPlaybackAck200> => {
 
-    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
-    if (!h) return {};
-    if (h instanceof Headers) return Object.fromEntries(h.entries());
-    if (Symbol.iterator in h) {
-      return Object.fromEntries(
-        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
-      );
-    }
-    const headers: Record<string, string | readonly string[]> = {};
-    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
-      if (value !== undefined) headers[name] = value;
-    }
-    return headers;
-  };
-return customInstance<PostPlaybackAck200>(getPostPlaybackAckUrl(),
+  return customInstance<PostPlaybackAck200>(getPostPlaybackAckUrl(),
   {
     ...options,
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    headers: getHeaders({ 'Content-Type': 'application/json' }, options?.headers),
     body: JSON.stringify(acknowledgePlaybackRequest)
   }
 );}
@@ -35673,9 +34457,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type PostPlaybackAckMutationError = ErrorType<ApiError>
     export type PostPlaybackAckMutationVariables = {data: BodyType<AcknowledgePlaybackRequest>}
 
-    /**
- * @summary Acknowledge an owned endpoint command
- */
+    /** @summary Acknowledge an owned endpoint command */
 export const usePostPlaybackAck = <TError = ErrorType<ApiError>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postPlaybackAck>>, TError,PostPlaybackAckMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient): UseMutationResult<
@@ -35700,25 +34482,11 @@ export const getPostPlaybackObserveUrl = () => {
  */
 export const postPlaybackObserve = async (observePlaybackRequest: ObservePlaybackRequest, options?: Parameters<typeof customInstance>[1]): Promise<PostPlaybackObserve200> => {
 
-    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
-    if (!h) return {};
-    if (h instanceof Headers) return Object.fromEntries(h.entries());
-    if (Symbol.iterator in h) {
-      return Object.fromEntries(
-        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
-      );
-    }
-    const headers: Record<string, string | readonly string[]> = {};
-    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
-      if (value !== undefined) headers[name] = value;
-    }
-    return headers;
-  };
-return customInstance<PostPlaybackObserve200>(getPostPlaybackObserveUrl(),
+  return customInstance<PostPlaybackObserve200>(getPostPlaybackObserveUrl(),
   {
     ...options,
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    headers: getHeaders({ 'Content-Type': 'application/json' }, options?.headers),
     body: JSON.stringify(observePlaybackRequest)
   }
 );}
@@ -35761,9 +34529,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type PostPlaybackObserveMutationError = ErrorType<ApiError>
     export type PostPlaybackObserveMutationVariables = {data: BodyType<ObservePlaybackRequest>}
 
-    /**
- * @summary Renew endpoint presence and report observed playback
- */
+    /** @summary Renew endpoint presence and report observed playback */
 export const usePostPlaybackObserve = <TError = ErrorType<ApiError>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postPlaybackObserve>>, TError,PostPlaybackObserveMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient): UseMutationResult<
@@ -35788,25 +34554,11 @@ export const getPostPlaybackControlUrl = () => {
  */
 export const postPlaybackControl = async (controlPlaybackRequest: ControlPlaybackRequest, options?: Parameters<typeof customInstance>[1]): Promise<PostPlaybackControl200> => {
 
-    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
-    if (!h) return {};
-    if (h instanceof Headers) return Object.fromEntries(h.entries());
-    if (Symbol.iterator in h) {
-      return Object.fromEntries(
-        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
-      );
-    }
-    const headers: Record<string, string | readonly string[]> = {};
-    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
-      if (value !== undefined) headers[name] = value;
-    }
-    return headers;
-  };
-return customInstance<PostPlaybackControl200>(getPostPlaybackControlUrl(),
+  return customInstance<PostPlaybackControl200>(getPostPlaybackControlUrl(),
   {
     ...options,
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    headers: getHeaders({ 'Content-Type': 'application/json' }, options?.headers),
     body: JSON.stringify(controlPlaybackRequest)
   }
 );}
@@ -35849,9 +34601,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type PostPlaybackControlMutationError = ErrorType<ApiError>
     export type PostPlaybackControlMutationVariables = {data: BodyType<ControlPlaybackRequest>}
 
-    /**
- * @summary Control the committed playback runner
- */
+    /** @summary Control the committed playback runner */
 export const usePostPlaybackControl = <TError = ErrorType<ApiError>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postPlaybackControl>>, TError,PostPlaybackControlMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient): UseMutationResult<
@@ -35876,25 +34626,11 @@ export const getPostPlaybackReconcileUrl = () => {
  */
 export const postPlaybackReconcile = async (reconcilePlaybackRequest: ReconcilePlaybackRequest, options?: Parameters<typeof customInstance>[1]): Promise<PostPlaybackReconcile200> => {
 
-    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
-    if (!h) return {};
-    if (h instanceof Headers) return Object.fromEntries(h.entries());
-    if (Symbol.iterator in h) {
-      return Object.fromEntries(
-        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
-      );
-    }
-    const headers: Record<string, string | readonly string[]> = {};
-    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
-      if (value !== undefined) headers[name] = value;
-    }
-    return headers;
-  };
-return customInstance<PostPlaybackReconcile200>(getPostPlaybackReconcileUrl(),
+  return customInstance<PostPlaybackReconcile200>(getPostPlaybackReconcileUrl(),
   {
     ...options,
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    headers: getHeaders({ 'Content-Type': 'application/json' }, options?.headers),
     body: JSON.stringify(reconcilePlaybackRequest)
   }
 );}
@@ -35937,9 +34673,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type PostPlaybackReconcileMutationError = ErrorType<ApiError>
     export type PostPlaybackReconcileMutationVariables = {data: BodyType<ReconcilePlaybackRequest>}
 
-    /**
- * @summary Stop an uncertain transfer target
- */
+    /** @summary Stop an uncertain transfer target */
 export const usePostPlaybackReconcile = <TError = ErrorType<ApiError>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postPlaybackReconcile>>, TError,PostPlaybackReconcileMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient): UseMutationResult<
@@ -35964,25 +34698,11 @@ export const getPostPlaybackRecoverLocalUrl = () => {
  */
 export const postPlaybackRecoverLocal = async (recoverLocalPlaybackRequest: RecoverLocalPlaybackRequest, options?: Parameters<typeof customInstance>[1]): Promise<PostPlaybackRecoverLocal200> => {
 
-    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
-    if (!h) return {};
-    if (h instanceof Headers) return Object.fromEntries(h.entries());
-    if (Symbol.iterator in h) {
-      return Object.fromEntries(
-        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
-      );
-    }
-    const headers: Record<string, string | readonly string[]> = {};
-    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
-      if (value !== undefined) headers[name] = value;
-    }
-    return headers;
-  };
-return customInstance<PostPlaybackRecoverLocal200>(getPostPlaybackRecoverLocalUrl(),
+  return customInstance<PostPlaybackRecoverLocal200>(getPostPlaybackRecoverLocalUrl(),
   {
     ...options,
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    headers: getHeaders({ 'Content-Type': 'application/json' }, options?.headers),
     body: JSON.stringify(recoverLocalPlaybackRequest)
   }
 );}
@@ -36025,9 +34745,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type PostPlaybackRecoverLocalMutationError = ErrorType<void>
     export type PostPlaybackRecoverLocalMutationVariables = {data: BodyType<RecoverLocalPlaybackRequest>}
 
-    /**
- * @summary Recover a proven stopped local browser incarnation
- */
+    /** @summary Recover a proven stopped local browser incarnation */
 export const usePostPlaybackRecoverLocal = <TError = ErrorType<void>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postPlaybackRecoverLocal>>, TError,PostPlaybackRecoverLocalMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient): UseMutationResult<
@@ -36052,25 +34770,11 @@ export const getPostPlaybackCloseUrl = () => {
  */
 export const postPlaybackClose = async (closePlaybackEndpointRequest: ClosePlaybackEndpointRequest, options?: Parameters<typeof customInstance>[1]): Promise<PostPlaybackClose200> => {
 
-    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
-    if (!h) return {};
-    if (h instanceof Headers) return Object.fromEntries(h.entries());
-    if (Symbol.iterator in h) {
-      return Object.fromEntries(
-        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
-      );
-    }
-    const headers: Record<string, string | readonly string[]> = {};
-    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
-      if (value !== undefined) headers[name] = value;
-    }
-    return headers;
-  };
-return customInstance<PostPlaybackClose200>(getPostPlaybackCloseUrl(),
+  return customInstance<PostPlaybackClose200>(getPostPlaybackCloseUrl(),
   {
     ...options,
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    headers: getHeaders({ 'Content-Type': 'application/json' }, options?.headers),
     body: JSON.stringify(closePlaybackEndpointRequest)
   }
 );}
@@ -36113,9 +34817,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type PostPlaybackCloseMutationError = ErrorType<ApiError>
     export type PostPlaybackCloseMutationVariables = {data: BodyType<ClosePlaybackEndpointRequest>}
 
-    /**
- * @summary Report that an endpoint is going away and its players have stopped
- */
+    /** @summary Report that an endpoint is going away and its players have stopped */
 export const usePostPlaybackClose = <TError = ErrorType<ApiError>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postPlaybackClose>>, TError,PostPlaybackCloseMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient): UseMutationResult<
@@ -36140,25 +34842,11 @@ export const getPostPlaybackOverrideUrl = () => {
  */
 export const postPlaybackOverride = async (overridePlaybackRequest: OverridePlaybackRequest, options?: Parameters<typeof customInstance>[1]): Promise<PostPlaybackOverride200> => {
 
-    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
-    if (!h) return {};
-    if (h instanceof Headers) return Object.fromEntries(h.entries());
-    if (Symbol.iterator in h) {
-      return Object.fromEntries(
-        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
-      );
-    }
-    const headers: Record<string, string | readonly string[]> = {};
-    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
-      if (value !== undefined) headers[name] = value;
-    }
-    return headers;
-  };
-return customInstance<PostPlaybackOverride200>(getPostPlaybackOverrideUrl(),
+  return customInstance<PostPlaybackOverride200>(getPostPlaybackOverrideUrl(),
   {
     ...options,
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    headers: getHeaders({ 'Content-Type': 'application/json' }, options?.headers),
     body: JSON.stringify(overridePlaybackRequest)
   }
 );}
@@ -36201,9 +34889,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type PostPlaybackOverrideMutationError = ErrorType<ApiError>
     export type PostPlaybackOverrideMutationVariables = {data: BodyType<OverridePlaybackRequest>}
 
-    /**
- * @summary End the hold of a destination that is no longer registered
- */
+    /** @summary End the hold of a destination that is no longer registered */
 export const usePostPlaybackOverride = <TError = ErrorType<ApiError>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postPlaybackOverride>>, TError,PostPlaybackOverrideMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient): UseMutationResult<
@@ -36277,6 +34963,7 @@ export type GetPlaybackSnapshotQueryResult = NonNullable<Awaited<ReturnType<type
 export type GetPlaybackSnapshotQueryError = ErrorType<ApiError>
 
 
+/** @summary Recover the complete playback snapshot */
 export function useGetPlaybackSnapshot<TData = Awaited<ReturnType<typeof getPlaybackSnapshot>>, TError = ErrorType<ApiError>>(
  params: undefined |  GetPlaybackSnapshotParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getPlaybackSnapshot>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
@@ -36287,6 +34974,7 @@ export function useGetPlaybackSnapshot<TData = Awaited<ReturnType<typeof getPlay
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/** @summary Recover the complete playback snapshot */
 export function useGetPlaybackSnapshot<TData = Awaited<ReturnType<typeof getPlaybackSnapshot>>, TError = ErrorType<ApiError>>(
  params?: GetPlaybackSnapshotParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getPlaybackSnapshot>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
@@ -36297,14 +34985,12 @@ export function useGetPlaybackSnapshot<TData = Awaited<ReturnType<typeof getPlay
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/** @summary Recover the complete playback snapshot */
 export function useGetPlaybackSnapshot<TData = Awaited<ReturnType<typeof getPlaybackSnapshot>>, TError = ErrorType<ApiError>>(
  params?: GetPlaybackSnapshotParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getPlaybackSnapshot>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-/**
- * @summary Recover the complete playback snapshot
- */
-
+/** @summary Recover the complete playback snapshot */
 export function useGetPlaybackSnapshot<TData = Awaited<ReturnType<typeof getPlaybackSnapshot>>, TError = ErrorType<ApiError>>(
  params?: GetPlaybackSnapshotParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getPlaybackSnapshot>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
@@ -36378,6 +35064,7 @@ export type GetAdminLogsSourcesQueryResult = NonNullable<Awaited<ReturnType<type
 export type GetAdminLogsSourcesQueryError = ErrorType<unknown>
 
 
+/** @summary List configured log sources and host coverage */
 export function useGetAdminLogsSources<TData = Awaited<ReturnType<typeof getAdminLogsSources>>, TError = ErrorType<unknown>>(
   options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAdminLogsSources>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
@@ -36388,6 +35075,7 @@ export function useGetAdminLogsSources<TData = Awaited<ReturnType<typeof getAdmi
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/** @summary List configured log sources and host coverage */
 export function useGetAdminLogsSources<TData = Awaited<ReturnType<typeof getAdminLogsSources>>, TError = ErrorType<unknown>>(
   options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAdminLogsSources>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
@@ -36398,14 +35086,12 @@ export function useGetAdminLogsSources<TData = Awaited<ReturnType<typeof getAdmi
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/** @summary List configured log sources and host coverage */
 export function useGetAdminLogsSources<TData = Awaited<ReturnType<typeof getAdminLogsSources>>, TError = ErrorType<unknown>>(
   options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAdminLogsSources>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-/**
- * @summary List configured log sources and host coverage
- */
-
+/** @summary List configured log sources and host coverage */
 export function useGetAdminLogsSources<TData = Awaited<ReturnType<typeof getAdminLogsSources>>, TError = ErrorType<unknown>>(
   options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAdminLogsSources>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
@@ -36494,6 +35180,7 @@ export type GetAdminLogsEntriesQueryResult = NonNullable<Awaited<ReturnType<type
 export type GetAdminLogsEntriesQueryError = ErrorType<unknown>
 
 
+/** @summary Browse a bounded frozen log snapshot */
 export function useGetAdminLogsEntries<TData = Awaited<ReturnType<typeof getAdminLogsEntries>>, TError = ErrorType<unknown>>(
  params: undefined |  GetAdminLogsEntriesParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAdminLogsEntries>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
@@ -36504,6 +35191,7 @@ export function useGetAdminLogsEntries<TData = Awaited<ReturnType<typeof getAdmi
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/** @summary Browse a bounded frozen log snapshot */
 export function useGetAdminLogsEntries<TData = Awaited<ReturnType<typeof getAdminLogsEntries>>, TError = ErrorType<unknown>>(
  params?: GetAdminLogsEntriesParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAdminLogsEntries>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
@@ -36514,14 +35202,12 @@ export function useGetAdminLogsEntries<TData = Awaited<ReturnType<typeof getAdmi
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/** @summary Browse a bounded frozen log snapshot */
 export function useGetAdminLogsEntries<TData = Awaited<ReturnType<typeof getAdminLogsEntries>>, TError = ErrorType<unknown>>(
  params?: GetAdminLogsEntriesParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAdminLogsEntries>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-/**
- * @summary Browse a bounded frozen log snapshot
- */
-
+/** @summary Browse a bounded frozen log snapshot */
 export function useGetAdminLogsEntries<TData = Awaited<ReturnType<typeof getAdminLogsEntries>>, TError = ErrorType<unknown>>(
  params?: GetAdminLogsEntriesParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAdminLogsEntries>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
@@ -36595,6 +35281,7 @@ export type GetAdminLogsDetailQueryResult = NonNullable<Awaited<ReturnType<typeo
 export type GetAdminLogsDetailQueryError = ErrorType<unknown>
 
 
+/** @summary Inspect a retained log record */
 export function useGetAdminLogsDetail<TData = Awaited<ReturnType<typeof getAdminLogsDetail>>, TError = ErrorType<unknown>>(
  id: string, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAdminLogsDetail>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
@@ -36605,6 +35292,7 @@ export function useGetAdminLogsDetail<TData = Awaited<ReturnType<typeof getAdmin
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/** @summary Inspect a retained log record */
 export function useGetAdminLogsDetail<TData = Awaited<ReturnType<typeof getAdminLogsDetail>>, TError = ErrorType<unknown>>(
  id: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAdminLogsDetail>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
@@ -36615,14 +35303,12 @@ export function useGetAdminLogsDetail<TData = Awaited<ReturnType<typeof getAdmin
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/** @summary Inspect a retained log record */
 export function useGetAdminLogsDetail<TData = Awaited<ReturnType<typeof getAdminLogsDetail>>, TError = ErrorType<unknown>>(
  id: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAdminLogsDetail>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-/**
- * @summary Inspect a retained log record
- */
-
+/** @summary Inspect a retained log record */
 export function useGetAdminLogsDetail<TData = Awaited<ReturnType<typeof getAdminLogsDetail>>, TError = ErrorType<unknown>>(
  id: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAdminLogsDetail>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
@@ -36654,25 +35340,11 @@ export const getPostAdminLogsQueryUrl = () => {
  */
 export const postAdminLogsQuery = async (logSqlRequest: LogSqlRequest, options?: Parameters<typeof customInstance>[1]): Promise<PostAdminLogsQuery200> => {
 
-    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
-    if (!h) return {};
-    if (h instanceof Headers) return Object.fromEntries(h.entries());
-    if (Symbol.iterator in h) {
-      return Object.fromEntries(
-        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
-      );
-    }
-    const headers: Record<string, string | readonly string[]> = {};
-    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
-      if (value !== undefined) headers[name] = value;
-    }
-    return headers;
-  };
-return customInstance<PostAdminLogsQuery200>(getPostAdminLogsQueryUrl(),
+  return customInstance<PostAdminLogsQuery200>(getPostAdminLogsQueryUrl(),
   {
     ...options,
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    headers: getHeaders({ 'Content-Type': 'application/json' }, options?.headers),
     body: JSON.stringify(logSqlRequest)
   }
 );}
@@ -36715,9 +35387,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type PostAdminLogsQueryMutationError = ErrorType<unknown>
     export type PostAdminLogsQueryMutationVariables = {data: BodyType<LogSqlRequest>}
 
-    /**
- * @summary Execute read-only SQL against a frozen log snapshot
- */
+    /** @summary Execute read-only SQL against a frozen log snapshot */
 export const usePostAdminLogsQuery = <TError = ErrorType<unknown>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postAdminLogsQuery>>, TError,PostAdminLogsQueryMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient): UseMutationResult<
@@ -36786,6 +35456,11 @@ export type GetDebugConfigCheckQueryResult = NonNullable<Awaited<ReturnType<type
 export type GetDebugConfigCheckQueryError = ErrorType<unknown>
 
 
+/**
+ * Runs all configuration checks (env vars, connectivity, framework config)
+ * and returns results with a summary. Used by the admin Configuration page.
+ * @summary Validate application configuration
+ */
 export function useGetDebugConfigCheck<TData = Awaited<ReturnType<typeof getDebugConfigCheck>>, TError = ErrorType<unknown>>(
   options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getDebugConfigCheck>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
@@ -36796,6 +35471,11 @@ export function useGetDebugConfigCheck<TData = Awaited<ReturnType<typeof getDebu
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * Runs all configuration checks (env vars, connectivity, framework config)
+ * and returns results with a summary. Used by the admin Configuration page.
+ * @summary Validate application configuration
+ */
 export function useGetDebugConfigCheck<TData = Awaited<ReturnType<typeof getDebugConfigCheck>>, TError = ErrorType<unknown>>(
   options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getDebugConfigCheck>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
@@ -36806,14 +35486,20 @@ export function useGetDebugConfigCheck<TData = Awaited<ReturnType<typeof getDebu
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * Runs all configuration checks (env vars, connectivity, framework config)
+ * and returns results with a summary. Used by the admin Configuration page.
+ * @summary Validate application configuration
+ */
 export function useGetDebugConfigCheck<TData = Awaited<ReturnType<typeof getDebugConfigCheck>>, TError = ErrorType<unknown>>(
   options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getDebugConfigCheck>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 /**
+ * Runs all configuration checks (env vars, connectivity, framework config)
+ * and returns results with a summary. Used by the admin Configuration page.
  * @summary Validate application configuration
  */
-
 export function useGetDebugConfigCheck<TData = Awaited<ReturnType<typeof getDebugConfigCheck>>, TError = ErrorType<unknown>>(
   options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getDebugConfigCheck>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
@@ -36887,6 +35573,7 @@ export type GetDebugCoroutinesQueryResult = NonNullable<Awaited<ReturnType<typeo
 export type GetDebugCoroutinesQueryError = ErrorType<unknown>
 
 
+/** @summary Swoole coroutine and channel statistics of every HTTP worker */
 export function useGetDebugCoroutines<TData = Awaited<ReturnType<typeof getDebugCoroutines>>, TError = ErrorType<unknown>>(
   options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getDebugCoroutines>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
@@ -36897,6 +35584,7 @@ export function useGetDebugCoroutines<TData = Awaited<ReturnType<typeof getDebug
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/** @summary Swoole coroutine and channel statistics of every HTTP worker */
 export function useGetDebugCoroutines<TData = Awaited<ReturnType<typeof getDebugCoroutines>>, TError = ErrorType<unknown>>(
   options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getDebugCoroutines>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
@@ -36907,14 +35595,12 @@ export function useGetDebugCoroutines<TData = Awaited<ReturnType<typeof getDebug
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/** @summary Swoole coroutine and channel statistics of every HTTP worker */
 export function useGetDebugCoroutines<TData = Awaited<ReturnType<typeof getDebugCoroutines>>, TError = ErrorType<unknown>>(
   options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getDebugCoroutines>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-/**
- * @summary Swoole coroutine and channel statistics of every HTTP worker
- */
-
+/** @summary Swoole coroutine and channel statistics of every HTTP worker */
 export function useGetDebugCoroutines<TData = Awaited<ReturnType<typeof getDebugCoroutines>>, TError = ErrorType<unknown>>(
   options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getDebugCoroutines>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
@@ -36989,6 +35675,10 @@ export type GetDebugHealthQueryResult = NonNullable<Awaited<ReturnType<typeof ge
 export type GetDebugHealthQueryError = ErrorType<GetDebugHealth503>
 
 
+/**
+ * Runs the checks of `/health` and returns each with its latency and details: connection state, Redis key count, Swoole figures, the largest web worker's memory against its limit, the background worker's heartbeat, the deployment profile fingerprints, and a failed dependency's error. The status code follows `/health`: the background worker, the worker profile and memory can read unhealthy while it answers 200.
+ * @summary Full health report
+ */
 export function useGetDebugHealth<TData = Awaited<ReturnType<typeof getDebugHealth>>, TError = ErrorType<GetDebugHealth503>>(
   options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getDebugHealth>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
@@ -36999,6 +35689,10 @@ export function useGetDebugHealth<TData = Awaited<ReturnType<typeof getDebugHeal
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * Runs the checks of `/health` and returns each with its latency and details: connection state, Redis key count, Swoole figures, the largest web worker's memory against its limit, the background worker's heartbeat, the deployment profile fingerprints, and a failed dependency's error. The status code follows `/health`: the background worker, the worker profile and memory can read unhealthy while it answers 200.
+ * @summary Full health report
+ */
 export function useGetDebugHealth<TData = Awaited<ReturnType<typeof getDebugHealth>>, TError = ErrorType<GetDebugHealth503>>(
   options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getDebugHealth>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
@@ -37009,14 +35703,18 @@ export function useGetDebugHealth<TData = Awaited<ReturnType<typeof getDebugHeal
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * Runs the checks of `/health` and returns each with its latency and details: connection state, Redis key count, Swoole figures, the largest web worker's memory against its limit, the background worker's heartbeat, the deployment profile fingerprints, and a failed dependency's error. The status code follows `/health`: the background worker, the worker profile and memory can read unhealthy while it answers 200.
+ * @summary Full health report
+ */
 export function useGetDebugHealth<TData = Awaited<ReturnType<typeof getDebugHealth>>, TError = ErrorType<GetDebugHealth503>>(
   options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getDebugHealth>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 /**
+ * Runs the checks of `/health` and returns each with its latency and details: connection state, Redis key count, Swoole figures, the largest web worker's memory against its limit, the background worker's heartbeat, the deployment profile fingerprints, and a failed dependency's error. The status code follows `/health`: the background worker, the worker profile and memory can read unhealthy while it answers 200.
  * @summary Full health report
  */
-
 export function useGetDebugHealth<TData = Awaited<ReturnType<typeof getDebugHealth>>, TError = ErrorType<GetDebugHealth503>>(
   options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getDebugHealth>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
@@ -37098,6 +35796,10 @@ export type GetMonitorAnalyticsSummaryQueryResult = NonNullable<Awaited<ReturnTy
 export type GetMonitorAnalyticsSummaryQueryError = ErrorType<ApiError>
 
 
+/**
+ * Returns status counts, job type breakdown, success rate, and throughput per hour.
+ * @summary Get analytics summary for a time range
+ */
 export function useGetMonitorAnalyticsSummary<TData = Awaited<ReturnType<typeof getMonitorAnalyticsSummary>>, TError = ErrorType<ApiError>>(
  params: undefined |  GetMonitorAnalyticsSummaryParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getMonitorAnalyticsSummary>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
@@ -37108,6 +35810,10 @@ export function useGetMonitorAnalyticsSummary<TData = Awaited<ReturnType<typeof 
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * Returns status counts, job type breakdown, success rate, and throughput per hour.
+ * @summary Get analytics summary for a time range
+ */
 export function useGetMonitorAnalyticsSummary<TData = Awaited<ReturnType<typeof getMonitorAnalyticsSummary>>, TError = ErrorType<ApiError>>(
  params?: GetMonitorAnalyticsSummaryParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getMonitorAnalyticsSummary>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
@@ -37118,14 +35824,18 @@ export function useGetMonitorAnalyticsSummary<TData = Awaited<ReturnType<typeof 
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * Returns status counts, job type breakdown, success rate, and throughput per hour.
+ * @summary Get analytics summary for a time range
+ */
 export function useGetMonitorAnalyticsSummary<TData = Awaited<ReturnType<typeof getMonitorAnalyticsSummary>>, TError = ErrorType<ApiError>>(
  params?: GetMonitorAnalyticsSummaryParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getMonitorAnalyticsSummary>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 /**
+ * Returns status counts, job type breakdown, success rate, and throughput per hour.
  * @summary Get analytics summary for a time range
  */
-
 export function useGetMonitorAnalyticsSummary<TData = Awaited<ReturnType<typeof getMonitorAnalyticsSummary>>, TError = ErrorType<ApiError>>(
  params?: GetMonitorAnalyticsSummaryParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getMonitorAnalyticsSummary>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
@@ -37207,6 +35917,10 @@ export type GetMonitorAnalyticsTimingQueryResult = NonNullable<Awaited<ReturnTyp
 export type GetMonitorAnalyticsTimingQueryError = ErrorType<ApiError>
 
 
+/**
+ * Returns average, median, and P95 execution times and queue latency per job type.
+ * @summary Get timing analytics for a time range
+ */
 export function useGetMonitorAnalyticsTiming<TData = Awaited<ReturnType<typeof getMonitorAnalyticsTiming>>, TError = ErrorType<ApiError>>(
  params: undefined |  GetMonitorAnalyticsTimingParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getMonitorAnalyticsTiming>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
@@ -37217,6 +35931,10 @@ export function useGetMonitorAnalyticsTiming<TData = Awaited<ReturnType<typeof g
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * Returns average, median, and P95 execution times and queue latency per job type.
+ * @summary Get timing analytics for a time range
+ */
 export function useGetMonitorAnalyticsTiming<TData = Awaited<ReturnType<typeof getMonitorAnalyticsTiming>>, TError = ErrorType<ApiError>>(
  params?: GetMonitorAnalyticsTimingParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getMonitorAnalyticsTiming>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
@@ -37227,14 +35945,18 @@ export function useGetMonitorAnalyticsTiming<TData = Awaited<ReturnType<typeof g
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * Returns average, median, and P95 execution times and queue latency per job type.
+ * @summary Get timing analytics for a time range
+ */
 export function useGetMonitorAnalyticsTiming<TData = Awaited<ReturnType<typeof getMonitorAnalyticsTiming>>, TError = ErrorType<ApiError>>(
  params?: GetMonitorAnalyticsTimingParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getMonitorAnalyticsTiming>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 /**
+ * Returns average, median, and P95 execution times and queue latency per job type.
  * @summary Get timing analytics for a time range
  */
-
 export function useGetMonitorAnalyticsTiming<TData = Awaited<ReturnType<typeof getMonitorAnalyticsTiming>>, TError = ErrorType<ApiError>>(
  params?: GetMonitorAnalyticsTimingParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getMonitorAnalyticsTiming>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
@@ -37316,6 +36038,10 @@ export type GetMonitorAnalyticsFailuresQueryResult = NonNullable<Awaited<ReturnT
 export type GetMonitorAnalyticsFailuresQueryError = ErrorType<ApiError>
 
 
+/**
+ * Returns top failing job types, top exception classes, retry frequency, and recent failures.
+ * @summary Get failure analytics for a time range
+ */
 export function useGetMonitorAnalyticsFailures<TData = Awaited<ReturnType<typeof getMonitorAnalyticsFailures>>, TError = ErrorType<ApiError>>(
  params: undefined |  GetMonitorAnalyticsFailuresParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getMonitorAnalyticsFailures>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
@@ -37326,6 +36052,10 @@ export function useGetMonitorAnalyticsFailures<TData = Awaited<ReturnType<typeof
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * Returns top failing job types, top exception classes, retry frequency, and recent failures.
+ * @summary Get failure analytics for a time range
+ */
 export function useGetMonitorAnalyticsFailures<TData = Awaited<ReturnType<typeof getMonitorAnalyticsFailures>>, TError = ErrorType<ApiError>>(
  params?: GetMonitorAnalyticsFailuresParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getMonitorAnalyticsFailures>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
@@ -37336,14 +36066,18 @@ export function useGetMonitorAnalyticsFailures<TData = Awaited<ReturnType<typeof
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * Returns top failing job types, top exception classes, retry frequency, and recent failures.
+ * @summary Get failure analytics for a time range
+ */
 export function useGetMonitorAnalyticsFailures<TData = Awaited<ReturnType<typeof getMonitorAnalyticsFailures>>, TError = ErrorType<ApiError>>(
  params?: GetMonitorAnalyticsFailuresParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getMonitorAnalyticsFailures>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 /**
+ * Returns top failing job types, top exception classes, retry frequency, and recent failures.
  * @summary Get failure analytics for a time range
  */
-
 export function useGetMonitorAnalyticsFailures<TData = Awaited<ReturnType<typeof getMonitorAnalyticsFailures>>, TError = ErrorType<ApiError>>(
  params?: GetMonitorAnalyticsFailuresParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getMonitorAnalyticsFailures>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
@@ -37417,6 +36151,7 @@ export type GetMonitorStatusQueryResult = NonNullable<Awaited<ReturnType<typeof 
 export type GetMonitorStatusQueryError = ErrorType<unknown>
 
 
+/** @summary Get background job monitoring status summary */
 export function useGetMonitorStatus<TData = Awaited<ReturnType<typeof getMonitorStatus>>, TError = ErrorType<unknown>>(
   options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getMonitorStatus>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
@@ -37427,6 +36162,7 @@ export function useGetMonitorStatus<TData = Awaited<ReturnType<typeof getMonitor
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/** @summary Get background job monitoring status summary */
 export function useGetMonitorStatus<TData = Awaited<ReturnType<typeof getMonitorStatus>>, TError = ErrorType<unknown>>(
   options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getMonitorStatus>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
@@ -37437,14 +36173,12 @@ export function useGetMonitorStatus<TData = Awaited<ReturnType<typeof getMonitor
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/** @summary Get background job monitoring status summary */
 export function useGetMonitorStatus<TData = Awaited<ReturnType<typeof getMonitorStatus>>, TError = ErrorType<unknown>>(
   options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getMonitorStatus>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-/**
- * @summary Get background job monitoring status summary
- */
-
+/** @summary Get background job monitoring status summary */
 export function useGetMonitorStatus<TData = Awaited<ReturnType<typeof getMonitorStatus>>, TError = ErrorType<unknown>>(
   options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getMonitorStatus>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
@@ -37525,6 +36259,7 @@ export type GetMonitorJobsQueryResult = NonNullable<Awaited<ReturnType<typeof ge
 export type GetMonitorJobsQueryError = ErrorType<ApiError>
 
 
+/** @summary Get background jobs with filtering, sorting, and pagination */
 export function useGetMonitorJobs<TData = Awaited<ReturnType<typeof getMonitorJobs>>, TError = ErrorType<ApiError>>(
  params: undefined |  GetMonitorJobsParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getMonitorJobs>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
@@ -37535,6 +36270,7 @@ export function useGetMonitorJobs<TData = Awaited<ReturnType<typeof getMonitorJo
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/** @summary Get background jobs with filtering, sorting, and pagination */
 export function useGetMonitorJobs<TData = Awaited<ReturnType<typeof getMonitorJobs>>, TError = ErrorType<ApiError>>(
  params?: GetMonitorJobsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getMonitorJobs>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
@@ -37545,14 +36281,12 @@ export function useGetMonitorJobs<TData = Awaited<ReturnType<typeof getMonitorJo
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/** @summary Get background jobs with filtering, sorting, and pagination */
 export function useGetMonitorJobs<TData = Awaited<ReturnType<typeof getMonitorJobs>>, TError = ErrorType<ApiError>>(
  params?: GetMonitorJobsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getMonitorJobs>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-/**
- * @summary Get background jobs with filtering, sorting, and pagination
- */
-
+/** @summary Get background jobs with filtering, sorting, and pagination */
 export function useGetMonitorJobs<TData = Awaited<ReturnType<typeof getMonitorJobs>>, TError = ErrorType<ApiError>>(
  params?: GetMonitorJobsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getMonitorJobs>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
@@ -37626,6 +36360,7 @@ export type GetMonitorJobsDetailQueryResult = NonNullable<Awaited<ReturnType<typ
 export type GetMonitorJobsDetailQueryError = ErrorType<ApiError>
 
 
+/** @summary Get background job detail */
 export function useGetMonitorJobsDetail<TData = Awaited<ReturnType<typeof getMonitorJobsDetail>>, TError = ErrorType<ApiError>>(
  jobId: string, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getMonitorJobsDetail>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
@@ -37636,6 +36371,7 @@ export function useGetMonitorJobsDetail<TData = Awaited<ReturnType<typeof getMon
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/** @summary Get background job detail */
 export function useGetMonitorJobsDetail<TData = Awaited<ReturnType<typeof getMonitorJobsDetail>>, TError = ErrorType<ApiError>>(
  jobId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getMonitorJobsDetail>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
@@ -37646,14 +36382,12 @@ export function useGetMonitorJobsDetail<TData = Awaited<ReturnType<typeof getMon
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/** @summary Get background job detail */
 export function useGetMonitorJobsDetail<TData = Awaited<ReturnType<typeof getMonitorJobsDetail>>, TError = ErrorType<ApiError>>(
  jobId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getMonitorJobsDetail>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-/**
- * @summary Get background job detail
- */
-
+/** @summary Get background job detail */
 export function useGetMonitorJobsDetail<TData = Awaited<ReturnType<typeof getMonitorJobsDetail>>, TError = ErrorType<ApiError>>(
  jobId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getMonitorJobsDetail>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
@@ -37686,25 +36420,11 @@ export const getPostMonitorPruneUrl = () => {
  */
 export const postMonitorPrune = async (postMonitorPruneBody?: PostMonitorPruneBody, options?: Parameters<typeof customInstance>[1]): Promise<PostMonitorPrune200> => {
 
-    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
-    if (!h) return {};
-    if (h instanceof Headers) return Object.fromEntries(h.entries());
-    if (Symbol.iterator in h) {
-      return Object.fromEntries(
-        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
-      );
-    }
-    const headers: Record<string, string | readonly string[]> = {};
-    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
-      if (value !== undefined) headers[name] = value;
-    }
-    return headers;
-  };
-return customInstance<PostMonitorPrune200>(getPostMonitorPruneUrl(),
+  return customInstance<PostMonitorPrune200>(getPostMonitorPruneUrl(),
   {
     ...options,
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    headers: getHeaders({ 'Content-Type': 'application/json' }, options?.headers),
     body: JSON.stringify(postMonitorPruneBody)
   }
 );}
@@ -37748,6 +36468,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type PostMonitorPruneMutationVariables = {data?: BodyType<PostMonitorPruneBody>}
 
     /**
+ * Deletes finished, failed, and cancelled job monitors older than the specified number of days. Defaults to 7 days.
  * @summary Prune old job monitors
  */
 export const usePostMonitorPrune = <TError = ErrorType<ApiError>,
@@ -37823,6 +36544,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type PostMonitorJobsRetryMutationVariables = {jobId: string}
 
     /**
+ * Re-dispatches the original message payload of a failed job. The job must be in Failed status, not previously retried, and have a stored message payload.
  * @summary Retry a failed background job
  */
 export const usePostMonitorJobsRetry = <TError = ErrorType<ApiError>,
@@ -37898,6 +36620,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type PostMonitorJobsCancelMutationVariables = {jobId: string}
 
     /**
+ * Sets a cooperative cancellation flag in Redis; a running job stops at its next checkpoint and becomes cancelled. A finished job that queued work to run later, such as the lyrics fetches of a bulk fetch, has that work cancelled instead: what has not run yet is skipped when it comes due, and the job becomes cancelled.
  * @summary Cancel a running background job, or the work a finished job queued
  */
 export const usePostMonitorJobsCancel = <TError = ErrorType<ApiError>,
@@ -37966,6 +36689,7 @@ export type GetMonitorRatelimitersListQueryResult = NonNullable<Awaited<ReturnTy
 export type GetMonitorRatelimitersListQueryError = ErrorType<unknown>
 
 
+/** @summary List all rate limiters with configuration */
 export function useGetMonitorRatelimitersList<TData = Awaited<ReturnType<typeof getMonitorRatelimitersList>>, TError = ErrorType<unknown>>(
   options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getMonitorRatelimitersList>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
@@ -37976,6 +36700,7 @@ export function useGetMonitorRatelimitersList<TData = Awaited<ReturnType<typeof 
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/** @summary List all rate limiters with configuration */
 export function useGetMonitorRatelimitersList<TData = Awaited<ReturnType<typeof getMonitorRatelimitersList>>, TError = ErrorType<unknown>>(
   options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getMonitorRatelimitersList>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
@@ -37986,14 +36711,12 @@ export function useGetMonitorRatelimitersList<TData = Awaited<ReturnType<typeof 
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/** @summary List all rate limiters with configuration */
 export function useGetMonitorRatelimitersList<TData = Awaited<ReturnType<typeof getMonitorRatelimitersList>>, TError = ErrorType<unknown>>(
   options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getMonitorRatelimitersList>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-/**
- * @summary List all rate limiters with configuration
- */
-
+/** @summary List all rate limiters with configuration */
 export function useGetMonitorRatelimitersList<TData = Awaited<ReturnType<typeof getMonitorRatelimitersList>>, TError = ErrorType<unknown>>(
   options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getMonitorRatelimitersList>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
@@ -38081,6 +36804,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type DeleteMonitorRatelimitersClearAllMutationVariables = {params: DeleteMonitorRatelimitersClearAllParams}
 
     /**
+ * Clears the stored state of every configured rate limiter. Requires ?confirm=true.
  * @summary Clear all rate limiter state
  */
 export const useDeleteMonitorRatelimitersClearAll = <TError = ErrorType<ValidationError | ApiError>,
@@ -38165,6 +36889,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type DeleteMonitorRatelimitersClearMutationVariables = {name: string;params: DeleteMonitorRatelimitersClearParams}
 
     /**
+ * Clears the stored state of the named rate limiter only. Other limiters keep their state. Requires ?confirm=true.
  * @summary Clear one rate limiter's state
  */
 export const useDeleteMonitorRatelimitersClear = <TError = ErrorType<ApiError | ValidationError>,
@@ -38233,6 +36958,7 @@ export type GetDebugStatsQueryResult = NonNullable<Awaited<ReturnType<typeof get
 export type GetDebugStatsQueryError = ErrorType<unknown>
 
 
+/** @summary Per-worker server diagnostics with the shared Redis figures */
 export function useGetDebugStats<TData = Awaited<ReturnType<typeof getDebugStats>>, TError = ErrorType<unknown>>(
   options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getDebugStats>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
@@ -38243,6 +36969,7 @@ export function useGetDebugStats<TData = Awaited<ReturnType<typeof getDebugStats
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/** @summary Per-worker server diagnostics with the shared Redis figures */
 export function useGetDebugStats<TData = Awaited<ReturnType<typeof getDebugStats>>, TError = ErrorType<unknown>>(
   options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getDebugStats>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
@@ -38253,14 +36980,12 @@ export function useGetDebugStats<TData = Awaited<ReturnType<typeof getDebugStats
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/** @summary Per-worker server diagnostics with the shared Redis figures */
 export function useGetDebugStats<TData = Awaited<ReturnType<typeof getDebugStats>>, TError = ErrorType<unknown>>(
   options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getDebugStats>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-/**
- * @summary Per-worker server diagnostics with the shared Redis figures
- */
-
+/** @summary Per-worker server diagnostics with the shared Redis figures */
 export function useGetDebugStats<TData = Awaited<ReturnType<typeof getDebugStats>>, TError = ErrorType<unknown>>(
   options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getDebugStats>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
@@ -38341,6 +37066,7 @@ export type GetDebugSpansQueryResult = NonNullable<Awaited<ReturnType<typeof get
 export type GetDebugSpansQueryError = ErrorType<unknown>
 
 
+/** @summary Recent server spans, newest first */
 export function useGetDebugSpans<TData = Awaited<ReturnType<typeof getDebugSpans>>, TError = ErrorType<unknown>>(
  params: undefined |  GetDebugSpansParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getDebugSpans>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
@@ -38351,6 +37077,7 @@ export function useGetDebugSpans<TData = Awaited<ReturnType<typeof getDebugSpans
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/** @summary Recent server spans, newest first */
 export function useGetDebugSpans<TData = Awaited<ReturnType<typeof getDebugSpans>>, TError = ErrorType<unknown>>(
  params?: GetDebugSpansParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getDebugSpans>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
@@ -38361,14 +37088,12 @@ export function useGetDebugSpans<TData = Awaited<ReturnType<typeof getDebugSpans
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/** @summary Recent server spans, newest first */
 export function useGetDebugSpans<TData = Awaited<ReturnType<typeof getDebugSpans>>, TError = ErrorType<unknown>>(
  params?: GetDebugSpansParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getDebugSpans>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-/**
- * @summary Recent server spans, newest first
- */
-
+/** @summary Recent server spans, newest first */
 export function useGetDebugSpans<TData = Awaited<ReturnType<typeof getDebugSpans>>, TError = ErrorType<unknown>>(
  params?: GetDebugSpansParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getDebugSpans>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
@@ -38447,9 +37172,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type DeleteDebugSpansClearMutationError = ErrorType<unknown>
 
 
-    /**
- * @summary Clear the span buffer of every worker
- */
+    /** @summary Clear the span buffer of every worker */
 export const useDeleteDebugSpansClear = <TError = ErrorType<unknown>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteDebugSpansClear>>, TError,void, TContext>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient): UseMutationResult<
@@ -38516,6 +37239,7 @@ export type GetAdminSettingsIndexQueryResult = NonNullable<Awaited<ReturnType<ty
 export type GetAdminSettingsIndexQueryError = ErrorType<ApiError>
 
 
+/** @summary Get every system setting with its effective and stored value */
 export function useGetAdminSettingsIndex<TData = Awaited<ReturnType<typeof getAdminSettingsIndex>>, TError = ErrorType<ApiError>>(
   options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAdminSettingsIndex>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
@@ -38526,6 +37250,7 @@ export function useGetAdminSettingsIndex<TData = Awaited<ReturnType<typeof getAd
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/** @summary Get every system setting with its effective and stored value */
 export function useGetAdminSettingsIndex<TData = Awaited<ReturnType<typeof getAdminSettingsIndex>>, TError = ErrorType<ApiError>>(
   options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAdminSettingsIndex>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
@@ -38536,14 +37261,12 @@ export function useGetAdminSettingsIndex<TData = Awaited<ReturnType<typeof getAd
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/** @summary Get every system setting with its effective and stored value */
 export function useGetAdminSettingsIndex<TData = Awaited<ReturnType<typeof getAdminSettingsIndex>>, TError = ErrorType<ApiError>>(
   options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAdminSettingsIndex>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-/**
- * @summary Get every system setting with its effective and stored value
- */
-
+/** @summary Get every system setting with its effective and stored value */
 export function useGetAdminSettingsIndex<TData = Awaited<ReturnType<typeof getAdminSettingsIndex>>, TError = ErrorType<ApiError>>(
   options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAdminSettingsIndex>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
@@ -38575,25 +37298,11 @@ export const getPatchAdminSettingsUpdateUrl = () => {
  */
 export const patchAdminSettingsUpdate = async (patchAdminSettingsUpdateBody: PatchAdminSettingsUpdateBody, options?: Parameters<typeof customInstance>[1]): Promise<PatchAdminSettingsUpdate200> => {
 
-    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
-    if (!h) return {};
-    if (h instanceof Headers) return Object.fromEntries(h.entries());
-    if (Symbol.iterator in h) {
-      return Object.fromEntries(
-        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
-      );
-    }
-    const headers: Record<string, string | readonly string[]> = {};
-    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
-      if (value !== undefined) headers[name] = value;
-    }
-    return headers;
-  };
-return customInstance<PatchAdminSettingsUpdate200>(getPatchAdminSettingsUpdateUrl(),
+  return customInstance<PatchAdminSettingsUpdate200>(getPatchAdminSettingsUpdateUrl(),
   {
     ...options,
     method: 'PATCH',
-    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    headers: getHeaders({ 'Content-Type': 'application/json' }, options?.headers),
     body: JSON.stringify(patchAdminSettingsUpdateBody)
   }
 );}
@@ -38636,9 +37345,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type PatchAdminSettingsUpdateMutationError = ErrorType<ApiError | ValidationError>
     export type PatchAdminSettingsUpdateMutationVariables = {data: BodyType<PatchAdminSettingsUpdateBody>}
 
-    /**
- * @summary Update system settings (SUPER_ADMIN only); any invalid value rejects the whole request
- */
+    /** @summary Update system settings (SUPER_ADMIN only); any invalid value rejects the whole request */
 export const usePatchAdminSettingsUpdate = <TError = ErrorType<ApiError | ValidationError>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof patchAdminSettingsUpdate>>, TError,PatchAdminSettingsUpdateMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient): UseMutationResult<
@@ -38705,6 +37412,7 @@ export type GetAdminSettingsDefinitionsQueryResult = NonNullable<Awaited<ReturnT
 export type GetAdminSettingsDefinitionsQueryError = ErrorType<ApiError>
 
 
+/** @summary Get the definition of every setting, server-wide and per-user */
 export function useGetAdminSettingsDefinitions<TData = Awaited<ReturnType<typeof getAdminSettingsDefinitions>>, TError = ErrorType<ApiError>>(
   options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAdminSettingsDefinitions>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
@@ -38715,6 +37423,7 @@ export function useGetAdminSettingsDefinitions<TData = Awaited<ReturnType<typeof
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/** @summary Get the definition of every setting, server-wide and per-user */
 export function useGetAdminSettingsDefinitions<TData = Awaited<ReturnType<typeof getAdminSettingsDefinitions>>, TError = ErrorType<ApiError>>(
   options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAdminSettingsDefinitions>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
@@ -38725,14 +37434,12 @@ export function useGetAdminSettingsDefinitions<TData = Awaited<ReturnType<typeof
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/** @summary Get the definition of every setting, server-wide and per-user */
 export function useGetAdminSettingsDefinitions<TData = Awaited<ReturnType<typeof getAdminSettingsDefinitions>>, TError = ErrorType<ApiError>>(
   options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAdminSettingsDefinitions>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-/**
- * @summary Get the definition of every setting, server-wide and per-user
- */
-
+/** @summary Get the definition of every setting, server-wide and per-user */
 export function useGetAdminSettingsDefinitions<TData = Awaited<ReturnType<typeof getAdminSettingsDefinitions>>, TError = ErrorType<ApiError>>(
   options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAdminSettingsDefinitions>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
@@ -38811,9 +37518,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type DeleteAdminSettingsResetMutationError = ErrorType<ApiError>
     export type DeleteAdminSettingsResetMutationVariables = {key: string}
 
-    /**
- * @summary Reset a system setting to its default (SUPER_ADMIN only)
- */
+    /** @summary Reset a system setting to its default (SUPER_ADMIN only) */
 export const useDeleteAdminSettingsReset = <TError = ErrorType<ApiError>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteAdminSettingsReset>>, TError,DeleteAdminSettingsResetMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient): UseMutationResult<
@@ -38881,6 +37586,10 @@ export type GetMonitorTransportStatusQueryResult = NonNullable<Awaited<ReturnTyp
 export type GetMonitorTransportStatusQueryError = ErrorType<GetMonitorTransportStatus503>
 
 
+/**
+ * Returns queue depths, consumer name, and consumer running status for the messenger transports. CLI counterpart: app:monitor:transport.
+ * @summary Get transport status
+ */
 export function useGetMonitorTransportStatus<TData = Awaited<ReturnType<typeof getMonitorTransportStatus>>, TError = ErrorType<GetMonitorTransportStatus503>>(
   options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getMonitorTransportStatus>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
@@ -38891,6 +37600,10 @@ export function useGetMonitorTransportStatus<TData = Awaited<ReturnType<typeof g
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * Returns queue depths, consumer name, and consumer running status for the messenger transports. CLI counterpart: app:monitor:transport.
+ * @summary Get transport status
+ */
 export function useGetMonitorTransportStatus<TData = Awaited<ReturnType<typeof getMonitorTransportStatus>>, TError = ErrorType<GetMonitorTransportStatus503>>(
   options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getMonitorTransportStatus>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
@@ -38901,14 +37614,18 @@ export function useGetMonitorTransportStatus<TData = Awaited<ReturnType<typeof g
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * Returns queue depths, consumer name, and consumer running status for the messenger transports. CLI counterpart: app:monitor:transport.
+ * @summary Get transport status
+ */
 export function useGetMonitorTransportStatus<TData = Awaited<ReturnType<typeof getMonitorTransportStatus>>, TError = ErrorType<GetMonitorTransportStatus503>>(
   options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getMonitorTransportStatus>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 /**
+ * Returns queue depths, consumer name, and consumer running status for the messenger transports. CLI counterpart: app:monitor:transport.
  * @summary Get transport status
  */
-
 export function useGetMonitorTransportStatus<TData = Awaited<ReturnType<typeof getMonitorTransportStatus>>, TError = ErrorType<GetMonitorTransportStatus503>>(
   options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getMonitorTransportStatus>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
@@ -38990,6 +37707,10 @@ export type GetMonitorTransportFailedListQueryResult = NonNullable<Awaited<Retur
 export type GetMonitorTransportFailedListQueryError = ErrorType<ApiError>
 
 
+/**
+ * Lists the messages held by the failure transport, newest first, including messages waiting out a retry delay. CLI counterpart: app:failed-message:list.
+ * @summary List failed messages
+ */
 export function useGetMonitorTransportFailedList<TData = Awaited<ReturnType<typeof getMonitorTransportFailedList>>, TError = ErrorType<ApiError>>(
  params: undefined |  GetMonitorTransportFailedListParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getMonitorTransportFailedList>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
@@ -39000,6 +37721,10 @@ export function useGetMonitorTransportFailedList<TData = Awaited<ReturnType<type
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * Lists the messages held by the failure transport, newest first, including messages waiting out a retry delay. CLI counterpart: app:failed-message:list.
+ * @summary List failed messages
+ */
 export function useGetMonitorTransportFailedList<TData = Awaited<ReturnType<typeof getMonitorTransportFailedList>>, TError = ErrorType<ApiError>>(
  params?: GetMonitorTransportFailedListParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getMonitorTransportFailedList>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
@@ -39010,14 +37735,18 @@ export function useGetMonitorTransportFailedList<TData = Awaited<ReturnType<type
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * Lists the messages held by the failure transport, newest first, including messages waiting out a retry delay. CLI counterpart: app:failed-message:list.
+ * @summary List failed messages
+ */
 export function useGetMonitorTransportFailedList<TData = Awaited<ReturnType<typeof getMonitorTransportFailedList>>, TError = ErrorType<ApiError>>(
  params?: GetMonitorTransportFailedListParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getMonitorTransportFailedList>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 /**
+ * Lists the messages held by the failure transport, newest first, including messages waiting out a retry delay. CLI counterpart: app:failed-message:list.
  * @summary List failed messages
  */
-
 export function useGetMonitorTransportFailedList<TData = Awaited<ReturnType<typeof getMonitorTransportFailedList>>, TError = ErrorType<ApiError>>(
  params?: GetMonitorTransportFailedListParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getMonitorTransportFailedList>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
@@ -39092,6 +37821,10 @@ export type GetMonitorTransportFailedShowQueryResult = NonNullable<Awaited<Retur
 export type GetMonitorTransportFailedShowQueryError = ErrorType<ApiError>
 
 
+/**
+ * Returns one message held by the failure transport. CLI counterpart: messenger:failed:show {id}.
+ * @summary Show a failed message
+ */
 export function useGetMonitorTransportFailedShow<TData = Awaited<ReturnType<typeof getMonitorTransportFailedShow>>, TError = ErrorType<ApiError>>(
  id: string, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getMonitorTransportFailedShow>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
@@ -39102,6 +37835,10 @@ export function useGetMonitorTransportFailedShow<TData = Awaited<ReturnType<type
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * Returns one message held by the failure transport. CLI counterpart: messenger:failed:show {id}.
+ * @summary Show a failed message
+ */
 export function useGetMonitorTransportFailedShow<TData = Awaited<ReturnType<typeof getMonitorTransportFailedShow>>, TError = ErrorType<ApiError>>(
  id: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getMonitorTransportFailedShow>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
@@ -39112,14 +37849,18 @@ export function useGetMonitorTransportFailedShow<TData = Awaited<ReturnType<type
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * Returns one message held by the failure transport. CLI counterpart: messenger:failed:show {id}.
+ * @summary Show a failed message
+ */
 export function useGetMonitorTransportFailedShow<TData = Awaited<ReturnType<typeof getMonitorTransportFailedShow>>, TError = ErrorType<ApiError>>(
  id: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getMonitorTransportFailedShow>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 /**
+ * Returns one message held by the failure transport. CLI counterpart: messenger:failed:show {id}.
  * @summary Show a failed message
  */
-
 export function useGetMonitorTransportFailedShow<TData = Awaited<ReturnType<typeof getMonitorTransportFailedShow>>, TError = ErrorType<ApiError>>(
  id: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getMonitorTransportFailedShow>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
@@ -39200,6 +37941,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type DeleteMonitorTransportFailedRemoveMutationVariables = {id: string}
 
     /**
+ * Removes one message from the failure transport. CLI counterpart: messenger:failed:remove {id} --force.
  * @summary Remove a failed message
  */
 export const useDeleteMonitorTransportFailedRemove = <TError = ErrorType<ApiError>,
@@ -39282,6 +38024,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type PostMonitorTransportFailedFlushMutationVariables = {params: PostMonitorTransportFailedFlushParams}
 
     /**
+ * Removes all messages from the failed transport, including messages waiting out a retry delay. Requires ?confirm=true query parameter. CLI counterpart: app:failed-message:flush.
  * @summary Flush all failed messages
  */
 export const usePostMonitorTransportFailedFlush = <TError = ErrorType<ValidationError | ApiError>,
@@ -39357,6 +38100,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type PostMonitorTransportFailedRetryMutationVariables = {id: string}
 
     /**
+ * Handles a failed message again by running messenger:failed:retry {id} --force. A message that fails again returns to the failure transport under a new ID with its retry count increased, and stays listed until it succeeds or is removed.
  * @summary Retry a failed message
  */
 export const usePostMonitorTransportFailedRetry = <TError = ErrorType<ApiError>,
@@ -39425,6 +38169,7 @@ export type GetDebugWorkersQueryResult = NonNullable<Awaited<ReturnType<typeof g
 export type GetDebugWorkersQueryError = ErrorType<unknown>
 
 
+/** @summary Server HTTP and user worker statistics */
 export function useGetDebugWorkers<TData = Awaited<ReturnType<typeof getDebugWorkers>>, TError = ErrorType<unknown>>(
   options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getDebugWorkers>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
@@ -39435,6 +38180,7 @@ export function useGetDebugWorkers<TData = Awaited<ReturnType<typeof getDebugWor
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/** @summary Server HTTP and user worker statistics */
 export function useGetDebugWorkers<TData = Awaited<ReturnType<typeof getDebugWorkers>>, TError = ErrorType<unknown>>(
   options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getDebugWorkers>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
@@ -39445,14 +38191,12 @@ export function useGetDebugWorkers<TData = Awaited<ReturnType<typeof getDebugWor
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/** @summary Server HTTP and user worker statistics */
 export function useGetDebugWorkers<TData = Awaited<ReturnType<typeof getDebugWorkers>>, TError = ErrorType<unknown>>(
   options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getDebugWorkers>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-/**
- * @summary Server HTTP and user worker statistics
- */
-
+/** @summary Server HTTP and user worker statistics */
 export function useGetDebugWorkers<TData = Awaited<ReturnType<typeof getDebugWorkers>>, TError = ErrorType<unknown>>(
   options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getDebugWorkers>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
@@ -39530,6 +38274,7 @@ export type GetStreamArtifactMasterQueryResult = NonNullable<Awaited<ReturnType<
 export type GetStreamArtifactMasterQueryError = ErrorType<ApiError | void>
 
 
+/** @summary Get the HLS master playlist for completed video */
 export function useGetStreamArtifactMaster<TData = Awaited<ReturnType<typeof getStreamArtifactMaster>>, TError = ErrorType<ApiError | void>>(
  jobPublicId: string,
     generation: string, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getStreamArtifactMaster>>, TError, TData>> & Pick<
@@ -39541,6 +38286,7 @@ export function useGetStreamArtifactMaster<TData = Awaited<ReturnType<typeof get
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/** @summary Get the HLS master playlist for completed video */
 export function useGetStreamArtifactMaster<TData = Awaited<ReturnType<typeof getStreamArtifactMaster>>, TError = ErrorType<ApiError | void>>(
  jobPublicId: string,
     generation: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getStreamArtifactMaster>>, TError, TData>> & Pick<
@@ -39552,15 +38298,13 @@ export function useGetStreamArtifactMaster<TData = Awaited<ReturnType<typeof get
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/** @summary Get the HLS master playlist for completed video */
 export function useGetStreamArtifactMaster<TData = Awaited<ReturnType<typeof getStreamArtifactMaster>>, TError = ErrorType<ApiError | void>>(
  jobPublicId: string,
     generation: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getStreamArtifactMaster>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-/**
- * @summary Get the HLS master playlist for completed video
- */
-
+/** @summary Get the HLS master playlist for completed video */
 export function useGetStreamArtifactMaster<TData = Awaited<ReturnType<typeof getStreamArtifactMaster>>, TError = ErrorType<ApiError | void>>(
  jobPublicId: string,
     generation: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getStreamArtifactMaster>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
@@ -39643,6 +38387,7 @@ export type GetStreamArtifactMediaQueryResult = NonNullable<Awaited<ReturnType<t
 export type GetStreamArtifactMediaQueryError = ErrorType<ApiError | void>
 
 
+/** @summary Get a completed HLS track playlist */
 export function useGetStreamArtifactMedia<TData = Awaited<ReturnType<typeof getStreamArtifactMedia>>, TError = ErrorType<ApiError | void>>(
  jobPublicId: string,
     generation: string,
@@ -39655,6 +38400,7 @@ export function useGetStreamArtifactMedia<TData = Awaited<ReturnType<typeof getS
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/** @summary Get a completed HLS track playlist */
 export function useGetStreamArtifactMedia<TData = Awaited<ReturnType<typeof getStreamArtifactMedia>>, TError = ErrorType<ApiError | void>>(
  jobPublicId: string,
     generation: string,
@@ -39667,16 +38413,14 @@ export function useGetStreamArtifactMedia<TData = Awaited<ReturnType<typeof getS
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/** @summary Get a completed HLS track playlist */
 export function useGetStreamArtifactMedia<TData = Awaited<ReturnType<typeof getStreamArtifactMedia>>, TError = ErrorType<ApiError | void>>(
  jobPublicId: string,
     generation: string,
     track: 'video' | 'audio', options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getStreamArtifactMedia>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-/**
- * @summary Get a completed HLS track playlist
- */
-
+/** @summary Get a completed HLS track playlist */
 export function useGetStreamArtifactMedia<TData = Awaited<ReturnType<typeof getStreamArtifactMedia>>, TError = ErrorType<ApiError | void>>(
  jobPublicId: string,
     generation: string,
@@ -39760,6 +38504,7 @@ export type GetStreamArtifactInitQueryResult = NonNullable<Awaited<ReturnType<ty
 export type GetStreamArtifactInitQueryError = ErrorType<ApiError | void>
 
 
+/** @summary Get completed track initialization media */
 export function useGetStreamArtifactInit<TData = Awaited<ReturnType<typeof getStreamArtifactInit>>, TError = ErrorType<ApiError | void>>(
  jobPublicId: string,
     generation: string,
@@ -39772,6 +38517,7 @@ export function useGetStreamArtifactInit<TData = Awaited<ReturnType<typeof getSt
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/** @summary Get completed track initialization media */
 export function useGetStreamArtifactInit<TData = Awaited<ReturnType<typeof getStreamArtifactInit>>, TError = ErrorType<ApiError | void>>(
  jobPublicId: string,
     generation: string,
@@ -39784,16 +38530,14 @@ export function useGetStreamArtifactInit<TData = Awaited<ReturnType<typeof getSt
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/** @summary Get completed track initialization media */
 export function useGetStreamArtifactInit<TData = Awaited<ReturnType<typeof getStreamArtifactInit>>, TError = ErrorType<ApiError | void>>(
  jobPublicId: string,
     generation: string,
     track: 'video' | 'audio', options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getStreamArtifactInit>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-/**
- * @summary Get completed track initialization media
- */
-
+/** @summary Get completed track initialization media */
 export function useGetStreamArtifactInit<TData = Awaited<ReturnType<typeof getStreamArtifactInit>>, TError = ErrorType<ApiError | void>>(
  jobPublicId: string,
     generation: string,
@@ -39888,6 +38632,7 @@ export type GetStreamArtifactSegmentQueryResult = NonNullable<Awaited<ReturnType
 export type GetStreamArtifactSegmentQueryError = ErrorType<void | ApiError>
 
 
+/** @summary Get a completed track segment */
 export function useGetStreamArtifactSegment<TData = Awaited<ReturnType<typeof getStreamArtifactSegment>>, TError = ErrorType<void | ApiError>>(
  jobPublicId: string,
     generation: string,
@@ -39901,6 +38646,7 @@ export function useGetStreamArtifactSegment<TData = Awaited<ReturnType<typeof ge
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/** @summary Get a completed track segment */
 export function useGetStreamArtifactSegment<TData = Awaited<ReturnType<typeof getStreamArtifactSegment>>, TError = ErrorType<void | ApiError>>(
  jobPublicId: string,
     generation: string,
@@ -39914,6 +38660,7 @@ export function useGetStreamArtifactSegment<TData = Awaited<ReturnType<typeof ge
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/** @summary Get a completed track segment */
 export function useGetStreamArtifactSegment<TData = Awaited<ReturnType<typeof getStreamArtifactSegment>>, TError = ErrorType<void | ApiError>>(
  jobPublicId: string,
     generation: string,
@@ -39921,10 +38668,7 @@ export function useGetStreamArtifactSegment<TData = Awaited<ReturnType<typeof ge
     params: GetStreamArtifactSegmentParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getStreamArtifactSegment>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-/**
- * @summary Get a completed track segment
- */
-
+/** @summary Get a completed track segment */
 export function useGetStreamArtifactSegment<TData = Awaited<ReturnType<typeof getStreamArtifactSegment>>, TError = ErrorType<void | ApiError>>(
  jobPublicId: string,
     generation: string,
@@ -40012,6 +38756,7 @@ export type GetStreamMasterManifestQueryResult = NonNullable<Awaited<ReturnType<
 export type GetStreamMasterManifestQueryError = ErrorType<ApiError>
 
 
+/** @summary Get HLS master playlist */
 export function useGetStreamMasterManifest<TData = Awaited<ReturnType<typeof getStreamMasterManifest>>, TError = ErrorType<ApiError>>(
  videoId: string,
     params: GetStreamMasterManifestParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getStreamMasterManifest>>, TError, TData>> & Pick<
@@ -40023,6 +38768,7 @@ export function useGetStreamMasterManifest<TData = Awaited<ReturnType<typeof get
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/** @summary Get HLS master playlist */
 export function useGetStreamMasterManifest<TData = Awaited<ReturnType<typeof getStreamMasterManifest>>, TError = ErrorType<ApiError>>(
  videoId: string,
     params: GetStreamMasterManifestParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getStreamMasterManifest>>, TError, TData>> & Pick<
@@ -40034,15 +38780,13 @@ export function useGetStreamMasterManifest<TData = Awaited<ReturnType<typeof get
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/** @summary Get HLS master playlist */
 export function useGetStreamMasterManifest<TData = Awaited<ReturnType<typeof getStreamMasterManifest>>, TError = ErrorType<ApiError>>(
  videoId: string,
     params: GetStreamMasterManifestParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getStreamMasterManifest>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-/**
- * @summary Get HLS master playlist
- */
-
+/** @summary Get HLS master playlist */
 export function useGetStreamMasterManifest<TData = Awaited<ReturnType<typeof getStreamMasterManifest>>, TError = ErrorType<ApiError>>(
  videoId: string,
     params: GetStreamMasterManifestParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getStreamMasterManifest>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
@@ -40132,6 +38876,7 @@ export type GetStreamMediaManifestQueryResult = NonNullable<Awaited<ReturnType<t
 export type GetStreamMediaManifestQueryError = ErrorType<ApiError>
 
 
+/** @summary Get HLS media playlist for a specific rendition */
 export function useGetStreamMediaManifest<TData = Awaited<ReturnType<typeof getStreamMediaManifest>>, TError = ErrorType<ApiError>>(
  jobPublicId: string,
     track: 'video' | 'audio',
@@ -40144,6 +38889,7 @@ export function useGetStreamMediaManifest<TData = Awaited<ReturnType<typeof getS
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/** @summary Get HLS media playlist for a specific rendition */
 export function useGetStreamMediaManifest<TData = Awaited<ReturnType<typeof getStreamMediaManifest>>, TError = ErrorType<ApiError>>(
  jobPublicId: string,
     track: 'video' | 'audio',
@@ -40156,16 +38902,14 @@ export function useGetStreamMediaManifest<TData = Awaited<ReturnType<typeof getS
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/** @summary Get HLS media playlist for a specific rendition */
 export function useGetStreamMediaManifest<TData = Awaited<ReturnType<typeof getStreamMediaManifest>>, TError = ErrorType<ApiError>>(
  jobPublicId: string,
     track: 'video' | 'audio',
     params: GetStreamMediaManifestParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getStreamMediaManifest>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-/**
- * @summary Get HLS media playlist for a specific rendition
- */
-
+/** @summary Get HLS media playlist for a specific rendition */
 export function useGetStreamMediaManifest<TData = Awaited<ReturnType<typeof getStreamMediaManifest>>, TError = ErrorType<ApiError>>(
  jobPublicId: string,
     track: 'video' | 'audio',
@@ -40252,6 +38996,7 @@ export type GetStreamDashManifestQueryResult = NonNullable<Awaited<ReturnType<ty
 export type GetStreamDashManifestQueryError = ErrorType<ApiError>
 
 
+/** @summary Get DASH manifest for a video */
 export function useGetStreamDashManifest<TData = Awaited<ReturnType<typeof getStreamDashManifest>>, TError = ErrorType<ApiError>>(
  videoId: string,
     params: GetStreamDashManifestParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getStreamDashManifest>>, TError, TData>> & Pick<
@@ -40263,6 +39008,7 @@ export function useGetStreamDashManifest<TData = Awaited<ReturnType<typeof getSt
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/** @summary Get DASH manifest for a video */
 export function useGetStreamDashManifest<TData = Awaited<ReturnType<typeof getStreamDashManifest>>, TError = ErrorType<ApiError>>(
  videoId: string,
     params: GetStreamDashManifestParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getStreamDashManifest>>, TError, TData>> & Pick<
@@ -40274,15 +39020,13 @@ export function useGetStreamDashManifest<TData = Awaited<ReturnType<typeof getSt
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/** @summary Get DASH manifest for a video */
 export function useGetStreamDashManifest<TData = Awaited<ReturnType<typeof getStreamDashManifest>>, TError = ErrorType<ApiError>>(
  videoId: string,
     params: GetStreamDashManifestParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getStreamDashManifest>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-/**
- * @summary Get DASH manifest for a video
- */
-
+/** @summary Get DASH manifest for a video */
 export function useGetStreamDashManifest<TData = Awaited<ReturnType<typeof getStreamDashManifest>>, TError = ErrorType<ApiError>>(
  videoId: string,
     params: GetStreamDashManifestParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getStreamDashManifest>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
@@ -40376,6 +39120,7 @@ export type GetStreamQualityLadderQueryResult = NonNullable<Awaited<ReturnType<t
 export type GetStreamQualityLadderQueryError = ErrorType<unknown>
 
 
+/** @summary Get available quality tiers for a video */
 export function useGetStreamQualityLadder<TData = Awaited<ReturnType<typeof getStreamQualityLadder>>, TError = ErrorType<unknown>>(
  videoId: string,
     params: GetStreamQualityLadderParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getStreamQualityLadder>>, TError, TData>> & Pick<
@@ -40387,6 +39132,7 @@ export function useGetStreamQualityLadder<TData = Awaited<ReturnType<typeof getS
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/** @summary Get available quality tiers for a video */
 export function useGetStreamQualityLadder<TData = Awaited<ReturnType<typeof getStreamQualityLadder>>, TError = ErrorType<unknown>>(
  videoId: string,
     params: GetStreamQualityLadderParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getStreamQualityLadder>>, TError, TData>> & Pick<
@@ -40398,15 +39144,13 @@ export function useGetStreamQualityLadder<TData = Awaited<ReturnType<typeof getS
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/** @summary Get available quality tiers for a video */
 export function useGetStreamQualityLadder<TData = Awaited<ReturnType<typeof getStreamQualityLadder>>, TError = ErrorType<unknown>>(
  videoId: string,
     params: GetStreamQualityLadderParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getStreamQualityLadder>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-/**
- * @summary Get available quality tiers for a video
- */
-
+/** @summary Get available quality tiers for a video */
 export function useGetStreamQualityLadder<TData = Awaited<ReturnType<typeof getStreamQualityLadder>>, TError = ErrorType<unknown>>(
  videoId: string,
     params: GetStreamQualityLadderParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getStreamQualityLadder>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
@@ -40496,6 +39240,7 @@ export type GetStreamSubtitleManifestQueryResult = NonNullable<Awaited<ReturnTyp
 export type GetStreamSubtitleManifestQueryError = ErrorType<ApiError>
 
 
+/** @summary Get HLS subtitle playlist for a source track */
 export function useGetStreamSubtitleManifest<TData = Awaited<ReturnType<typeof getStreamSubtitleManifest>>, TError = ErrorType<ApiError>>(
  jobPublicId: string,
     language: string,
@@ -40508,6 +39253,7 @@ export function useGetStreamSubtitleManifest<TData = Awaited<ReturnType<typeof g
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/** @summary Get HLS subtitle playlist for a source track */
 export function useGetStreamSubtitleManifest<TData = Awaited<ReturnType<typeof getStreamSubtitleManifest>>, TError = ErrorType<ApiError>>(
  jobPublicId: string,
     language: string,
@@ -40520,16 +39266,14 @@ export function useGetStreamSubtitleManifest<TData = Awaited<ReturnType<typeof g
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/** @summary Get HLS subtitle playlist for a source track */
 export function useGetStreamSubtitleManifest<TData = Awaited<ReturnType<typeof getStreamSubtitleManifest>>, TError = ErrorType<ApiError>>(
  jobPublicId: string,
     language: string,
     params: GetStreamSubtitleManifestParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getStreamSubtitleManifest>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-/**
- * @summary Get HLS subtitle playlist for a source track
- */
-
+/** @summary Get HLS subtitle playlist for a source track */
 export function useGetStreamSubtitleManifest<TData = Awaited<ReturnType<typeof getStreamSubtitleManifest>>, TError = ErrorType<ApiError>>(
  jobPublicId: string,
     language: string,
@@ -40620,6 +39364,7 @@ export type GetStreamSegmentInitSegmentQueryResult = NonNullable<Awaited<ReturnT
 export type GetStreamSegmentInitSegmentQueryError = ErrorType<GetStreamSegmentInitSegment403 | ApiError | Blob>
 
 
+/** @summary Get fMP4 track initialization segment */
 export function useGetStreamSegmentInitSegment<TData = Awaited<ReturnType<typeof getStreamSegmentInitSegment>>, TError = ErrorType<GetStreamSegmentInitSegment403 | ApiError | Blob>>(
  jobPublicId: string,
     track: 'video' | 'audio',
@@ -40632,6 +39377,7 @@ export function useGetStreamSegmentInitSegment<TData = Awaited<ReturnType<typeof
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/** @summary Get fMP4 track initialization segment */
 export function useGetStreamSegmentInitSegment<TData = Awaited<ReturnType<typeof getStreamSegmentInitSegment>>, TError = ErrorType<GetStreamSegmentInitSegment403 | ApiError | Blob>>(
  jobPublicId: string,
     track: 'video' | 'audio',
@@ -40644,16 +39390,14 @@ export function useGetStreamSegmentInitSegment<TData = Awaited<ReturnType<typeof
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/** @summary Get fMP4 track initialization segment */
 export function useGetStreamSegmentInitSegment<TData = Awaited<ReturnType<typeof getStreamSegmentInitSegment>>, TError = ErrorType<GetStreamSegmentInitSegment403 | ApiError | Blob>>(
  jobPublicId: string,
     track: 'video' | 'audio',
     params: GetStreamSegmentInitSegmentParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getStreamSegmentInitSegment>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-/**
- * @summary Get fMP4 track initialization segment
- */
-
+/** @summary Get fMP4 track initialization segment */
 export function useGetStreamSegmentInitSegment<TData = Awaited<ReturnType<typeof getStreamSegmentInitSegment>>, TError = ErrorType<GetStreamSegmentInitSegment403 | ApiError | Blob>>(
  jobPublicId: string,
     track: 'video' | 'audio',
@@ -40744,6 +39488,7 @@ export type GetStreamSegmentSegmentQueryResult = NonNullable<Awaited<ReturnType<
 export type GetStreamSegmentSegmentQueryError = ErrorType<void | ApiError>
 
 
+/** @summary Get fMP4 media segment (query-param routed) */
 export function useGetStreamSegmentSegment<TData = Awaited<ReturnType<typeof getStreamSegmentSegment>>, TError = ErrorType<void | ApiError>>(
  jobPublicId: string,
     track: 'video' | 'audio',
@@ -40756,6 +39501,7 @@ export function useGetStreamSegmentSegment<TData = Awaited<ReturnType<typeof get
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/** @summary Get fMP4 media segment (query-param routed) */
 export function useGetStreamSegmentSegment<TData = Awaited<ReturnType<typeof getStreamSegmentSegment>>, TError = ErrorType<void | ApiError>>(
  jobPublicId: string,
     track: 'video' | 'audio',
@@ -40768,16 +39514,14 @@ export function useGetStreamSegmentSegment<TData = Awaited<ReturnType<typeof get
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/** @summary Get fMP4 media segment (query-param routed) */
 export function useGetStreamSegmentSegment<TData = Awaited<ReturnType<typeof getStreamSegmentSegment>>, TError = ErrorType<void | ApiError>>(
  jobPublicId: string,
     track: 'video' | 'audio',
     params: GetStreamSegmentSegmentParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getStreamSegmentSegment>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-/**
- * @summary Get fMP4 media segment (query-param routed)
- */
-
+/** @summary Get fMP4 media segment (query-param routed) */
 export function useGetStreamSegmentSegment<TData = Awaited<ReturnType<typeof getStreamSegmentSegment>>, TError = ErrorType<void | ApiError>>(
  jobPublicId: string,
     track: 'video' | 'audio',
@@ -40872,6 +39616,7 @@ export type GetStreamSegmentSubtitleSegmentQueryResult = NonNullable<Awaited<Ret
 export type GetStreamSegmentSubtitleSegmentQueryError = ErrorType<void | ApiError>
 
 
+/** @summary Get subtitle segment (WebVTT) */
 export function useGetStreamSegmentSubtitleSegment<TData = Awaited<ReturnType<typeof getStreamSegmentSubtitleSegment>>, TError = ErrorType<void | ApiError>>(
  jobPublicId: string,
     language: string,
@@ -40885,6 +39630,7 @@ export function useGetStreamSegmentSubtitleSegment<TData = Awaited<ReturnType<ty
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/** @summary Get subtitle segment (WebVTT) */
 export function useGetStreamSegmentSubtitleSegment<TData = Awaited<ReturnType<typeof getStreamSegmentSubtitleSegment>>, TError = ErrorType<void | ApiError>>(
  jobPublicId: string,
     language: string,
@@ -40898,6 +39644,7 @@ export function useGetStreamSegmentSubtitleSegment<TData = Awaited<ReturnType<ty
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/** @summary Get subtitle segment (WebVTT) */
 export function useGetStreamSegmentSubtitleSegment<TData = Awaited<ReturnType<typeof getStreamSegmentSubtitleSegment>>, TError = ErrorType<void | ApiError>>(
  jobPublicId: string,
     language: string,
@@ -40905,10 +39652,7 @@ export function useGetStreamSegmentSubtitleSegment<TData = Awaited<ReturnType<ty
     params: GetStreamSegmentSubtitleSegmentParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getStreamSegmentSubtitleSegment>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-/**
- * @summary Get subtitle segment (WebVTT)
- */
-
+/** @summary Get subtitle segment (WebVTT) */
 export function useGetStreamSegmentSubtitleSegment<TData = Awaited<ReturnType<typeof getStreamSegmentSubtitleSegment>>, TError = ErrorType<void | ApiError>>(
  jobPublicId: string,
     language: string,
@@ -40943,25 +39687,11 @@ export const getPostStreamSigningSignUrl = () => {
  */
 export const postStreamSigningSign = async (postStreamSigningSignBody: PostStreamSigningSignBody, options?: Parameters<typeof customInstance>[1]): Promise<PostStreamSigningSign200> => {
 
-    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
-    if (!h) return {};
-    if (h instanceof Headers) return Object.fromEntries(h.entries());
-    if (Symbol.iterator in h) {
-      return Object.fromEntries(
-        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
-      );
-    }
-    const headers: Record<string, string | readonly string[]> = {};
-    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
-      if (value !== undefined) headers[name] = value;
-    }
-    return headers;
-  };
-return customInstance<PostStreamSigningSign200>(getPostStreamSigningSignUrl(),
+  return customInstance<PostStreamSigningSign200>(getPostStreamSigningSignUrl(),
   {
     ...options,
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    headers: getHeaders({ 'Content-Type': 'application/json' }, options?.headers),
     body: JSON.stringify(postStreamSigningSignBody)
   }
 );}
@@ -41004,9 +39734,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type PostStreamSigningSignMutationError = ErrorType<void | PostStreamSigningSign410 | ApiError>
     export type PostStreamSigningSignMutationVariables = {data: BodyType<PostStreamSigningSignBody>}
 
-    /**
- * @summary Generate a signed URL for a stream resource
- */
+    /** @summary Generate a signed URL for a stream resource */
 export const usePostStreamSigningSign = <TError = ErrorType<void | PostStreamSigningSign410 | ApiError>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postStreamSigningSign>>, TError,PostStreamSigningSignMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient): UseMutationResult<
@@ -41074,6 +39802,10 @@ export type GetAccentColorIndexQueryResult = NonNullable<Awaited<ReturnType<type
 export type GetAccentColorIndexQueryError = ErrorType<ApiError>
 
 
+/**
+ * Returns the current accent color for the authenticated user.
+ * @summary Get accent color
+ */
 export function useGetAccentColorIndex<TData = Awaited<ReturnType<typeof getAccentColorIndex>>, TError = ErrorType<ApiError>>(
   options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAccentColorIndex>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
@@ -41084,6 +39816,10 @@ export function useGetAccentColorIndex<TData = Awaited<ReturnType<typeof getAcce
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * Returns the current accent color for the authenticated user.
+ * @summary Get accent color
+ */
 export function useGetAccentColorIndex<TData = Awaited<ReturnType<typeof getAccentColorIndex>>, TError = ErrorType<ApiError>>(
   options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAccentColorIndex>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
@@ -41094,14 +39830,18 @@ export function useGetAccentColorIndex<TData = Awaited<ReturnType<typeof getAcce
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * Returns the current accent color for the authenticated user.
+ * @summary Get accent color
+ */
 export function useGetAccentColorIndex<TData = Awaited<ReturnType<typeof getAccentColorIndex>>, TError = ErrorType<ApiError>>(
   options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAccentColorIndex>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 /**
+ * Returns the current accent color for the authenticated user.
  * @summary Get accent color
  */
-
 export function useGetAccentColorIndex<TData = Awaited<ReturnType<typeof getAccentColorIndex>>, TError = ErrorType<ApiError>>(
   options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAccentColorIndex>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
@@ -41133,25 +39873,11 @@ export const getPutAccentColorUpdateUrl = () => {
  */
 export const putAccentColorUpdate = async (putAccentColorUpdateBody: PutAccentColorUpdateBody, options?: Parameters<typeof customInstance>[1]): Promise<PutAccentColorUpdate200> => {
 
-    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
-    if (!h) return {};
-    if (h instanceof Headers) return Object.fromEntries(h.entries());
-    if (Symbol.iterator in h) {
-      return Object.fromEntries(
-        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
-      );
-    }
-    const headers: Record<string, string | readonly string[]> = {};
-    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
-      if (value !== undefined) headers[name] = value;
-    }
-    return headers;
-  };
-return customInstance<PutAccentColorUpdate200>(getPutAccentColorUpdateUrl(),
+  return customInstance<PutAccentColorUpdate200>(getPutAccentColorUpdateUrl(),
   {
     ...options,
     method: 'PUT',
-    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    headers: getHeaders({ 'Content-Type': 'application/json' }, options?.headers),
     body: JSON.stringify(putAccentColorUpdateBody)
   }
 );}
@@ -41194,9 +39920,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type PutAccentColorUpdateMutationError = ErrorType<ApiError | ValidationError>
     export type PutAccentColorUpdateMutationVariables = {data: BodyType<PutAccentColorUpdateBody>}
 
-    /**
- * @summary Update accent color
- */
+    /** @summary Update accent color */
 export const usePutAccentColorUpdate = <TError = ErrorType<ApiError | ValidationError>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof putAccentColorUpdate>>, TError,PutAccentColorUpdateMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient): UseMutationResult<
@@ -41264,6 +39988,10 @@ export type GetAudioPreferencesIndexQueryResult = NonNullable<Awaited<ReturnType
 export type GetAudioPreferencesIndexQueryError = ErrorType<ApiError>
 
 
+/**
+ * Returns the audio preferences for the authenticated user. Payload uses the validated flat audio settings contract.
+ * @summary Get audio preferences
+ */
 export function useGetAudioPreferencesIndex<TData = Awaited<ReturnType<typeof getAudioPreferencesIndex>>, TError = ErrorType<ApiError>>(
   options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAudioPreferencesIndex>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
@@ -41274,6 +40002,10 @@ export function useGetAudioPreferencesIndex<TData = Awaited<ReturnType<typeof ge
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * Returns the audio preferences for the authenticated user. Payload uses the validated flat audio settings contract.
+ * @summary Get audio preferences
+ */
 export function useGetAudioPreferencesIndex<TData = Awaited<ReturnType<typeof getAudioPreferencesIndex>>, TError = ErrorType<ApiError>>(
   options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAudioPreferencesIndex>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
@@ -41284,14 +40016,18 @@ export function useGetAudioPreferencesIndex<TData = Awaited<ReturnType<typeof ge
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * Returns the audio preferences for the authenticated user. Payload uses the validated flat audio settings contract.
+ * @summary Get audio preferences
+ */
 export function useGetAudioPreferencesIndex<TData = Awaited<ReturnType<typeof getAudioPreferencesIndex>>, TError = ErrorType<ApiError>>(
   options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAudioPreferencesIndex>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 /**
+ * Returns the audio preferences for the authenticated user. Payload uses the validated flat audio settings contract.
  * @summary Get audio preferences
  */
-
 export function useGetAudioPreferencesIndex<TData = Awaited<ReturnType<typeof getAudioPreferencesIndex>>, TError = ErrorType<ApiError>>(
   options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAudioPreferencesIndex>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
@@ -41323,25 +40059,11 @@ export const getPutAudioPreferencesUpdateUrl = () => {
  */
 export const putAudioPreferencesUpdate = async (saveAudioPreferencesRequest: SaveAudioPreferencesRequest, options?: Parameters<typeof customInstance>[1]): Promise<PutAudioPreferencesUpdate200> => {
 
-    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
-    if (!h) return {};
-    if (h instanceof Headers) return Object.fromEntries(h.entries());
-    if (Symbol.iterator in h) {
-      return Object.fromEntries(
-        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
-      );
-    }
-    const headers: Record<string, string | readonly string[]> = {};
-    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
-      if (value !== undefined) headers[name] = value;
-    }
-    return headers;
-  };
-return customInstance<PutAudioPreferencesUpdate200>(getPutAudioPreferencesUpdateUrl(),
+  return customInstance<PutAudioPreferencesUpdate200>(getPutAudioPreferencesUpdateUrl(),
   {
     ...options,
     method: 'PUT',
-    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    headers: getHeaders({ 'Content-Type': 'application/json' }, options?.headers),
     body: JSON.stringify(saveAudioPreferencesRequest)
   }
 );}
@@ -41384,9 +40106,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type PutAudioPreferencesUpdateMutationError = ErrorType<ApiError>
     export type PutAudioPreferencesUpdateMutationVariables = {data: BodyType<SaveAudioPreferencesRequest>}
 
-    /**
- * @summary Save audio preferences
- */
+    /** @summary Save audio preferences */
 export const usePutAudioPreferencesUpdate = <TError = ErrorType<ApiError>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof putAudioPreferencesUpdate>>, TError,PutAudioPreferencesUpdateMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient): UseMutationResult<
@@ -41454,6 +40174,10 @@ export type GetAudioPreferencesHistoryQueryResult = NonNullable<Awaited<ReturnTy
 export type GetAudioPreferencesHistoryQueryError = ErrorType<ApiError>
 
 
+/**
+ * Returns the version history for audio preferences.
+ * @summary Get audio preferences history
+ */
 export function useGetAudioPreferencesHistory<TData = Awaited<ReturnType<typeof getAudioPreferencesHistory>>, TError = ErrorType<ApiError>>(
   options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAudioPreferencesHistory>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
@@ -41464,6 +40188,10 @@ export function useGetAudioPreferencesHistory<TData = Awaited<ReturnType<typeof 
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * Returns the version history for audio preferences.
+ * @summary Get audio preferences history
+ */
 export function useGetAudioPreferencesHistory<TData = Awaited<ReturnType<typeof getAudioPreferencesHistory>>, TError = ErrorType<ApiError>>(
   options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAudioPreferencesHistory>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
@@ -41474,14 +40202,18 @@ export function useGetAudioPreferencesHistory<TData = Awaited<ReturnType<typeof 
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * Returns the version history for audio preferences.
+ * @summary Get audio preferences history
+ */
 export function useGetAudioPreferencesHistory<TData = Awaited<ReturnType<typeof getAudioPreferencesHistory>>, TError = ErrorType<ApiError>>(
   options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAudioPreferencesHistory>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 /**
+ * Returns the version history for audio preferences.
  * @summary Get audio preferences history
  */
-
 export function useGetAudioPreferencesHistory<TData = Awaited<ReturnType<typeof getAudioPreferencesHistory>>, TError = ErrorType<ApiError>>(
   options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAudioPreferencesHistory>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
@@ -41513,25 +40245,11 @@ export const getPostAudioPreferencesRollbackUrl = () => {
  */
 export const postAudioPreferencesRollback = async (postAudioPreferencesRollbackBody: PostAudioPreferencesRollbackBody, options?: Parameters<typeof customInstance>[1]): Promise<PostAudioPreferencesRollback200> => {
 
-    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
-    if (!h) return {};
-    if (h instanceof Headers) return Object.fromEntries(h.entries());
-    if (Symbol.iterator in h) {
-      return Object.fromEntries(
-        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
-      );
-    }
-    const headers: Record<string, string | readonly string[]> = {};
-    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
-      if (value !== undefined) headers[name] = value;
-    }
-    return headers;
-  };
-return customInstance<PostAudioPreferencesRollback200>(getPostAudioPreferencesRollbackUrl(),
+  return customInstance<PostAudioPreferencesRollback200>(getPostAudioPreferencesRollbackUrl(),
   {
     ...options,
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    headers: getHeaders({ 'Content-Type': 'application/json' }, options?.headers),
     body: JSON.stringify(postAudioPreferencesRollbackBody)
   }
 );}
@@ -41574,9 +40292,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type PostAudioPreferencesRollbackMutationError = ErrorType<ApiError>
     export type PostAudioPreferencesRollbackMutationVariables = {data: BodyType<PostAudioPreferencesRollbackBody>}
 
-    /**
- * @summary Rollback audio preferences to a previous version
- */
+    /** @summary Rollback audio preferences to a previous version */
 export const usePostAudioPreferencesRollback = <TError = ErrorType<ApiError>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postAudioPreferencesRollback>>, TError,PostAudioPreferencesRollbackMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient): UseMutationResult<
@@ -41643,6 +40359,7 @@ export type GetEqProfilesIndexQueryResult = NonNullable<Awaited<ReturnType<typeo
 export type GetEqProfilesIndexQueryError = ErrorType<ApiError>
 
 
+/** @summary List all EQ device profiles for the authenticated user */
 export function useGetEqProfilesIndex<TData = Awaited<ReturnType<typeof getEqProfilesIndex>>, TError = ErrorType<ApiError>>(
   options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getEqProfilesIndex>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
@@ -41653,6 +40370,7 @@ export function useGetEqProfilesIndex<TData = Awaited<ReturnType<typeof getEqPro
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/** @summary List all EQ device profiles for the authenticated user */
 export function useGetEqProfilesIndex<TData = Awaited<ReturnType<typeof getEqProfilesIndex>>, TError = ErrorType<ApiError>>(
   options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getEqProfilesIndex>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
@@ -41663,14 +40381,12 @@ export function useGetEqProfilesIndex<TData = Awaited<ReturnType<typeof getEqPro
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/** @summary List all EQ device profiles for the authenticated user */
 export function useGetEqProfilesIndex<TData = Awaited<ReturnType<typeof getEqProfilesIndex>>, TError = ErrorType<ApiError>>(
   options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getEqProfilesIndex>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-/**
- * @summary List all EQ device profiles for the authenticated user
- */
-
+/** @summary List all EQ device profiles for the authenticated user */
 export function useGetEqProfilesIndex<TData = Awaited<ReturnType<typeof getEqProfilesIndex>>, TError = ErrorType<ApiError>>(
   options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getEqProfilesIndex>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
@@ -41702,25 +40418,11 @@ export const getPostEqProfilesCreateUrl = () => {
  */
 export const postEqProfilesCreate = async (postEqProfilesCreateBody: PostEqProfilesCreateBody, options?: Parameters<typeof customInstance>[1]): Promise<void> => {
 
-    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
-    if (!h) return {};
-    if (h instanceof Headers) return Object.fromEntries(h.entries());
-    if (Symbol.iterator in h) {
-      return Object.fromEntries(
-        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
-      );
-    }
-    const headers: Record<string, string | readonly string[]> = {};
-    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
-      if (value !== undefined) headers[name] = value;
-    }
-    return headers;
-  };
-return customInstance<void>(getPostEqProfilesCreateUrl(),
+  return customInstance<void>(getPostEqProfilesCreateUrl(),
   {
     ...options,
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    headers: getHeaders({ 'Content-Type': 'application/json' }, options?.headers),
     body: JSON.stringify(postEqProfilesCreateBody)
   }
 );}
@@ -41763,9 +40465,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type PostEqProfilesCreateMutationError = ErrorType<ApiError | ValidationError>
     export type PostEqProfilesCreateMutationVariables = {data: BodyType<PostEqProfilesCreateBody>}
 
-    /**
- * @summary Create a new EQ device profile
- */
+    /** @summary Create a new EQ device profile */
 export const usePostEqProfilesCreate = <TError = ErrorType<ApiError | ValidationError>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postEqProfilesCreate>>, TError,PostEqProfilesCreateMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient): UseMutationResult<
@@ -41832,6 +40532,7 @@ export type GetEqProfilesShowQueryResult = NonNullable<Awaited<ReturnType<typeof
 export type GetEqProfilesShowQueryError = ErrorType<ApiError>
 
 
+/** @summary Get a specific EQ device profile */
 export function useGetEqProfilesShow<TData = Awaited<ReturnType<typeof getEqProfilesShow>>, TError = ErrorType<ApiError>>(
  id: string, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getEqProfilesShow>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
@@ -41842,6 +40543,7 @@ export function useGetEqProfilesShow<TData = Awaited<ReturnType<typeof getEqProf
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/** @summary Get a specific EQ device profile */
 export function useGetEqProfilesShow<TData = Awaited<ReturnType<typeof getEqProfilesShow>>, TError = ErrorType<ApiError>>(
  id: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getEqProfilesShow>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
@@ -41852,14 +40554,12 @@ export function useGetEqProfilesShow<TData = Awaited<ReturnType<typeof getEqProf
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/** @summary Get a specific EQ device profile */
 export function useGetEqProfilesShow<TData = Awaited<ReturnType<typeof getEqProfilesShow>>, TError = ErrorType<ApiError>>(
  id: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getEqProfilesShow>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-/**
- * @summary Get a specific EQ device profile
- */
-
+/** @summary Get a specific EQ device profile */
 export function useGetEqProfilesShow<TData = Awaited<ReturnType<typeof getEqProfilesShow>>, TError = ErrorType<ApiError>>(
  id: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getEqProfilesShow>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
@@ -41892,25 +40592,11 @@ export const getPutEqProfilesUpdateUrl = (id: string,) => {
 export const putEqProfilesUpdate = async (id: string,
     putEqProfilesUpdateBody: PutEqProfilesUpdateBody, options?: Parameters<typeof customInstance>[1]): Promise<PutEqProfilesUpdate200> => {
 
-    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
-    if (!h) return {};
-    if (h instanceof Headers) return Object.fromEntries(h.entries());
-    if (Symbol.iterator in h) {
-      return Object.fromEntries(
-        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
-      );
-    }
-    const headers: Record<string, string | readonly string[]> = {};
-    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
-      if (value !== undefined) headers[name] = value;
-    }
-    return headers;
-  };
-return customInstance<PutEqProfilesUpdate200>(getPutEqProfilesUpdateUrl(id),
+  return customInstance<PutEqProfilesUpdate200>(getPutEqProfilesUpdateUrl(id),
   {
     ...options,
     method: 'PUT',
-    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    headers: getHeaders({ 'Content-Type': 'application/json' }, options?.headers),
     body: JSON.stringify(putEqProfilesUpdateBody)
   }
 );}
@@ -41953,9 +40639,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type PutEqProfilesUpdateMutationError = ErrorType<ApiError | ValidationError>
     export type PutEqProfilesUpdateMutationVariables = {id: string;data: BodyType<PutEqProfilesUpdateBody>}
 
-    /**
- * @summary Update an EQ device profile
- */
+    /** @summary Update an EQ device profile */
 export const usePutEqProfilesUpdate = <TError = ErrorType<ApiError | ValidationError>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof putEqProfilesUpdate>>, TError,PutEqProfilesUpdateMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient): UseMutationResult<
@@ -42027,9 +40711,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type DeleteEqProfilesDeleteMutationError = ErrorType<ApiError | ValidationError>
     export type DeleteEqProfilesDeleteMutationVariables = {id: string}
 
-    /**
- * @summary Delete an EQ device profile (cannot delete default)
- */
+    /** @summary Delete an EQ device profile (cannot delete default) */
 export const useDeleteEqProfilesDelete = <TError = ErrorType<ApiError | ValidationError>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteEqProfilesDelete>>, TError,DeleteEqProfilesDeleteMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient): UseMutationResult<
@@ -42101,9 +40783,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type PostEqProfilesActivateMutationError = ErrorType<ApiError>
     export type PostEqProfilesActivateMutationVariables = {id: string}
 
-    /**
- * @summary Set a profile as the active profile for the current user
- */
+    /** @summary Set a profile as the active profile for the current user */
 export const usePostEqProfilesActivate = <TError = ErrorType<ApiError>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postEqProfilesActivate>>, TError,PostEqProfilesActivateMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient): UseMutationResult<
@@ -42171,6 +40851,10 @@ export type GetLayoutPreferencesIndexQueryResult = NonNullable<Awaited<ReturnTyp
 export type GetLayoutPreferencesIndexQueryError = ErrorType<ApiError>
 
 
+/**
+ * Returns the layout preferences for the authenticated user.
+ * @summary Get layout preferences
+ */
 export function useGetLayoutPreferencesIndex<TData = Awaited<ReturnType<typeof getLayoutPreferencesIndex>>, TError = ErrorType<ApiError>>(
   options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getLayoutPreferencesIndex>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
@@ -42181,6 +40865,10 @@ export function useGetLayoutPreferencesIndex<TData = Awaited<ReturnType<typeof g
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * Returns the layout preferences for the authenticated user.
+ * @summary Get layout preferences
+ */
 export function useGetLayoutPreferencesIndex<TData = Awaited<ReturnType<typeof getLayoutPreferencesIndex>>, TError = ErrorType<ApiError>>(
   options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getLayoutPreferencesIndex>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
@@ -42191,14 +40879,18 @@ export function useGetLayoutPreferencesIndex<TData = Awaited<ReturnType<typeof g
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * Returns the layout preferences for the authenticated user.
+ * @summary Get layout preferences
+ */
 export function useGetLayoutPreferencesIndex<TData = Awaited<ReturnType<typeof getLayoutPreferencesIndex>>, TError = ErrorType<ApiError>>(
   options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getLayoutPreferencesIndex>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 /**
+ * Returns the layout preferences for the authenticated user.
  * @summary Get layout preferences
  */
-
 export function useGetLayoutPreferencesIndex<TData = Awaited<ReturnType<typeof getLayoutPreferencesIndex>>, TError = ErrorType<ApiError>>(
   options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getLayoutPreferencesIndex>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
@@ -42230,25 +40922,11 @@ export const getPutLayoutPreferencesUpdateUrl = () => {
  */
 export const putLayoutPreferencesUpdate = async (saveLayoutPreferencesRequest: SaveLayoutPreferencesRequest, options?: Parameters<typeof customInstance>[1]): Promise<PutLayoutPreferencesUpdate200> => {
 
-    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
-    if (!h) return {};
-    if (h instanceof Headers) return Object.fromEntries(h.entries());
-    if (Symbol.iterator in h) {
-      return Object.fromEntries(
-        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
-      );
-    }
-    const headers: Record<string, string | readonly string[]> = {};
-    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
-      if (value !== undefined) headers[name] = value;
-    }
-    return headers;
-  };
-return customInstance<PutLayoutPreferencesUpdate200>(getPutLayoutPreferencesUpdateUrl(),
+  return customInstance<PutLayoutPreferencesUpdate200>(getPutLayoutPreferencesUpdateUrl(),
   {
     ...options,
     method: 'PUT',
-    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    headers: getHeaders({ 'Content-Type': 'application/json' }, options?.headers),
     body: JSON.stringify(saveLayoutPreferencesRequest)
   }
 );}
@@ -42291,9 +40969,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type PutLayoutPreferencesUpdateMutationError = ErrorType<ApiError>
     export type PutLayoutPreferencesUpdateMutationVariables = {data: BodyType<SaveLayoutPreferencesRequest>}
 
-    /**
- * @summary Save layout preferences
- */
+    /** @summary Save layout preferences */
 export const usePutLayoutPreferencesUpdate = <TError = ErrorType<ApiError>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof putLayoutPreferencesUpdate>>, TError,PutLayoutPreferencesUpdateMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient): UseMutationResult<
@@ -42361,6 +41037,10 @@ export type GetLayoutPreferencesHistoryQueryResult = NonNullable<Awaited<ReturnT
 export type GetLayoutPreferencesHistoryQueryError = ErrorType<ApiError>
 
 
+/**
+ * Returns the version history for layout preferences.
+ * @summary Get layout preferences history
+ */
 export function useGetLayoutPreferencesHistory<TData = Awaited<ReturnType<typeof getLayoutPreferencesHistory>>, TError = ErrorType<ApiError>>(
   options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getLayoutPreferencesHistory>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
@@ -42371,6 +41051,10 @@ export function useGetLayoutPreferencesHistory<TData = Awaited<ReturnType<typeof
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * Returns the version history for layout preferences.
+ * @summary Get layout preferences history
+ */
 export function useGetLayoutPreferencesHistory<TData = Awaited<ReturnType<typeof getLayoutPreferencesHistory>>, TError = ErrorType<ApiError>>(
   options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getLayoutPreferencesHistory>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
@@ -42381,14 +41065,18 @@ export function useGetLayoutPreferencesHistory<TData = Awaited<ReturnType<typeof
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * Returns the version history for layout preferences.
+ * @summary Get layout preferences history
+ */
 export function useGetLayoutPreferencesHistory<TData = Awaited<ReturnType<typeof getLayoutPreferencesHistory>>, TError = ErrorType<ApiError>>(
   options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getLayoutPreferencesHistory>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 /**
+ * Returns the version history for layout preferences.
  * @summary Get layout preferences history
  */
-
 export function useGetLayoutPreferencesHistory<TData = Awaited<ReturnType<typeof getLayoutPreferencesHistory>>, TError = ErrorType<ApiError>>(
   options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getLayoutPreferencesHistory>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
@@ -42420,25 +41108,11 @@ export const getPostLayoutPreferencesRollbackUrl = () => {
  */
 export const postLayoutPreferencesRollback = async (postLayoutPreferencesRollbackBody: PostLayoutPreferencesRollbackBody, options?: Parameters<typeof customInstance>[1]): Promise<PostLayoutPreferencesRollback200> => {
 
-    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
-    if (!h) return {};
-    if (h instanceof Headers) return Object.fromEntries(h.entries());
-    if (Symbol.iterator in h) {
-      return Object.fromEntries(
-        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
-      );
-    }
-    const headers: Record<string, string | readonly string[]> = {};
-    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
-      if (value !== undefined) headers[name] = value;
-    }
-    return headers;
-  };
-return customInstance<PostLayoutPreferencesRollback200>(getPostLayoutPreferencesRollbackUrl(),
+  return customInstance<PostLayoutPreferencesRollback200>(getPostLayoutPreferencesRollbackUrl(),
   {
     ...options,
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    headers: getHeaders({ 'Content-Type': 'application/json' }, options?.headers),
     body: JSON.stringify(postLayoutPreferencesRollbackBody)
   }
 );}
@@ -42481,9 +41155,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type PostLayoutPreferencesRollbackMutationError = ErrorType<ApiError>
     export type PostLayoutPreferencesRollbackMutationVariables = {data: BodyType<PostLayoutPreferencesRollbackBody>}
 
-    /**
- * @summary Rollback layout preferences to a previous version
- */
+    /** @summary Rollback layout preferences to a previous version */
 export const usePostLayoutPreferencesRollback = <TError = ErrorType<ApiError>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postLayoutPreferencesRollback>>, TError,PostLayoutPreferencesRollbackMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient): UseMutationResult<
@@ -42551,6 +41223,10 @@ export type GetPlayerPreferencesIndexQueryResult = NonNullable<Awaited<ReturnTyp
 export type GetPlayerPreferencesIndexQueryError = ErrorType<ApiError>
 
 
+/**
+ * Returns the player preferences for the authenticated user.
+ * @summary Get player preferences
+ */
 export function useGetPlayerPreferencesIndex<TData = Awaited<ReturnType<typeof getPlayerPreferencesIndex>>, TError = ErrorType<ApiError>>(
   options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getPlayerPreferencesIndex>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
@@ -42561,6 +41237,10 @@ export function useGetPlayerPreferencesIndex<TData = Awaited<ReturnType<typeof g
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * Returns the player preferences for the authenticated user.
+ * @summary Get player preferences
+ */
 export function useGetPlayerPreferencesIndex<TData = Awaited<ReturnType<typeof getPlayerPreferencesIndex>>, TError = ErrorType<ApiError>>(
   options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getPlayerPreferencesIndex>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
@@ -42571,14 +41251,18 @@ export function useGetPlayerPreferencesIndex<TData = Awaited<ReturnType<typeof g
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * Returns the player preferences for the authenticated user.
+ * @summary Get player preferences
+ */
 export function useGetPlayerPreferencesIndex<TData = Awaited<ReturnType<typeof getPlayerPreferencesIndex>>, TError = ErrorType<ApiError>>(
   options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getPlayerPreferencesIndex>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 /**
+ * Returns the player preferences for the authenticated user.
  * @summary Get player preferences
  */
-
 export function useGetPlayerPreferencesIndex<TData = Awaited<ReturnType<typeof getPlayerPreferencesIndex>>, TError = ErrorType<ApiError>>(
   options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getPlayerPreferencesIndex>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
@@ -42610,25 +41294,11 @@ export const getPutPlayerPreferencesUpdateUrl = () => {
  */
 export const putPlayerPreferencesUpdate = async (savePlayerPreferencesRequest: SavePlayerPreferencesRequest, options?: Parameters<typeof customInstance>[1]): Promise<PutPlayerPreferencesUpdate200> => {
 
-    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
-    if (!h) return {};
-    if (h instanceof Headers) return Object.fromEntries(h.entries());
-    if (Symbol.iterator in h) {
-      return Object.fromEntries(
-        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
-      );
-    }
-    const headers: Record<string, string | readonly string[]> = {};
-    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
-      if (value !== undefined) headers[name] = value;
-    }
-    return headers;
-  };
-return customInstance<PutPlayerPreferencesUpdate200>(getPutPlayerPreferencesUpdateUrl(),
+  return customInstance<PutPlayerPreferencesUpdate200>(getPutPlayerPreferencesUpdateUrl(),
   {
     ...options,
     method: 'PUT',
-    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    headers: getHeaders({ 'Content-Type': 'application/json' }, options?.headers),
     body: JSON.stringify(savePlayerPreferencesRequest)
   }
 );}
@@ -42671,9 +41341,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type PutPlayerPreferencesUpdateMutationError = ErrorType<ApiError>
     export type PutPlayerPreferencesUpdateMutationVariables = {data: BodyType<SavePlayerPreferencesRequest>}
 
-    /**
- * @summary Save player preferences
- */
+    /** @summary Save player preferences */
 export const usePutPlayerPreferencesUpdate = <TError = ErrorType<ApiError>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof putPlayerPreferencesUpdate>>, TError,PutPlayerPreferencesUpdateMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient): UseMutationResult<
@@ -42741,6 +41409,10 @@ export type GetPlayerPreferencesHistoryQueryResult = NonNullable<Awaited<ReturnT
 export type GetPlayerPreferencesHistoryQueryError = ErrorType<ApiError>
 
 
+/**
+ * Returns the version history for player preferences.
+ * @summary Get player preferences history
+ */
 export function useGetPlayerPreferencesHistory<TData = Awaited<ReturnType<typeof getPlayerPreferencesHistory>>, TError = ErrorType<ApiError>>(
   options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getPlayerPreferencesHistory>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
@@ -42751,6 +41423,10 @@ export function useGetPlayerPreferencesHistory<TData = Awaited<ReturnType<typeof
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * Returns the version history for player preferences.
+ * @summary Get player preferences history
+ */
 export function useGetPlayerPreferencesHistory<TData = Awaited<ReturnType<typeof getPlayerPreferencesHistory>>, TError = ErrorType<ApiError>>(
   options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getPlayerPreferencesHistory>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
@@ -42761,14 +41437,18 @@ export function useGetPlayerPreferencesHistory<TData = Awaited<ReturnType<typeof
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * Returns the version history for player preferences.
+ * @summary Get player preferences history
+ */
 export function useGetPlayerPreferencesHistory<TData = Awaited<ReturnType<typeof getPlayerPreferencesHistory>>, TError = ErrorType<ApiError>>(
   options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getPlayerPreferencesHistory>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 /**
+ * Returns the version history for player preferences.
  * @summary Get player preferences history
  */
-
 export function useGetPlayerPreferencesHistory<TData = Awaited<ReturnType<typeof getPlayerPreferencesHistory>>, TError = ErrorType<ApiError>>(
   options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getPlayerPreferencesHistory>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
@@ -42800,25 +41480,11 @@ export const getPostPlayerPreferencesRollbackUrl = () => {
  */
 export const postPlayerPreferencesRollback = async (postPlayerPreferencesRollbackBody: PostPlayerPreferencesRollbackBody, options?: Parameters<typeof customInstance>[1]): Promise<PostPlayerPreferencesRollback200> => {
 
-    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
-    if (!h) return {};
-    if (h instanceof Headers) return Object.fromEntries(h.entries());
-    if (Symbol.iterator in h) {
-      return Object.fromEntries(
-        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
-      );
-    }
-    const headers: Record<string, string | readonly string[]> = {};
-    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
-      if (value !== undefined) headers[name] = value;
-    }
-    return headers;
-  };
-return customInstance<PostPlayerPreferencesRollback200>(getPostPlayerPreferencesRollbackUrl(),
+  return customInstance<PostPlayerPreferencesRollback200>(getPostPlayerPreferencesRollbackUrl(),
   {
     ...options,
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    headers: getHeaders({ 'Content-Type': 'application/json' }, options?.headers),
     body: JSON.stringify(postPlayerPreferencesRollbackBody)
   }
 );}
@@ -42861,9 +41527,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type PostPlayerPreferencesRollbackMutationError = ErrorType<ApiError>
     export type PostPlayerPreferencesRollbackMutationVariables = {data: BodyType<PostPlayerPreferencesRollbackBody>}
 
-    /**
- * @summary Rollback player preferences to a previous version
- */
+    /** @summary Rollback player preferences to a previous version */
 export const usePostPlayerPreferencesRollback = <TError = ErrorType<ApiError>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postPlayerPreferencesRollback>>, TError,PostPlayerPreferencesRollbackMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient): UseMutationResult<
@@ -42931,6 +41595,10 @@ export type GetSidebarConfigGetQueryResult = NonNullable<Awaited<ReturnType<type
 export type GetSidebarConfigGetQueryError = ErrorType<ApiError | ValidationError>
 
 
+/**
+ * Returns the sidebar configuration for the authenticated user and given media type. Returns defaults if no custom config exists.
+ * @summary Get sidebar configuration for a media type
+ */
 export function useGetSidebarConfigGet<TData = Awaited<ReturnType<typeof getSidebarConfigGet>>, TError = ErrorType<ApiError | ValidationError>>(
  mediaType: string, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getSidebarConfigGet>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
@@ -42941,6 +41609,10 @@ export function useGetSidebarConfigGet<TData = Awaited<ReturnType<typeof getSide
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * Returns the sidebar configuration for the authenticated user and given media type. Returns defaults if no custom config exists.
+ * @summary Get sidebar configuration for a media type
+ */
 export function useGetSidebarConfigGet<TData = Awaited<ReturnType<typeof getSidebarConfigGet>>, TError = ErrorType<ApiError | ValidationError>>(
  mediaType: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getSidebarConfigGet>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
@@ -42951,14 +41623,18 @@ export function useGetSidebarConfigGet<TData = Awaited<ReturnType<typeof getSide
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * Returns the sidebar configuration for the authenticated user and given media type. Returns defaults if no custom config exists.
+ * @summary Get sidebar configuration for a media type
+ */
 export function useGetSidebarConfigGet<TData = Awaited<ReturnType<typeof getSidebarConfigGet>>, TError = ErrorType<ApiError | ValidationError>>(
  mediaType: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getSidebarConfigGet>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 /**
+ * Returns the sidebar configuration for the authenticated user and given media type. Returns defaults if no custom config exists.
  * @summary Get sidebar configuration for a media type
  */
-
 export function useGetSidebarConfigGet<TData = Awaited<ReturnType<typeof getSidebarConfigGet>>, TError = ErrorType<ApiError | ValidationError>>(
  mediaType: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getSidebarConfigGet>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
@@ -42991,25 +41667,11 @@ export const getPutSidebarConfigUpdateUrl = (mediaType: string,) => {
 export const putSidebarConfigUpdate = async (mediaType: string,
     putSidebarConfigUpdateBody: PutSidebarConfigUpdateBody, options?: Parameters<typeof customInstance>[1]): Promise<PutSidebarConfigUpdate200> => {
 
-    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
-    if (!h) return {};
-    if (h instanceof Headers) return Object.fromEntries(h.entries());
-    if (Symbol.iterator in h) {
-      return Object.fromEntries(
-        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
-      );
-    }
-    const headers: Record<string, string | readonly string[]> = {};
-    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
-      if (value !== undefined) headers[name] = value;
-    }
-    return headers;
-  };
-return customInstance<PutSidebarConfigUpdate200>(getPutSidebarConfigUpdateUrl(mediaType),
+  return customInstance<PutSidebarConfigUpdate200>(getPutSidebarConfigUpdateUrl(mediaType),
   {
     ...options,
     method: 'PUT',
-    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    headers: getHeaders({ 'Content-Type': 'application/json' }, options?.headers),
     body: JSON.stringify(putSidebarConfigUpdateBody)
   }
 );}
@@ -43052,9 +41714,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type PutSidebarConfigUpdateMutationError = ErrorType<ApiError | ValidationError>
     export type PutSidebarConfigUpdateMutationVariables = {mediaType: string;data: BodyType<PutSidebarConfigUpdateBody>}
 
-    /**
- * @summary Update sidebar configuration for a media type
- */
+    /** @summary Update sidebar configuration for a media type */
 export const usePutSidebarConfigUpdate = <TError = ErrorType<ApiError | ValidationError>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof putSidebarConfigUpdate>>, TError,PutSidebarConfigUpdateMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient): UseMutationResult<
@@ -43126,9 +41786,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type DeleteSidebarConfigDeleteMutationError = ErrorType<ApiError | ValidationError>
     export type DeleteSidebarConfigDeleteMutationVariables = {mediaType: string}
 
-    /**
- * @summary Reset sidebar configuration to defaults for a media type
- */
+    /** @summary Reset sidebar configuration to defaults for a media type */
 export const useDeleteSidebarConfigDelete = <TError = ErrorType<ApiError | ValidationError>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteSidebarConfigDelete>>, TError,DeleteSidebarConfigDeleteMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient): UseMutationResult<
@@ -43196,6 +41854,10 @@ export type GetThemeMoodIndexQueryResult = NonNullable<Awaited<ReturnType<typeof
 export type GetThemeMoodIndexQueryError = ErrorType<ApiError>
 
 
+/**
+ * Returns the current theme mood for the authenticated user.
+ * @summary Get theme mood
+ */
 export function useGetThemeMoodIndex<TData = Awaited<ReturnType<typeof getThemeMoodIndex>>, TError = ErrorType<ApiError>>(
   options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getThemeMoodIndex>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
@@ -43206,6 +41868,10 @@ export function useGetThemeMoodIndex<TData = Awaited<ReturnType<typeof getThemeM
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * Returns the current theme mood for the authenticated user.
+ * @summary Get theme mood
+ */
 export function useGetThemeMoodIndex<TData = Awaited<ReturnType<typeof getThemeMoodIndex>>, TError = ErrorType<ApiError>>(
   options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getThemeMoodIndex>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
@@ -43216,14 +41882,18 @@ export function useGetThemeMoodIndex<TData = Awaited<ReturnType<typeof getThemeM
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * Returns the current theme mood for the authenticated user.
+ * @summary Get theme mood
+ */
 export function useGetThemeMoodIndex<TData = Awaited<ReturnType<typeof getThemeMoodIndex>>, TError = ErrorType<ApiError>>(
   options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getThemeMoodIndex>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 /**
+ * Returns the current theme mood for the authenticated user.
  * @summary Get theme mood
  */
-
 export function useGetThemeMoodIndex<TData = Awaited<ReturnType<typeof getThemeMoodIndex>>, TError = ErrorType<ApiError>>(
   options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getThemeMoodIndex>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
@@ -43255,25 +41925,11 @@ export const getPutThemeMoodUpdateUrl = () => {
  */
 export const putThemeMoodUpdate = async (putThemeMoodUpdateBody: PutThemeMoodUpdateBody, options?: Parameters<typeof customInstance>[1]): Promise<PutThemeMoodUpdate200> => {
 
-    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
-    if (!h) return {};
-    if (h instanceof Headers) return Object.fromEntries(h.entries());
-    if (Symbol.iterator in h) {
-      return Object.fromEntries(
-        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
-      );
-    }
-    const headers: Record<string, string | readonly string[]> = {};
-    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
-      if (value !== undefined) headers[name] = value;
-    }
-    return headers;
-  };
-return customInstance<PutThemeMoodUpdate200>(getPutThemeMoodUpdateUrl(),
+  return customInstance<PutThemeMoodUpdate200>(getPutThemeMoodUpdateUrl(),
   {
     ...options,
     method: 'PUT',
-    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    headers: getHeaders({ 'Content-Type': 'application/json' }, options?.headers),
     body: JSON.stringify(putThemeMoodUpdateBody)
   }
 );}
@@ -43316,9 +41972,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type PutThemeMoodUpdateMutationError = ErrorType<ApiError | ValidationError>
     export type PutThemeMoodUpdateMutationVariables = {data: BodyType<PutThemeMoodUpdateBody>}
 
-    /**
- * @summary Update theme mood
- */
+    /** @summary Update theme mood */
 export const usePutThemeMoodUpdate = <TError = ErrorType<ApiError | ValidationError>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof putThemeMoodUpdate>>, TError,PutThemeMoodUpdateMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient): UseMutationResult<
@@ -43385,6 +42039,7 @@ export type GetUserSettingsIndexQueryResult = NonNullable<Awaited<ReturnType<typ
 export type GetUserSettingsIndexQueryError = ErrorType<ApiError>
 
 
+/** @summary Get the signed-in user's settings with their effective values */
 export function useGetUserSettingsIndex<TData = Awaited<ReturnType<typeof getUserSettingsIndex>>, TError = ErrorType<ApiError>>(
   options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getUserSettingsIndex>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
@@ -43395,6 +42050,7 @@ export function useGetUserSettingsIndex<TData = Awaited<ReturnType<typeof getUse
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/** @summary Get the signed-in user's settings with their effective values */
 export function useGetUserSettingsIndex<TData = Awaited<ReturnType<typeof getUserSettingsIndex>>, TError = ErrorType<ApiError>>(
   options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getUserSettingsIndex>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
@@ -43405,14 +42061,12 @@ export function useGetUserSettingsIndex<TData = Awaited<ReturnType<typeof getUse
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/** @summary Get the signed-in user's settings with their effective values */
 export function useGetUserSettingsIndex<TData = Awaited<ReturnType<typeof getUserSettingsIndex>>, TError = ErrorType<ApiError>>(
   options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getUserSettingsIndex>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-/**
- * @summary Get the signed-in user's settings with their effective values
- */
-
+/** @summary Get the signed-in user's settings with their effective values */
 export function useGetUserSettingsIndex<TData = Awaited<ReturnType<typeof getUserSettingsIndex>>, TError = ErrorType<ApiError>>(
   options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getUserSettingsIndex>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
@@ -43445,25 +42099,11 @@ export const getPutUserSettingsSetUrl = (key: string,) => {
 export const putUserSettingsSet = async (key: string,
     setUserSettingRequest: SetUserSettingRequest, options?: Parameters<typeof customInstance>[1]): Promise<PutUserSettingsSet200> => {
 
-    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
-    if (!h) return {};
-    if (h instanceof Headers) return Object.fromEntries(h.entries());
-    if (Symbol.iterator in h) {
-      return Object.fromEntries(
-        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
-      );
-    }
-    const headers: Record<string, string | readonly string[]> = {};
-    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
-      if (value !== undefined) headers[name] = value;
-    }
-    return headers;
-  };
-return customInstance<PutUserSettingsSet200>(getPutUserSettingsSetUrl(key),
+  return customInstance<PutUserSettingsSet200>(getPutUserSettingsSetUrl(key),
   {
     ...options,
     method: 'PUT',
-    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    headers: getHeaders({ 'Content-Type': 'application/json' }, options?.headers),
     body: JSON.stringify(setUserSettingRequest)
   }
 );}
@@ -43506,9 +42146,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type PutUserSettingsSetMutationError = ErrorType<ApiError | ValidationError>
     export type PutUserSettingsSetMutationVariables = {key: string;data: BodyType<SetUserSettingRequest>}
 
-    /**
- * @summary Set the signed-in user's choice for a setting
- */
+    /** @summary Set the signed-in user's choice for a setting */
 export const usePutUserSettingsSet = <TError = ErrorType<ApiError | ValidationError>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof putUserSettingsSet>>, TError,PutUserSettingsSetMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient): UseMutationResult<
@@ -43580,9 +42218,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type DeleteUserSettingsResetMutationError = ErrorType<ApiError>
     export type DeleteUserSettingsResetMutationVariables = {key: string}
 
-    /**
- * @summary Remove the signed-in user's choice so the setting follows its default
- */
+    /** @summary Remove the signed-in user's choice so the setting follows its default */
 export const useDeleteUserSettingsReset = <TError = ErrorType<ApiError>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteUserSettingsReset>>, TError,DeleteUserSettingsResetMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient): UseMutationResult<

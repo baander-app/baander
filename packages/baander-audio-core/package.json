@@ -34,7 +34,7 @@
   },
   "dependencies": {
     "node-addon-api": "^8.9.2",
-    "node-gyp": "^11.0.0"
+    "node-gyp": "^12.3.0"
   },
   "gypfile": true,
   "engines": {

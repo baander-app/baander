@@ -1610,7 +1610,7 @@ locks (`ui/electron/yarn.lock`) and copy the result into place; a plain
 loads in Electron as well:
 
 ```sh
-npx node-gyp rebuild --runtime=electron --target=45.0.0 --dist-url=https://electronjs.org/headers
+npx node-gyp rebuild --runtime=electron --target=45.4.1 --dist-url=https://electronjs.org/headers
 mkdir -p prebuilds/$(node -p 'process.platform + "-" + process.arch')
 cp build/Release/baander_audio_core.node prebuilds/$(node -p 'process.platform + "-" + process.arch')/
 ```
