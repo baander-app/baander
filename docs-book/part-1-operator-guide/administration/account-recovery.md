@@ -1,6 +1,6 @@
 # Account recovery and sign-in methods
 
-Use these procedures to help a user recover access, verify an address or change sign-in methods. Run console commands on the installation host in the shell where the [`dc` wrapper](../getting-started/installation.md) is defined. Console access carries full authority; the admin API applies the role checks described in [User management](user-management.md#who-can-manage-users).
+Use these procedures to help a user recover access, verify an address or change sign-in methods. Run console commands on the installation host in the shell where the [`dc` function](../getting-started/installation.md#command-context) is defined. Console access carries full authority; the admin API applies the role checks described in [User management](user-management.md#who-can-manage-users).
 
 ## Passkeys (WebAuthn)
 
@@ -28,7 +28,7 @@ sign-in answers that TOTP is unavailable because the configured key no longer op
 their secret, turn TOTP off for them:
 
 ```bash
-dc exec app php bin/console app:user:reset-totp alice@baander.app
+dc exec web php bin/console app:user:reset-totp alice@baander.app
 ```
 
 The reset also signs the user out of every session. Afterwards they sign in with their
@@ -45,7 +45,7 @@ password reset leaves TOTP on, unless the account's address was never verified; 
 Set a new password for a user who has forgotten theirs:
 
 ```bash
-dc exec app php bin/console app:user:reset-password alice@baander.app
+dc exec web php bin/console app:user:reset-password alice@baander.app
 ```
 
 The command prompts for the password, or reads it from stdin with `--password`. It accepts an email address or public ID and does the same as **Reset password** in the admin panel. Both sign the user out of every session. See [app:user:reset-password](../commands/app-user-reset-password.md).
@@ -72,7 +72,7 @@ Baander sends notification email only to verified addresses. Until its address i
 On an installation without email, or for a user who cannot receive the link, mark the current address verified yourself:
 
 ```bash
-dc exec app php bin/console app:user:mark-email-verified alice@baander.app
+dc exec web php bin/console app:user:mark-email-verified alice@baander.app
 ```
 
 A super administrator can do the same through the admin API (`POST /api/admin/users/{publicId}/verify-email`). See [app:user:mark-email-verified](../commands/app-user-mark-email-verified.md).
@@ -84,7 +84,7 @@ See [Email verification](../configuration/account-security.md#email-verification
 Users change their own address in **Settings**. Operators change it in the admin panel or with the CLI:
 
 ```bash
-dc exec app php bin/console app:user:change-email alice@baander.app alice.new@baander.app
+dc exec web php bin/console app:user:change-email alice@baander.app alice.new@baander.app
 ```
 
 The command accepts the current email address or the public ID. The two ways differ:

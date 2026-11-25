@@ -37,13 +37,13 @@ Anyone with console access can run the `app:oauth:client:*` commands. In the adm
 Register a device client with a name the user will recognize when approving it:
 
 ```bash
-dc exec app php bin/console app:oauth:client:create 'Living room TV' --type device
+dc exec web php bin/console app:oauth:client:create 'Living room TV' --type device
 ```
 
 Public and confidential clients need at least one redirect URI, and at most 10. This is where Baander sends the user back after the decision:
 
 ```bash
-dc exec app php bin/console app:oauth:client:create 'Baander Player' --type public --redirect-uri https://player.baander.app/callback
+dc exec web php bin/console app:oauth:client:create 'Baander Player' --type public --redirect-uri https://player.baander.app/callback
 ```
 
 A redirect URI must be absolute, without a fragment or credentials, and use `https`, plain `http` on a loopback host (`localhost`, `127.0.0.1` or `[::1]`), or a private-use scheme in reverse domain form such as `app.baander.tv:/callback`. A pushed authorization request must name a registered URI exactly. A loopback URI also matches on any port, because native apps listen on a port the system picks. Device clients have no redirect URIs. See [app:oauth:client:create](../commands/app-oauth-client-create.md) for the full rules.

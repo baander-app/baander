@@ -64,6 +64,18 @@ class ComposeRuntime
         }
     }
 
+    /**
+     * A preview's application container bind-mounts the worktree and boots Symfony's Dotenv from it,
+     * which cannot start without `.env`. Git ignores that file, so a new linked worktree has none.
+     */
+    public static function assertPreviewDotenv(string $worktree): void
+    {
+        $path = $worktree . '/.env';
+        if (!is_file($path)) {
+            throw new WorkflowError('This worktree has no ' . $path . ', which Git does not track; copy .env.example to .env and start the preview again.');
+        }
+    }
+
     /** @return array<string,mixed> */
     public static function bind(string $source, string $target, bool $readOnly = true): array
     {

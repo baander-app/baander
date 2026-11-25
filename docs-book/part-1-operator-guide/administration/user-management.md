@@ -7,7 +7,7 @@ Library membership separately controls which media a user can read; see
 [Library management](../media/library-management.md).
 
 Run commands on the installation host, from its checkout, in the shell where the
-[`dc` wrapper](../getting-started/installation.md) is defined. Console access carries full authority;
+[`dc` function](../getting-started/installation.md#command-context) is defined. Console access carries full authority;
 it does not apply the admin API's role checks. Make commands target development
 instances; see the [development environment guide](../../part-2-developer-guide/getting-started/development-environment.md).
 
@@ -20,13 +20,13 @@ Self-registration through the sign-up page and the public `POST /api/auth/regist
 Create a regular user:
 
 ```bash
-dc exec app php bin/console app:user:create alice@baander.app Alice
+dc exec web php bin/console app:user:create alice@baander.app Alice
 ```
 
 Create an admin (the command asks for confirmation before granting admin privileges):
 
 ```bash
-dc exec app php bin/console app:user:create admin@baander.app Admin --role admin
+dc exec web php bin/console app:user:create admin@baander.app Admin --role admin
 ```
 
 ### Arguments and options
@@ -44,7 +44,7 @@ For scripted use, provide a protected password file through stdin with `--passwo
 and disable Compose terminal allocation with `-T`:
 
 ```bash
-dc exec -T app php bin/console app:user:create alice@baander.app Alice --password < /secure/path/initial-password
+dc exec -T web php bin/console app:user:create alice@baander.app Alice --password < /secure/path/initial-password
 ```
 
 See the [full command reference](../commands/app-user-create.md) for exit codes and additional details.
@@ -68,7 +68,7 @@ Roles apply in Baander's own web and desktop apps. A token that another applicat
 Roles are assigned at creation time with the `--role` flag. To change them later, [app:user:roles](../commands/app-user-roles.md) replaces a user's roles with the set you give; a super administrator can do the same in the admin panel or through the admin API (`POST /api/admin/users/{publicId}/roles`):
 
 ```bash
-dc exec app php bin/console app:user:roles alice@baander.app ROLE_USER ROLE_ADMIN
+dc exec web php bin/console app:user:roles alice@baander.app ROLE_USER ROLE_ADMIN
 ```
 
 The install keeps at least one enabled super administrator. Demoting, disabling or deleting the only enabled one is refused, in the admin API with `409` and `details.reason` `last_super_admin` and on the console with exit code 1; make another user a super administrator first. A disabled super administrator does not count, and an install that has no enabled super administrator refuses none of these changes. Such changes take turns, so two super administrators who demote each other at the same moment leave one of them a super administrator.
@@ -101,9 +101,9 @@ Each user has settings of their own. Currently there is one, `language`, the lan
 Users change their own language in **Settings**. Administrators see a user's language in the admin user dialog; super administrators can change it there, and other administrators see it read-only. Operators use the CLI:
 
 ```bash
-dc exec app php bin/console app:user:setting get alice@baander.app
-dc exec app php bin/console app:user:setting set alice@baander.app language da
-dc exec app php bin/console app:user:setting reset alice@baander.app language
+dc exec web php bin/console app:user:setting get alice@baander.app
+dc exec web php bin/console app:user:setting set alice@baander.app language da
+dc exec web php bin/console app:user:setting reset alice@baander.app language
 ```
 
 The command accepts an email address or public ID. `reset` removes the choice, so the user follows the server default again. See [app:user:setting](../commands/app-user-setting.md).
@@ -123,18 +123,18 @@ Super administrators can set every user setting, including any that users cannot
 Disable a user account to revoke access without deleting it:
 
 ```bash
-dc exec app php bin/console app:user:disable alice@baander.app
+dc exec web php bin/console app:user:disable alice@baander.app
 ```
 
 Re-enable a disabled account:
 
 ```bash
-dc exec app php bin/console app:user:enable alice@baander.app
+dc exec web php bin/console app:user:enable alice@baander.app
 ```
 
 Both commands accept an email address or public ID as the identifier. Disabling saves the
 account state and revokes access and refresh tokens in one transaction, then asks
-the web server to close open WebSocket connections. Run it in the app container so
+the web server to close open WebSocket connections. Run it in the web container so
 it can reach that server. Enabling restores the account, but restores none of its
 revoked tokens: the user signs in again. See [app:user:disable](../commands/app-user-disable.md) and [app:user:enable](../commands/app-user-enable.md) for details.
 
@@ -149,10 +149,10 @@ disabling the owner refuses its next request. Read [Disabled accounts](sessions-
 [app:user:delete](../commands/app-user-delete.md) deletes an account through the same use case as the admin panel. It asks for confirmation on a terminal and needs `--force` in a script:
 
 ```bash
-dc exec app php bin/console app:user:delete alice@baander.app
+dc exec web php bin/console app:user:delete alice@baander.app
 ```
 
-Deletion cannot be undone. Once it is saved, the web server closes the user's open WebSocket connections; run the command in the app container so it can reach that server. To stop someone from signing in while keeping their account, disable it instead.
+Deletion cannot be undone. Once it is saved, the web server closes the user's open WebSocket connections; run the command in the web container so it can reach that server. To stop someone from signing in while keeping their account, disable it instead.
 
 ## OAuth Clients
 

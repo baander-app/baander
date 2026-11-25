@@ -5,9 +5,9 @@ List the MusicBrainz candidates for an album, song or artist, best first, each w
 ## Quick start
 
 The Make examples below target the checkout's development preview. For an
-installed instance, use the `dc` function from
-[Getting started](../getting-started/installation.md#command-context) and replace
-`make exec cmd="php bin/console …"` with `dc exec app php bin/console …`.
+installation, use the `dc` function from
+[Installation](../getting-started/installation.md#command-context) and replace
+`make exec cmd="php bin/console …"` with `dc exec web php bin/console …`.
 
 The releases an album may match, searched by the album's own title and primary artist:
 

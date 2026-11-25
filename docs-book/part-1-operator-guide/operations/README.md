@@ -4,12 +4,12 @@ When the web interface responds but a library stops changing, check the backgrou
 path as well as the web server. A successful web probe does not establish that a
 scan, outbox relay or consumer is making progress.
 
-Run the commands below on the installed Docker host, from the installation checkout,
-with the `dc` shell function and private environment files from
-[Getting Started](../getting-started/installation.md#installation). `dc exec -T app` runs a command
-inside that installation's web container; it does not enter the worker deployment.
-For HTTP probes, set `BAANDER_URL` to the HTTPS origin clients use, with no trailing
-slash. The client must trust its certificate.
+Run the commands below on the installation host, from its checkout, with the `dc`
+function from [Installation](../getting-started/installation.md#command-context).
+`dc exec -T web` runs a command inside the deployment's web container; it does not
+enter the worker pair. For HTTP probes, set `BAANDER_URL` to the origin clients use,
+the configuration's `origin`, with no trailing slash. For an HTTPS origin, the client
+must trust the certificate of the TLS proxy in front of the gateway.
 
 | Guide | Scope |
 |-------|-------|
@@ -20,7 +20,7 @@ slash. The client must trust its certificate.
 
 | Component or stage | First signal | What it establishes |
 |--------------------|--------------|---------------------|
-| Reverse proxy and web server | `/live`, `dc logs nginx app` | The request reaches a responding process; read `draining` too |
+| Gateway and web server | `/live`, `dc logs gateway web` | The request reaches a responding process; read `draining` too |
 | PostgreSQL and Redis | `/ready`, `app:health:check` | Dependency connectivity at the time of the check |
 | Web worker memory and pools | `app:server:stats` (pools with `--json`), health memory row | Current web process pressure; the CLI health process measures its own memory |
 | Admitted worker deployment | Host controller `readiness` action | Current readiness observation of the exact admitted deployment |
@@ -55,20 +55,20 @@ symptom-led checks.
 | `POST /api/monitor/transport/failed/{id}/retry` | Retry a failed message (admin) |
 | `DELETE /api/monitor/transport/failed/{id}` | Remove a failed message (admin) |
 | `POST /api/monitor/transport/failed/flush?confirm=true` | Remove all failed messages (admin) |
-| `dc exec -T app php bin/console app:monitor:transport` | CLI transport queue depths and consumer state |
-| `dc exec -T app php bin/console app:failed-message:list` | CLI failed message list |
-| `dc exec app php bin/console app:failed-message:flush` | CLI removal of all failed messages, after a terminal confirmation |
+| `dc exec -T web php bin/console app:monitor:transport` | CLI transport queue depths and consumer state |
+| `dc exec -T web php bin/console app:failed-message:list` | CLI failed message list |
+| `dc exec web php bin/console app:failed-message:flush` | CLI removal of all failed messages, after a terminal confirmation |
 | `GET /api/monitor/analytics/summary` | Job analytics summary (admin) |
 | `GET /api/monitor/analytics/timing` | Job timing analytics (admin) |
 | `GET /api/monitor/analytics/failures` | Job failure analytics (admin) |
 | `GET /api/monitor/rate-limiters` | Rate limiter catalog (admin) |
-| `DELETE /api/monitor/rate-limiters/clear?confirm=true` | Clear every rate limiter (admin) |
-| `DELETE /api/monitor/rate-limiters/{name}/clear?confirm=true` | Clear rate limiter state (admin) |
-| `dc exec -T app php bin/console app:health:check` | CLI health check |
-| `dc exec -T app php bin/console app:config:validate` | CLI configuration validation |
-| `dc logs -f app` | Follow this installation's app logs |
-| `dc logs --since=1h app` | Recent app logs |
-| `dc ps` | This installation's Compose service status |
+| `DELETE /api/monitor/rate-limiters/clear?confirm=true` | Clear every rate limiter (super admin) |
+| `DELETE /api/monitor/rate-limiters/{name}/clear?confirm=true` | Clear rate limiter state (super admin) |
+| `dc exec -T web php bin/console app:health:check` | CLI health check |
+| `dc exec -T web php bin/console app:config:validate` | CLI configuration validation |
+| `dc logs -f web` | Follow this installation's web logs |
+| `dc logs --since=1h web` | Recent web logs |
+| `dc ps` | This installation's Compose service status; the worker pair is not a Compose service |
 
 ## See Also
 

@@ -29,6 +29,14 @@ From the repository root, install the standalone controller dependencies under
 composer --working-dir=scripts install --no-dev
 ```
 
+The preview's application container reads `.env` from your checkout, and Git does
+not track that file. If the checkout has none, copy the tracked template;
+`make preview-up` refuses to start without it:
+
+```bash
+cp .env.example .env
+```
+
 ## 2. Configure `.baander.test` DNS
 
 Each worktree preview runs on its own `*.baander.test` subdomain behind a local

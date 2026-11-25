@@ -2,14 +2,14 @@
 
 To make files available for playback, register their directory as a library, scan it, then let background ingestion build the catalog. Optional enrichment adds information from external services after catalog records exist. A library registration alone does not import its files.
 
-The examples use the installed stack. On the installation host, run them from its checkout in the shell where the [installed `dc` wrapper](../getting-started/installation.md#command-context) is defined. Paths such as `/media/library/music` are paths inside the app and worker containers; see [Storage and Data](../getting-started/storage-and-data.md) for their host mounts. Console commands require trusted shell access to the installation.
+The examples use an installation. On the installation host, run them from its checkout in the shell where the [`dc` function](../getting-started/installation.md#command-context) is defined. Paths such as `/storage/media/music` are paths inside the web and worker containers, which mount the deployment's media volume read-only at `/storage/media`; see [Storage and Data](../getting-started/storage-and-data.md) for the volumes. Console commands require trusted shell access to the installation.
 
 ## Creating Libraries
 
 Use the `app:library:create` command to register a new media library. You must provide a name, the absolute path to the media directory, and the library type.
 
 ```bash
-dc exec app php bin/console app:library:create 'My Music' /media/library/music music
+dc exec web php bin/console app:library:create 'My Music' /storage/media/music music
 ```
 
 | Argument | Description |
@@ -23,10 +23,10 @@ The command also accepts `podcast`, `audiobook` and `tv_show` as type values, bu
 The slug is auto-generated from the name: lowercased, with each run of characters other than `a`–`z` and `0`–`9` replaced by one hyphen and hyphens trimmed from both ends, so "AC/DC" becomes `ac-dc`. Provide `--slug` to override it:
 
 ```bash
-dc exec app php bin/console app:library:create 'My Music' /media/library/music music --slug my-music-collection
+dc exec web php bin/console app:library:create 'My Music' /storage/media/music music --slug my-music-collection
 ```
 
-Mount the source directory before creating the library. The app must be able to read it for scanning and original-file streaming; the worker must see the same absolute source path for conversion. Registering a library does not copy its source files.
+Put the source files in the media volume before creating the library, as [Installation](../getting-started/installation.md#7-add-media-and-scan-a-library) shows. Web must be able to read them for scanning and original-file streaming; the worker must see the same absolute source path for conversion. Registering a library does not copy its source files.
 
 See the [full command reference](../commands/app-library-create.md) for all options including `--sort-order`.
 
@@ -35,14 +35,14 @@ See the [full command reference](../commands/app-library-create.md) for all opti
 After creating a library, run a scan to index its contents:
 
 ```bash
-dc exec app php bin/console app:library:scan my-music
+dc exec web php bin/console app:library:scan my-music
 ```
 
 The console runs discovery inline and records that job in the job monitor. Starting a scan from the administrator interface queues discovery instead: acceptance means it is waiting for background execution, not that any files have been read.
 
 Both routes then follow the same stages:
 
-1. **Discovery** walks the directory, filters recognized extensions, hashes files and updates the file index. It records changed directories for later ingestion.
+1. **Discovery** walks the directory, filters recognized extensions, hashes files and updates the file index. It records changed directories for later ingestion. A file symlink is followed only while its target stays inside the library. A link whose target leaves the library is skipped with a warning in the log, and a track or video imported through it earlier is marked unavailable. Directory symlinks are not followed.
 2. **Catalog ingestion** consumes those directory messages in the background. Music ingestion reads tags and creates albums and tracks; movie ingestion creates movie and video records.
 3. **Optional enrichment** queues MusicBrainz matching of the albums an import or rescan touches, and lyrics work for newly created tracks and for tracks a rescan repairs, when the corresponding setting is enabled.
 
@@ -61,7 +61,7 @@ After discovery, background ingestion adds new albums and tracks to the catalog.
 | Setting | While it is on |
 |---------|----------------|
 | `metadata.auto_sync` | Each album an import or rescan touches is queued for [automatic MusicBrainz matching](musicbrainz-matching.md#automatic-matching) when it has no match yet, or when it is matched and holds songs no match has compared yet, such as those of a new disc. The request waits at least five minutes, so that the album's other discs land first. Each artist a batch of files creates with a MusicBrainz ID from the tags, or gives one, is queued for the [fill of its details](musicbrainz-matching.md#artist-details) from MusicBrainz. |
-| `lyrics.auto_fetch` | Each new track without an `.lrc` lyrics file beside it is queued for a lyrics fetch from LRCLIB, once the catalog has stored the track. A track with an `.lrc` file takes its lyrics from that file. A track without lyrics that a rescan gives an artist credit or a new length is queued the same way. |
+| `lyrics.auto_fetch` | Each new track without an `.lrc` lyrics file beside it is queued for a lyrics fetch from LRCLIB, once the catalog has stored the track. A track with an `.lrc` file takes its lyrics from that file, when the file lies inside the library and holds at most 1 MiB. A track without lyrics that a rescan gives an artist credit or a new length is queued the same way. |
 
 `metadata.auto_sync` also acts on albums Baander already has, so a rescan with the setting on queues every album it touches that has no match yet; an album left for review is queued again only when its number of songs has changed. `lyrics.auto_fetch` acts on new tracks and on the tracks a rescan repairs; see [What a rescan repairs](../commands/app-library-scan.md#what-a-rescan-repairs). The bulk lyrics fetch, [`app:lyrics:fetch`](../commands/app-lyrics-fetch.md), and the syncs and fetches an administrator starts are not affected by either setting.
 
@@ -89,13 +89,13 @@ claims, correct profiles or merge confirmed duplicates.
 To inspect filesystem changes, use `app:watch-files`. It prints Linux inotify events in the foreground. It does not start scans or update the catalog; run a scan separately when you want to import changes:
 
 ```bash
-dc exec app php bin/console app:watch-files --path /media/library/music
+dc exec web php bin/console app:watch-files --path /storage/media/music
 ```
 
 Each watch covers the named directory, without recursive registration of its subdirectories. Watch multiple directories at once:
 
 ```bash
-dc exec app php bin/console app:watch-files --path /media/library/music --path /media/library/movies
+dc exec web php bin/console app:watch-files --path /storage/media/music --path /storage/media/movies
 ```
 
 The watcher prints these event categories:
@@ -111,7 +111,7 @@ The watcher prints these event categories:
 Adjust the read timeout with `--timeout` (in milliseconds, default `5000`):
 
 ```bash
-dc exec app php bin/console app:watch-files --path /media/library/music --timeout 10000
+dc exec web php bin/console app:watch-files --path /storage/media/music --timeout 10000
 ```
 
 Always supply at least one `--path`. The current command prints a current-directory message when paths are omitted, but does not register that directory and then fails because no directories are watched.
@@ -120,39 +120,45 @@ See the [command reference](../commands/app-watch-files.md) for details.
 
 ## Supported Media Formats
 
-Library discovery selects files by extension. These lists describe what a scan discovers, not a guarantee that every codec inside a container can be decoded or played by a browser. For conversion and browser fallback, see [Transcoding](transcoding.md).
+Library discovery selects files by extension. FFmpeg then opens a song only as one of the audio containers below, and a video only as one of the video containers, each recognized by the demuxer the table names. These lists describe what a scan discovers and what FFmpeg may open, not a guarantee that every codec inside a container can be decoded or played by a browser. For conversion and browser fallback, see [Transcoding](transcoding.md).
+
+A file that holds another format under a media file name, such as a DASH manifest, an HLS playlist or a concat script named `.mkv`, does not play: those formats name other files, and FFmpeg refuses them.
+
+A scan does not import such a file. The import's failure report names the format FFmpeg found, for example `Not a supported media container: dash.`, and the file's index row is marked unavailable, so a song or video imported from it earlier stops playing.
 
 ### Audio formats
 
-| Format | Extensions discovered |
-|--------|-----------------------|
-| MP3 | `.mp3` |
-| FLAC | `.flac` |
-| OGG | `.ogg` |
-| Opus | `.opus` |
-| WAV | `.wav` |
-| AAC / MPEG-4 audio | `.aac`, `.m4a` |
-| WMA | `.wma` |
-
-The scanner does not include `.oga` or `.wave`, even where a metadata reader could recognize their contents.
+| Format | Extensions discovered | FFmpeg demuxer |
+|--------|-----------------------|----------------|
+| MP3 | `.mp3` | `mp3` |
+| FLAC | `.flac` | `flac` |
+| Ogg | `.ogg`, `.oga` | `ogg` |
+| Opus | `.opus` | `ogg` |
+| WAV | `.wav`, `.wave` | `wav` |
+| AAC | `.aac` | `aac` |
+| MPEG-4 audio | `.m4a`, `.mp4a`, `.m4b` | `mov` |
+| WMA | `.wma` | `asf` |
+| AIFF | `.aif`, `.aiff`, `.aifc` | `aiff` |
 
 ### Video formats
 
-| Format | Extensions discovered |
-|--------|-----------------------|
-| MP4 | `.mp4`, `.m4v` |
-| Matroska | `.mkv` |
-| WebM | `.webm` |
-| AVI | `.avi` |
-| MOV | `.mov` |
-| WMV | `.wmv` |
+| Format | Extensions discovered | FFmpeg demuxer |
+|--------|-----------------------|----------------|
+| MP4 | `.mp4`, `.m4v` | `mov` |
+| QuickTime | `.mov` | `mov` |
+| Matroska | `.mkv` | `matroska` |
+| WebM | `.webm` | `matroska` |
+| AVI | `.avi` | `avi` |
+| WMV | `.wmv` | `asf` |
+
+An AVI file that embeds a text subtitle file loses that subtitle track: FFmpeg reads it with a nested subtitle demuxer that is not in the list. The film still plays.
 
 ## Cover Art Extraction
 
 After scanning a music library, extract embedded cover art from audio files:
 
 ```bash
-dc exec app php bin/console app:album:extract-covers
+dc exec web php bin/console app:album:extract-covers
 ```
 
 The command runs the coverless-album batch inline and queues one extraction job per album. The independent worker reads embedded images from source audio and stores any extracted cover. A successful batch means the extraction jobs were queued; check album covers and background job outcomes to establish extraction results.

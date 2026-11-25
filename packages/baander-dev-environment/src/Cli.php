@@ -288,6 +288,9 @@ final class Cli
             }
             $reservedTargets = array_column(array_diff_key($instance['state_mounts'] ?? [], ['media' => true]), 'target');
             $media = new MediaMounts($layout)->preflight($media, $store->root, $applicationEnvironment, $reservedTargets);
+            if ($identity !== 'persistent') {
+                ComposeRuntime::assertPreviewDotenv($root);
+            }
             new RetainedState($store, $runner, $environment, $configuration->budgets->seconds('process'))->convert($identity);
             $converted = $store->load($identity);
             if ($converted !== null && $converted != $observed) {

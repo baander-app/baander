@@ -18,15 +18,11 @@ Each entry of a probe's `checks` list holds only `component` and `status`, and `
 
 While the web server [drains before it stops](../maintenance/web-server-restarts.md#stopping-and-restarting-the-web-server), `/ready` answers `503` with `"draining": true` without checking any dependency. Its `checks` list holds a single unhealthy `server` entry. The server accepts no new connections once the drain starts, so only a client that holds a kept-alive connection from before the stop sees this answer, and the answer carries `Connection: close`. `/live` still answers `200` during the drain, so liveness probes do not restart the container, and its body says `"draining": true`. The web player reads that answer as "server not back yet".
 
-These endpoints are meant for orchestrator probes. The Docker healthcheck does not call one; it runs the `app:health:check` command. The development stack defines it in `docker-compose.yml` as below; the web image's `Dockerfile` defines the same check with a 10-second start period:
+These endpoints are meant for orchestrator probes. The Docker healthcheck does not call one; it runs the `app:health:check` command. The web image's `Dockerfile` defines it as below, and the deployment's web service, which sets no healthcheck of its own, uses that definition. The development stack's `docker-compose.yml` defines the same check with a 15-second start period:
 
-```yaml
-healthcheck:
-    test: ["CMD", "php", "bin/console", "app:health:check"]
-    interval: 30s
-    timeout: 5s
-    retries: 3
-    start_period: 15s
+```dockerfile
+HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
+    CMD ["php", "bin/console", "app:health:check"]
 ```
 
 ### CLI health check
@@ -34,7 +30,7 @@ healthcheck:
 You can also run the health check from the command line inside the container. It prints a table with per-component status, latency and details:
 
 ```bash
-dc exec -T app php bin/console app:health:check
+dc exec -T web php bin/console app:health:check
 ```
 
 This runs the same checks as `/health` and `GET /api/debug/health` and exits with code 1 if a component other
@@ -101,7 +97,7 @@ meanwhile. The server logs the store failure, not every `503` it answers.
 The server stats endpoint returns a snapshot of every HTTP worker of the web server. Requires `ROLE_ADMIN`. The [`app:server:stats`](../commands/app-server-stats.md) command prints the same data from the web container with `--json`; its default table shows each worker's memory and coroutines and the Redis figures.
 
 ```bash
-dc exec -T app php bin/console app:server:stats
+dc exec -T web php bin/console app:server:stats
 ```
 
 The `data` object holds:
@@ -127,7 +123,7 @@ Use this for lightweight debugging of memory leaks, connection exhaustion, or ha
 The web server exposes a Prometheus-compatible metrics endpoint at `GET /metrics` on its own port, `9501`. No authentication is required, so the shipped gateways keep it off the public listener: the production nginx (`docker/prod/nginx.conf`) and the preset gateway answer `/metrics` with `404`. Read it from a container on the application network:
 
 ```bash
-dc exec -T app curl --fail --show-error --silent http://127.0.0.1:9501/metrics
+dc exec -T web curl --fail --show-error --silent http://127.0.0.1:9501/metrics
 ```
 
 The endpoint returns metrics in Prometheus text exposition format (`text/plain; version=0.0.4`). Available metrics:
@@ -146,7 +142,8 @@ The endpoint returns metrics in Prometheus text exposition format (`text/plain; 
 ### Prometheus scrape configuration
 
 Use a scrape target reachable from the Prometheus server. The example below assumes
-that Prometheus shares the application network and resolves its `app` service.
+that Prometheus shares the deployment's private network, `baander-private`, and
+resolves its `web` service.
 The web port is not a public metrics listener to expose separately:
 
 ```yaml
@@ -154,7 +151,7 @@ scrape_configs:
   - job_name: 'baander'
     scrape_interval: 15s
     static_configs:
-      - targets: ['app:9501']
+      - targets: ['web:9501']
     metrics_path: '/metrics'
 ```
 
@@ -165,12 +162,13 @@ Grafana dashboard setup is out of scope for this guide.
 
 ## Rate Limiter Monitor
 
-Inspect and manage configured rate limiters. Requires `ROLE_ADMIN`.
+Inspect and manage configured rate limiters. Listing them requires `ROLE_ADMIN`;
+clearing them requires `ROLE_SUPER_ADMIN`, and every clear is logged with who made it.
 
 ### List all rate limiters
 
 ```bash
-dc exec -T app php bin/console app:rate-limiter:list
+dc exec -T web php bin/console app:rate-limiter:list
 ```
 
 This lists every limiter configured under `framework.rate_limiter` in
@@ -184,7 +182,7 @@ After diagnosing a rate-limit incident, clear one limiter only if resetting ever
 subject's budget for that limiter is the intended action:
 
 ```bash
-dc exec -T app php bin/console app:rate-limiter:clear auth_login_ip
+dc exec -T web php bin/console app:rate-limiter:clear auth_login_ip
 ```
 
 Each limiter has its own Redis namespace. A clear advances its generation and
@@ -193,8 +191,9 @@ are replaced on the next read; an old writer must retry against the new generati
 Other limiters keep their state. An unknown name returns `404` through the API
 and fails the console command.
 
-To clear every limiter, call `DELETE /api/monitor/rate-limiters/clear?confirm=true`,
-or use the **Clear All** button on the admin Rate Limits tab. Clear-all tries each
+To clear every limiter, call `DELETE /api/monitor/rate-limiters/clear?confirm=true`
+as a super admin, or use the **Clear All** button that the admin Rate Limits tab shows
+to super admins. Clear-all tries each
 namespace sequentially and reports failures; successful clears remain in effect.
 An unavailable or unacknowledged clear reports failure instead of claiming that
 clients were unblocked. A successful generation change does not repair every kind
@@ -205,7 +204,7 @@ The CLI calls the same application service. Clearing all limiters resets every
 subject's budgets across them; use it only when that is the intended scope:
 
 ```bash
-dc exec -T app php bin/console app:rate-limiter:clear --all
+dc exec -T web php bin/console app:rate-limiter:clear --all
 ```
 
 ### Rate-limit storage outages
@@ -229,7 +228,7 @@ Validate your application configuration from the CLI or the API.
 ### CLI
 
 ```bash
-dc exec -T app php bin/console app:config:validate
+dc exec -T web php bin/console app:config:validate
 ```
 
 This runs all configuration checks and prints a table of results. See the [full command reference](../commands/app-config-validate.md).
@@ -258,31 +257,24 @@ The endpoint validates environment variables, key file existence, whether `APP_S
 
 ## Logs
 
-Use Compose service names in the installed `dc` context; fixed Docker container
-names can point at a different checkout. These commands read logs without restarting
-anything:
+Use Compose service names in the installed `dc` context; it selects the deployment's
+Compose project by name. These commands read logs without restarting anything:
 
 ```bash
 dc ps
-dc logs --tail=100 app nginx database redis
-dc logs --since=1h --tail=200 app
-dc logs -f app nginx
+dc logs --tail=100 web gateway postgres redis
+dc logs --since=1h --tail=200 web
+dc logs -f web gateway
 ```
 
-Stop following with Ctrl+C. PostgreSQL in the supplied Compose stack also writes
-its collected server logs to `/var/log/postgresql` inside `database`; inspect that
-location if `dc logs database` shows only the collector startup:
+Stop following with Ctrl+C. The deployment's PostgreSQL configuration enables no
+logging collector, so `dc logs postgres` holds PostgreSQL's server log.
+
+The gateway's access log belongs to `gateway`, not `web`; the gateway writes it to
+the container's standard output, one JSON line per request:
 
 ```bash
-dc exec -T database ls -lt /var/log/postgresql
-```
-
-Read the file matching the incident time after identifying it. Nginx's access log
-belongs to `nginx`, not `app`; the nginx image sends it to the container's standard
-output:
-
-```bash
-dc logs --tail=100 nginx
+dc logs --tail=100 gateway
 ```
 
 The separate worker deployment has its own control and consumer containers. Use
@@ -290,9 +282,10 @@ its exact manifest and the inspection steps in
 [Background Work](../workers/background-work.md#observe-background-work) to locate their logs;
 web logs alone cannot explain an outbox relay failure. Docker logs carry the
 application's warnings and errors, and Messenger's info messages; the complete
-application log is `<environment>.log` in the application's `var/log` directory,
-with warnings also in `error.log`. For Swoole failures, check the same directory:
-`config/packages/swoole.yaml` selects `swoole_<environment>.log` there.
+application log is `<environment>.log` in the log directory that `BAANDER_LOG_DIR`
+names, a directory per rendered boot under `/var/log/baander/web` in the web
+container, with warnings also in `error.log`. For Swoole failures, check the same
+directory: `config/packages/swoole.yaml` selects `swoole_<environment>.log` there.
 
 Before sharing logs or diagnostic output, redact tokens, credentials, private
 paths and personal data. Preserve timestamps, job IDs and the relevant error chain.

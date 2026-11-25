@@ -140,7 +140,9 @@ sends bounded native requests over
 the private socket to execution, where FFmpeg, probes and helpers run. Each native
 execution attempt carries its deployment and attempt identity. If completion is
 uncertain, ownership remains until containment or a confirmed release; cancelling
-the caller does not by itself free the native slot. The native daemon starts each
+the caller does not by itself free the native slot. A media file that makes a
+command print more than the 1 MiB output bound fails that one command, for example
+the playback of that file; other playbacks and the worker pair keep running. The native daemon starts each
 FFmpeg command at nice 10, so encodes yield CPU to the execution unit's own
 processes; [System Requirements](../getting-started/system-requirements.md#kill-order) describes the
 out-of-memory kill order.
@@ -167,7 +169,7 @@ Use several observations together:
 
 Run controller observations on the trusted host from the checkout, with
 `APP_HOME` matching the selected image layout as described in
-[Getting started](../getting-started/installation.md#7-start-web-and-deploy-workers). Keep the exact
+[Building the worker image](worker-deployment.md#building-the-worker-image). Keep the exact
 manifest and private credentials for the boot being observed. Apply an external
 deadline:
 

@@ -134,19 +134,19 @@ connects the system explanation to configuration, monitoring, upgrades and recov
 Start with the **[operator manual](docs-book/part-1-operator-guide/README.md)**.
 Its reading path explains the components and data stores before installation,
 then connects routine tasks to monitoring, maintenance and recovery. If you are
-ready to install, the [source-installation guide](docs-book/part-1-operator-guide/getting-started/installation.md)
-walks through configuration and TLS, shared storage, image builds, database
-initialization, OAuth keys, the first administrator account, the frontend build,
-worker deployment and a first library scan.
+ready to install, the [installation guide](docs-book/part-1-operator-guide/getting-started/installation.md)
+walks through the frontend and image builds, the private configuration, starting
+the deployment, the first administrator account and a first library scan.
 
-Bånder is a pre-release project. The current setup builds from source and uses a
-development-oriented Docker Compose stack. Starting Compose alone does not provide
-a complete instance: background processing requires the separately admitted worker
-pair explained in [Background Work](docs-book/part-1-operator-guide/workers/background-work.md).
+Bånder is a pre-release project. An installation builds its images from source and
+runs them through the [deployment preset](deploy/preset/README.md), which starts
+the gateway, web server, PostgreSQL, connection pooler, Redis and the background
+worker pair explained in [Background Work](docs-book/part-1-operator-guide/workers/background-work.md)
+from one private configuration. That procedure has not yet been run end to end.
 
-A disposable source-installation check verified frontend loading, administrator
-login, worker startup and a sample music scan through ingestion and browser
-catalog display. The scanned track played to completion as original FLAC and
+An earlier disposable check of the development Compose stack verified frontend
+loading, administrator login, worker startup and a sample music scan through
+ingestion and browser catalog display. The scanned track played to completion as original FLAC and
 transcoded Opus; byte-range requests also passed.
 The [roadmap checkpoint](ROADMAP.md#source-installation-documentation)
 records the evidence, environment adaptations and verification limits. Other media

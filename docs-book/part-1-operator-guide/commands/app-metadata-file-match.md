@@ -18,7 +18,7 @@ make exec cmd="php bin/console app:metadata:file:match /music/Portal/01-still-al
 
 | Argument | Description |
 |----------|-------------|
-| `path` | Path of the media file, as the container the command runs in sees it |
+| `path` | Absolute path of a media file inside a library, as the container the command runs in sees it |
 
 ## Options
 
@@ -33,11 +33,13 @@ The command compares each candidate's title, artist and album with the file's ta
 
 The command needs at least one candidate. Without `--candidates`, or with an empty array, it prints the API's validation messages and exits with 2; so does a value that is not a JSON array of objects.
 
-When no file exists at the path, or the file is in a format no tag reader supports, the command says so and exits with 2. The API answers 422 with the same message.
+The command reads only files inside a library's folder, by the rules on the [app:metadata:file:extract](app-metadata-file-extract.md) page: a symlink counts where its target lies, and a path outside every library gets the message a missing file gets.
+
+When no library holds a file at the path, or the file is in a format no tag reader supports, the command says so and exits with 2. The API answers 422 with the same message.
 
 ## Exit codes
 
 | Code | Meaning |
 |------|---------|
 | 0 | The candidates were ranked; the table lists those that fit, possibly none |
-| 2 | The path is empty, the candidates are missing or malformed, no file exists at the path, or the format is not supported; the message says which |
+| 2 | The path is empty, the candidates are missing or malformed, no library holds a file at the path, or the format is not supported; the message says which |

@@ -1,0 +1,423 @@
+# Development Compose Stack
+
+The repository's `docker-compose.yml` describes a development stack, not an
+installation. Its `app` service runs the `dev` image target with `APP_ENV=dev`,
+`privileged: true` and the checkout mounted read-write, and nginx terminates TLS
+with the bundled development certificate. Operators install Bånder through the
+deployment preset instead; see [Installation](../../part-1-operator-guide/getting-started/installation.md).
+
+For everyday development, the managed preview and persistent instance described in
+[Development Environment](development-environment.md) build and start their own
+Compose model; they do not read this file. Tools that attach to a service of this
+file by name, such as a PhpStorm remote interpreter or the `profiling` profile's
+profiler, use it directly. The procedure below starts the whole file by hand. It
+was the operator guide's source installation until that guide moved to the
+preset.
+
+## Known gap: log collector settings
+
+Since the log collector joined this file, Compose also requires
+`BAANDER_LOG_BOOT_ID`, `BAANDER_LOG_NODES`, `BAANDER_LOG_AGENT_IMAGE`,
+`COMPOSE_PROJECT_NAME`, `BAANDER_LOG_DOCKER_SOCKET`,
+`BAANDER_LOG_AGENT_CONFIG_FILE`, `BAANDER_LOG_QUERY_TOKEN_FILE` and
+`BAANDER_LOG_CHECKPOINT_TOKEN_FILE`. The procedure below does not set them, so
+`dcdev config --quiet` in step 3 stops at the first one missing. No repository
+command writes the daemon-pinned collector configuration for this file; the
+development controller generates the equivalent settings for its own instances
+through `Baander\Deployment\Observability\LogCollection`.
+
+## Prerequisites
+
+- Git, Docker with Compose and Buildx, and OpenSSL for generating secrets.
+- A Linux Docker host with cgroup v2, a rootful Docker daemon with a local Unix
+  socket, and enough CPU and memory for web, PostgreSQL, Redis, the worker pair and
+  the media jobs you run at once. Containers carry no resource limits; the media
+  slots bound media work, 8 video and 12 audio by default in a `transcode`
+  deployment.
+  [System Requirements](../../part-1-operator-guide/getting-started/system-requirements.md) gives the measured cost of each job
+  and how to choose the slots for your host.
+- Host PHP 8.5 with Swoole for image-build tooling, Composer, and `posix` and
+  `pdo_pgsql` for the worker controller. Tooling and application dependencies are
+  installed separately below. The controller runs on the trusted host; the
+  application containers receive no Docker socket.
+- Media files that you can copy into a shared named Docker volume. Worker admission
+  does not accept host-directory bind mounts for media.
+
+FFmpeg, Node and Corepack are supplied by the app image. The web frontend selects
+its Yarn version from the repository's `packageManager` field.
+
+Read [Worker deployment](../../part-1-operator-guide/workers/worker-deployment.md) before provisioning
+storage or choosing host resources. Its version 9 procedure is authoritative for
+the worker manifest, credentials, volume ownership and admission checks.
+
+The stack runs the default deployment profile, `transcode` at the 16 GB starting
+point; see [capability and size](../../part-1-operator-guide/configuration/deployment-profiles.md#deployment-capability-and-size).
+
+## Compose context
+
+Run the commands on this page on the trusted Docker host, from this checkout. The
+`dcdev` function defined below selects this stack and its private configuration.
+Run console commands as `dcdev exec app php bin/console …` in that same shell,
+once the app is running. A plain `php bin/console …` example applies only inside
+an application container in its application directory.
+
+The worker controller, `php bin/worker-deployment.php`, runs on the trusted host.
+Its database URL must be reachable from that host; worker URLs must be reachable
+from the worker containers. Do not mount Docker's socket into the web application.
+
+Make commands select the checkout's development preview by default.
+`INSTANCE=persistent` selects a persistent development instance. Neither selects
+this stack. See [Which installation a command targets](../../part-1-operator-guide/getting-started/understanding-baander.md#which-installation-a-command-targets)
+and the [development environment guide](development-environment.md).
+
+## Start the stack
+
+Run the following steps from the repository root, with a fresh checkout and fresh
+resources. Do not reuse the database or media volumes of another instance.
+
+### 1. Prepare configuration and the browser address
+
+Clone the repository from its Git remote, then enter the checkout:
+
+```bash
+git clone <repository-url> baander
+cd baander
+cp .env.example .env
+```
+
+The tracked `.env.example` supplies build defaults. Your local `.env` is ignored
+by Git and excluded from image contexts, source snapshots and qualification
+archives; image builds create their runtime `.env` from `.env.example`. Private
+deployment settings remain separate from those defaults.
+
+In the local `.env` used by the checkout-mounted web process, set the media paths
+and executables supplied by the image's Debian packages:
+
+```env
+MEDIA_STORAGE_PATH=/media/library
+CONVERT_STORAGE_PATH=/storage/conversions
+FFMPEG_PATH=/usr/bin/ffmpeg
+FFPROBE_PATH=/usr/bin/ffprobe
+VIDEO_ENCODER=libx264
+HW_ACCEL_DEVICE=
+HW_BITRATE_MULTIPLIER=1.0
+```
+
+The encoder settings above select CPU encoding and match the safe defaults in
+`.env.example`. Editing the local `.env` does not change worker-image defaults.
+Worker credentials can override `VIDEO_ENCODER` through `runtimeEnvironment`, but
+do not accept `HW_ACCEL_DEVICE` or `HW_BITRATE_MULTIPLIER`; those two use the image's
+template defaults. Configure a hardware encoder in the deployment profile instead;
+see [Transcoding](../../part-1-operator-guide/media/hardware-acceleration.md#hardware-acceleration).
+
+Create `.env.dev.local` with mode `0600`. Put the following settings in it, replacing
+the secret placeholders with independently generated values from `openssl rand -hex 32`,
+except the TOTP key, which takes `openssl rand -base64 32`.
+Use the same database password in `DB_PASSWORD`, `DATABASE_URL` and
+`DATABASE_CONTROL_URL`, and the same Redis password in all three Redis settings:
+
+```env
+APP_SECRET=<chosen-random-secret>
+STREAM_URL_HMAC_SECRET=<another-random-secret>
+AUTH_TOTP_ENCRYPTION_KEY=<base64-random-key>
+DB_USERNAME=baander
+DB_PASSWORD=<chosen-database-password>
+DB_DATABASE=baander
+DATABASE_URL="postgresql://baander:<chosen-database-password>@pooler:6432/baander?serverVersion=18&charset=utf8"
+DATABASE_CONTROL_URL="postgresql://baander_control:<chosen-database-password>@pooler:6432/baander_control?serverVersion=18&charset=utf8"
+REDIS_PASSWORD=<chosen-redis-password>
+REDIS_URL=redis://default:<chosen-redis-password>@redis:6379
+MESSENGER_TRANSPORT_DSN=redis://default:<chosen-redis-password>@redis:6379/messages
+SERVER_NAME=baander.test
+APP_DOMAIN=baander.test
+APP_URL=https://baander.test:8443
+DEFAULT_URI=https://baander.test:8443
+WEB_PORT_HTTP=8080
+WEB_PORT_TLS=8443
+AUTH_SPA_CLIENT_ID=baander_dev_spa_00001
+```
+
+Symfony loads `.env`, `.env.local`, `.env.dev`, then `.env.dev.local` in this
+configuration; existing process environment variables take precedence. The tracked
+`.env.dev` contains a development `APP_SECRET`, so putting your secret only in `.env`
+or `.env.local` does not override it. `.env.dev.local` is excluded from Git and Docker
+build contexts. Set the complete connection URLs there so they use the same chosen
+credentials as the services. Both database URLs reach PostgreSQL through the
+[connection pooler](../../part-1-operator-guide/configuration/deployment-profiles.md#connection-pooler) on port 6432.
+`DATABASE_URL` uses its application alias. `DATABASE_CONTROL_URL` uses its control
+alias and role, whose names are `DB_DATABASE` and `DB_USERNAME` with `_control`
+appended. The `.env.example` defaults both URLs to the password `baander`, so a
+custom password must appear in both URLs; otherwise the control connections fail
+to authenticate.
+
+Compose has its own environment loading. Use this shell function for every Compose
+command below so it reads the private settings and the image selection explicitly.
+Step 3 generates `.env.compose.local` before the first `dcdev` invocation:
+
+```bash
+dcdev() {
+    docker compose --env-file .env.dev.local --env-file .env.compose.local -f docker-compose.yml "$@"
+}
+```
+
+Run it in the same shell as the remaining commands. Remove conflicting exported
+variables before using it; shell values override Compose's environment file. The
+Makefile shortcuts target a different development workflow.
+
+Resolve `baander.test` to the Docker host in your local DNS or hosts file. The bundled
+development certificate covers `baander.test`, its subdomains and `127.0.0.1`.
+Trust that certificate in your development browser, or configure a certificate
+trusted by your clients before using the instance. Changing `SERVER_NAME` alone does
+not change the certificate. See [Security](../../part-1-operator-guide/maintenance/security.md) for deployment hardening.
+
+### 2. Prepare the network and shared storage
+
+The Compose file expects an external network:
+
+```bash
+docker network create baander-backtier
+```
+
+If that name already exists, inspect it before choosing it for this instance. The
+Compose file also has fixed container names and published database and Redis ports.
+Choose non-conflicting names and ports before starting another instance on the same
+host; a Compose project name alone does not isolate these settings.
+
+Provision the named media volumes using the local driver without driver options:
+
+```bash
+docker volume create baander-source
+docker volume create baander-conversions
+docker volume create baander-storage
+docker volume create baander-transcode-state
+```
+
+In your checkout's `docker-compose.yml`, replace the personal `/home/martin/...`
+bind mounts in `app.volumes` with these shared mounts. Keep the checkout and PHP
+configuration mounts:
+
+```yaml
+services:
+    app:
+        volumes:
+            - ./:${APP_HOME:?Use the generated build --compose-env file}:cached
+            - ./docker/dev/php.ini:/usr/local/etc/php/php.ini:ro
+            - ./docker/dev/swoole.ini:/usr/local/etc/php/conf.d/docker-php-ext-swoole.ini:ro
+            - baander-source:/media:ro
+            - baander-conversions:/storage/conversions
+            - baander-storage:${APP_HOME:?Use the generated build --compose-env file}/storage
+            - baander-transcode-state:${APP_HOME:?Use the generated build --compose-env file}/var/transcode_state
+volumes:
+    baander-source:
+        external: true
+    baander-conversions:
+        external: true
+    baander-storage:
+        external: true
+    baander-transcode-state:
+        external: true
+```
+
+Merge these entries into the existing services and volumes; retain the database
+volume declaration. Copy the media you want to scan into `library/music` inside
+`baander-source`. Keep originals intact. Web and workers must see the same paths;
+set `MEDIA_STORAGE_PATH=/media/library` in both roles. Source media is read-only
+in workers. The web mount above is also read-only; authorized deletion of media
+files through web requires writable access there.
+
+Prepare the derived volumes for the runtime UID/GID of the images you build, so
+web and workers can write them. Follow the worker guide for ownership checks and
+its separate private IPC volume; never mount that IPC volume into web.
+
+### 3. Build images and start dependencies
+
+Install the standalone host tooling, then build the development application image.
+The builder reads the application's layout contract and writes its image ID and
+`APP_HOME` into `.env.compose.local`; Compose requires both values. This generated
+file selects the build and contains no application credentials.
+
+```bash
+composer --working-dir=scripts install --no-dev --no-interaction
+php scripts/build-application.php --target dev --tag baander:local --compose-env .env.compose.local
+dcdev config --quiet
+dcdev build nginx database
+dcdev up -d --wait database redis
+dcdev up -d --wait pooler
+dcdev exec redis sh -c 'REDISCLI_AUTH="$REDIS_PASSWORD" redis-cli ping'
+```
+
+The Redis check must print `PONG`. Redis receives its password on its first startup.
+Starting `pooler` first runs its one-off `pooler-credentials` dependency to
+completion: once PostgreSQL is healthy, that step derives SCRAM verifiers from
+`DB_PASSWORD` for the database role and its `_control` role and writes the
+pooler's auth file. The pooler service shares the database image built above.
+The app and nginx are still stopped. If a build or dependency fails, inspect its
+error before continuing.
+
+### 4. Install PHP dependencies
+
+A new checkout has no `vendor/` directory, so use a one-off container rather than
+executing a command in a running web container:
+
+```bash
+dcdev run --rm --no-deps app composer install --no-interaction --no-progress --no-scripts
+dcdev run --rm --no-deps app composer dump-autoload --optimize --no-interaction
+```
+
+The separate dump runs the Symfony Runtime autoload hook, generating
+`vendor/autoload_runtime.php`. Do not add `--no-scripts` to that second command.
+The first command defers cache and asset scripts until configuration is ready.
+
+### 5. Initialize the main database and authentication
+
+```bash
+dcdev run --rm --no-deps app php bin/console doctrine:migrations:migrate --no-interaction
+dcdev run --rm --no-deps app php bin/console app:oauth:generate-keys --no-interaction
+dcdev run --rm --no-deps app php bin/console app:auth:setup-clients
+```
+
+The migration command initializes only the configured main database and retains the
+initial migration's empty-database guard. See [Database migrations](../../part-1-operator-guide/maintenance/upgrading.md#database-migrations)
+for existing histories and the separately approved reset procedure.
+
+Key generation is for this new instance. Keep its private key private; use the
+[security guide](../../part-1-operator-guide/maintenance/security.md) for later key rotation. Confirm that
+`AUTH_SPA_CLIENT_ID` in `.env.dev.local` matches the ID printed by client setup.
+
+Create the first account as a super administrator, interactively:
+
+```bash
+dcdev run --rm --no-deps app php bin/console app:user:create admin@baander.app Admin --role super-admin
+```
+
+Choose a password at the hidden prompt and confirm the administrator role. Only a
+super administrator can change server settings and other administrators from the web
+app, and self-registration stays closed until a super administrator opens it (see
+[Registration and address changes](../../part-1-operator-guide/configuration/account-security.md#registration-and-address-changes)). See
+[User management](../../part-1-operator-guide/administration/user-management.md) and [app:user:create](../../part-1-operator-guide/commands/app-user-create.md)
+for password rules and scripted creation.
+
+### 6. Install and build the web frontend
+
+Use the image's Node/Corepack tooling from the frontend directory. Corepack selects
+the pinned Yarn version from `packageManager`:
+
+```bash
+dcdev run --rm --no-deps app sh -c 'cd "$APP_HOME/ui/web" && corepack yarn install --immutable'
+dcdev run --rm --no-deps app sh -c 'cd "$APP_HOME/ui/web" && corepack yarn build'
+```
+
+The build type-checks the frontend and writes its assets into `public/`, where the
+web application loads them.
+
+### 7. Start web and deploy workers
+
+```bash
+dcdev up -d app nginx
+```
+
+Nginx terminates HTTPS and forwards requests to the app over HTTP. Configure the
+app to trust that proxy's actual source address so generated API URLs retain HTTPS
+and the published TLS port. Inspect nginx on the network prepared above:
+
+```bash
+docker inspect --format '{{(index .NetworkSettings.Networks "baander-backtier").IPAddress}}' "$(dcdev ps -q nginx)"
+```
+
+If you chose another network name, substitute it in the inspection command. Add
+the returned address to `.env.dev.local` as a single `TRUSTED_PROXIES` setting:
+
+```env
+TRUSTED_PROXIES=<nginx-source-ip>
+```
+
+Then restart the app to load it:
+
+```bash
+dcdev restart app
+```
+
+Trust only the actual proxy address; do not trust the entire Docker network.
+Both HTTP layers default to no proxy trust, which is appropriate for direct client
+access. If nginx is recreated, inspect its address again, update the setting and
+restart app. See [Configuration](../../part-1-operator-guide/configuration/rate-limits.md#rate-limiting) for the shared
+proxy trust setting.
+
+Follow [Worker deployment](../../part-1-operator-guide/workers/worker-deployment.md) to build the worker
+image, prepare its private IPC volume and credentials, and create and start the
+version 9 deployment from the host. First export the application layout selected by
+the builder in that host shell; the controller requires it when interpreting the
+manifest:
+
+```bash
+export APP_HOME="$(sed -n 's/^APP_HOME=//p' .env.compose.local)"
+```
+
+The current layout is `/var/www/html`. Use the network and media volumes prepared above;
+the host and worker database URLs must reach the same migrated database. Supply the
+same `APP_SECRET`, `STREAM_URL_HMAC_SECRET`, `AUTH_TOTP_ENCRYPTION_KEY` and Redis
+credentials through the worker credentials file. Its `runtimeEnvironment` must
+also set `MEDIA_STORAGE_PATH=/media/library` and
+`CONVERT_STORAGE_PATH=/storage/conversions` for the mounts prepared above; local
+`.env` edits are not worker configuration.
+Worker runtime uses `APP_ENV=prod` and does not load the web's `.env.dev.local`; it
+refuses to boot while one of the three secrets is missing or still a committed default.
+
+The admitted worker pair owns background consumption, scheduling, outbox relay and
+media execution. Compose starts none of these. Check worker logs and operational
+health as described in that guide; controller `status` reports
+`readiness: "not_checked"` and is not a readiness test. The separate controller
+`readiness` action observes the admitted pair; see [Observe background work](../../part-1-operator-guide/workers/background-work.md#observe-background-work).
+
+### 8. Create and scan a library
+
+Once media is present at `/media/library/music`, create a music library with its
+required media type and an explicit slug:
+
+```bash
+dcdev exec app php bin/console app:library:create "My Music" /media/library/music music --slug my-music
+dcdev exec app php bin/console app:library:scan my-music
+```
+
+The console scan discovers files in that process, records its work in the job
+monitor and queues directories for ingestion. Workers must finish ingestion before
+the media appears in the catalog; a completed scan alone does not establish that
+background processing works. Check worker health and ingestion progress using
+[Monitoring](../../part-1-operator-guide/operations/README.md), then browse the library as the administrator. Grant
+other users access separately. See [Library management](../../part-1-operator-guide/media/library-management.md) for
+library access and scanning.
+
+### 9. Open Bånder
+
+Open **https://baander.test:8443** and log in with the administrator account you
+created. Use the explicit HTTPS address: the development HTTP redirect does not
+preserve a custom TLS port. If you choose another port, change `WEB_PORT_TLS`,
+`APP_URL` and `DEFAULT_URI` together.
+
+## Check the stack
+
+Check the web and background paths separately:
+
+1. Open the HTTPS address above and sign in. This checks the browser, proxy and
+   authentication path for that account.
+2. Inspect web readiness and component health using [Monitoring](../../part-1-operator-guide/operations/README.md).
+   The web readiness check tests PostgreSQL and Redis; it does not establish worker
+   readiness or that external integrations work.
+3. Run the controller's read-only `readiness` action for the exact worker manifest
+   and inspect worker logs and health as described in [Background work](../../part-1-operator-guide/workers/background-work.md#observe-background-work).
+   Treat the result as an observation at that time.
+4. After the first scan, confirm ingestion completes and the expected media appears
+   in the catalog. Try playback of a known file; test transcoding separately if you
+   enable it. A scan finishing only confirms its discovery phase.
+
+These checks establish the paths you exercised. They do not qualify the stack
+for all media, failure recovery or external services. Keep the manifest and private
+configuration while the stack runs; [Storage and data](../../part-1-operator-guide/getting-started/storage-and-data.md#what-must-be-preserved)
+identifies the state that needs preservation.
+
+## See Also
+
+- [Development Environment](development-environment.md) — the managed preview and persistent instance
+- [Installation](../../part-1-operator-guide/getting-started/installation.md) — the operator installation through the deployment preset
+- [Configuration](../../part-1-operator-guide/configuration/README.md) — environment variables and integrations
+- [Background work](../../part-1-operator-guide/workers/background-work.md) — queues, scheduling and worker operation

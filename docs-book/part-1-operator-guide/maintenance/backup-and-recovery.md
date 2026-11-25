@@ -22,7 +22,7 @@ identities and endpoints, not just the recipe names.
 | Redis state and its persistence configuration | Pending deliveries and consumer state coexist with sessions, caches and security state; losing the stream can lose work already handed off by the outbox |
 | Source media and application storage | Original media and uploaded assets may have no other recoverable copy |
 | Conversion storage and shared media state | Useful retained output and learning state; regeneration still needs sources and compatible runtime records |
-| Configuration and secrets | Environment files, OAuth keys, signing secrets, provider credentials, database/Redis credentials and TLS material |
+| Configuration and secrets | The private preset configuration and state directory, OAuth keys, signing secrets, provider credentials, database/Redis credentials and TLS material |
 | Code and deployment inventory | Exact revisions/images, migration history, worker manifests, boot identities, host credentials and storage mapping |
 
 Keep secret material in private recovery storage, separate from public reports.
@@ -32,24 +32,29 @@ point in the application's work.
 
 ## Capture a maintenance checkpoint
 
-Use the installed `dc` context from [Getting Started](../getting-started/installation.md), on the
-installation host in its checkout. These steps interrupt new work.
+Use the installation's [`dc` function](../getting-started/installation.md#command-context),
+on the installation host in its checkout. These steps interrupt new work.
 
 1. **Quiesce writers.** Prevent new browser/API writes, stop independent console
    jobs and drain web. Retire the worker pair through its matching
    [host controller](../workers/background-work.md#stop-replace-or-recover-workers). Confirm
    both units have retired; an expired lease or an unreachable host is insufficient.
    Do not capture a supposed offline checkpoint while an encoder or consumer can
-   still write to it.
+   still write to it. The preset retires its pair only with
+   `php scripts/deploy-preset.php stop --state /srv/baander/preset-state`, which also
+   stops every service, PostgreSQL included; it has no state in which the database
+   runs and no worker can write. With the preset, export the database in step 2
+   before `stop`, record that the worker pair could still write until `stop`
+   completed, and run `stop` before step 3.
 2. **Preserve the database.** Export the main database using credentials with
-   access to all its application objects. The source-installation database service
-   has PostgreSQL client tools. In a private, newly created host directory, an
+   access to all its application objects. The preset's `postgres` service has
+   PostgreSQL client tools. In a private, newly created host directory, an
    example export is:
 
    ```bash
    umask 077
    backup_dir=$(mktemp -d)
-   dc exec -T database sh -ec 'pg_dump --format=custom --username="$POSTGRES_USER" --dbname="$POSTGRES_DB"' > "$backup_dir/application.dump"
+   dc exec -T postgres sh -ec 'pg_dump --format=custom --username="$POSTGRES_USER" --dbname="$POSTGRES_DB"' > "$backup_dir/application.dump"
    ```
 
    Check the command's exit status and stderr. A failed command can leave a partial
@@ -59,20 +64,25 @@ installation host in its checkout. These steps interrupt new work.
    the format and scope.
 3. **Preserve queues and files.** Capture Redis using the persistence/backup method
    configured for that deployment, and copy or snapshot the identified media and
-   application volumes while their writers remain stopped. The repository Compose
-   file declares no durable Redis volume. If you have not established a recoverable
-   Redis capture, stop here: do not recreate Redis or describe the set as preserving
-   pending work. Never copy a live PostgreSQL data directory as a substitute for
-   a database-aware backup.
-4. **Retain the matching configuration.** Copy the private configuration and
-   deployment inventory into protected recovery storage. Include the retired
-   worker pair's records so restoration does not introduce ambiguous old ownership.
-   Keep this set outside the volumes it is intended to recover.
+   application volumes while their writers remain stopped. The preset's `stop`
+   keeps every named volume: `baander-media`, `baander-storage`,
+   `baander-conversions` and `baander-transcode-state` hold the files, and
+   `baander-redis` holds Redis data, which the preset runs with the append-only file
+   on. If you have not established a recoverable Redis capture, stop here: do not
+   recreate Redis or describe the set as preserving pending work. Never copy a live
+   PostgreSQL data directory as a substitute for a database-aware backup.
+4. **Retain the matching configuration.** Copy the private configuration, the
+   preset state directory, the OAuth key pair in the `baander-secrets` volume and
+   the deployment inventory into protected recovery storage. The state directory
+   holds the retired worker pair's record; keep it so restoration does not
+   introduce ambiguous old ownership. Keep this set outside the volumes it is
+   intended to recover.
 5. **Verify before resuming.** Check archive readability and file inventories,
    then exercise a separate restore as below. Archive readability alone does not
-   prove application recovery. To resume the original installation, follow the
-   [upgrade start checks](upgrading.md#standard-update), including a fresh worker
-   boot after retirement.
+   prove application recovery. To resume the original installation, run
+   `php scripts/deploy-preset.php start --config /srv/baander/preset.json --state /srv/baander/preset-state`,
+   which starts a fresh worker pair, and complete the
+   [upgrade start checks](upgrading.md#standard-update).
 
 The capture is not complete if a required store or secret is missing. Record that
 limit explicitly. Do not compensate by flushing queues or deleting failed jobs.
@@ -96,8 +106,9 @@ volumes.
    Restore Redis only according to the captured deployment's verified procedure.
 3. **Resolve execution ownership.** Keep background execution stopped until old
    hosts and both old units are accounted for. Restored leases, runtime rows or
-   IPC files do not prove that an old process is gone. Use the controller and
-   manifest matching those records; stop if creation or retirement remains uncertain.
+   IPC files do not prove that an old process is gone. Use the preset state
+   directory, or the controller and manifest, matching those records; stop if
+   creation or retirement remains uncertain.
 4. **Check the recovered application.** Validate configuration and schema
    compatibility, sign in, inspect libraries and catalog records, and check source
    access. Start a fresh admitted worker pair only after ownership is resolved.

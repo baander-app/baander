@@ -99,23 +99,24 @@ JSON:
 ```
 
 An unset or empty variable means this default: `transcode` at the 16 GB starting
-point. Development instances and the source installation run it; the managed
-preset, the worker controller and the qualification harness always write the
-profile explicitly. Web, workers and the version 9 worker manifest must agree;
+point. Development instances and the development Compose stack run it; the
+deployment preset, the worker controller and the qualification harness always
+write the profile explicitly. Web, workers and the version 9 worker manifest must agree;
 conflicting settings fail startup, and web health reports a profile that differs
 from the active worker boot's. Print the effective profile, or one built from other
 settings, with
 [`app:deployment:profile:show`](../commands/app-deployment-profile-show.md) instead
 of writing the JSON by hand.
 
-The source installation's PostgreSQL loads `docker/postgres/conf/postgresql.conf`,
+The development Compose stack's PostgreSQL loads `docker/postgres/conf/postgresql.conf`,
 which is the file rendered for the 16 GB starting point, and its Compose file sets
-the pooler pools of that default profile.
+the pooler pools of that default profile. An installation renders its PostgreSQL
+configuration and pooler pools from its own size.
 
 ### Managed preset
 
-For the managed complete-stack preset, set `capability` and `size` in its private
-configuration and run the host controller:
+An installation runs the managed complete-stack preset. Set `capability` and `size`
+in its private configuration and run the host controller:
 
 ```bash
 php scripts/deploy-preset.php render --config /srv/baander/preset.json --state /srv/baander/preset-state
@@ -129,7 +130,7 @@ web, PostgreSQL, the connection pooler, Redis and worker pair. It does not build
 pull images. A later `start` retires the saved workers and stops the saved services
 before installing the selected configuration. `stop` retains named data volumes.
 Preserve the private state directory to recover an interrupted operation. See
-[Source Installation](../getting-started/installation.md) for image preparation and account setup.
+[Installation](../getting-started/installation.md) for image preparation and account setup.
 
 The preset turns OpenTelemetry export off for web and workers. To export traces,
 set `OTEL_ENABLED` and `OTEL_EXPORTER_OTLP_ENDPOINT` in the configuration's
@@ -156,8 +157,8 @@ A `transcode` configuration sets its slots in the `size` object:
 8 video or 12 audio. Zero disables that kind: instead of waiting for a slot, its
 conversions and stream copies are refused with the compatibility explanation
 described above. A `remux` configuration requires `copySlots` and refuses
-`videoSlots` and `audioSlots`. A source installation sets the same counts through
-`BAANDER_DEPLOYMENT_PROFILE` and the worker manifest's `deploymentProfile`;
+`videoSlots` and `audioSlots`. A deployment managed without the preset sets the same
+counts through `BAANDER_DEPLOYMENT_PROFILE` and the worker manifest's `deploymentProfile`;
 `app:deployment:profile:show` prints both.
 
 A top-level `hardware` entry in a `transcode` configuration names a hardware
@@ -197,7 +198,8 @@ The pooler exposes two aliases, each with its own server pool:
 
 Both pools follow the [deployment size](#size). At the 16 GB `transcode` starting
 point the pools are 20 and 8; at the 4 GB `remux` starting point they are 10 and 4.
-The source installation's Compose file uses the 16 GB pool sizes. The control
+The development Compose stack uses the 16 GB pool sizes; an installation sizes the
+pools from its configuration. The control
 alias keeps its own server connections, so lease renewals and authority checks do
 not wait behind web traffic. PgBouncer sets its query wait per user, so control
 traffic logs in as its own role, a member of the application role. A control

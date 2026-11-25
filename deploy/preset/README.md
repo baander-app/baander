@@ -15,6 +15,10 @@ remain unqualified.
 
 ## Prepare
 
+[Installation](../../docs-book/part-1-operator-guide/getting-started/installation.md)
+gives the complete procedure in order, from the host tooling to the first library
+scan. This section and the next state what the preset expects.
+
 Use the production application, worker and operator images from the same source
 revision. The example's application, PostgreSQL, nginx and Redis references follow
 the repository's existing image conventions; the worker and operator references
@@ -22,7 +26,7 @@ are local build tags. Set all six references to images available on the selected
 Docker daemon. The deployment command resolves each reference to an immutable
 image ID; it does not build or pull images.
 The application image must include the compiled web assets in `public/`. From a
-clean source checkout, first [build the frontend](../../docs-book/part-1-operator-guide/getting-started/installation.md#6-install-and-build-the-web-frontend),
+clean source checkout, first [build the frontend](../../docs-book/part-1-operator-guide/getting-started/installation.md#2-build-the-web-frontend),
 then build the three application images with the same revision:
 
 ```sh
@@ -51,16 +55,17 @@ reachable only from the local host; [Gateway and client addresses](#gateway-and-
 covers HTTPS and reverse proxies. Keep the configuration file and state directory
 accessible only to the operator.
 
-Install the standalone tooling loader with `composer tooling:autoload`. The host
+Install the standalone tooling with
+`composer --working-dir=scripts install --no-dev --no-interaction`. The host
 requires the normal tooling runtime, Docker Compose, and a daemon-visible Unix
 socket for the trusted worker operator. The Docker daemon must run rootful;
 rendering refuses a rootless daemon, which cannot apply the negative
 out-of-memory scores. The web container has no Docker socket.
-The account bootstrap commands documented in the operator guide remain applicable;
-this preset creates no default account, and self-registration ships closed. After first
-startup, run `app:auth:setup-clients` and
-[create the first account](../../docs-book/part-1-operator-guide/administration/user-management.md)
-as a super admin with `app:user:create` and `--role=super-admin` in the web container.
+This preset creates no default account, and self-registration ships closed. After
+first startup, run `app:auth:setup-clients` and
+[create the first account](../../docs-book/part-1-operator-guide/getting-started/installation.md#6-create-the-sign-in-client-and-the-first-account)
+as a super admin with `app:user:create` and `--role=super-admin` in the web container,
+through the installation's [command context](../../docs-book/part-1-operator-guide/getting-started/installation.md#command-context).
 The examples set `MAILER_DSN` to `null://null`, which discards mail; opening
 self-registration on that mailer draws a configuration warning, because new accounts
 never receive their verification link. OAuth key

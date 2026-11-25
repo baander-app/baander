@@ -55,7 +55,7 @@ failed rendition that neither produced AAC nor read an AAC source stays failed.
 Change it in the admin settings page under Media, or on the command line:
 
 ```bash
-dc exec app php bin/console app:settings:set transcode.aac_implementation fdk_aac
+dc exec web php bin/console app:settings:set transcode.aac_implementation fdk_aac
 ```
 
 When the FFmpeg binary in use lacks the selected implementation, for example an

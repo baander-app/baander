@@ -5,12 +5,13 @@ job or playback. Then check the component that owns that stage. Restarting the w
 server can restore a web process, but it does not restart the separate worker
 deployment or deliver work waiting in the outbox.
 
-These examples run on the installed Docker host, from the installation checkout,
-using the `dc` shell function and private environment files in
-[Getting Started](../getting-started/installation.md#installation). They target that installation's
-Compose services. Worker inspection runs separately on the trusted host with the
-exact manifest and credentials file described in
-[Background Work](../workers/background-work.md#observe-background-work).
+These examples run on the installation host, from its checkout, using the `dc`
+function from [Installation](../getting-started/installation.md#command-context). They target the
+deployment's Compose services: `gateway`, `web`, `postgres`, `pooler`, `redis` and
+`log-agent`. The worker pair is not among them. `php scripts/deploy-preset.php status`
+reports in `workersRunning` whether both of its containers run, and
+[Background Work](../workers/background-work.md#observe-background-work) describes its
+observation.
 
 ## Diagnostic Commands
 
@@ -19,9 +20,9 @@ connections and configuration:
 
 ```bash
 dc ps
-dc logs --since=1h --tail=200 app nginx database redis
-dc exec -T app php bin/console app:health:check
-dc exec -T app php bin/console app:config:validate
+dc logs --since=1h --tail=200 web gateway postgres redis
+dc exec -T web php bin/console app:health:check
+dc exec -T web php bin/console app:config:validate
 ```
 
 Read individual rows, including warnings. `app:health:check` can exit successfully
@@ -45,24 +46,25 @@ or malformed settings but does not prove that every integration works. See
 
 ## Log Locations
 
-Use service names through `dc` so the selected checkout and environment files stay
-attached to the command:
+Use service names through `dc` so the command stays attached to the deployment's
+Compose project:
 
 ```bash
 # Follow this installation's web logs; Ctrl+C stops following
-dc logs -f app nginx
+dc logs -f web gateway
 
 # Bounded logs for a particular service
 dc logs --since=1h --tail=100 redis
 ```
 
-Docker logs carry the proxy's output and the application's warnings and errors.
-The complete application log is `<environment>.log` in the application's `var/log`
-directory. The supplied PostgreSQL configuration also collects server logs inside `database` at
-`/var/log/postgresql`; inspect the files matching the incident time if Docker logs
-only show collector startup. Swoole's configured log is under the application's
-`var/log` directory. See [Monitoring: Logs](health-and-metrics.md#logs) for commands and
-worker-log boundaries.
+Docker logs carry the gateway's access log and the application's warnings and
+errors. The complete application log is `<environment>.log` in the web container's
+log directory, which `BAANDER_LOG_DIR` names: a directory per rendered boot under
+`/var/log/baander/web`, on the deployment's logs volume. Swoole's configured log is
+in the same directory. The deployment's PostgreSQL configuration enables no logging
+collector, so PostgreSQL's server log is its container output, `dc logs postgres`.
+See [Monitoring: Logs](health-and-metrics.md#logs) for commands and worker-log
+boundaries.
 
 ## Common Issues
 
@@ -82,7 +84,7 @@ not prove the view is current. Then trace the stages in order:
 2. Collect web worker diagnostics:
 
    ```bash
-   dc exec -T app php bin/console app:server:stats --json
+   dc exec -T web php bin/console app:server:stats --json
    ```
 
    Inspect `live_updates` for every responding worker. Worker zero owns projection;
@@ -146,23 +148,25 @@ see [Redis outage behavior](../../part-2-developer-guide/development/session-and
 1. Inspect `dc ps`, `dc logs --tail=100 redis` and the Redis row in
    `app:health:check`. A stopped service, failed authentication and exhausted Redis
    memory require different corrections.
-2. Privately compare the effective `REDIS_URL` used by the application and worker
-   credentials with the Redis service password. In the supplied stack, Compose
-   takes its password from `REDIS_PASSWORD`. Check the host and port too: the
-   container-side service address differs from a host-controller address. Do not
-   paste connection URLs or environment-file contents into an incident report.
-3. If the service is stopped, establish why before starting that service with
-   `dc up -d redis`. For a credential mismatch, use the coordinated
+2. Check the credential source. The deployment derives `REDIS_URL` for web and
+   workers from the configuration's `REDIS_PASSWORD`, and Redis takes its password
+   from the same value when its container starts, so all three agree after a
+   successful `start`. Editing the configuration changes none of them until the
+   next `start`. Do not paste the configuration file or connection URLs into an
+   incident report.
+3. If the service is stopped, establish why before starting the deployment again
+   with `php scripts/deploy-preset.php start --config /srv/baander/preset.json --state /srv/baander/preset-state`.
+   `start` retires the worker pair and stops the saved services before it starts
+   the deployment, so the restart interrupts web and background work. To change the
+   password, use the coordinated
    [Redis password rotation procedure](../maintenance/credential-rotation.md#rotating-redis-password).
-   Recreating a service to apply environment changes is different from restarting
-   an existing process; keep the application and worker credentials consistent.
 4. Run `app:health:check` again, observe worker readiness and follow a pending job
    to progress. Restored connectivity alone does not show that delayed work has
    completed.
 
-If the service is running but unreachable, inspect the selected Compose network
-and service attachments. Correct the installation's network configuration before
-recreating an affected service. Keep Redis data and queued messages intact; use
+If the service is running but unreachable, inspect the deployment's private network,
+`baander-private`, and the service attachments. Correct the cause before starting
+the deployment again. Keep Redis data and queued messages intact; use
 [Backup and Recovery](../maintenance/backup-and-recovery.md) if state recovery is required.
 
 ### Transcoding failures
@@ -176,7 +180,7 @@ unsupported codec, FFmpeg, worker execution or resource exhaustion.
    transcodes.
 2. Identify the execution container and immutable image from the exact worker
    deployment's controller status. Inspect that unit's logs for probe or encoder
-   errors. FFmpeg runs in this worker image; checking it in `app` only checks web.
+   errors. FFmpeg runs in this worker image; checking it in `web` only checks web.
    If the worker image is missing the binary, correct and rebuild the
    [worker image](../workers/worker-deployment.md#building-the-worker-image), then follow the confirmed
    retirement and fresh-boot procedure in [Upgrading](../maintenance/upgrading.md).
@@ -184,12 +188,12 @@ unsupported codec, FFmpeg, worker execution or resource exhaustion.
 3. Inspect the source path and permissions in the container executing the work.
    The same source mount must be available to the admitted worker when it handles
    queued work. See [Storage and Data](../getting-started/storage-and-data.md).
-4. Read app and worker logs around the failure. Check memory, disk space and codec
+4. Read web and worker logs around the failure. Check memory, disk space and codec
    errors before changing resource settings. A configured hardware encoder that
    fails its test encode stops media control with the reason
    `hardware_encoder_unavailable`; see [Hardware acceleration](../media/hardware-acceleration.md#hardware-acceleration).
    Use [server statistics](health-and-metrics.md#server-stats) for the web process; they do
-   not describe worker container limits.
+   not describe the worker containers.
 5. Once the cause is corrected, verify playback of the affected item and the
    expected tier, rather than relying on a healthy probe. A transcode has no
    job-monitor record or failure-transport entry, so
@@ -199,11 +203,11 @@ unsupported codec, FFmpeg, worker execution or resource exhaustion.
 
 A path can be readable on the host and inaccessible to the user running the
 application or worker. Check the exact failing path and its parent directories.
-Replace `/media/music` below with the configured container-side library path:
+Replace `/storage/media/music` below with the configured container-side library path:
 
 ```bash
-dc exec -T app id
-dc exec -T app ls -ld /media /media/music
+dc exec -T web id
+dc exec -T web ls -ld /storage/media /storage/media/music
 ```
 
 Compare the effective process UID and GID with the mounted host path's owner, group,
@@ -223,25 +227,25 @@ Verify the same operation with the actual application or worker identity afterwa
 
 ### Swoole crashes
 
-A 502 response can mean that Nginx cannot reach the web server; repeated container
-restarts can mean the process exits or is killed.
+A 502 response can mean that the gateway cannot reach the web server; repeated
+container restarts can mean the process exits or is killed.
 
 ```bash
 dc ps
-dc logs --tail=200 nginx app
+dc logs --tail=200 gateway web
 ```
 
-Inspect the installed app container without assuming its Docker name:
+Inspect the installed web container without assuming its Docker name:
 
 ```bash
-docker inspect --format '{{.RestartCount}} {{.State.Status}} {{.State.OOMKilled}}' "$(dc ps -q app)"
+docker inspect --format '{{.RestartCount}} {{.State.Status}} {{.State.OOMKilled}}' "$(dc ps -q web)"
 ```
 
 Read the timestamps and error preceding an exit. If the process still responds,
-collect `dc exec -T app php bin/console app:server:stats --json` to see web worker
+collect `dc exec -T web php bin/console app:server:stats --json` to see web worker
 memory, missing responses and connection pools. An OOM kill or increasing memory use
-requires checking the container limit and workload before adjusting worker counts
-or PHP's memory limit. Use the effective Swoole settings in
+requires checking the host's memory and the workload before adjusting worker counts
+or PHP's memory limit; the deployment sets no container memory limit. Use the effective Swoole settings in
 `config/packages/swoole.yaml`; do not assume a shell variable changes them.
 
 After correcting the cause, use the [web stop and restart procedure](../maintenance/web-server-restarts.md#stopping-and-restarting-the-web-server),
@@ -253,18 +257,19 @@ leaves the admitted background worker deployment running.
 A refused connection means the client could not establish a database connection;
 authentication, database-name and schema errors occur later and need their own fix.
 
-1. Check `dc ps` and `dc logs --tail=100 pooler database`. The application reaches
+1. Check `dc ps` and `dc logs --tail=100 pooler postgres`. The application reaches
    PostgreSQL through the `pooler` connection pooler, so a refusal can come from
-   either service. If the logging collector is active, also inspect
-   `/var/log/postgresql` inside `database` for the incident.
-2. Privately check the effective `DATABASE_URL`, `DATABASE_CONTROL_URL` and selected
-   environment files. Inside the supplied Compose network they name the pooler,
-   `pooler:6432`, not `localhost`. The host controller uses its own reachable address. Compare the
-   database name and credentials without printing the URL.
-3. If PostgreSQL is stopped, identify the cause and preserve its volume before
-   starting it with `dc up -d database`. Storage corruption or missing data calls
-   for [Backup and Recovery](../maintenance/backup-and-recovery.md), not a new empty volume.
-4. Run `app:health:check` from the app container. Its PostgreSQL row executes
+   either service.
+2. Check the credential source privately. The deployment derives `DATABASE_URL` and
+   `DATABASE_CONTROL_URL` from the configuration's `DB_USERNAME`, `DB_PASSWORD` and
+   `DB_DATABASE`. Both name the pooler, `pooler:6432`, on the deployment's private
+   network, not `localhost`. Compare the database name and credentials without
+   printing the URL.
+3. If PostgreSQL is stopped, identify the cause and preserve its volume,
+   `baander-postgres`, before starting the deployment again with `deploy-preset.php start`.
+   Storage corruption or missing data calls for
+   [Backup and Recovery](../maintenance/backup-and-recovery.md), not a new empty volume.
+4. Run `app:health:check` from the web container. Its PostgreSQL row executes
    `SELECT 1`. Then verify the failed operation and worker readiness. A successful
    connection does not establish that the schema is compatible with the running
    code; check [Upgrading](../maintenance/upgrading.md) if failures began after a release change.
@@ -300,7 +305,7 @@ music and movie libraries; selecting another media type does not establish an
 implemented ingestion path. See [Library Management](../media/library-management.md).
 
 1. Confirm the library's configured path and media type. Inspect that path inside
-   `app`, and confirm the admitted worker has the matching mount and read access.
+   `web`, and confirm the admitted worker has the matching mount and read access.
    A host directory alone does not make files visible inside either container.
 2. Inspect the scan result and logs. Distinguish a scan that has only been
    submitted from one that has finished discovering files. If paths or filters
@@ -315,10 +320,10 @@ implemented ingestion path. See [Library Management](../media/library-management
 4. Inspect current and failed jobs:
 
    ```bash
-   dc exec -T app php bin/console app:monitor:status
-   dc exec -T app php bin/console app:monitor:jobs --status=failed --limit=20
-   dc exec -T app php bin/console app:monitor:transport
-   dc exec -T app php bin/console app:failed-message:list
+   dc exec -T web php bin/console app:monitor:status
+   dc exec -T web php bin/console app:monitor:jobs --status=failed --limit=20
+   dc exec -T web php bin/console app:monitor:transport
+   dc exec -T web php bin/console app:failed-message:list
    ```
 
    Match the operation and timestamps. Redis stream length and consumer

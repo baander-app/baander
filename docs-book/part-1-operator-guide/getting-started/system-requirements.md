@@ -15,11 +15,13 @@ they are a starting point, not a guarantee for yours.
   preset and creating worker units both refuse a rootless daemon, which cannot
   apply the negative out-of-memory scores described under [Kill order](#kill-order).
 - Docker with Compose and Buildx.
-- Host PHP 8.5 with Swoole, Composer, and the `posix` and `pdo_pgsql` extensions for
-  image-build tooling and the worker controller.
+- Host PHP 8.5 with Swoole and Composer for the image-build and deployment tooling.
+  The direct worker controller, `bin/worker-deployment.php`, also needs the `posix`
+  and `pdo_pgsql` extensions; the deployment preset runs the controller from its
+  operator image instead.
 
-[Source Installation](installation.md#prerequisites) lists the complete
-prerequisites and the installation order.
+[Installation](installation.md#prerequisites) lists the complete prerequisites
+and the installation order.
 
 ## Choose a capability and size
 

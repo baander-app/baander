@@ -7,9 +7,9 @@ to [background work](../workers/background-work.md). A stored notification or an
 does not prove that an external receiver got it.
 
 Run commands on the installation host, from its checkout, with the
-[`dc` wrapper](../getting-started/installation.md). The worker sends every notification email,
-push and webhook, so keep it running once delivery is configured. Restarting the web service alone
-does not refresh a separately managed worker.
+[`dc` function](../getting-started/installation.md#command-context). The worker sends every
+notification email, push and webhook, so keep it running once delivery is configured.
+Restarting the web service alone does not refresh the worker pair.
 
 ## Push Notifications (VAPID)
 
@@ -20,24 +20,33 @@ Browser push notifications use the [Web Push protocol](https://developer.mozilla
 1. **Generate a VAPID key pair:**
 
 ```bash
-dc exec app php bin/console app:generate-vapid-keys
+dc exec web php bin/console app:generate-vapid-keys
 ```
 
 See the [app:generate-vapid-keys](../commands/app-generate-vapid-keys.md) command reference for full details.
 
-2. **Add the keys to the protected web configuration and worker credentials:**
+2. **Add the keys to the `environment` object of the installation's private configuration:**
 
-```env
-VAPID_PUBLIC_KEY=BIj3...
-VAPID_PRIVATE_KEY=MIGT...
+```json
+"environment": {
+    "VAPID_PUBLIC_KEY": "BIj3...",
+    "VAPID_PRIVATE_KEY": "MIGT..."
+}
 ```
 
 [Environment variables](../configuration/environment-variables.md#web-push-vapid) documents both.
 
-3. **Apply the new environment to the web service and background worker.** Follow
-   the [configuration lifecycle](../configuration/README.md#where-a-change-takes-effect) and
-   [Background work](../workers/background-work.md). Recreate containers when changing values
-   injected by Compose; restarting an existing container retains its environment.
+3. **Apply the new environment to the web service and the worker pair.** From the
+   checkout, run the preset's `start`, which retires the worker pair, stops the
+   services and starts them with the new environment; the preset passes both keys
+   to web and to the workers. See the
+   [configuration lifecycle](../configuration/README.md#where-a-change-takes-effect) and
+   [Background work](../workers/background-work.md). Restarting an existing container
+   retains its environment.
+
+   ```bash
+   php scripts/deploy-preset.php start --config /srv/baander/preset.json --state /srv/baander/preset-state
+   ```
 
 A client that implements the subscription can then register for push notifications; the web application does not. To rotate the keys later, follow [VAPID key rotation](../maintenance/credential-rotation.md#rotating-vapid-keys) in the security guide.
 
@@ -127,9 +136,12 @@ it to the receiver before further notifications go out.
   deduplicate `Idempotency-Key`; see [Background work](../workers/background-work.md).
 - **Timeout:** Each HTTP attempt has a 10-second timeout and maximum duration.
 - **Destination checks:** Every DNS answer must be public or fall in an explicitly
-  permitted LAN range from `WEBHOOK_LAN_ALLOWLIST`. Loopback, link-local and metadata
-  endpoints remain blocked. The selected address is pinned for sending. Resolution
-  or validation failure is logged as a failed delivery and can retry.
+  permitted LAN range from `WEBHOOK_LAN_ALLOWLIST`. Loopback, link-local, site-local
+  and metadata endpoints remain blocked. An IPv6 address that carries an IPv4
+  address, such as a NAT64 (`64:ff9b::/96`) or 6to4 address, is checked, and matched
+  against the allowlist, as that IPv4 address. The selected address is pinned for
+  sending. Resolution or validation failure is logged as a failed delivery and can
+  retry.
 - **Observation:** Webhook delivery logs record success for a 2xx response, or
   failure with an HTTP status when available. A 2xx proves receiver acceptance,
   not that its downstream action completed. Worker logs use the

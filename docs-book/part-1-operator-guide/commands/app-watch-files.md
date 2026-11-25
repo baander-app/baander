@@ -7,20 +7,20 @@ command reports events; it does not scan libraries or dispatch ingestion. See
 ## Quick start
 
 Run from the installed-instance host shell with the `dc` function from
-[Getting started](../getting-started/installation.md#command-context). Paths name locations
-inside the application container. The examples use the source-installation media
+[Installation](../getting-started/installation.md#command-context). Paths name locations
+inside the application container. The examples use the installation's media
 root; substitute your configured paths and ensure each directory exists first.
 
 Watch a single directory:
 
 ```bash
-dc exec app php bin/console app:watch-files --path /media/library/music
+dc exec web php bin/console app:watch-files --path /storage/media/music
 ```
 
 Watch multiple directories:
 
 ```bash
-dc exec app php bin/console app:watch-files --path /media/library/music --path /media/library/movies
+dc exec web php bin/console app:watch-files --path /storage/media/music --path /storage/media/movies
 ```
 
 ## Options

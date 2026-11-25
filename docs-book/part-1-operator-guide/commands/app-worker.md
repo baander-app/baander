@@ -92,7 +92,12 @@ except the hardware encoder the deployment profile names: its device node, or th
 host's NVIDIA GPUs for an encoder that uses no device node; control receives none.
 Native requests carry deployment, boot, epoch, client generation and attempt
 identity. Uncertain completion retains ownership until containment or a confirmed
-release; caller cancellation alone does not free a native slot. The native daemon
+release; caller cancellation alone does not free a native slot. A command's
+standard output is bounded at 1 MiB: past that the daemon stops the command and
+fails that attempt alone with `Native output byte limit exceeded.`, while every
+other attempt keeps running. Error output keeps its newest 64 KiB. The daemon
+still stops admission, and the pair drains, when it cannot prove what became of a
+command, such as a launch or a stop whose outcome is unknown. The native daemon
 starts each FFmpeg command at nice 10 with the media work out-of-memory score
 600; each PHP media child in control raises its own score to 600. Control runs at
 −500 and execution at 300, so under host memory pressure media work is killed

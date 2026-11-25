@@ -4,7 +4,7 @@ Use this reference to set the container stop timeout and understand what listene
 
 ## Stopping and Restarting the Web Server
 
-An update that replaces the app container stops the web server in it, and so do `dc stop`, `dc restart`, `docker stop` and `docker compose restart app`. Docker sends `SIGTERM` to `app:serve`, and the server drains: it finishes what it can, tells clients to come back, and exits on its own. `SIGINT`, `swoole:server:stop` and `DELETE /api/server` on the internal API server start the same drain. A second stop request during a drain changes nothing, and a worker reload (`PATCH /api/server`) never starts one.
+An update that replaces the web container stops the web server in it, and so do the deployment preset's `stop` and `start`, `docker stop` and `docker compose restart web`. Docker sends `SIGTERM` to `app:serve`, and the server drains: it finishes what it can, tells clients to come back, and exits on its own. `SIGINT`, `swoole:server:stop` and `DELETE /api/server` on the internal API server start the same drain. A second stop request during a drain changes nothing, and a worker reload (`PATCH /api/server`) never starts one.
 
 ### What the drain does
 
@@ -23,7 +23,7 @@ If the server's manager process is still running at the deadline, the drain watc
 
 Give the container a stop timeout of at least D + 5 seconds, 35 seconds at the default, before the runtime sends `SIGKILL`:
 
-- Docker Compose: `stop_grace_period: 35s` on the app service. The development `docker-compose.yml` sets this.
+- Docker Compose: `stop_grace_period: 35s` on the web service. The deployment preset renders this, and its `stop` passes Compose a 40-second timeout. Neither follows `WEB_DRAIN_SECONDS`, so with a drain deadline above 30 seconds the preset's grace period is shorter than D + 5.
 - `docker run --stop-timeout 35`, or `docker stop -t 35` for one stop.
 - Kubernetes: `terminationGracePeriodSeconds: 35`. On other orchestrators, set the equivalent grace period or kill timeout.
 
@@ -33,7 +33,7 @@ Docker's default stop timeout is 10 seconds, shorter than even the smallest drai
 
 ### Listeners during a restart
 
-When its stream fails, or stalls for 10 seconds, the web player asks the server's `/live` endpoint whether the server answers. No answer, a timeout, an answer other than `2xx` or an answer with `"draining": true` means the server is unreachable; nginx answers `502` while the app container restarts, and a draining server can still answer on a connection nginx kept alive. The player then:
+When its stream fails, or stalls for 10 seconds, the web player asks the server's `/live` endpoint whether the server answers. No answer, a timeout, an answer other than `2xx` or an answer with `"draining": true` means the server is unreachable; the gateway answers `502` while the web container restarts, and a draining server can still answer on a connection the gateway kept alive. The player then:
 
 - shows "Reconnecting…" in place of the time and keeps the position it had reached;
 - retries with a growing, randomised delay, from 1 second up to 15 seconds, and honours a `Retry-After` header on a `503`;
@@ -43,16 +43,12 @@ A transcoded track resumes once its accepted rendition is complete; until then t
 
 A token refresh that fails because the server is restarting, with a network error or a `5xx` answer, keeps the user signed in. Only a `401`, or a `400` with the error `invalid_grant`, from the refresh signs the user out. Video execution stays with the worker during a web restart; see [Transcoding](../media/video-transcoding.md#restarts).
 
-### nginx and a replaced app container
+### The gateway and a replaced web container
 
-The bundled nginx resolves the `app` host name once, when it starts. A restarted container normally keeps its address. A recreated container can come back with a new one. nginx then keeps sending requests to the old address and answers `502`, and the player gives up after two minutes. After the app container has been replaced, reload nginx so it resolves `app` again:
+A restarted container normally keeps its address. A recreated container can come back with a new one. The preset's gateway, an nginx container, resolves the `web` host name at run time through Docker's DNS and keeps each answer for 10 seconds, so it follows a replaced web container to its new address without a reload. An nginx that resolves its upstream only when it starts keeps sending requests to the old address instead and answers `502`, and the player gives up after two minutes; reload such a proxy after the web container has been replaced.
 
-```bash
-dc exec nginx nginx -s reload
-```
+### A proxy in front of the gateway
 
-### A proxy in front of nginx
+The gateway serves plain HTTP and expects a reverse proxy in front of it to terminate TLS; see [Gateway and client addresses](../../../deploy/preset/README.md#gateway-and-client-addresses). When the web server cuts a stream, that proxy must pass the cut on to the client as an error. Over HTTP/2 a proxy can answer an upstream reset by ending the client's stream normally. The player then takes the cut for the end of the track and skips to the next one.
 
-The production nginx expects a reverse proxy in front of it to terminate TLS. When the web server cuts a stream, that proxy must pass the cut on to the client as an error. Over HTTP/2 a proxy can answer an upstream reset by ending the client's stream normally. The player then takes the cut for the end of the track and skips to the next one.
-
-To check your proxy, copy a stream request from the browser's network tab as a curl command and run it through the proxy with `--limit-rate 32k`, so that it is still downloading when you restart the app container. curl must fail with exit code `18` over HTTP/1.1 or `92` over HTTP/2. Exit code `0` means the proxy ended the stream cleanly.
+To check your proxy, copy a stream request from the browser's network tab as a curl command and run it through the proxy with `--limit-rate 32k`, so that it is still downloading when you restart the web container. curl must fail with exit code `18` over HTTP/1.1 or `92` over HTTP/2. Exit code `0` means the proxy ended the stream cleanly.

@@ -77,14 +77,15 @@ Lyrics have a separate `lyrics.auto_fetch` setting, also off by default. It requ
 
 ## Configuration
 
-Put web lookup credentials in the private Compose environment file described in
-[Getting Started](../getting-started/installation.md#command-context), rather than committing them
-to the checkout. Apply changes using the [configuration lifecycle](../configuration/README.md).
-This configures web; it does not configure the independent worker image.
+Put web lookup credentials in the `environment` object of the installation's
+[private configuration](../getting-started/installation.md#4-write-the-private-configuration),
+rather than committing them to the checkout. Apply changes using the
+[configuration lifecycle](../configuration/README.md). The preset passes these keys to
+web alone; it does not configure the independent worker image.
 
 TMDB movie enrichment runs in workers. Set the optional `TMDB_BEARER_TOKEN` in
-the private deployment environment and apply the configuration lifecycle so the
-workers receive the change. The admitted credentials, preset renderer and preview
+the configuration's `environment` object and apply the configuration lifecycle so
+the workers receive the change. The admitted credentials, preset renderer and preview
 worker setup forward this token; the default is empty. An unconfigured token
 does not provide authenticated TMDB lookup, but local movie import and playback
 remain available.

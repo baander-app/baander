@@ -2,8 +2,10 @@
 
 Environment variables configure service connections, paths, secrets and optional
 integrations. Symfony's configuration reads those values when the application
-starts. The [source installation](../getting-started/installation.md) keeps private web settings
-and a separate worker credentials file; changing one does not update the other.
+starts. An [installation](../getting-started/installation.md) keeps them in the deployment
+preset's private configuration file. Its `environment` object holds the operator's
+values, and the preset derives the rest; web and the worker pair receive both from
+the same file when the deployment starts.
 
 Behavior that an administrator may want to change while the server runs, such as
 whether audio is transcoded or which language emails default to, lives in the
@@ -22,40 +24,47 @@ database instead.
 
 | Configuration | Applies to | How a change takes effect |
 |---------------|------------|---------------------------|
-| Web environment and Symfony configuration | Web application and console commands launched with that environment | Restart the running app after changing environment values; use the [upgrade procedure](../maintenance/upgrading.md) for release or image changes. A new console process reads its own environment. |
-| Worker image and admitted credentials | The control/execution worker pair | Follow [worker deployment](../workers/worker-deployment.md) and [upgrading](../maintenance/upgrading.md). Changed deployment recipes require retirement and a fresh boot; editing a file does not alter running containers. |
-| Worker manifest | Host controller and the admitted profile/storage recipe | Use the exact manifest for observation and recovery. Changes to its profile or recipe require a new admitted deployment. |
+| Deployment configuration: `environment`, `origin`, `listen`, `capability`, `size` | Web, console commands run in the web container, and the worker pair | Edit the private configuration file, then run the preset's `start`, which retires the worker pair, stops the services and starts the deployment with the new values. Use the [upgrade procedure](../maintenance/upgrading.md) for release or image changes. A console command in the web container reads that container's environment, so it sees a change only after `start`. |
+| Worker image and admitted credentials | The control/execution worker pair | The preset takes the worker image from its configuration's `images` and renders the credentials on every `start`. For a pair managed separately, follow [worker deployment](../workers/worker-deployment.md) and [upgrading](../maintenance/upgrading.md). Changed deployment recipes require retirement and a fresh boot; editing a file does not alter running containers. |
+| Worker manifest | Host controller and the admitted profile/storage recipe | The preset writes it into its state directory. Use the exact manifest for observation and recovery. Changes to its profile or recipe require a new admitted deployment. |
 | Server settings | Application behavior that reads a setting while running | Use the admin UI, settings CLI or API described below. Each feature reads the setting when it acts; already completed work is not undone. |
 | User settings | One user's explicitly stored preferences | Change through the account UI, admin tools or user settings API. Removing a choice restores the applicable default. |
 
-For the source-installation web environment, Symfony reads `.env`, `.env.local`,
-`.env.dev` and `.env.dev.local` in that order; values already in the process
-environment win. The tracked `.env.dev` carries development defaults, including an
-application secret, so put private overrides in `.env.dev.local` as shown in
-[Source Installation](../getting-started/installation.md#1-prepare-configuration-and-the-browser-address).
-A `prod` process selects its corresponding environment files instead. Do not put secrets
-in files copied into an image.
+An installation's private configuration file, written in
+[Installation](../getting-started/installation.md#4-write-the-private-configuration),
+sets the operator's variables in its `environment` object. The preset refuses the
+variables it derives: `APP_ENV`, always `prod`, and `APP_DEBUG`; `APP_URL`,
+`DEFAULT_URI` and `APP_DOMAIN` from `origin`; `DATABASE_URL` and
+`DATABASE_CONTROL_URL` from `DB_USERNAME`, `DB_PASSWORD` and `DB_DATABASE`;
+`REDIS_URL` and `MESSENGER_TRANSPORT_DSN` from `REDIS_PASSWORD`;
+`MEDIA_STORAGE_PATH`, `CONVERT_STORAGE_PATH`, `APP_HOME` and the OAuth key paths;
+`BAANDER_DEPLOYMENT_PROFILE` from `capability` and `size`; and `TRUSTED_PROXIES`,
+which names the gateway. Declare a reverse proxy in front of the gateway in
+`listen.frontProxies` instead. The image's `.env`, copied from `.env.example` when
+the image is built, supplies defaults for everything else, and a variable in
+`environment` overrides it. Do not put secrets in files copied into an image.
 
-Compose's `--env-file` options set Compose's own interpolation, separately from
-Symfony's environment loading. The installation's `dc` function names both the
-private settings file and the generated image-selection file. Use that function for
-the installation's commands; Make targets the development preview instead. See
-[Command context](../getting-started/installation.md#command-context).
+Console commands for an installation run in its web container through the `dc`
+function in [Command context](../getting-started/installation.md#command-context), and
+read that container's environment. Make targets the development preview instead.
 
-The worker pair runs with `APP_ENV=prod` and does not read the web's
-`.env.dev.local`. Its admitted credentials accept a restricted set of runtime keys,
-among them `VIDEO_ENCODER`, which overrides the value in the image's `.env`. Other
-values, including `HW_ACCEL_DEVICE` and `HW_BITRATE_MULTIPLIER`, must be configured in
-the image as the worker and transcoding guides describe. Web, workers and the host
-controller must reach the same main database, each through an address that works on
-its own network. Web and workers must also agree on shared media paths and Redis
-transport settings. See [Shared media paths](../getting-started/storage-and-data.md#shared-media-paths).
+The worker pair runs with `APP_ENV=prod` and receives a fixed subset of the web
+environment: the derived connection and media path values, `APP_URL`,
+`DEFAULT_URI` and `BAANDER_DEPLOYMENT_PROFILE`, the three secrets,
+`REDIS_PASSWORD`, `MAILER_DSN`, `MAIL_FROM_ADDRESS`, `VIDEO_ENCODER`, the VAPID
+pair, `OTEL_ENABLED`, `OTEL_EXPORTER_OTLP_ENDPOINT` and `TMDB_BEARER_TOKEN`.
+Any other `environment` key reaches web alone. Other worker values, including
+`HW_ACCEL_DEVICE` and `HW_BITRATE_MULTIPLIER`, come from the image as the worker
+and transcoding guides describe. The preset gives web and workers the same database,
+Redis and media paths. See [Shared media paths](../getting-started/storage-and-data.md#shared-media-paths).
 
 ## Protect configuration
 
-- Keep deployment credentials out of Git and image build contexts. The source
-  installation uses `.env.dev.local`; the worker credentials file has its own
-  ownership and mode requirements in the [worker deployment reference](../workers/worker-deployment.md#ipc-and-media-volumes).
+- Keep deployment credentials out of Git and image build contexts. An installation
+  keeps them in its private configuration file and state directory; keep both
+  accessible only to the operator. A separately managed worker pair's credentials
+  file has its own ownership and mode requirements in the
+  [worker deployment reference](../workers/worker-deployment.md#ipc-and-media-volumes).
 - A real environment variable set in the container runtime, such as Docker Compose
   or Kubernetes, overrides the same variable in `.env`.
 - For each deployment, generate a unique `APP_SECRET` and `STREAM_URL_HMAC_SECRET` with `php -r 'echo bin2hex(random_bytes(32));'`, and an `AUTH_TOTP_ENCRYPTION_KEY` with `openssl rand -base64 32`. In `prod`, every process refuses to boot while one of the three is unset, a committed default, a `replace-with-` placeholder or shorter than 32 bytes.

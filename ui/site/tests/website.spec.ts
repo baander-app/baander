@@ -57,7 +57,7 @@ test('pages set their text in the self-hosted Geist faces', async ({ page }) => 
   expect(codec.loaded).toContain('Geist Mono Variable');
 });
 
-test('visitor reaches operating model and source-based installation', async ({ page }) => {
+test('visitor reaches operating model and the preset installation', async ({ page }) => {
   await page.goto('/');
   const screenshot = page.getByRole('img', { name: /music library/ });
   await expect(screenshot).toBeVisible();
@@ -73,12 +73,12 @@ test('visitor reaches operating model and source-based installation', async ({ p
     .toHaveAttribute('href', 'https://github.com/baander-app/baander');
   await page.getByRole('link', { name: /Start hosting/ }).click();
   await expect(page).toHaveURL(/\/docs\/operator-guide\/getting-started\/$/);
-  await expect(page.locator('main')).toContainText(/from source/);
-  await expect(page.locator('main')).toContainText(/development-oriented/);
+  await expect(page.locator('main')).toContainText(/deployment preset/);
+  await expect(page.locator('main')).toContainText(/production stack/);
   await expect(page.locator('main')).toContainText(/workers/);
   const chapters = page.getByRole('navigation', { name: 'Manual chapters', exact: true });
-  await chapters.getByRole('link', { name: 'Source Installation', exact: true }).click();
-  await expect(page.locator('main h1')).toContainText('Source Installation');
+  await chapters.getByRole('link', { name: 'Installation', exact: true }).click();
+  await expect(page.locator('main h1')).toContainText('Installation');
   const section = page.locator('main h2[id]').first();
   const id = await section.getAttribute('id');
   await page.goto(`/docs/operator-guide/getting-started/installation/#${id}`);

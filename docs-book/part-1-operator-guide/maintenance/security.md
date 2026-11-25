@@ -5,7 +5,7 @@ grants, replacing signing keys and ending signed media URLs affect different
 state. Clearing Redis does not revoke the OAuth grants stored in PostgreSQL.
 
 Run commands on the installation host, from its checkout, with the
-[`dc` wrapper](../getting-started/installation.md). Before planned downtime, follow
+[`dc` function](../getting-started/installation.md#command-context). Before planned downtime, follow
 [Background work](../workers/background-work.md) to stop or drain separately managed workers.
 Keep matching data and secrets together as described in
 [Backup and recovery](backup-and-recovery.md).
@@ -32,58 +32,61 @@ records trust boundaries, regression evidence and unresolved findings.
 - [ ] **HTTPS in production** — set `DEFAULT_URI` and `APP_URL` to `https://`
 - [ ] **Reverse proxy configured** — set `TRUSTED_PROXIES` to the actual trusted proxy addresses or CIDRs. Both HTTP layers default to no trust. Proxies must replace incoming `X-Forwarded-*` headers; direct access leaves the list empty. The [deployment preset](../../../deploy/preset/README.md) derives `TRUSTED_PROXIES` to its own gateway and refuses a configured value; list a proxy in front of the gateway under `listen.frontProxies` instead.
 - [ ] **Rate limiting active** — relies on Redis; verify Redis is reachable
-- [ ] **External API keys secured** — store in `.env`, never in source code or config committed to git
+- [ ] **External API keys secured** — store in the private configuration's `environment` object, never in source code or config committed to git
 - [ ] **OAuth keys not in version control** — `config/secrets/oauth/` should be in `.gitignore`
 - [ ] **Database not exposed** — PostgreSQL should only be accessible from the internal Docker network, not from the host
 
-### Production `.env` template
+### Production configuration
 
-```env
-APP_ENV=prod
-APP_SECRET=<generate with: php -r 'echo bin2hex(random_bytes(32));'>
-APP_URL=https://baander.app
-APP_DOMAIN=baander.app
-DEFAULT_URI=https://baander.app
+The [deployment preset](../../../deploy/preset/README.md) runs web and the worker
+pair with `APP_ENV=prod` and `APP_DEBUG=0`. Put the installation's own values in the
+`environment` object of its private configuration, kept readable only by the
+operator:
 
-DB_PASSWORD=<strong_password>
-DATABASE_URL="postgresql://baander:<strong_password>@pooler:6432/baander?serverVersion=18&charset=utf8"
-DATABASE_CONTROL_URL="postgresql://baander_control:<strong_password>@pooler:6432/baander_control?serverVersion=18&charset=utf8"
-
-REDIS_PASSWORD=<strong_password>
-REDIS_URL=redis://default:<strong_password>@redis:6379
-MESSENGER_TRANSPORT_DSN=redis://default:<strong_password>@redis:6379/messages
-MESSENGER_CONSUMER_NAME=${HOSTNAME:-worker}
-
-MAILER_DSN=smtp://user:pass@smtp.baander.app:587
-
-VAPID_PUBLIC_KEY=<from app:generate-vapid-keys>
-VAPID_PRIVATE_KEY=<from app:generate-vapid-keys>
-
-STREAM_URL_HMAC_SECRET=<generate with: php -r 'echo bin2hex(random_bytes(32));'>
-AUTH_TOTP_ENCRYPTION_KEY=<generate with: openssl rand -base64 32>
+```json
+"origin": "https://baander.app",
+"environment": {
+    "APP_SECRET": "<generate with: php -r 'echo bin2hex(random_bytes(32));'>",
+    "STREAM_URL_HMAC_SECRET": "<generate with: php -r 'echo bin2hex(random_bytes(32));'>",
+    "AUTH_TOTP_ENCRYPTION_KEY": "<generate with: openssl rand -base64 32>",
+    "DB_USERNAME": "baander",
+    "DB_PASSWORD": "<strong_password>",
+    "DB_DATABASE": "baander",
+    "REDIS_PASSWORD": "<strong_password>",
+    "MAILER_DSN": "smtp://user:pass@smtp.baander.app:587",
+    "VAPID_PUBLIC_KEY": "<from app:generate-vapid-keys>",
+    "VAPID_PRIVATE_KEY": "<from app:generate-vapid-keys>"
+}
 ```
 
-The supplied Compose stack initializes PostgreSQL and writes the connection pooler's
-verifiers from `DB_PASSWORD`, which defaults to `baander` when unset. Use the same
-password in `DB_PASSWORD`, `DATABASE_URL` and `DATABASE_CONTROL_URL`.
+The preset refuses the settings it controls in `environment`: `APP_ENV` and
+`APP_DEBUG`; `APP_URL`, `DEFAULT_URI` and `APP_DOMAIN`, derived from `origin`;
+`DATABASE_URL` and `DATABASE_CONTROL_URL` from the three `DB_*` values; `REDIS_URL`
+and `MESSENGER_TRANSPORT_DSN` from `REDIS_PASSWORD`; the storage paths, `APP_HOME`,
+the OAuth key paths and `BAANDER_DEPLOYMENT_PROFILE`; and `TRUSTED_PROXIES`, which
+it sets to its gateway. Rendering and starting refuse any value that still begins
+with `replace-with-`. The preset initializes PostgreSQL, gives the database roles
+and the connection pooler's auth file their verifiers, and builds both database
+URLs, all from the one `DB_PASSWORD`.
 
 ### Network security
 
-The supplied Compose topology places Nginx in front of the web server. Inspect the
-actual published ports before exposing the installation:
+The deployment preset places its gateway, an nginx container, in front of the web
+server and publishes no other port. Inspect the actual published ports before
+exposing the installation:
 
-- **Port 80/443** — Nginx proxies to the Swoole server. The base Compose file builds its development configuration, which also terminates TLS on 443 with a self-signed certificate; the production configuration listens on port 80 only and expects a reverse proxy in front of it to terminate TLS
-- **Port 9200** — Swoole management API. It has no authentication and can report status, reload workers and shut the server down, so it listens only on `127.0.0.1` inside the app container and no compose file publishes it. `swoole:server:status` and `swoole:server:reload` reach it from inside the container. Keep `swoole.http_server.api.host` on loopback; the bundle also defaults to `127.0.0.1` when no host is configured.
-- **Port 5432** — the base Compose file publishes PostgreSQL on the host; remove or
-  restrict this publication for an exposed installation.
-- **Port 6379** — the base Compose file binds Redis on host loopback. Keep it
+- **`listen.port` on `listen.address`** — the gateway proxies plain HTTP to the Swoole server; the example configurations listen on `127.0.0.1:8080`. The gateway does not terminate TLS: for an HTTPS origin, run a TLS reverse proxy in front of it and declare that proxy in `listen.frontProxies`, as [Gateway and client addresses](../../../deploy/preset/README.md#gateway-and-client-addresses) describes
+- **Port 9200** — Swoole management API. It has no authentication and can report status, reload workers and shut the server down, so it listens only on `127.0.0.1` inside the web container and no compose file publishes it. `swoole:server:status` and `swoole:server:reload` reach it from inside the container. Keep `swoole.http_server.api.host` on loopback; the bundle also defaults to `127.0.0.1` when no host is configured.
+- **Ports 5432, 6432 and 6379** — the preset publishes none of PostgreSQL, the
+  connection pooler and Redis on the host. They share the deployment's private
+  network with web and the worker pair; reach them with `dc exec`. Keep them
   inaccessible to untrusted clients.
 
-The base file also binds the web service on host loopback port 9501, where the
-web server answers `/metrics` and the health probes without authentication. The
-production Nginx configuration answers `/metrics` with `404`. Review every
-publication and host firewall rule for your deployment;
-[Getting started](../getting-started/installation.md) describes the source-install topology.
+The preset does not publish web's port 9501 either, where the web server answers
+`/metrics` and the health probes without authentication. The gateway answers
+`/metrics` with `404`. Review every publication and host firewall rule for your
+deployment; [Installation](../getting-started/installation.md) describes the
+installation's topology.
 
 ### Browser protections
 

@@ -5,16 +5,16 @@ background jobs and the server. Application console commands run inside the
 application container; worker deployment uses a separate host entrypoint.
 
 For an installed instance, use the host shell and `dc` function established in
-[Getting started](../getting-started/installation.md#command-context):
+[Installation](../getting-started/installation.md#command-context):
 
 ```bash
-dc exec app php bin/console app:user:create --help
+dc exec web php bin/console app:user:create --help
 ```
 
 Most reference pages show development examples in the form
 `make exec cmd="php bin/console …"`. Those run against the checkout's preview, not
 an installed instance. On an installed instance, run the same console arguments
-with `dc exec app php bin/console …`, and read
+with `dc exec web php bin/console …`, and read
 [Which installation a command targets](../getting-started/understanding-baander.md#which-installation-a-command-targets)
 before changing targets. A plain `php bin/console …` example assumes a shell inside
 the application container, in its application directory. Paths a console command
@@ -22,7 +22,7 @@ takes are container paths.
 
 ## Worker deployment
 
-Application console commands run inside `app`. The control and execution worker pair is provisioned and operated from the host, through `bin/worker-deployment.php` or `scripts/deploy-preset.php`. [Worker Deployment](../workers/worker-deployment.md) explains how the pair works, the version 9 manifest and credentials format, and the host lifecycle commands; [Background Work](../workers/background-work.md) covers queue flow, observation and recovery.
+Application console commands run inside `web`. The control and execution worker pair is provisioned and operated from the host, through `bin/worker-deployment.php` or `scripts/deploy-preset.php`. [Worker Deployment](../workers/worker-deployment.md) explains how the pair works, the version 9 manifest and credentials format, and the host lifecycle commands; [Background Work](../workers/background-work.md) covers queue flow, observation and recovery.
 
 ## Auth & Users
 

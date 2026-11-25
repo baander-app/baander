@@ -45,7 +45,10 @@ transactionally and clears the token cache without a blanket Redis flush.
 - Replace exposed database and Redis credentials using [their rotation procedures](credential-rotation.md).
   Preserve pending work before a Redis service change.
 - Replace `STREAM_URL_HMAC_SECRET` and restart the web server if signed video
-  URLs must end globally. OAuth revocation does not end those URLs; see
+  URLs must end globally. With the preset, change it in the configuration's
+  `environment` object and run the preset's `start` action, as in
+  [Rotate credentials](credential-rotation.md); it recreates web and the worker
+  pair with the new value. OAuth revocation does not end those URLs; see
   [Disabled accounts](../administration/sessions-and-access.md#disabled-accounts).
 - Replacing an exposed `AUTH_TOTP_ENCRYPTION_KEY` locks out every user who has TOTP on.
   Baander does not re-encrypt stored secrets, so under a new key those users' logins
@@ -60,10 +63,12 @@ transactionally and clears the token cache without a blanket Redis flush.
 ### 4. Verify before reopening traffic
 
 Review application and proxy access logs without publishing tokens or secret-bearing
-URLs. From the installed checkout, application logs can be inspected with:
+URLs. From the installed checkout, in the shell where the installation's
+[`dc` function](../getting-started/installation.md#command-context) is defined,
+application logs can be inspected with:
 
 ```bash
-dc logs --since 24h app
+dc logs --since 24h web
 ```
 
 Confirm fresh authentication, refusal of the accounts/grants you disabled or

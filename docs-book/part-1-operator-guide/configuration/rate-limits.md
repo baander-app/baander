@@ -8,7 +8,9 @@ Limits are set in `config/packages/auth.yaml`. They feed the Symfony policies in
 `config/packages/framework.yaml`; all 27 configured limiters consume state through
 atomic Redis compare-and-set. Each limiter has its own namespace, so the admin
 **Rate Limits** tab and `app:rate-limiter:clear` reset its generation without
-changing other limiters. The catalog reports `storageNamespace`, not a cache pool.
+changing other limiters. Only a super admin may clear limiters from the tab or the
+admin API, and every clear is logged with who made it. The catalog reports
+`storageNamespace`, not a cache pool.
 Changing a limiter's effective configuration starts fresh subject budgets; it does
 not carry a shared budget across different configurations during a rolling change.
 See [Rate Limiter Monitor](../operations/health-and-metrics.md#rate-limiter-monitor).
@@ -86,6 +88,12 @@ Each limiter counts requests per key:
 
 The last seven have fixed limits in `config/packages/framework.yaml` and no `auth.yaml` parameter.
 
+A client IP key counts an IPv4 address on its own and an IPv6 address by its `/64`
+network: an IPv6 client is normally assigned a whole `/64` and can send from any
+address in it, so each address would otherwise bring a fresh budget. An IPv4-mapped
+IPv6 address such as `::ffff:198.51.100.7` counts as `198.51.100.7`. The warning
+logged for a refused request still names the full address.
+
 The per-IP limits run before Baander authenticates the request. The per-account login failure and step-up limits run once the account's address or user is known, and the per-client limits once the client has authenticated, so a caller who merely names a client in `client_id` cannot use up that client's allowance.
 
 The auth, OAuth, discovery and cover-extraction limits are tied to the route the router matched, not to the path as the client spelled it. The router decodes the path first, so a percent-encoded request such as `POST /%61pi/auth/registe%72` reaches `POST /api/auth/register` and is charged to `auth_register_ip` like any other registration; `anonymous_api` and `authenticated_api` likewise judge whether a request is an API request from its decoded path. Each route fixes its own methods, so a `HEAD` request to a limited `GET` route is charged like `GET`.
@@ -94,9 +102,9 @@ The auth, OAuth, discovery and cover-extraction limits are tied to the route the
 
 The three login limits count different things. `auth_login_ip` and `auth_login_ip_email` count every `POST /api/auth/login` from an address, DPoP nonce challenges and TOTP prompts included. They slow one address down but do not stop an attack spread over many addresses: each new address brings a fresh budget.
 
-`auth_login_email_failures` counts only rejected passwords and TOTP codes for an email address, from every address together, and it charges an address that belongs to no account exactly as one that does, so the limit reveals nothing about which accounts exist. A nonce challenge, the TOTP prompt and a successful login cost nothing against it. Once an address reaches the limit, every login for it answers `429`, the right password included, until older failures slide out of the window.
+`auth_login_email_failures` counts only rejected passwords and TOTP codes for an email address, from every address together, and it charges an address that belongs to no account exactly as one that does, so the limit reveals nothing about which accounts exist. A nonce challenge, the TOTP prompt and a successful login cost nothing against it. A login takes its failure before the password is checked and gives it back when the attempt was not a wrong guess, so concurrent wrong passwords for one address are checked no more often than the limit allows. Once an address reaches the limit, every login for it answers `429`, the right password included, until older failures slide out of the window.
 
-An attacker who keeps guessing can therefore lock the real user out for as long as the attack lasts; clearing the limiter from the **Rate Limits** tab or with `app:rate-limiter:clear auth_login_email_failures` lets the user in sooner, and resets the count of every address at once.
+An attacker who keeps guessing can therefore lock the real user out for as long as the attack lasts; `app:rate-limiter:clear auth_login_email_failures` lets the user in sooner, and resets the count of every address at once. A super admin can also clear every limiter from the **Rate Limits** tab.
 
 A sign-in with TOTP costs more requests than one without it, because a failed login answer, the TOTP prompt included, carries no new DPoP nonce and the web app starts each attempt without one. With no wrong code it takes four `POST /api/auth/login` requests: a nonce challenge, the password, a second nonce challenge and the password with the code. Each wrong code adds two, so a sign-in with `n` wrong codes costs `4 + 2n` requests against `auth_login_ip` and `auth_login_ip_email`.
 
@@ -116,7 +124,7 @@ A Discogs or Last.fm search on the metadata search routes spends one call of the
 
 The `lrclib` limit never answers `429` either. Every LRCLIB request, from any worker or web process, reserves the next free turn in its shared bucket and waits for it; each turn starts at least two seconds after the one before it. The fetch of one song, a lyrics search and an apply, which only administrators may call, wait at most 10 seconds, and a queued lyrics fetch at most 30.
 
-A request whose turn comes later is not sent: LRCLIB then counts as unavailable, as it does when the limiter state in Redis cannot be read, and the lyrics routes answer `503`. Clearing `lrclib`, from the **Rate Limits** tab or with `app:rate-limiter:clear lrclib`, resets these turns only. A pause that LRCLIB asked for with a `429`, or a `503` with a `Retry-After` header, is stored outside the limiter and ends on its own, after one hour at most; see [External APIs](../media/external-apis.md#supported-apis).
+A request whose turn comes later is not sent: LRCLIB then counts as unavailable, as it does when the limiter state in Redis cannot be read, and the lyrics routes answer `503`. Clearing `lrclib` with `app:rate-limiter:clear lrclib`, or every limiter from the **Rate Limits** tab, resets these turns only. A pause that LRCLIB asked for with a `429`, or a `503` with a `Retry-After` header, is stored outside the limiter and ends on its own, after one hour at most; see [External APIs](../media/external-apis.md#supported-apis).
 
 Media delivery routes are exempt from `anonymous_api` and `authenticated_api`, so playback is never throttled by the general API budget: the audio stream (`/api/stream/track`), the original-file streams (`/api/stream/video`, `/api/stream/original/track`), the HLS and DASH manifests and segments under `/api/transcode/{id}/` (`master.m3u8`, `media.m3u8`, `manifest.mpd`, `init`, `segment`), the completed-video playlists and segments under `/api/transcode/artifacts/`, subtitle playlists and segments, image files (`/api/images/{id}/file`) and album covers (`GET /api/albums/{id}/cover`). Health, readiness and metrics endpoints (`/health`, `/ready`, `/live`, `/metrics`) are outside `/api` and are never limited.
 

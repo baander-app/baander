@@ -6,7 +6,7 @@ in separate stages, each owned by a component. If you know which component owns
 the stage that stalled, you can choose the right check before restarting anything.
 
 Read this chapter first, then [Storage and Data](storage-and-data.md) and
-[Source Installation](installation.md). If the instance is already installed, use
+[Installation](installation.md). If the instance is already installed, use
 [Monitoring](../operations/README.md) to find the evidence for the stage you are checking.
 
 ## The components
@@ -65,11 +65,12 @@ conditions; the application's health response does not cover it.
 ## Which installation a command targets
 
 The installed-instance procedures use the `dc` shell function defined in
-[Source Installation](installation.md). Run those commands on the installation
-host, from that installation's checkout, in the shell where `dc` is defined.
-The function supplies its private Compose environment file. An application
-console command runs inside `app`; a host-controller command runs on the trusted
-host with its own manifest and credential paths. Keep those contexts separate.
+[Installation](installation.md#command-context). Run those commands on the
+installation host, from that installation's checkout, in the shell where `dc` is
+defined. The function selects the deployment's Compose project by name. An
+application console command runs inside `web`; the deployment preset's `start`,
+`stop` and `status` actions run on the host with the private configuration and
+state directory. Keep those contexts separate.
 
 Repository Make targets manage local development instances. They normally select
 the current worktree's preview; `INSTANCE=persistent` selects the persistent
@@ -77,8 +78,8 @@ the current worktree's preview; `INSTANCE=persistent` selects the persistent
 operator instance. Use the [Development Environment](../../part-2-developer-guide/getting-started/development-environment.md)
 guide when working on those instances.
 
-The source-installation recipe adapts a development-oriented Compose stack and
-requires explicit network, volume, credential and worker preparation. Following it
-does not qualify the result for every hosting arrangement. Work through the
-checkpoints in [Source Installation](installation.md) before treating a new
-installation as ready for use.
+The repository's `docker-compose.yml` is a development stack, not an
+installation; the developer guide describes it. Following the installation
+procedure does not qualify the result for every hosting arrangement. Work through
+the checkpoints in [Installation](installation.md#check-the-installation) before
+treating a new installation as ready for use.

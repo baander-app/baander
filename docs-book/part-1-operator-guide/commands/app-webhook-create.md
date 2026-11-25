@@ -5,9 +5,9 @@ Add an outgoing webhook and print its signing secret. The command does what `POS
 ## Quick start
 
 The Make examples below target the checkout's development preview. For an
-installed instance, use the `dc` function from
-[Getting started](../getting-started/installation.md#command-context) and replace
-`make exec cmd="php bin/console …"` with `dc exec app php bin/console …`.
+installation, use the `dc` function from
+[Installation](../getting-started/installation.md#command-context) and replace
+`make exec cmd="php bin/console …"` with `dc exec web php bin/console …`.
 
 ```bash
 make exec cmd="php bin/console app:webhook:create https://hooks.baander.app/notify --category=security --category=media_changes"
@@ -38,7 +38,7 @@ The categories are `security`, `background_jobs`, `media_changes` and `admin_ope
 
 The command prints the new webhook's public ID and the signing secret. This is the only time the secret is shown: store it with the receiver now. Baander keeps it encrypted with `APP_SECRET` and never prints it again. A lost secret can only be replaced with [app:webhook:rotate-secret](app-webhook-rotate-secret.md). The command also prints the signing version the webhook's deliveries use; see [Notifications](../administration/notifications.md) for verifying signatures.
 
-Every address the URL's host resolves to must be public, or a LAN address listed in `WEBHOOK_LAN_ALLOWLIST`; loopback, link-local and metadata addresses are never allowed. The command rejects a blank or malformed URL, a URL with embedded credentials, a host with any other address, and an unknown category, and stores nothing. The API answers the same cases with `422` and the same message.
+Every address the URL's host resolves to must be public, or a LAN address listed in `WEBHOOK_LAN_ALLOWLIST`; loopback, link-local, site-local and metadata addresses are never allowed. An IPv6 address that carries an IPv4 address, such as `64:ff9b::a00:5` for `10.0.0.5`, counts as that IPv4 address. The command rejects a blank or malformed URL, a URL with embedded credentials, a host with any other address, and an unknown category, and stores nothing. The API answers the same cases with `422` and the same message.
 
 With `--json` the command prints the API's `data` object: `publicId`, `url`, `category_filter`, `secret`, `signing_version`, `created_at` and `updated_at`.
 

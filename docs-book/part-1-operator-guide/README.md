@@ -3,11 +3,11 @@
 For a new Baander instance, follow the reading path below. For an existing
 instance, use the task and symptom tables to find the procedure you need.
 
-Commands for an installed instance use the `dc` function that
-[Source Installation](getting-started/installation.md) defines, and run on the
-installation host from its checkout. Worker-controller commands run separately,
-on the trusted host. Repository Make targets select development instances, not
-an installed one; see
+Commands for an installation use the `dc` function that
+[Installation](getting-started/installation.md#command-context) defines, and run
+on the installation host from its checkout. The deployment preset starts, stops
+and reports the installation from the same host. Repository Make targets select
+development instances, not an installation; see
 [Which installation a command targets](getting-started/understanding-baander.md#which-installation-a-command-targets)
 before carrying a command from one environment to another.
 
@@ -15,7 +15,7 @@ before carrying a command from one environment to another.
 
 | Chapter | Coverage |
 | --- | --- |
-| [Getting Started](getting-started/README.md) | Component overview, deployment topology, storage requirements, host sizing, and source installation |
+| [Getting Started](getting-started/README.md) | Component overview, deployment topology, storage requirements, host sizing, and installation through the deployment preset |
 | [Configuration](configuration/README.md) | Deployment capability and size, media slots, PgBouncer pooler, environment variables, authentication limits, and live server/user settings |
 | [Workers and Background Work](workers/README.md) | Control/execution worker pair, queue and outbox flow, version 9 manifest, credentials, and host lifecycle controller |
 | [Media and Playback](media/README.md) | Library management, file watching, external metadata/lyrics APIs, video/audio transcoding, and watch parties |
@@ -31,7 +31,7 @@ before carrying a command from one environment to another.
    for the components and [Storage and Data](getting-started/storage-and-data.md)
    for what must be preserved.
 2. **Install it.** Check [System Requirements](getting-started/system-requirements.md),
-   then follow [Source Installation](getting-started/installation.md).
+   then follow [Installation](getting-started/installation.md).
 3. **Operate it.** Choose a task below. [Monitoring and Troubleshooting](operations/README.md)
    explains where to look when a step fails.
 4. **Prepare for changes.** Read [Backup and Recovery](maintenance/backup-and-recovery.md)
@@ -44,7 +44,7 @@ before carrying a command from one environment to another.
 | --- | --- |
 | See how the pieces fit together | [Deployment Topology](getting-started/deployment-topology.md) |
 | Size a host or choose a deployment capability | [System Requirements](getting-started/system-requirements.md) and [Deployment Capability, Size and Runtime](configuration/deployment-profiles.md) |
-| Install an instance and scan its first library | [Source Installation](getting-started/installation.md) |
+| Install an instance and scan its first library | [Installation](getting-started/installation.md) |
 | Change an environment variable or server setting | [Environment Variables](configuration/environment-variables.md) and [Server and User Settings](configuration/server-settings.md) |
 | Configure OAuth lifetimes, rate limits or passkeys | [Authentication and Rate Limiting](configuration/authentication-and-limits.md) |
 | Add media, scan again or inspect file-watcher limits | [Library Management](media/library-management.md) |

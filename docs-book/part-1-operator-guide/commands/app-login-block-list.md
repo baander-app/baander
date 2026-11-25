@@ -37,6 +37,8 @@ The default table has one row per block:
 
 Below the table the command prints which blocks the page holds and the total, for example `Blocks 1-50 of 120.` When the page is empty, it prints `No login blocks are recorded.`
 
+Each text field holds at most 255 characters: the honeypot cuts longer input when it records the block. Blocks are kept for 30 days; recording a block deletes the blocks recorded more than 30 days before it.
+
 ## Exit codes
 
 | Code | Meaning |

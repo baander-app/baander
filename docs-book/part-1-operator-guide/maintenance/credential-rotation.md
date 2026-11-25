@@ -1,6 +1,8 @@
 # Rotate credentials
 
-Choose the procedure for the credential being replaced. The procedures affect different state and have different recovery conditions. Run installation commands in the shell where the [`dc` wrapper](../getting-started/installation.md) is defined. Before stopping services, follow [Background work](../workers/background-work.md); keep matching data and secrets together as described in [Backup and recovery](backup-and-recovery.md).
+Choose the procedure for the credential being replaced. The procedures affect different state and have different recovery conditions. Run installation commands in the shell where the [`dc` function](../getting-started/installation.md#command-context) is defined. Before stopping services, follow [Background work](../workers/background-work.md); keep matching data and secrets together as described in [Backup and recovery](backup-and-recovery.md).
+
+The deployment preset reads credentials from the `environment` object of its private configuration, `/srv/baander/preset.json` in the installation procedure. A changed value reaches web and the worker pair only through `php scripts/deploy-preset.php start --config /srv/baander/preset.json --state /srv/baander/preset-state`: it stops the saved deployment, retiring the worker pair, and creates the services and a fresh pair from the new configuration. Restarting a container keeps its old environment. `php scripts/deploy-preset.php stop --state /srv/baander/preset-state` stops web, the worker pair and every other service, and keeps the named volumes.
 
 ## Rotating APP_SECRET
 
@@ -15,7 +17,7 @@ are not a rotation mechanism in this application.
 
 ### Step-by-step
 
-1. **Prepare recovery and stop delivery.** Back up the database together with the current `APP_SECRET`. Drain traffic and stop web and worker instances so no webhook is delivered during the change. Keep the old value available for recovery.
+1. **Prepare recovery and stop delivery.** Back up the database together with the current `APP_SECRET`. Drain traffic and stop web and worker instances so no webhook is delivered during the change; with the preset, `stop` does both. Keep the old value available for recovery.
 
 2. **Generate a new secret:**
 
@@ -28,21 +30,28 @@ php -r 'echo bin2hex(random_bytes(32));'
    drained. Authenticate as an administrator; APP_SECRET rotation alone has not
    revoked existing API tokens.
 
-```env
-APP_SECRET=new_secret_here
+```json
+"APP_SECRET": "new_secret_here"
 ```
 
-4. **Rekey every configured webhook.** Call `POST /api/webhooks/{id}/rotate-secret` for each webhook and install its returned secret at the receiver. Each response shows the new secret only once. Keep workers stopped until all receivers are ready.
+   With the preset, put the new value in the configuration's `environment` object
+   and run `start`. The preset cannot hold delivery while web runs: `start` starts
+   web and a fresh worker pair together. A webhook delivery that runs before its
+   webhook is rekeyed cannot decrypt the stored secret; the worker logs
+   `Webhook signing secret could not be decrypted.` and the delivery fails as a
+   transient error.
 
-5. **Resume and verify.** Restart every instance with the same new `APP_SECRET`, resume worker delivery, and check fresh authentication and webhook verification.
+4. **Rekey every configured webhook.** Call `POST /api/webhooks/{id}/rotate-secret` for each webhook, or run [app:webhook:rotate-secret](../commands/app-webhook-rotate-secret.md) in the web container, and install its returned secret at the receiver. Each response shows the new secret only once. Keep workers stopped until all receivers are ready. With the preset they already run, so a receiver rejects deliveries signed with its webhook's new secret until it has that secret.
 
-Apply the new environment to the web service using the
-[configuration lifecycle](../configuration/README.md#where-a-change-takes-effect), then
-refresh separately managed workers through [Background work](../workers/background-work.md).
-If values are injected by Compose, recreate the container with the new values;
-`docker compose restart` retains the old container environment.
+5. **Resume and verify.** Restart every instance with the same new `APP_SECRET`, resume worker delivery, and check fresh authentication and webhook verification. With the preset, the `start` of step 3 has done the restart.
 
-If rekeying fails, keep workers stopped. Restore the database backup and its matching old `APP_SECRET` together, then restore receiver secrets changed during this attempt before resuming delivery. Restoring only the old value cannot decrypt webhook rows already rekeyed under the new value. If the old value is unavailable, rotate affected webhooks under the new value and update their receivers before starting workers.
+A web service or worker pair managed outside the preset takes the new environment
+through the [configuration lifecycle](../configuration/README.md#where-a-change-takes-effect)
+and [Background work](../workers/background-work.md). If values are injected by
+Compose, recreate the container with the new values; `docker compose restart`
+retains the old container environment.
+
+If rekeying fails, keep workers stopped; with the preset, `stop` the deployment. Restore the database backup and its matching old `APP_SECRET` together, then restore receiver secrets changed during this attempt before resuming delivery. Restoring only the old value cannot decrypt webhook rows already rekeyed under the new value. If the old value is unavailable, rotate affected webhooks under the new value and update their receivers before starting workers.
 
 ### When to rotate
 
@@ -75,6 +84,14 @@ private key was exposed, keep service offline until every instance starts with a
 trusted replacement. Follow the [runbook's recovery table](../commands/app-auth-rotate-secrets.md#failure-and-recovery)
 if configuration or startup fails.
 
+The deployment preset cannot run this cutover yet. It keeps the key pair at fixed
+paths in its `baander-secrets` volume, mounted read-only into web, and refuses
+`OAUTH_PRIVATE_KEY_PATH` and `OAUTH_PUBLIC_KEY_PATH` in its configuration, so the
+bundle's two values cannot be installed. It also has no action that runs
+PostgreSQL and Redis while web and the worker pair stay stopped, which
+`invalidate --offline` needs. `start` generates a key pair only when the secrets
+volume holds none, and keeps an existing pair.
+
 ## Rotating Redis Password
 
 Redis holds framework sessions, rate-limit and DPoP state, caches and queued work.
@@ -82,20 +99,26 @@ API access and refresh grants are stored in PostgreSQL. Changing a Redis passwor
 is a connectivity cutover, not a token-revocation operation.
 
 1. Drain traffic and stop all application processes and background workers that
-   connect to Redis. Preserve queued work using the
-   [backup procedure](backup-and-recovery.md) before changing the Redis service.
+   connect to Redis; with the preset, `stop` stops them and Redis. Preserve queued
+   work using the [backup procedure](backup-and-recovery.md) before changing the
+   Redis service.
 2. Update the Redis server credential and every client reference together:
    `REDIS_PASSWORD`, `REDIS_URL`, `MESSENGER_TRANSPORT_DSN` and any explicit
    deployment overrides. Keep the values in the installation's protected
    configuration; see [Redis configuration](../configuration/environment-variables.md#redis).
-3. Apply the server configuration and restart clients with matching credentials.
-   Check Redis connectivity, fresh authentication and worker progress before
-   reopening traffic.
+   With the preset, change `REDIS_PASSWORD` in the configuration's `environment`
+   object alone: the preset gives it to Redis as its password and derives
+   `REDIS_URL` and `MESSENGER_TRANSPORT_DSN` from it, refusing both in the
+   configuration.
+3. Apply the server configuration and restart clients with matching credentials;
+   with the preset, run `start`. Check Redis connectivity, fresh authentication and
+   worker progress before reopening traffic.
 
 Changing a password does not itself erase Redis data. Restart or recreation can
-lose it when the deployment has no durable Redis storage; the supplied base
-Compose service declares no Redis data volume. Do not assume a restart preserves
-queues. Loss of that state also loses pending deliveries and other work; rerunning
+lose it when the deployment has no durable Redis storage. The preset keeps Redis
+data in the `baander-redis` volume with the append-only file on, and `stop` and
+`start` keep that volume; another Redis deployment may not. Do not assume a restart
+preserves queues. Loss of that state also loses pending deliveries and other work; rerunning
 a scan cannot reconstruct every lost message. See [Storage and data](../getting-started/storage-and-data.md).
 
 ## Rotating VAPID Keys
@@ -107,13 +130,16 @@ Rotating VAPID keys invalidates all existing push subscriptions. Browsers must r
 1. **Generate new keys:**
 
 ```bash
-dc exec app php bin/console app:generate-vapid-keys
+dc exec web php bin/console app:generate-vapid-keys
 ```
 
 2. **Update the protected web configuration and worker credentials** with the new
-   public and private keys.
+   public and private keys. With the preset, set `VAPID_PUBLIC_KEY` and
+   `VAPID_PRIVATE_KEY` in the configuration's `environment` object; the preset
+   passes both to web and the worker pair.
 
-3. **Apply the environment and refresh delivery.** Follow the
+3. **Apply the environment and refresh delivery.** With the preset, run `start`.
+   Otherwise follow the
    [configuration lifecycle](../configuration/README.md#where-a-change-takes-effect) for the
    web service and [Background work](../workers/background-work.md) for separately managed
    workers. A Compose-injected value needs container recreation; restarting the
@@ -130,6 +156,8 @@ Database role changes depend on who owns the existing schemas, tables and sequen
 A new role with only database-level privileges is not automatically a replacement
 for that owner. Do not drop the old role after granting only database access.
 
-Drain traffic and stop application processes and workers, retain a verified backup, and have the database administrator prepare the replacement credential with the required object privileges and ownership. Update `DATABASE_URL`, `DATABASE_CONTROL_URL` and the deployment's server-side credential configuration. The control URL connects as a second role, the application role's name with `_control` appended, which needs the replacement credential too. In the supplied Compose stack, the one-off `pooler-credentials` service derives both roles' verifiers from `DB_PASSWORD`, applies them and writes the connection pooler's auth file.
+Drain traffic and stop application processes and workers, retain a verified backup, and have the database administrator prepare the replacement credential with the required object privileges and ownership. Update `DATABASE_URL`, `DATABASE_CONTROL_URL` and the deployment's server-side credential configuration. The control URL connects as a second role, the application role's name with `_control` appended, which needs the replacement credential too. The preset builds both URLs from `DB_USERNAME`, `DB_PASSWORD` and `DB_DATABASE` and refuses them in its configuration. Each preset `start` runs a one-off pooler-credentials helper that derives both roles' verifiers from `DB_PASSWORD`, applies them and writes the connection pooler's auth file.
 
-It logs in as the application role with `DB_PASSWORD`, so run it again with the replacement password only after the role accepts that password, then restart the pooler. Then restart all clients, and verify protected API access, writes and worker progress before retiring the old credential. Changing a Compose initialization password does not update a role in an already initialized PostgreSQL data directory. See [Backup and recovery](backup-and-recovery.md) and [database configuration](../configuration/environment-variables.md#database).
+The helper logs in as the application role with `DB_PASSWORD`, so run it with the replacement password only after the role accepts that password; the pooler starts after it. Then restart all clients, and verify protected API access, writes and worker progress before retiring the old credential. Changing an initialization password does not update a role in an already initialized PostgreSQL data directory: the preset also passes `DB_PASSWORD` to PostgreSQL's initialization, which applies it only to an empty data directory. See [Backup and recovery](backup-and-recovery.md) and [database configuration](../configuration/environment-variables.md#database).
+
+The preset has no step for that ordering yet. Its `start` stops the saved deployment, PostgreSQL included, before it runs the helper with the configured password, and it has no action that runs PostgreSQL while every client stays stopped. On a preset installation, this rotation is not yet a supported procedure.

@@ -5,17 +5,17 @@ Register a new media library. This tells Baander where to find media files on di
 ## Quick start
 
 Run from the installed-instance host shell with the `dc` function from
-[Getting started](../getting-started/installation.md#command-context). Paths name locations
+[Installation](../getting-started/installation.md#command-context). Paths name locations
 inside the application container.
 
 ```bash
-dc exec app php bin/console app:library:create 'My Music' /media/library/music music
+dc exec web php bin/console app:library:create 'My Music' /storage/media/music music
 ```
 
 With a custom slug:
 
 ```bash
-dc exec app php bin/console app:library:create 'My Music' /media/library/music music --slug my-music-collection
+dc exec web php bin/console app:library:create 'My Music' /storage/media/music music --slug my-music-collection
 ```
 
 ## Arguments

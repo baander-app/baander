@@ -88,8 +88,8 @@ Ordinary admission can change within the profile's bounds; all ordinary consumer
 Enable and cap audio transcoding with its [server settings](audio-transcoding.md#settings). Execution uses the worker deployment's admitted resources and shared storage:
 
 - **Derived output** uses `CONVERT_STORAGE_PATH`, default `/storage/conversions`, mounted at the same path in web and worker.
-- **Application storage and state** require shared writable worker volumes covering `APP_HOME/storage` and `APP_HOME/var/transcode_state`, where `APP_HOME` is the image application path generated during [installation](../getting-started/installation.md).
-- **Source media** uses an explicit `MEDIA_STORAGE_PATH`, for example `/media/library`, covered by a read-only worker source volume. Use the identical source root in both roles. Preserve web access needed for authorized library deletion.
+- **Application storage and state** require shared writable worker volumes covering `APP_HOME/storage` and `APP_HOME/var/transcode_state`, where `APP_HOME` is the application path that the [installation](../getting-started/installation.md) images declare, `/var/www/html`.
+- **Source media** uses an explicit `MEDIA_STORAGE_PATH`, for example `/storage/media`, the path the deployment preset sets, covered by a read-only worker source volume. Use the identical source root in both roles. Preserve web access needed for authorized library deletion.
 - **Capacity** comes from the startup profile: `transcode` permits as many video jobs and audio renditions as its [media slots](../configuration/deployment-profiles.md#media-slots), 8 and 12 by default; `remux` permits as many copy jobs as its shared copy slots and no encoding. The [host manifest](../workers/worker-deployment.md#manifest-format) carries the same profile; it declares no memory or process reservations.
 
 ## Checking playback

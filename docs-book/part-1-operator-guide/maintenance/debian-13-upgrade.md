@@ -10,19 +10,23 @@ An existing PostgreSQL data volume, created by a Debian 12 database image, repor
 
 1. **Stop the writers.** Stop web and retire the worker pair as in the
    [standard update](upgrading.md#standard-update). Keep PostgreSQL running on the new image.
+   The preset has no state for this step: its `start` runs PostgreSQL on the new
+   image together with web and a fresh worker pair, and its `stop` stops PostgreSQL
+   too. With the preset, keep incoming traffic drained after `start` and run step 2
+   at once; the worker pair runs meanwhile.
 2. **Rebuild the indexes and record the new version.** Connect to PostgreSQL
-   directly as the database owner, not through the pooler. For the source
-   installation:
+   directly as the database owner, not through the pooler, in the preset's
+   `postgres` service container:
 
    ```bash
-   dc exec database sh -ec 'psql -v ON_ERROR_STOP=1 --username="$POSTGRES_USER" --dbname="$POSTGRES_DB" -c "REINDEX DATABASE" -c "ALTER DATABASE \"$POSTGRES_DB\" REFRESH COLLATION VERSION"'
+   dc exec postgres sh -ec 'psql -v ON_ERROR_STOP=1 --username="$POSTGRES_USER" --dbname="$POSTGRES_DB" -c "REINDEX DATABASE" -c "ALTER DATABASE \"$POSTGRES_DB\" REFRESH COLLATION VERSION"'
    ```
 
-   For the managed preset, run the same `psql` command in its `postgres` service
-   container. `REINDEX DATABASE` rebuilds every index of the current database and
+   `REINDEX DATABASE` rebuilds every index of the current database and
    takes longer on a larger library; `REFRESH COLLATION VERSION` then records the
    new glibc version so the mismatch warning stops.
 3. **Repeat for other databases.** Run both statements in any other database of
    the same volume that reports the mismatch.
 4. **Return the writers.** Start web and a fresh worker pair, then complete the
-   [standard update checks](upgrading.md#standard-update).
+   [standard update checks](upgrading.md#standard-update). With the preset, they
+   already run since `start`; reopen traffic after the checks.

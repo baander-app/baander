@@ -5,23 +5,23 @@ Scan a media library, or every library, for new, changed, returning, or missing 
 ## Quick start
 
 Run from the installed-instance host shell with the `dc` function from
-[Getting started](../getting-started/installation.md#command-context). Paths name locations
+[Installation](../getting-started/installation.md#command-context). Paths name locations
 inside the application container.
 
 ```bash
-dc exec app php bin/console app:library:scan my-music
+dc exec web php bin/console app:library:scan my-music
 ```
 
 Every library, one after another:
 
 ```bash
-dc exec app php bin/console app:library:scan --all
+dc exec web php bin/console app:library:scan --all
 ```
 
 Release the claim of a scan, or of a delete with files, that is gone:
 
 ```bash
-dc exec app php bin/console app:library:scan my-music --release
+dc exec web php bin/console app:library:scan my-music --release
 ```
 
 ## Arguments

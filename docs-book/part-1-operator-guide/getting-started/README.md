@@ -1,9 +1,9 @@
 # Getting Started
 
-These chapters prepare a Bånder instance from source. They explain the components,
-size the host for a deployment capability and size, run the development-oriented
-Compose stack, and deploy the separate background workers that handle scans,
-metadata and media conversions.
+These chapters prepare a Bånder installation. They explain the components and
+the data to preserve, size the host for a deployment capability and size, and
+install the production stack through the deployment preset, which also starts the
+background workers that handle scans, metadata and media conversions.
 
 | Guide | Scope |
 |-------|-------|
@@ -11,4 +11,4 @@ metadata and media conversions.
 | [Deployment Topology](deployment-topology.md) | How the browser path, PostgreSQL behind PgBouncer, Redis, the worker deployment pair, shared storage, and the optional registry fit together |
 | [Storage and Data](storage-and-data.md) | What must be preserved across PostgreSQL, Redis, source media, and generated output, plus shared media mount requirements |
 | [System Requirements](system-requirements.md) | Host software, choosing a capability and size starting point, sizing media slots, and measured memory and CPU consumption |
-| [Source Installation](installation.md) | Step-by-step source installation, network and volume preparation, database and OAuth initialization, worker deployment, and your first library scan |
+| [Installation](installation.md) | Step-by-step installation: production image builds, the private preset configuration, rendering and starting the deployment, the first account, and your first library scan |

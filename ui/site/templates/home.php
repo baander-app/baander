@@ -191,8 +191,8 @@ include __DIR__ . '/header.php';
     <div class="section-intro">
       <p class="eyebrow">Running Bånder</p>
       <h2 id="hosting-title">Know what you're hosting.</h2>
-      <p>Bånder is pre-release software. The current installation builds from source using a development-oriented Compose stack. You need to prepare the network, storage and credentials before starting it.</p>
-      <p>The web application uses PostgreSQL and Redis. Background work needs a separate control and execution deployment pair, shared media paths and output storage. Starting the web service alone does not start that pair.</p>
+      <p>Bånder is pre-release software. An installation builds its images from source and starts them through the deployment preset, from one private configuration that holds its secrets, sizes and network address. That procedure has not yet been run end to end.</p>
+      <p>The web application uses PostgreSQL and Redis. Background work runs in a separate control and execution worker pair that shares the media and output storage; the preset starts and stops that pair together with the web services.</p>
       <a class="button" href="/docs/operator-guide/getting-started/">Read the installation guide <span class="arrow" aria-hidden="true">→</span></a>
     </div>
     <div class="hosting-reference">

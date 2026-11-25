@@ -5,11 +5,11 @@ Check the health of the system's components, such as the database, Redis and the
 ## Quick start
 
 Run from the installed-instance host shell with the `dc` function from
-[Getting started](../getting-started/installation.md#command-context). Paths name locations
+[Installation](../getting-started/installation.md#command-context). Paths name locations
 inside the application container.
 
 ```bash
-dc exec app php bin/console app:health:check
+dc exec web php bin/console app:health:check
 ```
 
 ## Details

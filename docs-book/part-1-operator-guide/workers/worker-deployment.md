@@ -44,7 +44,7 @@ launches to 600, and each PHP media child raises its own score to 600; see
 ## Building the worker image
 
 Build the worker image with the same layout-aware builder used in
-[Getting started](../getting-started/installation.md#3-build-images-and-start-dependencies).
+[Installation](../getting-started/installation.md#3-build-the-images).
 Run on the host after installing its standalone tooling dependencies:
 
 ```bash

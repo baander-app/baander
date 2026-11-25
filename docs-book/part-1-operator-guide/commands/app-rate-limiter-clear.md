@@ -1,13 +1,13 @@
 # app:rate-limiter:clear
 
-Clear the stored state of one rate limiter, or of every rate limiter with `--all`. Use it to unblock rate-limited clients after a configuration change or during an incident. The command does what `DELETE /api/monitor/rate-limiters/{name}/clear` and `DELETE /api/monitor/rate-limiters/clear` do in the admin API.
+Clear the stored state of one rate limiter, or of every rate limiter with `--all`. Use it to unblock rate-limited clients after a configuration change or during an incident. The command does what `DELETE /api/monitor/rate-limiters/{name}/clear` and `DELETE /api/monitor/rate-limiters/clear` do in the admin API, which only a super admin may call.
 
 ## Quick start
 
 The Make examples below target the checkout's development preview. For an
-installed instance, use the `dc` function from
-[Getting started](../getting-started/installation.md#command-context) and replace
-`make exec cmd="php bin/console …"` with `dc exec app php bin/console …`.
+installation, use the `dc` function from
+[Installation](../getting-started/installation.md#command-context) and replace
+`make exec cmd="php bin/console …"` with `dc exec web php bin/console …`.
 
 Reset the budget of every client of one limiter. The command clears at once, without asking:
 
@@ -59,6 +59,12 @@ the configuration contributes to their storage identities. Named clear still
 reaches every configuration under that limiter name.
 
 The command clears immediately and does not ask for confirmation. The admin API requires `?confirm=true` instead.
+
+Every clear writes a `Rate limiter state cleared.` record to the application log at
+notice level, with `actor` and the cleared `limiters` in its context. The command's
+actor is `cli`; a clear through the admin API names the super admin's user identifier,
+their email address. A `--all` run that fails for some limiters logs a warning with its
+actor instead, because the others stay cleared.
 
 With `--all`, the command tries every configured namespace sequentially, including
 after a failure, then reports any limiters it could not clear. Successful clears

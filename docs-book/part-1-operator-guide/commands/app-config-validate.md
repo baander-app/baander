@@ -5,9 +5,9 @@ Check the application's configuration for common mistakes. The checks cover envi
 ## Quick start
 
 The Make examples below target the checkout's development preview. For an
-installed instance, use the `dc` function from
-[Getting started](../getting-started/installation.md#command-context) and replace
-`make exec cmd="php bin/console …"` with `dc exec app php bin/console …`.
+installation, use the `dc` function from
+[Installation](../getting-started/installation.md#command-context) and replace
+`make exec cmd="php bin/console …"` with `dc exec web php bin/console …`.
 
 Run all checks:
 

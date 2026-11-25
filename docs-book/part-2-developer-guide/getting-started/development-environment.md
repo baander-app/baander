@@ -139,12 +139,15 @@ make preview-status
 make preview-url
 ```
 
-A new linked worktree (`git worktree add`) lacks two host-side prerequisites,
-because neither is tracked. Run `composer --working-dir=scripts install`
+A new linked worktree (`git worktree add`) lacks three host-side prerequisites,
+because none is tracked. Run `composer --working-dir=scripts install`
 in it first; without that, every lifecycle command stops with "Install workflow
-tooling first". On an SELinux host, also pass the new directory to `--share-path`
-as shown under host setup; otherwise preflight reports "Preview checkout is
-unavailable to the selected Docker daemon". The new preview inherits the
+tooling first". Copy `.env.example` to `.env` as well. The preview's application
+container mounts the worktree and boots Symfony's environment loader from it;
+while the worktree has no `.env`, `make preview-up` stops before it changes
+anything and names the missing file. On an SELinux host, also pass the new
+directory to `--share-path` as shown under host setup; otherwise preflight reports
+"Preview checkout is unavailable to the selected Docker daemon". The new preview inherits the
 persistent instance's media mount declarations, as described under media mounts,
 but starts with an empty catalog. Scan a library from the administration page, or
 with `make exec cmd="php bin/console app:library:scan <slug>"`.

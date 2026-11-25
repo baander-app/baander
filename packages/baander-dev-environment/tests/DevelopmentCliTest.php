@@ -221,6 +221,7 @@ final class DevelopmentCliTest extends TestCase
                 $root = $this->directory . ($clear ? '/empty-preview' : '/inherited-preview');
                 mkdir($root, 0700);
                 $this->sourceLayout($root);
+                touch($root . '/.env');
                 if ($clear) {
                     file_put_contents($root . '/dev.local.json', '{"libraries":[]}');
                 }
@@ -297,6 +298,42 @@ final class DevelopmentCliTest extends TestCase
             self::assertStringContainsString('dev.local.json', $error->getMessage());
         }
         self::assertDirectoryDoesNotExist($this->directory . '/state');
+    }
+
+    public function testNewPreviewWithoutDotenvRefusesBeforeCreatingState(): void
+    {
+        $root = $this->directory . '/checkout';
+        try {
+            $this->configure(new InstanceStateStore($this->directory . '/state'), new DevelopmentCommandExecutor(), $root, 'repository', Cli::parse(['up']));
+            self::fail('A preview without .env was configured.');
+        } catch (WorkflowError $error) {
+            self::assertStringContainsString($root . '/.env', $error->getMessage());
+            self::assertStringContainsString('.env.example', $error->getMessage());
+        }
+        self::assertDirectoryDoesNotExist($this->directory . '/state');
+    }
+
+    public function testSavedPreviewWithoutDotenvRefusesWithoutChangingItsState(): void
+    {
+        $root = $this->directory . '/checkout';
+        $store = new InstanceStateStore($this->directory . '/state');
+        $id = ProcessEnvironment::previewId($root, 'repository');
+        $store->save($id, [
+            'id' => $id, 'kind' => 'preview', 'repository' => 'repository', 'worktree' => $root,
+            'hostname' => $id . '.baander.test', 'project' => 'baander-' . $id, 'phase' => 'stopped', 'version' => 1,
+            'docker' => DevelopmentCommandExecutor::target(), 'media' => [], 'libraries' => [],
+            'initialization' => 'initializing', 'database_mutation_started' => false,
+        ]);
+        file_put_contents($store->directory($id) . '/env.json', '{}');
+        $saved = file_get_contents($store->directory($id) . '/state.json');
+        try {
+            $this->configure($store, new DevelopmentCommandExecutor(), $root, 'repository', Cli::parse(['up']));
+            self::fail('A preview without .env was configured.');
+        } catch (WorkflowError $error) {
+            self::assertStringContainsString($root . '/.env', $error->getMessage());
+        }
+        self::assertSame($saved, file_get_contents($store->directory($id) . '/state.json'));
+        self::assertFalse($store->load($id)['database_mutation_started']);
     }
 
     public function testCommandEnvironmentPreservesQuotedValuesAndMetacharacters(): void

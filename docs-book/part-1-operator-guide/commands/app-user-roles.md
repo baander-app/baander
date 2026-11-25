@@ -5,9 +5,9 @@ Replace a user's roles with the given set. The command runs the same use case as
 ## Quick start
 
 The Make examples below target the checkout's development preview. For an
-installed instance, use the `dc` function from
-[Getting started](../getting-started/installation.md#command-context) and replace
-`make exec cmd="php bin/console …"` with `dc exec app php bin/console …`.
+installation, use the `dc` function from
+[Installation](../getting-started/installation.md#command-context) and replace
+`make exec cmd="php bin/console …"` with `dc exec web php bin/console …`.
 
 Make a user an admin:
 
