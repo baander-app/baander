@@ -18,6 +18,7 @@
 | `score` | Numeric relevance score from the originating strategy |
 | `position` | Optional ordering position |
 | `userId` | Optional `Uuid` of the user who receives the recommendation |
+| `origin` | `RecommendationOrigin`: `generator` for a row the generator wrote, `member` for one a user wrote through `POST /api/recommendations/` |
 | `createdAt` | Creation timestamp |
 | `updatedAt` | Last update timestamp |
 
@@ -30,6 +31,7 @@
 | Type | Kind | Description |
 |------|------|-------------|
 | `RecommendationType` | `final readonly class` | Validated entity type (`song`, `album`, `artist`, `movie`, `video`) |
+| `RecommendationOrigin` | Enum | Who wrote a recommendation: `Generator` (`generator`) or `Member` (`member`) |
 | `RecommendationJobStatus` | Enum | Lifecycle status of a recommendation job: `Pending` (`pending`, queued), `InProgress` (`in_progress`, running), `Completed` (`completed`), `Failed` (`failed`), `Cancelled` (`cancelled`) |
 
 ## Domain Services
@@ -48,6 +50,7 @@ Each domain service implements one recommendation algorithm:
 | Command | Handler | Purpose |
 |---------|---------|---------|
 | `SaveRecommendationCommand` | `SaveRecommendationHandler` | Persist a single computed recommendation |
+| `CreateRecommendationCommand` | `CreateRecommendationHandler` | Store a recommendation a user wrote through the API, under the per-user cap |
 | `GenerateRecommendationsCommand` | `GenerateRecommendationsHandler` | Run recommendation generation (dispatched by the console command, the admin action and the scheduler) |
 | `ExecuteRecommendationJobCommand` | `ExecuteRecommendationJobHandler` | Execute a queued recommendation job on the `async` Messenger transport |
 | `CancelRecommendationJobCommand` | `CancelRecommendationJobHandler` | Cancel a pending or in-progress recommendation job |
@@ -75,6 +78,8 @@ Unless `$command->foreground` is `true` (used by the CLI commands `app:recommend
 | `GetRecommendationJobQuery` | `GetRecommendationJobHandler` | Fetch a single recommendation job by `publicId` |
 | `ListRecommendationJobsQuery` | `ListRecommendationJobsHandler` | List recent recommendation jobs, optionally filtered by status |
 
+The source and targeting queries carry the viewer. For a member, the repository keeps the viewer's rows and the rows that belong to no user before it applies the limit, so another user's rows cannot fill the page; an administrator reads every user's rows. Library visibility of each row's source and target is checked after the query, so a page can hold fewer rows than the limit.
+
 ## Ports
 
 | Port | Purpose | Implemented By |
@@ -98,9 +103,13 @@ User endpoints live under `RecommendationController` with the `/api/recommendati
 | GET | `/api/recommendations/for-you` | Personalized recommendations with explanation breakdown (`RecommendationController::forYou`, `limit` max 100) |
 | GET | `/api/recommendations/source/{sourceType}/{sourceId}` | Recommendations by source entity |
 | GET | `/api/recommendations/targeting/{targetType}/{targetId}` | Recommendations targeting a specific entity |
-| POST | `/api/recommendations/` | Create a recommendation |
+| POST | `/api/recommendations/` | Create a recommendation (see below) |
 | DELETE | `/api/recommendations/{publicId}` | Delete a single recommendation by `publicId` |
 | DELETE | `/api/recommendations/source/{sourceType}/{sourceId}` | Delete all recommendations for a source |
+
+`POST /api/recommendations/` binds its body to `CreateRecommendationRequest`, whose bounds live in `RecommendationLimits`. Both types are one of `song`, `album`, `artist`, `movie` and `video`; `score` is a finite number from 0 to 1, the range the generator scores in; `name` has at most 255 characters and defaults to `default`; `position` fits the 32-bit `position` column. A malformed body answers 422. A source or target ID that is not the public ID of an entity the user can see answers 404.
+
+`CreateRecommendationHandler` caps the rows a user writes through the API. Under a transaction-scoped advisory lock on the user, it counts the user's `member` rows and refuses the 1,001st with 409 (`reason` `recommendation_limit`, `limit` 1000), and it refuses a row with the same source, target, name and user with 409 (`reason` `recommendation_exists`). The generator's rows do not count, including the `collaborative` rows of a run for one user, and the generator writes past the cap. The partial index `idx_recommendations_user_id_member` serves the count. The database checks the name length with `chk_recommendations_name_length`, added `NOT VALID`, so a longer name stored before the bound stays readable.
 
 ### Admin Endpoints
 

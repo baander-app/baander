@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Recommendation\Infrastructure\Doctrine\Entity;
 
 use App\Auth\Infrastructure\Doctrine\Entity\UserEntity;
+use App\Recommendation\Domain\ValueObject\RecommendationOrigin;
 use App\Shared\Domain\Model\Uuid;
 use App\Shared\Domain\Model\PublicId;
 use Doctrine\ORM\Mapping as ORM;
@@ -13,6 +14,7 @@ use Doctrine\ORM\Mapping as ORM;
 #[ORM\Table(name: 'recommendations')]
 #[ORM\UniqueConstraint(name: 'uniq_recommendations_public_id', columns: ['public_id'])]
 #[ORM\Index(name: 'idx_recommendations_user_id', columns: ['user_id'])]
+#[ORM\Index(name: 'idx_recommendations_user_id_member', columns: ['user_id'], options: ['where' => "(origin = 'member'::text)"])]
 #[ORM\Index(name: 'idx_recommendations_target_type_target_id', columns: ['target_type', 'target_id'])]
 #[ORM\UniqueConstraint(
     name: 'uniq_recommendations_source_target_name_user_id',
@@ -55,6 +57,9 @@ class RecommendationEntity
     #[ORM\Column(type: 'integer', nullable: true)]
     private ?int $position = null;
 
+    #[ORM\Column(type: 'text', enumType: RecommendationOrigin::class, updatable: false, options: ['default' => 'generator'])]
+    private RecommendationOrigin $origin = RecommendationOrigin::Generator;
+
     #[ORM\Column(type: 'datetime_immutable')]
     private \DateTimeImmutable $createdAt;
 
@@ -72,6 +77,7 @@ class RecommendationEntity
         ?int $position = null,
         ?Uuid $id = null,
         ?PublicId $publicId = null,
+        RecommendationOrigin $origin = RecommendationOrigin::Generator,
     ) {
         $this->id = $id ?? new Uuid();
         $this->publicId = $publicId ?? new PublicId();
@@ -83,6 +89,7 @@ class RecommendationEntity
         $this->targetId = $targetId;
         $this->score = $score;
         $this->position = $position;
+        $this->origin = $origin;
         $this->createdAt = new \DateTimeImmutable();
         $this->updatedAt = new \DateTimeImmutable();
     }
@@ -154,6 +161,11 @@ class RecommendationEntity
     {
         $this->position = $position;
         $this->updatedAt = new \DateTimeImmutable();
+    }
+
+    public function getOrigin(): RecommendationOrigin
+    {
+        return $this->origin;
     }
 
     public function getCreatedAt(): \DateTimeImmutable

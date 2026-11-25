@@ -17,23 +17,38 @@ interface RecommendationRepositoryInterface
      */
     public function saveMany(array $recommendations): void;
 
+    /**
+     * Makes the user's member-written recommendations take turns until the caller's transaction
+     * ends. Requires an open transaction.
+     */
+    public function lockMemberRecommendations(Uuid $userId): void;
+
+    /** The number of rows the user wrote as a member, as committed when the statement runs. */
+    public function countWrittenByMember(Uuid $userId): int;
+
+    /** Whether a stored row has this recommendation's source, target, name and user. */
+    public function hasDuplicateOf(Recommendation $recommendation): bool;
+
     public function findByUuid(Uuid $uuid): ?Recommendation;
 
     public function findByPublicId(PublicId $publicId): ?Recommendation;
 
     /**
-     * Get recommendations for a given source entity.
+     * Get recommendations for a given source entity, best score first: the viewer's rows and the
+     * rows that belong to no user, or every user's rows when the viewer is null.
      *
      * @return Recommendation[]
      */
-    public function findBySource(string $sourceType, string $sourceId, string $name = 'default', int $limit = 100): array;
+    public function findBySource(string $sourceType, string $sourceId, ?Uuid $viewerId, string $name = 'default', int $limit = 100): array;
 
     /**
-     * Get recommendations targeting a specific entity (e.g., songs recommended for a song).
+     * Get recommendations targeting a specific entity (e.g., songs recommended for a song), best
+     * score first: the viewer's rows and the rows that belong to no user, or every user's rows
+     * when the viewer is null.
      *
      * @return Recommendation[]
      */
-    public function findTargeting(string $targetType, string $targetId, int $limit = 100): array;
+    public function findTargeting(string $targetType, string $targetId, ?Uuid $viewerId, int $limit = 100): array;
 
     /**
      * Get personalized recommendations for a user.

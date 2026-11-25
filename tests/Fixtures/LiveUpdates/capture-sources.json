@@ -1703,7 +1703,7 @@
       "classification": "capture",
       "operations": ["INSERT", "UPDATE", "DELETE"],
       "relevant_columns": ["id", "public_id", "user_id", "name", "source_type", "source_id", "target_type", "target_id", "score", "position", "created_at"],
-      "excluded_columns": ["updated_at"],
+      "excluded_columns": ["updated_at", "origin"],
       "families": ["recommendations", "admin-metadata"],
       "scope_routes": ["recommendation", "admin"],
       "readers": ["src/Recommendation/Infrastructure/Doctrine/Repository/RecommendationInsightsRepository.php"],

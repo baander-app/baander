@@ -22,6 +22,7 @@ final class GetTargetingRecommendationsHandler
         return $this->recommendationRepository->findTargeting(
             $query->getTargetType(),
             $query->getTargetId(),
+            $query->administrator ? null : $query->viewerId,
             $query->getLimit(),
         );
     }

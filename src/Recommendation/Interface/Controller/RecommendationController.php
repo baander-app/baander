@@ -7,11 +7,13 @@ namespace App\Recommendation\Interface\Controller;
 use App\Auth\Application\Port\AuthenticatedUserIdentityInterface;
 use App\Recommendation\Application\Command\DeleteRecommendationCommand;
 use App\Recommendation\Application\Command\DeleteRecommendationsBySourceCommand;
-use App\Recommendation\Application\Command\SaveRecommendationCommand;
+use App\Recommendation\Application\Command\CreateRecommendationCommand;
 use App\Recommendation\Application\Query\GetPersonalizedRecommendationsQuery;
 use App\Recommendation\Application\Query\GetRecommendationsBySourceQuery;
 use App\Recommendation\Application\Query\GetRecommendationsForUserQuery;
 use App\Recommendation\Application\Query\GetTargetingRecommendationsQuery;
+use App\Recommendation\Application\RecommendationLimits;
+use App\Recommendation\Interface\Request\CreateRecommendationRequest;
 use App\Recommendation\Interface\Resource\RecommendationResource;
 use App\Shared\Domain\Model\Uuid;
 use App\Shared\Interface\Controller\ApiResponsesTrait;
@@ -19,10 +21,10 @@ use OpenApi\Spec as OA;
 use Symfony\Bundle\SecurityBundle\Security;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
+use Symfony\Component\HttpKernel\Attribute\MapRequestPayload;
 use Symfony\Component\Messenger\MessageBusInterface;
 use Symfony\Component\Messenger\Stamp\HandledStamp;
 use Symfony\Component\Routing\Attribute\Route;
-use Symfony\Component\Serializer\Encoder\JsonEncoder;
 
 #[OA\Tag(name: 'Recommendation', description: 'Recommendation endpoints')]
 #[Route('/api/recommendations', name: 'recommendation_')]
@@ -33,7 +35,6 @@ final class RecommendationController
     public function __construct(
         private readonly Security $security,
         private readonly MessageBusInterface $bus,
-        private readonly JsonEncoder $jsonEncoder,
         private readonly \App\Recommendation\Application\Port\RecommendationPublicIdentityInterface $identities,
     ) {
     }
@@ -236,6 +237,8 @@ final class RecommendationController
         $recommendations = $this->bus->dispatch(new GetRecommendationsBySourceQuery(
             sourceType: $sourceType,
             sourceId: $this->identities->internalEntityId($sourceType, $sourceId, $this->actorId(), $this->security->isGranted('ROLE_ADMIN'))->toString(),
+            viewerId: $this->actorId(),
+            administrator: $this->security->isGranted('ROLE_ADMIN'),
             limit: $limit,
         ))->last(HandledStamp::class)?->getResult() ?? [];
 
@@ -302,6 +305,8 @@ final class RecommendationController
         $recommendations = $this->bus->dispatch(new GetTargetingRecommendationsQuery(
             targetType: $targetType,
             targetId: $this->identities->internalEntityId($targetType, $targetId, $this->actorId(), $this->security->isGranted('ROLE_ADMIN'))->toString(),
+            viewerId: $this->actorId(),
+            administrator: $this->security->isGranted('ROLE_ADMIN'),
             limit: $limit,
         ))->last(HandledStamp::class)?->getResult() ?? [];
 
@@ -317,24 +322,11 @@ final class RecommendationController
     #[OA\Operation\Post(
         path: '/api/recommendations/',
         summary: 'Create a recommendation',
+        description: 'Stores a recommendation of the authenticated user. A user keeps at most ' . RecommendationLimits::MEMBER_ROWS_PER_USER . ' rows written through this route; the recommendation generator\'s rows do not count.',
         requestBody: new OA\RequestBody(
+            required: true,
             content: new OA\MediaType\Json(
-                schema: new OA\Schema(
-                    type: 'object',
-                    properties: [
-                        'source_type' => new OA\Schema(type: 'string', example: 'song'),
-                        'source_id' => new OA\Schema(type: 'string', example: 'song-123'),
-                        'target_type' => new OA\Schema(type: 'string', example: 'song'),
-                        'target_id' => new OA\Schema(type: 'string', example: 'song-456'),
-                        'score' => new OA\Schema(
-                            type: 'number',
-                            format: 'float',
-                            example: 0.85,
-                        ),
-                        'name' => new OA\Schema(type: 'string', example: 'default'),
-                        'position' => new OA\Schema(type: 'integer', example: 1),
-                    ],
-                ),
+                schema: new OA\Schema(ref: CreateRecommendationRequest::class),
             ),
         ),
         responses: [
@@ -358,6 +350,20 @@ final class RecommendationController
                 ),
             ),
             new OA\Response(
+                response: '404',
+                description: 'The source or target entity is not visible to the user',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
+            ),
+            new OA\Response(
+                response: '409',
+                description: 'The user already keeps ' . RecommendationLimits::MEMBER_ROWS_PER_USER . ' rows written through this route (reason recommendation_limit, with limit), or a row with this source, target and name (reason recommendation_exists)',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
+            ),
+            new OA\Response(
                 response: '422',
                 description: 'Validation error',
                 content: new OA\MediaType\Json(
@@ -367,31 +373,25 @@ final class RecommendationController
         ],
     )]
     #[Route('/', name: 'store', methods: ['POST'])]
-    public function store(Request $request): JsonResponse
+    public function store(#[MapRequestPayload] CreateRecommendationRequest $payload): JsonResponse
     {
         $user = $this->security->getUser();
         if (!$user instanceof AuthenticatedUserIdentityInterface) {
             return $this->unauthorized();
         }
 
-        $payload = $this->jsonEncoder->decode((string) $request->getContent(), 'json');
-
-        try {
-            $command = new SaveRecommendationCommand(
-                sourceType: \App\Recommendation\Domain\ValueObject\RecommendationType::fromString($payload['source_type']),
-                sourceId: $this->identities->internalEntityId($payload['source_type'], $payload['source_id'], $this->actorId(), $this->security->isGranted('ROLE_ADMIN'))->toString(),
-                targetType: \App\Recommendation\Domain\ValueObject\RecommendationType::fromString($payload['target_type']),
-                targetId: $this->identities->internalEntityId($payload['target_type'], $payload['target_id'], $this->actorId(), $this->security->isGranted('ROLE_ADMIN'))->toString(),
-                score: (float) $payload['score'],
-                userId: Uuid::fromString($user->getId()),
-                name: $payload['name'] ?? 'default',
-                position: isset($payload['position']) ? (int) $payload['position'] : null,
-            );
-        } catch (\InvalidArgumentException $e) {
-            return $this->errorResponse($e->getMessage());
-        }
-
-        $this->bus->dispatch($command);
+        $userId = Uuid::fromString($user->getId());
+        $administrator = $this->security->isGranted('ROLE_ADMIN');
+        $this->bus->dispatch(new CreateRecommendationCommand(
+            sourceType: $payload->source_type,
+            sourceId: $this->identities->internalEntityId($payload->source_type, $payload->source_id, $userId, $administrator)->toString(),
+            targetType: $payload->target_type,
+            targetId: $this->identities->internalEntityId($payload->target_type, $payload->target_id, $userId, $administrator)->toString(),
+            score: (float) $payload->score,
+            userId: $userId,
+            name: $payload->name,
+            position: $payload->position,
+        ));
 
         return $this->created(['message' => 'Recommendation created.']);
     }

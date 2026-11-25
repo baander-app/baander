@@ -7,14 +7,23 @@ namespace App\Recommendation\Infrastructure\Doctrine\Repository;
 use App\Auth\Infrastructure\Doctrine\Entity\UserEntity;
 use App\Recommendation\Domain\Model\Recommendation;
 use App\Recommendation\Domain\Repository\RecommendationRepositoryInterface;
+use App\Recommendation\Domain\ValueObject\RecommendationOrigin;
 use App\Recommendation\Infrastructure\Doctrine\Entity\RecommendationEntity;
 use App\Shared\Domain\Model\Uuid;
 use App\Shared\Domain\Model\PublicId;
 use Doctrine\ORM\EntityManagerInterface;
+use Doctrine\ORM\QueryBuilder;
 use RuntimeException;
 
 final class RecommendationRepository implements RecommendationRepositoryInterface
 {
+    /**
+     * Seed of hashtextextended(<user id>, seed) for the lock that serializes a user's member
+     * writes. Its own seed keeps it apart from the application's other advisory locks; a hash
+     * collision only makes unrelated work wait.
+     */
+    private const int MEMBER_RECOMMENDATIONS_LOCK_SEED = 20261125151723;
+
     public function __construct(
         private readonly EntityManagerInterface $entityManager,
     ) {
@@ -54,30 +63,108 @@ final class RecommendationRepository implements RecommendationRepositoryInterfac
         return $entity !== null ? $this->toDomain($entity) : null;
     }
 
-    public function findBySource(string $sourceType, string $sourceId, string $name = 'default', int $limit = 100): array
+    public function lockMemberRecommendations(Uuid $userId): void
     {
-        $entities = $this->entityManager
-            ->getRepository(RecommendationEntity::class)
-            ->findBy(
-                ['sourceType' => $sourceType, 'sourceId' => $sourceId, 'name' => $name],
-                ['score' => 'DESC'],
-                $limit,
-            );
+        $connection = $this->entityManager->getConnection();
+        if (!$connection->isTransactionActive()) {
+            // Outside a transaction the lock would end with its own statement and serialize nothing.
+            throw new \LogicException('Lock a user\'s member recommendations inside the transaction that writes one.');
+        }
 
-        return array_map(fn (RecommendationEntity $e) => $this->toDomain($e), $entities);
+        // SQL because DQL has no advisory lock. Not a row lock on the user: sign-in takes
+        // FOR NO KEY UPDATE on the user row, and a write must not queue behind it.
+        $connection->executeQuery(
+            'SELECT pg_advisory_xact_lock(hashtextextended(:user, ' . self::MEMBER_RECOMMENDATIONS_LOCK_SEED . '))',
+            ['user' => $userId->toString()],
+        )->free();
     }
 
-    public function findTargeting(string $targetType, string $targetId, int $limit = 100): array
+    public function countWrittenByMember(Uuid $userId): int
     {
-        $entities = $this->entityManager
-            ->getRepository(RecommendationEntity::class)
-            ->findBy(
-                ['targetType' => $targetType, 'targetId' => $targetId],
-                ['score' => 'DESC'],
-                $limit,
-            );
+        // A statement of its own after the lock: under READ COMMITTED it sees what the lock's
+        // previous holder committed. The origin is a literal, not a parameter, so even a generic
+        // plan can prove the predicate of idx_recommendations_user_id_member, which holds only
+        // member rows; the count never reads the generator's rows for the user.
+        return (int) $this->entityManager->createQueryBuilder()
+            ->select('COUNT(r.id)')
+            ->from(RecommendationEntity::class, 'r')
+            ->where('IDENTITY(r.user) = :user')
+            ->andWhere(sprintf("r.origin = '%s'", RecommendationOrigin::Member->value))
+            ->setParameter('user', $userId, 'uuid')
+            ->getQuery()
+            ->getSingleScalarResult();
+    }
 
-        return array_map(fn (RecommendationEntity $e) => $this->toDomain($e), $entities);
+    public function hasDuplicateOf(Recommendation $recommendation): bool
+    {
+        $query = $this->entityManager->createQueryBuilder()
+            ->select('COUNT(r.id)')
+            ->from(RecommendationEntity::class, 'r')
+            ->where('r.sourceType = :sourceType')
+            ->andWhere('r.sourceId = :sourceId')
+            ->andWhere('r.targetType = :targetType')
+            ->andWhere('r.targetId = :targetId')
+            ->andWhere('r.name = :name')
+            ->setParameter('sourceType', (string) $recommendation->getSourceType())
+            ->setParameter('sourceId', $recommendation->getSourceId())
+            ->setParameter('targetType', (string) $recommendation->getTargetType())
+            ->setParameter('targetId', $recommendation->getTargetId())
+            ->setParameter('name', $recommendation->getName());
+        $userId = $recommendation->getUserId();
+        if ($userId === null) {
+            $query->andWhere('r.user IS NULL');
+        } else {
+            $query->andWhere('IDENTITY(r.user) = :user')->setParameter('user', $userId, 'uuid');
+        }
+
+        // uniq_recommendations_source_target_name_user_id holds at most one such row.
+        return (int) $query->getQuery()->getSingleScalarResult() > 0;
+    }
+
+    public function findBySource(string $sourceType, string $sourceId, ?Uuid $viewerId, string $name = 'default', int $limit = 100): array
+    {
+        $query = $this->entityManager->createQueryBuilder()
+            ->select('r')
+            ->from(RecommendationEntity::class, 'r')
+            ->where('r.sourceType = :sourceType')
+            ->andWhere('r.sourceId = :sourceId')
+            ->andWhere('r.name = :name')
+            ->setParameter('sourceType', $sourceType)
+            ->setParameter('sourceId', $sourceId)
+            ->setParameter('name', $name);
+
+        return $this->bestFirst($query, $viewerId, $limit);
+    }
+
+    public function findTargeting(string $targetType, string $targetId, ?Uuid $viewerId, int $limit = 100): array
+    {
+        $query = $this->entityManager->createQueryBuilder()
+            ->select('r')
+            ->from(RecommendationEntity::class, 'r')
+            ->where('r.targetType = :targetType')
+            ->andWhere('r.targetId = :targetId')
+            ->setParameter('targetType', $targetType)
+            ->setParameter('targetId', $targetId);
+
+        return $this->bestFirst($query, $viewerId, $limit);
+    }
+
+    /**
+     * The viewer's rows and the global rows, filtered before the limit, so another user's rows
+     * cannot fill the page; a null viewer reads every user's rows.
+     *
+     * @return list<Recommendation>
+     */
+    private function bestFirst(QueryBuilder $query, ?Uuid $viewerId, int $limit): array
+    {
+        if ($viewerId !== null) {
+            $query->andWhere('(IDENTITY(r.user) = :viewer OR r.user IS NULL)')->setParameter('viewer', $viewerId, 'uuid');
+        }
+
+        /** @var list<RecommendationEntity> $entities */
+        $entities = $query->orderBy('r.score', 'DESC')->setMaxResults($limit)->getQuery()->getResult();
+
+        return array_map($this->toDomain(...), $entities);
     }
 
     public function findForUser(Uuid $userId, int $limit = 50): array
@@ -139,6 +226,7 @@ final class RecommendationRepository implements RecommendationRepositoryInterfac
             $recommendation->getPosition(),
             $recommendation->getId(),
             $recommendation->getPublicId(),
+            $recommendation->getOrigin(),
         );
     }
 
@@ -181,6 +269,7 @@ final class RecommendationRepository implements RecommendationRepositoryInterfac
             $entity->getCreatedAt(),
             $entity->getUpdatedAt(),
             $entity->getPublicId(),
+            $entity->getOrigin(),
         );
     }
 }

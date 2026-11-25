@@ -16,7 +16,7 @@ use Stringable;
  */
 final readonly class RecommendationType implements Stringable, JsonSerializable
 {
-    private const ALLOWED = [
+    public const array ALLOWED = [
         'song',
         'album',
         'artist',

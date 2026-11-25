@@ -5,8 +5,10 @@ declare(strict_types=1);
 namespace App\Tests\Unit\Recommendation\Interface\Controller;
 
 use App\Auth\Infrastructure\Security\SecurityUser;
+use App\Recommendation\Application\Port\RecommendationPublicIdentityInterface;
 use App\Recommendation\Application\Query\GetRecommendationsForUserQuery;
 use App\Recommendation\Interface\Controller\RecommendationController;
+use App\Recommendation\Interface\Request\CreateRecommendationRequest;
 use App\Shared\Domain\Model\Uuid;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
@@ -16,7 +18,6 @@ use Symfony\Component\Messenger\Envelope;
 use Symfony\Component\Messenger\MessageBusInterface;
 use Symfony\Component\Messenger\Stamp\HandledStamp;
 use Symfony\Component\Security\Core\User\UserInterface;
-use Symfony\Component\Serializer\Encoder\JsonEncoder;
 use Symfony\Component\Translation\Translator;
 
 final class RecommendationControllerTest extends TestCase
@@ -37,10 +38,12 @@ final class RecommendationControllerTest extends TestCase
         $security->method('getUser')->willReturn($authenticated ? $this->createStub(UserInterface::class) : null);
         $bus = $this->createMock(MessageBusInterface::class);
         $bus->expects($this->never())->method('dispatch');
-        $controller = new RecommendationController($security, $bus, new JsonEncoder(), $this->createStub(\App\Recommendation\Application\Port\RecommendationPublicIdentityInterface::class));
+        $controller = new RecommendationController($security, $bus, $this->createStub(RecommendationPublicIdentityInterface::class));
         $controller->setTranslator(new Translator('en'));
 
-        $response = $controller->{$action}(new Request());
+        $response = $action === 'store'
+            ? $controller->store(new CreateRecommendationRequest('song', 'V1StGXR8_Z5jdHi6B-myT', 'song', 'Uakgb_J5m9g-0JDMbcJqL', 0.5))
+            : $controller->{$action}(new Request());
 
         self::assertSame(401, $response->getStatusCode());
     }
@@ -54,7 +57,7 @@ final class RecommendationControllerTest extends TestCase
         $bus->expects($this->once())->method('dispatch')
             ->with(self::callback(static fn (GetRecommendationsForUserQuery $query): bool => $query->getUserId()->equals($userId)))
             ->willReturnCallback(static fn (object $query): Envelope => new Envelope($query, [new HandledStamp([], 'recommendations')]));
-        $controller = new RecommendationController($security, $bus, new JsonEncoder(), $this->createStub(\App\Recommendation\Application\Port\RecommendationPublicIdentityInterface::class));
+        $controller = new RecommendationController($security, $bus, $this->createStub(RecommendationPublicIdentityInterface::class));
 
         $response = $controller->index(new Request());
 

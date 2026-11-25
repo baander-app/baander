@@ -22,6 +22,7 @@ final class GetRecommendationsBySourceHandler
         return $this->recommendationRepository->findBySource(
             $query->getSourceType(),
             $query->getSourceId(),
+            $query->administrator ? null : $query->viewerId,
             $query->getName(),
             $query->getLimit(),
         );

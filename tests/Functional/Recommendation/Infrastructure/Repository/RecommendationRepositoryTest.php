@@ -192,7 +192,7 @@ final class RecommendationRepositoryTest extends TestCase
             $this->recommendationRepository->save($rec);
         }
 
-        $results = $this->recommendationRepository->findBySource($sourceType, $sourceId, 'default', 3);
+        $results = $this->recommendationRepository->findBySource($sourceType, $sourceId, null, 'default', 3);
 
         $this->assertCount(3, $results);
         $this->assertSame(40.0, $results[0]->getScore());
@@ -211,8 +211,8 @@ final class RecommendationRepositoryTest extends TestCase
 
         $this->recommendationRepository->saveMany([$rec1, $rec2]);
 
-        $defaultResults = $this->recommendationRepository->findBySource('song', $sourceId, 'default');
-        $customResults = $this->recommendationRepository->findBySource('song', $sourceId, 'custom');
+        $defaultResults = $this->recommendationRepository->findBySource('song', $sourceId, null, 'default');
+        $customResults = $this->recommendationRepository->findBySource('song', $sourceId, null, 'custom');
 
         $this->assertCount(1, $defaultResults);
         $this->assertSame('tgt-1', $defaultResults[0]->getTargetId());
@@ -238,7 +238,7 @@ final class RecommendationRepositoryTest extends TestCase
             $this->recommendationRepository->save($rec);
         }
 
-        $results = $this->recommendationRepository->findTargeting('song', $targetId, 2);
+        $results = $this->recommendationRepository->findTargeting('song', $targetId, null, 2);
 
         $this->assertCount(2, $results);
         $this->assertSame(40.0, $results[0]->getScore());
@@ -368,7 +368,7 @@ final class RecommendationRepositoryTest extends TestCase
 
         $this->recommendationRepository->deleteBySource('song', $sourceId);
 
-        $remaining = $this->recommendationRepository->findBySource('song', $sourceId);
+        $remaining = $this->recommendationRepository->findBySource('song', $sourceId, null);
         $this->assertCount(0, $remaining);
 
         $otherFound = $this->recommendationRepository->findByUuid($otherRec->getId());
@@ -402,7 +402,7 @@ final class RecommendationRepositoryTest extends TestCase
 
     public function testFindBySourceReturnsEmptyArrayWhenNoResults(): void
     {
-        $results = $this->recommendationRepository->findBySource('nonexistent', 'nonexistent');
+        $results = $this->recommendationRepository->findBySource('nonexistent', 'nonexistent', null);
 
         $this->assertSame([], $results);
     }
@@ -411,7 +411,7 @@ final class RecommendationRepositoryTest extends TestCase
 
     public function testFindTargetingReturnsEmptyArrayWhenNoResults(): void
     {
-        $results = $this->recommendationRepository->findTargeting('nonexistent', 'nonexistent');
+        $results = $this->recommendationRepository->findTargeting('nonexistent', 'nonexistent', null);
 
         $this->assertSame([], $results);
     }

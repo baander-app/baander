@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Recommendation\Domain\Model;
 
+use App\Recommendation\Domain\ValueObject\RecommendationOrigin;
 use App\Recommendation\Domain\ValueObject\RecommendationType;
 use App\Shared\Domain\Model\Uuid;
 use App\Shared\Domain\Model\PublicId;
@@ -23,7 +24,8 @@ final class Recommendation
         private ?Uuid $userId,
         private readonly DateTimeImmutable $createdAt,
         private DateTimeImmutable $updatedAt,
-        private readonly PublicId $publicId = new PublicId(),
+        private readonly PublicId $publicId,
+        private readonly RecommendationOrigin $origin,
     ) {
     }
 
@@ -36,6 +38,7 @@ final class Recommendation
         ?Uuid $userId = null,
         string $name = 'default',
         ?int $position = null,
+        RecommendationOrigin $origin = RecommendationOrigin::Generator,
     ): self {
         return new self(
             new Uuid(),
@@ -49,6 +52,8 @@ final class Recommendation
             $userId,
             new DateTimeImmutable(),
             new DateTimeImmutable(),
+            new PublicId(),
+            $origin,
         );
     }
 
@@ -65,6 +70,7 @@ final class Recommendation
         DateTimeImmutable $createdAt,
         DateTimeImmutable $updatedAt,
         PublicId $publicId = new PublicId(),
+        RecommendationOrigin $origin = RecommendationOrigin::Generator,
     ): self {
         return new self(
             $id,
@@ -79,6 +85,7 @@ final class Recommendation
             $createdAt,
             $updatedAt,
             $publicId,
+            $origin,
         );
     }
 
@@ -133,6 +140,11 @@ final class Recommendation
     public function getUserId(): ?Uuid
     {
         return $this->userId;
+    }
+
+    public function getOrigin(): RecommendationOrigin
+    {
+        return $this->origin;
     }
 
     public function getCreatedAt(): DateTimeImmutable
