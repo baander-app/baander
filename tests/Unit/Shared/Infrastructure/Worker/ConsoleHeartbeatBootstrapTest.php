@@ -78,8 +78,8 @@ CHILD;
                 'VAPID_PRIVATE_KEY' => '',
                 'SYMFONY_DOTENV_VARS' => false,
                 'MESSENGER_TRANSPORT_DSN' => 'redis://redis.baander.app:6379/messages/baander',
-                'DATABASE_URL' => 'postgresql://worker:unreachable@127.0.0.1:1/worker?serverVersion=18',
-                'DATABASE_CONTROL_URL' => 'postgresql://worker_control:unreachable@127.0.0.1:1/worker_control?serverVersion=18',
+                'DATABASE_URL' => 'postgresql://worker:unreachable-database@127.0.0.1:1/worker?serverVersion=18',
+                'DATABASE_CONTROL_URL' => 'postgresql://worker_control:unreachable-database@127.0.0.1:1/worker_control?serverVersion=18',
                 'XDEBUG_MODE' => 'off',
                 'SHELL_VERBOSITY' => '0',
             ]);

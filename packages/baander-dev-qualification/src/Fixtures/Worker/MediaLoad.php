@@ -25,7 +25,7 @@ final class MediaLoad
     public const float LEASE_DEADLINE_SECONDS = 1.5;
     /** A media child's native request fails once the daemon has not answered within this many seconds. */
     public const float NATIVE_RPC_DEADLINE_SECONDS = 1.0;
-    private const string DIRECT_URL = 'postgresql://baander:test-only@postgres:5432/worker_operator_test?serverVersion=18&charset=utf8';
+    private const string DIRECT_URL = 'postgresql://baander:test-only-database-password@postgres:5432/worker_operator_test?serverVersion=18&charset=utf8';
     /** Clients beyond the application pool that keep every server connection busy in short transactions. */
     private const int SATURATING_EXTRA_CLIENTS = 2;
     private const int SAMPLER_SECONDS = 1900;
@@ -69,7 +69,7 @@ final class MediaLoad
                 self::SAMPLER_SECONDS + 50,
             );
             $checkpoint->measurements->container(
-                ['exec', $checkpoint->postgres, 'env', 'PGPASSWORD=test-only', 'sh', '-ec', self::DATABASE_SAMPLER, 'sh', (string) self::SAMPLER_SECONDS],
+                ['exec', $checkpoint->postgres, 'env', 'PGPASSWORD=test-only-database-password', 'sh', '-ec', self::DATABASE_SAMPLER, 'sh', (string) self::SAMPLER_SECONDS],
                 'database-samples.txt',
                 'database-sampler.log',
                 self::SAMPLER_SECONDS + 50,
@@ -90,7 +90,7 @@ final class MediaLoad
             // transactions throughout the run, so the pool has no idle server and every other
             // pooled request, the web's included, queues for one.
             $saturator = $docker->start(
-                ['exec', $checkpoint->postgres, 'env', 'PGPASSWORD=test-only', 'sh', '-ec', self::SATURATOR, 'sh',
+                ['exec', $checkpoint->postgres, 'env', 'PGPASSWORD=test-only-database-password', 'sh', '-ec', self::SATURATOR, 'sh',
                     (string) (Pooler::defaultPools()['application'] + self::SATURATING_EXTRA_CLIENTS), (string) self::SAMPLER_SECONDS],
                 timeout: self::SAMPLER_SECONDS,
                 logPath: $artifacts . '/saturator.log',

@@ -140,7 +140,7 @@ final class RuntimeWorkflow
 
     public function redisReady(): bool
     {
-        $result = $this->docker(['exec', '-e', 'REDISCLI_AUTH=test-only', $this->id . '-redis', 'redis-cli', 'ping'], check: false);
+        $result = $this->docker(['exec', '-e', 'REDISCLI_AUTH=test-only-redis-password', $this->id . '-redis', 'redis-cli', 'ping'], check: false);
         return $result->exitCode === 0 && trim($result->stdout) === 'PONG';
     }
 
@@ -177,7 +177,7 @@ final class RuntimeWorkflow
             '--network-alias',
             'redis',
             '-e',
-            'REDIS_ARGS=--requirepass test-only',
+            'REDIS_ARGS=--requirepass test-only-redis-password',
             $this->runtime->image('fixtureRedis')->id,
         ]);
         $this->container($this->id . '-postgres', [
@@ -188,7 +188,7 @@ final class RuntimeWorkflow
             '-e',
             'POSTGRES_USER=baander',
             '-e',
-            'POSTGRES_PASSWORD=test-only',
+            'POSTGRES_PASSWORD=test-only-database-password',
             '-e',
             'POSTGRES_DB=web_test',
             $this->runtime->image('postgres')->id,
@@ -270,11 +270,11 @@ final class RuntimeWorkflow
             'MAIL_FROM_ADDRESS=noreply@baander.app',
             'MEDIA_STORAGE_PATH=' . $this->appDirectory . '/storage/media',
             'CONVERT_STORAGE_PATH=' . $this->appDirectory . '/storage/conversions',
-            'REDIS_PASSWORD=test-only',
-            'REDIS_URL=redis://default:test-only@redis:6379',
-            'MESSENGER_TRANSPORT_DSN=redis://default:test-only@redis:6379/messages',
-            'DATABASE_URL=postgresql://baander:test-only@postgres:5432/web_test?serverVersion=18&charset=utf8',
-            'DATABASE_CONTROL_URL=postgresql://baander:test-only@postgres:5432/web_test?serverVersion=18&charset=utf8',
+            'REDIS_PASSWORD=test-only-redis-password',
+            'REDIS_URL=redis://default:test-only-redis-password@redis:6379',
+            'MESSENGER_TRANSPORT_DSN=redis://default:test-only-redis-password@redis:6379/messages',
+            'DATABASE_URL=postgresql://baander:test-only-database-password@postgres:5432/web_test?serverVersion=18&charset=utf8',
+            'DATABASE_CONTROL_URL=postgresql://baander:test-only-database-password@postgres:5432/web_test?serverVersion=18&charset=utf8',
         ];
         $arguments = [
             '--privileged',
@@ -510,7 +510,7 @@ final class RuntimeWorkflow
             $this->docker([
                 'exec',
                 '-e',
-                'PGPASSWORD=test-only',
+                'PGPASSWORD=test-only-database-password',
                 $this->id . '-postgres',
                 'psql',
                 '-h',

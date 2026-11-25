@@ -92,7 +92,7 @@ final class Qualification
             $redis = $ledger->create(ResourceKind::Container, $redis, [
                 '--network', $id,
                 '--network-alias', 'redis',
-                ...($mode === 'messaging' ? [] : ['-e', 'REDIS_ARGS=--requirepass test-only']),
+                ...($mode === 'messaging' ? [] : ['-e', 'REDIS_ARGS=--requirepass test-only-redis-password']),
                 $redisImage,
             ]);
             $docker->run(['start', $redis]);
@@ -100,7 +100,7 @@ final class Qualification
                 '--network', $id,
                 '--network-alias', 'postgres',
                 '-e', 'POSTGRES_USER=baander',
-                '-e', 'POSTGRES_PASSWORD=test-only',
+                '-e', 'POSTGRES_PASSWORD=test-only-database-password',
                 '-e', 'POSTGRES_DB=' . $database,
                 $postgresImage,
             ]);
@@ -116,7 +116,7 @@ final class Qualification
                     $ping = $docker->run(
                         [
                             'exec',
-                            ...($mode === 'messaging' ? [] : ['-e', 'REDISCLI_AUTH=test-only']),
+                            ...($mode === 'messaging' ? [] : ['-e', 'REDISCLI_AUTH=test-only-redis-password']),
                             $redis, 'redis-cli', 'ping',
                         ],
                         timeout: null,
@@ -150,7 +150,7 @@ final class Qualification
             $environment = $mode === 'messaging'
                 ? [
                     'MESSENGER_TEST_REDIS_DSN=redis://redis:6379',
-                    'OUTBOX_TEST_DATABASE_URL=postgresql://baander:test-only@postgres:5432/' . $database,
+                    'OUTBOX_TEST_DATABASE_URL=postgresql://baander:test-only-database-password@postgres:5432/' . $database,
                 ]
                 : [
                     'BAANDER_TEST_CHECKOUT_IN_IMAGE=' . ($inImage ? '1' : '0'),
@@ -163,11 +163,11 @@ final class Qualification
                     // roots are not writable here.
                     'MEDIA_STORAGE_PATH=' . $directory . '/storage/media',
                     'CONVERT_STORAGE_PATH=' . $directory . '/storage/conversions',
-                    'REDIS_PASSWORD=test-only',
-                    'REDIS_URL=redis://default:test-only@redis:6379',
-                    'MESSENGER_TRANSPORT_DSN=redis://default:test-only@redis:6379/messages',
-                    'DATABASE_URL=postgresql://baander:test-only@postgres:5432/' . $database . '?serverVersion=18&charset=utf8',
-                    'DATABASE_CONTROL_URL=postgresql://baander:test-only@postgres:5432/' . $database . '?serverVersion=18&charset=utf8',
+                    'REDIS_PASSWORD=test-only-redis-password',
+                    'REDIS_URL=redis://default:test-only-redis-password@redis:6379',
+                    'MESSENGER_TRANSPORT_DSN=redis://default:test-only-redis-password@redis:6379/messages',
+                    'DATABASE_URL=postgresql://baander:test-only-database-password@postgres:5432/' . $database . '?serverVersion=18&charset=utf8',
+                    'DATABASE_CONTROL_URL=postgresql://baander:test-only-database-password@postgres:5432/' . $database . '?serverVersion=18&charset=utf8',
                 ];
             $flags = [];
             foreach ($environment as $value) {

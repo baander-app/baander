@@ -132,7 +132,7 @@ try {
     $waitUntil = $stoppedAt + $profile->maxSampleAgeMs / 1000 + .2;
     while (hrtime(true) / 1e9 < $waitUntil) { usleep(20000); }
     $transport = new Symfony\Component\Messenger\Bridge\Redis\Transport\RedisTransport(
-        Symfony\Component\Messenger\Bridge\Redis\Transport\Connection::fromDsn('redis://default:test-only@redis:6379/messages/baander'),
+        Symfony\Component\Messenger\Bridge\Redis\Transport\Connection::fromDsn('redis://default:test-only-redis-password@redis:6379/messages/baander'),
         App\Tests\Fixtures\Messaging\MessageCodecFactory::signingSerializer([new WorkloadCodec()]),
     );
     $sent = $transport->send(new Symfony\Component\Messenger\Envelope(new Workload('observation-gap', 0)));
@@ -147,7 +147,7 @@ try {
     }
     $redis = new Redis();
     $redis->connect('redis', 6379, .2, read_timeout: .2);
-    $redis->auth(['default', 'test-only']);
+    $redis->auth(['default', 'test-only-redis-password']);
     $proof = $redis->eval(<<<'LUA'
         local groups = redis.call('XINFO', 'GROUPS', KEYS[1])
         local last = nil

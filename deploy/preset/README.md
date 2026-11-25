@@ -47,10 +47,13 @@ Copy the example for the nearest starting point and capability, such as
 its `size` if needed, replace every secret and set the origin and
 listening address for your installation. Rendering and starting refuse any value that
 still begins with `replace-with-`. `APP_SECRET`, `STREAM_URL_HMAC_SECRET` and
-`AUTH_TOTP_ENCRYPTION_KEY` must each be at least 32 bytes, or the containers refuse to
-boot; generate the TOTP key with `openssl rand -base64 32`. The containers also refuse
-to boot with `baander`, the repository's development password, as the Redis or database
-password, and with a VAPID private key the repository has committed. The default listener is
+`AUTH_TOTP_ENCRYPTION_KEY` must each be at least 32 bytes, and `DB_PASSWORD` and
+`REDIS_PASSWORD` at least 16 bytes, or the containers refuse to boot; generate the TOTP
+key with `openssl rand -base64 32`. The containers also refuse to boot with `baander`,
+the repository's development password, as the Redis or database password, and with a
+VAPID private key the repository has committed. Rendering and starting apply the same
+rules before anything starts, and also refuse every secret and password the repository
+commits, including the test values in `.env.test` that the containers accept. The default listener is
 reachable only from the local host; [Gateway and client addresses](#gateway-and-client-addresses)
 covers HTTPS and reverse proxies. Keep the configuration file and state directory
 accessible only to the operator.

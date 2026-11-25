@@ -116,7 +116,7 @@ final class MessagingWorkflowTest extends TestCase
         self::assertSame(0, $result->exitCode, $result->stderr);
         $calls = $this->recorded();
         self::assertTrue(array_any($calls, static fn(array $args): bool => in_array('--internal', $args, true)));
-        self::assertTrue(array_any($calls, static fn(array $args): bool => in_array('REDISCLI_AUTH=test-only', $args, true)));
+        self::assertTrue(array_any($calls, static fn(array $args): bool => in_array('REDISCLI_AUTH=test-only-redis-password', $args, true)));
         self::assertSame(
             2,
             count(array_filter($calls, static fn(array $args): bool => in_array('app:outbox:consume', $args, true))),

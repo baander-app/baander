@@ -163,7 +163,7 @@ final readonly class OperatorProvisioning
             'redis',
             ...$this->serviceLimits(['--memory', '256m', '--memory-swap', '256m']),
             '-e',
-            'REDIS_ARGS=--requirepass test-only',
+            'REDIS_ARGS=--requirepass test-only-redis-password',
             $this->qualification->commands->runtime->image('fixtureRedis')->id,
         ]);
         $publish = $this->qualification->configuration->container ? [] : ['--publish', '127.0.0.1::5432'];
@@ -177,7 +177,7 @@ final readonly class OperatorProvisioning
             '-e',
             'POSTGRES_USER=baander',
             '-e',
-            'POSTGRES_PASSWORD=test-only',
+            'POSTGRES_PASSWORD=test-only-database-password',
             '-e',
             'POSTGRES_DB=worker_operator_test',
             $this->qualification->commands->runtime->image('postgres')->id,
@@ -203,7 +203,7 @@ final readonly class OperatorProvisioning
                 false,
             );
             if ($postgres->exitCode === 0) {
-                $redis = $this->qualification->docker(['exec', '-e', 'REDISCLI_AUTH=test-only', $s->runId . '-redis', 'redis-cli', 'ping'], false);
+                $redis = $this->qualification->docker(['exec', '-e', 'REDISCLI_AUTH=test-only-redis-password', $s->runId . '-redis', 'redis-cli', 'ping'], false);
                 if ($redis->exitCode === 0 && trim($redis->stdout) === 'PONG') {
                     $ready = true;
                     break;
@@ -501,17 +501,17 @@ final readonly class OperatorProvisioning
                 'role' => 'source',
             ];
         }
-        $direct = 'postgresql://baander:test-only@postgres:5432/worker_operator_test?serverVersion=18&charset=utf8';
+        $direct = 'postgresql://baander:test-only-database-password@postgres:5432/worker_operator_test?serverVersion=18&charset=utf8';
         $runtime = [
             // Web and both units run the same profile, so web health and policy see the drill's slots.
             'BAANDER_DEPLOYMENT_PROFILE' => $deployment->json(),
             'APP_ENV' => 'prod',
             'APP_DEBUG' => '0',
             ...FixtureSecrets::ENVIRONMENT,
-            ...($this->load() ? Pooler::urls('baander', 'test-only', 'worker_operator_test') : ['DATABASE_URL' => $direct, 'DATABASE_CONTROL_URL' => $direct]),
-            'REDIS_URL' => 'redis://default:test-only@redis:6379',
-            'REDIS_PASSWORD' => 'test-only',
-            'MESSENGER_TRANSPORT_DSN' => 'redis://default:test-only@redis:6379/messages',
+            ...($this->load() ? Pooler::urls('baander', 'test-only-database-password', 'worker_operator_test') : ['DATABASE_URL' => $direct, 'DATABASE_CONTROL_URL' => $direct]),
+            'REDIS_URL' => 'redis://default:test-only-redis-password@redis:6379',
+            'REDIS_PASSWORD' => 'test-only-redis-password',
+            'MESSENGER_TRANSPORT_DSN' => 'redis://default:test-only-redis-password@redis:6379/messages',
             'CONVERT_STORAGE_PATH' => $this->qualification->application('%APP_HOME%/storage/conversions'),
             'MEDIA_STORAGE_PATH' => '/media/source',
         ];
@@ -520,7 +520,7 @@ final readonly class OperatorProvisioning
         OperatorConfiguration::write(
             $this->qualification->work('credentials.json'),
             [
-                'controllerDatabaseUrl' => 'postgresql://baander:test-only@' . $host . ':' . $port . '/worker_operator_test?serverVersion=18&charset=utf8',
+                'controllerDatabaseUrl' => 'postgresql://baander:test-only-database-password@' . $host . ':' . $port . '/worker_operator_test?serverVersion=18&charset=utf8',
                 'runtimeEnvironment' => $runtime,
             ],
         );
@@ -631,7 +631,7 @@ final readonly class OperatorProvisioning
         $image = $this->qualification->commands->runtime->image('postgres')->id;
         $volume = $s->runId . '-pooler-credentials';
         $this->qualification->resources->createVolume($volume, ['--label', 'app.baander.test.project=' . $s->runId]);
-        $helper = Pooler::credentialsHelper($image, $s->runId, $volume, 'baander', 'test-only', 'worker_operator_test', 'postgres');
+        $helper = Pooler::credentialsHelper($image, $s->runId, $volume, 'baander', 'test-only-database-password', 'worker_operator_test', 'postgres');
         $arguments = [];
         foreach ($helper['arguments'] as $index => $argument) {
             // The helper names its environment; the disposable container receives the values.

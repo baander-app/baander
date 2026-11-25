@@ -6,12 +6,12 @@ $project = dirname(__DIR__, 3);
 require $project . '/vendor/autoload.php';
 require $project . '/tests/Fixtures/Messaging/MessageCodecFactory.php';
 $transport = new Symfony\Component\Messenger\Bridge\Redis\Transport\RedisTransport(
-    Symfony\Component\Messenger\Bridge\Redis\Transport\Connection::fromDsn('redis://default:test-only@redis:6379/messages/baander'),
+    Symfony\Component\Messenger\Bridge\Redis\Transport\Connection::fromDsn('redis://default:test-only-redis-password@redis:6379/messages/baander'),
     App\Tests\Fixtures\Messaging\MessageCodecFactory::signingSerializer(),
 );
 $redis = new Redis();
 $redis->connect('redis', 6379, 1);
-$redis->auth(['default', 'test-only']);
+$redis->auth(['default', 'test-only-redis-password']);
 $deadline = hrtime(true) + 240_000_000_000;
 $sent = 0;
 while (hrtime(true) < $deadline) {

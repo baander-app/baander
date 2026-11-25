@@ -45,11 +45,44 @@ final class ProductionSecretsTest extends TestCase
         yield 'TOTP key that is not base64' => ['AUTH_TOTP_ENCRYPTION_KEY', str_repeat('!', 44), 'AUTH_TOTP_ENCRYPTION_KEY is not base64'];
         yield 'unset Redis password' => ['REDIS_PASSWORD', null, 'REDIS_PASSWORD is not set'];
         yield 'committed Redis password' => ['REDIS_PASSWORD', 'baander', 'REDIS_PASSWORD is a committed default'];
+        yield '15-byte Redis password' => ['REDIS_PASSWORD', str_repeat('r', 15), 'REDIS_PASSWORD is shorter than 16 bytes'];
+        yield 'Redis URL with a 15-byte password' => ['REDIS_URL', 'redis://baander:' . str_repeat('r', 15) . '@redis:6379', 'REDIS_URL carries a password shorter than 16 bytes'];
+        yield 'Redis URL without a password' => ['REDIS_URL', 'redis://redis:6379', 'REDIS_URL has no password'];
+        yield 'database URL with a 15-byte password' => ['DATABASE_URL', 'postgresql://baander:' . str_repeat('d', 15) . '@pooler:6432/baander', 'DATABASE_URL carries a password shorter than 16 bytes'];
+        yield 'control database URL with a 15-byte encoded password' => ['DATABASE_CONTROL_URL', 'postgresql://baander_control:' . rawurlencode(str_repeat('@', 15)) . '@pooler:6432/baander_control', 'DATABASE_CONTROL_URL carries a password shorter than 16 bytes'];
         yield 'unset database URL' => ['DATABASE_URL', null, 'DATABASE_URL is not set'];
         yield 'database URL without a password' => ['DATABASE_URL', 'postgresql://baander@pooler:6432/baander', 'DATABASE_URL has no password'];
         yield 'database URL with the committed password' => ['DATABASE_URL', 'postgresql://baander:baander@pooler:6432/baander?serverVersion=18', 'DATABASE_URL uses a committed default password'];
         yield 'control database URL with the committed password' => ['DATABASE_CONTROL_URL', 'postgresql://baander_control:baander@pooler:6432/baander_control', 'DATABASE_CONTROL_URL uses a committed default password'];
         yield 'committed Web Push private key' => ['VAPID_PRIVATE_KEY', self::COMMITTED_VAPID_PRIVATE_KEY, 'VAPID_PRIVATE_KEY is a committed key'];
+    }
+
+    public function testSixteenBytePasswordsAreAccepted(): void
+    {
+        $lookup = $this->lookup([
+            'REDIS_PASSWORD' => str_repeat('r', 16),
+            'REDIS_URL' => 'redis://baander:' . rawurlencode(str_repeat('%', 16)) . '@redis:6379',
+            'DATABASE_URL' => 'postgresql://baander:' . str_repeat('d', 16) . '@pooler:6432/baander',
+        ]);
+
+        self::assertSame([], new ProductionSecrets()->problems($lookup));
+    }
+
+    public function testTheTestEnvironmentValuesPassTheBootCheck(): void
+    {
+        // The tests boot production kernels on them; the preset refuses them.
+        $values = new Dotenv()->parse((string) file_get_contents(dirname(__DIR__, 5) . '/.env.test'), '.env.test');
+        $lookup = static fn (string $variable): ?string => $values[$variable] ?? null;
+
+        self::assertSame([], new ProductionSecrets()->problems($lookup));
+    }
+
+    public function testAnUnknownEnvironmentIsRefusedBeforeTheKernelExists(): void
+    {
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessage('APP_ENV must be dev, test or prod');
+
+        new Kernel('staging', false);
     }
 
     public function testOptionalCredentialsMayBeUnsetOrPrivate(): void

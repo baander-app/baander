@@ -186,7 +186,7 @@ if (in_array($mode, $consumerAckModes, true)) {
     }
     $redis = new Redis();
     $redis->connect('redis', 6379, 1.0);
-    $redis->auth(['default', 'test-only']);
+    $redis->auth(['default', 'test-only-redis-password']);
     $pending = $redis->xPending('scheduler_occurrences', 'baander', '-', '+', 2);
     $waiting = (int) $db->fetchOne(<<<'SQL'
         SELECT count(*) FROM pg_locks
@@ -330,7 +330,7 @@ if (in_array($mode, $deliveryAckModes, true)) {
         SQL);
     $redis = new Redis();
     $redis->connect('redis', 6379, 1.0);
-    $redis->auth(['default', 'test-only']);
+    $redis->auth(['default', 'test-only-redis-password']);
     $stream = $redis->xInfo('STREAM', 'messages');
     $entriesAdded = is_array($stream) ? ($stream['entries-added'] ?? null) : null;
     if ($mode === 'verify-delivery-ack-recovered') {
@@ -553,7 +553,7 @@ if ($mode === 'verify-scheduler' || $mode === 'replay-scheduler') {
     }
     $redis = new Redis();
     $redis->connect('redis', 6379, 1.0);
-    $redis->auth(['default', 'test-only']);
+    $redis->auth(['default', 'test-only-redis-password']);
     $pending = $redis->xPending('scheduler_occurrences', 'baander');
     if (!is_array($pending) || ($pending[0] ?? null) !== 0 || $redis->xLen('scheduler_occurrences') !== 0
         || $redis->zCard('scheduler_occurrences__queue') !== 0 || (int) $db->fetchOne('SELECT count(*) FROM failed_messages') !== 0) {
@@ -563,7 +563,7 @@ if ($mode === 'verify-scheduler' || $mode === 'replay-scheduler') {
         // A returned occurrence is never claimed again by the relay. Exercise the
         // consumer's retained deduplication guard with an actual duplicate delivery.
         $transport = new Symfony\Component\Messenger\Bridge\Redis\Transport\RedisTransport(
-            Symfony\Component\Messenger\Bridge\Redis\Transport\Connection::fromDsn('redis://default:test-only@redis:6379/scheduler_occurrences/baander'),
+            Symfony\Component\Messenger\Bridge\Redis\Transport\Connection::fromDsn('redis://default:test-only-redis-password@redis:6379/scheduler_occurrences/baander'),
             MessageCodecFactory::signingSerializer(),
         );
         $transport->send(new Symfony\Component\Messenger\Envelope(new App\Scheduler\Application\Command\ExecuteScheduledOccurrenceCommand(App\Shared\Domain\Model\Uuid::fromString($occurrence['id']))));
@@ -608,7 +608,7 @@ if ($mode === 'verify-outbox' || $mode === 'replay-outbox') {
     }
     $redis = new Redis();
     $redis->connect('redis', 6379, 1.0);
-    $redis->auth(['default', 'test-only']);
+    $redis->auth(['default', 'test-only-redis-password']);
     $pending = $redis->xPending('messages', 'baander');
     if (!is_array($pending) || ($pending[0] ?? null) !== 0 || $redis->xLen('messages') !== 0
         || (int) $db->fetchOne('SELECT count(*) FROM failed_messages') !== 0 || $redis->zCard('messages__queue') !== 0) {
@@ -731,7 +731,7 @@ if (count($roles) !== count($expectedRoles) || array_diff($expectedRoles, array_
 }
 $redis = new Redis();
 $redis->connect('redis', 6379, 1.0);
-$redis->auth(['default', 'test-only']);
+$redis->auth(['default', 'test-only-redis-password']);
 $consumerReadiness = [];
 foreach (['messages' => ($profile ?? throw new RuntimeException('No resident autoscaling profile.'))->consumerIds(), 'scheduler_occurrences' => ['scheduled-consumer']] as $stream => $consumerRoles) {
     $expected = array_map(static fn (string $role): string => 'worker-' . substr(hash('sha256', $namespace), 0, 16) . '-' . $bootId . '-' . $role . '-1', $consumerRoles);

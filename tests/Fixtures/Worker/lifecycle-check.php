@@ -226,7 +226,7 @@ try {
             }
             $redis = new Redis();
             $redis->connect('redis', 6379, 1.0, null, 0, 1.0);
-            $redis->auth(['default', 'test-only']);
+            $redis->auth(['default', 'test-only-redis-password']);
             try {
                 foreach (['messages', 'scheduler_occurrences'] as $stream) {
                     $pending = $redis->xPending($stream, 'baander');

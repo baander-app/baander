@@ -15,7 +15,7 @@ $redis = null;
 if ($db !== null) {
     $redis = new Redis();
     $redis->connect('redis', 6379, 1);
-    $redis->auth(['default', 'test-only']);
+    $redis->auth(['default', 'test-only-redis-password']);
 }
 $deadline = hrtime(true) + (int) ($seconds * 1e9);
 while (hrtime(true) < $deadline) {

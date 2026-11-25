@@ -14,7 +14,8 @@ final class ProductionSecretsRefusedException extends RuntimeException
     {
         parent::__construct(
             'Refusing to boot in production: ' . implode(' ', $problems)
-            . ' Set each to a private random value of at least 32 bytes (AUTH_TOTP_ENCRYPTION_KEY: 32 random bytes, base64-encoded).',
+            . ' Set each secret to a private random value of at least 32 bytes (AUTH_TOTP_ENCRYPTION_KEY: 32 random bytes, base64-encoded)'
+            . ' and each Redis or database password to at least 16 bytes.',
         );
     }
 }

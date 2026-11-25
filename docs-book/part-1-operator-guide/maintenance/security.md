@@ -25,10 +25,10 @@ records trust boundaries, regression evidence and unresolved findings.
 ### Hardening checklist
 
 - [ ] **Private secrets** — set `APP_SECRET`, `STREAM_URL_HMAC_SECRET` and `AUTH_TOTP_ENCRYPTION_KEY` to private random values. With `APP_ENV=prod`, every web, worker and console process refuses to boot while one of them is unset, still the value committed in `.env`, a `replace-with-` placeholder or shorter than 32 bytes. For `AUTH_TOTP_ENCRYPTION_KEY`, the 32 bytes are counted after base64 decoding. The error names the variable.
-- [ ] **Strong Redis password** — not the default `baander`. With `APP_ENV=prod`, every process refuses to boot while `REDIS_PASSWORD` is unset or `baander`.
-- [ ] **Strong database password** — not the default `baander`. With `APP_ENV=prod`, every process refuses to boot while the password in `DATABASE_URL`, or in `DATABASE_CONTROL_URL` when it is set, is empty or `baander`.
+- [ ] **Strong Redis password** — at least 16 bytes and not the default `baander`. With `APP_ENV=prod`, every process refuses to boot while `REDIS_PASSWORD` is unset, `baander` or shorter than 16 bytes, or while the password in `REDIS_URL` is missing, `baander` or shorter than 16 bytes.
+- [ ] **Strong database password** — at least 16 bytes and not the default `baander`. With `APP_ENV=prod`, every process refuses to boot while the password in `DATABASE_URL`, or in `DATABASE_CONTROL_URL` when it is set, is empty, `baander` or shorter than 16 bytes.
 - [ ] **Own Web Push keys** — generate the VAPID pair with `app:generate-vapid-keys`. With `APP_ENV=prod`, every process refuses to boot with a `VAPID_PRIVATE_KEY` the repository has ever committed, because anyone can read those keys from its history.
-- [ ] **`APP_ENV=prod`** in production — disables debug mode, verbose errors, and the profiler
+- [ ] **`APP_ENV=prod`** in production — disables debug mode, verbose errors, and the profiler. Baander refuses to boot under any environment name other than `dev`, `test` and `prod`.
 - [ ] **HTTPS in production** — set `DEFAULT_URI` and `APP_URL` to `https://`
 - [ ] **Reverse proxy configured** — set `TRUSTED_PROXIES` to the actual trusted proxy addresses or CIDRs. Both HTTP layers default to no trust. Proxies must replace incoming `X-Forwarded-*` headers; direct access leaves the list empty. The [deployment preset](../../../deploy/preset/README.md) derives `TRUSTED_PROXIES` to its own gateway and refuses a configured value; list a proxy in front of the gateway under `listen.frontProxies` instead.
 - [ ] **Rate limiting active** — relies on Redis; verify Redis is reachable
@@ -65,7 +65,11 @@ The preset refuses the settings it controls in `environment`: `APP_ENV` and
 and `MESSENGER_TRANSPORT_DSN` from `REDIS_PASSWORD`; the storage paths, `APP_HOME`,
 the OAuth key paths and `BAANDER_DEPLOYMENT_PROFILE`; and `TRUSTED_PROXIES`, which
 it sets to its gateway. Rendering and starting refuse any value that still begins
-with `replace-with-`. The preset initializes PostgreSQL, gives the database roles
+with `replace-with-`, and they apply the boot rules before any container starts: a
+secret shorter than 32 bytes, a password shorter than 16 bytes, and every secret or
+password the repository commits, the values in `.env.test` included, are refused. The
+containers themselves still accept the `.env.test` values, because the test suites boot
+production kernels on them. The preset initializes PostgreSQL, gives the database roles
 and the connection pooler's auth file their verifiers, and builds both database
 URLs, all from the one `DB_PASSWORD`.
 

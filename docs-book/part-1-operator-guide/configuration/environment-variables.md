@@ -11,7 +11,7 @@ name shown in emails, passkey prompts or TOTP enrollment.
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `APP_ENV` | `dev` | Symfony environment: `dev`, `prod`, or `test`. Controls debugging, caching, and error handling. `prod` logs at `info`. |
+| `APP_ENV` | `dev` | Symfony environment: `dev`, `prod`, or `test`. Controls debugging, caching, and error handling. `prod` logs at `info`. Baander refuses to boot under any other name. |
 | `APP_SECRET` | — | One cryptographic secret for Symfony security components and encrypted webhook signing secrets. Generate a unique value for each deployment; use the [offline rotation procedure](../maintenance/credential-rotation.md#rotating-app_secret) to change it. With `APP_ENV=prod`, Baander refuses to boot while it is unset, a committed default, a `replace-with-` placeholder or shorter than 32 bytes. |
 | `AUTH_TOTP_ENCRYPTION_KEY` | development value | Key that encrypts stored TOTP secrets, 32 random bytes base64-encoded; production refuses committed and short values. See [OAuth 2.0](authentication-and-limits.md#oauth-20). |
 | `APP_URL` | `https://localhost` | Canonical URL of the application. Used for CORS configuration and URL generation, as the OAuth issuer, and as the origin DPoP proofs must name; further origins go in `AUTH_EXTRA_ORIGINS` (see [OAuth 2.0](authentication-and-limits.md#oauth-20)). Its origin is also what Baander renders into the web app page as the API URL, into that page's Content-Security-Policy as the WebSocket origin, and into absolute URLs in API responses, such as cover image URLs, whenever a request's origin is neither `APP_URL`'s nor one listed in `AUTH_EXTRA_ORIGINS`. A `Host` header, sent by the client or forwarded by a trusted proxy, never chooses an unlisted origin. The WebSocket handshake accepts only `APP_URL`'s origin, so a page served on a listed extra origin cannot open its WebSocket connection. |
@@ -22,7 +22,7 @@ name shown in emails, passkey prompts or TOTP enrollment.
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `DATABASE_URL` | `postgresql://baander:baander@pooler:6432/baander?serverVersion=18&charset=utf8` | Full Doctrine DBAL connection URL for the pooler's application alias. Format: `postgresql://user:password@host:port/dbname?serverVersion=18&charset=utf8`. The `serverVersion` parameter should match your PostgreSQL version. With `APP_ENV=prod`, Baander refuses to boot while it is unset, carries no password, or carries the committed development password `baander`. |
+| `DATABASE_URL` | `postgresql://baander:baander@pooler:6432/baander?serverVersion=18&charset=utf8` | Full Doctrine DBAL connection URL for the pooler's application alias. Format: `postgresql://user:password@host:port/dbname?serverVersion=18&charset=utf8`. The `serverVersion` parameter should match your PostgreSQL version. With `APP_ENV=prod`, Baander refuses to boot while it is unset, carries no password, carries the committed development password `baander`, or carries a password shorter than 16 bytes. |
 | `DATABASE_CONTROL_URL` | `postgresql://baander_control:baander@pooler:6432/baander_control?serverVersion=18&charset=utf8` | Connection URL for the pooler's control alias, used by worker leases, media authority checks and the scheduler. Its user and database names append `_control`; its password is the database password. See [Connection pooler](deployment-profiles.md#connection-pooler). When it is set, `APP_ENV=prod` refuses it on the same password terms as `DATABASE_URL`. |
 
 The test database uses `baander_test` as the database name — configured in `.env.test`.
@@ -31,8 +31,8 @@ The test database uses `baander_test` as the database name — configured in `.e
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `REDIS_PASSWORD` | — | Password for the Redis instance. Optional in dev, **required in production**: with `APP_ENV=prod`, Baander refuses to boot while it is unset or the committed development password `baander`. The preset gives it to Redis's access control list and derives `REDIS_URL` and `MESSENGER_TRANSPORT_DSN` from it. |
-| `REDIS_URL` | `redis://default:${REDIS_PASSWORD}@redis:6379` | Redis endpoint URL. The cache pools, the session store, the rate limiters and every other Redis client authenticate as its user with its password; percent-encode both. The preset sets it to the `baander` user. Worker deployments require it to be pathless and queryless because the scheduler appends its stream and group. |
+| `REDIS_PASSWORD` | — | Password for the Redis instance. Optional in dev, **required in production**: with `APP_ENV=prod`, Baander refuses to boot while it is unset, the committed development password `baander` or shorter than 16 bytes. The preset gives it to Redis's access control list and derives `REDIS_URL` and `MESSENGER_TRANSPORT_DSN` from it. |
+| `REDIS_URL` | `redis://default:${REDIS_PASSWORD}@redis:6379` | Redis endpoint URL. The cache pools, the session store, the rate limiters and every other Redis client authenticate as its user with its password; percent-encode both. With `APP_ENV=prod`, Baander refuses to boot while its password is missing, `baander` or shorter than 16 bytes. The preset sets it to the `baander` user. Worker deployments require it to be pathless and queryless because the scheduler appends its stream and group. |
 
 Redis is used for:
 - **Cache** — tag-aware caching for API responses, OAuth tokens, and user sessions

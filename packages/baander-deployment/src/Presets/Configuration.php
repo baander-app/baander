@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Baander\Deployment\Presets;
 
 use Baander\Core\EnvironmentVariable;
+use Baander\Core\Secrets;
 use Baander\Configuration\Images\ImageSelection;
 use Baander\Configuration\Sources\JsonDocument;
 use Baander\Deployment\Profiles\ImageProfile;
@@ -28,7 +29,11 @@ final readonly class Configuration
     public const array POSTGRES_BOUNDS = ['sharedBuffersMiB' => [32, 16384], 'workMemMiB' => [1, 1024]];
     public const array HARDWARE_KEYS = ['accelerator', 'device', 'group'];
     /** The prefix of the example configurations' placeholder values. */
-    public const string PLACEHOLDER_PREFIX = 'replace-with-';
+    public const string PLACEHOLDER_PREFIX = Secrets::PLACEHOLDER_PREFIX;
+    /** The secrets the containers refuse to boot without; the TOTP key is base64. */
+    public const array SECRETS = [EnvironmentVariable::APP_SECRET => false, EnvironmentVariable::STREAM_URL_HMAC_SECRET => false, EnvironmentVariable::AUTH_TOTP_ENCRYPTION_KEY => true];
+    /** The service passwords the preset gives PostgreSQL and Redis. */
+    public const array PASSWORDS = ['DB_PASSWORD', EnvironmentVariable::REDIS_PASSWORD];
     /** @param list<string> $frontProxies Addresses and CIDR ranges of the reverse proxies in front of the gateway.
      * @param array<string,ImageSelection> $images
      * @param array<string,string> $environment
@@ -165,7 +170,10 @@ final readonly class Configuration
 
     /**
      * Refuses a configuration that still carries an example's `replace-with-` placeholder, so
-     * a copied example cannot be deployed. The shipped examples parse; they do not deploy.
+     * a copied example cannot be deployed: the shipped examples parse; they do not deploy. It
+     * also refuses the secrets and passwords the containers would refuse to boot with, by the
+     * rules they apply ({@see Secrets}), and any secret or password the repository commits,
+     * the test values the containers accept included. Problems name the variable alone.
      */
     public function assertDeployable(): void
     {
@@ -173,6 +181,22 @@ final readonly class Configuration
             if (str_starts_with($value, self::PLACEHOLDER_PREFIX)) {
                 throw new \InvalidArgumentException('Replace the placeholder value of ' . $key . ' before deploying.');
             }
+        }
+        $problems = [];
+        foreach (self::SECRETS as $variable => $base64) {
+            $problems[] = Secrets::secretProblem($variable, $this->environment[$variable] ?? '', $base64);
+        }
+        foreach (self::PASSWORDS as $variable) {
+            $problems[] = Secrets::passwordProblem($variable, $this->environment[$variable] ?? '');
+        }
+        foreach ([...array_keys(self::SECRETS), ...self::PASSWORDS] as $variable) {
+            if (Secrets::committed($this->environment[$variable] ?? '')) {
+                $problems[] = $variable . ' is a value the repository commits.';
+            }
+        }
+        $problems = array_values(array_unique(array_filter($problems)));
+        if ($problems !== []) {
+            throw new \InvalidArgumentException('Generate private values before deploying: ' . implode(' ', $problems));
         }
     }
 

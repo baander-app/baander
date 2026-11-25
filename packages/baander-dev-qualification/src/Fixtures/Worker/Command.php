@@ -95,7 +95,7 @@ final class Command
             '--network-alias',
             'redis',
             '-e',
-            'REDIS_ARGS=--requirepass test-only',
+            'REDIS_ARGS=--requirepass test-only-redis-password',
             $this->runtime->image('fixtureRedis')->id,
         ]);
         $this->resources->startContainer($id . '-postgres', [
@@ -106,7 +106,7 @@ final class Command
             '-e',
             'POSTGRES_USER=baander',
             '-e',
-            'POSTGRES_PASSWORD=test-only',
+            'POSTGRES_PASSWORD=test-only-database-password',
             '-e',
             'POSTGRES_DB=worker_command_test',
             $this->runtime->image('postgres')->id,
@@ -130,7 +130,7 @@ final class Command
                 false,
             )->exitCode === 0
             && $this->docker(
-                ['exec', '-e', 'REDISCLI_AUTH=test-only', $id . '-redis', 'redis-cli', 'ping'],
+                ['exec', '-e', 'REDISCLI_AUTH=test-only-redis-password', $id . '-redis', 'redis-cli', 'ping'],
                 false,
             )->stdout
                 |> trim(...) === 'PONG',
@@ -155,15 +155,15 @@ final class Command
             '-e',
             'CONVERT_STORAGE_PATH=' . $workspace . '/storage/conversions',
             '-e',
-            'REDIS_PASSWORD=test-only',
+            'REDIS_PASSWORD=test-only-redis-password',
             '-e',
-            'REDIS_URL=redis://default:test-only@redis:6379',
+            'REDIS_URL=redis://default:test-only-redis-password@redis:6379',
             '-e',
-            'MESSENGER_TRANSPORT_DSN=redis://default:test-only@redis:6379/messages',
+            'MESSENGER_TRANSPORT_DSN=redis://default:test-only-redis-password@redis:6379/messages',
             '-e',
-            'DATABASE_URL=postgresql://baander:test-only@postgres:5432/worker_command_test?serverVersion=18&charset=utf8',
+            'DATABASE_URL=postgresql://baander:test-only-database-password@postgres:5432/worker_command_test?serverVersion=18&charset=utf8',
             '-e',
-            'DATABASE_CONTROL_URL=postgresql://baander:test-only@postgres:5432/worker_command_test?serverVersion=18&charset=utf8',
+            'DATABASE_CONTROL_URL=postgresql://baander:test-only-database-password@postgres:5432/worker_command_test?serverVersion=18&charset=utf8',
             // A worker refuses a --deployment-profile that differs from the deployment's own.
             '-e',
             'BAANDER_DEPLOYMENT_PROFILE=' . $this->deploymentProfile,

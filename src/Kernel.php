@@ -21,9 +21,23 @@ class Kernel extends BaseKernel
 {
     public const int LOG_QUERY_HOOKS = SWOOLE_HOOK_NATIVE_CURL | SWOOLE_HOOK_PROC;
 
+    /**
+     * The environments the configuration defines. Every environment guard in the application
+     * tells prod from dev and test, so another name would boot with neither's guards.
+     */
+    public const array ENVIRONMENTS = ['dev', 'test', 'prod'];
+
     use CoroutinesSupportingKernel, MicroKernelTrait {
         CoroutinesSupportingKernel::initializeContainer insteadof MicroKernelTrait;
         CoroutinesSupportingKernel::getContainerBaseClass insteadof MicroKernelTrait;
+    }
+
+    public function __construct(string $environment, bool $debug)
+    {
+        if (!in_array($environment, self::ENVIRONMENTS, true)) {
+            throw new \InvalidArgumentException('Unknown environment; APP_ENV must be dev, test or prod.');
+        }
+        parent::__construct($environment, $debug);
     }
 
     /**

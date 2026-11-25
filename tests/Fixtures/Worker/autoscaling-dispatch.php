@@ -10,7 +10,7 @@ $kind = $argv[3] ?? 'io';
 if ($count === false || $count < 1 || $count > 48) { throw new InvalidArgumentException('Invalid bounded workload count.'); }
 new App\Tests\Fixtures\Worker\Autoscaling\Workload($batch, 0, $kind);
 $transport = new Symfony\Component\Messenger\Bridge\Redis\Transport\RedisTransport(
-    Symfony\Component\Messenger\Bridge\Redis\Transport\Connection::fromDsn('redis://default:test-only@redis:6379/messages/baander'),
+    Symfony\Component\Messenger\Bridge\Redis\Transport\Connection::fromDsn('redis://default:test-only-redis-password@redis:6379/messages/baander'),
     App\Tests\Fixtures\Messaging\MessageCodecFactory::signingSerializer([new App\Tests\Fixtures\Worker\Autoscaling\WorkloadCodec()]),
 );
 $started = hrtime(true) / 1e9;

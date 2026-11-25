@@ -44,7 +44,7 @@ final class PresetDeploymentTest extends TestCase
             'origin' => 'http://baander.app:8080',
             'listen' => ['address' => '127.0.0.1', 'port' => 8080],
             'images' => array_fill_keys(['application', 'worker', 'operator', 'postgres', 'gateway', 'redis'], 'baander/fixture:local'),
-            'environment' => ['APP_SECRET' => 'private-app-secret', 'STREAM_URL_HMAC_SECRET' => 'private-stream-secret', 'AUTH_TOTP_ENCRYPTION_KEY' => 'cHJpdmF0ZS10b3RwLWVuY3J5cHRpb24ta2V5LTMyYiE=', 'DB_USERNAME' => 'baander', 'DB_PASSWORD' => 'private-database-secret', 'DB_DATABASE' => 'baander', 'REDIS_PASSWORD' => 'private-redis-secret'],
+            'environment' => ['APP_SECRET' => 'private-app-secret-of-the-preset-tests', 'STREAM_URL_HMAC_SECRET' => 'private-stream-secret-of-the-preset-tests', 'AUTH_TOTP_ENCRYPTION_KEY' => 'cHJpdmF0ZS10b3RwLWVuY3J5cHRpb24ta2V5LTMyYiE=', 'DB_USERNAME' => 'baander', 'DB_PASSWORD' => 'private-database-secret', 'DB_DATABASE' => 'baander', 'REDIS_PASSWORD' => 'private-redis-secret'],
         ];
     }
 
@@ -266,6 +266,71 @@ final class PresetDeploymentTest extends TestCase
         } finally {
             Collector::remove($directory);
         }
+    }
+
+    /** @return iterable<string, array{string, string}> */
+    public static function committedSecrets(): iterable
+    {
+        $variables = ['APP_SECRET' => 'APP_SECRET', 'STREAM_URL_HMAC_SECRET' => 'STREAM_URL_HMAC_SECRET', 'AUTH_TOTP_ENCRYPTION_KEY' => 'AUTH_TOTP_ENCRYPTION_KEY', 'REDIS_PASSWORD' => 'REDIS_PASSWORD'];
+        $urls = ['DATABASE_URL' => 'DB_PASSWORD', 'DATABASE_CONTROL_URL' => 'DB_PASSWORD', 'REDIS_URL' => 'REDIS_PASSWORD'];
+        foreach (['.env.dev', '.env.example', '.env.test'] as $file) {
+            $values = new \Symfony\Component\Dotenv\Dotenv()->parse((string) file_get_contents(dirname(__DIR__, 3) . '/' . $file), $file);
+            foreach ($variables as $variable => $setting) {
+                if (($values[$variable] ?? '') !== '') {
+                    yield $file . ' ' . $variable => [$setting, $values[$variable]];
+                }
+            }
+            foreach ($urls as $variable => $setting) {
+                $password = rawurldecode((string) parse_url($values[$variable] ?? '', PHP_URL_PASS));
+                if ($password !== '') {
+                    yield $file . ' ' . $variable => [$setting, $password];
+                }
+            }
+        }
+    }
+
+    #[\PHPUnit\Framework\Attributes\DataProvider('committedSecrets')]
+    public function testThePresetRefusesEverySecretATrackedEnvironmentFileCommits(string $setting, string $value): void
+    {
+        $data = self::configuration();
+        $data['environment'][$setting] = $value;
+
+        try {
+            Configuration::fromArray($data)->assertDeployable();
+            self::fail('Rendering accepted a committed ' . $setting . '.');
+        } catch (\InvalidArgumentException $refused) {
+            self::assertStringContainsString($setting, $refused->getMessage());
+            self::assertStringNotContainsString($value, $refused->getMessage());
+        }
+    }
+
+    /** @return iterable<string, array{string, string, string}> */
+    public static function shortSecrets(): iterable
+    {
+        yield '31-byte APP_SECRET' => ['APP_SECRET', str_repeat('a', 31), 'APP_SECRET is shorter than 32 bytes'];
+        yield '15-byte database password' => ['DB_PASSWORD', str_repeat('d', 15), 'DB_PASSWORD is shorter than 16 bytes'];
+        yield '15-byte Redis password' => ['REDIS_PASSWORD', str_repeat('r', 15), 'REDIS_PASSWORD is shorter than 16 bytes'];
+        yield '31-byte TOTP key' => ['AUTH_TOTP_ENCRYPTION_KEY', base64_encode(str_repeat("\x02", 31)), 'AUTH_TOTP_ENCRYPTION_KEY is shorter than 32 bytes'];
+    }
+
+    #[\PHPUnit\Framework\Attributes\DataProvider('shortSecrets')]
+    public function testRenderingRefusesAShortSecretOrPassword(string $setting, string $value, string $problem): void
+    {
+        $data = self::configuration();
+        $data['environment'][$setting] = $value;
+
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessage($problem);
+        Configuration::fromArray($data)->assertDeployable();
+    }
+
+    public function testRenderingAccepts16BytePasswordsAnd32ByteSecrets(): void
+    {
+        $data = self::configuration();
+        $data['environment'] = ['APP_SECRET' => str_repeat('a', 32), 'DB_PASSWORD' => str_repeat('d', 16), 'REDIS_PASSWORD' => str_repeat('r', 16)] + $data['environment'];
+
+        Configuration::fromArray($data)->assertDeployable();
+        $this->addToAssertionCount(1);
     }
 
     public function testPresetRequiresTheTotpEncryptionKey(): void

@@ -35,8 +35,8 @@ final class OAuthProductionConfigurationTest extends TestCase
         $this->environment('OAUTH_PUBLIC_KEY_PATH', $this->directory . '/public.pem');
         // Kernel environment, rather than this ambient value, must govern admission.
         $this->environment('APP_ENV', 'test');
-        $this->environment('DATABASE_URL', 'postgresql://worker:private@db.baander.app/unused?serverVersion=18&charset=utf8');
-        $this->environment('REDIS_URL', 'redis://redis.baander.app:6379');
+        $this->environment('DATABASE_URL', 'postgresql://worker:private-database-password@db.baander.app/unused?serverVersion=18&charset=utf8');
+        $this->environment('REDIS_URL', 'redis://baander:private-redis-password@redis.baander.app:6379');
         $this->environment('APP_URL', 'https://baander.app');
     }
 

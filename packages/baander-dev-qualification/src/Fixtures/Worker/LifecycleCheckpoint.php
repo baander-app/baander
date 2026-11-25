@@ -165,7 +165,7 @@ final readonly class LifecycleCheckpoint
                 [
                     'exec',
                     '-e',
-                    'REDISCLI_AUTH=test-only',
+                    'REDISCLI_AUTH=test-only-redis-password',
                     $s->runId . '-redis',
                     'redis-cli',
                     '--raw',
@@ -242,7 +242,7 @@ final readonly class LifecycleCheckpoint
                 [
                     'exec',
                     '-e',
-                    'REDISCLI_AUTH=test-only',
+                    'REDISCLI_AUTH=test-only-redis-password',
                     $s->runId . '-redis',
                     'redis-cli',
                     '--raw',
