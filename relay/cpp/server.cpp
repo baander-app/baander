@@ -29,6 +29,11 @@ struct Server {
     std::string enrollment_key;
     bool initialized = false;
     bool schema_bootstrapped = false;
+    // Bumped on every incompatible answer, so a probe that started earlier cannot
+    // restore readiness after it.
+    std::uint64_t readiness_generation = 0;
+    asio::steady_timer retry_timer;
+    asio::cancellation_signal readiness_cancellation;
     asio::steady_timer shutdown_timer;
     const std::chrono::milliseconds shutdown_grace;
     bool stopping = false;
@@ -41,7 +46,8 @@ struct Server {
 
     Server(asio::io_context &context, const Json &config, DatabaseConfig database_config)
         : context(context), acceptor(context), database(context, std::move(database_config)),
-          shutdown_timer(context), shutdown_grace(config.value("shutdownGraceMs", 5000)),
+          retry_timer(context), shutdown_timer(context),
+          shutdown_grace(config.value("shutdownGraceMs", 5000)),
           maximum_sessions(config.value("maximumSessions", 64u)),
           tokens(config.value("burst", 200.0)), rate(config.value("requestsPerSecond", 200.0)),
           burst(config.value("burst", 200.0)), deadline(config.value("deadlineMs", 2000)) {
@@ -99,39 +105,8 @@ struct Server {
         if (request.method() == http::verb::get && target == "/ready") {
             if (!schema_bootstrapped)
                 throw Failure(503, "Registry schema is not ready.");
-            try {
-                DatabaseRequest readiness_request{
-                    "/db/query?level=linearizable&associative",
-                    Json::array({"SELECT version, checksum FROM schema_migrations "
-                                 "ORDER BY version",
-                                 "SELECT public_id, credential_digest, url, name, "
-                                 "version, created_ms, "
-                                 "updated_ms, last_seen_ms, revision FROM registries "
-                                 "WHERE 0"})};
-                auto result =
-                    co_await database.request(std::move(readiness_request), database_deadline);
-                validate_database_result(result.status, result.body, 2);
-                const auto &schema = result.body["results"][0];
-                if (!schema.contains("types") || !schema.contains("rows") ||
-                    schema["types"] != schema_snapshot["types"] ||
-                    schema["rows"] != schema_snapshot["rows"])
-                    throw Failure(503, "Registry schema is incompatible.");
-                const Json expected_columns{
-                    {"public_id", "text"},     {"credential_digest", "text"},
-                    {"url", "text"},           {"name", "text"},
-                    {"version", "text"},       {"created_ms", "integer"},
-                    {"updated_ms", "integer"}, {"last_seen_ms", "integer"},
-                    {"revision", "integer"}};
-                const auto &registry_table = result.body["results"][1];
-                if (!registry_table.contains("types") ||
-                    registry_table["types"] != expected_columns)
-                    throw Failure(503, "Registry table is incompatible.");
-                initialized = true;
-                co_return Json{{"data", {{"ready", true}}}};
-            } catch (const std::exception &) {
-                initialized = false;
-                throw;
-            }
+            co_await probe_readiness(database_deadline);
+            co_return Json{{"data", {{"ready", true}}}};
         }
         if (!initialized)
             throw Failure(503, "Registry schema is not ready.");
@@ -163,10 +138,19 @@ struct Server {
         }
         throw Failure(404, "Route not found.");
     }
-    asio::awaitable<void> initialize() {
-        // Retry initialization with a bounded delay; readiness itself never writes
-        // schema.
-        while (!stopping && !initialized) {
+    // False once stop() has begun; stop() cancels a pending wait.
+    asio::awaitable<bool> retry_after_one_second() {
+        if (stopping)
+            co_return false;
+        retry_timer.expires_after(std::chrono::seconds(1));
+        boost::system::error_code error;
+        co_await retry_timer.async_wait(asio::redirect_error(asio::use_awaitable, error));
+        co_return !error && !stopping;
+    }
+    // Writes the schema at startup, retrying each second. Afterwards it only reads: while
+    // readiness is lost it probes once a second, so recovery needs no client.
+    asio::awaitable<void> maintain_readiness() {
+        while (!schema_bootstrapped) {
             try {
                 auto result = co_await database.request(schema_request());
                 validate_schema_result(result.status, result.body);
@@ -174,14 +158,35 @@ struct Server {
                 initialized = true;
                 schema_bootstrapped = true;
             } catch (const std::exception &) {
-                initialized = false;
             }
-            if (!initialized && !stopping) {
-                asio::steady_timer retry(context, std::chrono::seconds(1));
-                co_await retry.async_wait(asio::use_awaitable);
+            if (!schema_bootstrapped && !co_await retry_after_one_second())
+                co_return;
+        }
+        while (co_await retry_after_one_second()) {
+            if (initialized)
+                continue;
+            try {
+                co_await probe_readiness(std::nullopt);
+            } catch (const std::exception &) {
             }
         }
-        co_return;
+    }
+    // Only an incompatible answer from rqlite closes the gate; a capacity, budget, deadline
+    // or transport failure answers this probe with 503 and leaves the gate as it was.
+    asio::awaitable<void>
+    probe_readiness(std::optional<std::chrono::steady_clock::time_point> database_deadline) {
+        const auto generation = readiness_generation;
+        try {
+            const auto result = co_await database.request(readiness_request(), database_deadline);
+            validate_readiness_result(schema_snapshot, result.status, result.body);
+        } catch (const SchemaIncompatible &) {
+            initialized = false;
+            ++readiness_generation;
+            throw;
+        }
+        if (generation != readiness_generation)
+            throw Failure(503, "Registry schema is not ready.");
+        initialized = true;
     }
     asio::awaitable<void> listen();
     void stop();
@@ -302,6 +307,7 @@ void Server::stop() {
     if (stopping)
         return;
     stopping = true;
+    readiness_cancellation.emit(asio::cancellation_type::terminal);
     boost::system::error_code ignored;
     acceptor.close(ignored);
     for (const auto &session : sessions) {
@@ -357,7 +363,9 @@ int main(int argc, char **argv) {
             if (!error)
                 server.stop();
         });
-        boost::asio::co_spawn(context, server.initialize(), [](std::exception_ptr) {});
+        boost::asio::co_spawn(context, server.maintain_readiness(),
+                              boost::asio::bind_cancellation_slot(
+                                  server.readiness_cancellation.slot(), [](std::exception_ptr) {}));
         boost::asio::co_spawn(context, server.listen(), [](std::exception_ptr) {});
         context.run(); // Drain cancellation before pool/session destruction.
     } catch (const std::exception &) {

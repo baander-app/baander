@@ -129,6 +129,19 @@ final class ClusterContract
         } while (Runtime::now() < $until);
         throw new \RuntimeException('Voters did not rejoin/apply acknowledged state within 30 seconds. ' . $last);
     }
+    public static function waitLookup(Api $api, string $identifier): void
+    {
+        $until = Runtime::now() + 30;
+        do {
+            [$status, $body, $headers] = $api->request('GET', '/api/servers/' . $identifier);
+            if ($status === 200) {
+                return;
+            }
+            self::requireUnavailable($status, $body, $headers);
+            usleep(50000);
+        } while (Runtime::now() < $until);
+        throw new \RuntimeException('Lookup did not recover within 30 seconds of the heal.');
+    }
     public static function exportDiagnostics(string $directory, ?string $destination): void
     {
         if ($destination === null) {
@@ -390,7 +403,9 @@ final class ClusterContract
             self::verify($pinned, $acknowledged);
             $cluster->network->heal();
             $healed = self::waitConverged($cluster, range(0, $nodes - 1), $index, $expected);
-            $minorityApi->waitReady();
+            // No readiness request here: the 503 readiness answer during the partition must
+            // not have closed this API's lookups.
+            self::waitLookup($minorityApi, $seed);
             self::verify($minorityApi, $acknowledged);
             echo 'PASS: ' . count($majority) . '–' . count($minority) . " partition, majority commits, leader recovery and voter rejoin\n";
             $failures = [$healed];

@@ -11,6 +11,11 @@ struct Failure : std::runtime_error {
     unsigned status;
     Failure(unsigned status, const char *message) : std::runtime_error(message), status(status) {}
 };
+// rqlite answered, and its answer does not match the schema this API serves. Every other
+// readiness failure (capacity, budget, deadline, transport, statement error) is a Failure.
+struct SchemaIncompatible : Failure {
+    explicit SchemaIncompatible(const char *message) : Failure(503, message) {}
+};
 struct DatabaseRequest {
     std::string target;
     Json statements;
@@ -27,6 +32,11 @@ Registration validate_registration(const Json &body);
 void validate_public_id(const std::string &public_id);
 DatabaseRequest schema_request();
 void validate_schema_result(unsigned http_status, const Json &response);
+// Read-only: the migration rows and the registry columns, compared with the snapshot that
+// startup recorded from schema_request().
+DatabaseRequest readiness_request();
+void validate_readiness_result(const Json &schema_snapshot, unsigned http_status,
+                               const Json &response);
 bool validate_enrollment(const Registration &registration, const std::string &token,
                          const std::string &key, std::int64_t now_ms);
 DatabaseRequest register_request(const Registration &registration, std::int64_t now_ms,

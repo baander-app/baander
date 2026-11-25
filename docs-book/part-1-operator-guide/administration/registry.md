@@ -56,13 +56,20 @@ use `docker compose down -v` against the operator inventory.
 | Signal | What it establishes | What it does not establish |
 |---|---|---|
 | Registry `GET /health` | The public API can answer its liveness request | Database quorum, backup freshness or authoritative lookup availability |
-| Registry `GET /ready` | An authoritative schema/column read succeeded | Regional latency, spare capacity or recoverability from a backup |
+| Registry `GET /ready` | An authoritative schema/column read succeeded. A `503` means this one read failed; registration and lookup stop only when rqlite reported an incompatible schema | Regional latency, spare capacity or recoverability from a backup |
 | Registration/lookup `503` | The request could not obtain the required result, including unavailable quorum or bounded capacity | That an identity is absent; do not treat it as a `404` |
 | Backup health | The recurring worker's capture/upload status and freshness | A destination-qualified recovery point or recovery time |
 
 These are registry endpoints, independent of the application endpoints with the
 same names. Probe with the configured TLS hostname and trusted CA. Do not disable
 certificate verification to make a health check pass.
+
+A readiness probe cannot switch the registry off. When `GET /ready` fails because the
+database pool is busy, the read ran out of time or the connection failed, it answers
+`503` and the registry keeps serving. When rqlite itself reports a schema checksum or
+registry columns that differ from what the API expects, registration and lookup
+answer `503` until the schema matches again. The API checks again every second and
+reopens by itself; it does not need a monitor to call `/ready`.
 
 If the API is alive but unready, inspect API logs, database reachability, TLS and
 credentials, then voter membership and available quorum. Preserve state when a

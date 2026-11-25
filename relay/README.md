@@ -207,12 +207,13 @@ The tests check minority 503 responses, majority progress, leader recovery withi
 During each partition, the majority updates an existing registration and creates
 another. Authenticated local diagnostic queries with `level=none` prove that every
 minority voter retains the old row and lacks the new identity. Both public lookups
-must return 503 with `Retry-After: 1` and a fixed error envelope before failed
-readiness can clear API initialization. Majority-capable APIs return the saved
-current public results. After healing, every voter's rows must match the saved
-metadata, revisions, timestamps and credential digests before the formerly isolated
-API becomes ready and returns the current results. These local diagnostic reads
-are confined to the test harness; public lookup remains linearizable.
+and readiness must return 503 with `Retry-After: 1` and a fixed error envelope.
+Majority-capable APIs return the saved current public results. After healing, every
+voter's rows must match the saved metadata, revisions, timestamps and credential
+digests. The formerly isolated API must then answer a lookup with the current
+results without any readiness request in between: its readiness 503 during the
+partition must not have closed its lookups. These local diagnostic reads are
+confined to the test harness; public lookup remains linearizable.
 
 The tests then stop a majority including the leader (two of three or three of five)
 while the API stays running. Existing and absent lookups, registration and readiness
@@ -411,9 +412,15 @@ Malformed JSON returns 400, invalid fields 422, unauthorized enrollment or
 wrong ownership 403, oversized bodies 413, rate limiting 429, and authoritative
 unavailability 503. Liveness never depends on rqlite. Readiness reads the schema
 and registry columns with linearizable consistency. Schema initialization retries
-at startup with a one-second delay; readiness itself never writes. A failed schema
-read marks the API unready. A later compatible authoritative read restores it
-without rewriting the schema.
+at startup with a one-second delay; readiness itself never writes. A readiness
+request that fails on pool capacity, its time budget, the database deadline or the
+transport answers 503 and changes nothing else: registration and lookup keep
+working. Only an answer in which rqlite reports a migration record or registry
+columns that differ from what this API serves closes registration and lookup with
+503. While they are closed, the API re-reads readiness once a second and reopens
+them after the first compatible answer, without a client's request and without
+rewriting the schema. A successful `GET /ready` reopens them too. An answer that
+was read before a later incompatible answer cannot reopen them.
 
 The server runs one Asio event-loop thread. Session capacity is fixed (default
 64, configurable 1–256); excess connections close without queued tasks. Each

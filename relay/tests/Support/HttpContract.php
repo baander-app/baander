@@ -264,6 +264,22 @@ final class HttpContract
         return $this->decode($result['result']);
     }
 
+    /**
+     * Polls a lookup and never calls /ready, so a pass shows the server restored readiness
+     * by itself.
+     */
+    private function lookupRecovers(string $failure, float $timeout = 5): void
+    {
+        $until = microtime(true) + $timeout;
+        do {
+            if ($this->request('GET', '/api/servers/server-one')[0] === 200) {
+                return;
+            }
+            usleep(100000);
+        } while (microtime(true) < $until);
+        throw new \RuntimeException($failure);
+    }
+
     private function ready(int $port, float $timeout = 10, string $failure = 'Native TLS registry never became ready.'): void
     {
         $until = microtime(true) + $timeout;
@@ -367,6 +383,7 @@ final class HttpContract
             self::json([
                 'delay' => 0,
                 'malformedReadiness' => false,
+                'closeReadiness' => false,
                 'arrivals' => 0,
                 'armed' => false,
                 'writes' => 0,
@@ -544,7 +561,8 @@ final class HttpContract
         $this->noSecrets(file_get_contents($d . '/api.log'));
         $this->noSecrets(file_get_contents($d . '/rqlite.log'));
         echo "PASS: native TLS API enrollment, owner replay, concurrent ownership, malformed JSON/wire types, "
-            . "unchanged snapshots, secret exclusion, bounds, rate/pool limits, uncertain commits, schema recovery, "
+            . "unchanged snapshots, secret exclusion, bounds, rate/pool limits, uncertain commits, transient readiness "
+            . "failures that keep lookups open, schema recovery without a readiness request, "
             . "outage, deadlines and graceful/forced shutdown.\n";
     }
 
@@ -782,10 +800,27 @@ final class HttpContract
             $this->request('GET', '/api/servers/server-one')[1]['data']['url'] === $owned['url'],
             'Revived metadata mismatch.',
         );
+        $this->change(['closeReadiness' => true]);
+        self::check($this->request('GET', '/ready')[0] === 503, 'Closed readiness response accepted.');
+        self::check(
+            $this->request('GET', '/api/servers/server-one')[0] === 200,
+            'A readiness transport failure closed lookups.',
+        );
+        $this->change(['closeReadiness' => false]);
+        self::check($this->request('GET', '/ready')[0] === 200, 'Readiness did not return after a transport failure.');
+        [$latchedPort, $latched] = $this->graceful(3000, 'latched');
         $this->change(['malformedReadiness' => true]);
         self::check($this->request('GET', '/ready')[0] === 503, 'Malformed readiness accepted.');
         self::check($this->request('GET', '/api/servers/server-one')[0] === 503, 'Malformed schema allowed lookup.');
+        self::check($this->request('GET', '/ready', port: $latchedPort)[0] === 503, 'Malformed readiness accepted.');
+        $start = microtime(true);
+        $latched->signal(SIGTERM);
+        self::check(
+            $latched->wait(2) === 0 && microtime(true) - $start < 1,
+            'Registry with lost readiness took a second or more to stop.',
+        );
         $this->change(['malformedReadiness' => false]);
+        $this->lookupRecovers('Malformed schema did not recover without a readiness request.');
         self::check($this->request('GET', '/ready')[0] === 200, 'Malformed schema did not recover.');
         $checksum = $this->database(['SELECT checksum FROM schema_migrations'], true)['results'][0]['rows'][0]['checksum'];
         $this->database([['UPDATE schema_migrations SET checksum=?', 'incompatible']]);
@@ -825,11 +860,17 @@ final class HttpContract
         $this->waitState(static fn(array $state): bool => $state['arrivals'] >= 2);
         $result = $this->request('GET', '/api/servers/server-one');
         self::check($result[0] === 503 && ($result[2]['retry-after'] ?? null) === '1', 'Saturated pool accepted lookup.');
+        $result = $this->request('GET', '/ready');
+        self::check($result[0] === 503 && ($result[2]['retry-after'] ?? null) === '1', 'Saturated pool answered readiness.');
         foreach ($writes as $write) {
             self::check($this->await($write)[0] === 200, 'In-flight capacity write failed.');
         }
         $this->change(['delay' => 0, 'arrivals' => 0]);
-        self::check($this->request('GET', '/api/servers/server-one')[0] === 200, 'Pool did not recover.');
+        self::check(
+            $this->request('GET', '/api/servers/server-one')[0] === 200,
+            'Pool did not recover, or saturated readiness closed lookups.',
+        );
+        self::check($this->request('GET', '/ready')[0] === 200, 'Readiness did not recover after saturation.');
         [$port, $process] = $this->graceful(500, 'deadline', 100);
         $this->change(['delay' => 0.3, 'arrivals' => 0]);
         $start = microtime(true);

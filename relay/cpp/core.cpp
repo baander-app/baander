@@ -130,8 +130,28 @@ void validate_schema_result(unsigned status, const Json &response) {
         !records[0]["version"].is_number_integer() ||
         records[0]["version"].get<std::int64_t>() != 1 || !records[0].contains("checksum") ||
         records[0]["checksum"] != schema_checksum()) {
-        throw Failure(503, "Registry schema is incompatible.");
+        throw SchemaIncompatible("Registry schema is incompatible.");
     }
+}
+DatabaseRequest readiness_request() {
+    return {"/db/query?level=linearizable&associative",
+            Json::array({"SELECT version, checksum FROM schema_migrations ORDER BY version",
+                         "SELECT public_id, credential_digest, url, name, version, created_ms, "
+                         "updated_ms, last_seen_ms, revision FROM registries WHERE 0"})};
+}
+void validate_readiness_result(const Json &schema_snapshot, unsigned status, const Json &response) {
+    validate_database_result(status, response, 2);
+    const auto &schema = response["results"][0];
+    if (!schema.contains("types") || !schema.contains("rows") ||
+        schema["types"] != schema_snapshot["types"] || schema["rows"] != schema_snapshot["rows"])
+        throw SchemaIncompatible("Registry schema is incompatible.");
+    static const Json expected_columns{
+        {"public_id", "text"},     {"credential_digest", "text"}, {"url", "text"},
+        {"name", "text"},          {"version", "text"},           {"created_ms", "integer"},
+        {"updated_ms", "integer"}, {"last_seen_ms", "integer"},   {"revision", "integer"}};
+    const auto &registry_table = response["results"][1];
+    if (!registry_table.contains("types") || registry_table["types"] != expected_columns)
+        throw SchemaIncompatible("Registry table is incompatible.");
 }
 bool validate_enrollment(const Registration &r, const std::string &token, const std::string &key,
                          std::int64_t now_ms) {

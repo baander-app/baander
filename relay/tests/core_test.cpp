@@ -188,6 +188,76 @@ TEST(Schema, RejectsChecksumMismatchUnsupportedVersionAndMissingMetadata) {
     failure(503, [&] { validate_schema_result(200, wrong); });
 }
 
+namespace {
+Json migration_snapshot() {
+    return {{"types", Json{{"version", "integer"}, {"checksum", "text"}}},
+            {"rows",
+             Json::array({Json{{"version", 1}, {"checksum", schema_request().statements[2][1]}}})}};
+}
+Json compatible_readiness() {
+    return {{"results",
+             Json::array({migration_snapshot(), Json{{"types", Json{{"public_id", "text"},
+                                                                    {"credential_digest", "text"},
+                                                                    {"url", "text"},
+                                                                    {"name", "text"},
+                                                                    {"version", "text"},
+                                                                    {"created_ms", "integer"},
+                                                                    {"updated_ms", "integer"},
+                                                                    {"last_seen_ms", "integer"},
+                                                                    {"revision", "integer"}}}}})}};
+}
+template <class F> bool incompatible(F operation) {
+    try {
+        operation();
+    } catch (const SchemaIncompatible &) {
+        return true;
+    } catch (const Failure &failure) {
+        EXPECT_EQ(503u, failure.status);
+        return false;
+    }
+    ADD_FAILURE() << "Expected a readiness failure";
+    return false;
+}
+} // namespace
+TEST(Readiness, ReadOnlyLinearizableProbe) {
+    const auto request = readiness_request();
+    EXPECT_EQ("/db/query?level=linearizable&associative", request.target);
+    EXPECT_EQ(2, request.statements.size());
+    for (const auto &statement : request.statements)
+        EXPECT_TRUE(statement.get<std::string>().starts_with("SELECT "));
+}
+TEST(Readiness, IncompatibleColumnsOrChecksumAreSchemaIncompatible) {
+    const auto snapshot = migration_snapshot();
+    EXPECT_NO_THROW(validate_readiness_result(snapshot, 200, compatible_readiness()));
+    auto response = compatible_readiness();
+    response["results"][1]["types"] = Json{{"public_id", "text"}};
+    EXPECT_TRUE(incompatible([&] { validate_readiness_result(snapshot, 200, response); }));
+    response = compatible_readiness();
+    response["results"][1]["types"]["revision"] = "text";
+    EXPECT_TRUE(incompatible([&] { validate_readiness_result(snapshot, 200, response); }));
+    response = compatible_readiness();
+    response["results"][0]["rows"][0]["checksum"] = "incompatible";
+    EXPECT_TRUE(incompatible([&] { validate_readiness_result(snapshot, 200, response); }));
+    response = compatible_readiness();
+    response["results"][0].erase("types");
+    EXPECT_TRUE(incompatible([&] { validate_readiness_result(snapshot, 200, response); }));
+}
+TEST(Readiness, TransportAndStatementFailuresAreNotSchemaIncompatible) {
+    const auto snapshot = migration_snapshot();
+    EXPECT_FALSE(incompatible([&] { validate_readiness_result(snapshot, 0, Json::object()); }));
+    EXPECT_FALSE(
+        incompatible([&] { validate_readiness_result(snapshot, 503, compatible_readiness()); }));
+    auto response = compatible_readiness();
+    response["results"][1] = Json{{"error", "no such table: registries"}};
+    EXPECT_FALSE(incompatible([&] { validate_readiness_result(snapshot, 200, response); }));
+    response = compatible_readiness();
+    response["error"] = "leadership lost";
+    EXPECT_FALSE(incompatible([&] { validate_readiness_result(snapshot, 200, response); }));
+    response = compatible_readiness();
+    response["results"].erase(1);
+    EXPECT_FALSE(incompatible([&] { validate_readiness_result(snapshot, 200, response); }));
+}
+
 TEST(Registration, Accepts128CharacterUnicodeNameAndRejects129) {
     auto registration = body();
     std::string name;

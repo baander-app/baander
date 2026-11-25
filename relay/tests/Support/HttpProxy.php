@@ -73,6 +73,10 @@ final class HttpProxy
                 if (str_contains($body, 'INSERT INTO registries') && $state['delay'] > 0) {
                     usleep((int) ($state['delay'] * 1000000));
                 }
+                if ($state['closeReadiness'] && str_contains($body, 'FROM registries WHERE 0')) {
+                    $response->close();
+                    return;
+                }
                 try {
                     $target = $request->server['request_uri'];
                     if (isset($request->server['query_string']) && $request->server['query_string'] !== '') {
