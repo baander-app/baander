@@ -10,6 +10,7 @@ use App\Library\Domain\ValueObject\LibrarySlug;
 use App\Media\Application\Command\PruneMissingImagesCommand;
 use App\Metadata\Application\Command\ExtractAlbumCoverCommand;
 use App\Notification\Application\DTO\SendPushCommand;
+use App\Notification\Application\DTO\SendPushToSubscriptionCommand;
 use App\Notification\Domain\ValueObject\NotificationCategory;
 use App\Radio\Application\Command\SyncCountryStationsCommand;
 use App\Scheduler\Application\Command\ExecuteScheduledOccurrenceCommand;
@@ -39,6 +40,7 @@ final class MessagingCodecWiringTest extends KernelTestCase
             new ExtractAlbumCoverCommand($id),
             new \App\Notification\Application\DTO\SendWebhookCommand($id, NotificationCategory::Security, 'title', 'body', 'notification'),
             new SendPushCommand($id, NotificationCategory::Security, 'title', 'body', 'notification'),
+            new SendPushToSubscriptionCommand(Uuid::generate(), $id, 'title', 'body', 'notification'),
             new SyncCountryStationsCommand($id, 'de'),
             new ExecuteScheduledOccurrenceCommand($id),
             new RelayOutboxCommand(50),
@@ -57,7 +59,7 @@ final class MessagingCodecWiringTest extends KernelTestCase
             new \App\Transcode\Application\Command\PrepareTimelinePreview('/media/movies/film.mkv', 'film-preview', 5400.5, 12.5, str_repeat('a', 64), 0),
         ];
 
-        self::assertCount(25, $messages);
+        self::assertCount(26, $messages);
         $catalog = self::getContainer()->get(\App\Shared\Infrastructure\Messaging\AsyncWorkloadCatalog::class);
         self::assertInstanceOf(\App\Shared\Infrastructure\Messaging\AsyncWorkloadCatalog::class, $catalog);
         $covered = array_fill_keys(array_map(static fn (object $message): string => $message::class, $messages), true);

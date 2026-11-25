@@ -89,6 +89,11 @@ return static function (ContainerConfigurator $container): void {
             'resource_class' => 'io',
             'default' => true,
         ],
+        \App\Notification\Application\DTO\SendPushToSubscriptionCommand::class => [
+            'transport' => 'async',
+            'resource_class' => 'io',
+            'default' => true,
+        ],
         \App\Media\Application\Command\PruneMissingImagesCommand::class => [
             'transport' => 'async',
             'resource_class' => 'io',

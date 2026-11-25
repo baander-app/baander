@@ -57,6 +57,7 @@ final class SwooleFallbackHandlerRegistrationTest extends TestCase
             \App\Recommendation\Application\CommandHandler\ExecuteRecommendationJobHandler::class => new \App\Recommendation\Application\Command\ExecuteRecommendationJobCommand(Uuid::v7()),
             \App\Media\Application\CommandHandler\GenerateImageDerivativeHandler::class => new \App\Media\Application\Command\GenerateImageDerivativeCommand('source.png'),
             \App\Notification\Application\Handler\SendPushHandler::class => new \App\Notification\Application\DTO\SendPushCommand(Uuid::v7(), \App\Notification\Domain\ValueObject\NotificationCategory::Security, 'title', 'body', 'notification'),
+            \App\Notification\Application\Handler\SendPushToSubscriptionHandler::class => new \App\Notification\Application\DTO\SendPushToSubscriptionCommand(Uuid::v7(), Uuid::v7(), 'title', 'body', 'notification'),
             \App\Notification\Application\Handler\SendEmailHandler::class => new \App\Notification\Application\DTO\SendEmailCommand(Uuid::v7(), 'worker@baander.app', \App\Notification\Domain\ValueObject\NotificationCategory::Security, 'title', [], 'body', [], new \DateTimeImmutable()),
             SyncSongHandler::class => new SyncSongMessage(Uuid::v7()),
             SyncMovieHandler::class => new SyncMovieMessage(Uuid::v7()),

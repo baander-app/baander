@@ -40,7 +40,8 @@ Services in `src/Notification/Application/Service/`:
 | `CreateNotificationCommand` | `CreateNotificationHandler` | Create an in-app notification |
 | `SeedDefaultPreferencesCommand` | `SeedDefaultPreferencesHandler` | Initialize default preferences for a user |
 | `SendEmailCommand` | `SendEmailHandler` | Deliver an email notification in the recipient's email language |
-| `SendPushCommand` | `SendPushHandler` | Deliver a Web Push notification while `notifications.push_enabled` is on |
+| `SendPushCommand` | `SendPushHandler` | Queue one `SendPushToSubscriptionCommand` per subscription of the user, the newest 20, while `notifications.push_enabled` is on |
+| `SendPushToSubscriptionCommand` | `SendPushToSubscriptionHandler` | Deliver a Web Push notification to one subscription; see [Push delivery](#push-delivery) |
 | `SendWebhookCommand` | `SendWebhookHandler` | Deliver a notification to an external webhook |
 | `ListWebhooksQuery` | `ListWebhooksHandler` | List the configured webhooks, oldest first, without secrets (`GET /api/webhooks` and `app:webhook:list`) |
 | `CreateWebhookCommand` | `CreateWebhookHandler` | Add a webhook and issue its signing secret (`POST /api/webhooks` and `app:webhook:create`) |
@@ -84,7 +85,7 @@ In-app notifications, push and webhook text stay in English. `CreateNotification
 
 The web server runs the health monitor. `HealthMonitorSubscriber` starts a Swoole timer in HTTP worker 0 that calls `HealthAlertService::checkAndAlert()` every `HEALTH_MONITOR_INTERVAL_SECONDS` (default 60). Each component's alert state (healthy, pending or acknowledged, with the outage window) lives in `HealthAlertTable`, a `Swoole\Table` created before the server forks its workers, so worker reloads keep it; `HealthAlertTransition` holds the rules as pure functions. A component that reads unhealthy owes one alert until it is delivered, also after the component recovers. Delivery reads the setting and saves the notifications through `AdminAlertPortInterface` inside one error boundary per component: a failure is logged, and the next tick retries. No delivery is tried while PostgreSQL reads unhealthy. The initial migration seeds no health-check schedule. See [Health alerts](../../part-1-operator-guide/administration/notifications.md#health-alerts) for what operators see.
 
-`SendPushHandler` reads its setting for every message and `HealthAlertService` reads its setting for every alert it delivers, so a change applies without a restart. See [Settings](shared.md#settings) for the mechanism.
+`SendPushHandler` and `SendPushToSubscriptionHandler` read their setting for every message, and `HealthAlertService` reads its setting for every alert it delivers, so a change applies without a restart. See [Settings](shared.md#settings) for the mechanism.
 
 ## API Endpoints
 
@@ -116,6 +117,21 @@ All endpoints are prefixed with `/api`.
 | POST | `/api/push/subscribe` | `PushSubscriptionController` | Subscribe to Web Push |
 | DELETE | `/api/push/subscribe` | `PushSubscriptionController` | Unsubscribe from Web Push |
 | DELETE | `/api/push/subscriptions` | `PushSubscriptionController` | Remove all push subscriptions |
+
+A user keeps at most 20 subscriptions. A registration that creates the 21st deletes the user's longest-registered subscription in the same transaction; registering an endpoint the user already holds rotates its keys and keeps its age. `PushSubscriptionRepository` takes a transaction-scoped advisory lock on the user first, so concurrent registrations count in turn. The endpoint is at most 2,048 characters, `keys.p256dh` 128 and `keys.auth` 64; a longer value answers `422`. The stored User-Agent label is cut to 255 characters. Database checks hold the same lengths (`chk_push_subscriptions_*`).
+
+#### Push delivery
+
+The outbox keeps one push delivery per notification. `SendPushHandler` turns it into one `SendPushToSubscriptionCommand` per subscription on the `async` transport, and Messenger retries each of those on its own:
+
+| Push service answer | Outcome |
+|---------------------|---------|
+| `2xx` | Delivered |
+| `404`, `410` | The subscription is removed; no retry |
+| `408`, `429`, `5xx`, no answer | Retried for that subscription alone |
+| Any other `4xx` | `UnrecoverableMessageHandlingException`: no retry, the message goes to the failure transport |
+
+A failing endpoint therefore never makes the user's other devices receive the notification again. When dispatching the batch itself fails, Messenger retries the whole batch and may queue a subscription twice, so delivery is at least once.
 
 ### Webhooks
 

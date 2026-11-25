@@ -5,27 +5,29 @@ declare(strict_types=1);
 namespace App\Notification\Application\Handler;
 
 use App\Notification\Application\DTO\SendPushCommand;
+use App\Notification\Application\DTO\SendPushToSubscriptionCommand;
+use App\Notification\Application\Port\PushDeliveryPortInterface;
 use App\Notification\Application\Settings\NotificationSettingDefinitions;
-use App\Notification\Infrastructure\Doctrine\Entity\PushSubscriptionEntity;
-use App\Notification\Infrastructure\Push\PushSubscriptionRepositoryInterface;
 use App\Notification\Domain\Repository\NotificationPreferenceRepositoryInterface;
 use App\Notification\Domain\ValueObject\NotificationChannel;
 use App\Shared\Application\Port\SystemSettingsPortInterface;
-use Minishlink\WebPush\Subscription;
-use Minishlink\WebPush\WebPush;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\Messenger\Attribute\AsMessageHandler;
-use Symfony\Component\Serializer\Encoder\JsonEncoder;
+use Symfony\Component\Messenger\MessageBusInterface;
 
+/**
+ * Fans one notification out to a message per subscription, each retried on its own, so a
+ * failing endpoint never makes the others receive the notification again. A failure while
+ * dispatching retries the whole batch, which may queue a subscription twice: delivery is
+ * at least once.
+ */
 final class SendPushHandler
 {
     public function __construct(
         private readonly NotificationPreferenceRepositoryInterface $preferenceRepository,
-        private readonly PushSubscriptionRepositoryInterface $subscriptionRepository,
-        private readonly WebPush $webPush,
+        private readonly PushDeliveryPortInterface $delivery,
+        private readonly MessageBusInterface $bus,
         private readonly LoggerInterface $logger,
-        private readonly string $appDomain,
-        private readonly JsonEncoder $jsonEncoder,
         private readonly SystemSettingsPortInterface $systemSettings,
     ) {
     }
@@ -53,61 +55,14 @@ final class SendPushHandler
             return;
         }
 
-        $subscriptions = $this->subscriptionRepository->findByUser($command->userId);
-
-        if ($subscriptions === []) {
-            return;
+        foreach ($this->delivery->subscriptionsOf($command->userId) as $subscriptionId) {
+            $this->bus->dispatch(new SendPushToSubscriptionCommand(
+                subscriptionId: $subscriptionId,
+                userId: $command->userId,
+                title: $command->title,
+                body: $command->body,
+                notificationPublicId: $command->notificationPublicId,
+            ));
         }
-
-        $payload = $this->jsonEncoder->encode([
-            'title' => $command->title,
-            'body' => $command->body,
-            'icon' => '/icons/notification.png',
-            'url' => sprintf('https://%s/notifications/%s', $this->appDomain, $command->notificationPublicId),
-        ], 'json');
-
-        $failureCount = 0;
-
-        foreach ($subscriptions as $entity) {
-            try {
-                $this->sendToSubscription($entity, $payload);
-            } catch (\Throwable) {
-                ++$failureCount;
-                $this->logger->error('Failed to send push notification.', [
-                    'channel' => 'notification.push',
-                    'notification_id' => $command->notificationPublicId,
-                    'subscription_id' => $entity->getId()->toString(),
-                ]);
-            }
-        }
-
-        if ($failureCount !== 0) {
-            throw new \RuntimeException(sprintf('Push delivery failed for %d subscription(s).', $failureCount));
-        }
-    }
-
-    private function sendToSubscription(PushSubscriptionEntity $entity, string $payload): void
-    {
-        $subscription = Subscription::create([
-            'endpoint' => $entity->getEndpoint(),
-            'keys' => [
-                'p256dh' => $entity->getPublicKey(),
-                'auth' => $entity->getAuthKey(),
-            ],
-            'contentEncoding' => $entity->getContentEncoding(),
-        ]);
-
-        $report = $this->webPush->sendOneNotification($subscription, $payload);
-
-        if ($report->isSuccess()) {
-            return;
-        }
-
-        if ($report->isSubscriptionExpired()) {
-            $this->subscriptionRepository->remove($entity);
-            return;
-        }
-
-        throw new \RuntimeException('Push service rejected notification.');
     }
 }

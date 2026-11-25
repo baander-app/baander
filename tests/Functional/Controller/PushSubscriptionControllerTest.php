@@ -146,6 +146,70 @@ final class PushSubscriptionControllerTest extends TestCase
         $this->assertJsonResponse($this->rawRequest('DELETE', '/api/push/subscribe', $user, '{"endpoint":'), 400, 'error');
     }
 
+    /** @return iterable<string, array{callable(array<string, mixed>): array<string, mixed>}> */
+    public static function oversizedSubscriptions(): iterable
+    {
+        yield 'endpoint over 2048 characters' => [static fn (array $payload): array => [...$payload, 'endpoint' => 'https://push.baander.app/' . str_repeat('e', 2048)]];
+        yield 'public key over 128 characters' => [static fn (array $payload): array => [...$payload, 'keys' => [...$payload['keys'], 'p256dh' => str_repeat('k', 129)]]];
+        yield 'authentication secret over 64 characters' => [static fn (array $payload): array => [...$payload, 'keys' => [...$payload['keys'], 'auth' => str_repeat('a', 65)]]];
+    }
+
+    /** @param callable(array<string, mixed>): array<string, mixed> $oversize */
+    #[DataProvider('oversizedSubscriptions')]
+    public function testAKeyOrEndpointOverItsLengthAnswers422(callable $oversize): void
+    {
+        $user = $this->createTestUser();
+
+        $response = $this->authenticatedRequest('POST', '/api/push/subscribe', $user, $oversize($this->validPayload($this->fcmEndpoint())));
+
+        $this->assertJsonResponse($response, 422);
+        $this->assertSame(0, $this->storedSubscriptions($user));
+    }
+
+    public function testThe21stRegistrationEvictsTheLongestRegisteredSubscription(): void
+    {
+        $user = $this->createTestUser();
+        $this->entityManager->getConnection()->executeStatement(
+            <<<'SQL'
+                INSERT INTO push_subscriptions (id, user_id, endpoint, public_key, auth_key, content_encoding, created_at)
+                SELECT gen_random_uuid(), ?, 'https://push.baander.app/registered-' || i, 'key', 'auth', 'aes128gcm',
+                       now() - make_interval(days => 21 - i)
+                FROM generate_series(1, 20) AS i
+                SQL,
+            [$user->getId()->toString()],
+        );
+        $newest = $this->fcmEndpoint();
+
+        $this->assertJsonResponse($this->authenticatedRequest('POST', '/api/push/subscribe', $user, $this->validPayload($newest)), 201);
+
+        $endpoints = $this->entityManager->getConnection()->fetchFirstColumn(
+            'SELECT endpoint FROM push_subscriptions WHERE user_id = ? ORDER BY created_at',
+            [$user->getId()->toString()],
+        );
+        $this->assertCount(20, $endpoints);
+        $this->assertNotContains('https://push.baander.app/registered-1', $endpoints);
+        $this->assertSame('https://push.baander.app/registered-2', $endpoints[0]);
+        $this->assertSame($newest, $endpoints[19]);
+    }
+
+    public function testTheUserAgentIsStoredAsAValidLabelOfAtMost255Characters(): void
+    {
+        $user = $this->createTestUser();
+        $endpoint = $this->fcmEndpoint();
+        $this->client->request('POST', '/api/push/subscribe', [], [], [
+            'CONTENT_TYPE' => 'application/json',
+            'HTTP_USER_AGENT' => "Browser\xff/" . str_repeat('ø', 600),
+            BaanderHeader::TestUserId->serverKey() => $user->getId()->toString(),
+        ], json_encode($this->validPayload($endpoint), JSON_THROW_ON_ERROR));
+
+        $this->assertJsonResponse($this->client->getResponse(), 201);
+        $stored = $this->entityManager->getConnection()->fetchOne('SELECT user_agent FROM push_subscriptions WHERE endpoint = ?', [$endpoint]);
+        $this->assertIsString($stored);
+        $this->assertSame(255, mb_strlen($stored));
+        $this->assertTrue(mb_check_encoding($stored, 'UTF-8'));
+        $this->assertStringStartsWith('Browser?/ø', $stored);
+    }
+
     // ---------------------------------------------------------------
     // DELETE /api/push/subscribe
     // ---------------------------------------------------------------

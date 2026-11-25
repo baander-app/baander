@@ -151,9 +151,6 @@ deptrac:
       - App\Auth\Domain\Model\User
       - App\Auth\Domain\Repository\UserRepositoryInterface
       - App\Library\Application\Query\LibraryMembershipQueryPort
-    App\Notification\Application\Handler\SendPushHandler:
-      - App\Notification\Infrastructure\Doctrine\Entity\PushSubscriptionEntity
-      - App\Notification\Infrastructure\Push\PushSubscriptionRepositoryInterface
     App\Notification\Application\Handler\SendWebhookHandler:
       - App\Notification\Infrastructure\Webhook\WebhookDeliveryService
     App\Notification\Domain\Service\EventCategoryResolver:
@@ -235,8 +232,6 @@ deptrac:
       - App\Party\Application\Command\SyncPlaybackCommand
       - App\Party\Domain\ValueObject\PlaybackAction
       - App\Transcode\Application\Command\UpdateTranscodePositionCommand
-    App\Transcode\Infrastructure\Swoole\TranscodeSessionSubscriber:
-      - App\Catalog\Domain\Repository\VideoRepositoryInterface
     App\Transcode\Interface\Controller\TranscodeSessionController:
       - App\Transcode\Domain\ValueObject\AudioProfile
       - App\Transcode\Domain\ValueObject\QualityTier

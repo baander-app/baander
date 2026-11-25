@@ -75,6 +75,7 @@ final class JsonMessageCodecTest extends TestCase
         yield [new SyncArtistMessage($id, Uuid::fromString('00000000-0000-4000-8000-000000000002'), 3)];
         yield [new SendEmailCommand($id, 'test@baander.app', NotificationCategory::Security, 'title', [], 'body', ['count' => 2], new \DateTimeImmutable('2026-10-01T12:00:00.000+00:00'))];
         yield [new SendPushCommand($id, NotificationCategory::Security, 'title', 'body', 'notification')];
+        yield [new \App\Notification\Application\DTO\SendPushToSubscriptionCommand(Uuid::fromString('00000000-0000-4000-8000-000000000003'), $id, 'title', 'body', 'notification')];
         yield [new SendWebhookCommand($id, NotificationCategory::Security, 'title', 'body', 'notification')];
         yield [new PruneMissingImagesCommand()];
         yield [new \App\Media\Application\Command\GenerateImageDerivativeCommand('source.png')];

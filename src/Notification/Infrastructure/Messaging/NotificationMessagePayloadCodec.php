@@ -6,6 +6,7 @@ namespace App\Notification\Infrastructure\Messaging;
 
 use App\Notification\Application\DTO\SendEmailCommand;
 use App\Notification\Application\DTO\SendPushCommand;
+use App\Notification\Application\DTO\SendPushToSubscriptionCommand;
 use App\Notification\Application\DTO\SendWebhookCommand;
 use App\Notification\Application\DTO\TranslatableParameter;
 use App\Notification\Domain\ValueObject\NotificationCategory;
@@ -17,6 +18,7 @@ final readonly class NotificationMessagePayloadCodec implements MessagePayloadCo
     private const array FIELDS = [
         'notification.send_email' => ['user_id', 'user_email', 'category', 'title_key', 'title_parameters', 'body_key', 'body_parameters', 'created_at', 'notification_id'],
         'notification.send_push' => ['user_id', 'category', 'title', 'body', 'notification_id'],
+        'notification.send_push_to_subscription' => ['subscription_id', 'user_id', 'title', 'body', 'notification_id'],
         'notification.send_webhook' => ['user_id', 'category', 'title', 'body', 'notification_id'],
     ];
 
@@ -25,6 +27,7 @@ final readonly class NotificationMessagePayloadCodec implements MessagePayloadCo
         return [
             'notification.send_email' => SendEmailCommand::class,
             'notification.send_push' => SendPushCommand::class,
+            'notification.send_push_to_subscription' => SendPushToSubscriptionCommand::class,
             'notification.send_webhook' => SendWebhookCommand::class,
         ];
     }
@@ -39,6 +42,7 @@ final readonly class NotificationMessagePayloadCodec implements MessagePayloadCo
         return match (true) {
             $message instanceof SendEmailCommand => [$message->userId->toString(), $message->userEmail, $message->category->value, $message->titleKey, $this->encodeParameters($message->titleParameters), $message->bodyKey, $this->encodeParameters($message->bodyParameters), $message->createdAt->format(\DateTimeInterface::RFC3339_EXTENDED), $message->notificationPublicId],
             $message instanceof SendPushCommand => [$message->userId->toString(), $message->category->value, $message->title, $message->body, $message->notificationPublicId],
+            $message instanceof SendPushToSubscriptionCommand => [$message->subscriptionId->toString(), $message->userId->toString(), $message->title, $message->body, $message->notificationPublicId],
             $message instanceof SendWebhookCommand => [$message->userId->toString(), $message->category->value, $message->title, $message->body, $message->notificationPublicId],
             default => throw new \InvalidArgumentException('Unsupported message type.'),
         };
@@ -49,6 +53,7 @@ final readonly class NotificationMessagePayloadCodec implements MessagePayloadCo
         return match ($type) {
             'notification.send_email' => new SendEmailCommand(Uuid::fromString($p['user_id']), $p['user_email'], NotificationCategory::from($p['category']), $p['title_key'], $this->decodeParameters($p['title_parameters']), $p['body_key'], $this->decodeParameters($p['body_parameters']), $this->decodeDate($p['created_at']), $p['notification_id']),
             'notification.send_push' => new SendPushCommand(Uuid::fromString($p['user_id']), NotificationCategory::from($p['category']), $p['title'], $p['body'], $p['notification_id']),
+            'notification.send_push_to_subscription' => new SendPushToSubscriptionCommand(Uuid::fromString($p['subscription_id']), Uuid::fromString($p['user_id']), $p['title'], $p['body'], $p['notification_id']),
             'notification.send_webhook' => new SendWebhookCommand(Uuid::fromString($p['user_id']), NotificationCategory::from($p['category']), $p['title'], $p['body'], $p['notification_id']),
             default => throw new \InvalidArgumentException('Unsupported message type.'),
         };

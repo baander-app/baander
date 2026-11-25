@@ -979,6 +979,9 @@ services:
     App\Notification\Infrastructure\Push\PushSubscriptionRepositoryInterface:
         alias: App\Notification\Infrastructure\Push\PushSubscriptionRepository
 
+    App\Notification\Application\Port\PushDeliveryPortInterface:
+        alias: App\Notification\Infrastructure\Push\WebPushDelivery
+
     App\Notification\Infrastructure\Push\PushTransport:
         arguments:
             $allowedPushDomains: '%notification.push.allowed_domains%'
@@ -992,7 +995,7 @@ services:
                     publicKey: '%env(VAPID_PUBLIC_KEY)%'
                     privateKey: '%env(VAPID_PRIVATE_KEY)%'
 
-    App\Notification\Application\Handler\SendPushHandler:
+    App\Notification\Application\Handler\SendPushToSubscriptionHandler:
         arguments:
             $appDomain: '%app.domain%'
 
@@ -1377,7 +1380,6 @@ services:
     App\Transcode\Infrastructure\Swoole\TranscodeSessionSubscriber:
         arguments:
             $segmentEncoder: !service_closure '@App\Transcode\Infrastructure\FFmpeg\SegmentEncoder'
-            $videoRepository: '@App\Catalog\Domain\Repository\VideoRepositoryInterface'
             $controlOwnership: '@worker.media.control_runtime'
             $renewalTimer: '@App\Transcode\Infrastructure\Swoole\LoopLockRenewalTimerInterface'
 

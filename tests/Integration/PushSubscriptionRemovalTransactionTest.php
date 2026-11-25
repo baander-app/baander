@@ -10,6 +10,7 @@ use App\Notification\Infrastructure\Push\PushSubscriptionRepository;
 use App\Notification\Application\DTO\PushSubscriptionRegistration;
 use App\Notification\Application\DTO\PushSubscriptionRegistrationResult;
 use App\Shared\Domain\Model\PublicId;
+use App\Shared\Domain\Model\Uuid;
 use App\Shared\Infrastructure\Doctrine\Platform\BaanderDriverMiddleware;
 use App\Shared\Infrastructure\Doctrine\Type\CustomTypesRegistrar;
 use Doctrine\DBAL\Configuration;
@@ -227,31 +228,7 @@ final class PushSubscriptionRemovalTransactionTest extends TestCase
             ->registerForUser($owner->getId(), new PushSubscriptionRegistration($endpoint, 'first', 'first-auth', 'aes128gcm')));
         $firstId = $this->writer->fetchOne('SELECT id FROM push_subscriptions');
         $applicationName = 'push_race_' . bin2hex(random_bytes(8));
-        $output = tmpfile();
-        self::assertIsResource($output);
-        $code = <<<'PHP'
-require $argv[1];
-\App\Shared\Infrastructure\Doctrine\Type\CustomTypesRegistrar::register();
-$params = (new \Doctrine\DBAL\Tools\DsnParser(['postgresql' => 'pdo_pgsql']))->parse(getenv('OUTBOX_TEST_DATABASE_URL'));
-$connection = \Doctrine\DBAL\DriverManager::getConnection($params);
-$connection->executeStatement('SET search_path TO ' . $argv[2] . ', public');
-$connection->executeQuery("SELECT set_config('application_name', :name, false)", ['name' => $argv[3]])->free();
-$connection->executeStatement("SET lock_timeout TO '5s'");
-$connection->executeStatement("SET statement_timeout TO '8s'");
-$orm = \Doctrine\ORM\ORMSetup::createAttributeMetadataConfig([dirname($argv[1], 2) . '/src'], true);
-$orm->setNamingStrategy(new \Doctrine\ORM\Mapping\UnderscoreNamingStrategy());
-$orm->enableNativeLazyObjects(true);
-$manager = new \Doctrine\ORM\EntityManager($connection, $orm);
-$result = (new \App\Notification\Infrastructure\Push\PushSubscriptionRepository($manager))->registerForUser(
-    \App\Shared\Domain\Model\Uuid::fromString($argv[4]),
-    new \App\Notification\Application\DTO\PushSubscriptionRegistration('https://push.baander.app/race', 'second', 'second-auth', 'aesgcm')
-);
-echo $result->name;
-PHP;
-        $process = proc_open([PHP_BINARY, '-r', $code, '--', dirname(__DIR__, 2) . '/vendor/autoload.php', $this->schema,
-            $applicationName, ($differentOwner ? $other : $owner)->getId()->toString()],
-            [0 => ['file', '/dev/null', 'r'], 1 => $output, 2 => $output], $pipes);
-        self::assertIsResource($process);
+        [$process, $output] = $this->registerInChild(($differentOwner ? $other : $owner)->getId(), $endpoint, $applicationName);
         try {
             $deadline = microtime(true) + 3;
             do {
@@ -283,5 +260,95 @@ PHP;
             }
             fclose($output);
         }
+    }
+
+    public function testConcurrentRegistrationsAtTheCapLeaveExactly20Subscriptions(): void
+    {
+        $owner = new UserEntity(new PublicId(), 'Owner', 'push-cap-race@baander.app', 'test-only');
+        $this->manager->persist($owner);
+        $this->manager->flush();
+        $this->writer->executeStatement(
+            <<<'SQL'
+                INSERT INTO push_subscriptions (id, user_id, endpoint, public_key, auth_key, content_encoding, created_at)
+                SELECT gen_random_uuid(), ?, 'https://push.baander.app/stored-' || i, 'key', 'auth', 'aes128gcm',
+                       now() - make_interval(hours => 21 - i)
+                FROM generate_series(1, 20) AS i
+                SQL,
+            [$owner->getId()->toString()],
+        );
+        $this->writer->beginTransaction();
+        self::assertSame(PushSubscriptionRegistrationResult::Created, (new PushSubscriptionRepository($this->manager))
+            ->registerForUser($owner->getId(), new PushSubscriptionRegistration('https://push.baander.app/first-new', 'first', 'first-auth', 'aes128gcm')));
+        $applicationName = 'push_cap_race_' . bin2hex(random_bytes(8));
+        [$process, $output] = $this->registerInChild($owner->getId(), 'https://push.baander.app/second-new', $applicationName);
+        try {
+            $deadline = microtime(true) + 3;
+            do {
+                $waiting = (int) $this->observer->fetchOne("SELECT count(*) FROM pg_stat_activity WHERE application_name = :name AND wait_event_type = 'Lock' AND wait_event = 'advisory'", ['name' => $applicationName]);
+                if ($waiting === 1) {
+                    break;
+                }
+                usleep(1000);
+            } while (microtime(true) < $deadline);
+            self::assertSame(1, $waiting, 'The second registration must wait for the owner\'s lock.');
+            $this->writer->commit();
+            $status = proc_close($process);
+            rewind($output);
+            $result = stream_get_contents($output);
+            self::assertSame(0, $status, $result);
+            self::assertSame('Created', $result);
+            $kept = $this->observer->fetchFirstColumn('SELECT endpoint FROM push_subscriptions ORDER BY created_at, id');
+            self::assertCount(20, $kept);
+            self::assertSame(
+                [
+                    ...array_map(static fn (int $i): string => 'https://push.baander.app/stored-' . $i, range(3, 20)),
+                    'https://push.baander.app/first-new',
+                    'https://push.baander.app/second-new',
+                ],
+                $kept,
+            );
+        } finally {
+            if (is_resource($process)) {
+                proc_terminate($process, 9);
+                proc_close($process);
+            }
+            fclose($output);
+        }
+    }
+
+    /**
+     * Registers the endpoint for the owner from a separate PHP process on its own connection.
+     *
+     * @return array{resource, resource} the process and the file holding its output
+     */
+    private function registerInChild(Uuid $owner, string $endpoint, string $applicationName): array
+    {
+        $output = tmpfile();
+        self::assertIsResource($output);
+        $code = <<<'PHP'
+require $argv[1];
+\App\Shared\Infrastructure\Doctrine\Type\CustomTypesRegistrar::register();
+$params = (new \Doctrine\DBAL\Tools\DsnParser(['postgresql' => 'pdo_pgsql']))->parse(getenv('OUTBOX_TEST_DATABASE_URL'));
+$connection = \Doctrine\DBAL\DriverManager::getConnection($params);
+$connection->executeStatement('SET search_path TO ' . $argv[2] . ', public');
+$connection->executeQuery("SELECT set_config('application_name', :name, false)", ['name' => $argv[3]])->free();
+$connection->executeStatement("SET lock_timeout TO '5s'");
+$connection->executeStatement("SET statement_timeout TO '8s'");
+$orm = \Doctrine\ORM\ORMSetup::createAttributeMetadataConfig([dirname($argv[1], 2) . '/src'], true);
+$orm->setNamingStrategy(new \Doctrine\ORM\Mapping\UnderscoreNamingStrategy());
+$orm->enableNativeLazyObjects(true);
+$manager = new \Doctrine\ORM\EntityManager($connection, $orm);
+$result = (new \App\Notification\Infrastructure\Push\PushSubscriptionRepository($manager))->registerForUser(
+    \App\Shared\Domain\Model\Uuid::fromString($argv[4]),
+    new \App\Notification\Application\DTO\PushSubscriptionRegistration($argv[5], 'second', 'second-auth', 'aesgcm')
+);
+echo $result->name;
+PHP;
+        $process = proc_open([PHP_BINARY, '-r', $code, '--', dirname(__DIR__, 2) . '/vendor/autoload.php', $this->schema,
+            $applicationName, $owner->toString(), $endpoint],
+            [0 => ['file', '/dev/null', 'r'], 1 => $output, 2 => $output], $pipes);
+        self::assertIsResource($process);
+
+        return [$process, $output];
     }
 }

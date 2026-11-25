@@ -44,6 +44,7 @@ final class PushSubscriptionController
     #[OA\Operation\Post(
         path: '/api/push/subscribe',
         summary: 'Subscribe to push notifications',
+        description: 'A user keeps at most 20 subscriptions; registering another evicts the longest-registered ones.',
         requestBody: new OA\RequestBody(
             required: true,
             content: new OA\MediaType(
@@ -51,12 +52,21 @@ final class PushSubscriptionController
                 schema: new OA\Schema(
                     type: 'object',
                     properties: [
-                        'endpoint' => new OA\Schema(type: 'string'),
+                        'endpoint' => new OA\Schema(
+                            type: 'string',
+                            maxLength: PushSubscriptionRegistrationPortInterface::ENDPOINT_LENGTH,
+                        ),
                         'keys' => new OA\Schema(
                             type: 'object',
                             properties: [
-                                'p256dh' => new OA\Schema(type: 'string'),
-                                'auth' => new OA\Schema(type: 'string'),
+                                'p256dh' => new OA\Schema(
+                                    type: 'string',
+                                    maxLength: PushSubscriptionRegistrationPortInterface::PUBLIC_KEY_LENGTH,
+                                ),
+                                'auth' => new OA\Schema(
+                                    type: 'string',
+                                    maxLength: PushSubscriptionRegistrationPortInterface::AUTH_KEY_LENGTH,
+                                ),
                             ],
                         ),
                         'contentEncoding' => new OA\Schema(
@@ -157,7 +167,7 @@ final class PushSubscriptionController
             publicKey: $data['keys']['p256dh'],
             authKey: $data['keys']['auth'],
             contentEncoding: $data['contentEncoding'],
-            userAgent: $request->headers->get('User-Agent'),
+            userAgent: self::userAgent($request),
         );
         $result = $this->subscriptionRegistration->registerForUser(Uuid::fromString($user->getId()), $registration);
         if ($result === PushSubscriptionRegistrationResult::Conflict) {
@@ -251,10 +261,23 @@ final class PushSubscriptionController
     private function validateSubscription(array $data): array
     {
         $constraints = new Assert\Collection([
-            'endpoint'        => new Assert\Sequentially([new Assert\Type('string'), new Assert\NotBlank(), new Assert\Url()]),
+            'endpoint'        => new Assert\Sequentially([
+                new Assert\Type('string'),
+                new Assert\NotBlank(),
+                new Assert\Length(max: PushSubscriptionRegistrationPortInterface::ENDPOINT_LENGTH),
+                new Assert\Url(),
+            ]),
             'keys'            => new Assert\Collection([
-                'p256dh' => new Assert\Sequentially([new Assert\Type('string'), new Assert\NotBlank()]),
-                'auth'   => new Assert\Sequentially([new Assert\Type('string'), new Assert\NotBlank()]),
+                'p256dh' => new Assert\Sequentially([
+                    new Assert\Type('string'),
+                    new Assert\NotBlank(),
+                    new Assert\Length(max: PushSubscriptionRegistrationPortInterface::PUBLIC_KEY_LENGTH),
+                ]),
+                'auth'   => new Assert\Sequentially([
+                    new Assert\Type('string'),
+                    new Assert\NotBlank(),
+                    new Assert\Length(max: PushSubscriptionRegistrationPortInterface::AUTH_KEY_LENGTH),
+                ]),
             ]),
             'contentEncoding' => new Assert\Sequentially([new Assert\Type('string'), new Assert\NotBlank(), new Assert\Choice(choices: ['aesgcm', 'aes128gcm'])]),
         ]);
@@ -268,6 +291,17 @@ final class PushSubscriptionController
         }
 
         return $errors;
+    }
+
+    /** The client's User-Agent, kept as a label: invalid UTF-8 replaced and cut to the stored bound. */
+    private static function userAgent(Request $request): ?string
+    {
+        $userAgent = $request->headers->get('User-Agent');
+        if ($userAgent === null) {
+            return null;
+        }
+
+        return mb_substr(mb_scrub($userAgent, 'UTF-8'), 0, PushSubscriptionRegistrationPortInterface::USER_AGENT_LENGTH);
     }
 
     private function isAllowedPushDomain(string $host): bool

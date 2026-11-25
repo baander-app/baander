@@ -5,212 +5,121 @@ declare(strict_types=1);
 namespace App\Tests\Unit\Notification\Application\Handler;
 
 use App\Notification\Application\DTO\SendPushCommand;
+use App\Notification\Application\DTO\SendPushToSubscriptionCommand;
 use App\Notification\Application\Handler\SendPushHandler;
 use App\Notification\Application\Settings\NotificationSettingDefinitions;
 use App\Notification\Domain\Repository\NotificationPreferenceRepositoryInterface;
 use App\Notification\Domain\ValueObject\NotificationCategory;
-use App\Notification\Infrastructure\Doctrine\Entity\PushSubscriptionEntity;
-use App\Notification\Infrastructure\Push\PushSubscriptionRepositoryInterface;
+use App\Notification\Application\Port\PushDeliveryPortInterface;
 use App\Shared\Application\Port\SystemSettingsPortInterface;
 use App\Shared\Domain\Model\Uuid;
-use Minishlink\WebPush\MessageSentReport;
-use Minishlink\WebPush\SubscriptionInterface;
-use Minishlink\WebPush\WebPush;
-use Nyholm\Psr7\Request;
-use Nyholm\Psr7\Response;
-use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
-use Symfony\Component\Serializer\Encoder\JsonEncoder;
+use Symfony\Component\Messenger\Envelope;
+use Symfony\Component\Messenger\MessageBusInterface;
 
 final class SendPushHandlerTest extends TestCase
 {
-    public function testTransportAndReportFailuresReachMessengerAfterAllSubscriptionsAreAttempted(): void
+    public function testEachSubscriptionReceivesItsOwnMessageWithTheNotification(): void
     {
-        $entities = [$this->subscription('first'), $this->subscription('second'), $this->subscription('healthy')];
-        $repository = $this->createMock(PushSubscriptionRepositoryInterface::class);
-        $repository->method('findByUser')->willReturn($entities);
-        $repository->expects($this->never())->method('remove');
-        $failure = new \RuntimeException('Push transport unavailable');
-        $attempted = [];
-        $webPush = $this->createMock(WebPush::class);
-        $webPush->expects($this->exactly(3))->method('sendOneNotification')->willReturnCallback(
-            function (SubscriptionInterface $subscription, string $payload) use (&$attempted, $failure): MessageSentReport {
-                $endpoint = $subscription->getEndpoint();
-                $attempted[] = $endpoint;
-                self::assertSame('Title', json_decode($payload, true, flags: JSON_THROW_ON_ERROR)['title']);
-                if (str_ends_with($endpoint, '/first')) {
-                    throw $failure;
-                }
-                return new MessageSentReport(new Request('POST', $endpoint), new Response(str_ends_with($endpoint, '/second') ? 503 : 201), !str_ends_with($endpoint, '/second'), 'Push response');
-            },
+        $command = $this->command();
+        $subscriptions = [Uuid::generate(), Uuid::generate(), Uuid::generate()];
+        $delivery = $this->createMock(PushDeliveryPortInterface::class);
+        $delivery->expects(self::once())->method('subscriptionsOf')->with($command->userId)->willReturn($subscriptions);
+        $dispatched = [];
+        $bus = $this->createMock(MessageBusInterface::class);
+        $bus->expects(self::exactly(3))->method('dispatch')->willReturnCallback(static function (object $message) use (&$dispatched): Envelope {
+            $dispatched[] = $message;
+
+            return new Envelope($message);
+        });
+
+        $this->handler($delivery, $bus)($command);
+
+        self::assertEquals(
+            array_map(static fn (Uuid $subscription): SendPushToSubscriptionCommand => new SendPushToSubscriptionCommand(
+                $subscription,
+                $command->userId,
+                'Title',
+                'Body',
+                'notification-1',
+            ), $subscriptions),
+            $dispatched,
         );
-
-        try {
-            $this->handler($repository, $webPush)($this->command());
-            self::fail('Push failures must reach Messenger.');
-        } catch (\RuntimeException $exception) {
-            self::assertNull($exception->getPrevious());
-            self::assertStringContainsString('2', $exception->getMessage());
-        }
-        self::assertSame(array_map(static fn (PushSubscriptionEntity $entity): string => $entity->getEndpoint(), $entities), $attempted);
     }
 
-    #[DataProvider('failedReports')]
-    public function testFailedReportReachesMessenger(?int $status): void
+    public function testAFailedDispatchReachesMessengerSoTheBatchIsRetried(): void
     {
-        $entity = $this->subscription('failed');
-        $repository = $this->createMock(PushSubscriptionRepositoryInterface::class);
-        $repository->method('findByUser')->willReturn([$entity]);
-        $repository->expects($this->never())->method('remove');
-        $webPush = $this->createMock(WebPush::class);
-        $webPush->expects($this->once())->method('sendOneNotification')->willReturn(
-            new MessageSentReport(new Request('POST', $entity->getEndpoint()), $status === null ? null : new Response($status), false, 'Push rejected'),
-        );
+        $command = $this->command();
+        $delivery = $this->createStub(PushDeliveryPortInterface::class);
+        $delivery->method('subscriptionsOf')->willReturn([Uuid::generate()]);
+        $bus = $this->createStub(MessageBusInterface::class);
+        $bus->method('dispatch')->willThrowException(new \RuntimeException('Transport unavailable'));
 
-        $this->expectException(\RuntimeException::class);
-        $this->handler($repository, $webPush)($this->command());
+        $this->expectExceptionMessage('Transport unavailable');
+
+        $this->handler($delivery, $bus)($command);
     }
 
-    /** @return iterable<string, array{int|null}> */
-    public static function failedReports(): iterable
+    public function testDisabledPushPreferenceSkipsTheSubscriptions(): void
     {
-        yield 'authentication' => [401];
-        yield 'rate limit' => [429];
-        yield 'server error' => [500];
-        yield 'unavailable' => [503];
-        yield 'network failure report' => [null];
-    }
+        $delivery = $this->createMock(PushDeliveryPortInterface::class);
+        $delivery->expects(self::never())->method('subscriptionsOf');
+        $bus = $this->createMock(MessageBusInterface::class);
+        $bus->expects(self::never())->method('dispatch');
 
-    #[DataProvider('expiredReports')]
-    public function testExpiredSubscriptionIsRemovedAndHealthySubscriptionStillSent(int $status): void
-    {
-        $expired = $this->subscription('expired');
-        $healthy = $this->subscription('healthy');
-        $repository = $this->createMock(PushSubscriptionRepositoryInterface::class);
-        $repository->method('findByUser')->willReturn([$expired, $healthy]);
-        $repository->expects($this->once())->method('remove')->with($expired);
-        $webPush = $this->createMock(WebPush::class);
-        $webPush->expects($this->exactly(2))->method('sendOneNotification')->willReturnOnConsecutiveCalls(
-            new MessageSentReport(new Request('POST', $expired->getEndpoint()), new Response($status), false, 'Expired'),
-            new MessageSentReport(new Request('POST', $healthy->getEndpoint()), new Response(201)),
-        );
-
-        $this->handler($repository, $webPush)($this->command());
-    }
-
-    /** @return iterable<string, array{int}> */
-    public static function expiredReports(): iterable
-    {
-        yield 'not found' => [404];
-        yield 'gone' => [410];
-    }
-
-    public function testExpiredSubscriptionRemovalFailureReachesMessengerAfterHealthyDelivery(): void
-    {
-        $expired = $this->subscription('expired');
-        $healthy = $this->subscription('healthy');
-        $failure = new \RuntimeException('Database unavailable');
-        $repository = $this->createMock(PushSubscriptionRepositoryInterface::class);
-        $repository->method('findByUser')->willReturn([$expired, $healthy]);
-        $repository->expects($this->once())->method('remove')->with($expired)->willThrowException($failure);
-        $webPush = $this->createMock(WebPush::class);
-        $webPush->expects($this->exactly(2))->method('sendOneNotification')->willReturnOnConsecutiveCalls(
-            new MessageSentReport(new Request('POST', $expired->getEndpoint()), new Response(410), false, 'Expired'),
-            new MessageSentReport(new Request('POST', $healthy->getEndpoint()), new Response(201)),
-        );
-
-        try {
-            $this->handler($repository, $webPush)($this->command());
-            self::fail('Subscription cleanup failure must reach Messenger.');
-        } catch (\RuntimeException $exception) {
-            self::assertNull($exception->getPrevious());
-        }
-    }
-
-    public function testDisabledPushSkipsSubscriptionLookupAndDelivery(): void
-    {
-        $repository = $this->createMock(PushSubscriptionRepositoryInterface::class);
-        $repository->expects($this->never())->method('findByUser');
-        $webPush = $this->createMock(WebPush::class);
-        $webPush->expects($this->never())->method('sendOneNotification');
-        $this->handler($repository, $webPush, false)($this->command());
+        $this->handler($delivery, $bus, enabled: false)($this->command());
     }
 
     public function testServerWidePushToggleOffSkipsDeliveryAndRecordsTheSkip(): void
     {
-        $repository = $this->createMock(PushSubscriptionRepositoryInterface::class);
-        $repository->expects($this->never())->method('findByUser');
-        $webPush = $this->createMock(WebPush::class);
-        $webPush->expects($this->never())->method('sendOneNotification');
+        $delivery = $this->createMock(PushDeliveryPortInterface::class);
+        $delivery->expects(self::never())->method('subscriptionsOf');
+        $bus = $this->createMock(MessageBusInterface::class);
+        $bus->expects(self::never())->method('dispatch');
         $logger = $this->createMock(LoggerInterface::class);
-        $logger->expects($this->once())->method('info')->with(
-            $this->stringContains('push notifications are turned off'),
-            $this->callback(static fn (array $context): bool => $context['notification_id'] === 'notification-1'
+        $logger->expects(self::once())->method('info')->with(
+            self::stringContains('push notifications are turned off'),
+            self::callback(static fn (array $context): bool => $context['notification_id'] === 'notification-1'
                 && $context['setting'] === NotificationSettingDefinitions::PUSH_ENABLED),
         );
 
-        $this->handler($repository, $webPush, pushEnabled: false, logger: $logger)($this->command());
+        $this->handler($delivery, $bus, pushEnabled: false, logger: $logger)($this->command());
     }
 
     public function testServerWidePushToggleIsReadForEveryMessage(): void
     {
-        $repository = $this->createStub(PushSubscriptionRepositoryInterface::class);
-        $repository->method('findByUser')->willReturn([$this->subscription('healthy')]);
-        $webPush = $this->createMock(WebPush::class);
-        $webPush->expects($this->once())->method('sendOneNotification')->willReturn(
-            new MessageSentReport(new Request('POST', 'https://push.baander.app/healthy'), new Response(201)),
-        );
+        $command = $this->command();
+        $delivery = $this->createStub(PushDeliveryPortInterface::class);
+        $delivery->method('subscriptionsOf')->willReturn([Uuid::generate()]);
+        $bus = $this->createMock(MessageBusInterface::class);
+        $bus->expects(self::once())->method('dispatch')->willReturnCallback(static fn (object $message): Envelope => new Envelope($message));
         $settings = $this->createMock(SystemSettingsPortInterface::class);
-        $settings->expects($this->exactly(2))->method('get')
+        $settings->expects(self::exactly(2))->method('get')
             ->with(NotificationSettingDefinitions::PUSH_ENABLED)
             ->willReturnOnConsecutiveCalls(false, true);
         $preferences = $this->createStub(NotificationPreferenceRepositoryInterface::class);
         $preferences->method('isEnabled')->willReturn(true);
-        $handler = new SendPushHandler($preferences, $repository, $webPush, new NullLogger(), 'baander.app', new JsonEncoder(), $settings);
+        $handler = new SendPushHandler($preferences, $delivery, $bus, new NullLogger(), $settings);
 
-        $handler($this->command());
-        $handler($this->command());
+        $handler($command);
+        $handler($command);
     }
 
-    public function testNoSubscriptionsSkipsDelivery(): void
+    public function testNoSubscriptionsDispatchNothing(): void
     {
-        $repository = $this->createStub(PushSubscriptionRepositoryInterface::class);
-        $repository->method('findByUser')->willReturn([]);
-        $webPush = $this->createMock(WebPush::class);
-        $webPush->expects($this->never())->method('sendOneNotification');
-        $this->handler($repository, $webPush)($this->command());
-    }
+        $delivery = $this->createStub(PushDeliveryPortInterface::class);
+        $delivery->method('subscriptionsOf')->willReturn([]);
+        $bus = $this->createMock(MessageBusInterface::class);
+        $bus->expects(self::never())->method('dispatch');
 
-    public function testCapabilityUrlsAndTransportExceptionsNeverEnterLogsOrTheMessengerFailure(): void
-    {
-        $entity = $this->subscription('capability-secret');
-        $repository = $this->createStub(PushSubscriptionRepositoryInterface::class);
-        $repository->method('findByUser')->willReturn([$entity]);
-        $webPush = $this->createMock(WebPush::class);
-        $webPush->expects($this->once())->method('sendOneNotification')->willThrowException(
-            new \RuntimeException('Failed request to ' . $entity->getEndpoint() . '?key=credential-secret'),
-        );
-        $logger = $this->createMock(LoggerInterface::class);
-        $logger->expects($this->once())->method('error')->with('Failed to send push notification.', [
-            'channel' => 'notification.push',
-            'notification_id' => 'notification-1',
-            'subscription_id' => $entity->getId()->toString(),
-        ]);
-
-        try {
-            $this->handler($repository, $webPush, logger: $logger)($this->command());
-            self::fail('Push failure must reach Messenger.');
-        } catch (\RuntimeException $exception) {
-            self::assertSame('Push delivery failed for 1 subscription(s).', $exception->getMessage());
-            self::assertNull($exception->getPrevious());
-        }
+        $this->handler($delivery, $bus)($this->command());
     }
 
     private function handler(
-        PushSubscriptionRepositoryInterface $repository,
-        WebPush $webPush,
+        PushDeliveryPortInterface $delivery,
+        MessageBusInterface $bus,
         bool $enabled = true,
         bool $pushEnabled = true,
         ?LoggerInterface $logger = null,
@@ -220,12 +129,7 @@ final class SendPushHandlerTest extends TestCase
         $settings = $this->createStub(SystemSettingsPortInterface::class);
         $settings->method('get')->willReturnMap([[NotificationSettingDefinitions::PUSH_ENABLED, $pushEnabled]]);
 
-        return new SendPushHandler($preferences, $repository, $webPush, $logger ?? new NullLogger(), 'baander.app', new JsonEncoder(), $settings);
-    }
-
-    private function subscription(string $name): PushSubscriptionEntity
-    {
-        return new PushSubscriptionEntity(new Uuid(), 'https://push.baander.app/'.$name, 'public-key', 'auth-key', 'aes128gcm');
+        return new SendPushHandler($preferences, $delivery, $bus, $logger ?? new NullLogger(), $settings);
     }
 
     private function command(): SendPushCommand
