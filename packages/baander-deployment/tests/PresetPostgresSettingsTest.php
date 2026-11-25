@@ -100,10 +100,26 @@ final class PresetPostgresSettingsTest extends TestCase
     public function testVerificationSqlCapturesSettingsAndExercisesExtensionsWithoutCredentials(): void
     {
         $sql = $this->remuxSettings()->verificationSql();
-        foreach (['pg_settings', 'pg_file_settings', 'pg_extension', 'pg_stat_statements', "pgroonga_command('status')", 'current_setting', 'BEGIN READ ONLY', 'COMMIT'] as $fragment) {
+        foreach (['pg_settings', 'pg_file_settings', 'pg_extension', 'pg_stat_statements', "pgroonga_command('status'::text)", 'current_setting', 'BEGIN READ ONLY', 'COMMIT'] as $fragment) {
             self::assertStringContainsString($fragment, $sql);
         }
         self::assertStringNotContainsString('PASSWORD', $sql);
+    }
+
+    /**
+     * A superuser runs the verification in the database the application role owns, and an owner
+     * may set that database's search_path ahead of pg_catalog.
+     */
+    public function testVerificationSqlPinsTheSearchPathBeforeItCallsAnyFunction(): void
+    {
+        $code = (string) preg_replace('/^--.*\n/m', '', $this->remuxSettings()->verificationSql());
+        $statements = array_map(trim(...), explode(";\n", $code));
+
+        self::assertSame(['BEGIN READ ONLY', 'SET LOCAL search_path = pg_catalog, pg_temp'], array_slice($statements, 0, 2));
+        self::assertSame("SELECT public.pgroonga_command('status'::text) IS NOT NULL", $statements[4]);
+        self::assertStringContainsString('FROM public.pg_stat_statements', $statements[5]);
+        // The extensions live in public, which the pinned search_path leaves out.
+        self::assertDoesNotMatchRegularExpression("/(?<![.\\w'])(pgroonga_command|pg_stat_statements)\\b/", $code);
     }
 
     /** The rendered configuration of a remux deployment with two web workers and two copy slots. */

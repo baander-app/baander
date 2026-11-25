@@ -49,10 +49,13 @@ final class PostgresSettings
         $names = implode(', ', array_map(static fn(string $name): string => "('" . $name . "')", array_keys($this->settings)));
         return <<<SQL
 BEGIN READ ONLY;
+-- A superuser runs this in the database the application role owns, and an owner may set the
+-- database's search_path ahead of pg_catalog. Only catalog names resolve unqualified here.
+SET LOCAL search_path = pg_catalog, pg_temp;
 SET LOCAL statement_timeout = '15s';
 SET LOCAL lock_timeout = '3s';
 -- Load PGroonga so its custom settings are registered in this observer session.
-SELECT pgroonga_command('status') IS NOT NULL;
+SELECT public.pgroonga_command('status'::text) IS NOT NULL;
 WITH requested(name) AS (VALUES {$names})
 SELECT json_build_object(
  'server_version', current_setting('server_version_num')::int,
@@ -66,7 +69,7 @@ SELECT json_build_object(
    'sourcefile', sourcefile, 'sourceline', sourceline, 'error', error)), '[]'::json)
    FROM pg_file_settings WHERE error IS NOT NULL),
  'extensions', (SELECT coalesce(json_object_agg(extname, extversion), '{}'::json) FROM pg_extension),
- 'statistics_usable', (SELECT count(*) >= 0 FROM pg_stat_statements)
+ 'statistics_usable', (SELECT count(*) >= 0 FROM public.pg_stat_statements)
 );
 COMMIT;
 SQL;

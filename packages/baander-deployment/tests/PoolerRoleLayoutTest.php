@@ -49,4 +49,20 @@ final class PoolerRoleLayoutTest extends TestCase
         self::assertSame('database', $helper['environment']['BAANDER_POOLER_SERVER_HOST']);
         self::assertStringNotContainsString(Pooler::SOCKET_DIRECTORY, implode(' ', $helper['arguments']));
     }
+
+    /**
+     * The application role owns the database and may give it a search_path that puts its own
+     * functions and operators ahead of pg_catalog's; the superuser's session must not resolve them.
+     * The tooling runtime has no Python, so the script is read rather than run.
+     */
+    public function testTheSuperuserSessionResolvesUnqualifiedNamesOnlyInTheCatalog(): void
+    {
+        self::assertSame(1, preg_match("/OWNER_SQL = '''(.+?)'''\\n/s", self::script(), $sql));
+        self::assertSame(1, preg_match('/^    if superuser:\n((?:        .*\n)+)/m', self::script(), $branch));
+
+        self::assertStringContainsString("SUPERUSER_OPTIONS = '-c search_path=pg_catalog,pg_temp'\n", self::script());
+        self::assertStringContainsString("environment['PGOPTIONS'] = SUPERUSER_OPTIONS\n", $branch[1]);
+        self::assertStringContainsString("pg_catalog.format('CREATE ROLE %I', :'role')", $sql[1]);
+        self::assertDoesNotMatchRegularExpression('/(?<!pg_catalog\.)\b(format\(|pg_roles\b)/', $sql[1]);
+    }
 }
