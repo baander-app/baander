@@ -370,6 +370,12 @@ secret rules of step 4 and the list of what `start` does in step 5 up to date wi
 the preset. It did not check sign-in in a browser, playback, transcoding, mail, an
 HTTPS front proxy, an IPv4-only edge network, a restart or an upgrade.
 
+The run predates one later change to the database image. Since 2026-11-25, the
+credentials helper's superuser session and the preset's verification SQL pin
+`search_path` to `pg_catalog, pg_temp`, so an object the application role plants in
+its own database cannot run as the superuser. The helper ships inside the database
+image, so a preset receives that change only from a rebuilt image; step 3 builds one.
+
 ## What's Next
 
 - [Configuration](../configuration/README.md) — environment variables and integrations

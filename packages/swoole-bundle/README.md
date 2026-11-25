@@ -292,6 +292,33 @@ erase the values a shared `ArrayAdapter` holds.
 `FrameworkIsolationPipelineTest` in the application's
 `tests/Unit/Shared/Infrastructure/Swoole/` cover these rules.
 
+Pooling isolates only the service that carries the tag, not the services it holds.
+SecurityBundle's `security.token_storage` is pooled through its `kernel.reset` tags,
+but every pooled instance wraps `security.untracked_token_storage`, which holds the
+token; shared, it handed one coroutine the token of another.
+`security.authorization_checker` keeps the token and the decision of a running
+`isGranted()` call on stacks that a second coroutine entering the same instance
+reads. `SecurityProcessor` therefore tags both as stateful services, so each
+coroutine takes its own instance: the storage is reset through `ResetInterface`, and
+the checker pops its stacks itself. A coroutine started inside a request, such as a
+WebSocket message or a streamed response, starts without a token. The application's
+`StaleTokenListener` also clears the token at the start of every main request, which
+covers kernels that handle requests outside a coroutine.
+`FrameworkIsolationSecurityTest` covers the isolation, and the application's
+`tests/Integration/PooledServiceResetCoverageTest.php` fails when a pooled service
+declares a `kernel.reset` method its pool does not run.
+
+`TwigProcessor` keeps the profiler's Twig extensions, `twig.extension.profiler` and
+`twig.extension.webprofiler`, out of the pool. WebProfilerBundle 8.1.11 tags its
+extension `kernel.reset`, which would make the pass put it behind a generated proxy.
+Twig keys an extension by the class of the object it receives, which is then the
+proxy class, while the profiler's node visitor compiles the wrapped class into each
+template as the lookup key; every Twig render in `dev` and `test` then failed with an
+undefined array key. The processor unshares both extensions, so each pooled Twig
+environment builds its own, and gives them the `swoole_bundle.safe_stateful_service`
+tag, which keeps the pass from pooling them. Their reset method does not run for these
+instances. `FrameworkIsolationPipelineTest` fails without the tag.
+
 **Container parameters:**
 
 | Parameter | Description |

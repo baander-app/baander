@@ -38,6 +38,20 @@ An authorization-code request that a client sends to the authorization server ov
 
 Every authorization-code request is a pushed request. The authorization code it produces works only with the DPoP key that pushed it.
 
+## Installations
+
+### Installation
+
+An instance started through the deployment preset from production images built from one source revision. It is the only installation the operator guide documents; worktree previews, the persistent development instance and the [development Compose stack](#development-compose-stack) are not installations.
+
+### Command context
+
+How an operator reaches an installation's services: the `dc` shell function, `docker compose --project-name <deployment name>`, used for `exec`, `logs` and `ps`. The preset's start and stop actions own the services' lifecycle, so `dc up`, `dc run` and `dc down` are not part of it.
+
+### Docker proxy
+
+The preset's allow-listing nginx service between the log agent and the Docker socket. It passes `GET` on the five read routes the agent needs and answers `403` to everything else; the agent mounts only the proxy's socket.
+
 ## Local development
 
 ### Persistent development instance
@@ -61,6 +75,10 @@ The environment variable `BAANDER_DEVELOPMENT_INSTANCE=1`, which the development
 The immutable worker build captured from a worktree when its preview is refreshed.
 Live web edits can be newer than this build; preview status identifies the active
 worker snapshot so integrated verification can account for that difference.
+
+### Development Compose stack
+
+The repository's `docker-compose.yml`, which runs the development image with the checkout mounted. It is a developer tool, not an [installation](#installation).
 
 ## Web server lifecycle
 
@@ -128,7 +146,7 @@ The sequence of refresh tokens one sign-in produces through rotation. Each rotat
 
 ### Credential epoch
 
-A per-user counter that every change to the user's credentials advances, and that each sign-in, authorization code, device approval and refresh token chain records from the moment its credential was verified. The changes are a password change or reset, turning TOTP on or off, an operator's TOTP reset, adding or removing a passkey, and confirming a [pending email change](#pending-email-change).
+A per-user counter that every change to the user's credentials advances, and that each sign-in, authorization code, device approval and refresh token chain records from the moment its credential was verified. The changes are a password change or reset, turning TOTP on or off, an operator's TOTP reset, adding or removing a passkey, and confirming a [pending email change](#pending-email-change). Disabling the account advances it too, so nothing verified before the disable issues tokens after the account is enabled again.
 
 Tokens are issued only while the recorded epoch matches the user's current one, so nothing verified before a credential change can produce a session after it. A change that keeps the requesting session moves that session's chain to the new epoch and revokes every other session of the user. A change requested from a session another change already ended is refused with `credentials_changed`.
 
@@ -182,6 +200,10 @@ The origins a deployment answers on: the origin of `APP_URL` and each origin lis
 
 The rule that an install keeps an enabled super admin. Deleting, disabling or demoting the only enabled super admin is refused, from the admin API and the console alike; such changes take turns under one lock, so two super admins who demote each other at once leave one of them a super admin. A disabled super admin does not count, and an install that has no enabled super admin refuses nothing.
 
+### Login block
+
+The record of a sign-in attempt that filled the sign-in form's honeypot field: the client address, email, honeypot value and User-Agent, each cut to 255 characters of valid UTF-8. Recording a block deletes the blocks recorded more than 30 days before it.
+
 ## Playlists
 
 ### Playlist collaborator
@@ -208,6 +230,10 @@ The host's permission for one user, named by public ID, to join a watch party. A
 
 A reverse proxy in front of the preset gateway that the operator lists, by IPv4 or IPv6 address or range, in the preset configuration's `listen.frontProxies`. The gateway reads the client address and protocol from a declared front proxy's forwarding headers; for any other peer it uses the connection's own address and protocol. A gateway that listens on a loopback address also declares the edge network's bridge addresses, the source of connections from the host. Web trusts only the gateway, so rate limits apply to each client's real address.
 
+### Limiter subject
+
+The key one limiter counts a request under: a user ID, a normalized email address, a token hash or a client address. A client address counts an IPv4 address on its own and an IPv6 address by its /64, since an IPv6 client can send from any address of its /64; an IPv4-mapped IPv6 address counts as its IPv4 address, and a zone suffix is dropped. A limiter that counts a client's network uses the /24 of an IPv4 address.
+
 ### Limiter generation
 
 The shared identity of one named limiter's state, replaced when that limiter is cleared.
@@ -228,11 +254,21 @@ The destination check shared by metadata, radio station catalog and push transpo
 
 It pins an approved address while preserving TLS hostname verification and has no LAN exception. Webhooks and operator-configured lyrics retain separate policies.
 
+An IPv6 address that carries an IPv4 address, in mapped, translated, compatible, NAT64, 6to4 or Teredo form, counts as that IPv4 address; site-local and local-use NAT64 addresses are never public. The same address classifier judges webhook destinations, whose LAN allowlist applies to the carried IPv4 address.
+
+### Bounded provider read
+
+Reading a provider's answer only up to a byte limit, 16 MiB unless the adapter names another. A longer answer fails the request, and no more than the limit is held in memory.
+
 ## Media availability
 
 ### Library
 
 A watched directory whose discovered media populates the catalog and whose membership determines a user's access to its media.
+
+### Media container table
+
+The Shared kernel's list of the containers a library may hold, each with its file extensions, the FFmpeg demuxer that must recognize its content, and the media type of its original. Discovery, the import check, every FFmpeg and ffprobe input clause and an original's response type read it; a file whose probed format is not a container of its kind is not imported.
 
 ### Accepted directory
 
@@ -395,6 +431,12 @@ and favorites move to the kept song, and its lyrics do when the kept song has no
 duplicate's own row is deleted with its credits and genres, and its file stays on disk.
 A song without a file hash is never a duplicate.
 
+## Recommendations
+
+### Recommendation origin
+
+Who wrote a stored recommendation: the generator, or a member through the API. A member keeps at most 1,000 rows they wrote, and the generator is never capped. A member's listing shows their own rows and the global ones.
+
 ## Lyrics
 
 ### Bulk lyrics run tally
@@ -481,6 +523,12 @@ A persisted, stop-only credential for one account, browser tab and endpoint inca
 
 The last recorded source-time cursor retained for interrupted playback, bound to its media identity, queue position and session revision. It preserves a useful resumption point without applying one item's position to another or claiming the exact position at a crash.
 
+## Notifications
+
+### Push subscription
+
+One browser endpoint a user registered for Web Push. A user keeps at most 20; registering another evicts the one registered longest ago, under a per-user lock. A notification reaches each subscription as its own Messenger message, so a failing endpoint retries alone, and an answer of `404` or `410` removes the subscription.
+
 ## Audio playback
 
 ### Loudness target
@@ -494,6 +542,18 @@ A listener chooses a preset or a custom target. The target controls playback gai
 ### Transcode session
 
 A user's playback lifecycle for a video transcode job, carrying its preparation, playback controls, position and completion state.
+
+### Transcode session share
+
+The most transcode sessions one user holds at once: the `transcode.sessions_per_user` server setting, default 6, administrators included. A session counts from its start until it ends, a finished one too, and encode and copy starts count together. A start past the share ends that user's session whose [sign of life](#sign-of-life) is oldest once it is two minutes old, and otherwise answers `409` `transcode_session_limit`. A start that finds no free video slot may end another user's session only after 70 minutes without a sign of life. An automatic start asks for no more quality tiers than the share admits.
+
+### Sign of life
+
+The last playback report, control, stream signing or readiness change that touched a transcode session. A paused player renews it hourly, so its session keeps its slot.
+
+### Input kind
+
+What one FFmpeg or ffprobe input is: library audio, library video, a worker's own published presentation, or a generated source. The kind decides the format whitelist that may open the input, from the [media container table](#media-container-table), and nested demuxers inherit it.
 
 ### Stale transcode session
 
@@ -769,7 +829,14 @@ Lease expiry and a direct-child exit do not satisfy this barrier.
 
 A bounded request owned by the execution daemon and identified by deployment,
 boot, lease epoch, client generation and attempt identity. An uncertain reply does
-not authorize another process or release its reserved slot.
+not authorize another process or release its reserved slot. Standard output past
+its bound fails only that attempt, and error output keeps a bounded tail.
+
+### Signed envelope
+
+A Messenger envelope that carries Symfony's HMAC under `APP_SECRET`. A worker drops
+an envelope whose signature does not verify, so a writer to Redis cannot start a
+handler. Rotating `APP_SECRET` invalidates the envelopes already queued.
 
 ## Backend verification
 
@@ -797,6 +864,13 @@ PGroonga index, or the next call to `pgroonga_vacuum()`.
 A host for the repository that runs its CI: the self-hosted Forgejo instance or
 GitHub. Both forges run the same workflow files, and each supplies its own runner,
 image registry, cache store and coverage-baseline store.
+
+### Trusted run
+
+A CI run that is not for a pull request, or one for a pull request whose head branch
+lives in this repository. Only a trusted run logs in to a registry, saves caches and
+coverage baselines, comments or publishes. On Forgejo, a pull request from a fork
+runs no job at all, because the runner that serves the jobs holds the Docker socket.
 
 ### Capability gate
 
@@ -827,6 +901,19 @@ A requested dependency check that could not establish its result, for example
 because a source was unavailable or returned an unsupported format. A gap prevents
 a clean result and preserves findings already collected from other sources.
 Checks deliberately excluded by local mode are stated exclusions, not gaps.
+
+### Pinned build input
+
+A build input fixed to its content: an image by digest, a download by a SHA-256
+value written in the instruction that fetches it, a Git source by commit. The local
+dependency check reports every input of the Dockerfiles and the image catalog that
+is not pinned.
+
+### Image digest drift
+
+A digest pin whose tag names another digest in its registry today. The daily
+dependency advisories run reports it; the pin keeps building the image it names
+until someone moves it.
 
 ## Live updates
 

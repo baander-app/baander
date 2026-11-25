@@ -11,7 +11,7 @@ symptoms:
 root_cause: memory_leak
 resolution_type: code_fix
 severity: high
-last_updated: 2026-10-31
+last_updated: 2026-11-25
 tags: [swoole, coroutine, service-pool, cowrapper, entity-manager, control-channel, resource-leak]
 ---
 
@@ -20,6 +20,8 @@ tags: [swoole, coroutine, service-pool, cowrapper, entity-manager, control-chann
 ## Problem
 
 With coroutines enabled, the swoole bundle gives each coroutine its own instance of every stateful service (the EntityManager, and services tagged `kernel.reset`). It takes the instance from a per-worker pool and gives it back when the coroutine ends, but only for coroutines the bundle knows about. The server control channel's callbacks (`ControlSocketConfigurator`'s `Receive` listener and `ControlPipeMessageHandler` on `PipeMessage`) run in coroutines that Swoole starts directly. Any pooled service an operation used there was never given back.
+
+Updated 2026-11-25: the isolation described above was narrower than this page said. It covers the tagged service only, not the services it holds: every pooled `security.token_storage` wrapped the one worker-wide `security.untracked_token_storage`, so two interleaved requests shared a token. Until `fa098c23b` the pool also ran only the first `kernel.reset` method of each service, and `security.token_storage` declares `disableUsageTracking` and then `setToken`, so a released storage kept its token and a request without credentials ran as the worker's previous user. The bundle now runs every reset method of a pooled service, pools `security.untracked_token_storage` and `security.authorization_checker` per coroutine (`7e8e53ce0`), and `StaleTokenListener` clears the token at the start of every main request (`a167d2396`). The [bundle README](../../../packages/swoole-bundle/README.md#service-pooling) states the current rules.
 
 ## Symptoms
 
@@ -79,7 +81,8 @@ Timers count as callbacks the bundle does not run. On Swoole 6.2.1 every tick of
 `Swoole\Timer::tick()` and `after()` runs in a new coroutine, in the server's master
 process as well as in its workers, so a pooled service a tick uses keeps its slot.
 Every `monolog.logger.*` channel is pooled (the bundle's `MonologProcessor` proxies
-them), and so are the EntityManager and services tagged `kernel.reset`. The app's own
+them), and so are the EntityManager, services tagged `kernel.reset`,
+`security.untracked_token_storage` and `security.authorization_checker`. The app's own
 Redis pool (`RedisClientFactory::borrow()`) gives its connection back by itself.
 
 The following inventory records the callbacks inspected on 2026-10-12. It is

@@ -206,6 +206,35 @@ sustained hostile load, whole-host CPU/RSS and the constrained 24-hour soak rema
 separate qualification work. Bounded state alone does not establish fair access
 or denial-of-service resistance.
 
+### Readiness and lost lookups
+
+A readiness request that fails on pool capacity, its time budget, the database
+deadline or the transport answers `503` and changes nothing else. Only an answer in
+which rqlite reports a migration record or registry columns that differ from what the
+API serves closes registration and lookup. While they are closed, one timer re-reads
+readiness once a second and reopens them after the first compatible answer, and a
+generation counter keeps an answer read before a later incompatible one from
+reopening them. Earlier, any failed `/ready` closed lookups until another `/ready`
+succeeded: a client that finished its request just before the session deadline, or
+eight concurrent lookups plus one `/ready`, took the registry out of service.
+
+`relay/tests/run_http_contract.php` checks that a readiness transport failure and a
+saturated pool leave lookups open, and that a malformed schema reopens them without
+a readiness request. `relay/tests/run_cluster_contract.php` checks lookups after a
+minority heals. Stopping cancels the timer and any probe in flight; no test checks
+that a stop during the startup schema loop or a probe wait ends the readiness
+coroutine.
+
+### Binary hardening
+
+Release builds without sanitizers compile with `-fstack-protector-strong`,
+`-fstack-clash-protection`, `-fcf-protection=full`, `_FORTIFY_SOURCE=3` and
+`_GLIBCXX_ASSERTIONS`, and link with full RELRO. The inventory tool refuses an API
+build that lacks one of them, at image capture and at verification
+(`packages/baander-dev-registry/tests/RegistryInventoryTest.php`). OpenSSL is 3.5.9,
+checked against its release SHA-256. The static OpenSSL build does not use
+`-fcf-protection`, so Intel CET is not enforced when the binary runs.
+
 ### Stored URLs and actual outbound connections
 
 A registration URL must be absolute HTTPS with a hostname, without user information

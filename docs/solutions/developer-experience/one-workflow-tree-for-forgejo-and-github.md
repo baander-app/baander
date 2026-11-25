@@ -1,7 +1,7 @@
 ---
 title: Run one workflow tree on Forgejo and GitHub without silent skips
 date: "2026-11-05"
-last_updated: "2026-11-16"
+last_updated: "2026-11-25"
 category: developer-experience
 module: CI workflows shared by Forgejo and GitHub
 problem_type: developer_experience
@@ -27,7 +27,7 @@ Baander's CI ran only on the self-hosted Forgejo instance, from `.forgejo/workfl
 turned up several forge behaviours that do not raise an error. When one of them goes wrong, a workflow
 stops running, a job waits in the queue forever, a cache never restores, or a check
 passes for the wrong reason. The
-[CI guide](../../../docs-book/part-2-developer-guide/continuous-integration.md)
+[CI guide](../../../docs-book/part-2-developer-guide/contributing/continuous-integration.md)
 states the resulting rules. This note records the traps behind them and the dead
 ends hit on the way, which neither the guide nor the code explains.
 
@@ -44,11 +44,17 @@ a single file, makes Forgejo ignore every shared workflow without any warning.
 used `github.forgejo_server_version`, which looks like the natural test. Forgejo
 lacks that key in the context it uses to resolve `runs-on` when it creates a run, so
 the label would always fall to the GitHub branch. Per-forge values follow the shape
-at `.github/workflows/ci.yaml:27`:
+of the `runs-on` lines in `.github/workflows/ci.yaml`:
 
 ```yaml
-runs-on: ${{ github.server_url == 'https://github.com' && 'ubuntu-latest' || 'docker-cli' }}
+runs-on: ${{ github.server_url == 'https://github.com' && 'ubuntu-latest' || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository) && 'fork-pull-request' || 'docker-cli' }}
 ```
+
+Updated 2026-11-25: the middle branch sends a Forgejo pull request from a fork to the
+`fork-pull-request` label, which no runner serves, so it never reaches the
+`docker-cli` runner and its Docker socket. `PublicationWorkflowTest` enforces the
+routing. The [CI guide](../../../docs-book/part-2-developer-guide/contributing/continuous-integration.md#trusted-runs-and-fork-pull-requests)
+explains why that routing is not a hard barrier.
 
 Never let a runner label depend on a repository variable. When the variable is
 missing, the label matches no runner and the job waits in the queue with no error.
@@ -118,7 +124,7 @@ builder, so the build kept running on the default builder and the step had no
 effect. The fix passes the builder explicitly (`--builder "$CI_BUILDER"`,
 `.github/workflows/ci.yaml:123`), and `Client::withBuilder()` accepts it only when
 `docker buildx inspect` shows the `docker-container` driver with every node on the
-captured daemon (`packages/baander-tooling/src/Docker/Client.php:43`). That keeps the
+captured daemon (`packages/baander-containers/src/Docker/Client.php:28`). That keeps the
 rule that no builder name can move a build to another engine.
 
 **Name the builder per run and remove it in an `always()` step.** A fixed name such
@@ -168,7 +174,7 @@ points back to these causes.
 
 - Before adding any workflow file or forge-specific directory.
 - Before adding a per-forge expression, especially in `runs-on`.
-- When touching builder selection in `packages/baander-tooling/src/Docker/Client.php`
+- When touching builder selection in `packages/baander-containers/src/Docker/Client.php`
   or the BuildKit cache steps in `ci.yaml`.
 - When writing a check that treats a registry or API refusal as success.
 - When adding a step to a container job that starts a browser, sources an
@@ -194,6 +200,6 @@ Explicit, same-daemon builder that the build tool verifies:
 
 ## Related
 
-- [CI guide and operator runbook](../../../docs-book/part-2-developer-guide/continuous-integration.md)
+- [CI guide and operator runbook](../../../docs-book/part-2-developer-guide/contributing/continuous-integration.md)
 - [Local gate images](local-gate-images-and-webkit-harness-runs.md): rebuilds the CI
   image with the same `build-application.php`. Locally no `--builder` is needed.

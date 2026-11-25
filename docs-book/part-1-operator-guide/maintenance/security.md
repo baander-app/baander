@@ -73,6 +73,36 @@ production kernels on them. The preset initializes PostgreSQL, gives the databas
 and the connection pooler's auth file their verifiers, and builds both database
 URLs, all from the one `DB_PASSWORD`.
 
+### Secrets in the repository's history
+
+The repository committed some development secrets and later deleted them. Git
+history keeps them, so anyone with a clone can read them. Treat each as burned and
+never copy one into an installation:
+
+- `docker/dev/juul.localdomain.key`, the private key of a development TLS
+  certificate, tracked from the first commit until 2026-11-22 with its certificate
+  `docker/dev/juul.localdomain.crt`, `docker/dev/cert.ini` and the CA certificate
+  `docker/dev/ca.crt`. The development image installed both certificates as trusted
+  roots. Remove them from any trust store that still holds them.
+- `.env`, tracked until 2026-11-21. Its values for `APP_SECRET`,
+  `STREAM_URL_HMAC_SECRET`, `AUTH_TOTP_ENCRYPTION_KEY`, the Web Push key pair
+  (`VAPID_PUBLIC_KEY` and `VAPID_PRIVATE_KEY`), and the Redis and database password
+  are public.
+
+`.env.dev` and `.env.example` still commit development and example values for some
+of these secrets, and `.env.test` and `compose.test.yaml` commit the test values. None
+is a production credential.
+
+With `APP_ENV=prod`, every process refuses to boot with any of these application
+secrets or passwords, and with the committed Web Push private key, which it
+recognizes by its SHA-256 digest; the error names the variable, never the value.
+`packages/baander-core/src/Secrets.php` lists the committed values, and
+`ProductionSecrets` applies them at boot. The test values are the exception at boot,
+because the test suites boot production kernels on them; the preset refuses them, and
+every other committed value, when it renders and when it starts. No check looks for
+the TLS key, because no installation loads it: the preset's gateway does not
+terminate TLS.
+
 ### Network security
 
 The deployment preset places its gateway, an nginx container, in front of the web

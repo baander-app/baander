@@ -1,6 +1,6 @@
 # Baander roadmap
 
-Updated 2026-11-24. The roadmap records remaining work, decisions and acceptance
+Updated 2026-11-25. The roadmap records remaining work, decisions and acceptance
 gates. The linked guides describe current operating contracts. Git history
 keeps completed milestones and their verification evidence.
 
@@ -16,13 +16,17 @@ Read [AGENTS.md](AGENTS.md) for workflow, [CONCEPTS.md](CONCEPTS.md) for shared 
 and the [testing guide](docs-book/part-2-developer-guide/testing/README.md) for current
 runners and verification boundaries. Historical suite counts apply to their own trees.
 
-## Security audit, 2026-11-24: in progress
+## Security audit, 2026-11-24
 
-The [security audit](SECURITY_FINDINGS.md) of `9524a6fd9` read the whole repository
-and attacked a disposable worktree preview. The
-[fix plan](docs/plans/2026-11-24-1754-fix-security-audit-findings-plan.md) resolves
-every finding in three phases. Phase 1 is on `master` at `02b09f172`; Phase 2 is in
-progress. These are the findings above low severity:
+The security audit of `9524a6fd9` read the whole repository and attacked a
+disposable worktree preview. The
+[fix plan](docs/plans/2026-11-24-1754-fix-security-audit-findings-plan.md) resolved
+every finding in three phases, all on `master`. The audit document is retired; read
+it with `git show adb9526fa:SECURITY_FINDINGS.md`. The
+[application threat model](docs-book/part-2-developer-guide/architecture/application-threat-model.md)
+and the [registry threat model](docs-book/part-2-developer-guide/architecture/registry-threat-model.md)
+record each closed path with its proving test and each residual. These are the
+findings above low severity:
 
 - **C1, critical, reproduced.** A request without credentials runs as the last user
   the web worker authenticated: with no credentials, `POST /api/admin/users` created
@@ -84,6 +88,132 @@ The later commits were verified with the security runtime drill, the changed tes
 files, the dependency checker's 84 tooling tests and the web, site and desktop checks
 named in their commit messages.
 
+### Delivered: Phase 2
+
+Each commit message records the failing output before its fix and the checks after
+it.
+
+- **H2 and M2, library confinement.** The Shared kernel's media container table
+  names the containers a library may hold; every FFmpeg and ffprobe input passes
+  `-format_whitelist` for its input kind, and a scan imports a file only when its
+  probed format is a container of its kind. The scanner skips links that resolve
+  outside the library, and a transcode resolves its source through the library, so
+  `POST /api/stream/sign` and `POST /api/transcode/sessions/` answer `409` for an
+  escaping source. Before the fix, the tests read H.264 through a DASH manifest named
+  `.mkv` (`99b5178ba`).
+- **M1.** Output past the native bound fails only its own attempt, error output
+  keeps a bounded tail, and the daemon keeps serving (`99b5178ba`).
+- **M3, file side.** The metadata extract and match endpoints, their console
+  commands and cover extraction read only files inside a library; a path that is not
+  absolute is refused before any library is read (`6ba980b84`).
+- **H3.** An original's media type comes from the container table, and every
+  original and rendition response is an attachment with
+  `default-src 'none'; sandbox`; every other non-HTML response gets a restrictive
+  default policy. In Chromium and Firefox, the old headers ran the script and the new
+  ones download the file (`fa7730562`).
+- **Hardening notes and L12.** The page policy adds `form-action 'self'` and allows
+  `http:` media only on an HTTP page, one nonce serves each page view, and the static
+  handler refuses `.php` files and dot segments other than `.well-known`
+  (`beea0b6a0`).
+- **M4 and L3.** Auth bodies over 65,536 bytes answer `413`; login block fields are
+  cut to 255 characters and blocks older than 30 days are deleted; the per-account
+  failure limit reserves a failure before the password check. The 50-process race
+  ran 50 password checks against a limit of 10 before the fix (`1eddd4812`).
+- **M5 and M6.** Every address-keyed limiter keys IPv6 by /64; only super admins
+  clear limiters, and each clear is logged with its actor (`06a62c0dc`).
+- **M7.** At most 20 push subscriptions per user, the oldest evicted, and one
+  Messenger message per subscription (`4237e9ccc`).
+- **M11.** Every member-writable field and collection is bounded, count caps are
+  checked under an advisory lock, and a migration adds the checks `NOT VALID`
+  (`862c3d7ee`).
+- **L6 and list bounds.** Page and limit are validated on the 14 page-numbered
+  routes, and the playlist list pages with `meta` (`53cfba09b`).
+- **L2 and recommendation writes.** Recommendation writes bind a validated request,
+  record their origin, are capped at 1,000 member rows per user, and listings show a
+  member their own and the global rows (`6231a4296`).
+- **L1 and the radio part of L9.** A member's source list omits the sync
+  configuration, the country catalogue is cached six hours, and the station list
+  pages at most 500 rows (`648c31131`).
+- **The transcode part of L9.** A per-user transcode session share, default 6
+  (`44085b755`), that copy starts count toward (`4045721e4`).
+- **L4 and provider reads.** IPv6 transition forms are judged by their IPv4 address,
+  and provider answers are read up to a byte limit (`f72916f76`).
+- **H4, M13 and the registry part of L10.** Readiness no longer latches on a failed
+  probe (`b06be50ac`); the request and database read buffers are bounded
+  (`44af1bfc3`); client and node certificate authorities are separate (`23105d9b0`);
+  release builds carry hardening flags, OpenSSL is 3.5.9 and TLS 1.2 is limited to
+  ECDHE with AEAD ciphers (`8ceca596c`).
+- **The pairing part of L10.** A completed pairing is returned only after the expiry
+  and server checks (`824ce8ea6`), and every refused pairing answers one `404`
+  (`67b925944`).
+- **M8.** The operator guide documents one installation, the preset; the Compose
+  procedure moves to the developer guide (`5232d0e44`).
+- **Generated client.** `eac10e7ab`, `1d3c15c0d` and `e4fb6fc56` regenerate the
+  OpenAPI spec and the web client for these API changes.
+
+### Delivered: Phase 3
+
+- **M9, Redis.** Messenger envelopes are signed under `APP_SECRET`, and cached values
+  carry an HMAC tag (`3ea35331e`). The preset's application connects as the Redis ACL
+  user `baander`, and the `default` user is reset (`8e0c41a07`).
+- **M9, PostgreSQL.** The preset runs the application as a `NOSUPERUSER` role that
+  owns the database (`752de602e`).
+- **M9, log agent.** The log agent reads Docker through a read-only allow-listing
+  proxy (`5783943a6`).
+- **M10.** Every image, download and Git source of the image builds is pinned, the
+  local dependency check reports any unpinned input and image digest drift, the
+  prebuild installer trusts only committed hashes, and on Forgejo a fork pull request
+  runs no job on the runner that holds the Docker socket (`944605d1e`).
+- **M12 and L11.** The desktop renderer runs sandboxed, stores and trusts only a
+  server's origin, loses the credential read channel, opens DevTools only unpackaged,
+  and keeps only safe discovered servers (`508bcfccf`). The player loads its DSP
+  modules relative to the build base, so they still load from `file://`
+  (`1ab64d3c6`).
+- **L5.** The web client encodes every path parameter, and a lint rule reports a raw
+  value in an API path (`6b04e5390`).
+- **M14 and L7.** Production logs at `info`, correlation IDs and request URLs are
+  bounded, preset services rotate their logs, and both nginx configurations log the
+  path without the query (`69e250319`).
+- **L8.** An unknown environment refuses to boot, and secrets and passwords have
+  minimum lengths at boot and in the preset, which also refuses every committed value
+  (`2a4498344`).
+- **Hardening notes and L13.** Disabling an account advances the credential epoch, a
+  refused refresh answers `invalid_token`, the pending TOTP secret is sealed, and a
+  user keeps at most 20 personal access clients (`0a686e063`). GD decoding is bounded
+  to 50,000,000 pixels and FLAC metadata parsing to a 32 MiB budget (`fd1067312`).
+- **L14.** The security guide records the burned development secrets in Git history
+  and the checks that refuse them.
+- **Installation run.** The documented preset installation ran once end to end on
+  `e4fb6fc56` (`53027fbcd`); the installation page's Verified section carries the
+  evidence. The run predates `2a707bcc8`, which reaches a preset through a rebuilt
+  database image.
+- **Found on the way.** `SchedulerWorkerRunnerTest` seeds a job due only in its own
+  minute, so a minute rollover no longer publishes two occurrences (`7acb50157`).
+  `ClientJwksFetcher` reads through `PublicHttpClient::content()` (`418af2f14`). The
+  simplification pass: `e1f2cfff3`, `19f774259`, `e1664e94b` and `154935634`.
+
+Code review: `ce-code-review` over `9524a6fd9..53027fbcd`, 18 reviewers, verdict ready
+with fixes. Its four confirmed findings are fixed. The application role owns the
+database and could plant an operator or function that the preset's superuser SQL
+ran; the superuser session and the verification SQL now pin `search_path`
+(`2a707bcc8`, reproduced on PostgreSQL 18.7 before and after). The qualification's
+Redis sampler authenticated as the disabled `default` user and recorded a failure on
+every sample (`4597eaf50`). A share of 1 or 2 sessions refused every automatic start
+of a 720p or larger video (`52b6118af`). A raw `/` in a `REDIS_URL` password was
+refused (`adb9526fa`).
+
+Verification checkpoints: the combined backend run over the Phase 2 work found four
+stale test expectations (`40bdba4e1`), and the whole-tree checks after Phase 2 found
+five more, among them the interleave test's 10-second handshake under host load
+(`372dc91da`). After Phase 3, `InitialSchemaMigrationTest` met the first irreversible
+migration (`2698fb77e`). The preset qualification has not run on this work: the code
+review found that its Redis sampler would have reported a failure on every sample
+(`4597eaf50`). The worker load proof with
+8 video and 12 audio jobs needs a live deployment and has not run. The Playwright spec
+for path encoding parses but has not run.
+
+Final verification: pending.
+
 ### Decisions confirmed by the owner
 
 - 2026-11-24: DPoP refuses RSA proofs. URL wrappers are off in every image. The
@@ -105,13 +235,156 @@ named in their commit messages.
   Docker's `local` driver, five files of 50 MB, and per-boot log directories older than
   14 days are pruned. Fork pull requests on Forgejo run no job on the runner that holds
   the Docker socket. Committed test secrets are refused by the preset, not yet at boot.
+  Copy starts count toward the same per-user session share as encode starts
+  (`4045721e4`). An unknown, expired or other server's pairing code answers one `404`,
+  so a caller cannot tell whether a code is live for another server (`67b925944`).
+- 2026-11-25, after the code review: a low "Video sessions per user" setting makes an
+  automatic start ask for fewer quality tiers, at most the share, rather than raising
+  the setting's minimum to 3. A share of 2 gives 360p and 720p, a share of 1 gives
+  360p (`52b6118af`).
 
 ### Open
 
-- Phase 2 (U9 to U32) and Phase 3 (U33 to U44) of the plan.
-- `SchedulerWorkerRunnerTest` publishes two occurrences when the minute rolls over
-  between its seed and the worker's first pass; it fails the same way on `9524a6fd9`
-  when the seed is placed at second 59.9.
+Residual risks, recorded in the threat models:
+
+- Signed envelopes carry no expiry or nonce, so a process that can write to Redis
+  can replay a captured one; the impact per message type was not assessed. Cached
+  values are authenticated without their key, so such a process can move a valid
+  value to another key, and it can still change rate-limiter state and WebSocket
+  tickets.
+- Sessions use `RedisSessionHandler`, which `AuthenticatedMarshaller` does not cover.
+  No route starts a session today; a feature that does should wrap the handler in a
+  `MarshallingSessionHandler` over the authenticated marshaller.
+- An undecodable envelope is dropped without a failure-transport row, and a signed
+  envelope the codec refuses is retried and dropped with one critical log line.
+  Rotating `APP_SECRET` drops the jobs queued at that moment; the credential rotation
+  page says to drain the queues first.
+- The Redis ACL's command list rests on a source search. It grants `EVAL` but not
+  `EVALSHA`, `SCRIPT`, `MULTI` or `EXEC`, and a missing command would show as
+  `NOPERM` at the first preset start.
+- Container inspect through the Docker proxy returns every container's environment,
+  `APP_SECRET` included.
+- PostgreSQL runs an extension's install script with `search_path` set to `public`,
+  which the application role owns; an extension added to the preset's list later
+  would run its script there as the superuser.
+- Forgejo fork routing is not a hard barrier: a fork that edits the workflow files
+  can name the socket runner, so fork runs must stay behind Forgejo's approval.
+  Routing keys on `head.repo.full_name`, so an AGit-flow pull request routes as a
+  same-repository one; whether the approval hold covers AGit pull requests is not
+  verified.
+- A 6to4 or Teredo answer whose carried IPv4 addresses are public is admitted, as the
+  plan decided.
+- The deferred part of L8: the committed test values are refused by the preset only.
+  A boot check would break the 56 test files that boot production kernels on them.
+- The registry's static OpenSSL is built without `-fcf-protection`, so CET is not
+  enforced at runtime.
+- Pairing completion reads and saves the session without a lock; a race between two
+  completions of one code is unproven.
+- A coroutine started inside a request finds no token; no such coroutine reads
+  security state today, by a source search. Likewise by source search only: every
+  FFmpeg and ffprobe input goes through the input clause (a filter that opens a file
+  itself, such as `subtitles=` or `movie=`, would not show), and no audio rendition
+  takes a video file as its source under the audio-only whitelist.
+
+Behaviour gaps:
+
+- A row stored over a member-input bound before the `NOT VALID` checks stays readable
+  and deletable, but any update of it, heartbeat writes included, fails with
+  SQLSTATE `23514` and answers `500`. Writing the guarded fields inside
+  `guardExistingWrite`'s compare-and-set and mapping `23514` to `409` would close it.
+  Real data was not checked for such rows.
+- Track delivery answers a generic `500` when confinement refuses a track:
+  `StreamService::resolveTrackPath` throws `InvalidArgumentException`, which
+  `DeliveryController::decide` does not catch. Video answers `409`.
+- `GET /api/songs/` and the recommendation source and target routes still clamp the
+  page size, and ui/web sends `limit=1000` to songs, so strict paging there would
+  break those calls. `ui/web/src/shared/utils/read-all-pages.ts` stops at the first
+  short page even when `meta.total` reports more, which is correct only while the
+  client's page limits equal the server's maxima.
+- Transcode session share: an expired pending session can count as a freed slot,
+  concurrent playback reports can make `makeRoom()` throw, and `assertRoomFor()` can
+  pass while a later tier fails. The web player shows `409`
+  `transcode_session_limit` as a generic failure, and its message is not translated.
+  `TranscodeSessionService::cancelSession` leaves the execution running.
+- A Matroska file named `.webm` is offered as a WebM original and ends playback in an
+  error with no fallback. Audio responses take their type from the container table;
+  the planned native players were not checked against it. The static handler serves
+  `/dsp/*.wasm` as `application/octet-stream`.
+- The recommendation `POST` documents `201` with a `RecommendationResource` but
+  returns a message; generation deletes every user's rows for the songs it
+  regenerates, member rows included; and a collaborative-row race with console
+  generation can still answer `500`.
+- `ActivityController::history` takes `limit` and `offset` but returns no `meta`.
+- Revoked personal access clients are never purged, so create and revoke cycles add
+  rows.
+- A limiter clear logs the super admin's email address; logging the user ID needs a
+  small Shared port.
+- `app:login-block:list`, like other console listings of user data, prints
+  sender-controlled text without removing ANSI and OSC escape sequences.
+- No server-side LAN discovery responder exists. The desktop client accepts an
+  announcement whose fields are at most 256 characters, `http:` only for a loopback
+  or private IP literal or a `.local` name, stores the origin only, keeps at most 64
+  servers, and shows the responder's address with a mark for unencrypted servers; a
+  responder and the native apps should follow the same rules.
+- `App\Media\Infrastructure\Converter\ImageConverter` is deprecated and has no callers;
+  its removal is the owner's decision, after reading its history.
+
+Preset and operations:
+
+- The preset cannot yet rotate the OAuth keys offline, rotate the database password,
+  rotate `APP_SECRET` with webhook delivery held, or run maintenance with PostgreSQL
+  up and web and workers stopped; the maintenance pages say so. Its 35-second
+  `stop_grace_period` ignores `WEB_DRAIN_SECONDS`, and worker readiness under the
+  preset has not been observed.
+- `DB_USERNAME=postgres` passes preset validation but fails at start, after the
+  volumes are created, with a message that names internal variables.
+- Worker containers that `DeploymentContainerRecipe` creates keep the Docker daemon's
+  default log driver. `REDIS_PASSWORD` is still rendered into the web and worker
+  environments, although `REDIS_URL` carries it.
+- The development stack's Redis keeps the `default` user with `requirepass`, and its
+  `docker-compose.yml` needs eight log-collector variables (since `1575b1ea7`) that no
+  command writes; `compose-stack.md` documents the gap.
+- The 64 MiB cap on the IPRD catalogue was not checked against the live catalogue.
+
+Build and supply chain:
+
+- The workflows pin `baander-runner` at commit tag `7491ddce…`. GHCR holds that tag
+  and `ffmpeg-baander-static`'s; the Forgejo registry was not checked, and Forgejo CI
+  fails closed without them. The pin keeps CI on that runner until it moves to a
+  build of `944605d1e` or later.
+- `docker/nginx/Dockerfile.test` does not build, because Alpine now offers only
+  `php85` 8.5.13; the runtime declarations need the same bump.
+- `composer check:php-dependencies:local` exits `2` on the redis-rate-limiter
+  package's "could not detect the root package version" validation gap.
+- Node has no owner in the production inventory (2,114 review gaps): move Node to the
+  development stages or add build evidence. PIE is still listed in
+  `third_party/inventory/application-review.json`.
+- The FFmpeg build script's 55 nested downloads are not verified, `cargo-c` floats,
+  and two builds use `-march=native`.
+- Registry: the host's GCC 16 reports false `-Warray-bounds` and `-Wstringop-overflow`
+  errors in Asio under `_FORTIFY_SOURCE=3`, and the ZTS CI gate image cannot run the
+  registry harness (`test_runtime_lifecycle.php` exits 139).
+
+Tests and gates:
+
+- Not run on this work: the preset qualification, the worker load proof with 8 video
+  and 12 audio jobs, the Playwright path-encoding spec, and the original-media browser
+  check through Swoole and the gateway.
+- No test checks that a throwing `SimpleResetter` method still lets the later methods
+  run and the pool free its slot; that newline-suffixed or percent-encoded dot paths
+  are refused by the Docker proxy; that the `409` answers carry
+  `error.details.reason` `transcode_session_limit` and `error.details.limit`; or that
+  the registry's `stop()` during the startup loop or a probe wait ends the readiness
+  coroutine.
+- `RequestIdentityInterleaveTest`, the Redis ACL tests and the Messenger and DPoP
+  outage tests skip instead of failing when their environment variables are missing,
+  and `failOnSkipped` is not set.
+- Two verified PostgreSQL findings await the postgres-remediation skill's Doctrine
+  reference: a `NOT VALID` check applies to every new row version, so an update of
+  any column of a violating row fails with `23514`, and `pg_column_size()` reads a
+  stored `jsonb` value compressed (`MemberInputBoundsMigrationTest`); a partial index
+  whose predicate compares a column with a constant serves only queries that state
+  that constant (`RecommendationOriginMigrationTest`).
 
 ## Security review findings
 
