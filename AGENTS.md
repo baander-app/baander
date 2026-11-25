@@ -37,6 +37,11 @@ written). Run `prose-fix` on documentation prose you write or change.
 - Read a feature's source and history before proposing its removal; "no callers"
   is not evidence. Movie and concert code and the OAuth auth-code and device-code
   flow are groundwork for planned features: keep them correct, never remove them.
+  Native iOS and Android apps are planned, so server capabilities they may need
+  (passkey attestation formats, device pairing, EC DPoP keys, push delivery) are
+  groundwork too.
+- Ask the user before removing or narrowing a capability or changing an API or
+  protocol contract; a plan's assumptions list is not consent.
 - `ui/rn` and Essentia are out of scope with no end date: no plans, fixes, CI jobs
   or gates for them, and ask before touching `ui/rn`.
 - Capacity is bounded by transcode slots, not container CPU or memory limits; do
