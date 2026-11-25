@@ -157,6 +157,10 @@ final class InitialSchemaMigrationTest extends TestCase
             'DoctrineMigrations\\Version20261122150000',
             'DoctrineMigrations\\Version20261122160000',
             'DoctrineMigrations\\Version20261122170000',
+            'DoctrineMigrations\\Version20261125090307',
+            'DoctrineMigrations\\Version20261125141000',
+            'DoctrineMigrations\\Version20261125142000',
+            'DoctrineMigrations\\Version20261125151723',
         ], $this->connection->fetchFirstColumn('SELECT version FROM doctrine_migration_versions ORDER BY version'));
         self::assertSame(108, (int) $this->connection->fetchOne("SELECT count(*) FROM pg_tables WHERE schemaname = 'public' AND tablename <> 'doctrine_migration_versions'"));
         self::assertSame(['TimeZone=UTC'], $this->databaseSettings($this->connection));
@@ -171,13 +175,13 @@ final class InitialSchemaMigrationTest extends TestCase
         self::assertSame($history, $this->connection->fetchAllAssociative('SELECT * FROM doctrine_migration_versions'));
 
         $failure = $this->refused($this->factory(), '0');
-        self::assertStringContainsString('The deleted authorization and device codes cannot be restored', $failure);
+        self::assertStringContainsString('The cut field values cannot be restored', $failure);
         self::assertSame($catalog, $this->catalog('public'));
         self::assertSame($seeds, $this->connection->fetchAllAssociative('SELECT * FROM scheduled_jobs ORDER BY id'));
         self::assertSame($history, $this->connection->fetchAllAssociative('SELECT * FROM doctrine_migration_versions'));
 
         self::assertSame(0, $this->migrate($this->factory(true)));
-        self::assertSame(44, (int) $this->connection->fetchOne('SELECT count(*) FROM doctrine_migration_versions'));
+        self::assertSame(48, (int) $this->connection->fetchOne('SELECT count(*) FROM doctrine_migration_versions'));
         self::assertSame('future_migration_probe', $this->connection->fetchOne("SELECT to_regclass('future_migration_probe')::text"));
     }
 
