@@ -15,7 +15,7 @@ final class BlurHashGeneratorTest extends TestCase
 
     protected function setUp(): void
     {
-        $this->tmpDir = sys_get_temp_dir() . '/blurhash_generator_' . bin2hex(random_bytes(6));
+        $this->tmpDir = sys_get_temp_dir() . '/blurhash_generator_' . (random_bytes(6) |> bin2hex(...));
         $this->assertTrue(mkdir($this->tmpDir, 0o755, true));
     }
 

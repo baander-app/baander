@@ -116,13 +116,7 @@ final class SecurityProcessor implements CompileProcessor
 
     private function hasAbstractArguments(Definition $definition): bool
     {
-        foreach ($definition->getArguments() as $argument) {
-            if ($argument instanceof AbstractArgument) {
-                return true;
-            }
-        }
-
-        return false;
+        return array_any($definition->getArguments(), static fn (mixed $argument): bool => $argument instanceof AbstractArgument);
     }
 
     private function processLazyFirewallContexts(ContainerBuilder $container): void

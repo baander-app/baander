@@ -232,7 +232,7 @@ class HardwareCapabilitiesProber
         }
         array_push($command, '-c:v', $encoder, '-threads', '1', '-f', 'null', '-');
         $output = $this->exec($command);
-        $lines = array_values(array_filter(array_map(trim(...), explode("\n", $output)), static fn (string $line): bool => $line !== ''));
+        $lines = array_filter(array_map(trim(...), explode("\n", $output)), static fn (string $line): bool => $line !== '') |> array_values(...);
         $this->lastDiagnostic = substr(implode(' | ', array_slice($lines, -3)), 0, 512);
 
         if ($this->lastExitCode !== 0) {

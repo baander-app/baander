@@ -23,7 +23,7 @@ final class GdImageConverter
         $source = $this->decode($sourcePath, $imageInfo);
 
         $this->ensureDirectory(dirname($outputPath));
-        $tempPath = $outputPath . '.' . bin2hex(random_bytes(8)) . '.tmp';
+        $tempPath = $outputPath . '.' . (random_bytes(8) |> bin2hex(...)) . '.tmp';
 
         if (!imagewebp($source, $tempPath, self::WEBP_QUALITY)) {
             @unlink($tempPath);
@@ -74,7 +74,7 @@ final class GdImageConverter
         imagecopyresampled($canvas, $source, 0, 0, 0, 0, $maxWidth, $newHeight, $originalWidth, $originalHeight);
 
         $this->ensureDirectory(dirname($outputPath));
-        $tempPath = $outputPath . '.' . bin2hex(random_bytes(8)) . '.tmp';
+        $tempPath = $outputPath . '.' . (random_bytes(8) |> bin2hex(...)) . '.tmp';
 
         if (!imagewebp($canvas, $tempPath, self::WEBP_QUALITY)) {
             @unlink($tempPath);

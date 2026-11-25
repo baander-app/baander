@@ -315,11 +315,11 @@ final class NativeExecutionDaemon
 
             return $existing->snapshot();
         }
-        $owned = count(array_filter($this->attempts, static fn (NativeExecutionAttempt $attempt): bool => $attempt->session === $session && $attempt->state === 'running'));
+        $owned = array_filter($this->attempts, static fn (NativeExecutionAttempt $attempt): bool => $attempt->session === $session && $attempt->state === 'running') |> count(...);
         if ($owned >= $this->clientCommandCaps[$client]) {
             throw new NativeExecutionException('Native client command capacity is exhausted.', false);
         }
-        $active = count(array_filter($this->attempts, static fn (NativeExecutionAttempt $attempt): bool => $attempt->state === 'running'));
+        $active = array_filter($this->attempts, static fn (NativeExecutionAttempt $attempt): bool => $attempt->state === 'running') |> count(...);
         if ($active >= $this->deploymentProfile->nativeCommandLimit() || count($this->attempts) >= $this->deploymentProfile->nativeResultLimit()) {
             throw new NativeExecutionException('Native command or result capacity is exhausted.', false);
         }
@@ -333,7 +333,7 @@ final class NativeExecutionDaemon
             stream_set_blocking($pipe, false);
         }
         $status = proc_get_status($process);
-        $token = bin2hex(random_bytes(32));
+        $token = random_bytes(32) |> bin2hex(...);
         $attempt = new NativeExecutionAttempt($token, $session, $sequence, $fingerprint, $status['pid'], $process, $pipes, self::now() + $timeout);
         $this->attempts[$token] = $attempt;
 
@@ -463,7 +463,7 @@ final class NativeExecutionDaemon
         }
         // Fields after the command name start at the state (field 3), so utime, stime, cutime
         // and cstime (fields 14 to 17) sit at offsets 11 to 14.
-        $fields = explode(' ', trim(substr($stat, $close + 2)));
+        $fields = explode(' ', substr($stat, $close + 2) |> trim(...));
         if (count($fields) < 15) {
             return;
         }

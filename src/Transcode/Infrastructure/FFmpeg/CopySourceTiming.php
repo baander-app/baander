@@ -91,7 +91,7 @@ final readonly class CopySourceTiming
             $previous = $time;
         }
         $gap = max($gap, $this->origin + $this->duration - $previous);
-        return max(1.0, ceil(min($this->duration, 6.0 + $gap)));
+        return max(1.0, min($this->duration, 6.0 + $gap) |> ceil(...));
     }
 
     /** @param list<array<string, mixed>> $packets */

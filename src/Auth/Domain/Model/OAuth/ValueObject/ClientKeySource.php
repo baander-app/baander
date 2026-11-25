@@ -90,7 +90,7 @@ final readonly class ClientKeySource
         if (count($keys) > self::MAX_KEYS) {
             throw new InvalidArgumentException(sprintf('A JWK Set may hold at most %d keys.', self::MAX_KEYS));
         }
-        if (strlen(json_encode($jwks, JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES)) > self::MAX_JWKS_BYTES) {
+        if (json_encode($jwks, JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES) |> strlen(...) > self::MAX_JWKS_BYTES) {
             throw new InvalidArgumentException(sprintf('A JWK Set may be at most %d bytes.', self::MAX_JWKS_BYTES));
         }
 
@@ -139,7 +139,7 @@ final readonly class ClientKeySource
     /** The big-endian bytes of a base64url JWK integer, without leading zero bytes; none when the member is not a string. */
     private static function unsignedInteger(mixed $member): string
     {
-        return is_string($member) ? ltrim(base64_decode(strtr($member, '-_', '+/')), "\0") : '';
+        return is_string($member) ? ltrim(strtr($member, '-_', '+/') |> base64_decode(...), "\0") : '';
     }
 
     /** @param list<array<string, mixed>> $keys */
@@ -153,7 +153,7 @@ final readonly class ClientKeySource
             array_map(static fn (array $key): mixed => $key['kid'] ?? null, $keys),
             static fn (mixed $kid): bool => is_string($kid) && $kid !== '',
         );
-        if (count($kids) !== count($keys) || count(array_unique($kids)) !== count($keys)) {
+        if (count($kids) !== count($keys) || array_unique($kids) |> count(...) !== count($keys)) {
             throw new InvalidArgumentException('Each key in a JWK Set of several keys needs its own "kid".');
         }
     }

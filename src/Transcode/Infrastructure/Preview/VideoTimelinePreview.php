@@ -121,7 +121,7 @@ final readonly class VideoTimelinePreview implements VideoTimelinePreviewPort
             return;
         }
         touch($this->path($identity, 'lock'));
-        $temporary = $this->path($identity, bin2hex(random_bytes(8)) . '.part');
+        $temporary = $this->path($identity, (random_bytes(8) |> bin2hex(...)) . '.part');
         try {
             if (is_file($this->path($identity, 'cancelled')) || is_file($this->path($identity, 'jpg'))) {
                 return;

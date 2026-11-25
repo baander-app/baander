@@ -133,7 +133,7 @@ final class AsyncWorkloadCompilerPass implements CompilerPassInterface
     /** @param array<string, mixed> $handlers @param class-string $class */
     private function hasEligibleHandler(ContainerBuilder $container, array $handlers, string $class, string $transport): bool
     {
-        $types = [$class, ...array_values(class_parents($class)), ...array_values(class_implements($class)), '*'];
+        $types = [$class, ...(class_parents($class) |> array_values(...)), ...(class_implements($class) |> array_values(...)), '*'];
         $namespace = $class;
         while (($position = strrpos($namespace, '\\')) !== false) {
             $namespace = substr($namespace, 0, $position);

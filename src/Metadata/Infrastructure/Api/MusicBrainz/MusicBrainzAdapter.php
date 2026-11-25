@@ -624,10 +624,10 @@ final readonly class MusicBrainzAdapter implements MusicBrainzLookupInterface
             ended: ($lifeSpan['ended'] ?? false) === true,
             gender: self::text($artist, 'gender'),
             birthplace: is_array($artist['begin-area'] ?? null) ? self::text($artist['begin-area'], 'name') : null,
-            aliases: array_values(array_filter(array_map(
+            aliases: array_map(
                 static fn (array $alias): ?string => self::text($alias, 'name'),
                 self::objects($artist['aliases'] ?? null),
-            ))),
+            ) |> array_filter(...) |> array_values(...),
             personIdentifiers: MusicBrainzArtistLinks::fromRelationships(self::objects($artist['relations'] ?? null)),
         );
     }

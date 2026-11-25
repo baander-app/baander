@@ -70,7 +70,7 @@ final class FFprobeAdapter implements AudioProbePortInterface, VideoProbePortInt
             throw new RuntimeException(sprintf(
                 'ffprobe failed with code %d: %s',
                 $result['code'],
-                trim(substr($result['output'] . $result['error'], -self::ERROR_REPORT_BYTES)),
+                substr($result['output'] . $result['error'], -self::ERROR_REPORT_BYTES) |> trim(...),
             ));
         }
 

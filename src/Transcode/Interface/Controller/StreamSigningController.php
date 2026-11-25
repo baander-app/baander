@@ -222,7 +222,7 @@ final class StreamSigningController
                 }
                 return PublicId::fromString($id);
             }, $jobIdentifiers);
-            if (count(array_unique($jobIdentifiers)) !== count($jobIdentifiers)) {
+            if (array_unique($jobIdentifiers) |> count(...) !== count($jobIdentifiers)) {
                 throw new \InvalidArgumentException('Job identifiers must be unique.');
             }
             $video = $this->publicView->videoId(PublicId::fromString($matches[1]))
@@ -255,10 +255,10 @@ final class StreamSigningController
         }
         $this->playback->touchSessions(array_values($sessions));
         // The attached set is the client's word; it counts only for jobs its own sessions hold.
-        $attached = array_values(array_filter(
+        $attached = array_filter(
             $attached,
             static fn(array $pair): bool => isset($sessions[$pair['jobId']]),
-        ));
+        ) |> array_values(...);
         $state = $this->streaming->getPlaybackState($videoId, array_keys($sessions), $attached);
         if ($state === null || !isset($sessions[$state['jobId']])) {
             return new JsonResponse(['error' => 'Media execution is unavailable'], 503, ['Retry-After' => '2']);

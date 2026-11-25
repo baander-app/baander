@@ -29,7 +29,7 @@ final readonly class RedisRateLimiterFactory implements RefundableRateLimiterFac
             throw new \InvalidArgumentException('Atomic rate limiters require a named fixed window, sliding window or token bucket with a positive limit, interval and refill amount.');
         }
         // Validate Symfony's interval/configuration without touching shared storage.
-        (new RateLimiterFactory($config, new SnapshotRateLimiterStorage('', null)))->create('');
+        new RateLimiterFactory($config, new SnapshotRateLimiterStorage('', null))->create('');
         $now = new \DateTimeImmutable('@' . time());
         if ($now->modify('+' . $interval) <= $now) {
             throw new \InvalidArgumentException('Atomic rate limiter interval must be positive.');

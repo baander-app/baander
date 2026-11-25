@@ -104,10 +104,10 @@ final class BulkFetchLyricsHandler
                 // Which of a page's songs have lyrics, and the signatures of the others, each come
                 // from one query that loads no entities.
                 $withLyrics = $this->lyricsRepository->songIdsWithLyrics($songIds);
-                $signatures = $this->songs->findLyricSignatures(array_values(array_filter(
+                $signatures = $this->songs->findLyricSignatures(array_filter(
                     $songIds,
                     static fn (Uuid $songId): bool => !isset($withLyrics[$songId->toString()]),
-                )));
+                ) |> array_values(...));
 
                 foreach ($songIds as $songId) {
                     if ($limit !== null && $queued >= $limit) {
@@ -148,7 +148,7 @@ final class BulkFetchLyricsHandler
                 if (count($songIds) < $remaining) {
                     break;
                 }
-                $after = $songIds[array_key_last($songIds)];
+                $after = array_last($songIds);
             }
         } catch (JobCancelledException $cancelled) {
             if ($queued > 0) {

@@ -22,6 +22,7 @@ use App\Transcode\Application\Port\TranscodeLoopStarterInterface;
 use App\Transcode\Application\Port\TranscodeSessionPortInterface;
 use App\Transcode\Application\Port\TranscodeStoragePortInterface;
 use App\Transcode\Domain\Model\TranscodeJob;
+use App\Transcode\Domain\ValueObject\AudioStreamInfo;
 use App\Transcode\Domain\ValueObject\QualityTier;
 use App\Transcode\Domain\ValueObject\PresentationSelection;
 use App\Transcode\Domain\ValueObject\SessionState;
@@ -214,10 +215,10 @@ final class TranscodeSessionSubscriber implements TranscodeLoopStarterInterface
                         // Reap the captured process before advancing the write fence.
                         $this->streamManager->stopStream($jobId);
                         $this->processPool->shutdown();
-                        $subtitleQueue = array_values(array_filter(
+                        $subtitleQueue = array_filter(
                             $probe->subtitleStreams,
                             static fn(SubtitleTrackInfo $track): bool => $track->isText(),
-                        ));
+                        ) |> array_values(...);
                         $subtitleActive = [];
                         $subtitleDeadline = hrtime(true) + 30_000_000_000;
                         $active = $latest;
@@ -813,12 +814,7 @@ final class TranscodeSessionSubscriber implements TranscodeLoopStarterInterface
 
     private function copyAudioChannels(VideoProbeResult $probe, ?int $index): ?int
     {
-        foreach ($probe->audioStreams as $stream) {
-            if ($stream->streamIndex === $index) {
-                return $stream->channels;
-            }
-        }
-        return null;
+        return array_find($probe->audioStreams, static fn(AudioStreamInfo $stream): bool => $stream->streamIndex === $index)?->channels;
     }
 
     private function captureNativeClock(string $output, string $availabilityStartTime): void

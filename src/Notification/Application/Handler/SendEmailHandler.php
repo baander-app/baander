@@ -65,7 +65,7 @@ final class SendEmailHandler
                 'headerTitle' => $this->translate($command->category->headerTitle(), ['appName' => $this->appName], $locale),
             ]);
 
-            $email = (new Email())
+            $email = new Email()
                 ->to(new Address($command->userEmail))
                 ->subject(sprintf('[%s] %s', $this->appName, $title))
                 ->html($htmlBody);

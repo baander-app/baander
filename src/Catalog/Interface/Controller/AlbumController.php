@@ -182,9 +182,9 @@ final class AlbumController
         $searchResult = $this->albumService->searchVisible($options, $scope);
 
         $albums = $searchResult->getItems();
-        $coverImageIds = array_values(array_filter(
-            array_map(fn(Album $album) => $album->getCoverImageId(), $albums),
-        ));
+        $coverImageIds = array_map(fn(Album $album) => $album->getCoverImageId(), $albums)
+            |> array_filter(...)
+            |> array_values(...);
         $images = $coverImageIds !== [] ? $this->imagePort->findByUuids($coverImageIds) : [];
 
         $baseUrl = $this->publicOrigins->forRequest($request);

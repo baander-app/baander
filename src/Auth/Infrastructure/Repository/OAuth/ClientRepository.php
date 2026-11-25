@@ -223,6 +223,6 @@ final class ClientRepository implements ClientRepositoryInterface
             return $uris;
         }
 
-        return array_filter(array_map('trim', explode(',', $redirect)));
+        return array_map('trim', explode(',', $redirect)) |> array_filter(...);
     }
 }

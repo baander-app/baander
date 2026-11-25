@@ -244,10 +244,10 @@ final class RecommendationController
             limit: $limit,
         ))->last(HandledStamp::class)?->getResult() ?? [];
 
-        return $this->successResponse(array_values(array_filter(array_map(
+        return $this->successResponse(array_map(
             fn($r) => $this->identities->project($r, $viewerId, $administrator),
             $recommendations,
-        ))));
+        ) |> array_filter(...) |> array_values(...));
     }
 
     /**
@@ -314,10 +314,10 @@ final class RecommendationController
             limit: $limit,
         ))->last(HandledStamp::class)?->getResult() ?? [];
 
-        return $this->successResponse(array_values(array_filter(array_map(
+        return $this->successResponse(array_map(
             fn($r) => $this->identities->project($r, $viewerId, $administrator),
             $recommendations,
-        ))));
+        ) |> array_filter(...) |> array_values(...));
     }
 
     /**

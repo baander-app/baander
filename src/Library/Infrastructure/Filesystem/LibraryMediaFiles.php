@@ -77,10 +77,10 @@ final readonly class LibraryMediaFiles implements LibraryMediaFilesInterface
     public function markMissingUnavailable(Uuid $libraryId, array $paths): array
     {
         $root = $this->libraries->findByUuid($libraryId)?->getPath()->toString();
-        $missing = array_values(array_filter(
+        $missing = array_filter(
             $paths,
             static fn(string $path): bool => !self::presentInside($root, $path),
-        ));
+        ) |> array_values(...);
 
         // Unavailable paths are republished if a later scan finds them unchanged.
         if ($missing !== []) {
@@ -172,9 +172,11 @@ final readonly class LibraryMediaFiles implements LibraryMediaFilesInterface
 
         $unwritable = $inspection->withVerdict(LibraryMediaFileVerdict::DirectoryNotWritable);
         if ($unwritable !== []) {
-            throw LibraryMediaDirectoryNotWritableException::forDirectories(array_values(array_unique(
-                array_map(static fn (LibraryMediaFileCheck $file): string => (string) $file->directory, $unwritable),
-            )));
+            throw LibraryMediaDirectoryNotWritableException::forDirectories(
+                array_map(static fn (LibraryMediaFileCheck $file): string => (string) $file->directory, $unwritable)
+                    |> array_unique(...)
+                    |> array_values(...),
+            );
         }
 
         return $inspection;

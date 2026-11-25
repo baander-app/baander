@@ -55,7 +55,7 @@ final class LeaseAgentProcess
                 throw new \RuntimeException('Cannot secure lease helper output files.');
             }
         }
-        $payload = base64_encode(json_encode($request, JSON_THROW_ON_ERROR));
+        $payload = json_encode($request, JSON_THROW_ON_ERROR) |> base64_encode(...);
         $agent->child = WorkerChildProcess::start([PHP_BINARY, '-d', 'memory_limit=64M', '-d', 'display_errors=0', '-d', 'log_errors=0', $projectDirectory . '/bin/worker-lease-agent.php', $payload], $projectDirectory, $agent->stdout, $agent->stderr, $environment);
         return $agent;
     }

@@ -306,12 +306,9 @@ final class PushSubscriptionController
 
     private function isAllowedPushDomain(string $host): bool
     {
-        foreach ($this->allowedPushDomains as $allowedDomain) {
-            if ($host === $allowedDomain || str_ends_with($host, '.' . $allowedDomain)) {
-                return true;
-            }
-        }
-
-        return false;
+        return array_any(
+            $this->allowedPushDomains,
+            static fn (string $allowedDomain): bool => $host === $allowedDomain || str_ends_with($host, '.' . $allowedDomain),
+        );
     }
 }

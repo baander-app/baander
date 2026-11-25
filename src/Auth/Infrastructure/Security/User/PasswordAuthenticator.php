@@ -249,7 +249,7 @@ final class PasswordAuthenticator extends AbstractAuthenticator
 
     private function dummyHash(): string
     {
-        return $this->dummyHash ??= $this->passwordHasher->hash(bin2hex(random_bytes(16)));
+        return $this->dummyHash ??= $this->passwordHasher->hash(random_bytes(16) |> bin2hex(...));
     }
 
     /**

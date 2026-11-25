@@ -180,7 +180,7 @@ final class AdvancedStaticFilesServer implements RequestHandler, Bootable
         $segments = explode('/', $path);
 
         return !array_any($segments, static fn(string $segment): bool => str_starts_with($segment, '.') && $segment !== '.well-known')
-            && strtolower(pathinfo($path, PATHINFO_EXTENSION)) !== 'php';
+            && pathinfo($path, PATHINFO_EXTENSION) |> strtolower(...) !== 'php';
     }
 
     private function checkPath(string $path): bool

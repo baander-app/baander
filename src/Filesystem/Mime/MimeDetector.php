@@ -120,7 +120,7 @@ final class MimeDetector implements \App\Filesystem\Application\Port\MimeDetecto
         // Check SVG by content (not magic bytes)
         if (str_contains($header, '<svg') || str_contains($header, '<?xml')) {
             if ($path !== '') {
-                $ext = strtolower(pathinfo($path, PATHINFO_EXTENSION));
+                $ext = pathinfo($path, PATHINFO_EXTENSION) |> strtolower(...);
                 if ($ext === 'svg') {
                     return 'image/svg+xml';
                 }
@@ -235,7 +235,7 @@ final class MimeDetector implements \App\Filesystem\Application\Port\MimeDetecto
     private function guessMp4Type(string $path): string
     {
         if ($path !== '') {
-            $ext = strtolower(pathinfo($path, PATHINFO_EXTENSION));
+            $ext = pathinfo($path, PATHINFO_EXTENSION) |> strtolower(...);
             return match ($ext) {
                 'm4a' => 'audio/x-m4a',
                 'm4v' => 'video/mp4',

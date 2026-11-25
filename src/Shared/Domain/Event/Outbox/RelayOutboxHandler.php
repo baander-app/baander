@@ -46,7 +46,7 @@ final class RelayOutboxHandler
                 $eventClass = $row['event_class'];
 
                 if (!class_exists($eventClass) || !is_subclass_of($eventClass, DomainEventInterface::class)
-                    || (new \ReflectionClass($eventClass))->isAbstract()
+                    || new \ReflectionClass($eventClass)->isAbstract()
                     || !method_exists($eventClass, 'fromPayload')) {
                     throw new \UnexpectedValueException(sprintf('Unsupported outbox event class: %s.', $eventClass));
                 }
@@ -78,7 +78,7 @@ final class RelayOutboxHandler
                         'error' => $e->getMessage(),
                     ]);
                 } else {
-                    $nextAttemptAt = (new \DateTimeImmutable())->modify(
+                    $nextAttemptAt = new \DateTimeImmutable()->modify(
                         sprintf('+%d seconds', self::BASE_BACKOFF_SECONDS * (2 ** ($attempts - 1))),
                     );
 

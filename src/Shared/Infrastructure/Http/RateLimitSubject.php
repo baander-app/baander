@@ -52,7 +52,7 @@ final class RateLimitSubject
         $packed = (string) inet_pton($ip);
 
         return str_starts_with($packed, self::IPV4_MAPPED_PREFIX)
-            ? (string) inet_ntop(substr($packed, 12))
+            ? (string) (substr($packed, 12) |> inet_ntop(...))
             : $ip;
     }
 }

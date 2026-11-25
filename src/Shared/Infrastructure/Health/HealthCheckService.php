@@ -610,7 +610,7 @@ final class HealthCheckService
                 continue; // An empty key produces no result.
             }
 
-            if (strlen(trim($val)) < 8) {
+            if (trim($val) |> strlen(...) < 8) {
                 $results[] = new HealthCheckResult(
                     component: 'api_keys',
                     status: HealthStatus::NotAvailable,

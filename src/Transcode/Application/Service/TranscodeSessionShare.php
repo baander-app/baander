@@ -147,10 +147,10 @@ final readonly class TranscodeSessionShare
             return [];
         }
         $silentSince = self::before($now, self::OWN_SILENCE_SECONDS);
-        $silent = array_values(array_filter(
+        $silent = array_filter(
             $held,
             static fn (HeldTranscodeSession $session): bool => !$session->belongsTo($videoId, $requestId) && $session->lastSignOfLife <= $silentSince,
-        ));
+        ) |> array_values(...);
         if (count($silent) < $excess) {
             throw TranscodeSessionLimitException::at($limit);
         }
@@ -182,7 +182,7 @@ final readonly class TranscodeSessionShare
      */
     private static function ids(array $sessions): array
     {
-        return array_values(array_map(static fn (HeldTranscodeSession $session): Uuid => $session->sessionId, $sessions));
+        return array_map(static fn (HeldTranscodeSession $session): Uuid => $session->sessionId, $sessions) |> array_values(...);
     }
 
     private function end(HeldTranscodeSession $session): void

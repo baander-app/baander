@@ -270,7 +270,7 @@ final class FlacParserTest extends TestCase
     private function buildVorbisCommentBlock(array $comments, bool $isLast): string
     {
         $vendor = 'PHP Unit Test';
-        $totalEntries = array_sum(array_map('count', $comments));
+        $totalEntries = array_map('count', $comments) |> array_sum(...);
         $data = pack('V', strlen($vendor)) . $vendor . pack('V', $totalEntries);
 
         foreach ($comments as $key => $values) {

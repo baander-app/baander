@@ -44,7 +44,7 @@ final readonly class SyncPeopleHandler
             }
         }
         if (count($ids) === self::PAGE_SIZE) {
-            $this->bus->dispatch(new SyncPeopleMessage($ids[array_key_last($ids)]));
+            $this->bus->dispatch(new SyncPeopleMessage(array_last($ids)));
         }
     }
 
@@ -65,10 +65,10 @@ final readonly class SyncPeopleHandler
             3 => 'non-binary',
             default => null,
         };
-        $aliases = array_values(array_filter(
+        $aliases = array_filter(
             is_array($data['also_known_as'] ?? null) ? $data['also_known_as'] : [],
             is_string(...),
-        ));
+        ) |> array_values(...);
         $path = self::text($data['profile_path'] ?? null);
         $deathDate = self::text($data['deathday'] ?? null);
         $this->people->enrichTmdbPerson($tmdbId, $externalIds, [

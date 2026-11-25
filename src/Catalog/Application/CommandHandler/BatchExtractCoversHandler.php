@@ -57,7 +57,7 @@ final class BatchExtractCoversHandler
                 }
             }
 
-            $after = $ids[array_key_last($ids)];
+            $after = array_last($ids);
         }
 
         $this->logger->info('Batch cover extraction completed', [

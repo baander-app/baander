@@ -43,7 +43,7 @@ final class WorkerJobMonitorSubscriber
         $serialized = $this->messageSerializer->serialize($envelope);
         $attempt = $this->jobMonitorService->startAttempt(
             jobId: $jobIdStamp->jobId->toString(),
-            name: (new \ReflectionClass($envelope->getMessage()))->getShortName(),
+            name: new \ReflectionClass($envelope->getMessage())->getShortName(),
             queue: $event->getReceiverName(),
             data: $serialized,
             dataTruncated: $serialized === null,

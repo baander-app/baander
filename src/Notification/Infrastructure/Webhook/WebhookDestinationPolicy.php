@@ -57,7 +57,7 @@ final class WebhookDestinationPolicy implements WebhookDestinationPortInterface
     {
         return AddressClassifier::isPublic($address) || (
             IpUtils::checkIp($address, self::LAN_RANGES) &&
-            IpUtils::checkIp($address, array_values(array_filter($this->lanAllowlist)))
+            IpUtils::checkIp($address, array_filter($this->lanAllowlist) |> array_values(...))
         );
     }
 
@@ -81,6 +81,6 @@ final class WebhookDestinationPolicy implements WebhookDestinationPortInterface
                 $ips[] = $ip;
             }
         }
-        return array_values(array_unique($ips));
+        return array_unique($ips) |> array_values(...);
     }
 }

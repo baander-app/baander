@@ -135,22 +135,22 @@ final class FilesDiscoveredHandler
         /** @var array<string, true> $committedPaths */
         $committedPaths = [];
 
-        $audioFiles = array_values(array_filter($files, static fn(DiscoveredFile $file): bool => $file->isAudio()));
+        $audioFiles = array_filter($files, static fn(DiscoveredFile $file): bool => $file->isAudio()) |> array_values(...);
         // What each file becomes: a repair of the stored song its content belongs to; else an update
         // of the song stored at its path; else a new song in the album its tags name.
         $targets = $this->knownSongs($audioFiles);
         $retagged = $this->retaggedSongs(
             $libraryId,
-            array_values(array_filter(
+            array_filter(
                 $audioFiles,
                 static fn(DiscoveredFile $file): bool => !isset($targets[$file->absolutePath]),
-            )),
+            ) |> array_values(...),
         );
         $targets += $retagged;
-        $newFiles = array_values(array_filter(
+        $newFiles = array_filter(
             $audioFiles,
             static fn(DiscoveredFile $file): bool => !isset($targets[$file->absolutePath]),
-        ));
+        ) |> array_values(...);
         $album = null;
         if ($newFiles !== []) {
             $resolved = $this->resolveAlbum($libraryId, $message->directory, $newFiles);
@@ -168,10 +168,10 @@ final class FilesDiscoveredHandler
                 $targets[$file->absolutePath] = $album;
             }
         }
-        $audioFiles = array_values(array_filter(
+        $audioFiles = array_filter(
             $audioFiles,
             static fn(DiscoveredFile $file): bool => isset($targets[$file->absolutePath]),
-        ));
+        ) |> array_values(...);
 
         // The albums the message touched, and the album-artist credit of each file whose tags were
         // read, by album and path.
@@ -218,10 +218,10 @@ final class FilesDiscoveredHandler
                     $libraryId,
                     $message->libraryType,
                     $message->directory,
-                    array_values(array_filter(
+                    array_filter(
                         $audioFiles,
                         static fn(DiscoveredFile $file): bool => !isset($committedPaths[$file->absolutePath]),
-                    )),
+                    ) |> array_values(...),
                 );
                 break;
             }
@@ -480,10 +480,10 @@ final class FilesDiscoveredHandler
                 $metadata->getMbArtistIds(),
             ),
             'albumArtist' => $this->taggedCredit($metadata->getAlbumArtists(), $metadata->getMbAlbumArtistIds()),
-            'genres' => array_values(array_filter(
+            'genres' => array_filter(
                 array_map(trim(...), $metadata->getGenre()),
                 static fn(string $genre): bool => $genre !== '',
-            )),
+            ) |> array_values(...),
         ];
     }
 
@@ -904,10 +904,10 @@ final class FilesDiscoveredHandler
             return $songs;
         }
 
-        $credited = array_flip($this->songService->findCreditedSongIds(array_values(array_map(
+        $credited = array_flip($this->songService->findCreditedSongIds(array_map(
             static fn(array $song): Uuid => $song['song']->getId(),
             $known,
-        ))));
+        ) |> array_values(...)));
         foreach (array_keys($known) as $index) {
             if (isset($credited[$songs[$index]['song']->getId()->toString()])) {
                 $songs[$index]['credit'] = null;
@@ -1160,7 +1160,7 @@ final class FilesDiscoveredHandler
     {
         $failures = [];
         $committedPaths = [];
-        $videoFiles = array_values(array_filter($files, static fn(DiscoveredFile $file): bool => $file->isVideo()));
+        $videoFiles = array_filter($files, static fn(DiscoveredFile $file): bool => $file->isVideo()) |> array_values(...);
         foreach (array_chunk($videoFiles, self::BATCH_SIZE) as $batch) {
             $prepared = [];
             $refused = [];
@@ -1252,10 +1252,10 @@ final class FilesDiscoveredHandler
                     $message->libraryId,
                     $message->libraryType,
                     $message->directory,
-                    array_values(array_filter(
+                    array_filter(
                         $files,
                         static fn(DiscoveredFile $file): bool => !isset($committedPaths[$file->absolutePath]),
-                    )),
+                    ) |> array_values(...),
                 ));
 
                 return;
@@ -1297,7 +1297,7 @@ final class FilesDiscoveredHandler
      */
     private function resolveAlbum(Uuid $libraryId, string $directory, array &$files): ?array
     {
-        $candidates = array_values(array_filter($files, static fn(DiscoveredFile $file): bool => $file->isAudio()));
+        $candidates = array_filter($files, static fn(DiscoveredFile $file): bool => $file->isAudio()) |> array_values(...);
         while ($candidates !== []) {
             $anchor = $candidates[0];
             $metadata = null;
@@ -1328,10 +1328,10 @@ final class FilesDiscoveredHandler
                     static fn(DiscoveredFile $file): string => $file->absolutePath,
                     $candidates,
                 ));
-                $current = array_values(array_filter(
+                $current = array_filter(
                     $candidates,
                     static fn(DiscoveredFile $file): bool => ($hashes[$file->absolutePath] ?? null) === $file->hash,
-                ));
+                ) |> array_values(...);
                 if (($hashes[$anchor->absolutePath] ?? null) !== $anchor->hash) {
                     return [null];
                 }
@@ -1417,10 +1417,10 @@ final class FilesDiscoveredHandler
 
         $missingByPath = array_flip($missing);
 
-        return array_values(array_filter(
+        return array_filter(
             $files,
             static fn(DiscoveredFile $file): bool => !isset($missingByPath[$file->absolutePath]),
-        ));
+        ) |> array_values(...);
     }
 
     /** @param list<DiscoveredFile> $files
@@ -1433,10 +1433,10 @@ final class FilesDiscoveredHandler
             $files,
         ));
 
-        return array_values(array_filter(
+        return array_filter(
             $files,
             static fn(DiscoveredFile $file): bool => ($hashes[$file->absolutePath] ?? null) === $file->hash,
-        ));
+        ) |> array_values(...);
     }
 
     private function detectMimeType(string $extension): string

@@ -125,16 +125,16 @@ enum MediaContainer
             return array_find($candidates, $named);
         }
         $family = explode(',', $formatName);
-        $probed = array_values(array_filter(
+        $probed = array_filter(
             $candidates,
             static fn(self $container): bool => in_array($container->demuxer(), $family, true),
-        ));
+        ) |> array_values(...);
         return array_find($probed, $named) ?? array_first($probed);
     }
 
     /** @return list<self> */
     private static function ofKind(MediaKind $kind): array
     {
-        return array_values(array_filter(self::cases(), static fn(self $container): bool => $container->kind() === $kind));
+        return array_filter(self::cases(), static fn(self $container): bool => $container->kind() === $kind) |> array_values(...);
     }
 }

@@ -56,7 +56,7 @@ final class PublicDestinationPolicy
             $approved[] = IpUtils::checkIp($ip, '::ffff:0:0/96') ? AddressClassifier::destinations($ip)[0] : $ip;
         }
 
-        return ['host' => $host, 'ips' => array_values(array_unique($approved))];
+        return ['host' => $host, 'ips' => array_unique($approved) |> array_values(...)];
     }
 
     /**
@@ -68,11 +68,9 @@ final class PublicDestinationPolicy
         if (in_array($host, $hosts, true)) {
             return true;
         }
-        foreach ($suffixes as $suffix) {
-            if ($suffix !== '' && ($host === $suffix || str_ends_with($host, '.' . $suffix))) {
-                return true;
-            }
-        }
-        return false;
+        return array_any(
+            $suffixes,
+            static fn (string $suffix): bool => $suffix !== '' && ($host === $suffix || str_ends_with($host, '.' . $suffix)),
+        );
     }
 }

@@ -138,7 +138,7 @@ final class PublicHttpClientTest extends TestCase
         $policy = new PublicDestinationPolicy(static function () use (&$calls): array { return ++$calls === 1 ? ['1.1.1.1'] : ['127.0.0.1']; });
         $transport = new MockHttpClient(new MockResponse('', ['http_code' => 307, 'response_headers' => ['location: /next']]));
         try {
-            (new PublicHttpClient($transport, $policy))->request('GET', 'https://api.baander.app/start', ['api.baander.app'], [], ['api.baander.app']);
+            new PublicHttpClient($transport, $policy)->request('GET', 'https://api.baander.app/start', ['api.baander.app'], [], ['api.baander.app']);
             self::fail('Changed private address was accepted.');
         } catch (UnsafeDestinationException) {
             self::assertSame(1, $transport->getRequestsCount());
@@ -184,7 +184,7 @@ final class PublicHttpClientTest extends TestCase
             return ['1.1.1.1'];
         });
         $this->expectException(\RuntimeException::class);
-        (new PublicHttpClient($transport, $policy))->request('GET', 'https://api.baander.app/x', ['api.baander.app'], ['max_duration' => 0.001]);
+        new PublicHttpClient($transport, $policy)->request('GET', 'https://api.baander.app/x', ['api.baander.app'], ['max_duration' => 0.001]);
     }
 
     public function testRedirectLookupsShareOneDeadlineAndReduceTransportBudget(): void
@@ -202,7 +202,7 @@ final class PublicHttpClientTest extends TestCase
                 ? new MockResponse('', ['http_code' => 302, 'response_headers' => ['location: /next']])
                 : new MockResponse('complete');
         });
-        $response = (new PublicHttpClient($transport, $policy))->request('GET', 'https://api.baander.app/x', ['api.baander.app'], ['max_duration' => 1], ['baander.app']);
+        $response = new PublicHttpClient($transport, $policy)->request('GET', 'https://api.baander.app/x', ['api.baander.app'], ['max_duration' => 1], ['baander.app']);
         self::assertSame('complete', $response->getContent());
         self::assertCount(2, $deadlines);
         self::assertSame($deadlines[0], $deadlines[1]);

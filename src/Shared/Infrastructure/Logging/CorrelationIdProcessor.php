@@ -40,7 +40,7 @@ final class CorrelationIdProcessor implements ProcessorInterface, ResetInterface
     {
         if ($this->correlationId === null) {
             $header = $this->requestStack->getCurrentRequest()?->headers->get(BaanderHeader::CorrelationId->value);
-            $this->correlationId = is_string($header) && self::acceptable($header) ? $header : bin2hex(random_bytes(16));
+            $this->correlationId = is_string($header) && self::acceptable($header) ? $header : random_bytes(16) |> bin2hex(...);
         }
 
         $record->extra['correlation_id'] = $this->correlationId;

@@ -124,7 +124,7 @@ final class TranscodeProcessPool
             }
             $rebased = $temporary . '.rebased';
             try {
-                (new WebVttTimeline())->rebase($temporary, $rebased, $attempt['subtitleStartTime']);
+                new WebVttTimeline()->rebase($temporary, $rebased, $attempt['subtitleStartTime']);
                 if (!rename($rebased, $attempt['output'])) {
                     throw new \RuntimeException('Subtitle timeline could not be published.');
                 }

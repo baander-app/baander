@@ -269,7 +269,7 @@ final class StatefulServicesPass implements CompilerPassInterface
         $factoryProxifier = new UnmanagedFactoryProxifier($container, $modificationProcessor);
         /** @var array<string, array<string, mixed>|null> $factoriesToProxify */
         $factoriesToProxify = $container->findTaggedServiceIds(ContainerConstants::TAG_UNMANAGED_FACTORY);
-        $factoriesToProxify = array_unique(array_keys($factoriesToProxify));
+        $factoriesToProxify = array_keys($factoriesToProxify) |> array_unique(...);
 
         foreach ($factoriesToProxify as $serviceId) {
             if (isset(self::IGNORED_SERVICES[$serviceId])) {

@@ -221,7 +221,7 @@ final class ClientController
             $this->commandBus->dispatch(new RevokeClientCommand($userId, $clientPublicId));
         } catch (HandlerFailedException $exception) {
             $failures = $exception->getWrappedExceptions();
-            if (count($failures) === 1 && reset($failures) instanceof ClientNotFoundException) {
+            if (count($failures) === 1 && array_first($failures) instanceof ClientNotFoundException) {
                 return $this->notFound();
             }
 

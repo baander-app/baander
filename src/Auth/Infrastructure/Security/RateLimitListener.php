@@ -95,7 +95,7 @@ final class RateLimitListener
                 'limiter' => $authLoginIpEmailLimiter,
                 'key_resolver' => function (Request $r): string {
                     $client = self::clientSubject($r);
-                    $email = strtolower(trim($this->jsonStringField($r, 'email')));
+                    $email = trim($this->jsonStringField($r, 'email')) |> strtolower(...);
 
                     // When no email is provided, skip the compound check
                     // (validation will reject it later anyway)

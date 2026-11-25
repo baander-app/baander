@@ -154,7 +154,7 @@ final class PublicHttpClient
                 }
                 [$name, $values] = $pair;
             }
-            $name = strtolower(trim($name));
+            $name = trim($name) |> strtolower(...);
             if (in_array($name, ['host', 'proxy-authorization'], true) || !preg_match('/^[a-z0-9!#$%&\'*+.^_`|~-]+$/D', $name)) {
                 throw new \InvalidArgumentException('Invalid provider header.');
             }

@@ -59,7 +59,7 @@ final readonly class SecurityHeadersListener
     public function onKernelRequest(RequestEvent $event): void
     {
         if ($event->isMainRequest()) {
-            $event->getRequest()->attributes->set(self::NONCE_ATTRIBUTE, base64_encode(random_bytes(18)));
+            $event->getRequest()->attributes->set(self::NONCE_ATTRIBUTE, random_bytes(18) |> base64_encode(...));
         }
     }
 

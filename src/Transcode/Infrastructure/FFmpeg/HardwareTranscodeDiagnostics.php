@@ -55,7 +55,7 @@ final readonly class HardwareTranscodeDiagnostics implements HardwareTranscodeDi
                 $tier->videoBitrate,
                 $tier->maxBitrate,
                 $tier->bufferSize,
-                escapeshellarg(sprintf('/tmp/init_%s.mp4', $tier->name)),
+                sprintf('/tmp/init_%s.mp4', $tier->name) |> escapeshellarg(...),
             );
 
             $sampleCommands[$tier->name] = $cmd;

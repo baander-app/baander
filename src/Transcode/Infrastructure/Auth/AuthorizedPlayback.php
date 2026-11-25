@@ -245,10 +245,10 @@ final readonly class AuthorizedPlayback implements PlaybackPortInterface
         if ($sourceHeight === false) {
             throw new TranscodeStartupUnavailableException();
         }
-        $tiers = array_values(array_filter(
+        $tiers = array_filter(
             [QualityTier::p360(), QualityTier::p720(), QualityTier::p1080()],
             static fn(QualityTier $tier): bool => $tier->height <= (int) $sourceHeight,
-        ));
+        ) |> array_values(...);
         if ($tiers === []) {
             $tiers = [QualityTier::p360()];
         }
