@@ -1,4 +1,5 @@
 import { AXIOS_INSTANCE } from '@/shared/api-client/axios-instance'
+import { apiPath } from '@/shared/api-client/api-path'
 
 export interface NotificationItem {
   publicId: string
@@ -28,11 +29,11 @@ export const notificationApi = {
     AXIOS_INSTANCE.get<UnreadCountResponse>('/api/notifications/unread-count', { signal }).then((r) => r.data.data.count),
 
   markRead: (publicId: string) =>
-    AXIOS_INSTANCE.patch(`/api/notifications/${publicId}/read`),
+    AXIOS_INSTANCE.patch(apiPath`/api/notifications/${publicId}/read`),
 
   markAllRead: () =>
     AXIOS_INSTANCE.patch('/api/notifications/read-all'),
 
   delete: (publicId: string) =>
-    AXIOS_INSTANCE.delete(`/api/notifications/${publicId}`),
+    AXIOS_INSTANCE.delete(apiPath`/api/notifications/${publicId}`),
 }

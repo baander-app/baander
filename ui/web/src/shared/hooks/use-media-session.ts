@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react'
 import { usePlayerStore, resolveNextIndex } from '@/features/player/stores/player-store'
 import { useRadioStore } from '@/features/radio/stores/radio-store'
 import { getCurrentTime, subscribe as subscribeToTime } from '@/features/player/stores/player-time-tracker'
+import { apiPath } from '@/shared/api-client/api-path'
 
 const SEEK_OFFSET = 10 // seconds
 
@@ -10,7 +11,7 @@ type MediaSource = 'player' | 'radio' | null
 // Note: artwork URLs pass through auth-stream-worker.ts; first-load 404 race is accepted (no retry)
 function buildArtwork(albumPublicId?: string): MediaImage[] {
   if (!albumPublicId) return []
-  const base = `/api/albums/${albumPublicId}/cover`
+  const base = apiPath`/api/albums/${albumPublicId}/cover`
   return [
     { src: `${base}?preset=thumb`, sizes: '96x96', type: 'image/webp' },
     { src: `${base}?preset=small`, sizes: '128x128', type: 'image/webp' },

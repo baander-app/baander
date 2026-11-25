@@ -1,4 +1,5 @@
 import { AXIOS_INSTANCE } from '@/shared/api-client/axios-instance'
+import { apiPath } from '@/shared/api-client/api-path'
 
 export interface ScheduledJob {
   publicId: string
@@ -68,7 +69,7 @@ export const schedulerAdminApi = {
   },
 
   show: async (id: string, signal?: AbortSignal): Promise<ScheduledJob> => {
-    const { data } = await AXIOS_INSTANCE.get(`/api/admin/scheduler/jobs/${id}`, { signal })
+    const { data } = await AXIOS_INSTANCE.get(apiPath`/api/admin/scheduler/jobs/${id}`, { signal })
     return data.data
   },
 
@@ -78,39 +79,39 @@ export const schedulerAdminApi = {
   },
 
   update: async (id: string, payload: UpdateScheduledJobPayload): Promise<ScheduledJob> => {
-    const { data } = await AXIOS_INSTANCE.put(`/api/admin/scheduler/jobs/${id}`, payload)
+    const { data } = await AXIOS_INSTANCE.put(apiPath`/api/admin/scheduler/jobs/${id}`, payload)
     return data.data
   },
 
   remove: async (id: string): Promise<void> => {
-    await AXIOS_INSTANCE.delete(`/api/admin/scheduler/jobs/${id}`)
+    await AXIOS_INSTANCE.delete(apiPath`/api/admin/scheduler/jobs/${id}`)
   },
 
   pause: async (id: string): Promise<ScheduledJob> => {
-    const { data } = await AXIOS_INSTANCE.post(`/api/admin/scheduler/jobs/${id}/pause`)
+    const { data } = await AXIOS_INSTANCE.post(apiPath`/api/admin/scheduler/jobs/${id}/pause`)
     return data.data
   },
 
   resume: async (id: string): Promise<ScheduledJob> => {
-    const { data } = await AXIOS_INSTANCE.post(`/api/admin/scheduler/jobs/${id}/resume`)
+    const { data } = await AXIOS_INSTANCE.post(apiPath`/api/admin/scheduler/jobs/${id}/resume`)
     return data.data
   },
 
   trigger: async (id: string): Promise<ScheduledJobReceipt> => {
     // Axios authentication retries retain the original request configuration and identity.
-    const { data } = await AXIOS_INSTANCE.post(`/api/admin/scheduler/jobs/${id}/trigger`, undefined, {
+    const { data } = await AXIOS_INSTANCE.post(apiPath`/api/admin/scheduler/jobs/${id}/trigger`, undefined, {
       headers: { 'Idempotency-Key': crypto.randomUUID() },
     })
     return data.data
   },
 
   enable: async (id: string): Promise<ScheduledJob> => {
-    const { data } = await AXIOS_INSTANCE.post(`/api/admin/scheduler/jobs/${id}/enable`)
+    const { data } = await AXIOS_INSTANCE.post(apiPath`/api/admin/scheduler/jobs/${id}/enable`)
     return data.data
   },
 
   disable: async (id: string): Promise<ScheduledJob> => {
-    const { data } = await AXIOS_INSTANCE.post(`/api/admin/scheduler/jobs/${id}/disable`)
+    const { data } = await AXIOS_INSTANCE.post(apiPath`/api/admin/scheduler/jobs/${id}/disable`)
     return data.data
   },
 

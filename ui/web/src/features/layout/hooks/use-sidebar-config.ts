@@ -2,6 +2,7 @@ import { replaceEqualDeep } from '@tanstack/react-query'
 import { isAxiosError } from 'axios'
 import { useEffect } from 'react'
 import { AXIOS_INSTANCE } from '@/shared/api-client/axios-instance'
+import { apiPath } from '@/shared/api-client/api-path'
 import { useLiveCoordinator } from '@/shared/live/context'
 import { captureOwnership, isCurrentOwnership } from '@/shared/live/ownership'
 import { useSidebarStore } from '../stores/sidebar-store'
@@ -23,7 +24,7 @@ export function useSidebarConfig() {
       const store = useSidebarStore.getState()
       store.setLoading(store.schemas[activeMedia].sections.length === 0)
       try {
-        const res = await AXIOS_INSTANCE.get(`/api/user/sidebar-config/${activeMedia}`, { signal })
+        const res = await AXIOS_INSTANCE.get(apiPath`/api/user/sidebar-config/${activeMedia}`, { signal })
         if (!current()) return
         store.setError(null)
         const schema = res.data?.data as MediaSidebarSchema | undefined

@@ -1,4 +1,5 @@
 import { AXIOS_INSTANCE } from '@/shared/api-client/axios-instance'
+import { apiPath } from '@/shared/api-client/api-path'
 
 export interface Genre {
   publicId: string
@@ -31,27 +32,27 @@ export const genreAdminApi = {
     slug: string,
     payload: { name?: string; slug?: string },
   ): Promise<Genre> => {
-    const { data } = await AXIOS_INSTANCE.patch(`/api/genres/${slug}`, payload)
+    const { data } = await AXIOS_INSTANCE.patch(apiPath`/api/genres/${slug}`, payload)
     return data.data
   },
 
   delete: async (slug: string): Promise<void> => {
-    await AXIOS_INSTANCE.delete(`/api/genres/${slug}`)
+    await AXIOS_INSTANCE.delete(apiPath`/api/genres/${slug}`)
   },
 
   addAlbum: async (slug: string, albumId: string): Promise<void> => {
-    await AXIOS_INSTANCE.post(`/api/genres/${slug}/albums`, { albumId })
+    await AXIOS_INSTANCE.post(apiPath`/api/genres/${slug}/albums`, { albumId })
   },
 
   removeAlbum: async (slug: string, albumId: string): Promise<void> => {
-    await AXIOS_INSTANCE.delete(`/api/genres/${slug}/albums/${albumId}`)
+    await AXIOS_INSTANCE.delete(apiPath`/api/genres/${slug}/albums/${albumId}`)
   },
 
   addSong: async (slug: string, songId: string): Promise<void> => {
-    await AXIOS_INSTANCE.post(`/api/genres/${slug}/songs`, { songId })
+    await AXIOS_INSTANCE.post(apiPath`/api/genres/${slug}/songs`, { songId })
   },
 
   removeSong: async (slug: string, songId: string): Promise<void> => {
-    await AXIOS_INSTANCE.delete(`/api/genres/${slug}/songs/${songId}`)
+    await AXIOS_INSTANCE.delete(apiPath`/api/genres/${slug}/songs/${songId}`)
   },
 }

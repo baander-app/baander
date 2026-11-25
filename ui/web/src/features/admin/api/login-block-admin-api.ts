@@ -1,4 +1,5 @@
 import { AXIOS_INSTANCE } from '@/shared/api-client/axios-instance'
+import { apiPath } from '@/shared/api-client/api-path'
 
 export interface LoginBlock {
   publicId: string
@@ -21,7 +22,7 @@ export const loginBlockAdminApi = {
   },
 
   delete: async (id: string): Promise<void> => {
-    await AXIOS_INSTANCE.delete(`/api/admin/login-blocks/${id}`)
+    await AXIOS_INSTANCE.delete(apiPath`/api/admin/login-blocks/${id}`)
   },
 
   deleteAll: async (): Promise<void> => {

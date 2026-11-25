@@ -1,4 +1,5 @@
 import { AXIOS_INSTANCE } from '@/shared/api-client/axios-instance'
+import { apiPath } from '@/shared/api-client/api-path'
 
 /**
  * Mirrors App\Transcode\Interface\Resource\TranscodeSessionResource.
@@ -27,7 +28,7 @@ export const transcodeAdminApi = {
     ),
 
   getSession: (publicId: string, signal?: AbortSignal) =>
-    AXIOS_INSTANCE.get<{ data: TranscodeSession }>(`/api/transcode/sessions/${publicId}`, { signal }).then(
+    AXIOS_INSTANCE.get<{ data: TranscodeSession }>(apiPath`/api/transcode/sessions/${publicId}`, { signal }).then(
       (r) => r.data.data,
     ),
 }

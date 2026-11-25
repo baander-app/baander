@@ -124,13 +124,13 @@ export const layoutLiveCoverage = [
       "notification_preferences",
     ],
     deploymentTables: [],
-    sources: ["`/api/user/sidebar-config/${activeMedia}`"],
+    sources: ["apiPath`/api/user/sidebar-config/${activeMedia}`"],
     keyVariants: [],
     dependentFamilies: [],
     mirrors: ["src/features/layout/stores/sidebar-store.ts"],
     responseCaches: ["authoritative-read"],
     consumers: [
-      "src/features/layout/hooks/use-sidebar-config.ts#AXIOS_INSTANCE.get:`/api/user/sidebar-config/${activeMedia}`",
+      "src/features/layout/hooks/use-sidebar-config.ts#AXIOS_INSTANCE.get:apiPath`/api/user/sidebar-config/${activeMedia}`",
     ],
     coverageVerification: ["tests/live-updates/coverage.test.ts"],
     behaviorVerification: {

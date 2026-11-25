@@ -1,4 +1,5 @@
 import { AXIOS_INSTANCE } from '@/shared/api-client/axios-instance'
+import { apiPath } from '@/shared/api-client/api-path'
 
 export interface AlbumSummary {
   publicId: string
@@ -32,11 +33,11 @@ export const albumDuplicatesApi = {
     }).then((r) => r.data.data),
 
   getAlbumDuplicates: (albumPublicId: string, signal?: AbortSignal) =>
-    AXIOS_INSTANCE.get<{ data: DuplicateGroup[] }>(`/api/albums/${albumPublicId}/duplicates`, { signal }).then(
+    AXIOS_INSTANCE.get<{ data: DuplicateGroup[] }>(apiPath`/api/albums/${albumPublicId}/duplicates`, { signal }).then(
       (r) => r.data.data,
     ),
 }
 
 export function getCoverImageUrl(publicId: string): string {
-  return `/api/images/${publicId}/file`
+  return apiPath`/api/images/${publicId}/file`
 }

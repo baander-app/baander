@@ -1,4 +1,5 @@
 import { AXIOS_INSTANCE } from '@/shared/api-client/axios-instance'
+import { apiPath } from '@/shared/api-client/api-path'
 
 export interface RecommendationCoverage {
   total_tracks: number
@@ -62,13 +63,13 @@ export const recommendationsAdminApi = {
   generate: (request: GenerateRecommendationsRequest) =>
     AXIOS_INSTANCE.post<{ data: GenerateRecommendationsResponse }>('/api/admin/recommendations/generate', request),
   getJob: (publicId: string, signal?: AbortSignal) =>
-    AXIOS_INSTANCE.get<{ data: RecommendationJob }>(`/api/admin/recommendations/jobs/${publicId}`, { signal }),
+    AXIOS_INSTANCE.get<{ data: RecommendationJob }>(apiPath`/api/admin/recommendations/jobs/${publicId}`, { signal }),
   listJobs: (params?: { limit?: number; status?: string }, signal?: AbortSignal) =>
     AXIOS_INSTANCE.get<{ data: RecommendationJob[] }>('/api/admin/recommendations/jobs', { signal, params }),
   cancelJob: (publicId: string) =>
-    AXIOS_INSTANCE.delete(`/api/admin/recommendations/jobs/${publicId}`),
+    AXIOS_INSTANCE.delete(apiPath`/api/admin/recommendations/jobs/${publicId}`),
   requeueJob: (publicId: string) =>
     AXIOS_INSTANCE.post<{ data: { public_id: string; mode: 'full' | 'incremental'; status: string } }>(
-      `/api/admin/recommendations/jobs/${publicId}/requeue`
+      apiPath`/api/admin/recommendations/jobs/${publicId}/requeue`
     ),
 }

@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { captureEqSettings, applyEqSettings } from '../stores/eq-settings'
 import { useEqProfilesStore, type EqProfile, type EqProfileIcon } from '../stores/eq-profiles-store'
 import { AXIOS_INSTANCE } from '@/shared/api-client/axios-instance'
+import { apiPath } from '@/shared/api-client/api-path'
 import { Input } from '@/shared/components/ui/input'
 import { Button } from '@/shared/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/shared/components/ui/card'
@@ -47,16 +48,16 @@ async function apiCreateProfile(data: { name: string; icon: string; deviceId?: s
 }
 
 async function apiUpdateProfile(id: string, data: Record<string, unknown>) {
-  const res = await AXIOS_INSTANCE.put(`/api/user/eq-profiles/${id}`, data)
+  const res = await AXIOS_INSTANCE.put(apiPath`/api/user/eq-profiles/${id}`, data)
   return (res.data?.data ?? res.data) as EqProfile
 }
 
 async function apiDeleteProfile(id: string) {
-  await AXIOS_INSTANCE.delete(`/api/user/eq-profiles/${id}`)
+  await AXIOS_INSTANCE.delete(apiPath`/api/user/eq-profiles/${id}`)
 }
 
 async function apiActivateProfile(id: string) {
-  await AXIOS_INSTANCE.post(`/api/user/eq-profiles/${id}/activate`)
+  await AXIOS_INSTANCE.post(apiPath`/api/user/eq-profiles/${id}/activate`)
 }
 
 function captureCurrentPayload(): Record<string, unknown> {

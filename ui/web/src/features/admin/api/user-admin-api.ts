@@ -1,4 +1,5 @@
 import { AXIOS_INSTANCE } from '@/shared/api-client/axios-instance'
+import { apiPath } from '@/shared/api-client/api-path'
 import type { AdminUserSettingResource } from '@/shared/api-client/gen/endpoints'
 
 export type AdminUserSetting = AdminUserSettingResource
@@ -49,34 +50,34 @@ export const userAdminApi = {
   },
 
   update: async (id: string, payload: { email?: string; name?: string }): Promise<AdminUser> => {
-    const { data } = await AXIOS_INSTANCE.patch(`/api/admin/users/${id}`, payload)
+    const { data } = await AXIOS_INSTANCE.patch(apiPath`/api/admin/users/${id}`, payload)
     return data.data
   },
 
   delete: async (id: string): Promise<void> => {
-    await AXIOS_INSTANCE.delete(`/api/admin/users/${id}`)
+    await AXIOS_INSTANCE.delete(apiPath`/api/admin/users/${id}`)
   },
 
   assignRoles: async (id: string, roles: string[]): Promise<void> => {
-    await AXIOS_INSTANCE.post(`/api/admin/users/${id}/roles`, { roles })
+    await AXIOS_INSTANCE.post(apiPath`/api/admin/users/${id}/roles`, { roles })
   },
 
   resetPassword: async (id: string, password: string): Promise<void> => {
-    await AXIOS_INSTANCE.post(`/api/admin/users/${id}/reset-password`, { password })
+    await AXIOS_INSTANCE.post(apiPath`/api/admin/users/${id}/reset-password`, { password })
   },
 
   disable: async (id: string): Promise<void> => {
-    await AXIOS_INSTANCE.post(`/api/admin/users/${id}/disable`)
+    await AXIOS_INSTANCE.post(apiPath`/api/admin/users/${id}/disable`)
   },
 
   enable: async (id: string): Promise<void> => {
-    await AXIOS_INSTANCE.post(`/api/admin/users/${id}/enable`)
+    await AXIOS_INSTANCE.post(apiPath`/api/admin/users/${id}/enable`)
   },
 
   /** Every library in display order, each with whether the user has access. */
   libraryAccess: async (id: string, signal?: AbortSignal): Promise<AdminUserLibraryAccess[]> => {
     const { data } = await AXIOS_INSTANCE.get<DataEnvelope<AdminUserLibraryAccess[]>>(
-      `/api/admin/users/${id}/libraries`,
+      apiPath`/api/admin/users/${id}/libraries`,
       { signal },
     )
     return data.data
@@ -84,14 +85,14 @@ export const userAdminApi = {
 
   grantLibraryAccess: async (id: string, libraryId: string): Promise<AdminUserLibraryAccess> => {
     const { data } = await AXIOS_INSTANCE.put<DataEnvelope<AdminUserLibraryAccess>>(
-      `/api/admin/users/${id}/libraries/${libraryId}`,
+      apiPath`/api/admin/users/${id}/libraries/${libraryId}`,
     )
     return data.data
   },
 
   revokeLibraryAccess: async (id: string, libraryId: string): Promise<AdminUserLibraryAccess> => {
     const { data } = await AXIOS_INSTANCE.delete<DataEnvelope<AdminUserLibraryAccess>>(
-      `/api/admin/users/${id}/libraries/${libraryId}`,
+      apiPath`/api/admin/users/${id}/libraries/${libraryId}`,
     )
     return data.data
   },

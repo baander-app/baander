@@ -29,7 +29,7 @@ export const catalogLiveCoverage = [
     ],
     deploymentTables: [],
     sources: [
-      '`/api/albums/${albumPublicId}/duplicates`',
+      'apiPath`/api/albums/${albumPublicId}/duplicates`',
       '[ `/api/albums/`, ...(params ? [params] : []) ]',
       '[ `/api/artists/`, ...(params ? [params] : []) ]',
       '[ `/api/songs/`, ...(params ? [params] : []) ]',
@@ -64,7 +64,7 @@ export const catalogLiveCoverage = [
     responseCaches: ['authoritative-read'],
     consumers: [
       "src/features/catalog/api/album-duplicates-api.ts#useQuery:['album-duplicates',albumPublicId]",
-      'src/features/catalog/api/album-duplicates-api.ts#AXIOS_INSTANCE.get:`/api/albums/${albumPublicId}/duplicates`',
+      'src/features/catalog/api/album-duplicates-api.ts#AXIOS_INSTANCE.get:apiPath`/api/albums/${albumPublicId}/duplicates`',
       'src/features/catalog/components/SearchResults.tsx#useGetAlbumIndex:generated',
       'src/features/catalog/components/SearchResults.tsx#useGetArtistIndex:generated',
       'src/features/catalog/components/SearchResults.tsx#useGetSongIndex:generated',
@@ -435,30 +435,6 @@ export const catalogLiveCoverage = [
     consumers: [
       "src/features/catalog/hooks/use-starred-stations.ts#useQuery:['catalog','starred-stations']",
       "src/features/catalog/hooks/use-starred-stations.ts#AXIOS_INSTANCE.get:'/api/radio/starred'"
-    ],
-    coverageVerification: ['tests/live-updates/coverage.test.ts'],
-    behaviorVerification: {
-      unitProofs: ['tests/live-updates/collections.test.tsx']
-    }
-  },
-  {
-    id: 'catalog.radio-global',
-    family: 'radio',
-    policy: {
-      kind: 'stored',
-      reason:
-        'Authenticated listeners share the imported public station, source and country catalog.'
-    },
-    audiences: ['global'],
-    sourceTables: ['radio_stations', 'radio_sources'],
-    deploymentTables: [],
-    sources: ["'/api/radio/stations'"],
-    keyVariants: [],
-    dependentFamilies: [],
-    mirrors: [],
-    responseCaches: ['authoritative-read'],
-    consumers: [
-      "src/features/catalog/hooks/use-starred-stations.ts#AXIOS_INSTANCE.get:'/api/radio/stations'"
     ],
     coverageVerification: ['tests/live-updates/coverage.test.ts'],
     behaviorVerification: {

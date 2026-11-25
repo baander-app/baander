@@ -5,6 +5,7 @@ import { useShallow } from 'zustand/react/shallow'
 import styled from 'styled-components'
 import { useState, useEffect, useRef } from 'react'
 import { AXIOS_INSTANCE } from '@/shared/api-client/axios-instance'
+import { apiPath } from '@/shared/api-client/api-path'
 import { useSidebarStore, type SidebarItemData } from '../stores/sidebar-store'
 import { useMediaModeStore, type MediaType } from '../stores/media-mode-store'
 import { type MediaSidebarSchema, type SidebarSection } from '../schemas/types'
@@ -395,7 +396,7 @@ function SidebarEditorForm({ activeMedia, initialSchema }: { activeMedia: MediaT
     const release = coordinator?.beginMutation(['preferences'])
     setIsSaving(true)
     try {
-      const res = await AXIOS_INSTANCE.put(`/api/user/sidebar-config/${activeMedia}`, submission.values)
+      const res = await AXIOS_INSTANCE.put(apiPath`/api/user/sidebar-config/${activeMedia}`, submission.values)
       if (!mounted.current || !isCurrentOwnership(owner)) return
       draft.completeSave(submission)
       const schema = res.data?.data as MediaSidebarSchema | undefined
@@ -416,7 +417,7 @@ function SidebarEditorForm({ activeMedia, initialSchema }: { activeMedia: MediaT
     const release = coordinator?.beginMutation(['preferences'])
     setIsSaving(true)
     try {
-      const res = await AXIOS_INSTANCE.delete(`/api/user/sidebar-config/${activeMedia}`)
+      const res = await AXIOS_INSTANCE.delete(apiPath`/api/user/sidebar-config/${activeMedia}`)
       if (!mounted.current || !isCurrentOwnership(owner)) return
       const schema = res.data?.data as MediaSidebarSchema | undefined
       if (schema?.mediaType) setSchema(activeMedia, schema)

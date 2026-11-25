@@ -1,6 +1,7 @@
 import styled from 'styled-components'
 import { useImageBlob } from '@/shared/hooks/use-image-blob'
 import { Music } from 'lucide-react'
+import { apiPath } from '@/shared/api-client/api-path'
 
 interface CoverArtProps {
   albumPublicId?: string
@@ -29,7 +30,7 @@ const MutedIcon = styled(Music)`
 `
 
 export function CoverArt({ albumPublicId, className, iconSize = 48 }: CoverArtProps) {
-  const coverUrl = albumPublicId ? `/api/albums/${albumPublicId}/cover` : null
+  const coverUrl = albumPublicId ? apiPath`/api/albums/${albumPublicId}/cover` : null
   const { src } = useImageBlob(coverUrl)
 
   if (src) {

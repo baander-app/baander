@@ -24,12 +24,12 @@ const PlaceholderSubtitle = styled.p`
   margin: 0;
 `
 
-/** Redirect component that forwards route params */
+/** Redirects to `to`, substituting each `:param` with its value encoded as one path segment. */
 export function ParamRedirect({ to }: { to: string }) {
   const params = useParams()
   let target = to
   Object.entries(params).forEach(([key, value]) => {
-    if (value) target = target.replace(`:${key}`, value)
+    if (value) target = target.replace(`:${key}`, () => encodeURIComponent(value))
   })
   return <Navigate to={target} replace />
 }

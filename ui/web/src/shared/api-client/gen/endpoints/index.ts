@@ -10110,7 +10110,7 @@ export const getGetMovieDirectorShowUrl = (publicId: string,) => {
 
 
 
-  return `/api/movies/directors/${publicId}`
+  return `/api/movies/directors/${encodeURIComponent(String(publicId))}`
 }
 
 /**
@@ -10219,7 +10219,7 @@ export const getGetMovieDirectorMoviesUrl = (publicId: string,
 
   const stringifiedParams = normalizedParams.toString();
 
-  return stringifiedParams.length > 0 ? `/api/movies/directors/${publicId}/movies?${stringifiedParams}` : `/api/movies/directors/${publicId}/movies`
+  return stringifiedParams.length > 0 ? `/api/movies/directors/${encodeURIComponent(String(publicId))}/movies?${stringifiedParams}` : `/api/movies/directors/${encodeURIComponent(String(publicId))}/movies`
 }
 
 /**
@@ -10428,7 +10428,7 @@ export const getGetTranscodeJobShowUrl = (publicId: string,) => {
 
 
 
-  return `/api/transcode/jobs/${publicId}`
+  return `/api/transcode/jobs/${encodeURIComponent(String(publicId))}`
 }
 
 /**
@@ -10601,7 +10601,7 @@ export const getGetTranscodeJobMetricsUrl = (publicId: string,) => {
 
 
 
-  return `/api/transcode/jobs/${publicId}/metrics`
+  return `/api/transcode/jobs/${encodeURIComponent(String(publicId))}/metrics`
 }
 
 /**
@@ -10976,7 +10976,7 @@ export const getGetTranscodeSessionShowUrl = (publicId: string,) => {
 
 
 
-  return `/api/transcode/sessions/${publicId}`
+  return `/api/transcode/sessions/${encodeURIComponent(String(publicId))}`
 }
 
 /**
@@ -11077,7 +11077,7 @@ export const getDeleteTranscodeSessionCancelUrl = (publicId: string,) => {
 
 
 
-  return `/api/transcode/sessions/${publicId}`
+  return `/api/transcode/sessions/${encodeURIComponent(String(publicId))}`
 }
 
 /**
@@ -11149,7 +11149,7 @@ export const getPatchTranscodeSessionUpdateUrl = (publicId: string,) => {
 
 
 
-  return `/api/transcode/sessions/${publicId}`
+  return `/api/transcode/sessions/${encodeURIComponent(String(publicId))}`
 }
 
 /**
@@ -11222,7 +11222,7 @@ export const getPatchTranscodeSessionPauseUrl = (publicId: string,) => {
 
 
 
-  return `/api/transcode/sessions/${publicId}/pause`
+  return `/api/transcode/sessions/${encodeURIComponent(String(publicId))}/pause`
 }
 
 /**
@@ -11294,7 +11294,7 @@ export const getPatchTranscodeSessionResumeUrl = (publicId: string,) => {
 
 
 
-  return `/api/transcode/sessions/${publicId}/resume`
+  return `/api/transcode/sessions/${encodeURIComponent(String(publicId))}/resume`
 }
 
 /**
@@ -11467,7 +11467,7 @@ export const getPostTranscodeSessionPositionUrl = (publicId: string,) => {
 
 
 
-  return `/api/transcode/sessions/${publicId}/position`
+  return `/api/transcode/sessions/${encodeURIComponent(String(publicId))}/position`
 }
 
 /**
@@ -12152,7 +12152,7 @@ export const getPostActivityLoveUrl = (publicId: string,) => {
 
 
 
-  return `/api/activity/love/${publicId}`
+  return `/api/activity/love/${encodeURIComponent(String(publicId))}`
 }
 
 /**
@@ -12613,7 +12613,7 @@ export const getDeleteAdminLoginBlocksDeleteUrl = (publicId: string,) => {
 
 
 
-  return `/api/admin/login-blocks/${publicId}`
+  return `/api/admin/login-blocks/${encodeURIComponent(String(publicId))}`
 }
 
 /**
@@ -12875,7 +12875,7 @@ export const getPostAdminOauthClientsRotateSecretUrl = (clientId: string,) => {
 
 
 
-  return `/api/admin/oauth/clients/${clientId}/rotate-secret`
+  return `/api/admin/oauth/clients/${encodeURIComponent(String(clientId))}/rotate-secret`
 }
 
 /**
@@ -12951,7 +12951,7 @@ export const getPostAdminOauthClientsReplaceKeysUrl = (clientId: string,) => {
 
 
 
-  return `/api/admin/oauth/clients/${clientId}/keys`
+  return `/api/admin/oauth/clients/${encodeURIComponent(String(clientId))}/keys`
 }
 
 /**
@@ -13028,7 +13028,7 @@ export const getPostAdminOauthClientsRevokeUrl = (clientId: string,) => {
 
 
 
-  return `/api/admin/oauth/clients/${clientId}/revoke`
+  return `/api/admin/oauth/clients/${encodeURIComponent(String(clientId))}/revoke`
 }
 
 /**
@@ -13288,7 +13288,7 @@ export const getPatchAdminUsersUpdateUrl = (publicId: string,) => {
 
 
 
-  return `/api/admin/users/${publicId}`
+  return `/api/admin/users/${encodeURIComponent(String(publicId))}`
 }
 
 /**
@@ -13365,7 +13365,7 @@ export const getDeleteAdminUsersDeleteUrl = (publicId: string,) => {
 
 
 
-  return `/api/admin/users/${publicId}`
+  return `/api/admin/users/${encodeURIComponent(String(publicId))}`
 }
 
 /**
@@ -13437,7 +13437,7 @@ export const getPostAdminUsersAssignRolesUrl = (publicId: string,) => {
 
 
 
-  return `/api/admin/users/${publicId}/roles`
+  return `/api/admin/users/${encodeURIComponent(String(publicId))}/roles`
 }
 
 /**
@@ -13510,7 +13510,7 @@ export const getPostAdminUsersResetPasswordUrl = (publicId: string,) => {
 
 
 
-  return `/api/admin/users/${publicId}/reset-password`
+  return `/api/admin/users/${encodeURIComponent(String(publicId))}/reset-password`
 }
 
 /**
@@ -13587,7 +13587,7 @@ export const getPostAdminUsersResetTotpUrl = (publicId: string,) => {
 
 
 
-  return `/api/admin/users/${publicId}/reset-totp`
+  return `/api/admin/users/${encodeURIComponent(String(publicId))}/reset-totp`
 }
 
 /**
@@ -13663,7 +13663,7 @@ export const getPostAdminUsersVerifyEmailUrl = (publicId: string,) => {
 
 
 
-  return `/api/admin/users/${publicId}/verify-email`
+  return `/api/admin/users/${encodeURIComponent(String(publicId))}/verify-email`
 }
 
 /**
@@ -13739,7 +13739,7 @@ export const getPostAdminUsersDisableUrl = (publicId: string,) => {
 
 
 
-  return `/api/admin/users/${publicId}/disable`
+  return `/api/admin/users/${encodeURIComponent(String(publicId))}/disable`
 }
 
 /**
@@ -13811,7 +13811,7 @@ export const getPostAdminUsersEnableUrl = (publicId: string,) => {
 
 
 
-  return `/api/admin/users/${publicId}/enable`
+  return `/api/admin/users/${encodeURIComponent(String(publicId))}/enable`
 }
 
 /**
@@ -13883,7 +13883,7 @@ export const getGetAdminUserSettingsIndexUrl = (publicId: string,) => {
 
 
 
-  return `/api/admin/users/${publicId}/settings`
+  return `/api/admin/users/${encodeURIComponent(String(publicId))}/settings`
 }
 
 /**
@@ -13998,7 +13998,7 @@ export const getPutAdminUserSettingsSetUrl = (publicId: string,
 
 
 
-  return `/api/admin/users/${publicId}/settings/${key}`
+  return `/api/admin/users/${encodeURIComponent(String(publicId))}/settings/${encodeURIComponent(String(key))}`
 }
 
 /**
@@ -14077,7 +14077,7 @@ export const getDeleteAdminUserSettingsResetUrl = (publicId: string,
 
 
 
-  return `/api/admin/users/${publicId}/settings/${key}`
+  return `/api/admin/users/${encodeURIComponent(String(publicId))}/settings/${encodeURIComponent(String(key))}`
 }
 
 /**
@@ -14428,7 +14428,7 @@ export const getDeleteOauthClientsRevokeUrl = (publicId: string,) => {
 
 
 
-  return `/api/oauth/clients/${publicId}`
+  return `/api/oauth/clients/${encodeURIComponent(String(publicId))}`
 }
 
 /**
@@ -15599,7 +15599,7 @@ export const getDeletePasskeyDeleteUrl = (publicId: string,) => {
 
 
 
-  return `/api/auth/passkey/${publicId}`
+  return `/api/auth/passkey/${encodeURIComponent(String(publicId))}`
 }
 
 /**
@@ -17087,7 +17087,7 @@ export const getGetAdminAlbumDeletePreviewUrl = (publicId: string,
 
   const stringifiedParams = normalizedParams.toString();
 
-  return stringifiedParams.length > 0 ? `/api/admin/albums/${publicId}/delete-preview?${stringifiedParams}` : `/api/admin/albums/${publicId}/delete-preview`
+  return stringifiedParams.length > 0 ? `/api/admin/albums/${encodeURIComponent(String(publicId))}/delete-preview?${stringifiedParams}` : `/api/admin/albums/${encodeURIComponent(String(publicId))}/delete-preview`
 }
 
 /**
@@ -17203,7 +17203,7 @@ export const getDeleteAdminAlbumDeleteUrl = (publicId: string,
 
   const stringifiedParams = normalizedParams.toString();
 
-  return stringifiedParams.length > 0 ? `/api/admin/albums/${publicId}?${stringifiedParams}` : `/api/admin/albums/${publicId}`
+  return stringifiedParams.length > 0 ? `/api/admin/albums/${encodeURIComponent(String(publicId))}?${stringifiedParams}` : `/api/admin/albums/${encodeURIComponent(String(publicId))}`
 }
 
 /**
@@ -17284,7 +17284,7 @@ export const getGetAdminSongDeletePreviewUrl = (publicId: string,
 
   const stringifiedParams = normalizedParams.toString();
 
-  return stringifiedParams.length > 0 ? `/api/admin/songs/${publicId}/delete-preview?${stringifiedParams}` : `/api/admin/songs/${publicId}/delete-preview`
+  return stringifiedParams.length > 0 ? `/api/admin/songs/${encodeURIComponent(String(publicId))}/delete-preview?${stringifiedParams}` : `/api/admin/songs/${encodeURIComponent(String(publicId))}/delete-preview`
 }
 
 /**
@@ -17400,7 +17400,7 @@ export const getDeleteAdminSongDeleteUrl = (publicId: string,
 
   const stringifiedParams = normalizedParams.toString();
 
-  return stringifiedParams.length > 0 ? `/api/admin/songs/${publicId}?${stringifiedParams}` : `/api/admin/songs/${publicId}`
+  return stringifiedParams.length > 0 ? `/api/admin/songs/${encodeURIComponent(String(publicId))}?${stringifiedParams}` : `/api/admin/songs/${encodeURIComponent(String(publicId))}`
 }
 
 /**
@@ -17581,7 +17581,7 @@ export const getGetAlbumShowUrl = (publicId: string,) => {
 
 
 
-  return `/api/albums/${publicId}`
+  return `/api/albums/${encodeURIComponent(String(publicId))}`
 }
 
 /**
@@ -17682,7 +17682,7 @@ export const getPatchAlbumUpdateUrl = (publicId: string,) => {
 
 
 
-  return `/api/albums/${publicId}`
+  return `/api/albums/${encodeURIComponent(String(publicId))}`
 }
 
 /**
@@ -17755,7 +17755,7 @@ export const getDeleteAlbumDestroyUrl = (publicId: string,) => {
 
 
 
-  return `/api/albums/${publicId}`
+  return `/api/albums/${encodeURIComponent(String(publicId))}`
 }
 
 /**
@@ -17827,7 +17827,7 @@ export const getGetAlbumCoverUrl = (publicId: string,) => {
 
 
 
-  return `/api/albums/${publicId}/cover`
+  return `/api/albums/${encodeURIComponent(String(publicId))}/cover`
 }
 
 /**
@@ -17928,7 +17928,7 @@ export const getPostAlbumCoverUploadUrl = (publicId: string,) => {
 
 
 
-  return `/api/albums/${publicId}/cover`
+  return `/api/albums/${encodeURIComponent(String(publicId))}/cover`
 }
 
 /**
@@ -18003,7 +18003,7 @@ export const getDeleteAlbumCoverDeleteUrl = (publicId: string,) => {
 
 
 
-  return `/api/albums/${publicId}/cover`
+  return `/api/albums/${encodeURIComponent(String(publicId))}/cover`
 }
 
 /**
@@ -18075,7 +18075,7 @@ export const getGetAlbumDuplicatesUrl = (publicId: string,) => {
 
 
 
-  return `/api/albums/${publicId}/duplicates`
+  return `/api/albums/${encodeURIComponent(String(publicId))}/duplicates`
 }
 
 /**
@@ -18536,7 +18536,7 @@ export const getGetArtistShowUrl = (publicId: string,) => {
 
 
 
-  return `/api/artists/${publicId}`
+  return `/api/artists/${encodeURIComponent(String(publicId))}`
 }
 
 /**
@@ -18637,7 +18637,7 @@ export const getPatchArtistUpdateUrl = (publicId: string,) => {
 
 
 
-  return `/api/artists/${publicId}`
+  return `/api/artists/${encodeURIComponent(String(publicId))}`
 }
 
 /**
@@ -18710,7 +18710,7 @@ export const getDeleteArtistDestroyUrl = (publicId: string,) => {
 
 
 
-  return `/api/artists/${publicId}`
+  return `/api/artists/${encodeURIComponent(String(publicId))}`
 }
 
 /**
@@ -18782,7 +18782,7 @@ export const getPostArtistAddSongUrl = (publicId: string,) => {
 
 
 
-  return `/api/artists/${publicId}/songs`
+  return `/api/artists/${encodeURIComponent(String(publicId))}/songs`
 }
 
 /**
@@ -18856,7 +18856,7 @@ export const getDeleteArtistRemoveSongUrl = (publicId: string,
 
 
 
-  return `/api/artists/${publicId}/songs/${songId}`
+  return `/api/artists/${encodeURIComponent(String(publicId))}/songs/${encodeURIComponent(String(songId))}`
 }
 
 /**
@@ -18930,7 +18930,7 @@ export const getPatchArtistUpdateSongRoleUrl = (publicId: string,
 
 
 
-  return `/api/artists/${publicId}/songs/${songId}`
+  return `/api/artists/${encodeURIComponent(String(publicId))}/songs/${encodeURIComponent(String(songId))}`
 }
 
 /**
@@ -19004,7 +19004,7 @@ export const getPostArtistAddAlbumUrl = (publicId: string,) => {
 
 
 
-  return `/api/artists/${publicId}/albums`
+  return `/api/artists/${encodeURIComponent(String(publicId))}/albums`
 }
 
 /**
@@ -19078,7 +19078,7 @@ export const getDeleteArtistRemoveAlbumUrl = (publicId: string,
 
 
 
-  return `/api/artists/${publicId}/albums/${albumId}`
+  return `/api/artists/${encodeURIComponent(String(publicId))}/albums/${encodeURIComponent(String(albumId))}`
 }
 
 /**
@@ -19152,7 +19152,7 @@ export const getPatchArtistUpdateAlbumRoleUrl = (publicId: string,
 
 
 
-  return `/api/artists/${publicId}/albums/${albumId}`
+  return `/api/artists/${encodeURIComponent(String(publicId))}/albums/${encodeURIComponent(String(albumId))}`
 }
 
 /**
@@ -19226,7 +19226,7 @@ export const getPostArtistCoverUploadUrl = (publicId: string,) => {
 
 
 
-  return `/api/artists/${publicId}/cover`
+  return `/api/artists/${encodeURIComponent(String(publicId))}/cover`
 }
 
 /**
@@ -19301,7 +19301,7 @@ export const getDeleteArtistCoverDeleteUrl = (publicId: string,) => {
 
 
 
-  return `/api/artists/${publicId}/cover`
+  return `/api/artists/${encodeURIComponent(String(publicId))}/cover`
 }
 
 /**
@@ -19629,7 +19629,7 @@ export const getGetGenreShowUrl = (slug: string,) => {
 
 
 
-  return `/api/genres/${slug}`
+  return `/api/genres/${encodeURIComponent(String(slug))}`
 }
 
 /**
@@ -19730,7 +19730,7 @@ export const getPatchGenreUpdateUrl = (slug: string,) => {
 
 
 
-  return `/api/genres/${slug}`
+  return `/api/genres/${encodeURIComponent(String(slug))}`
 }
 
 /**
@@ -19803,7 +19803,7 @@ export const getDeleteGenreDestroyUrl = (slug: string,) => {
 
 
 
-  return `/api/genres/${slug}`
+  return `/api/genres/${encodeURIComponent(String(slug))}`
 }
 
 /**
@@ -19875,7 +19875,7 @@ export const getPostGenreAddSongUrl = (slug: string,) => {
 
 
 
-  return `/api/genres/${slug}/songs`
+  return `/api/genres/${encodeURIComponent(String(slug))}/songs`
 }
 
 /**
@@ -19949,7 +19949,7 @@ export const getDeleteGenreRemoveSongUrl = (slug: string,
 
 
 
-  return `/api/genres/${slug}/songs/${songId}`
+  return `/api/genres/${encodeURIComponent(String(slug))}/songs/${encodeURIComponent(String(songId))}`
 }
 
 /**
@@ -20022,7 +20022,7 @@ export const getPostGenreAddAlbumUrl = (slug: string,) => {
 
 
 
-  return `/api/genres/${slug}/albums`
+  return `/api/genres/${encodeURIComponent(String(slug))}/albums`
 }
 
 /**
@@ -20096,7 +20096,7 @@ export const getDeleteGenreRemoveAlbumUrl = (slug: string,
 
 
 
-  return `/api/genres/${slug}/albums/${albumId}`
+  return `/api/genres/${encodeURIComponent(String(slug))}/albums/${encodeURIComponent(String(albumId))}`
 }
 
 /**
@@ -20277,7 +20277,7 @@ export const getGetMovieShowUrl = (publicId: string,) => {
 
 
 
-  return `/api/movies/${publicId}`
+  return `/api/movies/${encodeURIComponent(String(publicId))}`
 }
 
 /**
@@ -20378,7 +20378,7 @@ export const getPatchMovieUpdateUrl = (publicId: string,) => {
 
 
 
-  return `/api/movies/${publicId}`
+  return `/api/movies/${encodeURIComponent(String(publicId))}`
 }
 
 /**
@@ -20451,7 +20451,7 @@ export const getDeleteMovieDestroyUrl = (publicId: string,) => {
 
 
 
-  return `/api/movies/${publicId}`
+  return `/api/movies/${encodeURIComponent(String(publicId))}`
 }
 
 /**
@@ -20653,7 +20653,7 @@ export const getGetAdminMetadataMatchCandidatesUrl = (type: 'album' | 'song' | '
 
   const stringifiedParams = normalizedParams.toString();
 
-  return stringifiedParams.length > 0 ? `/api/admin/metadata/match/${type}/${publicId}/candidates?${stringifiedParams}` : `/api/admin/metadata/match/${type}/${publicId}/candidates`
+  return stringifiedParams.length > 0 ? `/api/admin/metadata/match/${encodeURIComponent(String(type))}/${encodeURIComponent(String(publicId))}/candidates?${stringifiedParams}` : `/api/admin/metadata/match/${encodeURIComponent(String(type))}/${encodeURIComponent(String(publicId))}/candidates`
 }
 
 /**
@@ -20790,7 +20790,7 @@ export const getGetAdminMetadataMatchComparisonUrl = (type: 'album' | 'song' | '
 
   const stringifiedParams = normalizedParams.toString();
 
-  return stringifiedParams.length > 0 ? `/api/admin/metadata/match/${type}/${publicId}/comparison?${stringifiedParams}` : `/api/admin/metadata/match/${type}/${publicId}/comparison`
+  return stringifiedParams.length > 0 ? `/api/admin/metadata/match/${encodeURIComponent(String(type))}/${encodeURIComponent(String(publicId))}/comparison?${stringifiedParams}` : `/api/admin/metadata/match/${encodeURIComponent(String(type))}/${encodeURIComponent(String(publicId))}/comparison`
 }
 
 /**
@@ -20919,7 +20919,7 @@ export const getPostAdminMetadataMatchApplyUrl = (type: 'album' | 'song' | 'arti
 
 
 
-  return `/api/admin/metadata/match/${type}/${publicId}/apply`
+  return `/api/admin/metadata/match/${encodeURIComponent(String(type))}/${encodeURIComponent(String(publicId))}/apply`
 }
 
 /**
@@ -21105,7 +21105,7 @@ export const getPersonShowUrl = (publicId: string,) => {
 
 
 
-  return `/api/people/${publicId}`
+  return `/api/people/${encodeURIComponent(String(publicId))}`
 }
 
 /**
@@ -21214,7 +21214,7 @@ export const getPersonCreditsUrl = (publicId: string,
 
   const stringifiedParams = normalizedParams.toString();
 
-  return stringifiedParams.length > 0 ? `/api/people/${publicId}/credits?${stringifiedParams}` : `/api/people/${publicId}/credits`
+  return stringifiedParams.length > 0 ? `/api/people/${encodeURIComponent(String(publicId))}/credits?${stringifiedParams}` : `/api/people/${encodeURIComponent(String(publicId))}/credits`
 }
 
 /**
@@ -21330,7 +21330,7 @@ export const getPersonMovieCreditsUrl = (publicId: string,
 
   const stringifiedParams = normalizedParams.toString();
 
-  return stringifiedParams.length > 0 ? `/api/movies/${publicId}/credits?${stringifiedParams}` : `/api/movies/${publicId}/credits`
+  return stringifiedParams.length > 0 ? `/api/movies/${encodeURIComponent(String(publicId))}/credits?${stringifiedParams}` : `/api/movies/${encodeURIComponent(String(publicId))}/credits`
 }
 
 /**
@@ -21438,7 +21438,7 @@ export const getPersonArtistUrl = (publicId: string,) => {
 
 
 
-  return `/api/artists/${publicId}/person`
+  return `/api/artists/${encodeURIComponent(String(publicId))}/person`
 }
 
 /**
@@ -21647,7 +21647,7 @@ export const getGetSongShowUrl = (publicId: string,) => {
 
 
 
-  return `/api/songs/${publicId}`
+  return `/api/songs/${encodeURIComponent(String(publicId))}`
 }
 
 /**
@@ -21748,7 +21748,7 @@ export const getPatchSongUpdateUrl = (publicId: string,) => {
 
 
 
-  return `/api/songs/${publicId}`
+  return `/api/songs/${encodeURIComponent(String(publicId))}`
 }
 
 /**
@@ -21821,7 +21821,7 @@ export const getDeleteSongDestroyUrl = (publicId: string,) => {
 
 
 
-  return `/api/songs/${publicId}`
+  return `/api/songs/${encodeURIComponent(String(publicId))}`
 }
 
 /**
@@ -22001,7 +22001,7 @@ export const getTvSeriesShowUrl = (publicId: string,) => {
 
 
 
-  return `/api/tv/series/${publicId}`
+  return `/api/tv/series/${encodeURIComponent(String(publicId))}`
 }
 
 /**
@@ -22110,7 +22110,7 @@ export const getTvSeriesEpisodesUrl = (publicId: string,
 
   const stringifiedParams = normalizedParams.toString();
 
-  return stringifiedParams.length > 0 ? `/api/tv/series/${publicId}/episodes?${stringifiedParams}` : `/api/tv/series/${publicId}/episodes`
+  return stringifiedParams.length > 0 ? `/api/tv/series/${encodeURIComponent(String(publicId))}/episodes?${stringifiedParams}` : `/api/tv/series/${encodeURIComponent(String(publicId))}/episodes`
 }
 
 /**
@@ -22218,7 +22218,7 @@ export const getTvEpisodeShowUrl = (publicId: string,) => {
 
 
 
-  return `/api/tv/episodes/${publicId}`
+  return `/api/tv/episodes/${encodeURIComponent(String(publicId))}`
 }
 
 /**
@@ -22327,7 +22327,7 @@ export const getTvSeriesCreditsUrl = (publicId: string,
 
   const stringifiedParams = normalizedParams.toString();
 
-  return stringifiedParams.length > 0 ? `/api/tv/series/${publicId}/credits?${stringifiedParams}` : `/api/tv/series/${publicId}/credits`
+  return stringifiedParams.length > 0 ? `/api/tv/series/${encodeURIComponent(String(publicId))}/credits?${stringifiedParams}` : `/api/tv/series/${encodeURIComponent(String(publicId))}/credits`
 }
 
 /**
@@ -22443,7 +22443,7 @@ export const getTvEpisodeCreditsUrl = (publicId: string,
 
   const stringifiedParams = normalizedParams.toString();
 
-  return stringifiedParams.length > 0 ? `/api/tv/episodes/${publicId}/credits?${stringifiedParams}` : `/api/tv/episodes/${publicId}/credits`
+  return stringifiedParams.length > 0 ? `/api/tv/episodes/${encodeURIComponent(String(publicId))}/credits?${stringifiedParams}` : `/api/tv/episodes/${encodeURIComponent(String(publicId))}/credits`
 }
 
 /**
@@ -22551,7 +22551,7 @@ export const getGetVideoPlaybackInformationUrl = (publicId: string,) => {
 
 
 
-  return `/api/videos/${publicId}/playback-information`
+  return `/api/videos/${encodeURIComponent(String(publicId))}/playback-information`
 }
 
 /**
@@ -22652,7 +22652,7 @@ export const getGetVideoPlaybackPreviewUrl = (publicId: string,) => {
 
 
 
-  return `/api/videos/${publicId}/timeline-preview`
+  return `/api/videos/${encodeURIComponent(String(publicId))}/timeline-preview`
 }
 
 /**
@@ -22897,7 +22897,7 @@ export const getPostDiscoveryQrPayloadUrl = (serverPublicId: string,) => {
 
 
 
-  return `/api/discovery/qr-payload/${serverPublicId}`
+  return `/api/discovery/qr-payload/${encodeURIComponent(String(serverPublicId))}`
 }
 
 /**
@@ -23221,7 +23221,7 @@ export const getDeleteFavoritesRemoveUrl = (publicId: string,) => {
 
 
 
-  return `/api/favorites/${publicId}`
+  return `/api/favorites/${encodeURIComponent(String(publicId))}`
 }
 
 /**
@@ -23293,7 +23293,7 @@ export const getGetAdminUserLibrariesIndexUrl = (userId: string,) => {
 
 
 
-  return `/api/admin/users/${userId}/libraries`
+  return `/api/admin/users/${encodeURIComponent(String(userId))}/libraries`
 }
 
 /**
@@ -23395,7 +23395,7 @@ export const getPutAdminUserLibrariesGrantUrl = (userId: string,
 
 
 
-  return `/api/admin/users/${userId}/libraries/${libraryId}`
+  return `/api/admin/users/${encodeURIComponent(String(userId))}/libraries/${encodeURIComponent(String(libraryId))}`
 }
 
 /**
@@ -23473,7 +23473,7 @@ export const getDeleteAdminUserLibrariesRevokeUrl = (userId: string,
 
 
 
-  return `/api/admin/users/${userId}/libraries/${libraryId}`
+  return `/api/admin/users/${encodeURIComponent(String(userId))}/libraries/${encodeURIComponent(String(libraryId))}`
 }
 
 /**
@@ -23730,7 +23730,7 @@ export const getGetLibraryShowUrl = (id: string,) => {
 
 
 
-  return `/api/libraries/${id}`
+  return `/api/libraries/${encodeURIComponent(String(id))}`
 }
 
 /**
@@ -23831,7 +23831,7 @@ export const getPatchLibraryUpdateUrl = (id: string,) => {
 
 
 
-  return `/api/libraries/${id}`
+  return `/api/libraries/${encodeURIComponent(String(id))}`
 }
 
 /**
@@ -23904,7 +23904,7 @@ export const getDeleteLibraryDeleteUrl = (id: string,) => {
 
 
 
-  return `/api/libraries/${id}`
+  return `/api/libraries/${encodeURIComponent(String(id))}`
 }
 
 /**
@@ -23976,7 +23976,7 @@ export const getPostLibraryScanUrl = (id: string,) => {
 
 
 
-  return `/api/libraries/${id}/scan`
+  return `/api/libraries/${encodeURIComponent(String(id))}/scan`
 }
 
 /**
@@ -24052,7 +24052,7 @@ export const getGetLibraryStatsUrl = (id: string,) => {
 
 
 
-  return `/api/libraries/${id}/stats`
+  return `/api/libraries/${encodeURIComponent(String(id))}/stats`
 }
 
 /**
@@ -24579,7 +24579,7 @@ export const getGetLyricsSongLyricsUrl = (publicId: string,) => {
 
 
 
-  return `/api/songs/${publicId}/lyrics`
+  return `/api/songs/${encodeURIComponent(String(publicId))}/lyrics`
 }
 
 /**
@@ -24680,7 +24680,7 @@ export const getPostLyricsSongLyricsFetchUrl = (publicId: string,) => {
 
 
 
-  return `/api/songs/${publicId}/lyrics/fetch`
+  return `/api/songs/${encodeURIComponent(String(publicId))}/lyrics/fetch`
 }
 
 /**
@@ -24886,7 +24886,7 @@ export const getPostLyricsApplyUrl = (resultId: number,) => {
 
 
 
-  return `/api/lyrics/search/${resultId}/apply`
+  return `/api/lyrics/search/${encodeURIComponent(String(resultId))}/apply`
 }
 
 /**
@@ -25031,7 +25031,7 @@ export const getGetImageShowUrl = (publicId: string,) => {
 
 
 
-  return `/api/images/${publicId}`
+  return `/api/images/${encodeURIComponent(String(publicId))}`
 }
 
 /**
@@ -25140,7 +25140,7 @@ export const getGetImageFileUrl = (publicId: string,
 
   const stringifiedParams = normalizedParams.toString();
 
-  return stringifiedParams.length > 0 ? `/api/images/${publicId}/file?${stringifiedParams}` : `/api/images/${publicId}/file`
+  return stringifiedParams.length > 0 ? `/api/images/${encodeURIComponent(String(publicId))}/file?${stringifiedParams}` : `/api/images/${encodeURIComponent(String(publicId))}/file`
 }
 
 /**
@@ -25248,7 +25248,7 @@ export const getGetImageBlurhashUrl = (publicId: string,) => {
 
 
 
-  return `/api/images/${publicId}/blurhash`
+  return `/api/images/${encodeURIComponent(String(publicId))}/blurhash`
 }
 
 /**
@@ -26402,7 +26402,7 @@ export const getGetMetadataBrowseArtistUrl = (mbid: string,) => {
 
 
 
-  return `/api/metadata/browse/artist/${mbid}`
+  return `/api/metadata/browse/artist/${encodeURIComponent(String(mbid))}`
 }
 
 /**
@@ -26503,7 +26503,7 @@ export const getGetMetadataBrowseReleaseGroupUrl = (mbid: string,) => {
 
 
 
-  return `/api/metadata/browse/release-group/${mbid}`
+  return `/api/metadata/browse/release-group/${encodeURIComponent(String(mbid))}`
 }
 
 /**
@@ -27281,7 +27281,7 @@ export const getPatchNotificationMarkReadUrl = (publicId: string,) => {
 
 
 
-  return `/api/notifications/${publicId}/read`
+  return `/api/notifications/${encodeURIComponent(String(publicId))}/read`
 }
 
 /**
@@ -27425,7 +27425,7 @@ export const getDeleteNotificationDeleteUrl = (publicId: string,) => {
 
 
 
-  return `/api/notifications/${publicId}`
+  return `/api/notifications/${encodeURIComponent(String(publicId))}`
 }
 
 /**
@@ -28076,7 +28076,7 @@ export const getPutWebhookUpdateUrl = (id: string,) => {
 
 
 
-  return `/api/webhooks/${id}`
+  return `/api/webhooks/${encodeURIComponent(String(id))}`
 }
 
 /**
@@ -28149,7 +28149,7 @@ export const getDeleteWebhookDeleteUrl = (id: string,) => {
 
 
 
-  return `/api/webhooks/${id}`
+  return `/api/webhooks/${encodeURIComponent(String(id))}`
 }
 
 /**
@@ -28221,7 +28221,7 @@ export const getPostWebhookRotateSecretUrl = (id: string,) => {
 
 
 
-  return `/api/webhooks/${id}/rotate-secret`
+  return `/api/webhooks/${encodeURIComponent(String(id))}/rotate-secret`
 }
 
 /**
@@ -28293,7 +28293,7 @@ export const getGetPartyInvitationIndexUrl = (publicId: string,) => {
 
 
 
-  return `/api/party/sessions/${publicId}/invitations/`
+  return `/api/party/sessions/${encodeURIComponent(String(publicId))}/invitations/`
 }
 
 /**
@@ -28408,7 +28408,7 @@ export const getPutPartyInvitationInviteUrl = (publicId: string,
 
 
 
-  return `/api/party/sessions/${publicId}/invitations/${userPublicId}`
+  return `/api/party/sessions/${encodeURIComponent(String(publicId))}/invitations/${encodeURIComponent(String(userPublicId))}`
 }
 
 /**
@@ -28486,7 +28486,7 @@ export const getDeletePartyInvitationRevokeUrl = (publicId: string,
 
 
 
-  return `/api/party/sessions/${publicId}/invitations/${userPublicId}`
+  return `/api/party/sessions/${encodeURIComponent(String(publicId))}/invitations/${encodeURIComponent(String(userPublicId))}`
 }
 
 /**
@@ -28563,7 +28563,7 @@ export const getGetPartyMemberIndexUrl = (publicId: string,) => {
 
 
 
-  return `/api/party/sessions/${publicId}/members/`
+  return `/api/party/sessions/${encodeURIComponent(String(publicId))}/members/`
 }
 
 /**
@@ -28664,7 +28664,7 @@ export const getPatchPartyMemberUpdateMeUrl = (publicId: string,) => {
 
 
 
-  return `/api/party/sessions/${publicId}/members/me`
+  return `/api/party/sessions/${encodeURIComponent(String(publicId))}/members/me`
 }
 
 /**
@@ -28737,7 +28737,7 @@ export const getPostPartyMemberTransferHostUrl = (publicId: string,) => {
 
 
 
-  return `/api/party/sessions/${publicId}/members/transfer-host`
+  return `/api/party/sessions/${encodeURIComponent(String(publicId))}/members/transfer-host`
 }
 
 /**
@@ -28996,7 +28996,7 @@ export const getGetPartySessionShowUrl = (publicId: string,) => {
 
 
 
-  return `/api/party/sessions/${publicId}`
+  return `/api/party/sessions/${encodeURIComponent(String(publicId))}`
 }
 
 /**
@@ -29110,7 +29110,7 @@ export const getDeletePartySessionEndUrl = (publicId: string,) => {
 
 
 
-  return `/api/party/sessions/${publicId}`
+  return `/api/party/sessions/${encodeURIComponent(String(publicId))}`
 }
 
 /**
@@ -29182,7 +29182,7 @@ export const getPostPartySessionJoinUrl = (publicId: string,) => {
 
 
 
-  return `/api/party/sessions/${publicId}/join`
+  return `/api/party/sessions/${encodeURIComponent(String(publicId))}/join`
 }
 
 /**
@@ -29258,7 +29258,7 @@ export const getPostPartySessionLeaveUrl = (publicId: string,) => {
 
 
 
-  return `/api/party/sessions/${publicId}/leave`
+  return `/api/party/sessions/${encodeURIComponent(String(publicId))}/leave`
 }
 
 /**
@@ -29330,7 +29330,7 @@ export const getPostPartySessionSyncUrl = (publicId: string,) => {
 
 
 
-  return `/api/party/sessions/${publicId}/sync`
+  return `/api/party/sessions/${encodeURIComponent(String(publicId))}/sync`
 }
 
 /**
@@ -29589,7 +29589,7 @@ export const getGetPlaylistShowUrl = (publicId: string,) => {
 
 
 
-  return `/api/playlists/${publicId}`
+  return `/api/playlists/${encodeURIComponent(String(publicId))}`
 }
 
 /**
@@ -29690,7 +29690,7 @@ export const getPatchPlaylistUpdateUrl = (publicId: string,) => {
 
 
 
-  return `/api/playlists/${publicId}`
+  return `/api/playlists/${encodeURIComponent(String(publicId))}`
 }
 
 /**
@@ -29763,7 +29763,7 @@ export const getDeletePlaylistDestroyUrl = (publicId: string,) => {
 
 
 
-  return `/api/playlists/${publicId}`
+  return `/api/playlists/${encodeURIComponent(String(publicId))}`
 }
 
 /**
@@ -29835,7 +29835,7 @@ export const getPostPlaylistAddSongUrl = (publicId: string,) => {
 
 
 
-  return `/api/playlists/${publicId}/songs`
+  return `/api/playlists/${encodeURIComponent(String(publicId))}/songs`
 }
 
 /**
@@ -29909,7 +29909,7 @@ export const getDeletePlaylistRemoveSongUrl = (publicId: string,
 
 
 
-  return `/api/playlists/${publicId}/songs/${songId}`
+  return `/api/playlists/${encodeURIComponent(String(publicId))}/songs/${encodeURIComponent(String(songId))}`
 }
 
 /**
@@ -29983,7 +29983,7 @@ export const getPutPlaylistAddCollaboratorUrl = (publicId: string,
 
 
 
-  return `/api/playlists/${publicId}/collaborators/${userPublicId}`
+  return `/api/playlists/${encodeURIComponent(String(publicId))}/collaborators/${encodeURIComponent(String(userPublicId))}`
 }
 
 /**
@@ -30061,7 +30061,7 @@ export const getDeletePlaylistRemoveCollaboratorUrl = (publicId: string,
 
 
 
-  return `/api/playlists/${publicId}/collaborators/${userPublicId}`
+  return `/api/playlists/${encodeURIComponent(String(publicId))}/collaborators/${encodeURIComponent(String(userPublicId))}`
 }
 
 /**
@@ -30138,7 +30138,7 @@ export const getPostPlaylistReorderUrl = (publicId: string,) => {
 
 
 
-  return `/api/playlists/${publicId}/reorder`
+  return `/api/playlists/${encodeURIComponent(String(publicId))}/reorder`
 }
 
 /**
@@ -30730,7 +30730,7 @@ export const getDeleteRadioSubscriptionUnsubscribeUrl = (countryCode: string,) =
 
 
 
-  return `/api/radio/subscriptions/${countryCode}`
+  return `/api/radio/subscriptions/${encodeURIComponent(String(countryCode))}`
 }
 
 /**
@@ -30802,7 +30802,7 @@ export const getPostRadioSubscriptionRefreshUrl = (countryCode: string,) => {
 
 
 
-  return `/api/radio/subscriptions/${countryCode}/refresh`
+  return `/api/radio/subscriptions/${encodeURIComponent(String(countryCode))}/refresh`
 }
 
 /**
@@ -31674,7 +31674,7 @@ export const getDeleteRadioStarredUnstarUrl = (stationId: string,) => {
 
 
 
-  return `/api/radio/starred/${stationId}`
+  return `/api/radio/starred/${encodeURIComponent(String(stationId))}`
 }
 
 /**
@@ -32125,7 +32125,7 @@ export const getGetAdminRecommendationsJobStatusUrl = (publicId: string,) => {
 
 
 
-  return `/api/admin/recommendations/jobs/${publicId}`
+  return `/api/admin/recommendations/jobs/${encodeURIComponent(String(publicId))}`
 }
 
 /**
@@ -32226,7 +32226,7 @@ export const getDeleteAdminRecommendationsJobCancelUrl = (publicId: string,) => 
 
 
 
-  return `/api/admin/recommendations/jobs/${publicId}`
+  return `/api/admin/recommendations/jobs/${encodeURIComponent(String(publicId))}`
 }
 
 /**
@@ -32302,7 +32302,7 @@ export const getPostAdminRecommendationsJobRequeueUrl = (publicId: string,) => {
 
 
 
-  return `/api/admin/recommendations/jobs/${publicId}/requeue`
+  return `/api/admin/recommendations/jobs/${encodeURIComponent(String(publicId))}/requeue`
 }
 
 /**
@@ -32796,7 +32796,7 @@ export const getGetRecommendationBySourceUrl = (sourceType: 'song' | 'album' | '
 
   const stringifiedParams = normalizedParams.toString();
 
-  return stringifiedParams.length > 0 ? `/api/recommendations/source/${sourceType}/${sourceId}?${stringifiedParams}` : `/api/recommendations/source/${sourceType}/${sourceId}`
+  return stringifiedParams.length > 0 ? `/api/recommendations/source/${encodeURIComponent(String(sourceType))}/${encodeURIComponent(String(sourceId))}?${stringifiedParams}` : `/api/recommendations/source/${encodeURIComponent(String(sourceType))}/${encodeURIComponent(String(sourceId))}`
 }
 
 /**
@@ -32912,7 +32912,7 @@ export const getDeleteRecommendationDestroyBySourceUrl = (sourceType: 'song' | '
 
 
 
-  return `/api/recommendations/source/${sourceType}/${sourceId}`
+  return `/api/recommendations/source/${encodeURIComponent(String(sourceType))}/${encodeURIComponent(String(sourceId))}`
 }
 
 /**
@@ -32994,7 +32994,7 @@ export const getGetRecommendationTargetingUrl = (targetType: 'song' | 'album' | 
 
   const stringifiedParams = normalizedParams.toString();
 
-  return stringifiedParams.length > 0 ? `/api/recommendations/targeting/${targetType}/${targetId}?${stringifiedParams}` : `/api/recommendations/targeting/${targetType}/${targetId}`
+  return stringifiedParams.length > 0 ? `/api/recommendations/targeting/${encodeURIComponent(String(targetType))}/${encodeURIComponent(String(targetId))}?${stringifiedParams}` : `/api/recommendations/targeting/${encodeURIComponent(String(targetType))}/${encodeURIComponent(String(targetId))}`
 }
 
 /**
@@ -33109,7 +33109,7 @@ export const getDeleteRecommendationDestroyUrl = (publicId: string,) => {
 
 
 
-  return `/api/recommendations/${publicId}`
+  return `/api/recommendations/${encodeURIComponent(String(publicId))}`
 }
 
 /**
@@ -33354,7 +33354,7 @@ export const getGetAdminSchedulerShowUrl = (id: string,) => {
 
 
 
-  return `/api/admin/scheduler/jobs/${id}`
+  return `/api/admin/scheduler/jobs/${encodeURIComponent(String(id))}`
 }
 
 /**
@@ -33455,7 +33455,7 @@ export const getPutAdminSchedulerUpdateUrl = (id: string,) => {
 
 
 
-  return `/api/admin/scheduler/jobs/${id}`
+  return `/api/admin/scheduler/jobs/${encodeURIComponent(String(id))}`
 }
 
 /**
@@ -33528,7 +33528,7 @@ export const getDeleteAdminSchedulerDeleteUrl = (id: string,) => {
 
 
 
-  return `/api/admin/scheduler/jobs/${id}`
+  return `/api/admin/scheduler/jobs/${encodeURIComponent(String(id))}`
 }
 
 /**
@@ -33600,7 +33600,7 @@ export const getPostAdminSchedulerPauseUrl = (id: string,) => {
 
 
 
-  return `/api/admin/scheduler/jobs/${id}/pause`
+  return `/api/admin/scheduler/jobs/${encodeURIComponent(String(id))}/pause`
 }
 
 /**
@@ -33672,7 +33672,7 @@ export const getPostAdminSchedulerResumeUrl = (id: string,) => {
 
 
 
-  return `/api/admin/scheduler/jobs/${id}/resume`
+  return `/api/admin/scheduler/jobs/${encodeURIComponent(String(id))}/resume`
 }
 
 /**
@@ -33744,7 +33744,7 @@ export const getPostAdminSchedulerTriggerUrl = (id: string,) => {
 
 
 
-  return `/api/admin/scheduler/jobs/${id}/trigger`
+  return `/api/admin/scheduler/jobs/${encodeURIComponent(String(id))}/trigger`
 }
 
 /**
@@ -33816,7 +33816,7 @@ export const getPostAdminSchedulerEnableUrl = (id: string,) => {
 
 
 
-  return `/api/admin/scheduler/jobs/${id}/enable`
+  return `/api/admin/scheduler/jobs/${encodeURIComponent(String(id))}/enable`
 }
 
 /**
@@ -33888,7 +33888,7 @@ export const getPostAdminSchedulerDisableUrl = (id: string,) => {
 
 
 
-  return `/api/admin/scheduler/jobs/${id}/disable`
+  return `/api/admin/scheduler/jobs/${encodeURIComponent(String(id))}/disable`
 }
 
 /**
@@ -34234,7 +34234,7 @@ export const getPutDeviceRenameUrl = (deviceId: string,) => {
 
 
 
-  return `/api/devices/${deviceId}`
+  return `/api/devices/${encodeURIComponent(String(deviceId))}`
 }
 
 /**
@@ -34307,7 +34307,7 @@ export const getDeleteDeviceForgetUrl = (deviceId: string,) => {
 
 
 
-  return `/api/devices/${deviceId}`
+  return `/api/devices/${encodeURIComponent(String(deviceId))}`
 }
 
 /**
@@ -35352,7 +35352,7 @@ export const getGetAdminLogsDetailUrl = (id: string,) => {
 
 
 
-  return `/api/admin/logs/entries/${id}`
+  return `/api/admin/logs/entries/${encodeURIComponent(String(id))}`
 }
 
 /**
@@ -36431,7 +36431,7 @@ export const getGetMonitorJobsDetailUrl = (jobId: string,) => {
 
 
 
-  return `/api/monitor/jobs/${jobId}`
+  return `/api/monitor/jobs/${encodeURIComponent(String(jobId))}`
 }
 
 /**
@@ -36608,7 +36608,7 @@ export const getPostMonitorJobsRetryUrl = (jobId: string,) => {
 
 
 
-  return `/api/monitor/jobs/${jobId}/retry`
+  return `/api/monitor/jobs/${encodeURIComponent(String(jobId))}/retry`
 }
 
 /**
@@ -36684,7 +36684,7 @@ export const getPostMonitorJobsCancelUrl = (jobId: string,) => {
 
 
 
-  return `/api/monitor/jobs/${jobId}/cancel`
+  return `/api/monitor/jobs/${encodeURIComponent(String(jobId))}/cancel`
 }
 
 /**
@@ -36952,7 +36952,7 @@ export const getDeleteMonitorRatelimitersClearUrl = (name: string,
 
   const stringifiedParams = normalizedParams.toString();
 
-  return stringifiedParams.length > 0 ? `/api/monitor/rate-limiters/${name}/clear?${stringifiedParams}` : `/api/monitor/rate-limiters/${name}/clear`
+  return stringifiedParams.length > 0 ? `/api/monitor/rate-limiters/${encodeURIComponent(String(name))}/clear?${stringifiedParams}` : `/api/monitor/rate-limiters/${encodeURIComponent(String(name))}/clear`
 }
 
 /**
@@ -37584,7 +37584,7 @@ export const getDeleteAdminSettingsResetUrl = (key: string,) => {
 
 
 
-  return `/api/admin/settings/${key}`
+  return `/api/admin/settings/${encodeURIComponent(String(key))}`
 }
 
 /**
@@ -37891,7 +37891,7 @@ export const getGetMonitorTransportFailedShowUrl = (id: string,) => {
 
 
 
-  return `/api/monitor/transport/failed/${id}`
+  return `/api/monitor/transport/failed/${encodeURIComponent(String(id))}`
 }
 
 /**
@@ -38005,7 +38005,7 @@ export const getDeleteMonitorTransportFailedRemoveUrl = (id: string,) => {
 
 
 
-  return `/api/monitor/transport/failed/${id}`
+  return `/api/monitor/transport/failed/${encodeURIComponent(String(id))}`
 }
 
 /**
@@ -38164,7 +38164,7 @@ export const getPostMonitorTransportFailedRetryUrl = (id: string,) => {
 
 
 
-  return `/api/monitor/transport/failed/${id}/retry`
+  return `/api/monitor/transport/failed/${encodeURIComponent(String(id))}/retry`
 }
 
 /**
@@ -38342,7 +38342,7 @@ export const getGetStreamArtifactMasterUrl = (jobPublicId: string,
 
 
 
-  return `/api/transcode/artifacts/${jobPublicId}/${generation}/master.m3u8`
+  return `/api/transcode/artifacts/${encodeURIComponent(String(jobPublicId))}/${encodeURIComponent(String(generation))}/master.m3u8`
 }
 
 /**
@@ -38452,7 +38452,7 @@ export const getGetStreamArtifactMediaUrl = (jobPublicId: string,
 
 
 
-  return `/api/transcode/artifacts/${jobPublicId}/${generation}/tracks/${track}/media.m3u8`
+  return `/api/transcode/artifacts/${encodeURIComponent(String(jobPublicId))}/${encodeURIComponent(String(generation))}/tracks/${encodeURIComponent(String(track))}/media.m3u8`
 }
 
 /**
@@ -38569,7 +38569,7 @@ export const getGetStreamArtifactInitUrl = (jobPublicId: string,
 
 
 
-  return `/api/transcode/artifacts/${jobPublicId}/${generation}/tracks/${track}/init.mp4`
+  return `/api/transcode/artifacts/${encodeURIComponent(String(jobPublicId))}/${encodeURIComponent(String(generation))}/tracks/${encodeURIComponent(String(track))}/init.mp4`
 }
 
 /**
@@ -38694,7 +38694,7 @@ export const getGetStreamArtifactSegmentUrl = (jobPublicId: string,
 
   const stringifiedParams = normalizedParams.toString();
 
-  return stringifiedParams.length > 0 ? `/api/transcode/artifacts/${jobPublicId}/${generation}/tracks/${track}/segment.m4s?${stringifiedParams}` : `/api/transcode/artifacts/${jobPublicId}/${generation}/tracks/${track}/segment.m4s`
+  return stringifiedParams.length > 0 ? `/api/transcode/artifacts/${encodeURIComponent(String(jobPublicId))}/${encodeURIComponent(String(generation))}/tracks/${encodeURIComponent(String(track))}/segment.m4s?${stringifiedParams}` : `/api/transcode/artifacts/${encodeURIComponent(String(jobPublicId))}/${encodeURIComponent(String(generation))}/tracks/${encodeURIComponent(String(track))}/segment.m4s`
 }
 
 /**
@@ -38824,7 +38824,7 @@ export const getGetStreamMasterManifestUrl = (videoId: string,
 
   const stringifiedParams = normalizedParams.toString();
 
-  return stringifiedParams.length > 0 ? `/api/transcode/${videoId}/master.m3u8?${stringifiedParams}` : `/api/transcode/${videoId}/master.m3u8`
+  return stringifiedParams.length > 0 ? `/api/transcode/${encodeURIComponent(String(videoId))}/master.m3u8?${stringifiedParams}` : `/api/transcode/${encodeURIComponent(String(videoId))}/master.m3u8`
 }
 
 /**
@@ -38941,7 +38941,7 @@ export const getGetStreamMediaManifestUrl = (jobPublicId: string,
 
   const stringifiedParams = normalizedParams.toString();
 
-  return stringifiedParams.length > 0 ? `/api/transcode/${jobPublicId}/tracks/${track}/media.m3u8?${stringifiedParams}` : `/api/transcode/${jobPublicId}/tracks/${track}/media.m3u8`
+  return stringifiedParams.length > 0 ? `/api/transcode/${encodeURIComponent(String(jobPublicId))}/tracks/${encodeURIComponent(String(track))}/media.m3u8?${stringifiedParams}` : `/api/transcode/${encodeURIComponent(String(jobPublicId))}/tracks/${encodeURIComponent(String(track))}/media.m3u8`
 }
 
 /**
@@ -39064,7 +39064,7 @@ export const getGetStreamDashManifestUrl = (videoId: string,
 
   const stringifiedParams = normalizedParams.toString();
 
-  return stringifiedParams.length > 0 ? `/api/transcode/${videoId}/manifest.mpd?${stringifiedParams}` : `/api/transcode/${videoId}/manifest.mpd`
+  return stringifiedParams.length > 0 ? `/api/transcode/${encodeURIComponent(String(videoId))}/manifest.mpd?${stringifiedParams}` : `/api/transcode/${encodeURIComponent(String(videoId))}/manifest.mpd`
 }
 
 /**
@@ -39188,7 +39188,7 @@ export const getGetStreamQualityLadderUrl = (videoId: string,
 
   const stringifiedParams = normalizedParams.toString();
 
-  return stringifiedParams.length > 0 ? `/api/transcode/${videoId}/quality-ladder?${stringifiedParams}` : `/api/transcode/${videoId}/quality-ladder`
+  return stringifiedParams.length > 0 ? `/api/transcode/${encodeURIComponent(String(videoId))}/quality-ladder?${stringifiedParams}` : `/api/transcode/${encodeURIComponent(String(videoId))}/quality-ladder`
 }
 
 /**
@@ -39305,7 +39305,7 @@ export const getGetStreamSubtitleManifestUrl = (jobPublicId: string,
 
   const stringifiedParams = normalizedParams.toString();
 
-  return stringifiedParams.length > 0 ? `/api/transcode/${jobPublicId}/subtitles/${language}/media.m3u8?${stringifiedParams}` : `/api/transcode/${jobPublicId}/subtitles/${language}/media.m3u8`
+  return stringifiedParams.length > 0 ? `/api/transcode/${encodeURIComponent(String(jobPublicId))}/subtitles/${encodeURIComponent(String(language))}/media.m3u8?${stringifiedParams}` : `/api/transcode/${encodeURIComponent(String(jobPublicId))}/subtitles/${encodeURIComponent(String(language))}/media.m3u8`
 }
 
 /**
@@ -39429,7 +39429,7 @@ export const getGetStreamSegmentInitSegmentUrl = (jobPublicId: string,
 
   const stringifiedParams = normalizedParams.toString();
 
-  return stringifiedParams.length > 0 ? `/api/transcode/${jobPublicId}/tracks/${track}/init.mp4?${stringifiedParams}` : `/api/transcode/${jobPublicId}/tracks/${track}/init.mp4`
+  return stringifiedParams.length > 0 ? `/api/transcode/${encodeURIComponent(String(jobPublicId))}/tracks/${encodeURIComponent(String(track))}/init.mp4?${stringifiedParams}` : `/api/transcode/${encodeURIComponent(String(jobPublicId))}/tracks/${encodeURIComponent(String(track))}/init.mp4`
 }
 
 /**
@@ -39553,7 +39553,7 @@ export const getGetStreamSegmentSegmentUrl = (jobPublicId: string,
 
   const stringifiedParams = normalizedParams.toString();
 
-  return stringifiedParams.length > 0 ? `/api/transcode/${jobPublicId}/tracks/${track}/segment.m4s?${stringifiedParams}` : `/api/transcode/${jobPublicId}/tracks/${track}/segment.m4s`
+  return stringifiedParams.length > 0 ? `/api/transcode/${encodeURIComponent(String(jobPublicId))}/tracks/${encodeURIComponent(String(track))}/segment.m4s?${stringifiedParams}` : `/api/transcode/${encodeURIComponent(String(jobPublicId))}/tracks/${encodeURIComponent(String(track))}/segment.m4s`
 }
 
 /**
@@ -39678,7 +39678,7 @@ export const getGetStreamSegmentSubtitleSegmentUrl = (jobPublicId: string,
 
   const stringifiedParams = normalizedParams.toString();
 
-  return stringifiedParams.length > 0 ? `/api/transcode/${jobPublicId}/subtitles/${language}/${segment}.vtt?${stringifiedParams}` : `/api/transcode/${jobPublicId}/subtitles/${language}/${segment}.vtt`
+  return stringifiedParams.length > 0 ? `/api/transcode/${encodeURIComponent(String(jobPublicId))}/subtitles/${encodeURIComponent(String(language))}/${encodeURIComponent(String(segment))}.vtt?${stringifiedParams}` : `/api/transcode/${encodeURIComponent(String(jobPublicId))}/subtitles/${encodeURIComponent(String(language))}/${encodeURIComponent(String(segment))}.vtt`
 }
 
 /**
@@ -40603,7 +40603,7 @@ export const getGetEqProfilesShowUrl = (id: string,) => {
 
 
 
-  return `/api/user/eq-profiles/${id}`
+  return `/api/user/eq-profiles/${encodeURIComponent(String(id))}`
 }
 
 /**
@@ -40704,7 +40704,7 @@ export const getPutEqProfilesUpdateUrl = (id: string,) => {
 
 
 
-  return `/api/user/eq-profiles/${id}`
+  return `/api/user/eq-profiles/${encodeURIComponent(String(id))}`
 }
 
 /**
@@ -40777,7 +40777,7 @@ export const getDeleteEqProfilesDeleteUrl = (id: string,) => {
 
 
 
-  return `/api/user/eq-profiles/${id}`
+  return `/api/user/eq-profiles/${encodeURIComponent(String(id))}`
 }
 
 /**
@@ -40849,7 +40849,7 @@ export const getPostEqProfilesActivateUrl = (id: string,) => {
 
 
 
-  return `/api/user/eq-profiles/${id}/activate`
+  return `/api/user/eq-profiles/${encodeURIComponent(String(id))}/activate`
 }
 
 /**
@@ -41665,7 +41665,7 @@ export const getGetSidebarConfigGetUrl = (mediaType: string,) => {
 
 
 
-  return `/api/user/sidebar-config/${mediaType}`
+  return `/api/user/sidebar-config/${encodeURIComponent(String(mediaType))}`
 }
 
 /**
@@ -41779,7 +41779,7 @@ export const getPutSidebarConfigUpdateUrl = (mediaType: string,) => {
 
 
 
-  return `/api/user/sidebar-config/${mediaType}`
+  return `/api/user/sidebar-config/${encodeURIComponent(String(mediaType))}`
 }
 
 /**
@@ -41852,7 +41852,7 @@ export const getDeleteSidebarConfigDeleteUrl = (mediaType: string,) => {
 
 
 
-  return `/api/user/sidebar-config/${mediaType}`
+  return `/api/user/sidebar-config/${encodeURIComponent(String(mediaType))}`
 }
 
 /**
@@ -42211,7 +42211,7 @@ export const getPutUserSettingsSetUrl = (key: string,) => {
 
 
 
-  return `/api/user/settings/${key}`
+  return `/api/user/settings/${encodeURIComponent(String(key))}`
 }
 
 /**
@@ -42284,7 +42284,7 @@ export const getDeleteUserSettingsResetUrl = (key: string,) => {
 
 
 
-  return `/api/user/settings/${key}`
+  return `/api/user/settings/${encodeURIComponent(String(key))}`
 }
 
 /**

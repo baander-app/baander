@@ -13,6 +13,7 @@ export default defineConfig({
       target: './src/shared/api-client/gen/endpoints/index.ts',
       client: 'react-query',
       mock: false,
+      urlEncodeParameters: true,
       override: {
         fetch: {
           includeHttpResponseReturnType: false,

@@ -4,6 +4,7 @@ import { Camera, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { useQueryClient } from '@tanstack/react-query'
 import { AXIOS_INSTANCE } from '@/shared/api-client/axios-instance'
+import { apiPath } from '@/shared/api-client/api-path'
 import { getGetAlbumShowQueryKey, getGetArtistShowQueryKey } from '@/shared/api-client/gen/endpoints'
 import { useLiveCoordinator } from '@/shared/live/context'
 import { captureOwnership, isCurrentOwnership } from '@/shared/live/ownership'
@@ -154,7 +155,7 @@ export function CoverImageUpload({ entityType, publicId, coverImage }: CoverImag
     const form = new FormData()
     form.append('cover', file)
     await updateCover(
-      () => AXIOS_INSTANCE.post(`/api/${entityType}s/${publicId}/cover`, form),
+      () => AXIOS_INSTANCE.post(apiPath`/api/${entityType}s/${publicId}/cover`, form),
       'Image uploaded',
       'Failed to upload image',
     )
@@ -162,7 +163,7 @@ export function CoverImageUpload({ entityType, publicId, coverImage }: CoverImag
 
   const handleDelete = async () => {
     await updateCover(
-      () => AXIOS_INSTANCE.delete(`/api/${entityType}s/${publicId}/cover`),
+      () => AXIOS_INSTANCE.delete(apiPath`/api/${entityType}s/${publicId}/cover`),
       'Image removed',
       'Failed to remove image',
     )

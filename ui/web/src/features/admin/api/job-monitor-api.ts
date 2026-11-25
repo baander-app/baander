@@ -1,4 +1,5 @@
 import { AXIOS_INSTANCE } from '@/shared/api-client/axios-instance';
+import { apiPath } from '@/shared/api-client/api-path';
 
 // Types
 
@@ -96,17 +97,17 @@ export async function getJobList(params: JobFilters = {}, signal?: AbortSignal):
 }
 
 export async function getJobDetail(jobId: string, signal?: AbortSignal): Promise<JobDetail> {
-  const {data} = await AXIOS_INSTANCE.get(`/api/monitor/jobs/${jobId}`, { signal });
+  const {data} = await AXIOS_INSTANCE.get(apiPath`/api/monitor/jobs/${jobId}`, { signal });
   return data.data;
 }
 
 export async function retryJob(jobId: string): Promise<{ newJobId: string }> {
-  const {data} = await AXIOS_INSTANCE.post(`/api/monitor/jobs/${jobId}/retry`);
+  const {data} = await AXIOS_INSTANCE.post(apiPath`/api/monitor/jobs/${jobId}/retry`);
   return data.data;
 }
 
 export async function cancelJob(jobId: string): Promise<{ cancelled: boolean }> {
-  const {data} = await AXIOS_INSTANCE.post(`/api/monitor/jobs/${jobId}/cancel`);
+  const {data} = await AXIOS_INSTANCE.post(apiPath`/api/monitor/jobs/${jobId}/cancel`);
   return data.data;
 }
 
@@ -148,6 +149,6 @@ export async function flushFailedQueue(): Promise<{ flushed: number }> {
 }
 
 export async function retryFailedMessage(id: string): Promise<{ retried: string }> {
-  const {data} = await AXIOS_INSTANCE.post(`/api/monitor/transport/failed/${id}/retry`);
+  const {data} = await AXIOS_INSTANCE.post(apiPath`/api/monitor/transport/failed/${id}/retry`);
   return data.data;
 }

@@ -1,4 +1,5 @@
 import { AXIOS_INSTANCE } from '@/shared/api-client/axios-instance'
+import { apiPath } from '@/shared/api-client/api-path'
 
 // --- Types ---
 
@@ -40,19 +41,19 @@ export async function createGenre(payload: GenreCreateRequest): Promise<void> {
 }
 
 export async function addSongToGenre(genreSlug: string, songId: string): Promise<void> {
-  await AXIOS_INSTANCE.post(`/api/genres/${genreSlug}/songs`, { songId })
+  await AXIOS_INSTANCE.post(apiPath`/api/genres/${genreSlug}/songs`, { songId })
 }
 
 export async function removeSongFromGenre(genreSlug: string, songId: string): Promise<void> {
-  await AXIOS_INSTANCE.delete(`/api/genres/${genreSlug}/songs/${songId}`)
+  await AXIOS_INSTANCE.delete(apiPath`/api/genres/${genreSlug}/songs/${songId}`)
 }
 
 export async function addAlbumToGenre(genreSlug: string, albumId: string): Promise<void> {
-  await AXIOS_INSTANCE.post(`/api/genres/${genreSlug}/albums`, { albumId })
+  await AXIOS_INSTANCE.post(apiPath`/api/genres/${genreSlug}/albums`, { albumId })
 }
 
 export async function removeAlbumFromGenre(genreSlug: string, albumId: string): Promise<void> {
-  await AXIOS_INSTANCE.delete(`/api/genres/${genreSlug}/albums/${albumId}`)
+  await AXIOS_INSTANCE.delete(apiPath`/api/genres/${genreSlug}/albums/${albumId}`)
 }
 
 // --- Artist API ---
@@ -62,25 +63,25 @@ export async function createArtist(payload: ArtistCreateRequest): Promise<void> 
 }
 
 export async function addSongToArtist(artistPublicId: string, songId: string, role: string): Promise<void> {
-  await AXIOS_INSTANCE.post(`/api/artists/${artistPublicId}/songs`, { songId, role })
+  await AXIOS_INSTANCE.post(apiPath`/api/artists/${artistPublicId}/songs`, { songId, role })
 }
 
 export async function removeSongFromArtist(artistPublicId: string, songId: string): Promise<void> {
-  await AXIOS_INSTANCE.delete(`/api/artists/${artistPublicId}/songs/${songId}`)
+  await AXIOS_INSTANCE.delete(apiPath`/api/artists/${artistPublicId}/songs/${songId}`)
 }
 
 export async function updateArtistSongRole(artistPublicId: string, songId: string, role: string): Promise<void> {
-  await AXIOS_INSTANCE.patch(`/api/artists/${artistPublicId}/songs/${songId}`, { role })
+  await AXIOS_INSTANCE.patch(apiPath`/api/artists/${artistPublicId}/songs/${songId}`, { role })
 }
 
 export async function addAlbumToArtist(artistPublicId: string, albumId: string, role: string): Promise<void> {
-  await AXIOS_INSTANCE.post(`/api/artists/${artistPublicId}/albums`, { albumId, role })
+  await AXIOS_INSTANCE.post(apiPath`/api/artists/${artistPublicId}/albums`, { albumId, role })
 }
 
 export async function removeAlbumFromArtist(artistPublicId: string, albumId: string): Promise<void> {
-  await AXIOS_INSTANCE.delete(`/api/artists/${artistPublicId}/albums/${albumId}`)
+  await AXIOS_INSTANCE.delete(apiPath`/api/artists/${artistPublicId}/albums/${albumId}`)
 }
 
 export async function updateArtistAlbumRole(artistPublicId: string, albumId: string, role: string): Promise<void> {
-  await AXIOS_INSTANCE.patch(`/api/artists/${artistPublicId}/albums/${albumId}`, { role })
+  await AXIOS_INSTANCE.patch(apiPath`/api/artists/${artistPublicId}/albums/${albumId}`, { role })
 }

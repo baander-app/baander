@@ -1,6 +1,7 @@
 import { useEffect, useRef, useCallback, useState } from 'react'
 import { isAxiosError, isCancel } from 'axios'
 import { AXIOS_INSTANCE } from '@/shared/api-client/axios-instance'
+import { apiPath } from '@/shared/api-client/api-path'
 import {
   assertTimingOffset,
   initialVideoSettings,
@@ -609,7 +610,7 @@ export function useBaanderPlayer({
           const result = await AXIOS_INSTANCE.post<PlaybackSnapshot>(
             '/api/stream/sign',
             {
-              path: `/api/transcode/${videoId}/master.m3u8`,
+              path: apiPath`/api/transcode/${videoId}/master.m3u8`,
               requestId,
               ...audioSelection,
               ...(qualityPreference === 'auto'
@@ -1156,7 +1157,7 @@ export function useBaanderPlayer({
               })
             const send = () =>
               AXIOS_INSTANCE.post<{ data?: PostTranscodeSessionPosition200 }>(
-                `/api/transcode/sessions/${sessionId}/position`,
+                apiPath`/api/transcode/sessions/${sessionId}/position`,
                 payload,
                 { signal: abort.signal, timeout: 5000 }
               )

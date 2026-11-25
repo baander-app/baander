@@ -1,4 +1,5 @@
 import { AXIOS_INSTANCE } from '@/shared/api-client/axios-instance'
+import { apiPath } from '@/shared/api-client/api-path'
 
 export const LIBRARY_TYPES = ['music', 'podcast', 'audiobook', 'movie', 'tv_show'] as const
 export type LibraryType = (typeof LIBRARY_TYPES)[number]
@@ -59,7 +60,7 @@ export async function getLibraries(type?: string, signal?: AbortSignal): Promise
 }
 
 export async function getLibrary(id: string, signal?: AbortSignal): Promise<Library> {
-  const { data } = await AXIOS_INSTANCE.get(`/api/libraries/${id}`, { signal })
+  const { data } = await AXIOS_INSTANCE.get(apiPath`/api/libraries/${id}`, { signal })
   return data.data
 }
 
@@ -69,23 +70,23 @@ export async function createLibrary(payload: CreateLibraryPayload): Promise<Libr
 }
 
 export async function updateLibrary(id: string, payload: UpdateLibraryPayload): Promise<Library> {
-  const { data } = await AXIOS_INSTANCE.patch(`/api/libraries/${id}`, payload)
+  const { data } = await AXIOS_INSTANCE.patch(apiPath`/api/libraries/${id}`, payload)
   return data.data
 }
 
 export async function deleteLibrary(id: string): Promise<void> {
-  await AXIOS_INSTANCE.delete(`/api/libraries/${id}`)
+  await AXIOS_INSTANCE.delete(apiPath`/api/libraries/${id}`)
 }
 
 export async function scanLibrary(id: string, options?: { rescan?: boolean }): Promise<Library> {
-  const { data } = await AXIOS_INSTANCE.post(`/api/libraries/${id}/scan`, {
+  const { data } = await AXIOS_INSTANCE.post(apiPath`/api/libraries/${id}/scan`, {
     rescan: options?.rescan ?? false,
   })
   return data.data
 }
 
 export async function getLibraryStats(id: string, signal?: AbortSignal): Promise<LibraryStats> {
-  const { data } = await AXIOS_INSTANCE.get(`/api/libraries/${id}/stats`, { signal })
+  const { data } = await AXIOS_INSTANCE.get(apiPath`/api/libraries/${id}/stats`, { signal })
   return data.data
 }
 
