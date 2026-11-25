@@ -7,6 +7,7 @@ namespace Baander\DevQualification\Tests;
 use Baander\Configuration\ApplicationLayout;
 use Baander\Configuration\ToolingConfiguration;
 use Baander\Deployment\Presets\Configuration;
+use Baander\Deployment\Presets\RedisCredentials;
 use Baander\Deployment\Presets\StateStore;
 use Baander\Containers\Docker\Client;
 use Baander\Containers\Docker\Target;
@@ -776,6 +777,33 @@ final class QualificationTest extends TestCase
         self::assertFalse(Qualification::unansweredControlRequest(''));
     }
 
+    public function testRedisDiagnosticsAuthenticateAsTheApplicationUserWithThePasswordOffTheArguments(): void
+    {
+        $sampled = null;
+        $this->withPreparedQualification(function (Qualification $qualification, array $state, string $directory) use (&$sampled): void {
+            $store = new StateStore($directory . '/deployment');
+            $deployment = $store->load();
+            $deployment['composeFile'] = $directory . '/compose.json';
+            $store->save($deployment);
+
+            $diagnostics = new \ReflectionMethod(Qualification::class, 'diagnostics')->invoke($qualification);
+
+            self::assertSame('noeviction', $diagnostics['redis']['maxmemory_policy'] ?? null);
+            self::assertSame([], new \ReflectionProperty(Qualification::class, 'unexpectedExits')->getValue($qualification));
+            self::assertInstanceOf(ProcessSpec::class, $sampled);
+            self::assertFalse(array_any($sampled->argv, static fn(string $argument): bool => str_contains($argument, 'private-redis')));
+        }, function (CommandExecutor&\PHPUnit\Framework\MockObject\Stub $executor) use (&$sampled): void {
+            $executor->method('run')->willReturnCallback(static function (ProcessSpec $command) use (&$sampled): ProcessResult {
+                $output = match (true) {
+                    in_array('app:server:stats', $command->argv, true) => '{"missing_workers":[],"worker_errors":[]}',
+                    in_array('redis-cli', $command->argv, true) => self::redisInfo($sampled = $command),
+                    default => '',
+                };
+                return new ProcessResult(0, null, false, false, $output, '', 0);
+            });
+        });
+    }
+
     public function testOnlyARetiredOrNeverRecordedWorkerPairCountsAsRetired(): void
     {
         self::assertTrue(Qualification::pairRetired(null));
@@ -836,6 +864,22 @@ final class QualificationTest extends TestCase
             };
             return new ProcessResult(0, null, false, false, $output, '', 0);
         };
+    }
+
+    /**
+     * Answers INFO as the preset's Redis does: its ACL disables `default`, and redis-cli prints the refusal
+     * and exits 0.
+     */
+    private static function redisInfo(ProcessSpec $command): string
+    {
+        $user = array_search('--user', $command->argv, true);
+        $authenticated = $user !== false
+            && ($command->argv[$user + 1] ?? null) === RedisCredentials::USER
+            && ($command->environment['REDISCLI_AUTH'] ?? null) === 'private-redis';
+
+        return $authenticated
+            ? "# Memory\r\nmaxmemory_policy:noeviction\r\n# Persistence\r\naof_last_write_status:ok\r\n# Stats\r\nevicted_keys:0\r\n"
+            : "AUTH failed: WRONGPASS invalid username-password pair or user is disabled.\nNOAUTH Authentication required.\n";
     }
 
     /** A Docker command for resource cleanup that finds no remaining test container. */

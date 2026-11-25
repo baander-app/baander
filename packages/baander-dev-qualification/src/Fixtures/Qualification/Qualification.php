@@ -12,6 +12,7 @@ use Baander\Deployment\Preset;
 use Baander\Deployment\Presets\Configuration;
 use Baander\Deployment\Presets\EdgeNetwork;
 use Baander\Deployment\Presets\EdgeSubnet;
+use Baander\Deployment\Presets\RedisCredentials;
 use Baander\Deployment\Presets\StateStore;
 use Baander\Deployment\Workers\Lifecycle;
 use Baander\Containers\Docker\Client;
@@ -2116,7 +2117,16 @@ CODE;
         if (!is_array($statistics) || ($statistics['missing_workers'] ?? null) !== [] || ($statistics['worker_errors'] ?? null) !== []) {
             throw new \RuntimeException('Web worker or pool diagnostics are incomplete.');
         }
-        $redis = $this->docker->compose($name, $file, ['exec', '-T', 'redis', 'sh', '-ec', 'REDISCLI_AUTH="$REDIS_PASSWORD" redis-cli --raw INFO memory persistence stats errorstats'], timeout: 15)->stdout;
+        // The preset's ACL disables `default`; the application user's rules grant INFO. Compose passes the
+        // named variable from its own environment, which keeps the password off its argument list.
+        $redis = $this->docker->compose(
+            $name,
+            $file,
+            ['exec', '-T', '--env', 'REDISCLI_AUTH', RedisCredentials::SERVICE, 'redis-cli', '--user', RedisCredentials::USER, '--no-auth-warning',
+                '--raw', 'INFO', 'memory', 'persistence', 'stats', 'errorstats'],
+            env: ['REDISCLI_AUTH' => $deployment['configuration']['environment']['REDIS_PASSWORD']],
+            timeout: 15,
+        )->stdout;
         $info = [];
         foreach (explode("\n", $redis) as $line) {
             if (str_contains($line, ':') && !str_starts_with($line, '#')) {
