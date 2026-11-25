@@ -144,6 +144,9 @@ ci: ## Run static and backend checks in disposable CI containers
 	@$(MAKE) phpstan
 	@$(STATIC_CHECK) $(STATIC_IMAGE) -- vendor/bin/deptrac analyse --no-cache --no-progress
 	@$(STATIC_CHECK) $(STATIC_IMAGE) -- composer check:imports
+	@$(STATIC_CHECK) $(STATIC_IMAGE) -- composer check:tooling-architecture
+	@$(STATIC_CHECK) $(STATIC_IMAGE) -- composer check:tooling-format
+	@$(STATIC_CHECK) $(STATIC_IMAGE) -- php vendor/bin/phpstan analyse --configuration phpstan-tooling.neon --memory-limit=1G --no-progress
 	@$(MAKE) phpunit
 
 # ── Profiling (reli-prof) ────────────────────────────────────────────────────

@@ -6,7 +6,7 @@ Contributions are welcome. This page covers the workflow and conventions for con
 
 1. Set up the [development environment](../getting-started/development-environment.md) and install standalone tooling loaders with `composer tooling:autoload`
 2. Select a local CI test container (`BAANDER_TEST_IMAGE`) and run the test suite: `make phpunit`
-3. Run static analysis (`make phpstan`) or the full local gate (`make ci`, which runs `composer validate --no-check-version`, `composer normalize --dry-run`, `phpstan`, `deptrac`, `composer check:imports`, and `phpunit`)
+3. Run static analysis (`make phpstan`) or the full local gate (`make ci`, which runs `composer validate --no-check-version`, `composer normalize --dry-run`, `phpstan`, `deptrac`, `composer check:imports`, the tooling architecture, format and PHPStan checks, and `phpunit`)
 
 ## Branch Naming
 
