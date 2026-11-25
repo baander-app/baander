@@ -19,6 +19,7 @@ store. The workflows select them at run time; nothing is edited per forge.
 | `website.yaml` | Public website | Pushes to `master` and pull requests that touch the website paths | Builds, validates and browser-checks the static website, then keeps the archive |
 | `dsp-analysis.yaml` | DSP analysis qualification | Pushes to `master` and pull requests that touch the DSP paths | Builds and qualifies the analysis modules with the pinned Emscripten |
 | `registry-nightly.yaml` | Registry nightly qualification | `17 2 * * *` (02:17 UTC) and manual dispatch | Five-voter Registry qualification and parser fuzzing |
+| `dependency-advisories.yaml` | Dependency advisories | `41 4 * * *` (04:41 UTC) and manual dispatch | Audits every owned Composer, Yarn and npm lock for security advisories, see below |
 | `runner.yaml` | Build Runner Image | Pushes to `master` that touch `docker/runner/**`, and dispatch | Publishes `baander-runner` |
 | `postgres.yaml` | Build PostgreSQL Image | Pushes to `master` that touch `docker/postgres/**`, and dispatch | Publishes `baander-postgres` |
 | `nginx.yaml` | Build Nginx Image | Pushes to `master` that touch `docker/nginx/**`, and dispatch | Publishes `baander-nginx` |
@@ -29,6 +30,30 @@ A workflow with path filters lists its own file among them, so editing the
 workflow runs it. The README's badges show GitHub's status for CI, Frontend CI,
 Public website, DSP analysis qualification and Registry nightly qualification. The
 image workflows run rarely or only on dispatch, so they have no badge.
+
+### Dependency advisories
+
+CI checks dependency manifests and locks without network access, so it cannot learn
+that an advisory was published against a package that is already locked. The
+Dependency advisories workflow asks once a day. In the runner image it runs
+`php scripts/check-php-dependencies.php --advisories-only`, which asks Packagist
+about each owned Composer lock through `composer audit --locked`, and then
+`php scripts/check-js-dependencies.php --advisories-only`, which asks the npm
+registry about each owned Yarn and npm lock through `yarn npm audit` and `npm audit`.
+
+Each command exits `1` when a lock has an advisory and `2` when a lock could not be
+audited. A run therefore fails when Packagist or the npm registry is unreachable.
+The JavaScript step carries `if: always()`, so it runs after a failed PHP step as
+well and an open PHP advisory does not keep a new JavaScript advisory from being
+reported. The job has no write step and keeps no artifact; the report is the step
+log. The
+[PHP](../getting-started/php-dependencies.md#repeatable-checks) and
+[JavaScript](contributing.md#javascript-dependency-maintenance) dependency pages
+describe the two commands and the policy entry that excepts a JavaScript advisory.
+
+GitHub runs a schedule only from the default branch and offers manual dispatch only
+for a workflow that exists there, so both start working once the workflow file is on
+`master`.
 
 ## One tree on two forges
 
@@ -386,10 +411,12 @@ Keep these settings in place:
 
 ### When GitHub needs attention
 
-- **Suspended nightly.** GitHub disables scheduled workflows in a public repository
+- **Suspended schedules.** GitHub disables scheduled workflows in a public repository
   after 60 days without repository activity. Re-enable Registry nightly
-  qualification on the repository's Actions page, or run
-  `gh workflow enable registry-nightly.yaml --repo baander-app/baander`.
+  qualification and Dependency advisories on the repository's Actions page, or run
+  `gh workflow enable registry-nightly.yaml --repo baander-app/baander` and
+  `gh workflow enable dependency-advisories.yaml --repo baander-app/baander`. No
+  advisory is reported while Dependency advisories is disabled.
 
 ## See also
 

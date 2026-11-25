@@ -27,7 +27,7 @@ final class PublicationWorkflowTest extends TestCase
     private const string FORK = 'contributor/baander';
     private const string UPLOAD_ARTIFACT = 'actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9';
     private const string FORGEJO_UPLOAD_ARTIFACT = './.github/actions/forgejo-upload-artifact';
-    private const array GATE_WORKFLOWS = ['ci.yaml', 'frontend.yaml', 'website.yaml', 'dsp-analysis.yaml', 'registry-nightly.yaml'];
+    private const array GATE_WORKFLOWS = ['ci.yaml', 'frontend.yaml', 'website.yaml', 'dsp-analysis.yaml', 'registry-nightly.yaml', 'dependency-advisories.yaml'];
 
     private string $directory;
 
@@ -168,6 +168,49 @@ final class PublicationWorkflowTest extends TestCase
             self::assertSame('error', $upload['with']['if-no-files-found']);
         }
         self::assertSame(self::UPLOAD_ARTIFACT, $existingUpload['uses']);
+    }
+
+    public function testDependencyAdvisoriesAreAuditedDailyForBothEcosystemsByOneWorkflow(): void
+    {
+        $root = dirname(__DIR__, 5);
+        foreach (['.forgejo/workflows', '.gitea/workflows'] as $directory) {
+            self::assertDirectoryDoesNotExist($root . '/' . $directory, 'Forgejo runs the first workflow directory it finds and ignores the shared tree');
+        }
+        $auditing = array_filter(self::documents($root), static fn(array $entry): bool => str_contains($entry['source'], '--advisories-only'));
+        self::assertSame(['.github/workflows/dependency-advisories.yaml'], array_keys($auditing));
+
+        $workflow = $this->workflow('dependency-advisories.yaml');
+        self::assertSame(['schedule', 'workflow_dispatch'], array_keys($workflow['on']));
+        self::assertSame([['cron' => '41 4 * * *']], $workflow['on']['schedule']);
+        self::assertSame(['contents' => 'read'], $workflow['permissions']);
+        self::assertSame(['audit'], array_keys($workflow['jobs']));
+        $job = $workflow['jobs']['audit'];
+        $nightly = $this->workflow('registry-nightly.yaml')['jobs']['qualify'];
+        self::assertSame($nightly['runs-on'], $job['runs-on']);
+        self::assertSame($nightly['container'], $job['container']);
+        self::assertSame($this->step($nightly, 'Checkout'), $this->step($job, 'Checkout'));
+        foreach ([self::GITHUB, self::FORGEJO] as $server) {
+            self::assertSame(30, self::timeout($job, self::context($server)), $server);
+        }
+        foreach (['permissions', 'if', 'continue-on-error'] as $key) {
+            self::assertArrayNotHasKey($key, $job);
+        }
+        self::assertStringContainsString(
+            'composer --working-dir=scripts install',
+            $this->step($job, 'Prepare standalone PHP tooling')['run'],
+        );
+
+        $php = $this->step($job, 'PHP lock advisories');
+        $javascript = $this->step($job, 'JavaScript lock advisories');
+        // The whole command: nothing after it can replace the checker's exit status.
+        self::assertSame('php scripts/check-php-dependencies.php --advisories-only', $php['run']);
+        self::assertSame('php scripts/check-js-dependencies.php --advisories-only', $javascript['run']);
+        self::assertArrayNotHasKey('if', $php);
+        // A PHP finding that stays open must not stop the JavaScript locks from being audited.
+        self::assertSame('always()', $javascript['if']);
+        foreach ([$php, $javascript] as $step) {
+            self::assertArrayNotHasKey('continue-on-error', $step);
+        }
     }
 
     #[DataProvider('requiredRegistryModeProvider')]

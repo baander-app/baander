@@ -258,8 +258,10 @@ load Swoole: the process engine uses its signal and timer APIs.
 ```bash
 composer run-script --timeout=720 check:php-dependencies:local
 composer run-script --timeout=720 check:php-dependencies
+composer run-script --timeout=720 check:php-dependencies:advisories
 php scripts/check-php-dependencies.php --local-only --format json
 php scripts/check-php-dependencies.php --format json
+php scripts/check-php-dependencies.php --advisories-only --format json
 ```
 
 The local command discovers manifests and checks their classifications against
@@ -296,8 +298,14 @@ have a Buildx plugin that supports
 the declared Composer image's registry configuration for every returned platform
 and compare its embedded PHP version with the policy minimum. It does not build,
 pull or execute images. Local mode needs neither curl nor Docker and explicitly
-excludes online currency, advisories and registry image metadata. Neither mode
+excludes online currency, advisories and registry image metadata. No mode
 qualifies installed extensions, native behavior or patch application.
+
+The advisories-only command runs Composer's locked audit on the four owned locks and
+collects nothing else, so it needs Composer and access to Packagist but neither curl
+nor Docker. It reports a lock whose audit did not complete as incomplete evidence.
+The [developer guide](../docs-book/part-2-developer-guide/getting-started/php-dependencies.md#repeatable-checks)
+lists what fails it and what it only reports.
 
 Each Composer call uses an explicit project directory, disabled plugins and scripts,
 no cache, and a private temporary Composer home. Ambient manifest, vendor, home and
@@ -321,7 +329,9 @@ retain collected findings when another requested source fails.
 | `2` | Requested evidence is incomplete, including an unsupported interface, malformed response, timeout or cancellation. Earlier findings remain in the report. |
 
 CI runs the local command without network access alongside the tooling gates.
-Online assessment is an explicit maintenance action; it is not a scheduled CI gate.
+The scheduled Dependency advisories workflow runs the advisories-only command every
+day. The full online assessment is an explicit maintenance action; it is not a
+scheduled CI gate.
 
 ## CI package store
 

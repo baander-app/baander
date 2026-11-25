@@ -95,23 +95,24 @@ See the [Testing](../testing/README.md) page for the full test suite guide.
 ## JavaScript Dependency Maintenance
 
 After changing a web dependency, inspect its manifest and owned lock with the
-read-only checker or its Composer script aliases (`composer check:js-dependencies:local`
-and `composer check:js-dependencies`):
+read-only checker or its Composer script aliases (`composer check:js-dependencies:local`,
+`composer check:js-dependencies` and `composer check:js-dependencies:advisories`):
 
 ```bash
 php scripts/check-js-dependencies.php --local-only --format json
 php scripts/check-js-dependencies.php --online --format json
+php scripts/check-js-dependencies.php --advisories-only --format json
 ```
 
 Local mode is the default and makes no requests. The
 [JavaScript policy](../../../packages/baander-dev-dependencies/resources/javascript-dependencies.json)
-classifies eight manifests inside its `scopeDirectories` (`ui/web`, `ui/site`,
-`ui/shared`, `ui/design-tokens`, and `tests/e2e`): web, player, site and shared
-own independent Yarn locks; `tests/e2e` owns its npm lock. The DPoP and BlurHash
-library manifests have no independent installs, and design tokens use Node
+classifies ten manifests inside its `scopeDirectories` (`ui/web`, `ui/site`,
+`ui/shared`, `ui/design-tokens`, `ui/electron`, `packages/baander-audio-core`, and
+`tests/e2e`): web, player, site, shared and the desktop app own independent Yarn
+locks; `packages/baander-audio-core` and `tests/e2e` own npm locks. The DPoP and
+BlurHash library manifests have no independent installs, and design tokens use Node
 builtins. Discovery reports unclassified manifests within those source trees;
-`ui/electron/package.json`, `ui/rn/package.json`, and
-`packages/baander-audio-core/package.json` sit outside `scopeDirectories`. Local
+`ui/rn/package.json` sits outside `scopeDirectories`. Local
 inspection checks lock presence, npm root requirements, browser versions,
 resolutions and authored patch hashes. It leaves Yarn lock semantics and
 resolved versions to the package manager in online mode.
@@ -125,6 +126,43 @@ version ranges or prove compatibility; run each project's typecheck, tests and
 build after an upgrade. Internal packages and local references are excluded from
 public registry requests.
 
+Advisories-only mode runs the local inspection and then one request per owned lock:
+`yarn npm audit --all --recursive --json` for a Yarn lock and
+`npm audit --package-lock-only --json --ignore-scripts` for an npm lock. It collects
+no resolved versions and compares no releases, so an outdated dependency does not
+fail it. It needs registry access and the package managers, but no install: on
+2026-11-24, Yarn 4.17.1 audited a copy of `ui/shared` that held only the manifests,
+`yarn.lock` and `.yarnrc.yml`. Yarn's deprecation notices appear in the report
+without failing it.
+
+An advisory fails advisories-only mode unless the policy's `advisoryExceptions` list
+names the same project, package and advisory and gives a reason. An entry has this
+shape:
+
+```json
+{
+    "projects": ["ui/web/package.json"],
+    "package": "minimatch",
+    "advisory": "GHSA-g3hv-75wg-m249",
+    "reason": "Reaches only the linter, which reads repository files."
+}
+```
+
+`advisory` is the identifier the report prints for the advisory: the GitHub advisory
+identifier from the registry's link, or the registry's numeric identifier when it
+links none. An excepted advisory stays in the report with its reason. The policy is
+rejected, with status `2`, when an entry lacks a reason or names an unclassified
+project.
+
+A failed, empty or unrecognized audit response is incomplete evidence, so the mode
+exits `2` when the registry is unreachable. The same holds when the package manager
+cannot read the lock. A Yarn release refuses a lock in an older lockfile format: on
+2026-11-24, Yarn 4.17.1, which writes format version 10, answered the `ui/electron`
+lock in version 9 with "This package doesn't seem to be present in your lockfile",
+and gave the same answer for a copy of the `ui/shared` lock once its version line
+read 9. Run each project with the Yarn release its `packageManager` field pins;
+Corepack selects it.
+
 Exit status `0` means the requested checks completed without findings, `1` means
 findings remain, and `2` means evidence is incomplete. A failed request leaves
 other evidence and findings in the report. Compatibility exceptions explain a
@@ -136,6 +174,8 @@ Authored patches require a path, SHA-256 hash and rationale in the policy. Yarn
 builtin compatibility patches belong to the package manager and are reported
 separately from authored files. The site's exact transitive resolutions have
 matching policy rationales; they reduce advisory exposure within existing major
-versions. Remaining advisories stay visible. Neither mode installs dependencies,
-changes locks or runs application lifecycle scripts. Online checks are an explicit
-maintenance action; CI uses local inspection.
+versions. Remaining advisories stay visible. No mode installs dependencies,
+changes locks or runs application lifecycle scripts. The full online check is an
+explicit maintenance action. CI uses local inspection, and the
+[Dependency advisories workflow](continuous-integration.md#dependency-advisories)
+runs advisories-only mode every day.

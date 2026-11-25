@@ -35,14 +35,11 @@ final class Check
             return $report;
         }
         $runtimes = LocalEvidence::collect($root, $inventory, $report);
-        $home = sys_get_temp_dir() . '/baander-dependencies-' . bin2hex(random_bytes(12));
-        try {
-            PrivateDirectory::prepare($home);
-            $composer = new ComposerEvidence($this->executor, $this->configuration->budgets->seconds('process'), $this->environment, $home);
+        $this->withComposer($report, function (ComposerEvidence $composer, string $home) use ($root, $localOnly, $inventory, $runtimes, $report): void {
             $supported = $this->source($report, 'repository', 'composer-interface', 'composer', static fn(): string => $composer->version());
             if ($supported !== null) {
                 foreach ($inventory->projects as $path => $project) {
-                    $directory = $root . (dirname($path) === '.' ? '' : '/' . dirname($path));
+                    $directory = self::directory($root, $path);
                     $validated = $this->source($report, $path, 'validation', 'composer', static fn() => $composer->validate($directory, $project['classification']['kind'] === 'locked'));
                     if ($validated !== null) {
                         $report->add($validated->exitCode === 0 ? 'evidence' : 'finding', $path, 'validation', 'composer', $validated->exitCode === 0 ? 'Composer validated the manifest and owned lock.' : 'Composer reported manifest or lock inconsistencies.', ['exitCode' => $validated->exitCode, 'output' => $validated->stdout . $validated->stderr]);
@@ -68,6 +65,90 @@ final class Check
                 $this->online($inventory, $runtimes, $report);
                 $this->composerImages($root, $home, $inventory, $report);
             }
+        });
+        return $report;
+    }
+
+    /**
+     * Audits every owned lock against the advisory sources and assesses nothing else. A lock whose
+     * audit did not complete is a gap, so an unreachable source cannot read as a clean lock.
+     */
+    public function advisories(string $root): Report
+    {
+        $this->stopped = false;
+        $report = new Report(localOnly: false, advisoriesOnly: true);
+        try {
+            $inventory = Inventory::load($root);
+        } catch (\Throwable $error) {
+            $report->add('gap', 'repository', 'inventory', 'policy', $error->getMessage());
+            return $report;
+        }
+        foreach ($inventory->gaps as $gap) {
+            $report->add('gap', $gap['path'], 'inventory', 'policy', $gap['reason']);
+        }
+        $this->withComposer($report, function (ComposerEvidence $composer) use ($root, $inventory, $report): void {
+            if ($this->source($report, 'repository', 'composer-interface', 'composer', static fn(): string => $composer->version()) === null) {
+                return;
+            }
+            foreach ($inventory->projects as $path => $project) {
+                if ($project['classification']['kind'] !== 'locked') {
+                    continue;
+                }
+                $directory = self::directory($root, $path);
+                $audit = $this->source($report, $path, 'advisories', 'composer', static fn(): array => $composer->audit($directory));
+                if ($audit !== null) {
+                    self::assessAdvisories($report, $path, $audit);
+                }
+            }
+        });
+        return $report;
+    }
+
+    /**
+     * Advisories and policy-list matches (Composer's malware list and custom lists) fail the check;
+     * abandonment, ignored advisories and cooldown releases are reported only.
+     *
+     * @param array<string,mixed> $audit
+     */
+    private static function assessAdvisories(Report $report, string $path, array $audit): void
+    {
+        if (isset($audit['scope'])) {
+            $report->add('evidence', $path, 'advisories', 'composer', 'Owned lock contains no auditable packages; Composer skipped advisory collection.', $audit);
+            return;
+        }
+        $unreachable = $audit['unreachable-repositories'] ?? [];
+        if ($unreachable !== []) {
+            $report->add('gap', $path, 'advisories', 'composer', 'Composer reported unreachable advisory or policy repositories.', ['unreachable' => $unreachable]);
+        }
+        $failing = array_filter(['advisories' => $audit['advisories'], 'filter' => $audit['filter']]);
+        if ($failing !== []) {
+            $report->add('finding', $path, 'advisories', 'composer', 'Locked packages have security advisories or match a Composer policy list.', $failing);
+        } elseif ($unreachable === []) {
+            $report->add('evidence', $path, 'advisories', 'composer', 'No security advisory or policy list entry applies to the owned lock.');
+        }
+        $reportedOnly = [
+            'abandoned' => 'Abandoned packages are reported without failing the advisory check.',
+            'ignored-advisories' => 'Advisories ignored by the project\'s Composer configuration are reported without failing the advisory check.',
+            'cooldown' => 'Releases inside the configured cooldown period are reported without failing the advisory check.',
+        ];
+        foreach ($reportedOnly as $category => $reason) {
+            if (!empty($audit[$category])) {
+                $report->add('evidence', $path, $category, 'composer', $reason, [$category => $audit[$category]]);
+            }
+        }
+    }
+
+    /**
+     * Binds Composer to a private home for the duration of the collection and removes it afterwards.
+     *
+     * @param \Closure(ComposerEvidence, string): void $collect
+     */
+    private function withComposer(Report $report, \Closure $collect): void
+    {
+        $home = sys_get_temp_dir() . '/baander-dependencies-' . bin2hex(random_bytes(12));
+        try {
+            PrivateDirectory::prepare($home);
+            $collect(new ComposerEvidence($this->executor, $this->configuration->budgets->seconds('process'), $this->environment, $home), $home);
         } catch (\Throwable $error) {
             $report->add('gap', 'repository', 'collection', 'tooling', $error->getMessage());
         } finally {
@@ -83,7 +164,11 @@ final class Check
                 rmdir($home);
             }
         }
-        return $report;
+    }
+
+    private static function directory(string $root, string $path): string
+    {
+        return $root . (dirname($path) === '.' ? '' : '/' . dirname($path));
     }
 
     /** @param array<string,list<array<string,mixed>>> $runtimes

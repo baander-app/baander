@@ -441,8 +441,10 @@
       "assets:install %PUBLIC_DIR%": "symfony-cmd"
     },
     "check:js-dependencies": "@php scripts/check-js-dependencies.php --online",
+    "check:js-dependencies:advisories": "@php scripts/check-js-dependencies.php --advisories-only",
     "check:js-dependencies:local": "@php scripts/check-js-dependencies.php --local-only",
     "check:php-dependencies": "@php scripts/check-php-dependencies.php",
+    "check:php-dependencies:advisories": "@php scripts/check-php-dependencies.php --advisories-only",
     "check:php-dependencies:local": "@php scripts/check-php-dependencies.php --local-only",
     "check:tooling-architecture": [
       "@deptrac:tooling",

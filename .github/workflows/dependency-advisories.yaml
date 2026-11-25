@@ -1,0 +1,48 @@
+name: Dependency advisories
+
+on:
+    schedule:
+        - cron: '41 4 * * *'
+    workflow_dispatch:
+
+permissions:
+    contents: read
+
+concurrency:
+    group: dependency-advisories-${{ github.ref }}
+    cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+    audit:
+        runs-on: ${{ github.server_url == 'https://github.com' && 'ubuntu-latest' || 'docker-cli' }}
+        timeout-minutes: 30
+        container:
+            image: ${{ github.server_url == 'https://github.com' && 'ghcr.io' || vars.REGISTRY_URL }}/${{ github.server_url == 'https://github.com' && 'baander-app' || vars.REGISTRY_OWNER }}/baander-runner:latest
+            options: --init
+        steps:
+            -   name: Checkout
+                env:
+                    GIT_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+                run: |
+                    if [ "$GITHUB_SERVER_URL" = https://github.com ]; then
+                        auth="basic $(printf 'x-access-token:%s' "$GIT_TOKEN" | base64 | tr -d '\n')"
+                    else
+                        auth="token $GIT_TOKEN"
+                    fi
+                    git config --global --add safe.directory "$PWD"
+                    git init -q
+                    git remote add origin ${{ github.event.repository.clone_url }}
+                    git -c http.extraHeader="Authorization: $auth" fetch -q origin "${{ github.event.pull_request.head.sha || github.sha }}"
+                    git checkout -q --detach "${{ github.event.pull_request.head.sha || github.sha }}"
+                    test "$(git rev-parse HEAD)" = "${{ github.event.pull_request.head.sha || github.sha }}"
+            -   name: Prepare standalone PHP tooling
+                run: composer --working-dir=scripts install --no-interaction --no-scripts --no-plugins
+            # Each checker exits 1 on an advisory and 2 when a lock could not be audited,
+            # so an unreachable advisory source fails the job.
+            -   name: PHP lock advisories
+                run: php scripts/check-php-dependencies.php --advisories-only
+            # Runs after a failed PHP audit as well: a PHP advisory that stays open must not
+            # keep the JavaScript locks from being audited.
+            -   name: JavaScript lock advisories
+                if: always()
+                run: php scripts/check-js-dependencies.php --advisories-only

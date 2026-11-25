@@ -9,7 +9,7 @@ final class Report
     /** @var list<array<string,mixed>> */
     private array $records = [];
 
-    public function __construct(public readonly bool $localOnly) {}
+    public function __construct(public readonly bool $localOnly, public readonly bool $advisoriesOnly = false) {}
 
     /** @param array<string,mixed> $details */
     public function add(string $status, string $project, string $kind, string $reason, array $details = []): void
@@ -26,7 +26,7 @@ final class Report
     /** @return array<string,mixed> */
     public function toArray(): array
     {
-        return ['mode' => $this->localOnly ? 'local-only' : 'online', 'exitCode' => $this->exitCode(), 'records' => $this->records];
+        return ['mode' => $this->mode(), 'exitCode' => $this->exitCode(), 'records' => $this->records];
     }
 
     public function render(bool $json = false): string
@@ -34,7 +34,7 @@ final class Report
         if ($json) {
             return json_encode($this->toArray(), JSON_THROW_ON_ERROR | JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES) . "\n";
         }
-        $lines = ['JavaScript dependencies: ' . ($this->localOnly ? 'local-only' : 'online') . '; status ' . $this->exitCode()];
+        $lines = ['JavaScript dependencies: ' . $this->mode() . '; status ' . $this->exitCode()];
         foreach ($this->records as $record) {
             $lines[] = sprintf('[%s] %s %s: %s', $record['status'], $record['project'], $record['kind'], $record['reason']);
             if ($record['details'] !== []) {
@@ -42,5 +42,14 @@ final class Report
             }
         }
         return implode("\n", $lines) . "\n";
+    }
+
+    private function mode(): string
+    {
+        return match (true) {
+            $this->advisoriesOnly => 'advisories-only',
+            $this->localOnly => 'local-only',
+            default => 'online',
+        };
     }
 }

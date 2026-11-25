@@ -5,6 +5,8 @@
         "ui/site",
         "ui/shared",
         "ui/design-tokens",
+        "ui/electron",
+        "packages/baander-audio-core",
         "tests/e2e"
     ],
     "projects": {
@@ -27,6 +29,16 @@
             "kind": "locked",
             "manager": "yarn",
             "lock": "ui/shared/yarn.lock"
+        },
+        "ui/electron/package.json": {
+            "kind": "locked",
+            "manager": "yarn",
+            "lock": "ui/electron/yarn.lock"
+        },
+        "packages/baander-audio-core/package.json": {
+            "kind": "locked",
+            "manager": "npm",
+            "lock": "packages/baander-audio-core/package-lock.json"
         },
         "tests/e2e/package.json": {
             "kind": "locked",
@@ -70,6 +82,185 @@
                 "^24.19.2"
             ],
             "reason": "Types follow the supported Node 24 build runtime."
+        }
+    ],
+    "advisoryExceptions": [
+        {
+            "projects": [
+                "ui/site/package.json"
+            ],
+            "package": "@fastify/busboy",
+            "advisory": "GHSA-x8mw-p69m-v3mx",
+            "reason": "vercel 65.9.0 deploys the website from a developer machine or CI and pins its dependencies exactly; vercel 66.6.0 pins the same versions. It is reached only through undici 5.29.0, whose ^2.0.0 range excludes the fixed 3.2.2."
+        },
+        {
+            "projects": [
+                "ui/site/package.json"
+            ],
+            "package": "@fastify/busboy",
+            "advisory": "GHSA-gxm5-99cw-xjw9",
+            "reason": "vercel 65.9.0 deploys the website from a developer machine or CI and pins its dependencies exactly; vercel 66.6.0 pins the same versions. It is reached only through undici 5.29.0, whose ^2.0.0 range excludes the fixed 3.2.2."
+        },
+        {
+            "projects": [
+                "ui/site/package.json"
+            ],
+            "package": "esbuild",
+            "advisory": "GHSA-g7r4-m6w7-qqqr",
+            "reason": "vercel 65.9.0 deploys the website from a developer machine or CI and pins its dependencies exactly; vercel 66.6.0 pins the same versions. tsx 4.21.0, an exact pin in @vercel/backends and @vercel/node, declares esbuild ~0.27.0; the fix is 0.28.1. The advisory concerns the esbuild development server on Windows, which the website build does not start."
+        },
+        {
+            "projects": [
+                "ui/site/package.json"
+            ],
+            "package": "glob",
+            "advisory": "GHSA-3g3m-2fjr-6pw4",
+            "reason": "vercel 65.9.0 deploys the website from a developer machine or CI and pins its dependencies exactly; vercel 66.6.0 pins the same versions. @vercel/nft 1.10.0 declares glob ^13.0.0; the fix is glob 14.0.2, a major."
+        },
+        {
+            "projects": [
+                "ui/electron/package.json",
+                "ui/site/package.json"
+            ],
+            "package": "minimatch",
+            "advisory": "GHSA-g3hv-75wg-m249",
+            "reason": "The fix is minimatch 11.0.1, a major. In ui/site it comes from @vercel/python-analysis 0.15.2, an exact pin inside vercel 65.9.0 (66.6.0 pins the same). In ui/electron it comes from electron-builder 26.18.1 through app-builder-lib and @electron/universal 2.0.3; no stable electron-builder release carries minimatch 11."
+        },
+        {
+            "projects": [
+                "ui/site/package.json"
+            ],
+            "package": "undici",
+            "advisory": "GHSA-g9mf-h72j-4rw9",
+            "reason": "vercel 65.9.0 deploys the website from a developer machine or CI and pins its dependencies exactly; vercel 66.6.0 pins the same versions. undici is pinned at 5.28.4 in vercel, @vercel/cli-support and @vercel/node (overridden to 5.29.0, the last 5.x); the fixes start at undici 6.23.0, a major those packages do not accept."
+        },
+        {
+            "projects": [
+                "ui/site/package.json"
+            ],
+            "package": "undici",
+            "advisory": "GHSA-2mjp-6q6p-2qxm",
+            "reason": "vercel 65.9.0 deploys the website from a developer machine or CI and pins its dependencies exactly; vercel 66.6.0 pins the same versions. undici is pinned at 5.28.4 in vercel, @vercel/cli-support and @vercel/node (overridden to 5.29.0, the last 5.x); the fixes start at undici 6.23.0, a major those packages do not accept."
+        },
+        {
+            "projects": [
+                "ui/site/package.json"
+            ],
+            "package": "undici",
+            "advisory": "GHSA-vrm6-8vpv-qv8q",
+            "reason": "vercel 65.9.0 deploys the website from a developer machine or CI and pins its dependencies exactly; vercel 66.6.0 pins the same versions. undici is pinned at 5.28.4 in vercel, @vercel/cli-support and @vercel/node (overridden to 5.29.0, the last 5.x); the fixes start at undici 6.23.0, a major those packages do not accept."
+        },
+        {
+            "projects": [
+                "ui/site/package.json"
+            ],
+            "package": "undici",
+            "advisory": "GHSA-v9p9-hfj2-hcw8",
+            "reason": "vercel 65.9.0 deploys the website from a developer machine or CI and pins its dependencies exactly; vercel 66.6.0 pins the same versions. undici is pinned at 5.28.4 in vercel, @vercel/cli-support and @vercel/node (overridden to 5.29.0, the last 5.x); the fixes start at undici 6.23.0, a major those packages do not accept."
+        },
+        {
+            "projects": [
+                "ui/site/package.json"
+            ],
+            "package": "undici",
+            "advisory": "GHSA-4992-7rv2-5pvq",
+            "reason": "vercel 65.9.0 deploys the website from a developer machine or CI and pins its dependencies exactly; vercel 66.6.0 pins the same versions. undici is pinned at 5.28.4 in vercel, @vercel/cli-support and @vercel/node (overridden to 5.29.0, the last 5.x); the fixes start at undici 6.23.0, a major those packages do not accept."
+        },
+        {
+            "projects": [
+                "ui/site/package.json"
+            ],
+            "package": "undici",
+            "advisory": "GHSA-p88m-4jfj-68fv",
+            "reason": "vercel 65.9.0 deploys the website from a developer machine or CI and pins its dependencies exactly; vercel 66.6.0 pins the same versions. undici is pinned at 5.28.4 in vercel, @vercel/cli-support and @vercel/node (overridden to 5.29.0, the last 5.x); the fixes start at undici 6.23.0, a major those packages do not accept."
+        },
+        {
+            "projects": [
+                "ui/site/package.json"
+            ],
+            "package": "undici",
+            "advisory": "GHSA-g8m3-5g58-fq7m",
+            "reason": "vercel 65.9.0 deploys the website from a developer machine or CI and pins its dependencies exactly; vercel 66.6.0 pins the same versions. undici is pinned at 5.28.4 in vercel, @vercel/cli-support and @vercel/node (overridden to 5.29.0, the last 5.x); the fixes start at undici 6.23.0, a major those packages do not accept."
+        },
+        {
+            "projects": [
+                "ui/site/package.json"
+            ],
+            "package": "undici",
+            "advisory": "GHSA-8xcm-r25x-g524",
+            "reason": "vercel 65.9.0 deploys the website from a developer machine or CI and pins its dependencies exactly; vercel 66.6.0 pins the same versions. undici is pinned at 5.28.4 in vercel, @vercel/cli-support and @vercel/node (overridden to 5.29.0, the last 5.x); the fixes start at undici 6.23.0, a major those packages do not accept."
+        },
+        {
+            "projects": [
+                "ui/site/package.json"
+            ],
+            "package": "undici",
+            "advisory": "GHSA-m8rv-5g2x-5cg5",
+            "reason": "vercel 65.9.0 deploys the website from a developer machine or CI and pins its dependencies exactly; vercel 66.6.0 pins the same versions. undici is pinned at 5.28.4 in vercel, @vercel/cli-support and @vercel/node (overridden to 5.29.0, the last 5.x); the fixes start at undici 6.23.0, a major those packages do not accept."
+        },
+        {
+            "projects": [
+                "ui/site/package.json"
+            ],
+            "package": "undici",
+            "advisory": "GHSA-v3r7-h72x-cjcm",
+            "reason": "vercel 65.9.0 deploys the website from a developer machine or CI and pins its dependencies exactly; vercel 66.6.0 pins the same versions. undici is pinned at 5.28.4 in vercel, @vercel/cli-support and @vercel/node (overridden to 5.29.0, the last 5.x); the fixes start at undici 6.23.0, a major those packages do not accept."
+        },
+        {
+            "projects": [
+                "ui/site/package.json"
+            ],
+            "package": "undici",
+            "advisory": "GHSA-35p6-xmwp-9g52",
+            "reason": "vercel 65.9.0 deploys the website from a developer machine or CI and pins its dependencies exactly; vercel 66.6.0 pins the same versions. undici is pinned at 5.28.4 in vercel, @vercel/cli-support and @vercel/node (overridden to 5.29.0, the last 5.x); the fixes start at undici 6.23.0, a major those packages do not accept."
+        },
+        {
+            "projects": [
+                "ui/site/package.json"
+            ],
+            "package": "undici",
+            "advisory": "GHSA-r53p-7pc4-xj5r",
+            "reason": "vercel 65.9.0 deploys the website from a developer machine or CI and pins its dependencies exactly; vercel 66.6.0 pins the same versions. undici is pinned at 5.28.4 in vercel, @vercel/cli-support and @vercel/node (overridden to 5.29.0, the last 5.x); the fixes start at undici 6.23.0, a major those packages do not accept."
+        },
+        {
+            "projects": [
+                "ui/site/package.json"
+            ],
+            "package": "undici",
+            "advisory": "GHSA-2m5v-pch6-74hx",
+            "reason": "vercel 65.9.0 deploys the website from a developer machine or CI and pins its dependencies exactly; vercel 66.6.0 pins the same versions. undici is pinned at 5.28.4 in vercel, @vercel/cli-support and @vercel/node (overridden to 5.29.0, the last 5.x); the fixes start at undici 6.23.0, a major those packages do not accept."
+        },
+        {
+            "projects": [
+                "ui/site/package.json"
+            ],
+            "package": "undici",
+            "advisory": "GHSA-qrxm-fqhp-jwvm",
+            "reason": "vercel 65.9.0 deploys the website from a developer machine or CI and pins its dependencies exactly; vercel 66.6.0 pins the same versions. undici is pinned at 5.28.4 in vercel, @vercel/cli-support and @vercel/node (overridden to 5.29.0, the last 5.x); the fixes start at undici 6.23.0, a major those packages do not accept."
+        },
+        {
+            "projects": [
+                "ui/site/package.json"
+            ],
+            "package": "undici",
+            "advisory": "GHSA-9fm3-97px-rjf6",
+            "reason": "vercel 65.9.0 deploys the website from a developer machine or CI and pins its dependencies exactly; vercel 66.6.0 pins the same versions. undici is pinned at 5.28.4 in vercel, @vercel/cli-support and @vercel/node (overridden to 5.29.0, the last 5.x); the fixes start at undici 6.23.0, a major those packages do not accept."
+        },
+        {
+            "projects": [
+                "ui/site/package.json"
+            ],
+            "package": "undici",
+            "advisory": "GHSA-vxpw-j846-p89q",
+            "reason": "vercel 65.9.0 deploys the website from a developer machine or CI and pins its dependencies exactly; vercel 66.6.0 pins the same versions. undici is pinned at 5.28.4 in vercel, @vercel/cli-support and @vercel/node (overridden to 5.29.0, the last 5.x); the fixes start at undici 6.23.0, a major those packages do not accept."
+        },
+        {
+            "projects": [
+                "ui/site/package.json"
+            ],
+            "package": "zod",
+            "advisory": "GHSA-mrhx-c7xc-m3w5",
+            "reason": "vercel 65.9.0 deploys the website from a developer machine or CI and pins its dependencies exactly; vercel 66.6.0 pins the same versions. zod 3.22.4 is an exact pin in @vercel/backends, @vercel/express, @vercel/hono and @vercel/python-analysis; the fix is zod 4.6.6, a major."
         }
     ],
     "patches": [],

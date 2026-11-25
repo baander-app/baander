@@ -51,8 +51,10 @@ Run these commands from the repository root:
 ```bash
 composer run-script --timeout=720 check:php-dependencies:local
 composer run-script --timeout=720 check:php-dependencies
+composer run-script --timeout=720 check:php-dependencies:advisories
 php scripts/check-php-dependencies.php --local-only --format json
 php scripts/check-php-dependencies.php --format json
+php scripts/check-php-dependencies.php --advisories-only --format json
 ```
 
 Local mode validates all classified manifests, reads both package sections of each owned
@@ -68,6 +70,24 @@ HTTPS-capable curl, upstream access and the configured Docker target with Buildx
 registry inspection. A release remains visible when the host platform, declared
 constraint or local path repository prevents Composer from selecting it.
 
+Advisories-only mode runs `composer audit --locked` on each owned lock and assesses
+nothing else: it skips validation, currency, runtime, patch and fork evidence. It
+needs Composer 2.11.1 and HTTPS access to Packagist, but neither curl nor Docker. A
+security advisory fails it, and so does a match with one of Composer's policy lists,
+such as its malware list. Abandoned packages, advisories that a project's Composer
+configuration ignores and releases inside a configured cooldown period appear in the
+report without failing it. An outdated package does not fail it either, because the
+mode never asks for newer releases.
+
+A lock whose audit did not complete is incomplete evidence, so advisories-only mode
+exits `2` when Packagist is unreachable, when Composer cannot run or when it prints
+nothing. On 2026-11-24, Composer 2.11.1 without network access exited `100` with
+"curl error 6 while downloading https://repo.packagist.org/packages.json" and no
+report; the checker reads that as status `2`. The relay lock is the one refusal it
+accepts. Composer exits `1` on that lock with "No installed packages found" instead
+of a report. The checker then reads the lock itself and accepts the refusal only
+when both package lists are empty.
+
 | Status | Meaning |
 | --- | --- |
 | `0` | Requested checks completed without findings; local exclusions still apply. |
@@ -75,11 +95,17 @@ constraint or local path repository prevents Composer from selecting it.
 | `2` | Requested evidence is incomplete; earlier findings remain visible. |
 
 The checker disables Composer plugins and scripts, isolates Composer settings and
-cache, and does not install, update, relock or apply patches. Neither mode proves
+cache, and does not install, update, relock or apply patches. No mode proves
 clean patch application, installed extension versions or native runtime behavior.
 See the [tooling command reference](../../../dev-docs/workflow-packages.md#php-dependency-maintenance)
-for budgets, environment handling and required interfaces. CI uses local mode;
-online assessment remains an explicit maintenance action.
+for budgets, environment handling and required interfaces.
+
+CI runs local mode on every push to `master` and every pull request. The
+[Dependency advisories workflow](../contributing/continuous-integration.md#dependency-advisories)
+runs advisories-only mode every day and on manual dispatch. The full online
+assessment remains an explicit maintenance action: it reports every package behind
+its latest stable release as a finding, so it cannot pass while the blockers listed
+[below](#remaining-stable-release-blockers) hold seven root packages back.
 
 Composer's outdated view uses the maintenance host's extensions. A missing extension
 can make its candidate older than the locked version: the 2026-10-31 host lacked

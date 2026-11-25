@@ -97,7 +97,7 @@ final class Inventory
         if (($policy['version'] ?? null) !== 1) {
             throw new \RuntimeException('Unsupported JavaScript dependency policy version.');
         }
-        foreach (['scopeDirectories', 'projects', 'exceptions', 'patches', 'resolutions'] as $field) {
+        foreach (['scopeDirectories', 'projects', 'exceptions', 'advisoryExceptions', 'patches', 'resolutions'] as $field) {
             if (!isset($policy[$field]) || !is_array($policy[$field])) {
                 throw new \RuntimeException('Missing or malformed JavaScript dependency policy field: ' . $field);
             }
@@ -131,7 +131,7 @@ final class Inventory
                 throw new \RuntimeException('Unlocked project classification requires a reason.');
             }
         }
-        if (!array_is_list($policy['exceptions']) || !array_is_list($policy['patches'])) {
+        if (!array_is_list($policy['exceptions']) || !array_is_list($policy['advisoryExceptions']) || !array_is_list($policy['patches'])) {
             throw new \RuntimeException('Policy exceptions and patches must be lists.');
         }
         foreach ($policy['exceptions'] as $exception) {
@@ -151,6 +151,26 @@ final class Inventory
             foreach ($exception['projects'] as $project) {
                 if (!isset($policy['projects'][$project])) {
                     throw new \RuntimeException('Exception references an unclassified project.');
+                }
+            }
+        }
+        foreach ($policy['advisoryExceptions'] as $exception) {
+            if (
+                !is_array($exception)
+                || !is_string($exception['package'] ?? null)
+                || $exception['package'] === ''
+                || !is_string($exception['advisory'] ?? null)
+                || trim($exception['advisory']) === ''
+                || !self::stringList($exception['projects'] ?? null)
+                || $exception['projects'] === []
+                || !is_string($exception['reason'] ?? null)
+                || trim($exception['reason']) === ''
+            ) {
+                throw new \RuntimeException('Malformed advisory exception.');
+            }
+            foreach ($exception['projects'] as $project) {
+                if (!isset($policy['projects'][$project])) {
+                    throw new \RuntimeException('Advisory exception references an unclassified project.');
                 }
             }
         }

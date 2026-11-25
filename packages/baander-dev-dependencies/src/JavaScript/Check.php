@@ -78,21 +78,7 @@ final class Check
                     $report->add('gap', $path, 'resolved', $error->getMessage());
                 }
                 try {
-                    $output = $this->execute($yarn ? ['yarn', 'npm', 'audit', '--all', '--recursive', '--json'] : ['npm', 'audit', '--package-lock-only', '--json', '--ignore-scripts'], $cwd, true);
-                    if ($yarn) {
-                        $advisories = $this->jsonLines($output, true);
-                        foreach ($advisories as $advisory) {
-                            if (!isset($advisory['children']['ID'])) {
-                                throw new \RuntimeException('Unrecognized Yarn advisory response.');
-                            }
-                        }
-                    } else {
-                        $audit = json_decode($output, true, flags: JSON_THROW_ON_ERROR);
-                        if (!is_array($audit) || !isset($audit['vulnerabilities']) || isset($audit['error'])) {
-                            throw new \RuntimeException('Unrecognized npm advisory response.');
-                        }
-                        $advisories = $audit['vulnerabilities'];
-                    }
+                    $advisories = $this->audit($cwd, $yarn);
                     $report->add($advisories === [] ? 'evidence' : 'finding', $path, 'advisories', 'Fresh package-manager advisory response.', ['advisories' => $advisories]);
                 } catch (\Throwable $error) {
                     $report->add('gap', $path, 'advisories', $error->getMessage());
@@ -136,6 +122,133 @@ final class Check
             }
         }
         return $report;
+    }
+
+    /**
+     * Audits every owned lock against the registry's advisories and assesses nothing else. A lock
+     * whose audit did not complete is a gap, so an unreachable registry cannot read as a clean lock.
+     */
+    public function advisories(string $root): Report
+    {
+        $report = new Report(localOnly: false, advisoriesOnly: true);
+        try {
+            $policy = Inventory::json($root . '/packages/baander-dev-dependencies/resources/javascript-dependencies.json');
+            $projects = Inventory::collect($root, $policy, $report);
+        } catch (\Throwable $error) {
+            $report->add('gap', 'repository', 'inventory', $error->getMessage());
+            return $report;
+        }
+        foreach ($projects as $path => $project) {
+            $classification = $project['classification'];
+            if ($classification['kind'] !== 'locked') {
+                continue;
+            }
+            $yarn = $classification['manager'] === 'yarn';
+            try {
+                ['advisories' => $advisories, 'deprecations' => $deprecations] = self::classify($this->audit($root . '/' . dirname($path), $yarn), $yarn);
+            } catch (\Throwable $error) {
+                $report->add('gap', $path, 'advisories', $error->getMessage());
+                continue;
+            }
+            $unlisted = [];
+            foreach ($advisories as $advisory) {
+                $exception = array_find($policy['advisoryExceptions'], static fn(array $exception): bool => $exception['package'] === $advisory['package'] && $exception['advisory'] === $advisory['advisory'] && in_array($path, $exception['projects'], true));
+                if ($exception === null) {
+                    $unlisted[] = $advisory;
+                } else {
+                    $report->add('evidence', $path, 'advisory-exception', $exception['reason'], $advisory);
+                }
+            }
+            if ($unlisted === []) {
+                $report->add('evidence', $path, 'advisories', 'No security advisory without a policy exception applies to the owned lock.');
+            } else {
+                $report->add('finding', $path, 'advisories', 'Security advisories without a policy exception apply to the owned lock.', ['advisories' => $unlisted]);
+            }
+            if ($deprecations !== []) {
+                $report->add('evidence', $path, 'deprecations', 'Deprecated packages are reported without failing the advisory check.', ['deprecations' => $deprecations]);
+            }
+        }
+        return $report;
+    }
+
+    /** @return array<array-key,mixed> Yarn's advisory records, or npm's vulnerabilities keyed by package */
+    private function audit(string $cwd, bool $yarn): array
+    {
+        $output = $this->execute($yarn ? ['yarn', 'npm', 'audit', '--all', '--recursive', '--json'] : ['npm', 'audit', '--package-lock-only', '--json', '--ignore-scripts'], $cwd, true);
+        if ($yarn) {
+            $advisories = $this->jsonLines($output, true);
+            foreach ($advisories as $advisory) {
+                if (!isset($advisory['children']['ID'])) {
+                    throw new \RuntimeException('Unrecognized Yarn advisory response.');
+                }
+            }
+            return $advisories;
+        }
+        $audit = json_decode($output, true, flags: JSON_THROW_ON_ERROR);
+        if (!is_array($audit) || !is_array($audit['vulnerabilities'] ?? null) || isset($audit['error'])) {
+            throw new \RuntimeException('Unrecognized npm advisory response.');
+        }
+        return $audit['vulnerabilities'];
+    }
+
+    /**
+     * Reduces an audit response to one entry per package and advisory. Yarn mixes deprecation
+     * notices into its advisory records and marks them only through the ID suffix; npm lists a
+     * package affected through a dependency with that dependency's name in place of an advisory.
+     *
+     * @param array<array-key,mixed> $response
+     * @return array{advisories: list<array<string,mixed>>, deprecations: list<array<string,mixed>>}
+     */
+    private static function classify(array $response, bool $yarn): array
+    {
+        $advisories = [];
+        $deprecations = [];
+        foreach ($response as $entry) {
+            if ($yarn) {
+                $package = $entry['value'] ?? null;
+                $record = $entry['children'];
+                if (!is_string($package) || $package === '') {
+                    throw new \RuntimeException('Unrecognized Yarn advisory response.');
+                }
+                if (is_string($record['ID']) && str_ends_with($record['ID'], ' (deprecation)')) {
+                    $deprecations[] = ['package' => $package, 'record' => $record];
+                    continue;
+                }
+                $advisory = self::identifier($record['URL'] ?? null, $record['ID']);
+                $advisories[$package . ' ' . $advisory] = ['package' => $package, 'advisory' => $advisory, 'severity' => $record['Severity'] ?? null, 'title' => $record['Issue'] ?? null, 'record' => $record];
+                continue;
+            }
+            $via = is_array($entry) ? $entry['via'] ?? null : null;
+            if (!is_array($via) || $via === []) {
+                throw new \RuntimeException('Unrecognized npm advisory response.');
+            }
+            foreach ($via as $source) {
+                if (is_string($source) && isset($response[$source])) {
+                    continue;
+                }
+                if (!is_array($source) || !is_string($source['name'] ?? null) || $source['name'] === '') {
+                    throw new \RuntimeException('Unrecognized npm advisory response.');
+                }
+                $advisory = self::identifier($source['url'] ?? null, $source['source'] ?? null);
+                $advisories[$source['name'] . ' ' . $advisory] = ['package' => $source['name'], 'advisory' => $advisory, 'severity' => $source['severity'] ?? null, 'title' => $source['title'] ?? null, 'record' => $source];
+            }
+        }
+        if ($response !== [] && $advisories === [] && $deprecations === []) {
+            throw new \RuntimeException('Audit reported vulnerable packages without an advisory.');
+        }
+        return ['advisories' => array_values($advisories), 'deprecations' => $deprecations];
+    }
+
+    /** The GitHub advisory identifier in the registry's link names an advisory the same way under Yarn and npm; the registry's numeric identifier is the fallback. */
+    private static function identifier(mixed $url, mixed $id): string
+    {
+        if (is_string($url) && preg_match('~/(GHSA(?:-[0-9a-z]{4}){3})$~', $url, $match) === 1) {
+            return $match[1];
+        }
+        if (!is_int($id)) {
+            throw new \RuntimeException('Advisory record has no identifier.');
+        }
+        return (string) $id;
     }
 
     /** @param non-empty-list<string> $argv */

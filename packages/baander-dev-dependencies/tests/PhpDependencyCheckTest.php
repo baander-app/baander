@@ -6,6 +6,7 @@ namespace Baander\DevDependencies\Tests;
 
 use Baander\Configuration\ToolingConfiguration;
 use Baander\DevDependencies\Php\Check;
+use Baander\DevDependencies\Php\Command;
 use Baander\DevDependencies\Php\ComposerEvidence;
 use Baander\DevDependencies\Php\DockerEvidence;
 use Baander\Containers\Docker\Client;
@@ -14,12 +15,19 @@ use Baander\Process\Execution\CommandFailure;
 use Baander\DevDependencies\Php\Report;
 use Baander\DevDependencies\Php\UpstreamEvidence;
 use Baander\Process\Execution\CommandExecutor;
+use Baander\Process\Execution\CompletionPolicy;
+use Baander\Process\Execution\EngineExecutor;
+use Baander\Process\Execution\ExecutionContext;
 use Baander\Process\Execution\ProcessResult;
 use Baander\Process\Execution\ProcessSpec;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
 final class PhpDependencyCheckTest extends TestCase
 {
+    private const array LOCKED_PACKAGE = ['packages' => [['name' => 'public/package', 'version' => '1.0.0']], 'packages-dev' => []];
+    private const string CLEAN_AUDIT = '{"advisories":[],"abandoned":[],"filter":[],"cooldown":[]}';
+
     public function testPackagistExpandsUnsetFieldsAndSortsStableIndependentlyOfPhpConstraint(): void
     {
         $releases = UpstreamEvidence::releases(['minified' => 'composer/2.0', 'packages' => ['public/package' => [
@@ -411,4 +419,202 @@ XML;
         }
     }
 
+    public function testAdvisoryCheckPassesAnOutdatedLockThatTheOnlineAssessmentReports(): void
+    {
+        $root = self::lockedProject(self::LOCKED_PACKAGE);
+        $commands = [];
+        $executor = $this->createStub(CommandExecutor::class);
+        $executor->method('run')->willReturnCallback(static function (ProcessSpec $spec) use (&$commands): ProcessResult {
+            $commands[] = array_filter($spec->argv, static fn(string $argument): bool => !str_starts_with($argument, '--no-') && !str_starts_with($argument, '--working-dir=')) |> array_values(...);
+            $output = match (true) {
+                in_array('--version', $spec->argv, true) => 'Composer version 2.11.1 2026-10-30 14:52:10',
+                in_array('validate', $spec->argv, true) => './composer.json is valid',
+                in_array('audit', $spec->argv, true) => self::CLEAN_AUDIT,
+                in_array('outdated', $spec->argv, true) => '{"locked":[{"name":"public/package","version":"1.0.0","latest":"1.1.0","latest-status":"semver-safe-update"}]}',
+                default => '{"packages":{"public/package":[{"name":"public/package","version":"1.1.0","source":{"reference":"new"}}]}}' . "\n200",
+            };
+            return new ProcessResult(0, null, false, false, $output, '', 0.01);
+        });
+        try {
+            $check = new Check($executor, ToolingConfiguration::resolve());
+            self::assertSame(1, $check->run($root)->exitCode());
+
+            $commands = [];
+            $report = $check->advisories($root);
+            self::assertSame(0, $report->exitCode(), $report->render());
+            self::assertSame([['composer', '--version'], ['composer', 'audit', '--locked', '--format=json']], $commands);
+            $data = $report->toArray();
+            self::assertSame('advisories-only', $data['mode']);
+            self::assertSame(['inventory', 'locks', 'advisories'], $data['requested']);
+            self::assertContains('online-currency', $data['excluded']);
+            self::assertStringStartsWith('PHP dependencies: advisories-only; status 0', $report->render());
+        } finally {
+            self::remove($root);
+        }
+    }
+
+    /** @param array<string,mixed> $categories */
+    #[DataProvider('auditVerdictProvider')]
+    public function testAdvisoryCheckFailsOnAdvisoriesAndPolicyListMatchesAndOnlyReportsTheRest(int $composerExit, array $categories, int $expected, string $reported): void
+    {
+        $root = self::lockedProject(self::LOCKED_PACKAGE);
+        $audit = json_encode([...json_decode(self::CLEAN_AUDIT, true, flags: JSON_THROW_ON_ERROR), ...$categories], JSON_THROW_ON_ERROR);
+        try {
+            $report = (new Check($this->auditExecutor(new ProcessResult($composerExit, null, false, false, $audit, '', 0.01)), ToolingConfiguration::resolve()))->advisories($root);
+            self::assertSame($expected, $report->exitCode(), $report->render());
+            self::assertStringContainsString($reported, $report->render());
+        } finally {
+            self::remove($root);
+        }
+    }
+
+    /** @return iterable<string, array{int, array<string,mixed>, int, string}> */
+    public static function auditVerdictProvider(): iterable
+    {
+        $advisory = ['public/package' => [['advisoryId' => 'PKSA-fixture', 'title' => 'Fixture advisory', 'affectedVersions' => '<2']]];
+        yield 'advisory' => [1, ['advisories' => $advisory], 1, 'PKSA-fixture'];
+        yield 'malware list match' => [1, ['filter' => ['public/package' => [['packageName' => 'public/package', 'listName' => 'malware', 'constraint' => '1.0.0', 'url' => null, 'reason' => 'Fixture malware report', 'id' => 'MAL-fixture', 'source' => null]]]], 1, 'MAL-fixture'];
+        yield 'abandoned package' => [1, ['abandoned' => ['public/package' => 'public/replacement']], 0, 'public/replacement'];
+        yield 'abandoned package beside an advisory' => [1, ['advisories' => $advisory, 'abandoned' => ['public/package' => null]], 1, 'abandoned'];
+        yield 'advisory the project ignores' => [0, ['ignored-advisories' => $advisory], 0, 'PKSA-fixture'];
+        yield 'release inside the cooldown period' => [1, ['cooldown' => ['public/package' => ['prettyVersion' => '1.0.0', 'releaseDate' => '2026-11-23T08:00:00+00:00', 'availableIn' => '2 days', 'source' => 'published-time']]], 0, 'availableIn'];
+    }
+
+    #[DataProvider('refusedAuditProvider')]
+    public function testAdvisoryCheckIsIncompleteWhenTheAuditIsRefusedEmptyOrUnreachable(ProcessResult|CommandFailure $audit): void
+    {
+        $root = self::lockedProject(self::LOCKED_PACKAGE);
+        try {
+            $report = (new Check($this->auditExecutor($audit), ToolingConfiguration::resolve()))->advisories($root);
+            self::assertSame(2, $report->exitCode(), $report->render());
+            $advisories = array_filter($report->toArray()['records'], static fn(array $record): bool => $record['kind'] === 'advisories');
+            self::assertContains('gap', array_column($advisories, 'status'));
+            self::assertNotContains('evidence', array_column($advisories, 'status'));
+        } finally {
+            self::remove($root);
+        }
+    }
+
+    /** @return iterable<string, array{ProcessResult|CommandFailure}> */
+    public static function refusedAuditProvider(): iterable
+    {
+        $result = static fn(int $exit, string $stdout, string $stderr = ''): ProcessResult => new ProcessResult($exit, null, false, false, $stdout, $stderr, 0.01);
+        yield 'Composer cannot be executed' => [$result(126, '', 'sh: 1: composer: Permission denied')];
+        yield 'name resolution refused' => [$result(100, '', "In CurlDownloader.php line 498:\n\n  curl error 6 while downloading https://repo.packagist.org/packages.json: Co  \n  uld not resolve host: repo.packagist.org  \n")];
+        yield 'connection refused' => [$result(100, '', 'curl error 7 while downloading https://repo.packagist.org/packages.json: Failed to connect to repo.packagist.org port 443 after 2 ms: Could not connect to server')];
+        yield 'successful exit with no output' => [$result(0, '')];
+        yield 'failed exit with no output' => [$result(1, '')];
+        yield 'failed exit with a clean report' => [$result(1, self::CLEAN_AUDIT)];
+        yield 'empty-lock refusal for a lock that holds packages' => [$result(1, '', 'No installed packages found. Please run "composer install" before running "audit" or pass "--locked" to audit the lock file.')];
+        yield 'unreachable repository' => [$result(0, '{"advisories":[],"unreachable-repositories":["https://repo.packagist.org"],"abandoned":[],"filter":[],"cooldown":[]}')];
+        yield 'timeout' => [new CommandFailure('Fixture timeout.', 124, new ProcessResult(124, null, true, false, '', '', 0.01))];
+    }
+
+    public function testAdvisoryCheckReportsAnEmptyOwnedLockAsItsOwnScope(): void
+    {
+        $root = self::lockedProject(['packages' => [], 'packages-dev' => []]);
+        $refusal = new ProcessResult(1, null, false, false, '', 'No installed packages found. Please run "composer install" before running "audit" or pass "--locked" to audit the lock file.', 0.01);
+        try {
+            $report = (new Check($this->auditExecutor($refusal), ToolingConfiguration::resolve()))->advisories($root);
+            self::assertSame(0, $report->exitCode(), $report->render());
+            $advisories = array_filter($report->toArray()['records'], static fn(array $record): bool => $record['kind'] === 'advisories') |> array_values(...);
+            self::assertCount(1, $advisories);
+            self::assertSame('evidence', $advisories[0]['status']);
+            self::assertSame('empty-lock', $advisories[0]['details']['scope']);
+            self::assertStringContainsString('no auditable packages', $advisories[0]['reason']);
+        } finally {
+            self::remove($root);
+        }
+    }
+
+    public function testAdvisoryCheckReportsAClassifiedProjectItCannotReadInsteadOfSkippingIt(): void
+    {
+        $root = self::lockedProject(self::LOCKED_PACKAGE);
+        file_put_contents($root . '/packages/baander-dev-dependencies/resources/php-dependencies.json', '{"version":1,"projects":{"composer.json":{"kind":"locked","owner":"fixture","lock":"composer.lock"},"scripts/composer.json":{"kind":"locked","owner":"fixture","lock":"scripts/composer.lock"}}}');
+        try {
+            $report = (new Check($this->auditExecutor(new ProcessResult(0, null, false, false, self::CLEAN_AUDIT, '', 0.01)), ToolingConfiguration::resolve()))->advisories($root);
+            self::assertSame(2, $report->exitCode(), $report->render());
+            self::assertStringContainsString('scripts/composer.json', $report->render());
+        } finally {
+            self::remove($root);
+        }
+    }
+
+    public function testAdvisoryCheckIsIncompleteWithoutTheSupportedComposerInterface(): void
+    {
+        $root = self::lockedProject(self::LOCKED_PACKAGE);
+        $executor = $this->createMock(CommandExecutor::class);
+        $executor->expects(self::once())->method('run')->willReturn(new ProcessResult(0, null, false, false, 'Composer version 2.10.0 2026-10-30 14:52:10', '', 0.01));
+        try {
+            $report = (new Check($executor, ToolingConfiguration::resolve()))->advisories($root);
+            self::assertSame(2, $report->exitCode(), $report->render());
+            self::assertStringContainsString('2.11.1', $report->render());
+        } finally {
+            self::remove($root);
+        }
+    }
+
+    public function testAdvisoriesOnlyFlagSelectsTheAdvisoryCheckAndItsExitStatus(): void
+    {
+        $root = self::lockedProject(self::LOCKED_PACKAGE);
+        mkdir($root . '/bin');
+        $stub = <<<'PHP_STUB'
+<?php
+if (in_array('--version', $argv, true)) {
+    echo 'Composer version 2.11.1 2026-10-30 14:52:10';
+} elseif (array_slice($argv, -3) === ['audit', '--locked', '--format=json']) {
+    echo '{"advisories":{"public/package":[{"advisoryId":"PKSA-fixture","title":"Fixture advisory","affectedVersions":"<2"}]},"abandoned":[],"filter":[],"cooldown":[]}';
+    exit(1);
+} else {
+    exit(70);
+}
+PHP_STUB;
+        file_put_contents($root . '/bin/composer', '#!' . PHP_BINARY . "\n" . $stub);
+        chmod($root . '/bin/composer', 0700);
+        $code = 'require $argv[1]; exit(' . Command::class . '::main(array_slice($argv, 3), $argv[2], getenv()));';
+        $environment = ['PATH' => $root . '/bin:' . (getenv('PATH') ?: ''), 'HOME' => $root, 'CI' => '1'];
+        $executor = new EngineExecutor(ExecutionContext::bounded(30, $environment));
+        try {
+            $result = $executor->run(new ProcessSpec([PHP_BINARY, '-r', $code, dirname(__DIR__, 3) . '/scripts/bootstrap.php', $root, '--advisories-only'], $root), new CompletionPolicy(null));
+            self::assertSame(1, $result->exitCode, $result->stdout . $result->stderr);
+            self::assertStringStartsWith('PHP dependencies: advisories-only; status 1', $result->stdout);
+            self::assertStringContainsString('PKSA-fixture', $result->stdout);
+        } finally {
+            $executor->close();
+            self::remove($root);
+        }
+    }
+
+    /** Answers the interface probe and gives the locked audit one outcome; any other command fails the test. */
+    private function auditExecutor(ProcessResult|CommandFailure $audit): CommandExecutor
+    {
+        $executor = $this->createStub(CommandExecutor::class);
+        $executor->method('run')->willReturnCallback(static function (ProcessSpec $spec) use ($audit): ProcessResult {
+            if (in_array('--version', $spec->argv, true)) {
+                return new ProcessResult(0, null, false, false, 'Composer version 2.11.1 2026-10-30 14:52:10', '', 0.01);
+            }
+            self::assertSame(['audit', '--locked', '--format=json'], array_slice($spec->argv, -3));
+            return $audit instanceof CommandFailure ? throw $audit : $audit;
+        });
+        return $executor;
+    }
+
+    /** @param array{packages: list<array<string,string>>, packages-dev: list<array<string,string>>} $lock */
+    private static function lockedProject(array $lock): string
+    {
+        $root = sys_get_temp_dir() . '/baander-advisory-check-' . bin2hex(random_bytes(8));
+        mkdir($root . '/packages/baander-dev-dependencies/resources', 0700, true);
+        file_put_contents($root . '/composer.json', '{"name":"baander/fixture","require":{"php":">=8.5","public/package":"^1.0"}}');
+        file_put_contents($root . '/composer.lock', json_encode($lock, JSON_THROW_ON_ERROR));
+        file_put_contents($root . '/packages/baander-dev-dependencies/resources/php-dependencies.json', '{"version":1,"projects":{"composer.json":{"kind":"locked","owner":"fixture","lock":"composer.lock"}}}');
+        return $root;
+    }
+
+    private static function remove(string $root): void
+    {
+        foreach (new \RecursiveIteratorIterator(new \RecursiveDirectoryIterator($root, \FilesystemIterator::SKIP_DOTS), \RecursiveIteratorIterator::CHILD_FIRST) as $entry) {
+            $entry->isDir() ? rmdir($entry->getPathname()) : unlink($entry->getPathname());
+        }
+        rmdir($root);
+    }
 }
