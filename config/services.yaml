@@ -1242,6 +1242,9 @@ services:
     App\Transcode\Application\Port\TranscodeExecutionOwnershipPort:
         alias: App\Transcode\Infrastructure\Doctrine\TranscodeRuntimeState
 
+    App\Transcode\Application\Port\TranscodeSessionSharePort:
+        alias: App\Transcode\Infrastructure\Doctrine\TranscodeSessionShareStore
+
     App\Transcode\Application\Port\AudioRenditionRuntimePort:
         alias: App\Transcode\Infrastructure\Doctrine\AudioRenditionRuntime
 
@@ -1249,9 +1252,6 @@ services:
     App\Transcode\Infrastructure\Storage\SegmentFileResolver:
         arguments:
             $basePath: '%env(CONVERT_STORAGE_PATH)%'
-
-    App\Transcode\Application\Port\TranscodeSessionSharePort:
-        alias: App\Transcode\Infrastructure\Doctrine\TranscodeSessionShareStore
 
     App\Transcode\Infrastructure\Storage\TranscodeFileStorage:
         arguments:
