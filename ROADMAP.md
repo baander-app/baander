@@ -212,7 +212,16 @@ review found that its Redis sampler would have reported a failure on every sampl
 8 video and 12 audio jobs needs a live deployment and has not run. The Playwright spec
 for path encoding parses but has not run.
 
-Final verification: pending.
+Final verification, on `715da1832` (after the PHP 8.5 pass and the import pass): every
+changed PHP file lints, PHPStan is clean on the whole tree with the application and the
+tooling configurations, Deptrac reports 0 violations, `check:tooling-format` and
+`check:tooling-source-policy` pass, and the web suite (3,911 tests), type check and lint
+passed on `1d3c15c0d` plus the two web test fixes in `372dc91da`. The last full backend
+run that was read, on `1d3c15c0d`, passed stack lane 1 (2,454 tests); its other failures
+were the stale migration list fixed in `2698fb77e`, the stale test double fixed in
+`372dc91da`, and three timing tests that pass alone. A full backend run and the full
+tooling suite were started on `715da1832` on 2026-11-25 at 19:57 and not yet read; their
+result is open.
 
 ### Decisions confirmed by the owner
 
