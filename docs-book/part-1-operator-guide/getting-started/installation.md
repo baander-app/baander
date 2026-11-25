@@ -14,11 +14,9 @@ mount the checkout into the web container; the
 [developer guide](../../part-2-developer-guide/getting-started/development-environment.md)
 describes them.
 
-This procedure has not yet been run end to end: no disposable installation that
-follows this page has been recorded. The earlier
-[source-installation check](../../../ROADMAP.md#source-installation-documentation)
-exercised the development Compose stack that this page no longer describes, so it
-verifies none of the steps below.
+This procedure has been run once end to end, on a disposable installation of commit
+`e4fb6fc56`. [Verified](#verified) records what that run established and what it
+left unchecked.
 
 ## Prerequisites
 
@@ -107,7 +105,7 @@ repository's pinned Yarn version, as your own user, so the output stays yours:
 ```bash
 docker run --rm --user "$(id -u):$(id -g)" \
     --env HOME=/tmp --env COREPACK_ENABLE_DOWNLOAD_PROMPT=0 \
-    --volume "$PWD:/src" --workdir /src/ui/web \
+    --volume "$PWD:/src:z" --workdir /src/ui/web \
     node:24.22.2-trixie-slim \
     sh -ec 'corepack yarn install --immutable && corepack yarn build && node scripts/verify-build.mjs'
 ```
@@ -115,6 +113,11 @@ docker run --rm --user "$(id -u):$(id -g)" \
 The build type-checks the frontend and writes its assets into `public/`. The last
 command checks that the production entry points and every listed asset exist; stop
 if it fails.
+
+The `:z` suffix matters on a host where SELinux is enforcing: it relabels the
+checkout so that containers may read and write it. Without it, the build stops at
+once with `EACCES: permission denied, open '/src/ui/web/package.json'`. Docker ignores
+the suffix on a host without SELinux.
 
 ### 3. Build the images
 
@@ -187,8 +190,12 @@ The excerpt shows only the keys to change; keep the example's `capability`, `siz
    with `openssl rand -hex 32`, and `AUTH_TOTP_ENCRYPTION_KEY` with
    `openssl rand -base64 32`. The containers refuse to boot when `APP_SECRET`,
    `STREAM_URL_HMAC_SECRET` or `AUTH_TOTP_ENCRYPTION_KEY` is shorter than 32
-   bytes, and when the database or Redis password is `baander`, the repository's
-   development password.
+   bytes, when the database or Redis password is shorter than 16 bytes, and when
+   either password is `baander`, the repository's development password. Rendering
+   and starting apply the same rules before anything starts. They also refuse every
+   secret and password the repository commits, including the test values in
+   `.env.test`, and name each variable they refuse, as in
+   `DB_PASSWORD is shorter than 16 bytes.`
 4. **Mail.** The examples set `MAILER_DSN` to `null://null`, which discards every
    message. Set an SMTP DSN before users need verification or recovery mail.
 5. **Network.** The edge network takes `10.231.0.0/28` and `fd00:baa:231::/64` by
@@ -214,12 +221,15 @@ php scripts/deploy-preset.php start --config /srv/baander/preset.json --state /s
 php scripts/deploy-preset.php status --state /srv/baander/preset-state
 ```
 
-`start` creates each missing named volume, starts PostgreSQL and Redis, gives the
-database role and the pooler one SCRAM verifier, runs pending schema migrations
-through the pooler, creates the OAuth key pair when the secrets volume holds none,
-verifies the effective database settings, starts web and the gateway, and launches
-the worker pair. It returns once the worker controller reports the pair ready.
-`status` then reports `"phase": "running"` and `"workersRunning": true`. If `start` fails, the state directory keeps the phase it
+`start` creates each missing named volume, writes Redis's access control list,
+starts PostgreSQL and Redis, creates the application's database role without
+superuser rights, gives that role and the pooler one SCRAM verifier, runs pending
+schema migrations through the pooler, creates the OAuth key pair when the secrets
+volume holds none, verifies the effective database settings, starts the log agent
+with its read-only Docker proxy, web and the gateway, and launches the worker pair.
+It returns once the worker controller reports the pair ready; in the verified run
+that took about three minutes. `status` then reports `"phase": "running"` and
+`"workersRunning": true`. If `start` fails, the state directory keeps the phase it
 reached; correct the cause and run `start` again. Keep the state directory: every
 later `start`, `stop` and `status` needs it.
 
@@ -234,9 +244,10 @@ dc exec web php bin/console app:auth:setup-clients --origin=https://media.baande
 dc exec web php bin/console app:user:create admin@baander.app Admin --role super-admin
 ```
 
-Choose a password at the hidden prompt and confirm the administrator role. Only a
-super administrator can change server settings and other administrators from the
-web app, and self-registration stays closed until a super administrator opens it
+Confirm the administrator role at the first prompt, then choose a password at the
+hidden prompt, which asks for it once. Only a super administrator can change server
+settings and other administrators from the web app, and self-registration stays
+closed until a super administrator opens it
 (see [Registration and address changes](../configuration/account-security.md#registration-and-address-changes)).
 See [User management](../administration/user-management.md) and
 [app:user:create](../commands/app-user-create.md) for password rules and scripted
@@ -249,12 +260,18 @@ Web and the workers mount the media volume, `baander-media`, read-only at
 application image, which gives the files to the image's runtime user:
 
 ```bash
-docker run --rm --network none --user 0:0 --entrypoint sh \
+docker run --rm --network none --user 0:0 --security-opt label=disable --entrypoint sh \
     --mount type=volume,src=baander-media,dst=/storage/media \
     --mount type=bind,src=/path/to/music,dst=/import,readonly \
     baander-app:local \
     -ec 'mkdir -p /storage/media/music && cp -R /import/. /storage/media/music/ && chown -R www-data:www-data /storage/media/music'
 ```
+
+`--security-opt label=disable` exempts this one helper from SELinux labelling, so it
+reads the bind-mounted directory without relabelling your media. Without it, on a
+host where SELinux is enforcing, `cp` stops with
+`cannot access '/import/.': Permission denied`; a `--mount` bind cannot take the
+`:z` suffix of step 2.
 
 Keep the originals intact. Then create a music library with its media type and an
 explicit slug, and scan it:
@@ -293,6 +310,65 @@ for all media, failure recovery or external services. Keep the configuration fil
 and the state directory private, and include them in your backups;
 [Storage and data](storage-and-data.md#what-must-be-preserved) identifies the state
 that needs preservation.
+
+## Verified
+
+On 2026-11-25 this procedure ran once on commit `e4fb6fc56`, from a clean
+`git archive` export instead of a clone. The host had a rootful Docker 29.9.2
+daemon with cgroup v2 and SELinux enforcing, and host PHP 8.5.12 with a 128 MB
+memory limit. The run used `example-16gb-transcode.json` with the name
+`baander-install-drill`, the origin `http://install-drill.baander.app:18480`, the
+listener `127.0.0.1:18480`, the default edge subnets and fresh `openssl rand`
+secrets. Its media was four generated 8-second tracks, three FLAC and one MP3. It
+established the following:
+
+1. **Images.** The frontend build passed `verify-build.mjs`. The application,
+   worker and operator images built within that memory limit and declared the
+   commit as `org.opencontainers.image.revision`.
+2. **Start.** `render` took 21 seconds and `start` 3 minutes 14 seconds. `status`
+   reported `"phase": "running"` and `"workersRunning": true`, with web,
+   PostgreSQL, the pooler and Redis healthy and the gateway, log agent and Docker
+   proxy running. The worker pair's control and execution containers ran on
+   `baander-install-drill-private`.
+3. **Database role.** Over the local socket as `postgres`,
+   `SELECT rolsuper FROM pg_roles WHERE rolname = 'baander'` returned `f`;
+   `rolcreaterole`, `rolcreatedb`, `rolreplication` and `rolbypassrls` were also
+   false. `baander` owned the database, and `postgres` had no password. Through
+   the pooler, web's `current_user` was `baander`.
+4. **Redis.** An unauthenticated `PING` answered `NOAUTH Authentication required.`
+   `AUTH default`, with the Redis password or a random one, answered
+   `WRONGPASS invalid username-password pair or user is disabled.` As `baander`,
+   `PING` answered `PONG`, and `KEYS`, `FLUSHALL`, `CONFIG GET` and `ACL LIST`
+   answered `NOPERM`. Redis ran as the `redis` user.
+5. **Docker proxy.** From the log-agent container, through
+   `/run/baander-docker-proxy/docker.sock`, `GET /info` and `GET /containers/json`
+   answered 200. `POST /containers/create`, a container `stop` and `exec`,
+   `POST /images/create` and a container `export` answered 403. The log agent
+   mounted only the proxy's socket volume, read-only, and the proxy had no network.
+6. **Account and sign-in.** `app:auth:setup-clients` created the client
+   `baander_dev_spa_00001`, and `app:user:create` at a terminal created a
+   `ROLE_SUPER_ADMIN` user. Through the gateway, the web app's password sign-in
+   answered as expected: the DPoP nonce challenge returned 400 with a `DPoP-Nonce`
+   header, `POST /api/auth/login` returned 200 with a token pair, and
+   `GET /api/auth/me` returned 200 with `ROLE_SUPER_ADMIN`. `GET /` served the web
+   app, and `app:health:check` reported PostgreSQL, Redis, Messenger, the worker
+   profile, Swoole and memory as OK.
+7. **Media.** `app:library:scan my-music` reported
+   `4 files discovered, 4 processed, 0 skipped; 1 directories queued for ingestion`.
+   The job monitor recorded `ScanLibraryCommand`, `FilesDiscovered` and
+   `ExtractAlbumCoverCommand` as `finished`, and `GET /api/songs/` as the
+   administrator listed the four tracks.
+8. **Refusal.** A configuration with a 15-byte database password and a committed
+   test password for Redis failed `render` with
+   `Generate private values before deploying: DB_PASSWORD is shorter than 16 bytes. REDIS_PASSWORD is a value the repository commits.`
+9. **Stop.** `stop` retired the worker pair and removed the containers and both
+   networks; it kept all 16 named volumes.
+
+The run corrected this page in three places: the SELinux options in steps 2 and 7,
+whose failures are quoted there, and the prompt order in step 6. It also brought the
+secret rules of step 4 and the list of what `start` does in step 5 up to date with
+the preset. It did not check sign-in in a browser, playback, transcoding, mail, an
+HTTPS front proxy, an IPv4-only edge network, a restart or an upgrade.
 
 ## What's Next
 
