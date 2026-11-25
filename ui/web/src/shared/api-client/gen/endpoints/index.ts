@@ -25113,7 +25113,7 @@ export const postStreamDelivery = async (deliveryRequest: DeliveryRequest, optio
 
 export const getPostStreamDeliveryMutationKey = () => ['postStreamDelivery'] as const;
 
-export const getPostStreamDeliveryMutationOptions = <TError = ErrorType<void>,
+export const getPostStreamDeliveryMutationOptions = <TError = ErrorType<void | ApiError>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postStreamDelivery>>, TError,PostStreamDeliveryMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
 ): UseMutationOptions<Awaited<ReturnType<typeof postStreamDelivery>>, TError,PostStreamDeliveryMutationVariables, TContext> => {
 
@@ -25142,11 +25142,11 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
     export type PostStreamDeliveryMutationResult = NonNullable<Awaited<ReturnType<typeof postStreamDelivery>>>
     export type PostStreamDeliveryMutationBody = BodyType<DeliveryRequest>
-    export type PostStreamDeliveryMutationError = ErrorType<void>
+    export type PostStreamDeliveryMutationError = ErrorType<void | ApiError>
     export type PostStreamDeliveryMutationVariables = {data: BodyType<DeliveryRequest>}
 
     /** @summary Choose compatible delivery for the destination before loading media */
-export const usePostStreamDelivery = <TError = ErrorType<void>,
+export const usePostStreamDelivery = <TError = ErrorType<void | ApiError>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postStreamDelivery>>, TError,PostStreamDeliveryMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient): UseMutationResult<
         Awaited<ReturnType<typeof postStreamDelivery>>,
