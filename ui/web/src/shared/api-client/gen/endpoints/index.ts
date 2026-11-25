@@ -1185,6 +1185,51 @@ export interface StarStationRequest {
   stationId: string;
 }
 
+export type CreateRecommendationRequestSourceType = typeof CreateRecommendationRequestSourceType[keyof typeof CreateRecommendationRequestSourceType];
+
+
+export const CreateRecommendationRequestSourceType = {
+  song: 'song',
+  album: 'album',
+  artist: 'artist',
+  movie: 'movie',
+  video: 'video',
+} as const;
+
+export type CreateRecommendationRequestTargetType = typeof CreateRecommendationRequestTargetType[keyof typeof CreateRecommendationRequestTargetType];
+
+
+export const CreateRecommendationRequestTargetType = {
+  song: 'song',
+  album: 'album',
+  artist: 'artist',
+  movie: 'movie',
+  video: 'video',
+} as const;
+
+export interface CreateRecommendationRequest {
+  source_type: CreateRecommendationRequestSourceType;
+  /** Public ID of the source entity */
+  source_id: string;
+  target_type: CreateRecommendationRequestTargetType;
+  /** Public ID of the target entity */
+  target_id: string;
+  /**
+     * Relevance in the range the recommendation generator scores in
+     * @minimum 0
+     * @maximum 1
+     */
+  score: number;
+  /** @maxLength 255 */
+  name?: string;
+  /**
+     * @minimum -2147483648
+     * @maximum 2147483647
+     * @nullable
+     */
+  position?: number | null;
+}
+
 export type CreateScheduledJobRequestJobType = typeof CreateScheduledJobRequestJobType[keyof typeof CreateScheduledJobRequestJobType];
 
 
@@ -1732,6 +1777,22 @@ export interface DirectorResource {
 }
 
 /**
+ * Additional error details, omitted when empty
+ */
+export type ApiErrorErrorDetails = { [key: string]: unknown };
+
+export type ApiErrorError = {
+  message: string;
+  code: number;
+  /** Additional error details, omitted when empty */
+  details?: ApiErrorErrorDetails;
+};
+
+export interface ApiError {
+  error: ApiErrorError;
+}
+
+/**
  * Poster image data
  * @nullable
  */
@@ -1836,22 +1897,6 @@ export interface MovieResource {
   createdAt: string;
   /** Update timestamp */
   updatedAt: string;
-}
-
-/**
- * Additional error details, omitted when empty
- */
-export type ApiErrorErrorDetails = { [key: string]: unknown };
-
-export type ApiErrorError = {
-  message: string;
-  code: number;
-  /** Additional error details, omitted when empty */
-  details?: ApiErrorErrorDetails;
-};
-
-export interface ApiError {
-  error: ApiErrorError;
 }
 
 export interface TranscodeMetricsResource {
@@ -5163,8 +5208,12 @@ export interface UserSettingResource {
 export type AcceptLanguageParameter = string;
 
 export type GetMovieDirectorIndexParams = {
+  /** @minimum 1 */
   page?: number;
-  /** @maximum 100 */
+  /**
+   * @minimum 1
+   * @maximum 100
+   */
   limit?: number;
   q?: string;
 };
@@ -5178,8 +5227,12 @@ export type GetMovieDirectorShow200 = {
 };
 
 export type GetMovieDirectorMoviesParams = {
+  /** @minimum 1 */
   page?: number;
-  /** @maximum 100 */
+  /**
+   * @minimum 1
+   * @maximum 100
+   */
   limit?: number;
   q?: string;
 };
@@ -6176,9 +6229,16 @@ export type DeleteAdminSongDelete200 = {
 };
 
 export type GetAlbumIndexParams = {
-  /** Page number */
+  /**
+   * Page number
+   * @minimum 1
+   */
   page?: number;
-  /** Items per page (max 100) */
+  /**
+   * Items per page
+   * @minimum 1
+   * @maximum 100
+   */
   limit?: number;
   /** Search query */
   q?: string;
@@ -6334,9 +6394,16 @@ export type PostArtistStore201 = {
 };
 
 export type GetArtistIndexParams = {
-  /** Page number */
+  /**
+   * Page number
+   * @minimum 1
+   */
   page?: number;
-  /** Items per page (max 100) */
+  /**
+   * Items per page
+   * @minimum 1
+   * @maximum 100
+   */
   limit?: number;
   /** Search query */
   q?: string;
@@ -6629,9 +6696,16 @@ export type PostGenreAddAlbumBody = {
 };
 
 export type GetMovieIndexParams = {
-  /** Page number */
+  /**
+   * Page number
+   * @minimum 1
+   */
   page?: number;
-  /** Items per page (max 100) */
+  /**
+   * Items per page
+   * @minimum 1
+   * @maximum 100
+   */
   limit?: number;
   /** Search query */
   q?: string;
@@ -8057,8 +8131,30 @@ export type PostPartySessionSync200 = {
   data?: PostPartySessionSync200Data;
 };
 
+export type GetPlaylistIndexParams = {
+  /**
+   * Maximum number of playlists to return
+   * @minimum 1
+   * @maximum 100
+   */
+  limit?: number;
+  /**
+   * Number of playlists to skip
+   * @minimum 0
+   */
+  offset?: number;
+};
+
+export type GetPlaylistIndex200Meta = {
+  /** Playlists the user owns or collaborates on */
+  total: number;
+  limit: number;
+  offset: number;
+};
+
 export type GetPlaylistIndex200 = {
-  data?: PlaylistResource[];
+  data: PlaylistResource[];
+  meta: GetPlaylistIndex200Meta;
 };
 
 export type GetPlaylistShow200DataSongsItem = {
@@ -8316,34 +8412,36 @@ export type PostRadioSessionStop200 = {
   data?: PostRadioSessionStop200Data;
 };
 
+/**
+ * Administrators only
+ */
+export type GetRadioSourceList200DataItemSyncConfig = { [key: string]: unknown };
+
 export type GetRadioSourceList200DataItem = {
   /**
      * @minLength 21
      * @maxLength 21
      * @pattern ^[0-9a-zA-Z_-]{21}$
      */
-  publicId?: string;
-  name?: string;
-  type?: string;
+  publicId: string;
+  name: string;
+  type: string;
+  /** Administrators only */
   syncUrl?: string;
+  /** Administrators only */
+  syncConfig?: GetRadioSourceList200DataItemSyncConfig;
   /** @nullable */
-  syncSchedule?: string | null;
-  /** @nullable */
-  lastSync?: string | null;
+  syncSchedule: string | null;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
 };
 
 export type GetRadioSourceList200 = {
-  data?: GetRadioSourceList200DataItem[];
+  data: GetRadioSourceList200DataItem[];
 };
 
-export type PostRadioSourceCreateBody = {
-  name: string;
-  type: string;
-  syncUrl: string;
-  syncConfig?: unknown[];
-  /** @nullable */
-  syncSchedule?: string | null;
-};
+export type PostRadioSourceCreate201DataSyncConfig = { [key: string]: unknown };
 
 export type PostRadioSourceCreate201Data = {
   /**
@@ -8351,13 +8449,20 @@ export type PostRadioSourceCreate201Data = {
      * @maxLength 21
      * @pattern ^[0-9a-zA-Z_-]{21}$
      */
-  publicId?: string;
-  name?: string;
-  type?: string;
+  publicId: string;
+  name: string;
+  type: string;
+  syncUrl: string;
+  syncConfig: PostRadioSourceCreate201DataSyncConfig;
+  /** @nullable */
+  syncSchedule: string | null;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
 };
 
 export type PostRadioSourceCreate201 = {
-  data?: PostRadioSourceCreate201Data;
+  data: PostRadioSourceCreate201Data;
 };
 
 export type GetRadioCountries200DataItem = {
@@ -8371,8 +8476,30 @@ export type GetRadioCountries200 = {
 };
 
 export type GetRadioStationsParams = {
+  /** Only stations of this country code */
   country?: string;
+  /** Only stations whose name contains this text, case-insensitively; % and _ match themselves */
   q?: string;
+  /** Only these stations: comma-separated station public IDs, at most 100 */
+  publicIds?: string;
+  /**
+   * Maximum number of stations to return
+   * @minimum 1
+   * @maximum 500
+   */
+  limit?: number;
+  /**
+   * Number of stations to skip
+   * @minimum 0
+   */
+  offset?: number;
+};
+
+export type GetRadioStations200DataItemStreamsItem = {
+  url: string;
+  format: string;
+  bitrate: number;
+  reliability: number;
 };
 
 export type GetRadioStations200DataItem = {
@@ -8381,31 +8508,42 @@ export type GetRadioStations200DataItem = {
      * @maxLength 21
      * @pattern ^[0-9a-zA-Z_-]{21}$
      */
-  publicId?: string;
-  /** Station identifier assigned by the external provider */
-  externalId?: string;
+  publicId: string;
   /**
      * @minLength 21
      * @maxLength 21
      * @pattern ^[0-9a-zA-Z_-]{21}$
      */
-  sourceId?: string;
-  name?: string;
-  countrycode?: string;
+  sourceId: string;
+  /** Station identifier assigned by the external provider */
+  externalId: string;
+  name: string;
+  country: string;
   /** @nullable */
-  url_resolved?: string | null;
+  language: string | null;
+  genres: string[];
+  tags: string[];
+  streams: GetRadioStations200DataItemStreamsItem[];
   /** @nullable */
-  favicon?: string | null;
+  logo: string | null;
   /** @nullable */
-  tags?: string | null;
+  website: string | null;
   /** @nullable */
-  codec?: string | null;
-  /** @nullable */
-  bitrate?: number | null;
+  lastCheckedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type GetRadioStations200Meta = {
+  /** Stations that match the filters */
+  total: number;
+  limit: number;
+  offset: number;
 };
 
 export type GetRadioStations200 = {
-  data?: GetRadioStations200DataItem[];
+  data: GetRadioStations200DataItem[];
+  meta: GetRadioStations200Meta;
 };
 
 export type GetRadioStarredList200DataItem = {
@@ -8414,12 +8552,15 @@ export type GetRadioStarredList200DataItem = {
      * @maxLength 21
      * @pattern ^[0-9a-zA-Z_-]{21}$
      */
-  stationId?: string;
-  name?: string;
-  countryCode?: string;
-  /** @nullable */
-  streamUrl?: string | null;
-  starredAt?: string;
+  userId: string;
+  /**
+     * The station public ID; GET /api/radio/stations?publicIds= reads the station
+     * @minLength 21
+     * @maxLength 21
+     * @pattern ^[0-9a-zA-Z_-]{21}$
+     */
+  stationId: string;
+  starredAt: string;
 };
 
 export type GetRadioStarredList200 = {
@@ -8614,16 +8755,6 @@ export type GetRecommendationIndexParams = {
 
 export type GetRecommendationIndex200 = {
   data?: RecommendationResource[];
-};
-
-export type PostRecommendationStoreBody = {
-  source_type?: string;
-  source_id?: string;
-  target_type?: string;
-  target_id?: string;
-  score?: number;
-  name?: string;
-  position?: number;
 };
 
 export type PostRecommendationStore201 = {
@@ -10037,7 +10168,7 @@ export const getGetMovieDirectorIndexQueryKey = (params?: GetMovieDirectorIndexP
     }
 
 
-export const getGetMovieDirectorIndexQueryOptions = <TData = Awaited<ReturnType<typeof getMovieDirectorIndex>>, TError = ErrorType<unknown>>(params?: GetMovieDirectorIndexParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getMovieDirectorIndex>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+export const getGetMovieDirectorIndexQueryOptions = <TData = Awaited<ReturnType<typeof getMovieDirectorIndex>>, TError = ErrorType<ApiError>>(params?: GetMovieDirectorIndexParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getMovieDirectorIndex>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
 ) => {
 
 const {query: queryOptions, request: requestOptions} = options ?? {};
@@ -10056,11 +10187,11 @@ const {query: queryOptions, request: requestOptions} = options ?? {};
 }
 
 export type GetMovieDirectorIndexQueryResult = NonNullable<Awaited<ReturnType<typeof getMovieDirectorIndex>>>
-export type GetMovieDirectorIndexQueryError = ErrorType<unknown>
+export type GetMovieDirectorIndexQueryError = ErrorType<ApiError>
 
 
 /** @summary List directors of accessible movies */
-export function useGetMovieDirectorIndex<TData = Awaited<ReturnType<typeof getMovieDirectorIndex>>, TError = ErrorType<unknown>>(
+export function useGetMovieDirectorIndex<TData = Awaited<ReturnType<typeof getMovieDirectorIndex>>, TError = ErrorType<ApiError>>(
  params: undefined |  GetMovieDirectorIndexParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getMovieDirectorIndex>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
           Awaited<ReturnType<typeof getMovieDirectorIndex>>,
@@ -10071,7 +10202,7 @@ export function useGetMovieDirectorIndex<TData = Awaited<ReturnType<typeof getMo
  , queryClient?: QueryClient
   ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 /** @summary List directors of accessible movies */
-export function useGetMovieDirectorIndex<TData = Awaited<ReturnType<typeof getMovieDirectorIndex>>, TError = ErrorType<unknown>>(
+export function useGetMovieDirectorIndex<TData = Awaited<ReturnType<typeof getMovieDirectorIndex>>, TError = ErrorType<ApiError>>(
  params?: GetMovieDirectorIndexParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getMovieDirectorIndex>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
           Awaited<ReturnType<typeof getMovieDirectorIndex>>,
@@ -10082,12 +10213,12 @@ export function useGetMovieDirectorIndex<TData = Awaited<ReturnType<typeof getMo
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 /** @summary List directors of accessible movies */
-export function useGetMovieDirectorIndex<TData = Awaited<ReturnType<typeof getMovieDirectorIndex>>, TError = ErrorType<unknown>>(
+export function useGetMovieDirectorIndex<TData = Awaited<ReturnType<typeof getMovieDirectorIndex>>, TError = ErrorType<ApiError>>(
  params?: GetMovieDirectorIndexParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getMovieDirectorIndex>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 /** @summary List directors of accessible movies */
-export function useGetMovieDirectorIndex<TData = Awaited<ReturnType<typeof getMovieDirectorIndex>>, TError = ErrorType<unknown>>(
+export function useGetMovieDirectorIndex<TData = Awaited<ReturnType<typeof getMovieDirectorIndex>>, TError = ErrorType<ApiError>>(
  params?: GetMovieDirectorIndexParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getMovieDirectorIndex>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
@@ -10249,7 +10380,7 @@ export const getGetMovieDirectorMoviesQueryKey = (publicId: string,
     }
 
 
-export const getGetMovieDirectorMoviesQueryOptions = <TData = Awaited<ReturnType<typeof getMovieDirectorMovies>>, TError = ErrorType<void>>(publicId: string,
+export const getGetMovieDirectorMoviesQueryOptions = <TData = Awaited<ReturnType<typeof getMovieDirectorMovies>>, TError = ErrorType<ApiError | void>>(publicId: string,
     params?: GetMovieDirectorMoviesParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getMovieDirectorMovies>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
 ) => {
 
@@ -10269,11 +10400,11 @@ const {query: queryOptions, request: requestOptions} = options ?? {};
 }
 
 export type GetMovieDirectorMoviesQueryResult = NonNullable<Awaited<ReturnType<typeof getMovieDirectorMovies>>>
-export type GetMovieDirectorMoviesQueryError = ErrorType<void>
+export type GetMovieDirectorMoviesQueryError = ErrorType<ApiError | void>
 
 
 /** @summary List accessible movies by a director */
-export function useGetMovieDirectorMovies<TData = Awaited<ReturnType<typeof getMovieDirectorMovies>>, TError = ErrorType<void>>(
+export function useGetMovieDirectorMovies<TData = Awaited<ReturnType<typeof getMovieDirectorMovies>>, TError = ErrorType<ApiError | void>>(
  publicId: string,
     params: undefined |  GetMovieDirectorMoviesParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getMovieDirectorMovies>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
@@ -10285,7 +10416,7 @@ export function useGetMovieDirectorMovies<TData = Awaited<ReturnType<typeof getM
  , queryClient?: QueryClient
   ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 /** @summary List accessible movies by a director */
-export function useGetMovieDirectorMovies<TData = Awaited<ReturnType<typeof getMovieDirectorMovies>>, TError = ErrorType<void>>(
+export function useGetMovieDirectorMovies<TData = Awaited<ReturnType<typeof getMovieDirectorMovies>>, TError = ErrorType<ApiError | void>>(
  publicId: string,
     params?: GetMovieDirectorMoviesParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getMovieDirectorMovies>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
@@ -10297,13 +10428,13 @@ export function useGetMovieDirectorMovies<TData = Awaited<ReturnType<typeof getM
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 /** @summary List accessible movies by a director */
-export function useGetMovieDirectorMovies<TData = Awaited<ReturnType<typeof getMovieDirectorMovies>>, TError = ErrorType<void>>(
+export function useGetMovieDirectorMovies<TData = Awaited<ReturnType<typeof getMovieDirectorMovies>>, TError = ErrorType<ApiError | void>>(
  publicId: string,
     params?: GetMovieDirectorMoviesParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getMovieDirectorMovies>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 /** @summary List accessible movies by a director */
-export function useGetMovieDirectorMovies<TData = Awaited<ReturnType<typeof getMovieDirectorMovies>>, TError = ErrorType<void>>(
+export function useGetMovieDirectorMovies<TData = Awaited<ReturnType<typeof getMovieDirectorMovies>>, TError = ErrorType<ApiError | void>>(
  publicId: string,
     params?: GetMovieDirectorMoviesParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getMovieDirectorMovies>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
@@ -17508,7 +17639,7 @@ export const getGetAlbumIndexQueryKey = (params?: GetAlbumIndexParams,) => {
     }
 
 
-export const getGetAlbumIndexQueryOptions = <TData = Awaited<ReturnType<typeof getAlbumIndex>>, TError = ErrorType<unknown>>(params?: GetAlbumIndexParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAlbumIndex>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+export const getGetAlbumIndexQueryOptions = <TData = Awaited<ReturnType<typeof getAlbumIndex>>, TError = ErrorType<ApiError>>(params?: GetAlbumIndexParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAlbumIndex>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
 ) => {
 
 const {query: queryOptions, request: requestOptions} = options ?? {};
@@ -17527,11 +17658,11 @@ const {query: queryOptions, request: requestOptions} = options ?? {};
 }
 
 export type GetAlbumIndexQueryResult = NonNullable<Awaited<ReturnType<typeof getAlbumIndex>>>
-export type GetAlbumIndexQueryError = ErrorType<unknown>
+export type GetAlbumIndexQueryError = ErrorType<ApiError>
 
 
 /** @summary List albums (paginated) */
-export function useGetAlbumIndex<TData = Awaited<ReturnType<typeof getAlbumIndex>>, TError = ErrorType<unknown>>(
+export function useGetAlbumIndex<TData = Awaited<ReturnType<typeof getAlbumIndex>>, TError = ErrorType<ApiError>>(
  params: undefined |  GetAlbumIndexParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAlbumIndex>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
           Awaited<ReturnType<typeof getAlbumIndex>>,
@@ -17542,7 +17673,7 @@ export function useGetAlbumIndex<TData = Awaited<ReturnType<typeof getAlbumIndex
  , queryClient?: QueryClient
   ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 /** @summary List albums (paginated) */
-export function useGetAlbumIndex<TData = Awaited<ReturnType<typeof getAlbumIndex>>, TError = ErrorType<unknown>>(
+export function useGetAlbumIndex<TData = Awaited<ReturnType<typeof getAlbumIndex>>, TError = ErrorType<ApiError>>(
  params?: GetAlbumIndexParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAlbumIndex>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
           Awaited<ReturnType<typeof getAlbumIndex>>,
@@ -17553,12 +17684,12 @@ export function useGetAlbumIndex<TData = Awaited<ReturnType<typeof getAlbumIndex
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 /** @summary List albums (paginated) */
-export function useGetAlbumIndex<TData = Awaited<ReturnType<typeof getAlbumIndex>>, TError = ErrorType<unknown>>(
+export function useGetAlbumIndex<TData = Awaited<ReturnType<typeof getAlbumIndex>>, TError = ErrorType<ApiError>>(
  params?: GetAlbumIndexParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAlbumIndex>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 /** @summary List albums (paginated) */
-export function useGetAlbumIndex<TData = Awaited<ReturnType<typeof getAlbumIndex>>, TError = ErrorType<unknown>>(
+export function useGetAlbumIndex<TData = Awaited<ReturnType<typeof getAlbumIndex>>, TError = ErrorType<ApiError>>(
  params?: GetAlbumIndexParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAlbumIndex>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
@@ -18463,7 +18594,7 @@ export const getGetArtistIndexQueryKey = (params?: GetArtistIndexParams,) => {
     }
 
 
-export const getGetArtistIndexQueryOptions = <TData = Awaited<ReturnType<typeof getArtistIndex>>, TError = ErrorType<unknown>>(params?: GetArtistIndexParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getArtistIndex>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+export const getGetArtistIndexQueryOptions = <TData = Awaited<ReturnType<typeof getArtistIndex>>, TError = ErrorType<ApiError>>(params?: GetArtistIndexParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getArtistIndex>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
 ) => {
 
 const {query: queryOptions, request: requestOptions} = options ?? {};
@@ -18482,11 +18613,11 @@ const {query: queryOptions, request: requestOptions} = options ?? {};
 }
 
 export type GetArtistIndexQueryResult = NonNullable<Awaited<ReturnType<typeof getArtistIndex>>>
-export type GetArtistIndexQueryError = ErrorType<unknown>
+export type GetArtistIndexQueryError = ErrorType<ApiError>
 
 
 /** @summary List artists (paginated) */
-export function useGetArtistIndex<TData = Awaited<ReturnType<typeof getArtistIndex>>, TError = ErrorType<unknown>>(
+export function useGetArtistIndex<TData = Awaited<ReturnType<typeof getArtistIndex>>, TError = ErrorType<ApiError>>(
  params: undefined |  GetArtistIndexParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getArtistIndex>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
           Awaited<ReturnType<typeof getArtistIndex>>,
@@ -18497,7 +18628,7 @@ export function useGetArtistIndex<TData = Awaited<ReturnType<typeof getArtistInd
  , queryClient?: QueryClient
   ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 /** @summary List artists (paginated) */
-export function useGetArtistIndex<TData = Awaited<ReturnType<typeof getArtistIndex>>, TError = ErrorType<unknown>>(
+export function useGetArtistIndex<TData = Awaited<ReturnType<typeof getArtistIndex>>, TError = ErrorType<ApiError>>(
  params?: GetArtistIndexParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getArtistIndex>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
           Awaited<ReturnType<typeof getArtistIndex>>,
@@ -18508,12 +18639,12 @@ export function useGetArtistIndex<TData = Awaited<ReturnType<typeof getArtistInd
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 /** @summary List artists (paginated) */
-export function useGetArtistIndex<TData = Awaited<ReturnType<typeof getArtistIndex>>, TError = ErrorType<unknown>>(
+export function useGetArtistIndex<TData = Awaited<ReturnType<typeof getArtistIndex>>, TError = ErrorType<ApiError>>(
  params?: GetArtistIndexParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getArtistIndex>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 /** @summary List artists (paginated) */
-export function useGetArtistIndex<TData = Awaited<ReturnType<typeof getArtistIndex>>, TError = ErrorType<unknown>>(
+export function useGetArtistIndex<TData = Awaited<ReturnType<typeof getArtistIndex>>, TError = ErrorType<ApiError>>(
  params?: GetArtistIndexParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getArtistIndex>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
@@ -20204,7 +20335,7 @@ export const getGetMovieIndexQueryKey = (params?: GetMovieIndexParams,) => {
     }
 
 
-export const getGetMovieIndexQueryOptions = <TData = Awaited<ReturnType<typeof getMovieIndex>>, TError = ErrorType<unknown>>(params?: GetMovieIndexParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getMovieIndex>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+export const getGetMovieIndexQueryOptions = <TData = Awaited<ReturnType<typeof getMovieIndex>>, TError = ErrorType<ApiError>>(params?: GetMovieIndexParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getMovieIndex>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
 ) => {
 
 const {query: queryOptions, request: requestOptions} = options ?? {};
@@ -20223,11 +20354,11 @@ const {query: queryOptions, request: requestOptions} = options ?? {};
 }
 
 export type GetMovieIndexQueryResult = NonNullable<Awaited<ReturnType<typeof getMovieIndex>>>
-export type GetMovieIndexQueryError = ErrorType<unknown>
+export type GetMovieIndexQueryError = ErrorType<ApiError>
 
 
 /** @summary List movies (paginated) */
-export function useGetMovieIndex<TData = Awaited<ReturnType<typeof getMovieIndex>>, TError = ErrorType<unknown>>(
+export function useGetMovieIndex<TData = Awaited<ReturnType<typeof getMovieIndex>>, TError = ErrorType<ApiError>>(
  params: undefined |  GetMovieIndexParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getMovieIndex>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
           Awaited<ReturnType<typeof getMovieIndex>>,
@@ -20238,7 +20369,7 @@ export function useGetMovieIndex<TData = Awaited<ReturnType<typeof getMovieIndex
  , queryClient?: QueryClient
   ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 /** @summary List movies (paginated) */
-export function useGetMovieIndex<TData = Awaited<ReturnType<typeof getMovieIndex>>, TError = ErrorType<unknown>>(
+export function useGetMovieIndex<TData = Awaited<ReturnType<typeof getMovieIndex>>, TError = ErrorType<ApiError>>(
  params?: GetMovieIndexParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getMovieIndex>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
           Awaited<ReturnType<typeof getMovieIndex>>,
@@ -20249,12 +20380,12 @@ export function useGetMovieIndex<TData = Awaited<ReturnType<typeof getMovieIndex
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 /** @summary List movies (paginated) */
-export function useGetMovieIndex<TData = Awaited<ReturnType<typeof getMovieIndex>>, TError = ErrorType<unknown>>(
+export function useGetMovieIndex<TData = Awaited<ReturnType<typeof getMovieIndex>>, TError = ErrorType<ApiError>>(
  params?: GetMovieIndexParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getMovieIndex>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 /** @summary List movies (paginated) */
-export function useGetMovieIndex<TData = Awaited<ReturnType<typeof getMovieIndex>>, TError = ErrorType<unknown>>(
+export function useGetMovieIndex<TData = Awaited<ReturnType<typeof getMovieIndex>>, TError = ErrorType<ApiError>>(
  params?: GetMovieIndexParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getMovieIndex>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
@@ -21032,7 +21163,7 @@ export const getPersonIndexQueryKey = (params?: PersonIndexParams,) => {
     }
 
 
-export const getPersonIndexQueryOptions = <TData = Awaited<ReturnType<typeof personIndex>>, TError = ErrorType<void>>(params?: PersonIndexParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof personIndex>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+export const getPersonIndexQueryOptions = <TData = Awaited<ReturnType<typeof personIndex>>, TError = ErrorType<ApiError | void>>(params?: PersonIndexParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof personIndex>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
 ) => {
 
 const {query: queryOptions, request: requestOptions} = options ?? {};
@@ -21051,11 +21182,11 @@ const {query: queryOptions, request: requestOptions} = options ?? {};
 }
 
 export type PersonIndexQueryResult = NonNullable<Awaited<ReturnType<typeof personIndex>>>
-export type PersonIndexQueryError = ErrorType<void>
+export type PersonIndexQueryError = ErrorType<ApiError | void>
 
 
 /** @summary List people with accessible credits */
-export function usePersonIndex<TData = Awaited<ReturnType<typeof personIndex>>, TError = ErrorType<void>>(
+export function usePersonIndex<TData = Awaited<ReturnType<typeof personIndex>>, TError = ErrorType<ApiError | void>>(
  params: undefined |  PersonIndexParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof personIndex>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
           Awaited<ReturnType<typeof personIndex>>,
@@ -21066,7 +21197,7 @@ export function usePersonIndex<TData = Awaited<ReturnType<typeof personIndex>>, 
  , queryClient?: QueryClient
   ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 /** @summary List people with accessible credits */
-export function usePersonIndex<TData = Awaited<ReturnType<typeof personIndex>>, TError = ErrorType<void>>(
+export function usePersonIndex<TData = Awaited<ReturnType<typeof personIndex>>, TError = ErrorType<ApiError | void>>(
  params?: PersonIndexParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof personIndex>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
           Awaited<ReturnType<typeof personIndex>>,
@@ -21077,12 +21208,12 @@ export function usePersonIndex<TData = Awaited<ReturnType<typeof personIndex>>, 
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 /** @summary List people with accessible credits */
-export function usePersonIndex<TData = Awaited<ReturnType<typeof personIndex>>, TError = ErrorType<void>>(
+export function usePersonIndex<TData = Awaited<ReturnType<typeof personIndex>>, TError = ErrorType<ApiError | void>>(
  params?: PersonIndexParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof personIndex>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 /** @summary List people with accessible credits */
-export function usePersonIndex<TData = Awaited<ReturnType<typeof personIndex>>, TError = ErrorType<void>>(
+export function usePersonIndex<TData = Awaited<ReturnType<typeof personIndex>>, TError = ErrorType<ApiError | void>>(
  params?: PersonIndexParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof personIndex>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
@@ -21244,7 +21375,7 @@ export const getPersonCreditsQueryKey = (publicId: string,
     }
 
 
-export const getPersonCreditsQueryOptions = <TData = Awaited<ReturnType<typeof personCredits>>, TError = ErrorType<void>>(publicId: string,
+export const getPersonCreditsQueryOptions = <TData = Awaited<ReturnType<typeof personCredits>>, TError = ErrorType<ApiError | void>>(publicId: string,
     params?: PersonCreditsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof personCredits>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
 ) => {
 
@@ -21264,11 +21395,11 @@ const {query: queryOptions, request: requestOptions} = options ?? {};
 }
 
 export type PersonCreditsQueryResult = NonNullable<Awaited<ReturnType<typeof personCredits>>>
-export type PersonCreditsQueryError = ErrorType<void>
+export type PersonCreditsQueryError = ErrorType<ApiError | void>
 
 
 /** @summary List accessible works credited to a person */
-export function usePersonCredits<TData = Awaited<ReturnType<typeof personCredits>>, TError = ErrorType<void>>(
+export function usePersonCredits<TData = Awaited<ReturnType<typeof personCredits>>, TError = ErrorType<ApiError | void>>(
  publicId: string,
     params: undefined |  PersonCreditsParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof personCredits>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
@@ -21280,7 +21411,7 @@ export function usePersonCredits<TData = Awaited<ReturnType<typeof personCredits
  , queryClient?: QueryClient
   ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 /** @summary List accessible works credited to a person */
-export function usePersonCredits<TData = Awaited<ReturnType<typeof personCredits>>, TError = ErrorType<void>>(
+export function usePersonCredits<TData = Awaited<ReturnType<typeof personCredits>>, TError = ErrorType<ApiError | void>>(
  publicId: string,
     params?: PersonCreditsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof personCredits>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
@@ -21292,13 +21423,13 @@ export function usePersonCredits<TData = Awaited<ReturnType<typeof personCredits
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 /** @summary List accessible works credited to a person */
-export function usePersonCredits<TData = Awaited<ReturnType<typeof personCredits>>, TError = ErrorType<void>>(
+export function usePersonCredits<TData = Awaited<ReturnType<typeof personCredits>>, TError = ErrorType<ApiError | void>>(
  publicId: string,
     params?: PersonCreditsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof personCredits>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 /** @summary List accessible works credited to a person */
-export function usePersonCredits<TData = Awaited<ReturnType<typeof personCredits>>, TError = ErrorType<void>>(
+export function usePersonCredits<TData = Awaited<ReturnType<typeof personCredits>>, TError = ErrorType<ApiError | void>>(
  publicId: string,
     params?: PersonCreditsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof personCredits>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
@@ -21360,7 +21491,7 @@ export const getPersonMovieCreditsQueryKey = (publicId: string,
     }
 
 
-export const getPersonMovieCreditsQueryOptions = <TData = Awaited<ReturnType<typeof personMovieCredits>>, TError = ErrorType<void>>(publicId: string,
+export const getPersonMovieCreditsQueryOptions = <TData = Awaited<ReturnType<typeof personMovieCredits>>, TError = ErrorType<ApiError | void>>(publicId: string,
     params?: PersonMovieCreditsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof personMovieCredits>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
 ) => {
 
@@ -21380,11 +21511,11 @@ const {query: queryOptions, request: requestOptions} = options ?? {};
 }
 
 export type PersonMovieCreditsQueryResult = NonNullable<Awaited<ReturnType<typeof personMovieCredits>>>
-export type PersonMovieCreditsQueryError = ErrorType<void>
+export type PersonMovieCreditsQueryError = ErrorType<ApiError | void>
 
 
 /** @summary List people credited to an accessible movie */
-export function usePersonMovieCredits<TData = Awaited<ReturnType<typeof personMovieCredits>>, TError = ErrorType<void>>(
+export function usePersonMovieCredits<TData = Awaited<ReturnType<typeof personMovieCredits>>, TError = ErrorType<ApiError | void>>(
  publicId: string,
     params: undefined |  PersonMovieCreditsParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof personMovieCredits>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
@@ -21396,7 +21527,7 @@ export function usePersonMovieCredits<TData = Awaited<ReturnType<typeof personMo
  , queryClient?: QueryClient
   ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 /** @summary List people credited to an accessible movie */
-export function usePersonMovieCredits<TData = Awaited<ReturnType<typeof personMovieCredits>>, TError = ErrorType<void>>(
+export function usePersonMovieCredits<TData = Awaited<ReturnType<typeof personMovieCredits>>, TError = ErrorType<ApiError | void>>(
  publicId: string,
     params?: PersonMovieCreditsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof personMovieCredits>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
@@ -21408,13 +21539,13 @@ export function usePersonMovieCredits<TData = Awaited<ReturnType<typeof personMo
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 /** @summary List people credited to an accessible movie */
-export function usePersonMovieCredits<TData = Awaited<ReturnType<typeof personMovieCredits>>, TError = ErrorType<void>>(
+export function usePersonMovieCredits<TData = Awaited<ReturnType<typeof personMovieCredits>>, TError = ErrorType<ApiError | void>>(
  publicId: string,
     params?: PersonMovieCreditsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof personMovieCredits>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 /** @summary List people credited to an accessible movie */
-export function usePersonMovieCredits<TData = Awaited<ReturnType<typeof personMovieCredits>>, TError = ErrorType<void>>(
+export function usePersonMovieCredits<TData = Awaited<ReturnType<typeof personMovieCredits>>, TError = ErrorType<ApiError | void>>(
  publicId: string,
     params?: PersonMovieCreditsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof personMovieCredits>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
@@ -21928,7 +22059,7 @@ export const getTvSeriesIndexQueryKey = (params?: TvSeriesIndexParams,) => {
     }
 
 
-export const getTvSeriesIndexQueryOptions = <TData = Awaited<ReturnType<typeof tvSeriesIndex>>, TError = ErrorType<void>>(params?: TvSeriesIndexParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof tvSeriesIndex>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+export const getTvSeriesIndexQueryOptions = <TData = Awaited<ReturnType<typeof tvSeriesIndex>>, TError = ErrorType<ApiError | void>>(params?: TvSeriesIndexParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof tvSeriesIndex>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
 ) => {
 
 const {query: queryOptions, request: requestOptions} = options ?? {};
@@ -21947,11 +22078,11 @@ const {query: queryOptions, request: requestOptions} = options ?? {};
 }
 
 export type TvSeriesIndexQueryResult = NonNullable<Awaited<ReturnType<typeof tvSeriesIndex>>>
-export type TvSeriesIndexQueryError = ErrorType<void>
+export type TvSeriesIndexQueryError = ErrorType<ApiError | void>
 
 
 /** @summary List accessible television series */
-export function useTvSeriesIndex<TData = Awaited<ReturnType<typeof tvSeriesIndex>>, TError = ErrorType<void>>(
+export function useTvSeriesIndex<TData = Awaited<ReturnType<typeof tvSeriesIndex>>, TError = ErrorType<ApiError | void>>(
  params: undefined |  TvSeriesIndexParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof tvSeriesIndex>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
           Awaited<ReturnType<typeof tvSeriesIndex>>,
@@ -21962,7 +22093,7 @@ export function useTvSeriesIndex<TData = Awaited<ReturnType<typeof tvSeriesIndex
  , queryClient?: QueryClient
   ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 /** @summary List accessible television series */
-export function useTvSeriesIndex<TData = Awaited<ReturnType<typeof tvSeriesIndex>>, TError = ErrorType<void>>(
+export function useTvSeriesIndex<TData = Awaited<ReturnType<typeof tvSeriesIndex>>, TError = ErrorType<ApiError | void>>(
  params?: TvSeriesIndexParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof tvSeriesIndex>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
           Awaited<ReturnType<typeof tvSeriesIndex>>,
@@ -21973,12 +22104,12 @@ export function useTvSeriesIndex<TData = Awaited<ReturnType<typeof tvSeriesIndex
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 /** @summary List accessible television series */
-export function useTvSeriesIndex<TData = Awaited<ReturnType<typeof tvSeriesIndex>>, TError = ErrorType<void>>(
+export function useTvSeriesIndex<TData = Awaited<ReturnType<typeof tvSeriesIndex>>, TError = ErrorType<ApiError | void>>(
  params?: TvSeriesIndexParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof tvSeriesIndex>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 /** @summary List accessible television series */
-export function useTvSeriesIndex<TData = Awaited<ReturnType<typeof tvSeriesIndex>>, TError = ErrorType<void>>(
+export function useTvSeriesIndex<TData = Awaited<ReturnType<typeof tvSeriesIndex>>, TError = ErrorType<ApiError | void>>(
  params?: TvSeriesIndexParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof tvSeriesIndex>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
@@ -22140,7 +22271,7 @@ export const getTvSeriesEpisodesQueryKey = (publicId: string,
     }
 
 
-export const getTvSeriesEpisodesQueryOptions = <TData = Awaited<ReturnType<typeof tvSeriesEpisodes>>, TError = ErrorType<void>>(publicId: string,
+export const getTvSeriesEpisodesQueryOptions = <TData = Awaited<ReturnType<typeof tvSeriesEpisodes>>, TError = ErrorType<ApiError | void>>(publicId: string,
     params?: TvSeriesEpisodesParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof tvSeriesEpisodes>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
 ) => {
 
@@ -22160,11 +22291,11 @@ const {query: queryOptions, request: requestOptions} = options ?? {};
 }
 
 export type TvSeriesEpisodesQueryResult = NonNullable<Awaited<ReturnType<typeof tvSeriesEpisodes>>>
-export type TvSeriesEpisodesQueryError = ErrorType<void>
+export type TvSeriesEpisodesQueryError = ErrorType<ApiError | void>
 
 
 /** @summary List registered episodes of an accessible series */
-export function useTvSeriesEpisodes<TData = Awaited<ReturnType<typeof tvSeriesEpisodes>>, TError = ErrorType<void>>(
+export function useTvSeriesEpisodes<TData = Awaited<ReturnType<typeof tvSeriesEpisodes>>, TError = ErrorType<ApiError | void>>(
  publicId: string,
     params: undefined |  TvSeriesEpisodesParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof tvSeriesEpisodes>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
@@ -22176,7 +22307,7 @@ export function useTvSeriesEpisodes<TData = Awaited<ReturnType<typeof tvSeriesEp
  , queryClient?: QueryClient
   ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 /** @summary List registered episodes of an accessible series */
-export function useTvSeriesEpisodes<TData = Awaited<ReturnType<typeof tvSeriesEpisodes>>, TError = ErrorType<void>>(
+export function useTvSeriesEpisodes<TData = Awaited<ReturnType<typeof tvSeriesEpisodes>>, TError = ErrorType<ApiError | void>>(
  publicId: string,
     params?: TvSeriesEpisodesParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof tvSeriesEpisodes>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
@@ -22188,13 +22319,13 @@ export function useTvSeriesEpisodes<TData = Awaited<ReturnType<typeof tvSeriesEp
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 /** @summary List registered episodes of an accessible series */
-export function useTvSeriesEpisodes<TData = Awaited<ReturnType<typeof tvSeriesEpisodes>>, TError = ErrorType<void>>(
+export function useTvSeriesEpisodes<TData = Awaited<ReturnType<typeof tvSeriesEpisodes>>, TError = ErrorType<ApiError | void>>(
  publicId: string,
     params?: TvSeriesEpisodesParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof tvSeriesEpisodes>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 /** @summary List registered episodes of an accessible series */
-export function useTvSeriesEpisodes<TData = Awaited<ReturnType<typeof tvSeriesEpisodes>>, TError = ErrorType<void>>(
+export function useTvSeriesEpisodes<TData = Awaited<ReturnType<typeof tvSeriesEpisodes>>, TError = ErrorType<ApiError | void>>(
  publicId: string,
     params?: TvSeriesEpisodesParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof tvSeriesEpisodes>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
@@ -22357,7 +22488,7 @@ export const getTvSeriesCreditsQueryKey = (publicId: string,
     }
 
 
-export const getTvSeriesCreditsQueryOptions = <TData = Awaited<ReturnType<typeof tvSeriesCredits>>, TError = ErrorType<void>>(publicId: string,
+export const getTvSeriesCreditsQueryOptions = <TData = Awaited<ReturnType<typeof tvSeriesCredits>>, TError = ErrorType<ApiError | void>>(publicId: string,
     params?: TvSeriesCreditsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof tvSeriesCredits>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
 ) => {
 
@@ -22377,11 +22508,11 @@ const {query: queryOptions, request: requestOptions} = options ?? {};
 }
 
 export type TvSeriesCreditsQueryResult = NonNullable<Awaited<ReturnType<typeof tvSeriesCredits>>>
-export type TvSeriesCreditsQueryError = ErrorType<void>
+export type TvSeriesCreditsQueryError = ErrorType<ApiError | void>
 
 
 /** @summary List people credited to an accessible series */
-export function useTvSeriesCredits<TData = Awaited<ReturnType<typeof tvSeriesCredits>>, TError = ErrorType<void>>(
+export function useTvSeriesCredits<TData = Awaited<ReturnType<typeof tvSeriesCredits>>, TError = ErrorType<ApiError | void>>(
  publicId: string,
     params: undefined |  TvSeriesCreditsParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof tvSeriesCredits>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
@@ -22393,7 +22524,7 @@ export function useTvSeriesCredits<TData = Awaited<ReturnType<typeof tvSeriesCre
  , queryClient?: QueryClient
   ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 /** @summary List people credited to an accessible series */
-export function useTvSeriesCredits<TData = Awaited<ReturnType<typeof tvSeriesCredits>>, TError = ErrorType<void>>(
+export function useTvSeriesCredits<TData = Awaited<ReturnType<typeof tvSeriesCredits>>, TError = ErrorType<ApiError | void>>(
  publicId: string,
     params?: TvSeriesCreditsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof tvSeriesCredits>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
@@ -22405,13 +22536,13 @@ export function useTvSeriesCredits<TData = Awaited<ReturnType<typeof tvSeriesCre
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 /** @summary List people credited to an accessible series */
-export function useTvSeriesCredits<TData = Awaited<ReturnType<typeof tvSeriesCredits>>, TError = ErrorType<void>>(
+export function useTvSeriesCredits<TData = Awaited<ReturnType<typeof tvSeriesCredits>>, TError = ErrorType<ApiError | void>>(
  publicId: string,
     params?: TvSeriesCreditsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof tvSeriesCredits>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 /** @summary List people credited to an accessible series */
-export function useTvSeriesCredits<TData = Awaited<ReturnType<typeof tvSeriesCredits>>, TError = ErrorType<void>>(
+export function useTvSeriesCredits<TData = Awaited<ReturnType<typeof tvSeriesCredits>>, TError = ErrorType<ApiError | void>>(
  publicId: string,
     params?: TvSeriesCreditsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof tvSeriesCredits>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
@@ -22473,7 +22604,7 @@ export const getTvEpisodeCreditsQueryKey = (publicId: string,
     }
 
 
-export const getTvEpisodeCreditsQueryOptions = <TData = Awaited<ReturnType<typeof tvEpisodeCredits>>, TError = ErrorType<void>>(publicId: string,
+export const getTvEpisodeCreditsQueryOptions = <TData = Awaited<ReturnType<typeof tvEpisodeCredits>>, TError = ErrorType<ApiError | void>>(publicId: string,
     params?: TvEpisodeCreditsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof tvEpisodeCredits>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
 ) => {
 
@@ -22493,11 +22624,11 @@ const {query: queryOptions, request: requestOptions} = options ?? {};
 }
 
 export type TvEpisodeCreditsQueryResult = NonNullable<Awaited<ReturnType<typeof tvEpisodeCredits>>>
-export type TvEpisodeCreditsQueryError = ErrorType<void>
+export type TvEpisodeCreditsQueryError = ErrorType<ApiError | void>
 
 
 /** @summary List people credited to an accessible episode */
-export function useTvEpisodeCredits<TData = Awaited<ReturnType<typeof tvEpisodeCredits>>, TError = ErrorType<void>>(
+export function useTvEpisodeCredits<TData = Awaited<ReturnType<typeof tvEpisodeCredits>>, TError = ErrorType<ApiError | void>>(
  publicId: string,
     params: undefined |  TvEpisodeCreditsParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof tvEpisodeCredits>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
@@ -22509,7 +22640,7 @@ export function useTvEpisodeCredits<TData = Awaited<ReturnType<typeof tvEpisodeC
  , queryClient?: QueryClient
   ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 /** @summary List people credited to an accessible episode */
-export function useTvEpisodeCredits<TData = Awaited<ReturnType<typeof tvEpisodeCredits>>, TError = ErrorType<void>>(
+export function useTvEpisodeCredits<TData = Awaited<ReturnType<typeof tvEpisodeCredits>>, TError = ErrorType<ApiError | void>>(
  publicId: string,
     params?: TvEpisodeCreditsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof tvEpisodeCredits>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
@@ -22521,13 +22652,13 @@ export function useTvEpisodeCredits<TData = Awaited<ReturnType<typeof tvEpisodeC
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 /** @summary List people credited to an accessible episode */
-export function useTvEpisodeCredits<TData = Awaited<ReturnType<typeof tvEpisodeCredits>>, TError = ErrorType<void>>(
+export function useTvEpisodeCredits<TData = Awaited<ReturnType<typeof tvEpisodeCredits>>, TError = ErrorType<ApiError | void>>(
  publicId: string,
     params?: TvEpisodeCreditsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof tvEpisodeCredits>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 /** @summary List people credited to an accessible episode */
-export function useTvEpisodeCredits<TData = Awaited<ReturnType<typeof tvEpisodeCredits>>, TError = ErrorType<void>>(
+export function useTvEpisodeCredits<TData = Awaited<ReturnType<typeof tvEpisodeCredits>>, TError = ErrorType<ApiError | void>>(
  publicId: string,
     params?: TvEpisodeCreditsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof tvEpisodeCredits>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
@@ -22848,7 +22979,7 @@ export const postDiscoveryPairingCode = async (postDiscoveryPairingCodeBody: Pos
 
 export const getPostDiscoveryPairingCodeMutationKey = () => ['postDiscoveryPairingCode'] as const;
 
-export const getPostDiscoveryPairingCodeMutationOptions = <TError = ErrorType<unknown>,
+export const getPostDiscoveryPairingCodeMutationOptions = <TError = ErrorType<ApiError | ValidationError>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postDiscoveryPairingCode>>, TError,PostDiscoveryPairingCodeMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
 ): UseMutationOptions<Awaited<ReturnType<typeof postDiscoveryPairingCode>>, TError,PostDiscoveryPairingCodeMutationVariables, TContext> => {
 
@@ -22877,11 +23008,11 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
     export type PostDiscoveryPairingCodeMutationResult = NonNullable<Awaited<ReturnType<typeof postDiscoveryPairingCode>>>
     export type PostDiscoveryPairingCodeMutationBody = BodyType<PostDiscoveryPairingCodeBody>
-    export type PostDiscoveryPairingCodeMutationError = ErrorType<unknown>
+    export type PostDiscoveryPairingCodeMutationError = ErrorType<ApiError | ValidationError>
     export type PostDiscoveryPairingCodeMutationVariables = {data: BodyType<PostDiscoveryPairingCodeBody>}
 
     /** @summary Create a pairing code for a server */
-export const usePostDiscoveryPairingCode = <TError = ErrorType<unknown>,
+export const usePostDiscoveryPairingCode = <TError = ErrorType<ApiError | ValidationError>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postDiscoveryPairingCode>>, TError,PostDiscoveryPairingCodeMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient): UseMutationResult<
         Awaited<ReturnType<typeof postDiscoveryPairingCode>>,
@@ -22920,7 +23051,7 @@ export const postDiscoveryQrPayload = async (serverPublicId: string, options?: P
 
 export const getPostDiscoveryQrPayloadMutationKey = () => ['postDiscoveryQrPayload'] as const;
 
-export const getPostDiscoveryQrPayloadMutationOptions = <TError = ErrorType<unknown>,
+export const getPostDiscoveryQrPayloadMutationOptions = <TError = ErrorType<ApiError>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postDiscoveryQrPayload>>, TError,PostDiscoveryQrPayloadMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
 ): UseMutationOptions<Awaited<ReturnType<typeof postDiscoveryQrPayload>>, TError,PostDiscoveryQrPayloadMutationVariables, TContext> => {
 
@@ -22949,11 +23080,11 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
     export type PostDiscoveryQrPayloadMutationResult = NonNullable<Awaited<ReturnType<typeof postDiscoveryQrPayload>>>
 
-    export type PostDiscoveryQrPayloadMutationError = ErrorType<unknown>
+    export type PostDiscoveryQrPayloadMutationError = ErrorType<ApiError>
     export type PostDiscoveryQrPayloadMutationVariables = {serverPublicId: string}
 
     /** @summary Create a QR code pairing session and return its payload */
-export const usePostDiscoveryQrPayload = <TError = ErrorType<unknown>,
+export const usePostDiscoveryQrPayload = <TError = ErrorType<ApiError>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postDiscoveryQrPayload>>, TError,PostDiscoveryQrPayloadMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient): UseMutationResult<
         Awaited<ReturnType<typeof postDiscoveryQrPayload>>,
@@ -22992,7 +23123,7 @@ export const postDiscoveryCompletePairing = async (postDiscoveryCompletePairingB
 
 export const getPostDiscoveryCompletePairingMutationKey = () => ['postDiscoveryCompletePairing'] as const;
 
-export const getPostDiscoveryCompletePairingMutationOptions = <TError = ErrorType<unknown>,
+export const getPostDiscoveryCompletePairingMutationOptions = <TError = ErrorType<ApiError | ValidationError>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postDiscoveryCompletePairing>>, TError,PostDiscoveryCompletePairingMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
 ): UseMutationOptions<Awaited<ReturnType<typeof postDiscoveryCompletePairing>>, TError,PostDiscoveryCompletePairingMutationVariables, TContext> => {
 
@@ -23021,11 +23152,11 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
     export type PostDiscoveryCompletePairingMutationResult = NonNullable<Awaited<ReturnType<typeof postDiscoveryCompletePairing>>>
     export type PostDiscoveryCompletePairingMutationBody = BodyType<PostDiscoveryCompletePairingBody>
-    export type PostDiscoveryCompletePairingMutationError = ErrorType<unknown>
+    export type PostDiscoveryCompletePairingMutationError = ErrorType<ApiError | ValidationError>
     export type PostDiscoveryCompletePairingMutationVariables = {data: BodyType<PostDiscoveryCompletePairingBody>}
 
     /** @summary Complete a pairing session */
-export const usePostDiscoveryCompletePairing = <TError = ErrorType<unknown>,
+export const usePostDiscoveryCompletePairing = <TError = ErrorType<ApiError | ValidationError>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postDiscoveryCompletePairing>>, TError,PostDiscoveryCompletePairingMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient): UseMutationResult<
         Awaited<ReturnType<typeof postDiscoveryCompletePairing>>,
@@ -23076,7 +23207,7 @@ export const getGetFavoritesIndexQueryKey = (params?: GetFavoritesIndexParams,) 
     }
 
 
-export const getGetFavoritesIndexQueryOptions = <TData = Awaited<ReturnType<typeof getFavoritesIndex>>, TError = ErrorType<unknown>>(params?: GetFavoritesIndexParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getFavoritesIndex>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+export const getGetFavoritesIndexQueryOptions = <TData = Awaited<ReturnType<typeof getFavoritesIndex>>, TError = ErrorType<ApiError>>(params?: GetFavoritesIndexParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getFavoritesIndex>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
 ) => {
 
 const {query: queryOptions, request: requestOptions} = options ?? {};
@@ -23095,11 +23226,11 @@ const {query: queryOptions, request: requestOptions} = options ?? {};
 }
 
 export type GetFavoritesIndexQueryResult = NonNullable<Awaited<ReturnType<typeof getFavoritesIndex>>>
-export type GetFavoritesIndexQueryError = ErrorType<unknown>
+export type GetFavoritesIndexQueryError = ErrorType<ApiError>
 
 
 /** @summary List user favorites */
-export function useGetFavoritesIndex<TData = Awaited<ReturnType<typeof getFavoritesIndex>>, TError = ErrorType<unknown>>(
+export function useGetFavoritesIndex<TData = Awaited<ReturnType<typeof getFavoritesIndex>>, TError = ErrorType<ApiError>>(
  params: undefined |  GetFavoritesIndexParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getFavoritesIndex>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
           Awaited<ReturnType<typeof getFavoritesIndex>>,
@@ -23110,7 +23241,7 @@ export function useGetFavoritesIndex<TData = Awaited<ReturnType<typeof getFavori
  , queryClient?: QueryClient
   ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 /** @summary List user favorites */
-export function useGetFavoritesIndex<TData = Awaited<ReturnType<typeof getFavoritesIndex>>, TError = ErrorType<unknown>>(
+export function useGetFavoritesIndex<TData = Awaited<ReturnType<typeof getFavoritesIndex>>, TError = ErrorType<ApiError>>(
  params?: GetFavoritesIndexParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getFavoritesIndex>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
           Awaited<ReturnType<typeof getFavoritesIndex>>,
@@ -23121,12 +23252,12 @@ export function useGetFavoritesIndex<TData = Awaited<ReturnType<typeof getFavori
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 /** @summary List user favorites */
-export function useGetFavoritesIndex<TData = Awaited<ReturnType<typeof getFavoritesIndex>>, TError = ErrorType<unknown>>(
+export function useGetFavoritesIndex<TData = Awaited<ReturnType<typeof getFavoritesIndex>>, TError = ErrorType<ApiError>>(
  params?: GetFavoritesIndexParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getFavoritesIndex>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 /** @summary List user favorites */
-export function useGetFavoritesIndex<TData = Awaited<ReturnType<typeof getFavoritesIndex>>, TError = ErrorType<unknown>>(
+export function useGetFavoritesIndex<TData = Awaited<ReturnType<typeof getFavoritesIndex>>, TError = ErrorType<ApiError>>(
  params?: GetFavoritesIndexParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getFavoritesIndex>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
@@ -29398,21 +29529,28 @@ export const usePostPartySessionSync = <TError = ErrorType<ApiError>,
       return useMutation(getPostPartySessionSyncMutationOptions(options), queryClient);
     }
 
-export const getGetPlaylistIndexUrl = () => {
+export const getGetPlaylistIndexUrl = (params?: GetPlaylistIndexParams,) => {
+  const normalizedParams = new URLSearchParams();
 
+  Object.entries(params || {}).forEach(([key, value]) => {
 
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
 
+  const stringifiedParams = normalizedParams.toString();
 
-  return `/api/playlists/`
+  return stringifiedParams.length > 0 ? `/api/playlists/?${stringifiedParams}` : `/api/playlists/`
 }
 
 /**
- * Each playlist carries the owner's public id and the number of songs the caller can see.
+ * A page of the playlists, ordered by name and then by id. Each playlist carries the owner's public id and the number of songs the caller can see.
  * @summary List the playlists the authenticated user owns or collaborates on
  */
-export const getPlaylistIndex = async ( options?: Parameters<typeof customInstance>[1]): Promise<GetPlaylistIndex200> => {
+export const getPlaylistIndex = async (params?: GetPlaylistIndexParams, options?: Parameters<typeof customInstance>[1]): Promise<GetPlaylistIndex200> => {
 
-  return customInstance<GetPlaylistIndex200>(getGetPlaylistIndexUrl(),
+  return customInstance<GetPlaylistIndex200>(getGetPlaylistIndexUrl(params),
   {
     ...options,
     method: 'GET'
@@ -29425,23 +29563,23 @@ export const getPlaylistIndex = async ( options?: Parameters<typeof customInstan
 
 
 
-export const getGetPlaylistIndexQueryKey = () => {
+export const getGetPlaylistIndexQueryKey = (params?: GetPlaylistIndexParams,) => {
     return [
-    `/api/playlists/`
+    `/api/playlists/`, ...(params ? [params] : [])
     ] as const;
     }
 
 
-export const getGetPlaylistIndexQueryOptions = <TData = Awaited<ReturnType<typeof getPlaylistIndex>>, TError = ErrorType<ApiError>>( options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getPlaylistIndex>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+export const getGetPlaylistIndexQueryOptions = <TData = Awaited<ReturnType<typeof getPlaylistIndex>>, TError = ErrorType<ApiError>>(params?: GetPlaylistIndexParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getPlaylistIndex>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
 ) => {
 
 const {query: queryOptions, request: requestOptions} = options ?? {};
 
-  const queryKey =  queryOptions?.queryKey ?? getGetPlaylistIndexQueryKey();
+  const queryKey =  queryOptions?.queryKey ?? getGetPlaylistIndexQueryKey(params);
 
 
 
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof getPlaylistIndex>>> = ({ signal }) => getPlaylistIndex({ signal, ...requestOptions });
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getPlaylistIndex>>> = ({ signal }) => getPlaylistIndex(params, { signal, ...requestOptions });
 
 
 
@@ -29455,11 +29593,11 @@ export type GetPlaylistIndexQueryError = ErrorType<ApiError>
 
 
 /**
- * Each playlist carries the owner's public id and the number of songs the caller can see.
+ * A page of the playlists, ordered by name and then by id. Each playlist carries the owner's public id and the number of songs the caller can see.
  * @summary List the playlists the authenticated user owns or collaborates on
  */
 export function useGetPlaylistIndex<TData = Awaited<ReturnType<typeof getPlaylistIndex>>, TError = ErrorType<ApiError>>(
-  options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getPlaylistIndex>>, TError, TData>> & Pick<
+ params: undefined |  GetPlaylistIndexParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getPlaylistIndex>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
           Awaited<ReturnType<typeof getPlaylistIndex>>,
           TError,
@@ -29469,11 +29607,11 @@ export function useGetPlaylistIndex<TData = Awaited<ReturnType<typeof getPlaylis
  , queryClient?: QueryClient
   ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 /**
- * Each playlist carries the owner's public id and the number of songs the caller can see.
+ * A page of the playlists, ordered by name and then by id. Each playlist carries the owner's public id and the number of songs the caller can see.
  * @summary List the playlists the authenticated user owns or collaborates on
  */
 export function useGetPlaylistIndex<TData = Awaited<ReturnType<typeof getPlaylistIndex>>, TError = ErrorType<ApiError>>(
-  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getPlaylistIndex>>, TError, TData>> & Pick<
+ params?: GetPlaylistIndexParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getPlaylistIndex>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
           Awaited<ReturnType<typeof getPlaylistIndex>>,
           TError,
@@ -29483,23 +29621,23 @@ export function useGetPlaylistIndex<TData = Awaited<ReturnType<typeof getPlaylis
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 /**
- * Each playlist carries the owner's public id and the number of songs the caller can see.
+ * A page of the playlists, ordered by name and then by id. Each playlist carries the owner's public id and the number of songs the caller can see.
  * @summary List the playlists the authenticated user owns or collaborates on
  */
 export function useGetPlaylistIndex<TData = Awaited<ReturnType<typeof getPlaylistIndex>>, TError = ErrorType<ApiError>>(
-  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getPlaylistIndex>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ params?: GetPlaylistIndexParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getPlaylistIndex>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 /**
- * Each playlist carries the owner's public id and the number of songs the caller can see.
+ * A page of the playlists, ordered by name and then by id. Each playlist carries the owner's public id and the number of songs the caller can see.
  * @summary List the playlists the authenticated user owns or collaborates on
  */
 export function useGetPlaylistIndex<TData = Awaited<ReturnType<typeof getPlaylistIndex>>, TError = ErrorType<ApiError>>(
-  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getPlaylistIndex>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ params?: GetPlaylistIndexParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getPlaylistIndex>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
 
-  const queryOptions = getGetPlaylistIndexQueryOptions(options)
+  const queryOptions = getGetPlaylistIndexQueryOptions(params,options)
 
   const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
 
@@ -31123,6 +31261,7 @@ export const getGetRadioSourceListUrl = () => {
 }
 
 /**
+ * Only administrators receive syncUrl and syncConfig.
  * @summary List all radio sources
  */
 export const getRadioSourceList = async ( options?: Parameters<typeof customInstance>[1]): Promise<GetRadioSourceList200> => {
@@ -31169,7 +31308,10 @@ export type GetRadioSourceListQueryResult = NonNullable<Awaited<ReturnType<typeo
 export type GetRadioSourceListQueryError = ErrorType<ApiError>
 
 
-/** @summary List all radio sources */
+/**
+ * Only administrators receive syncUrl and syncConfig.
+ * @summary List all radio sources
+ */
 export function useGetRadioSourceList<TData = Awaited<ReturnType<typeof getRadioSourceList>>, TError = ErrorType<ApiError>>(
   options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getRadioSourceList>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
@@ -31180,7 +31322,10 @@ export function useGetRadioSourceList<TData = Awaited<ReturnType<typeof getRadio
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-/** @summary List all radio sources */
+/**
+ * Only administrators receive syncUrl and syncConfig.
+ * @summary List all radio sources
+ */
 export function useGetRadioSourceList<TData = Awaited<ReturnType<typeof getRadioSourceList>>, TError = ErrorType<ApiError>>(
   options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getRadioSourceList>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
@@ -31191,12 +31336,18 @@ export function useGetRadioSourceList<TData = Awaited<ReturnType<typeof getRadio
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-/** @summary List all radio sources */
+/**
+ * Only administrators receive syncUrl and syncConfig.
+ * @summary List all radio sources
+ */
 export function useGetRadioSourceList<TData = Awaited<ReturnType<typeof getRadioSourceList>>, TError = ErrorType<ApiError>>(
   options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getRadioSourceList>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-/** @summary List all radio sources */
+/**
+ * Only administrators receive syncUrl and syncConfig.
+ * @summary List all radio sources
+ */
 export function useGetRadioSourceList<TData = Awaited<ReturnType<typeof getRadioSourceList>>, TError = ErrorType<ApiError>>(
   options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getRadioSourceList>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
@@ -31226,14 +31377,14 @@ export const getPostRadioSourceCreateUrl = () => {
 /**
  * @summary Create a radio source (admin)
  */
-export const postRadioSourceCreate = async (postRadioSourceCreateBody: PostRadioSourceCreateBody, options?: Parameters<typeof customInstance>[1]): Promise<PostRadioSourceCreate201> => {
+export const postRadioSourceCreate = async (createRadioSourceRequest: CreateRadioSourceRequest, options?: Parameters<typeof customInstance>[1]): Promise<PostRadioSourceCreate201> => {
 
   return customInstance<PostRadioSourceCreate201>(getPostRadioSourceCreateUrl(),
   {
     ...options,
     method: 'POST',
     headers: getHeaders({ 'Content-Type': 'application/json' }, options?.headers),
-    body: JSON.stringify(postRadioSourceCreateBody)
+    body: JSON.stringify(createRadioSourceRequest)
   }
 );}
 
@@ -31271,9 +31422,9 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
   return  { mutationFn, ...mutationOptions }}
 
     export type PostRadioSourceCreateMutationResult = NonNullable<Awaited<ReturnType<typeof postRadioSourceCreate>>>
-    export type PostRadioSourceCreateMutationBody = BodyType<PostRadioSourceCreateBody>
+    export type PostRadioSourceCreateMutationBody = BodyType<CreateRadioSourceRequest>
     export type PostRadioSourceCreateMutationError = ErrorType<ApiError | ValidationError>
-    export type PostRadioSourceCreateMutationVariables = {data: BodyType<PostRadioSourceCreateBody>}
+    export type PostRadioSourceCreateMutationVariables = {data: BodyType<CreateRadioSourceRequest>}
 
     /** @summary Create a radio source (admin) */
 export const usePostRadioSourceCreate = <TError = ErrorType<ApiError | ValidationError>,
@@ -31404,6 +31555,7 @@ export const getGetRadioStationsUrl = (params?: GetRadioStationsParams,) => {
 }
 
 /**
+ * A page of the synced stations that match every given filter, ordered by name and then by id.
  * @summary Browse/search stations
  */
 export const getRadioStations = async (params?: GetRadioStationsParams, options?: Parameters<typeof customInstance>[1]): Promise<GetRadioStations200> => {
@@ -31450,7 +31602,10 @@ export type GetRadioStationsQueryResult = NonNullable<Awaited<ReturnType<typeof 
 export type GetRadioStationsQueryError = ErrorType<ApiError>
 
 
-/** @summary Browse/search stations */
+/**
+ * A page of the synced stations that match every given filter, ordered by name and then by id.
+ * @summary Browse/search stations
+ */
 export function useGetRadioStations<TData = Awaited<ReturnType<typeof getRadioStations>>, TError = ErrorType<ApiError>>(
  params: undefined |  GetRadioStationsParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getRadioStations>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
@@ -31461,7 +31616,10 @@ export function useGetRadioStations<TData = Awaited<ReturnType<typeof getRadioSt
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-/** @summary Browse/search stations */
+/**
+ * A page of the synced stations that match every given filter, ordered by name and then by id.
+ * @summary Browse/search stations
+ */
 export function useGetRadioStations<TData = Awaited<ReturnType<typeof getRadioStations>>, TError = ErrorType<ApiError>>(
  params?: GetRadioStationsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getRadioStations>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
@@ -31472,12 +31630,18 @@ export function useGetRadioStations<TData = Awaited<ReturnType<typeof getRadioSt
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-/** @summary Browse/search stations */
+/**
+ * A page of the synced stations that match every given filter, ordered by name and then by id.
+ * @summary Browse/search stations
+ */
 export function useGetRadioStations<TData = Awaited<ReturnType<typeof getRadioStations>>, TError = ErrorType<ApiError>>(
  params?: GetRadioStationsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getRadioStations>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-/** @summary Browse/search stations */
+/**
+ * A page of the synced stations that match every given filter, ordered by name and then by id.
+ * @summary Browse/search stations
+ */
 export function useGetRadioStations<TData = Awaited<ReturnType<typeof getRadioStations>>, TError = ErrorType<ApiError>>(
  params?: GetRadioStationsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getRadioStations>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
@@ -32598,16 +32762,17 @@ export const getPostRecommendationStoreUrl = () => {
 }
 
 /**
+ * Stores a recommendation of the authenticated user. A user keeps at most 1000 rows written through this route; the recommendation generator's rows do not count.
  * @summary Create a recommendation
  */
-export const postRecommendationStore = async (postRecommendationStoreBody?: PostRecommendationStoreBody, options?: Parameters<typeof customInstance>[1]): Promise<PostRecommendationStore201> => {
+export const postRecommendationStore = async (createRecommendationRequest: CreateRecommendationRequest, options?: Parameters<typeof customInstance>[1]): Promise<PostRecommendationStore201> => {
 
   return customInstance<PostRecommendationStore201>(getPostRecommendationStoreUrl(),
   {
     ...options,
     method: 'POST',
     headers: getHeaders({ 'Content-Type': 'application/json' }, options?.headers),
-    body: JSON.stringify(postRecommendationStoreBody)
+    body: JSON.stringify(createRecommendationRequest)
   }
 );}
 
@@ -32645,11 +32810,14 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
   return  { mutationFn, ...mutationOptions }}
 
     export type PostRecommendationStoreMutationResult = NonNullable<Awaited<ReturnType<typeof postRecommendationStore>>>
-    export type PostRecommendationStoreMutationBody = BodyType<PostRecommendationStoreBody> | undefined
+    export type PostRecommendationStoreMutationBody = BodyType<CreateRecommendationRequest>
     export type PostRecommendationStoreMutationError = ErrorType<ApiError | ValidationError>
-    export type PostRecommendationStoreMutationVariables = {data?: BodyType<PostRecommendationStoreBody>}
+    export type PostRecommendationStoreMutationVariables = {data: BodyType<CreateRecommendationRequest>}
 
-    /** @summary Create a recommendation */
+    /**
+ * Stores a recommendation of the authenticated user. A user keeps at most 1000 rows written through this route; the recommendation generator's rows do not count.
+ * @summary Create a recommendation
+ */
 export const usePostRecommendationStore = <TError = ErrorType<ApiError | ValidationError>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postRecommendationStore>>, TError,PostRecommendationStoreMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient): UseMutationResult<

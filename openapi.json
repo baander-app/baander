@@ -19,6 +19,7 @@
                         "in": "query",
                         "schema": {
                             "type": "integer",
+                            "minimum": 1,
                             "default": 1
                         }
                     },
@@ -27,6 +28,7 @@
                         "in": "query",
                         "schema": {
                             "type": "integer",
+                            "minimum": 1,
                             "maximum": 100,
                             "default": 50
                         }
@@ -64,6 +66,16 @@
                                             ]
                                         }
                                     ]
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid page or limit",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
                                 }
                             }
                         }
@@ -136,6 +148,7 @@
                         "in": "query",
                         "schema": {
                             "type": "integer",
+                            "minimum": 1,
                             "default": 1
                         }
                     },
@@ -144,6 +157,7 @@
                         "in": "query",
                         "schema": {
                             "type": "integer",
+                            "minimum": 1,
                             "maximum": 100,
                             "default": 50
                         }
@@ -187,6 +201,16 @@
                     },
                     "404": {
                         "description": "Director not found"
+                    },
+                    "400": {
+                        "description": "Invalid page or limit",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
                     }
                 }
             }
@@ -489,7 +513,7 @@
                         }
                     },
                     "409": {
-                        "description": "Playback media is unavailable: the video file no longer resolves inside one of its libraries",
+                        "description": "Playback cannot start: the video file no longer resolves inside one of its libraries, or the account already holds as many transcode sessions as the server allows and too few have been silent for two minutes to give way (`error.details.reason` is `transcode_session_limit` and `error.details.limit` the limit)",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -3175,6 +3199,16 @@
                     },
                     "401": {
                         "description": "Not authenticated",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "The caller already holds 20 personal access clients that are not revoked (reason personal_access_client_limit)",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -6257,15 +6291,18 @@
                         "description": "Page number",
                         "schema": {
                             "type": "integer",
+                            "minimum": 1,
                             "default": 1
                         }
                     },
                     {
                         "name": "limit",
                         "in": "query",
-                        "description": "Items per page (max 100)",
+                        "description": "Items per page",
                         "schema": {
                             "type": "integer",
+                            "minimum": 1,
+                            "maximum": 100,
                             "default": 50
                         }
                     },
@@ -6325,6 +6362,16 @@
                             "application/json": {
                                 "schema": {
                                     "$ref": "#/components/schemas/PaginatedResponse"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid page or limit",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
                                 }
                             }
                         }
@@ -7111,15 +7158,18 @@
                         "description": "Page number",
                         "schema": {
                             "type": "integer",
+                            "minimum": 1,
                             "default": 1
                         }
                     },
                     {
                         "name": "limit",
                         "in": "query",
-                        "description": "Items per page (max 100)",
+                        "description": "Items per page",
                         "schema": {
                             "type": "integer",
+                            "minimum": 1,
+                            "maximum": 100,
                             "default": 50
                         }
                     },
@@ -7168,6 +7218,16 @@
                             "application/json": {
                                 "schema": {
                                     "$ref": "#/components/schemas/PaginatedResponse"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid page or limit",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
                                 }
                             }
                         }
@@ -8682,15 +8742,18 @@
                         "description": "Page number",
                         "schema": {
                             "type": "integer",
+                            "minimum": 1,
                             "default": 1
                         }
                     },
                     {
                         "name": "limit",
                         "in": "query",
-                        "description": "Items per page (max 100)",
+                        "description": "Items per page",
                         "schema": {
                             "type": "integer",
+                            "minimum": 1,
+                            "maximum": 100,
                             "default": 50
                         }
                     },
@@ -8710,6 +8773,16 @@
                             "application/json": {
                                 "schema": {
                                     "$ref": "#/components/schemas/PaginatedResponse"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid page or limit",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
                                 }
                             }
                         }
@@ -9470,6 +9543,16 @@
                     },
                     "404": {
                         "description": "Resource not found"
+                    },
+                    "400": {
+                        "description": "Invalid page or limit",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
                     }
                 }
             }
@@ -9613,6 +9696,16 @@
                     },
                     "404": {
                         "description": "Resource not found"
+                    },
+                    "400": {
+                        "description": "Invalid page or limit",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
                     }
                 }
             }
@@ -9692,6 +9785,16 @@
                     },
                     "404": {
                         "description": "Resource not found"
+                    },
+                    "400": {
+                        "description": "Invalid page or limit",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
                     }
                 }
             }
@@ -10136,6 +10239,16 @@
                     },
                     "404": {
                         "description": "Resource not found"
+                    },
+                    "400": {
+                        "description": "Invalid page or limit",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
                     }
                 }
             }
@@ -10258,6 +10371,16 @@
                     },
                     "404": {
                         "description": "Resource not found"
+                    },
+                    "400": {
+                        "description": "Invalid page or limit",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
                     }
                 }
             }
@@ -10380,6 +10503,16 @@
                     },
                     "404": {
                         "description": "Resource not found"
+                    },
+                    "400": {
+                        "description": "Invalid page or limit",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
                     }
                 }
             }
@@ -10459,6 +10592,16 @@
                     },
                     "404": {
                         "description": "Resource not found"
+                    },
+                    "400": {
+                        "description": "Invalid page or limit",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
                     }
                 }
             }
@@ -10634,6 +10777,26 @@
                                 }
                             }
                         }
+                    },
+                    "404": {
+                        "description": "Server not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ValidationError"
+                                }
+                            }
+                        }
                     }
                 }
             }
@@ -10678,6 +10841,16 @@
                                             }
                                         }
                                     }
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Server not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
                                 }
                             }
                         }
@@ -10735,6 +10908,26 @@
                                             }
                                         }
                                     }
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Pairing code not found or expired: the same answer for an unknown code, an expired code and another server's code",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ValidationError"
                                 }
                             }
                         }
@@ -10815,6 +11008,16 @@
                                             }
                                         }
                                     }
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid page or limit",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
                                 }
                             }
                         }
@@ -16010,8 +16213,33 @@
                     "Playlist"
                 ],
                 "summary": "List the playlists the authenticated user owns or collaborates on",
-                "description": "Each playlist carries the owner's public id and the number of songs the caller can see.",
+                "description": "A page of the playlists, ordered by name and then by id. Each playlist carries the owner's public id and the number of songs the caller can see.",
                 "operationId": "get_playlist_index",
+                "parameters": [
+                    {
+                        "name": "limit",
+                        "in": "query",
+                        "description": "Maximum number of playlists to return",
+                        "required": false,
+                        "schema": {
+                            "type": "integer",
+                            "minimum": 1,
+                            "maximum": 100,
+                            "default": 50
+                        }
+                    },
+                    {
+                        "name": "offset",
+                        "in": "query",
+                        "description": "Number of playlists to skip",
+                        "required": false,
+                        "schema": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "default": 0
+                        }
+                    }
+                ],
                 "responses": {
                     "200": {
                         "description": "Success",
@@ -16025,8 +16253,42 @@
                                             "items": {
                                                 "$ref": "#/components/schemas/PlaylistResource"
                                             }
+                                        },
+                                        "meta": {
+                                            "type": "object",
+                                            "properties": {
+                                                "total": {
+                                                    "type": "integer",
+                                                    "description": "Playlists the user owns or collaborates on"
+                                                },
+                                                "limit": {
+                                                    "type": "integer"
+                                                },
+                                                "offset": {
+                                                    "type": "integer"
+                                                }
+                                            },
+                                            "required": [
+                                                "total",
+                                                "limit",
+                                                "offset"
+                                            ]
                                         }
-                                    }
+                                    },
+                                    "required": [
+                                        "data",
+                                        "meta"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid limit or offset",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
                                 }
                             }
                         }
@@ -17515,6 +17777,7 @@
                     "Radio - Sources"
                 ],
                 "summary": "List all radio sources",
+                "description": "Only administrators receive syncUrl and syncConfig.",
                 "operationId": "get_radio_source_list",
                 "responses": {
                     "200": {
@@ -17543,21 +17806,45 @@
                                                     },
                                                     "syncUrl": {
                                                         "type": "string",
-                                                        "format": "uri"
+                                                        "format": "uri",
+                                                        "description": "Administrators only"
+                                                    },
+                                                    "syncConfig": {
+                                                        "type": "object",
+                                                        "description": "Administrators only",
+                                                        "additionalProperties": true
                                                     },
                                                     "syncSchedule": {
                                                         "type": "string",
                                                         "nullable": true
                                                     },
-                                                    "lastSync": {
+                                                    "isActive": {
+                                                        "type": "boolean"
+                                                    },
+                                                    "createdAt": {
                                                         "type": "string",
-                                                        "format": "date-time",
-                                                        "nullable": true
+                                                        "format": "date-time"
+                                                    },
+                                                    "updatedAt": {
+                                                        "type": "string",
+                                                        "format": "date-time"
                                                     }
-                                                }
+                                                },
+                                                "required": [
+                                                    "publicId",
+                                                    "name",
+                                                    "type",
+                                                    "syncSchedule",
+                                                    "isActive",
+                                                    "createdAt",
+                                                    "updatedAt"
+                                                ]
                                             }
                                         }
-                                    }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
                                 }
                             }
                         }
@@ -17584,32 +17871,7 @@
                     "content": {
                         "application/json": {
                             "schema": {
-                                "type": "object",
-                                "properties": {
-                                    "name": {
-                                        "type": "string"
-                                    },
-                                    "type": {
-                                        "type": "string"
-                                    },
-                                    "syncUrl": {
-                                        "type": "string",
-                                        "format": "uri"
-                                    },
-                                    "syncConfig": {
-                                        "type": "array",
-                                        "items": {}
-                                    },
-                                    "syncSchedule": {
-                                        "type": "string",
-                                        "nullable": true
-                                    }
-                                },
-                                "required": [
-                                    "name",
-                                    "type",
-                                    "syncUrl"
-                                ]
+                                "$ref": "#/components/schemas/CreateRadioSourceRequest"
                             }
                         }
                     },
@@ -17637,10 +17899,47 @@
                                                 },
                                                 "type": {
                                                     "type": "string"
+                                                },
+                                                "syncUrl": {
+                                                    "type": "string",
+                                                    "format": "uri"
+                                                },
+                                                "syncConfig": {
+                                                    "type": "object",
+                                                    "additionalProperties": true
+                                                },
+                                                "syncSchedule": {
+                                                    "type": "string",
+                                                    "nullable": true
+                                                },
+                                                "isActive": {
+                                                    "type": "boolean"
+                                                },
+                                                "createdAt": {
+                                                    "type": "string",
+                                                    "format": "date-time"
+                                                },
+                                                "updatedAt": {
+                                                    "type": "string",
+                                                    "format": "date-time"
                                                 }
-                                            }
+                                            },
+                                            "required": [
+                                                "publicId",
+                                                "name",
+                                                "type",
+                                                "syncUrl",
+                                                "syncConfig",
+                                                "syncSchedule",
+                                                "isActive",
+                                                "createdAt",
+                                                "updatedAt"
+                                            ]
                                         }
-                                    }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
                                 }
                             }
                         }
@@ -17732,11 +18031,13 @@
                     "Radio - Stations"
                 ],
                 "summary": "Browse/search stations",
+                "description": "A page of the synced stations that match every given filter, ordered by name and then by id.",
                 "operationId": "get_radio_stations",
                 "parameters": [
                     {
                         "name": "country",
                         "in": "query",
+                        "description": "Only stations of this country code",
                         "required": false,
                         "schema": {
                             "type": "string"
@@ -17745,15 +18046,48 @@
                     {
                         "name": "q",
                         "in": "query",
+                        "description": "Only stations whose name contains this text, case-insensitively; % and _ match themselves",
                         "required": false,
                         "schema": {
                             "type": "string"
+                        }
+                    },
+                    {
+                        "name": "publicIds",
+                        "in": "query",
+                        "description": "Only these stations: comma-separated station public IDs, at most 100",
+                        "required": false,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "limit",
+                        "in": "query",
+                        "description": "Maximum number of stations to return",
+                        "required": false,
+                        "schema": {
+                            "type": "integer",
+                            "minimum": 1,
+                            "maximum": 500,
+                            "default": 50
+                        }
+                    },
+                    {
+                        "name": "offset",
+                        "in": "query",
+                        "description": "Number of stations to skip",
+                        "required": false,
+                        "schema": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "default": 0
                         }
                     }
                 ],
                 "responses": {
                     "200": {
-                        "description": "List of stations",
+                        "description": "A page of stations",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -17770,48 +18104,139 @@
                                                         "maxLength": 21,
                                                         "pattern": "^[0-9a-zA-Z_-]{21}$"
                                                     },
-                                                    "externalId": {
-                                                        "type": "string",
-                                                        "description": "Station identifier assigned by the external provider"
-                                                    },
                                                     "sourceId": {
                                                         "type": "string",
                                                         "minLength": 21,
                                                         "maxLength": 21,
                                                         "pattern": "^[0-9a-zA-Z_-]{21}$"
                                                     },
+                                                    "externalId": {
+                                                        "type": "string",
+                                                        "description": "Station identifier assigned by the external provider"
+                                                    },
                                                     "name": {
                                                         "type": "string"
                                                     },
-                                                    "countrycode": {
+                                                    "country": {
                                                         "type": "string"
                                                     },
-                                                    "url_resolved": {
+                                                    "language": {
                                                         "type": "string",
-                                                        "format": "uri",
                                                         "nullable": true
                                                     },
-                                                    "favicon": {
-                                                        "type": "string",
-                                                        "format": "uri",
-                                                        "nullable": true
+                                                    "genres": {
+                                                        "type": "array",
+                                                        "items": {
+                                                            "type": "string"
+                                                        }
                                                     },
                                                     "tags": {
+                                                        "type": "array",
+                                                        "items": {
+                                                            "type": "string"
+                                                        }
+                                                    },
+                                                    "streams": {
+                                                        "type": "array",
+                                                        "items": {
+                                                            "type": "object",
+                                                            "properties": {
+                                                                "url": {
+                                                                    "type": "string"
+                                                                },
+                                                                "format": {
+                                                                    "type": "string"
+                                                                },
+                                                                "bitrate": {
+                                                                    "type": "integer"
+                                                                },
+                                                                "reliability": {
+                                                                    "type": "number"
+                                                                }
+                                                            },
+                                                            "required": [
+                                                                "url",
+                                                                "format",
+                                                                "bitrate",
+                                                                "reliability"
+                                                            ]
+                                                        }
+                                                    },
+                                                    "logo": {
                                                         "type": "string",
                                                         "nullable": true
                                                     },
-                                                    "codec": {
+                                                    "website": {
                                                         "type": "string",
                                                         "nullable": true
                                                     },
-                                                    "bitrate": {
-                                                        "type": "integer",
+                                                    "lastCheckedAt": {
+                                                        "type": "string",
+                                                        "format": "date-time",
                                                         "nullable": true
+                                                    },
+                                                    "createdAt": {
+                                                        "type": "string",
+                                                        "format": "date-time"
+                                                    },
+                                                    "updatedAt": {
+                                                        "type": "string",
+                                                        "format": "date-time"
                                                     }
-                                                }
+                                                },
+                                                "required": [
+                                                    "publicId",
+                                                    "sourceId",
+                                                    "externalId",
+                                                    "name",
+                                                    "country",
+                                                    "language",
+                                                    "genres",
+                                                    "tags",
+                                                    "streams",
+                                                    "logo",
+                                                    "website",
+                                                    "lastCheckedAt",
+                                                    "createdAt",
+                                                    "updatedAt"
+                                                ]
                                             }
+                                        },
+                                        "meta": {
+                                            "type": "object",
+                                            "properties": {
+                                                "total": {
+                                                    "type": "integer",
+                                                    "description": "Stations that match the filters"
+                                                },
+                                                "limit": {
+                                                    "type": "integer"
+                                                },
+                                                "offset": {
+                                                    "type": "integer"
+                                                }
+                                            },
+                                            "required": [
+                                                "total",
+                                                "limit",
+                                                "offset"
+                                            ]
                                         }
-                                    }
+                                    },
+                                    "required": [
+                                        "data",
+                                        "meta"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid limit, offset or public IDs",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
                                 }
                             }
                         }
@@ -17849,28 +18274,29 @@
                                             "items": {
                                                 "type": "object",
                                                 "properties": {
-                                                    "stationId": {
+                                                    "userId": {
                                                         "type": "string",
                                                         "minLength": 21,
                                                         "maxLength": 21,
                                                         "pattern": "^[0-9a-zA-Z_-]{21}$"
                                                     },
-                                                    "name": {
-                                                        "type": "string"
-                                                    },
-                                                    "countryCode": {
-                                                        "type": "string"
-                                                    },
-                                                    "streamUrl": {
+                                                    "stationId": {
                                                         "type": "string",
-                                                        "format": "uri",
-                                                        "nullable": true
+                                                        "description": "The station public ID; GET /api/radio/stations?publicIds= reads the station",
+                                                        "minLength": 21,
+                                                        "maxLength": 21,
+                                                        "pattern": "^[0-9a-zA-Z_-]{21}$"
                                                     },
                                                     "starredAt": {
                                                         "type": "string",
                                                         "format": "date-time"
                                                     }
-                                                }
+                                                },
+                                                "required": [
+                                                    "userId",
+                                                    "stationId",
+                                                    "starredAt"
+                                                ]
                                             }
                                         }
                                     }
@@ -18607,46 +19033,17 @@
                     "Recommendation"
                 ],
                 "summary": "Create a recommendation",
+                "description": "Stores a recommendation of the authenticated user. A user keeps at most 1000 rows written through this route; the recommendation generator's rows do not count.",
                 "operationId": "post_recommendation_store",
                 "requestBody": {
                     "content": {
                         "application/json": {
                             "schema": {
-                                "type": "object",
-                                "properties": {
-                                    "source_type": {
-                                        "type": "string",
-                                        "example": "song"
-                                    },
-                                    "source_id": {
-                                        "type": "string",
-                                        "example": "song-123"
-                                    },
-                                    "target_type": {
-                                        "type": "string",
-                                        "example": "song"
-                                    },
-                                    "target_id": {
-                                        "type": "string",
-                                        "example": "song-456"
-                                    },
-                                    "score": {
-                                        "type": "number",
-                                        "format": "float",
-                                        "example": 0.85
-                                    },
-                                    "name": {
-                                        "type": "string",
-                                        "example": "default"
-                                    },
-                                    "position": {
-                                        "type": "integer",
-                                        "example": 1
-                                    }
-                                }
+                                "$ref": "#/components/schemas/CreateRecommendationRequest"
                             }
                         }
-                    }
+                    },
+                    "required": true
                 },
                 "responses": {
                     "201": {
@@ -18666,6 +19063,26 @@
                     },
                     "401": {
                         "description": "Not authenticated",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "The source or target entity is not visible to the user",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "The user already keeps 1000 rows written through this route (reason recommendation_limit, with limit), or a row with this source, target and name (reason recommendation_exists)",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -22638,6 +23055,16 @@
                                 }
                             }
                         }
+                    },
+                    "400": {
+                        "description": "Invalid page or limit",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
                     }
                 }
             }
@@ -23991,7 +24418,7 @@
                         "description": "Invalid request"
                     },
                     "409": {
-                        "description": "Playback media is unavailable: the video file no longer resolves inside one of its libraries",
+                        "description": "Playback cannot start: the video file no longer resolves inside one of its libraries, or the account already holds as many transcode sessions as the server allows and too few have been silent for two minutes to give way (`error.details.reason` is `transcode_session_limit` and `error.details.limit` the limit)",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -27975,6 +28402,73 @@
                     "stationId"
                 ]
             },
+            "CreateRecommendationRequest": {
+                "type": "object",
+                "properties": {
+                    "source_type": {
+                        "type": "string",
+                        "enum": [
+                            "song",
+                            "album",
+                            "artist",
+                            "movie",
+                            "video"
+                        ],
+                        "example": "song"
+                    },
+                    "source_id": {
+                        "type": "string",
+                        "description": "Public ID of the source entity",
+                        "example": "V1StGXR8_Z5jdHi6B-myT"
+                    },
+                    "target_type": {
+                        "type": "string",
+                        "enum": [
+                            "song",
+                            "album",
+                            "artist",
+                            "movie",
+                            "video"
+                        ],
+                        "example": "song"
+                    },
+                    "target_id": {
+                        "type": "string",
+                        "description": "Public ID of the target entity",
+                        "example": "Uakgb_J5m9g-0JDMbcJqL"
+                    },
+                    "score": {
+                        "type": "number",
+                        "format": "double",
+                        "description": "Relevance in the range the recommendation generator scores in",
+                        "minimum": 0,
+                        "maximum": 1,
+                        "example": 0.85
+                    },
+                    "name": {
+                        "type": "string",
+                        "maxLength": 255,
+                        "default": "default",
+                        "example": "default"
+                    },
+                    "position": {
+                        "type": "integer",
+                        "format": "int32",
+                        "nullable": true,
+                        "minimum": -2147483648,
+                        "maximum": 2147483647,
+                        "default": null,
+                        "example": 1
+                    }
+                },
+                "required": [
+                    "source_type",
+                    "source_id",
+                    "target_type",
+                    "target_id",
+                    "score"
+                ]
+            },
             "CreateScheduledJobRequest": {
                 "type": "object",
                 "properties": {
@@ -28976,6 +29470,33 @@
                     "movieCount"
                 ]
             },
+            "ApiError": {
+                "type": "object",
+                "properties": {
+                    "error": {
+                        "type": "object",
+                        "properties": {
+                            "message": {
+                                "type": "string"
+                            },
+                            "code": {
+                                "type": "integer"
+                            },
+                            "details": {
+                                "type": "object",
+                                "description": "Additional error details, omitted when empty"
+                            }
+                        },
+                        "required": [
+                            "message",
+                            "code"
+                        ]
+                    }
+                },
+                "required": [
+                    "error"
+                ]
+            },
             "MovieResource": {
                 "type": "object",
                 "properties": {
@@ -29104,33 +29625,6 @@
                     "videos",
                     "createdAt",
                     "updatedAt"
-                ]
-            },
-            "ApiError": {
-                "type": "object",
-                "properties": {
-                    "error": {
-                        "type": "object",
-                        "properties": {
-                            "message": {
-                                "type": "string"
-                            },
-                            "code": {
-                                "type": "integer"
-                            },
-                            "details": {
-                                "type": "object",
-                                "description": "Additional error details, omitted when empty"
-                            }
-                        },
-                        "required": [
-                            "message",
-                            "code"
-                        ]
-                    }
-                },
-                "required": [
-                    "error"
                 ]
             },
             "TranscodeMetricsResource": {
