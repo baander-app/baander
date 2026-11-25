@@ -64,14 +64,14 @@ final class PlaylistScopedReadRepositoryTest extends TestCase
     public function testCountsPreserveEmptyAndFilteredPlaylistsWithoutLoadingOrStrippingChildren(): void
     {
         $repository = static::getContainer()->get(PlaylistRepositoryInterface::class);
-        $views = $repository->findReadByUser($this->owner->getId(), $this->scope);
+        $views = $repository->findReadByUser($this->owner->getId(), $this->scope, 100, 0);
         $this->assertSame(['A Mixed', 'B Empty', 'C Denied'], array_map(static fn ($view) => $view->getName(), $views));
         $this->assertSame([1, 0, 0], array_map(static fn ($view) => $view->getSongCount(), $views));
-        $this->assertSame([2, 0, 1], array_map(static fn ($view) => $view->getSongCount(), $repository->findReadByUser($this->owner->getId(), LibraryReadScope::unrestricted())));
-        $this->assertSame([0, 0, 0], array_map(static fn ($view) => $view->getSongCount(), $repository->findReadByUser($this->owner->getId(), LibraryReadScope::none())));
-        $this->assertSame([], $repository->findReadByUser(new Uuid(), LibraryReadScope::unrestricted()));
+        $this->assertSame([2, 0, 1], array_map(static fn ($view) => $view->getSongCount(), $repository->findReadByUser($this->owner->getId(), LibraryReadScope::unrestricted(), 100, 0)));
+        $this->assertSame([0, 0, 0], array_map(static fn ($view) => $view->getSongCount(), $repository->findReadByUser($this->owner->getId(), LibraryReadScope::none(), 100, 0)));
+        $this->assertSame([], $repository->findReadByUser(new Uuid(), LibraryReadScope::unrestricted(), 100, 0));
         $this->mixed->setName('Pending name');
-        $this->assertSame('A Mixed', $repository->findReadByUser($this->owner->getId(), $this->scope)[0]->getName());
+        $this->assertSame('A Mixed', $repository->findReadByUser($this->owner->getId(), $this->scope, 100, 0)[0]->getName());
         $this->assertSame('Pending name', $this->mixed->getName());
         $id = $this->mixed->getId();
         $this->entityManager->flush();
@@ -123,11 +123,11 @@ final class PlaylistScopedReadRepositoryTest extends TestCase
         };
         $repository = new PlaylistRepository($this->entityManager, $lookup, static::getContainer()->get(TransactionPortInterface::class));
 
-        $this->assertSame([2, 0, 1], array_map(static fn ($view) => $view->getSongCount(), $repository->findReadByUser($this->owner->getId(), LibraryReadScope::unrestricted())));
-        $this->assertSame([0, 0, 0], array_map(static fn ($view) => $view->getSongCount(), $repository->findReadByUser($this->owner->getId(), LibraryReadScope::none())));
+        $this->assertSame([2, 0, 1], array_map(static fn ($view) => $view->getSongCount(), $repository->findReadByUser($this->owner->getId(), LibraryReadScope::unrestricted(), 100, 0)));
+        $this->assertSame([0, 0, 0], array_map(static fn ($view) => $view->getSongCount(), $repository->findReadByUser($this->owner->getId(), LibraryReadScope::none(), 100, 0)));
         $this->assertSame([], $lookup->subsetRequests);
 
-        $this->assertSame([1, 0, 0], array_map(static fn ($view) => $view->getSongCount(), $repository->findReadByUser($this->owner->getId(), $this->scope)));
+        $this->assertSame([1, 0, 0], array_map(static fn ($view) => $view->getSongCount(), $repository->findReadByUser($this->owner->getId(), $this->scope, 100, 0)));
         $owned = [$this->allowedSong->getId()->toString(), $this->deniedSong->getId()->toString()];
         sort($owned);
         $this->assertSame([$owned], $lookup->subsetRequests);

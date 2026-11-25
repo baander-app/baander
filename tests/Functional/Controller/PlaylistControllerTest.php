@@ -51,6 +51,30 @@ final class PlaylistControllerTest extends TestCase
         $this->assertCount(1, $data['data']);
     }
 
+    public function testIndexReturnsAtMostLimitRowsInNameOrderWithTheTotal(): void
+    {
+        $user = $this->createTestUser();
+        foreach (['Delta', 'Alpha', 'Echo', 'Charlie', 'Bravo'] as $name) {
+            $this->createPlaylist($user, $name);
+        }
+
+        $first = $this->assertJsonResponse($this->authenticatedRequest('GET', '/api/playlists/?limit=2', $user), 200, 'meta');
+        $this->assertSame(['Alpha', 'Bravo'], array_column($first['data'], 'name'));
+        $this->assertSame(['total' => 5, 'limit' => 2, 'offset' => 0], $first['meta']);
+
+        $last = $this->assertJsonResponse($this->authenticatedRequest('GET', '/api/playlists/?limit=2&offset=4', $user), 200, 'meta');
+        $this->assertSame(['Echo'], array_column($last['data'], 'name'));
+        $this->assertSame(5, $last['meta']['total']);
+    }
+
+    public function testIndexRefusesALimitOverOneHundred(): void
+    {
+        $response = $this->authenticatedRequest('GET', '/api/playlists/?limit=101', $this->createTestUser());
+
+        $error = $this->assertJsonResponse($response, 400, 'error');
+        $this->assertArrayHasKey('limit', $error['error']['details']);
+    }
+
     public function testDeletePlaylist(): void
     {
         $user = $this->createTestUser();

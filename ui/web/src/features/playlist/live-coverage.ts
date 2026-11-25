@@ -26,10 +26,10 @@ export const playlistLiveCoverage = [
     mirrors: [],
     responseCaches: ["authoritative-read"],
     consumers: [
-      "src/features/playlist/components/AddToPlaylistDialog.tsx#useGetPlaylistIndex:generated",
       "src/features/playlist/components/SharePlaylistDialog.tsx#useGetPlaylistShow:generated",
+      "src/features/playlist/hooks/use-playlist-index.ts#useQuery:getGetPlaylistIndexQueryKey()",
+      "src/features/playlist/hooks/use-playlist-index.ts#AXIOS_INSTANCE.get:'/api/playlists/'",
       "src/features/playlist/pages/PlaylistDetailPage.tsx#useGetPlaylistShow:generated",
-      "src/features/playlist/pages/PlaylistsPage.tsx#useGetPlaylistIndex:generated",
     ],
     coverageVerification: ["tests/live-updates/coverage.test.ts"],
     behaviorVerification: { unitProofs: ["tests/live-updates/collections.test.tsx"] },

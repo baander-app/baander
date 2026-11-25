@@ -15,7 +15,7 @@ import { parseApiError } from '@/features/auth/lib/parse-api-error'
 import { PLAYLIST_NAME_MAX_LENGTH } from '../lib/playlist-limits'
 import { Button } from '@/shared/components/ui/button'
 import { Skeleton } from '@/shared/components/ui/skeleton'
-import { useGetPlaylistIndex } from '@/shared/api-client/gen/endpoints'
+import { usePlaylistIndex } from '../hooks/use-playlist-index'
 import { textRole } from '@/shared/theme'
 import { ContentText } from '@/shared/typography'
 
@@ -87,9 +87,7 @@ export function AddToPlaylistDialog({ open, onOpenChange, songId }: AddToPlaylis
   const [search, setSearch] = useState('')
   const [creating, setCreating] = useState(false)
   const [newName, setNewName] = useState('')
-  const { data, isPending: isLoading } = useGetPlaylistIndex({
-    query: { enabled: open },
-  })
+  const { data, isPending: isLoading } = usePlaylistIndex({ enabled: open })
   const addSong = usePostPlaylistAddSong()
   const createPlaylist = usePostPlaylistStore()
 

@@ -12,6 +12,7 @@ use App\Shared\Application\Port\TransportStatusInterface;
 use App\Shared\Interface\Attribute\CliCounterpart;
 use App\Shared\Interface\DTO\ApiError;
 use App\Shared\Interface\DTO\ValidationError;
+use App\Shared\Interface\Request\QueryParameters;
 use App\Shared\Interface\Resource\FailedMessageResource;
 use App\Shared\Interface\Resource\TransportStatusResource;
 use OpenApi\Spec as OA;
@@ -168,26 +169,32 @@ final class TransportController
                     schema: new OA\Schema(ref: ApiError::class),
                 ),
             ),
+            new OA\Response(
+                response: '400',
+                description: 'Invalid page or limit',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
+            ),
         ],
     )]
     #[Route('/failed', name: 'failed_list', methods: ['GET'])]
     #[CliCounterpart('app:failed-message:list')]
     public function listFailed(Request $request): JsonResponse
     {
-        $page = max(1, (int) $request->query->get('page', 1));
-        $limit = min(100, max(1, (int) $request->query->get('limit', 50)));
+        $pagination = QueryParameters::page($request->query);
 
         try {
-            $result = $this->failedMessages->page($page, $limit);
+            $result = $this->failedMessages->newest($pagination->limit, $pagination->offset);
         } catch (FailureTransportUnavailableException $e) {
             return $this->transportUnavailable($e);
         }
 
         return $this->paginatedResponse(FailedMessageResource::paginate(
             $result->messages,
-            $page,
-            max(1, (int) ceil($result->total / $limit)),
-            $limit,
+            $pagination->page,
+            $pagination->lastPage($result->total),
+            $pagination->limit,
             $result->total,
         ));
     }

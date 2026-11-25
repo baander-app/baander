@@ -142,19 +142,37 @@ final class PlaylistRepository implements PlaylistRepositoryInterface
         );
     }
 
-    public function findReadByUser(Uuid $actorId, LibraryReadScope $scope): array
+    public function findReadByUser(Uuid $actorId, LibraryReadScope $scope, int $limit, int $offset): array
+    {
+        $query = $this->ownedOrShared($this->readProjection(), $actorId)
+            ->orderBy('p.name', 'ASC')
+            ->addOrderBy('p.id', 'ASC')
+            ->setFirstResult($offset)
+            ->setMaxResults($limit);
+
+        return $this->readViews($query, $scope);
+    }
+
+    public function countReadByUser(Uuid $actorId): int
+    {
+        $query = $this->entityManager->createQueryBuilder()
+            ->select('COUNT(p.id)')
+            ->from(PlaylistEntity::class, 'p');
+
+        return (int) $this->ownedOrShared($query, $actorId)->getQuery()->getSingleScalarResult();
+    }
+
+    /** Narrows a query on playlists aliased p to those the actor owns or collaborates on. */
+    private function ownedOrShared(QueryBuilder $query, Uuid $actorId): QueryBuilder
     {
         $collaborated = sprintf(
             'SELECT shared.id FROM %s c INNER JOIN c.playlist shared WHERE IDENTITY(c.user) = :actorId',
             PlaylistCollaboratorEntity::class,
         );
-        $query = $this->readProjection()
-            ->where(sprintf('IDENTITY(p.user) = :actorId OR p.id IN (%s)', $collaborated))
-            ->setParameter('actorId', $actorId, 'uuid')
-            ->orderBy('p.name', 'ASC')
-            ->addOrderBy('p.id', 'ASC');
 
-        return $this->readViews($query, $scope);
+        return $query
+            ->where(sprintf('IDENTITY(p.user) = :actorId OR p.id IN (%s)', $collaborated))
+            ->setParameter('actorId', $actorId, 'uuid');
     }
 
     public function findRead(Uuid $playlistId, LibraryReadScope $scope): ?PlaylistReadView

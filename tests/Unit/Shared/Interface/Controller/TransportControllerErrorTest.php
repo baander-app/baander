@@ -63,7 +63,7 @@ final class TransportControllerErrorTest extends TestCase
                 throw $this->failure;
             }
 
-            public function page(int $page, int $limit): FailedMessagePage
+            public function newest(int $limit, int $offset): FailedMessagePage
             {
                 throw $this->failure;
             }

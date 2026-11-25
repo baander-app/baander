@@ -5,7 +5,7 @@ import { Link } from 'react-router-dom'
 import styled from 'styled-components'
 import { interactiveTransition, textRole } from '@/shared/theme'
 import { ContentText } from '@/shared/typography'
-import { useGetPlaylistIndex } from '@/shared/api-client/gen/endpoints'
+import { usePlaylistIndex } from '../hooks/use-playlist-index'
 import { SmartPlaylistEditor, type SmartRule } from '../components/SmartPlaylistEditor'
 import { useAuthStore } from '@/features/auth/stores/auth-store'
 import { Skeleton } from '@/shared/components/ui/skeleton'
@@ -197,7 +197,7 @@ export function PlaylistsPage() {
   const [isSmart, setIsSmart] = useState(false)
   const [smartRules, setSmartRules] = useState<SmartRule[]>([])
   const draftRevision = useRef(0)
-  const { data, isPending: isLoading } = useGetPlaylistIndex()
+  const { data, isPending: isLoading } = usePlaylistIndex()
   const createPlaylist = usePostPlaylistStore()
   const deletePlaylist = useDeletePlaylistDestroy()
 

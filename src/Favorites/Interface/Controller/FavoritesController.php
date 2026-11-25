@@ -15,6 +15,7 @@ use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
 use App\Shared\Interface\Controller\ApiResponsesTrait;
 use App\Shared\Interface\DTO\PaginatedResponse;
+use App\Shared\Interface\Request\QueryParameters;
 use OpenApi\Spec as OA;
 use Symfony\Bundle\SecurityBundle\Security;
 use Symfony\Component\HttpFoundation\JsonResponse;
@@ -92,6 +93,13 @@ final class FavoritesController
                     ),
                 ),
             ),
+            new OA\Response(
+                response: '400',
+                description: 'Invalid page or limit',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
+            ),
         ],
     )]
     #[Route('/', name: 'index', methods: ['GET'])]
@@ -104,19 +112,17 @@ final class FavoritesController
 
         $userId = Uuid::fromString($user->getId());
         $entityType = $request->query->get('entityType');
-        $limit = min(100, max(1, (int) $request->query->get('limit', 50)));
-        $page = max(1, (int) $request->query->get('page', 1));
-        $offset = ($page - 1) * $limit;
+        $pagination = QueryParameters::page($request->query);
 
         $type = $entityType !== null ? FavoriteType::tryFrom($entityType) : null;
-        $favorites = $this->favoritesPort->findByUser($userId, $type, $limit, $offset);
+        $favorites = $this->favoritesPort->findByUser($userId, $type, $pagination->limit, $pagination->offset);
         $total = $this->favoritesPort->countByUser($userId, $type);
 
         return $this->paginatedResponse(new PaginatedResponse(
             data: FavoriteResource::collection($favorites),
-            currentPage: $page,
-            lastPage: (int) ceil($total / $limit) ?: 1,
-            perPage: $limit,
+            currentPage: $pagination->page,
+            lastPage: $pagination->lastPage($total),
+            perPage: $pagination->limit,
             total: $total,
         ));
     }

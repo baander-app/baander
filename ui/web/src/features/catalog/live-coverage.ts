@@ -332,40 +332,6 @@ export const catalogLiveCoverage = [
     }
   },
   {
-    id: 'catalog.playlists',
-    family: 'playlists',
-    policy: {
-      kind: 'stored',
-      reason:
-        'Playlist membership, metadata, collaboration and derived statistics affect index, detail and share dialogs.'
-    },
-    audiences: ['playlist', 'user'],
-    sourceTables: [
-      'playlists',
-      'playlist_song',
-      'playlist_collaborators',
-      'playlist_statistics',
-      'songs',
-      'albums',
-      'artists',
-      'images'
-    ],
-    deploymentTables: [],
-    sources: ['[ `/api/playlists/` ]'],
-    keyVariants: ['[ `/api/playlists/` ]'],
-    dependentFamilies: [],
-    mirrors: [],
-    responseCaches: ['authoritative-read'],
-    consumers: [
-      'src/features/catalog/components/menus/SongContextMenu.tsx#useGetPlaylistIndex:generated',
-      'src/features/catalog/pages/HomePage.tsx#useGetPlaylistIndex:generated'
-    ],
-    coverageVerification: ['tests/live-updates/coverage.test.ts'],
-    behaviorVerification: {
-      unitProofs: ['tests/live-updates/collections.test.tsx']
-    }
-  },
-  {
     id: 'catalog.activity',
     family: 'activity',
     policy: {

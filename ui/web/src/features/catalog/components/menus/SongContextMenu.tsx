@@ -16,7 +16,7 @@ import { usePlayerStore, type Track } from '@/features/player/stores/player-stor
 import { mediator } from '@/shared/lib/mediator/bus'
 import { PLAYER_ACTIONS } from '@/features/player/player-actions'
 import { useContextActions, type SongContextMenuData } from '../../hooks/use-context-actions'
-import { useGetPlaylistIndex } from '@/shared/api-client/gen/endpoints'
+import { usePlaylistIndex } from '@/features/playlist/hooks/use-playlist-index'
 import { toast } from 'sonner'
 import { LyricsDialog } from '../LyricsDialog'
 import { ContentText } from '@/shared/typography'
@@ -33,9 +33,9 @@ export function SongContextMenu({ song, children }: SongContextMenuProps) {
   const playPauseKeys = useShortcutDisplay('transport.play-pause')
   const lyricsKeys = useShortcutDisplay('panel.lyrics')
   const infoKeys = useShortcutDisplay('panel.info')
-  const { data: playlistsData } = useGetPlaylistIndex()
+  const { data: playlistsData } = usePlaylistIndex()
   const { mutate: addSongToPlaylist } = usePostPlaylistAddSong()
-  const playlists = (playlistsData as Record<string, unknown> | undefined)?.data as Array<{ publicId: string; name: string }> ?? []
+  const playlists = playlistsData?.data ?? []
   const insertAfterCurrent = usePlayerStore((s) => s.insertAfterCurrent)
   const addToQueue = usePlayerStore((s) => s.addToQueue)
   const [lyricsOpen, setLyricsOpen] = useState(false)

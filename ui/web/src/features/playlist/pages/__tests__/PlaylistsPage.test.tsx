@@ -11,8 +11,11 @@ import type { PlaylistResource } from '@/shared/api-client/gen/endpoints'
 import { render } from '../../../../../tests/test-utils'
 import { PlaylistsPage } from '../PlaylistsPage'
 
+const { mockGet } = vi.hoisted(() => ({ mockGet: vi.fn() }))
+
 vi.mock('@/shared/api-client/axios-instance', () => ({
   customInstance: vi.fn(),
+  AXIOS_INSTANCE: { get: mockGet },
 }))
 
 vi.mock('sonner', () => ({
@@ -49,6 +52,17 @@ const THEIRS = playlist({
   name: 'Theirs',
 })
 
+/** Answers the playlist list a page at a time, as the server does. */
+function servePlaylists(rows: PlaylistResource[]) {
+  mockGet.mockReset()
+  mockGet.mockImplementation(async (url: string, config?: { params?: { limit: number; offset: number } }) => {
+    if (url !== '/api/playlists/') throw new Error(`Unexpected read ${url}`)
+    const { limit, offset } = config?.params ?? { limit: 100, offset: 0 }
+
+    return { data: { data: rows.slice(offset, offset + limit), meta: { total: rows.length, limit, offset } } }
+  })
+}
+
 function renderPage() {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
   render(
@@ -64,10 +78,9 @@ describe('PlaylistsPage shared badge', () => {
   beforeEach(() => {
     mockRequest.mockReset()
     mockRequest.mockImplementation(async (url: string) => {
-      if (url === '/api/playlists/') return { data: [MINE, THEIRS] }
-
       throw new Error(`Unexpected request ${url}`)
     })
+    servePlaylists([MINE, THEIRS])
     useAuthStore.setState({
       user: { publicId: VIEWER, email: 'viewer@baander.app', name: 'Viewer', roles: ['ROLE_USER'] },
       isAuthenticated: true,
@@ -90,6 +103,27 @@ describe('PlaylistsPage shared badge', () => {
   })
 })
 
+describe('PlaylistsPage list', () => {
+  afterEach(() => {
+    cleanup()
+  })
+
+  it('lists the playlists of every page', async () => {
+    const rows = Array.from({ length: 101 }, (_, index) => playlist({
+      publicId: `playlistPublicId${String(index).padStart(5, '0')}`,
+      name: `Playlist ${String(index + 1).padStart(3, '0')}`,
+    }))
+    servePlaylists(rows)
+    renderPage()
+
+    expect(await screen.findByRole('link', { name: /Playlist 101/ })).toBeInTheDocument()
+    expect(mockGet.mock.calls.map(([, config]) => config.params)).toEqual([
+      { limit: 100, offset: 0 },
+      { limit: 100, offset: 100 },
+    ])
+  })
+})
+
 describe('PlaylistsPage create form', () => {
   beforeEach(() => {
     mockRequest.mockReset()
@@ -105,10 +139,9 @@ describe('PlaylistsPage create form', () => {
           config,
         })
       }
-      if (url === '/api/playlists/') return { data: [MINE] }
-
       throw new Error(`Unexpected request ${url}`)
     })
+    servePlaylists([MINE])
     useAuthStore.setState({
       user: { publicId: VIEWER, email: 'viewer@baander.app', name: 'Viewer', roles: ['ROLE_USER'] },
       isAuthenticated: true,

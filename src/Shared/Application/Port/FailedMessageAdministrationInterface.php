@@ -18,8 +18,8 @@ interface FailedMessageAdministrationInterface
 {
     public function count(): int;
 
-    /** Newest failures first. */
-    public function page(int $page, int $limit): FailedMessagePage;
+    /** Up to $limit failures after skipping $offset, newest first, with the total count. */
+    public function newest(int $limit, int $offset): FailedMessagePage;
 
     public function find(string $id): ?FailedMessage;
 

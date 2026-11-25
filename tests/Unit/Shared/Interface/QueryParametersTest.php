@@ -58,6 +58,66 @@ final class QueryParametersTest extends TestCase
         QueryParameters::pagination(new InputBag(['limit' => '31']), 25, 30);
     }
 
+    public function testPageDefaultsAndOffset(): void
+    {
+        $defaults = QueryParameters::page(new InputBag());
+        self::assertSame([1, 50, 0], [$defaults->page, $defaults->limit, $defaults->offset]);
+
+        $third = QueryParameters::page(new InputBag(['page' => '3', 'limit' => '20']));
+        self::assertSame([3, 20, 40], [$third->page, $third->limit, $third->offset]);
+
+        $custom = QueryParameters::page(new InputBag(), 25, 30);
+        self::assertSame(25, $custom->limit);
+    }
+
+    public function testTheLastAddressablePageKeepsItsRowsWithinA64BitInteger(): void
+    {
+        $last = QueryParameters::page(new InputBag(['page' => (string) intdiv(PHP_INT_MAX, 100), 'limit' => '100']));
+
+        self::assertSame(intdiv(PHP_INT_MAX, 100), $last->page);
+        self::assertLessThanOrEqual(PHP_INT_MAX - 100, $last->offset);
+
+        $single = QueryParameters::page(new InputBag(['page' => (string) PHP_INT_MAX, 'limit' => '1']));
+        self::assertSame(PHP_INT_MAX - 1, $single->offset);
+    }
+
+    /** @return iterable<string, array{array<string, mixed>, string}> */
+    public static function invalidPages(): iterable
+    {
+        yield 'offset overflow' => [['page' => (string) PHP_INT_MAX, 'limit' => '100'], 'page'];
+        yield 'first page past the bound' => [['page' => (string) (intdiv(PHP_INT_MAX, 100) + 1), 'limit' => '100'], 'page'];
+        yield 'zero' => [['page' => '0'], 'page'];
+        yield 'negative' => [['page' => '-1'], 'page'];
+        yield 'non-numeric' => [['page' => 'abc'], 'page'];
+        yield 'fraction' => [['page' => '1.5'], 'page'];
+        yield 'beyond integer' => [['page' => '99999999999999999999'], 'page'];
+        yield 'array' => [['page' => ['1']], 'page'];
+        yield 'zero limit' => [['limit' => '0'], 'limit'];
+        yield 'excess limit' => [['limit' => '101'], 'limit'];
+    }
+
+    /** @param array<string, mixed> $query */
+    #[DataProvider('invalidPages')]
+    public function testInvalidPagesIdentifyTheParameter(array $query, string $name): void
+    {
+        try {
+            QueryParameters::page(new InputBag($query));
+            self::fail('Expected an invalid page to be rejected.');
+        } catch (InvalidQueryParameter $exception) {
+            self::assertSame($name, $exception->parameter);
+            self::assertSame(400, $exception->getStatusCode());
+        }
+    }
+
+    public function testLastPageCountsPartialPagesAndIsOneForAnEmptyList(): void
+    {
+        $pagination = QueryParameters::page(new InputBag(['limit' => '20']));
+
+        self::assertSame(1, $pagination->lastPage(0));
+        self::assertSame(1, $pagination->lastPage(20));
+        self::assertSame(2, $pagination->lastPage(21));
+    }
+
     public function testMissingFiltersAndValidChoices(): void
     {
         self::assertNull(QueryParameters::optionalChoice(new InputBag(), 'role', ['ROLE_ADMIN']));

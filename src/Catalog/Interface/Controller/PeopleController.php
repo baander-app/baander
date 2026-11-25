@@ -15,6 +15,7 @@ use App\Shared\Domain\Model\SearchOptions;
 use App\Shared\Domain\Model\SearchResult;
 use App\Shared\Interface\Controller\ApiResponsesTrait;
 use App\Shared\Interface\DTO\PaginatedResponse;
+use App\Shared\Interface\Request\QueryParameters;
 use OpenApi\Spec as OA;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
@@ -79,6 +80,13 @@ final readonly class PeopleController
                 ),
             ),
             new OA\Response(response: '404', description: 'Resource not found'),
+            new OA\Response(
+                response: '400',
+                description: 'Invalid page or limit',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
+            ),
         ],
     )]
     #[Route('/api/people', name: 'person_index', methods: ['GET'])]
@@ -184,11 +192,19 @@ final readonly class PeopleController
                 ),
             ),
             new OA\Response(response: '404', description: 'Resource not found'),
+            new OA\Response(
+                response: '400',
+                description: 'Invalid page or limit',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
+            ),
         ],
     )]
     #[Route('/api/people/{publicId}/credits', name: 'person_credits', requirements: ['publicId' => PublicId::PATTERN], methods: ['GET'])]
     public function credits(string $publicId, Request $request): JsonResponse
     {
+        $options = self::options($request);
         $id = PublicId::fromString($publicId);
         $scope = $this->scopes->current();
         if ($this->people->profile($id, $scope) === null) {
@@ -199,7 +215,7 @@ final readonly class PeopleController
             throw new InvalidInputException('Unknown media credit kind.');
         }
 
-        return $this->page($request, $this->people->credits($id, self::options($request), $scope, $kind, self::role($request)), PersonWorkResource::class);
+        return $this->page($request, $this->people->credits($id, $options, $scope, $kind, self::role($request)), PersonWorkResource::class);
     }
 
     #[OA\Operation\Get(
@@ -252,6 +268,13 @@ final readonly class PeopleController
                 ),
             ),
             new OA\Response(response: '404', description: 'Resource not found'),
+            new OA\Response(
+                response: '400',
+                description: 'Invalid page or limit',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
+            ),
         ],
     )]
     #[Route('/api/movies/{publicId}/credits', name: 'person_movie_credits', requirements: ['publicId' => PublicId::PATTERN], methods: ['GET'])]
@@ -302,23 +325,22 @@ final readonly class PeopleController
     /** @param class-string<\App\Shared\Interface\Resource\AbstractResource> $resource */
     private function page(Request $request, SearchResult $result, string $resource = PersonResource::class): JsonResponse
     {
-        $options = self::options($request);
+        $pagination = QueryParameters::page($request->query);
 
         return $this->paginatedResponse(new PaginatedResponse(
             data: $resource::collection($result->getItems()),
-            currentPage: intdiv($options->getOffset(), $options->getLimit()) + 1,
-            lastPage: max(1, (int) ceil($result->getTotal() / $options->getLimit())),
-            perPage: $options->getLimit(),
+            currentPage: $pagination->page,
+            lastPage: $pagination->lastPage($result->getTotal()),
+            perPage: $pagination->limit,
             total: $result->getTotal(),
         ));
     }
 
     private static function options(Request $request): SearchOptions
     {
-        $limit = min(100, max(1, $request->query->getInt('limit', 50)));
-        $page = min(intdiv(PHP_INT_MAX, $limit), max(1, $request->query->getInt('page', 1)));
+        $pagination = QueryParameters::page($request->query);
 
-        return SearchOptions::create($request->query->getString('q'), $limit, ($page - 1) * $limit);
+        return SearchOptions::create($request->query->getString('q'), $pagination->limit, $pagination->offset);
     }
 
     private static function role(Request $request): ?string

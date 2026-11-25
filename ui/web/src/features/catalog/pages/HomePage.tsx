@@ -1,7 +1,8 @@
 import { Button } from '@/shared/components/ui/button'
 import { useMemo } from 'react'
 import styled from 'styled-components'
-import { useGetAlbumIndex, useGetActivityHistory, useGetPlaylistIndex } from '@/shared/api-client/gen/endpoints'
+import { useGetAlbumIndex, useGetActivityHistory } from '@/shared/api-client/gen/endpoints'
+import { usePlaylistIndex } from '@/features/playlist/hooks/use-playlist-index'
 import { useForYouViewModel } from '@/features/catalog/hooks/use-for-you-view-model'
 import { useStarredStations } from '@/features/catalog/hooks/use-starred-stations'
 import { usePlayerStore } from '@/features/player/stores/player-store'
@@ -408,7 +409,7 @@ function SectionSkeleton() {
 export function HomePage() {
   const { data: albumData, isPending: albumsLoading } = useGetAlbumIndex({ page: 1, limit: 20 })
   const { data: activityData, isPending: activityLoading } = useGetActivityHistory({ limit: 10 })
-  const { data: playlistData, isPending: playlistsLoading } = useGetPlaylistIndex()
+  const { data: playlistData, isPending: playlistsLoading } = usePlaylistIndex()
 
   const albums = useMemo(() => {
     const response = albumData as Record<string, unknown> | undefined
@@ -421,10 +422,7 @@ export function HomePage() {
 
   const recentlyPlayed = useMemo(() => asRecentItems(activityData), [activityData])
 
-  const playlists = useMemo(() => {
-    const response = playlistData as Record<string, unknown> | undefined
-    return (Array.isArray(response?.data) ? response.data : []) as PlaylistItem[]
-  }, [playlistData])
+  const playlists: PlaylistItem[] = playlistData?.data ?? []
 
   // Radio stations: starred stations via React Query
   const { data: radioStations = [], isPending: radioLoading } = useStarredStations()

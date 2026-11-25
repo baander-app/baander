@@ -15,6 +15,8 @@ use App\Shared\Interface\Console\FailedMessageFlushCommand;
 use App\Shared\Interface\Console\FailedMessageListCommand;
 use App\Shared\Interface\Console\MonitorTransportCommand;
 use App\Shared\Interface\Controller\TransportController;
+use App\Shared\Interface\Exception\InvalidQueryParameter;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Tester\CommandTester;
@@ -96,15 +98,37 @@ final class TransportCommandsTest extends TestCase
         self::assertStringContainsString('Page 1 of 2, 3 messages in total.', $display);
     }
 
-    public function testListClampsPageAndLimitAsTheApiDoes(): void
+    public function testListReadsThePageTheApiReads(): void
     {
         $tester = new CommandTester(new FailedMessageListCommand($this->failedMessages));
 
-        $tester->execute(['--page' => '0', '--limit' => '500']);
-        self::assertSame([1, 100], $this->failedMessages->lastPage);
+        self::assertSame(Command::SUCCESS, $tester->execute(['--page' => '3', '--limit' => '20']));
+        self::assertSame([20, 40], $this->failedMessages->lastSlice);
+    }
 
-        $tester->execute(['--limit' => '0']);
-        self::assertSame([1, 1], $this->failedMessages->lastPage);
+    /** @return iterable<string, array{array<string, string>, string, string}> */
+    public static function refusedPages(): iterable
+    {
+        yield 'offset overflow' => [['--page' => (string) PHP_INT_MAX, '--limit' => '100'], 'page=9223372036854775807&limit=100', '--page must be between 1 and 92233720368547758.'];
+        yield 'page 0' => [['--page' => '0'], 'page=0', '--page must be between 1 and 184467440737095516.'];
+        yield 'non-numeric page' => [['--page' => 'abc'], 'page=abc', '--page must be an integer.'];
+        yield 'excess limit' => [['--limit' => '500'], 'limit=500', '--limit must be between 1 and 100.'];
+        yield 'zero limit' => [['--limit' => '0'], 'limit=0', '--limit must be between 1 and 100.'];
+    }
+
+    /** @param array<string, string> $options */
+    #[DataProvider('refusedPages')]
+    public function testListRefusesThePagesTheApiRefuses(array $options, string $query, string $message): void
+    {
+        $tester = new CommandTester(new FailedMessageListCommand($this->failedMessages));
+
+        self::assertSame(Command::INVALID, $tester->execute($options, ['capture_stderr_separately' => true]));
+        self::assertStringContainsString($message, $tester->getErrorOutput());
+        self::assertNull($this->failedMessages->lastSlice);
+
+        parse_str($query, $parameters);
+        $this->expectException(InvalidQueryParameter::class);
+        $this->controller()->listFailed(new Request($parameters));
     }
 
     public function testListOfAnEmptyTransportSaysSo(): void
@@ -223,8 +247,8 @@ final class FakeFailureTransport implements FailedMessageAdministrationInterface
 
     public ?\RuntimeException $failure = null;
 
-    /** @var array{int, int}|null */
-    public ?array $lastPage = null;
+    /** @var array{int, int}|null the limit and offset of the last read */
+    public ?array $lastSlice = null;
 
     public int $removeAllCalls = 0;
 
@@ -235,12 +259,12 @@ final class FakeFailureTransport implements FailedMessageAdministrationInterface
         return count($this->messages);
     }
 
-    public function page(int $page, int $limit): FailedMessagePage
+    public function newest(int $limit, int $offset): FailedMessagePage
     {
         $this->failIfUnavailable();
-        $this->lastPage = [$page, $limit];
+        $this->lastSlice = [$limit, $offset];
 
-        return new FailedMessagePage(array_slice($this->messages, ($page - 1) * $limit, $limit), count($this->messages));
+        return new FailedMessagePage(array_slice($this->messages, $offset, $limit), count($this->messages));
     }
 
     public function find(string $id): ?FailedMessage

@@ -43,8 +43,15 @@ vi.mock('@/features/catalog/components/LyricsDialog', () => ({
 }))
 
 // Mock API hooks that require QueryClient
+const { playlistIndex } = vi.hoisted(() => ({
+  playlistIndex: { rows: undefined as { publicId: string; name: string }[] | undefined },
+}))
+
+vi.mock('@/features/playlist/hooks/use-playlist-index', () => ({
+  usePlaylistIndex: () => ({ data: playlistIndex.rows === undefined ? undefined : { data: playlistIndex.rows } }),
+}))
+
 vi.mock('@/shared/api-client/gen/endpoints', () => ({
-  useGetPlaylistIndex: () => ({ data: undefined }),
   usePostPlaylistAddSong: () => ({ mutateAsync: vi.fn() }),
 }))
 
@@ -72,6 +79,7 @@ import { SongContextMenu } from '../SongContextMenu'
 describe('SongContextMenu', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    playlistIndex.rows = undefined
   })
 
   const song = {
@@ -125,6 +133,20 @@ describe('SongContextMenu', () => {
     expect(screen.getByText('Love')).toBeInTheDocument()
     expect(screen.getByText('Get Info')).toBeInTheDocument()
     expect(screen.getByText('Add to Playlist')).toBeInTheDocument()
+  })
+
+  it('offers every playlist the paging hook read, past the first page', async () => {
+    playlistIndex.rows = Array.from({ length: 101 }, (_, index) => ({
+      publicId: `playlist-${index}`,
+      name: `Playlist ${String(index + 1).padStart(3, '0')}`,
+    }))
+    const user = userEvent.setup()
+    renderMenu()
+
+    await user.pointer({ keys: '[MouseRight]', target: screen.getByTestId('trigger') })
+    await user.click(screen.getByRole('menuitem', { name: 'Add to Playlist' }))
+
+    expect(await screen.findByRole('menuitem', { name: 'Playlist 101' })).toBeInTheDocument()
   })
 
   it('displays keyboard shortcut for Play', async () => {

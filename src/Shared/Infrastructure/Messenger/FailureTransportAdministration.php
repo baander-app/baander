@@ -58,10 +58,10 @@ final readonly class FailureTransportAdministration implements FailedMessageAdmi
         }
     }
 
-    public function page(int $page, int $limit): FailedMessagePage
+    public function newest(int $limit, int $offset): FailedMessagePage
     {
         $messages = [];
-        foreach ($this->ids($limit, ($page - 1) * $limit) as $id) {
+        foreach ($this->ids($limit, $offset) as $id) {
             $envelope = $this->envelope($id);
             if ($envelope !== null) {
                 $messages[] = $this->describe($id, $envelope);

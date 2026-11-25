@@ -28,6 +28,7 @@ use App\Shared\Interface\Controller\ApiResponsesTrait;
 use App\Shared\Interface\Controller\DispatchesMessagesTrait;
 use App\Shared\Interface\DTO\ApiError;
 use App\Shared\Interface\DTO\PaginatedResponse;
+use App\Shared\Interface\Request\QueryParameters;
 use App\Shared\Interface\DTO\ValidationError;
 use InvalidArgumentException;
 use OpenApi\Spec as OA;
@@ -74,13 +75,13 @@ final class AlbumController
                 name: 'page',
                 in: 'query',
                 description: 'Page number',
-                schema: new OA\Schema(type: 'integer', default: 1),
+                schema: new OA\Schema(type: 'integer', minimum: 1, default: 1),
             ),
             new OA\Parameter(
                 name: 'limit',
                 in: 'query',
-                description: 'Items per page (max 100)',
-                schema: new OA\Schema(type: 'integer', default: 50),
+                description: 'Items per page',
+                schema: new OA\Schema(type: 'integer', minimum: 1, maximum: 100, default: 50),
             ),
             new OA\Parameter(
                 name: 'q',
@@ -130,15 +131,20 @@ final class AlbumController
                     schema: new OA\Schema(ref: PaginatedResponse::class),
                 ),
             ),
+            new OA\Response(
+                response: '400',
+                description: 'Invalid page or limit',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
+            ),
         ],
     )]
     #[Route('/', name: 'index', methods: ['GET'])]
     public function index(Request $request): JsonResponse
     {
         $scope = $this->libraryReadScopeProvider->current();
-        $page = max(1, (int)$request->query->get('page', 1));
-        $limit = min(100, max(1, (int)$request->query->get('limit', 50)));
-        $offset = ($page - 1) * $limit;
+        $pagination = QueryParameters::page($request->query);
         $query = (string)$request->query->get('q', '');
 
         $filters = [];
@@ -161,7 +167,7 @@ final class AlbumController
             ];
         }
 
-        $options = SearchOptions::create($query, $limit, $offset)
+        $options = SearchOptions::create($query, $pagination->limit, $pagination->offset)
             ->withFilters($filters);
 
         $sort = $request->query->get('sort');
@@ -196,9 +202,9 @@ final class AlbumController
 
         return $this->paginatedResponse(new PaginatedResponse(
             data: $results,
-            currentPage: $page,
-            lastPage: (int)ceil($total / $limit) ?: 1,
-            perPage: $limit,
+            currentPage: $pagination->page,
+            lastPage: $pagination->lastPage($total),
+            perPage: $pagination->limit,
             total: $total,
         ));
     }

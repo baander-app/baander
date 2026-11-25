@@ -13,11 +13,15 @@ use App\Shared\Domain\ValueObject\LibraryReadScope;
 interface PlaylistPortInterface
 {
     /**
-     * The playlists the actor owns or collaborates on, each with the actor's visible song count.
+     * A page of the playlists the actor owns or collaborates on, by name and then id, each
+     * with the actor's visible song count.
      *
      * @return list<PlaylistReadView>
      */
-    public function findReadByUser(Uuid $actorId, LibraryReadScope $scope): array;
+    public function findReadByUser(Uuid $actorId, LibraryReadScope $scope, int $limit, int $offset): array;
+
+    /** The number of playlists the actor owns or collaborates on. */
+    public function countReadByUser(Uuid $actorId): int;
 
     /** One playlist as the viewer reads it: the song count is the viewer's visible count. */
     public function findRead(Uuid $playlistId, LibraryReadScope $scope): ?PlaylistReadView;

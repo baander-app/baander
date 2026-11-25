@@ -28,6 +28,7 @@ use App\Catalog\Interface\Resource\SongResource;
 use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
 use App\Shared\Interface\Controller\ApiResponsesTrait;
+use App\Shared\Interface\Request\QueryParameters;
 use OpenApi\Spec as OA;
 use Symfony\Bundle\SecurityBundle\Security;
 use Symfony\Component\HttpFoundation\JsonResponse;
@@ -76,7 +77,32 @@ final class PlaylistController
     #[OA\Operation\Get(
         path: '/api/playlists/',
         summary: 'List the playlists the authenticated user owns or collaborates on',
-        description: 'Each playlist carries the owner\'s public id and the number of songs the caller can see.',
+        description: 'A page of the playlists, ordered by name and then by id. Each playlist carries the owner\'s public id and the number of songs the caller can see.',
+        parameters: [
+            new OA\Parameter(
+                name: 'limit',
+                in: 'query',
+                description: 'Maximum number of playlists to return',
+                required: false,
+                schema: new OA\Schema(
+                    type: 'integer',
+                    minimum: 1,
+                    maximum: 100,
+                    default: 50,
+                ),
+            ),
+            new OA\Parameter(
+                name: 'offset',
+                in: 'query',
+                description: 'Number of playlists to skip',
+                required: false,
+                schema: new OA\Schema(
+                    type: 'integer',
+                    minimum: 0,
+                    default: 0,
+                ),
+            ),
+        ],
         responses: [
             new OA\Response(
                 response: '200',
@@ -89,8 +115,25 @@ final class PlaylistController
                                 type: 'array',
                                 items: new OA\Schema(ref: PlaylistResource::class),
                             ),
+                            'meta' => new OA\Schema(
+                                type: 'object',
+                                properties: [
+                                    'total' => new OA\Schema(description: 'Playlists the user owns or collaborates on', type: 'integer'),
+                                    'limit' => new OA\Schema(type: 'integer'),
+                                    'offset' => new OA\Schema(type: 'integer'),
+                                ],
+                                required: ['total', 'limit', 'offset'],
+                            ),
                         ],
+                        required: ['data', 'meta'],
                     ),
+                ),
+            ),
+            new OA\Response(
+                response: '400',
+                description: 'Invalid limit or offset',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
                 ),
             ),
             new OA\Response(
@@ -110,12 +153,23 @@ final class PlaylistController
             return $this->unauthorized();
         }
 
+        $pagination = QueryParameters::pagination($request->query);
+        $actorId = Uuid::fromString($user->getId());
         $playlists = $this->playlistService->findReadByUser(
-            Uuid::fromString($user->getId()),
+            $actorId,
             $this->libraryScopes->current(),
+            $pagination->limit,
+            $pagination->offset,
         );
 
-        return $this->successResponse(PlaylistResource::collection($playlists));
+        return new JsonResponse([
+            'data' => PlaylistResource::collection($playlists),
+            'meta' => [
+                'total' => $this->playlistService->countReadByUser($actorId),
+                'limit' => $pagination->limit,
+                'offset' => $pagination->offset,
+            ],
+        ]);
     }
 
     /**

@@ -23,8 +23,8 @@ make exec cmd="php bin/console app:failed-message:list --page=2 --limit=20"
 
 | Option | Default | Description |
 |--------|---------|-------------|
-| `--page` | `1` | Page number; values below 1 read page 1 |
-| `--limit` | `50` | Messages per page; values outside 1-100 are clamped |
+| `--page` | `1` | Page number, from 1 |
+| `--limit` | `50` | Messages per page, from 1 to 100 |
 | `--json` | off | Print the `data` array of `GET /api/monitor/transport/failed` as JSON instead of a table |
 
 ## Details
@@ -46,9 +46,12 @@ Symfony's `messenger:failed:show` without an ID skips messages waiting out a ret
 
 With `--json`, stdout holds only the `data` array of the API response. The paging figures from the API's `meta` object are not printed.
 
+The command refuses the pages the API refuses with `400`: a `--page` or `--limit` that is not an integer, a value below 1, a `--limit` over 100, and a `--page` for which page × limit exceeds 2⁶³ − 1, the largest signed 64-bit integer. It names the option and its range on stderr and reads nothing.
+
 ## Exit codes
 
 | Code | Meaning |
 |------|---------|
 | 0 | List printed, possibly empty |
 | 1 | The failure transport could not be read; the message says why |
+| 2 | `--page` or `--limit` was refused |

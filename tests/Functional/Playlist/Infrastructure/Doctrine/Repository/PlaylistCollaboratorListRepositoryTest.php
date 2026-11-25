@@ -57,20 +57,20 @@ final class PlaylistCollaboratorListRepositoryTest extends TestCase
         $repository = static::getContainer()->get(PlaylistRepositoryInterface::class);
         $scope = LibraryReadScope::restricted([$this->collaboratorLibrary->getId()]);
 
-        $views = $repository->findReadByUser($this->collaborator->getId(), $scope);
+        $views = $repository->findReadByUser($this->collaborator->getId(), $scope, 100, 0);
 
         $this->assertSame(['A Shared', 'C Own'], array_map(static fn ($view) => $view->getName(), $views));
         $this->assertSame($this->owner->getPublicId()->toString(), $views[0]->getOwnerPublicId()->toString());
         $this->assertSame([$this->collaborator->getPublicId()->toString()], array_map(static fn (PublicId $id) => $id->toString(), $views[0]->getCollaboratorPublicIds()));
         $this->assertSame([1, 0], array_map(static fn ($view) => $view->getSongCount(), $views));
-        $this->assertSame([2, 0], array_map(static fn ($view) => $view->getSongCount(), $repository->findReadByUser($this->collaborator->getId(), LibraryReadScope::unrestricted())));
+        $this->assertSame([2, 0], array_map(static fn ($view) => $view->getSongCount(), $repository->findReadByUser($this->collaborator->getId(), LibraryReadScope::unrestricted(), 100, 0)));
     }
 
     public function testTheOwnerListsEveryOwnedPlaylistAndNotTheCollaboratorsOwn(): void
     {
         $repository = static::getContainer()->get(PlaylistRepositoryInterface::class);
 
-        $views = $repository->findReadByUser($this->owner->getId(), LibraryReadScope::unrestricted());
+        $views = $repository->findReadByUser($this->owner->getId(), LibraryReadScope::unrestricted(), 100, 0);
 
         $this->assertSame(['A Shared', 'B Private'], array_map(static fn ($view) => $view->getName(), $views));
         $this->assertSame([[$this->collaborator->getPublicId()->toString()], []], array_map(

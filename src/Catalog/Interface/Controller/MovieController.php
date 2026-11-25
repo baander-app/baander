@@ -19,6 +19,7 @@ use App\Shared\Interface\Attribute\CliCounterpart;
 use App\Shared\Interface\Controller\ApiResponsesTrait;
 use App\Shared\Interface\Controller\DispatchesMessagesTrait;
 use App\Shared\Interface\DTO\PaginatedResponse;
+use App\Shared\Interface\Request\QueryParameters;
 use OpenApi\Spec as OA;
 use OpenApi\Spec\Parameter;
 use OpenApi\Spec\Schema as ParameterSchema;
@@ -59,19 +60,26 @@ final class MovieController
                     schema: new OA\Schema(ref: PaginatedResponse::class),
                 ),
             ),
+            new OA\Response(
+                response: '400',
+                description: 'Invalid page or limit',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
+            ),
         ],
     )]
     #[Parameter(
         name: 'page',
         in: 'query',
         description: 'Page number',
-        schema: new ParameterSchema(type: 'integer', default: 1),
+        schema: new ParameterSchema(type: 'integer', minimum: 1, default: 1),
     )]
     #[Parameter(
         name: 'limit',
         in: 'query',
-        description: 'Items per page (max 100)',
-        schema: new ParameterSchema(type: 'integer', default: 50),
+        description: 'Items per page',
+        schema: new ParameterSchema(type: 'integer', minimum: 1, maximum: 100, default: 50),
     )]
     #[Parameter(
         name: 'q',
@@ -83,12 +91,10 @@ final class MovieController
     public function index(Request $request): JsonResponse
     {
         $scope = $this->libraryReadScopeProvider->current();
-        $page = max(1, (int) $request->query->get('page', 1));
-        $limit = min(100, max(1, (int) $request->query->get('limit', 50)));
-        $offset = ($page - 1) * $limit;
+        $pagination = QueryParameters::page($request->query);
         $query = (string) $request->query->get('q', '');
 
-        $options = SearchOptions::create($query, $limit, $offset);
+        $options = SearchOptions::create($query, $pagination->limit, $pagination->offset);
         $searchResult = $this->movieService->searchVisible($options, $scope);
 
         $results = MovieResource::collection($searchResult->getItems());
@@ -96,9 +102,9 @@ final class MovieController
 
         return $this->paginatedResponse(new PaginatedResponse(
             data: $results,
-            currentPage: $page,
-            lastPage: (int) ceil($total / $limit) ?: 1,
-            perPage: $limit,
+            currentPage: $pagination->page,
+            lastPage: $pagination->lastPage($total),
+            perPage: $pagination->limit,
             total: $total,
         ));
     }

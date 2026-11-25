@@ -12,6 +12,8 @@ use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\SearchOptions;
 use App\Shared\Interface\Controller\ApiResponsesTrait;
 use App\Shared\Interface\DTO\PaginatedResponse;
+use App\Shared\Interface\Request\PageNumberPagination;
+use App\Shared\Interface\Request\QueryParameters;
 use OpenApi\Spec as OA;
 use OpenApi\Spec\Parameter;
 use OpenApi\Spec\Schema as ParameterSchema;
@@ -59,18 +61,26 @@ final class MovieDirectorController
                     ),
                 ),
             ),
+            new OA\Response(
+                response: '400',
+                description: 'Invalid page or limit',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
+            ),
         ],
     )]
     #[Parameter(
         name: 'page',
         in: 'query',
-        schema: new ParameterSchema(type: 'integer', default: 1),
+        schema: new ParameterSchema(type: 'integer', minimum: 1, default: 1),
     )]
     #[Parameter(
         name: 'limit',
         in: 'query',
         schema: new ParameterSchema(
             type: 'integer',
+            minimum: 1,
             maximum: 100,
             default: 50,
         ),
@@ -83,14 +93,14 @@ final class MovieDirectorController
     #[Route('', name: 'index', methods: ['GET'])]
     public function index(Request $request): JsonResponse
     {
-        [$options, $page, $limit] = self::options($request);
-        $result = $this->directors->searchVisible($options, $this->scopeProvider->current());
+        $pagination = QueryParameters::page($request->query);
+        $result = $this->directors->searchVisible(self::options($request, $pagination), $this->scopeProvider->current());
 
         return $this->paginatedResponse(new PaginatedResponse(
             data: DirectorResource::collection($result->getItems()),
-            currentPage: $page,
-            lastPage: max(1, (int) ceil($result->getTotal() / $limit)),
-            perPage: $limit,
+            currentPage: $pagination->page,
+            lastPage: $pagination->lastPage($result->getTotal()),
+            perPage: $pagination->limit,
             total: $result->getTotal(),
         ));
     }
@@ -155,6 +165,13 @@ final class MovieDirectorController
                 ),
             ),
             new OA\Response(response: '404', description: 'Director not found'),
+            new OA\Response(
+                response: '400',
+                description: 'Invalid page or limit',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
+            ),
         ],
     )]
     #[Parameter(
@@ -166,13 +183,14 @@ final class MovieDirectorController
     #[Parameter(
         name: 'page',
         in: 'query',
-        schema: new ParameterSchema(type: 'integer', default: 1),
+        schema: new ParameterSchema(type: 'integer', minimum: 1, default: 1),
     )]
     #[Parameter(
         name: 'limit',
         in: 'query',
         schema: new ParameterSchema(
             type: 'integer',
+            minimum: 1,
             maximum: 100,
             default: 50,
         ),
@@ -185,29 +203,25 @@ final class MovieDirectorController
     #[Route('/{publicId}/movies', name: 'movies', methods: ['GET'])]
     public function movies(string $publicId, Request $request): JsonResponse
     {
+        $pagination = QueryParameters::page($request->query);
         $scope = $this->scopeProvider->current();
         $id = PublicId::fromString($publicId);
         if ($this->directors->findVisibleByPublicId($id, $scope) === null) {
             return $this->notFound();
         }
-        [$options, $page, $limit] = self::options($request);
-        $result = $this->directors->searchMoviesVisible($id, $options, $scope);
+        $result = $this->directors->searchMoviesVisible($id, self::options($request, $pagination), $scope);
 
         return $this->paginatedResponse(new PaginatedResponse(
             data: MovieResource::collection($result->getItems()),
-            currentPage: $page,
-            lastPage: max(1, (int) ceil($result->getTotal() / $limit)),
-            perPage: $limit,
+            currentPage: $pagination->page,
+            lastPage: $pagination->lastPage($result->getTotal()),
+            perPage: $pagination->limit,
             total: $result->getTotal(),
         ));
     }
 
-    /** @return array{SearchOptions, int, int} */
-    private static function options(Request $request): array
+    private static function options(Request $request, PageNumberPagination $pagination): SearchOptions
     {
-        $page = max(1, (int) $request->query->get('page', 1));
-        $limit = min(100, max(1, (int) $request->query->get('limit', 50)));
-
-        return [SearchOptions::create((string) $request->query->get('q', ''), $limit, ($page - 1) * $limit), $page, $limit];
+        return SearchOptions::create((string) $request->query->get('q', ''), $pagination->limit, $pagination->offset);
     }
 }

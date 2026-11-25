@@ -31,7 +31,14 @@ vi.mock('@/shared/api-client/gen/endpoints', () => ({
     },
     isPending: false,
   }),
-  useGetPlaylistIndex: () => ({ data: { data: [] }, isPending: false }),
+}))
+
+const { playlistIndex } = vi.hoisted(() => ({
+  playlistIndex: { rows: [] as { publicId: string; name: string; isSmart: boolean; songCount: number }[] },
+}))
+
+vi.mock('@/features/playlist/hooks/use-playlist-index', () => ({
+  usePlaylistIndex: () => ({ data: { data: playlistIndex.rows }, isPending: false }),
 }))
 
 vi.mock('@/features/catalog/hooks/use-for-you-view-model', () => ({
@@ -81,6 +88,19 @@ describe('HomePage', () => {
     for (const artist of screen.getAllByText('Rammstein')) {
       expect(artist).toHaveAttribute('lang', 'en')
     }
+  })
+
+  it('shows every playlist the paging hook read, past the first page', () => {
+    playlistIndex.rows = Array.from({ length: 101 }, (_, index) => ({
+      publicId: `playlist-${index}`,
+      name: `Playlist ${String(index + 1).padStart(3, '0')}`,
+      isSmart: false,
+      songCount: 0,
+    }))
+    renderPage()
+
+    expect(screen.getByText('Playlist 101')).toBeInTheDocument()
+    playlistIndex.rows = []
   })
 
   it('keeps a recently played song title apart from its unavailable note', () => {

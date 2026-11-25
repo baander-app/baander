@@ -4,8 +4,10 @@ declare(strict_types=1);
 
 namespace App\Shared\Interface\Console;
 
+use App\Shared\Application\Exception\InvalidInputException;
 use App\Shared\Application\FailureTransportUnavailableException;
 use App\Shared\Application\Port\FailedMessageAdministrationInterface;
+use App\Shared\Interface\Request\PageNumberPagination;
 use App\Shared\Interface\Resource\FailedMessageResource;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;
@@ -43,11 +45,15 @@ final class FailedMessageListCommand extends Command
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
         $io = new SymfonyStyle($input, $output);
-        $page = max(1, (int) $input->getOption('page'));
-        $limit = min(self::MAX_LIMIT, max(1, (int) $input->getOption('limit')));
 
         try {
-            $result = $this->failedMessages->page($page, $limit);
+            $pagination = self::pagination($input);
+        } catch (InvalidInputException $e) {
+            return AdminCommandSupport::fail($io, $e);
+        }
+
+        try {
+            $result = $this->failedMessages->newest($pagination->limit, $pagination->offset);
         } catch (FailureTransportUnavailableException $e) {
             $io->getErrorStyle()->error(sprintf('Failure transport unavailable: %s', $e->getMessage()));
 
@@ -74,14 +80,33 @@ final class FailedMessageListCommand extends Command
         if (!AdminCommandSupport::wantsJson($input) && $result->total > 0) {
             $io->text(sprintf(
                 'Page %d of %d, %d %s in total.',
-                $page,
-                max(1, (int) ceil($result->total / $limit)),
+                $pagination->page,
+                $pagination->lastPage($result->total),
                 $result->total,
                 $result->total === 1 ? 'message' : 'messages',
             ));
         }
 
         return $exitCode;
+    }
+
+    /** @throws InvalidInputException for a page or limit the API refuses with 400 */
+    private static function pagination(InputInterface $input): PageNumberPagination
+    {
+        $limit = self::bounded($input, 'limit', self::MAX_LIMIT);
+
+        return new PageNumberPagination(self::bounded($input, 'page', PageNumberPagination::maximumPage($limit)), $limit);
+    }
+
+    /** @throws InvalidInputException when the option is not an integer from 1 to $maximum */
+    private static function bounded(InputInterface $input, string $name, int $maximum): int
+    {
+        $value = AdminCommandSupport::integerOption($input, $name) ?? 1;
+        if ($value < 1 || $value > $maximum) {
+            throw new InvalidInputException(sprintf('--%s must be between 1 and %d.', $name, $maximum));
+        }
+
+        return $value;
     }
 
     private static function error(mixed $class, mixed $message): string

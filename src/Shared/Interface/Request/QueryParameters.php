@@ -107,6 +107,22 @@ final class QueryParameters
     }
 
     /**
+     * Numbered paging. A page below 1, a page that is not an integer, and a page for which
+     * page × limit exceeds PHP_INT_MAX are refused; a page past the last one reads no rows.
+     *
+     * @param InputBag<covariant string|int|float|bool|null> $query
+     */
+    public static function page(InputBag $query, int $defaultLimit = 50, int $maximumLimit = 100): PageNumberPagination
+    {
+        $limit = self::integer($query, 'limit', $defaultLimit, 1, $maximumLimit);
+
+        return new PageNumberPagination(
+            self::integer($query, 'page', 1, 1, PageNumberPagination::maximumPage($limit)),
+            $limit,
+        );
+    }
+
+    /**
      * @param InputBag<covariant string|int|float|bool|null> $query
      */
     public static function integer(InputBag $query, string $name, int $default, int $minimum, int $maximum = PHP_INT_MAX): int

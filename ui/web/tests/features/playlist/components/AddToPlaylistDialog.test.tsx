@@ -7,12 +7,15 @@ import { resolveTheme } from '@/shared/theme/resolve-theme'
 
 const testTheme = resolveTheme('dark', 'violet')
 
-const mockUseGetPlaylistIndex = vi.fn()
+const mockUsePlaylistIndex = vi.fn()
 const mockUsePostPlaylistAddSong = vi.fn()
 const mockUsePostPlaylistStore = vi.fn()
 
+vi.mock('@/features/playlist/hooks/use-playlist-index', () => ({
+  usePlaylistIndex: (...args: unknown[]) => mockUsePlaylistIndex(...args),
+}))
+
 vi.mock('@/shared/api-client/gen/endpoints', () => ({
-  useGetPlaylistIndex: (...args: unknown[]) => mockUseGetPlaylistIndex(...args),
   usePostPlaylistAddSong: (...args: unknown[]) => mockUsePostPlaylistAddSong(...args),
   usePostPlaylistStore: (...args: unknown[]) => mockUsePostPlaylistStore(...args),
 }))
@@ -47,7 +50,7 @@ describe('AddToPlaylistDialog', () => {
   })
 
   it('renders dialog title and description when open', () => {
-    mockUseGetPlaylistIndex.mockReturnValue({
+    mockUsePlaylistIndex.mockReturnValue({
       data: { data: [] },
       isPending: false,
     })
@@ -63,7 +66,7 @@ describe('AddToPlaylistDialog', () => {
   })
 
   it('shows playlists from API', () => {
-    mockUseGetPlaylistIndex.mockReturnValue({
+    mockUsePlaylistIndex.mockReturnValue({
       data: {
         data: [
           { publicId: 'pl_1', name: 'My Playlist', isSmart: false },
@@ -87,7 +90,7 @@ describe('AddToPlaylistDialog', () => {
   })
 
   it('shows loading skeleton while fetching playlists', () => {
-    mockUseGetPlaylistIndex.mockReturnValue({
+    mockUsePlaylistIndex.mockReturnValue({
       data: undefined,
       isPending: true,
     })
@@ -104,7 +107,7 @@ describe('AddToPlaylistDialog', () => {
   })
 
   it('shows empty message when no regular playlists exist', () => {
-    mockUseGetPlaylistIndex.mockReturnValue({
+    mockUsePlaylistIndex.mockReturnValue({
       data: { data: [{ publicId: 'pl_1', name: 'Smart Mix', isSmart: true }] },
       isPending: false,
     })
@@ -119,7 +122,7 @@ describe('AddToPlaylistDialog', () => {
   })
 
   it('shows create playlist form', () => {
-    mockUseGetPlaylistIndex.mockReturnValue({
+    mockUsePlaylistIndex.mockReturnValue({
       data: { data: [] },
       isPending: false,
     })
@@ -135,7 +138,7 @@ describe('AddToPlaylistDialog', () => {
   })
 
   it('adds the song to the created playlist using the plain resource response', async () => {
-    mockUseGetPlaylistIndex.mockReturnValue({ data: { data: [] }, isPending: false })
+    mockUsePlaylistIndex.mockReturnValue({ data: { data: [] }, isPending: false })
     const create = mockMutation()
     const add = mockMutation()
     const onOpenChange = vi.fn()
