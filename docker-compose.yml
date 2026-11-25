@@ -207,8 +207,8 @@ services:
         depends_on:
             - log-agent
         restart: unless-stopped
-        # noeviction is required by RedisTagAwareAdapter (tag-aware cache pool).
-        # Do not change to allkeys-lru or Redis tag invalidation will silently stop working.
+        # noeviction keeps queued messages and rate-limit and DPoP state from being evicted,
+        # as the preset does. Do not change it to allkeys-lru.
         command: redis-server --maxmemory-policy noeviction --requirepass $REDIS_PASSWORD
         environment:
             REDIS_PASSWORD: ${REDIS_PASSWORD}

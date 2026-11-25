@@ -1,11 +1,12 @@
 framework:
     cache:
-        # Default Redis provider for all pools. Every DSN carries a connect timeout and a
-        # read timeout of 1 s (RedisClientFactory::TIMEOUT_SECONDS), so a Redis that
-        # accepts connections but does not answer fails the request within a bound
-        # instead of blocking its coroutine. Rate limiters use RedisClientFactory
-        # directly, with the same timeouts.
-        default_redis_provider: 'redis://default:%env(REDIS_PASSWORD)%@redis:6379?timeout=1&read_timeout=1'
+        # Default Redis provider for all pools. The pools authenticate as REDIS_URL's user
+        # with its percent-decoded password, as every other Redis client does. Every DSN
+        # carries a connect timeout and a read timeout of 1 s
+        # (RedisClientFactory::TIMEOUT_SECONDS), so a Redis that accepts connections but
+        # does not answer fails the request within a bound instead of blocking its
+        # coroutine. Rate limiters use RedisClientFactory directly, with the same timeouts.
+        default_redis_provider: '%env(REDIS_URL)%?timeout=1&read_timeout=1'
 
         app: cache.adapter.redis
         system: cache.adapter.system
@@ -18,15 +19,15 @@ framework:
             # Doctrine result cache — 1 hour default, overridable per-query
             doctrine.result_cache_pool:
                 adapter: cache.adapter.redis
-                provider: 'redis://default:%env(REDIS_PASSWORD)%@redis:6379?timeout=1&read_timeout=1'
+                provider: '%env(REDIS_URL)%?timeout=1&read_timeout=1'
                 default_lifetime: 3600
 
-            # Tag-aware cache for application-level invalidation (RedisTagAwareAdapter)
-            # Requires Redis maxmemory-policy of noeviction or volatile-*
+            # Tag-aware cache for application-level invalidation: Symfony's TagAwareAdapter
+            # over a Redis pool, which keeps tag versions as ordinary cache items.
             cache.tags:
                 tags: true
                 adapter: cache.adapter.redis
-                provider: 'redis://default:%env(REDIS_PASSWORD)%@redis:6379?timeout=1&read_timeout=1'
+                provider: '%env(REDIS_URL)%?timeout=1&read_timeout=1'
                 default_lifetime: 3600
 
 services:
@@ -36,12 +37,10 @@ services:
         arguments:
             - '@redis.session.client'
 
+    # A connection with RedisClientFactory's timeouts, authenticated as REDIS_URL's user.
     redis.session.client:
         class: Redis
-        calls:
-            # Connect and read timeouts match RedisClientFactory::TIMEOUT_SECONDS.
-            - [connect, ['redis', 6379, 1.0, null, 0, 1.0]]
-            - [auth, ['%env(REDIS_PASSWORD)%']]
+        factory: ['@App\Shared\Infrastructure\Redis\RedisClientFactory', 'createStandaloneConnection']
 
 when@test:
     framework:

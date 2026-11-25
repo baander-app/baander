@@ -42,7 +42,12 @@ final class MessengerDelayedPromotionTest extends TestCase
         $this->stream = 'delayed_promotion_' . bin2hex(random_bytes(12));
         $this->queue = $this->stream . '__queue';
         $this->serializer = new JsonTransportSerializer(MessageCodecFactory::create());
-        $parts = parse_url($dsn);
+        // The test's own connection creates restricted users: ACL is outside the application user's ACL.
+        $admin = getenv('REDIS_TEST_ADMIN_DSN');
+        if (!$admin) {
+            self::markTestSkipped('Set REDIS_TEST_ADMIN_DSN to an administrator of the disposable Redis.');
+        }
+        $parts = parse_url($admin);
         self::assertIsArray($parts);
         $this->redis = new \Redis();
         $this->redis->connect($parts['host'], $parts['port'] ?? 6379, 2.0);

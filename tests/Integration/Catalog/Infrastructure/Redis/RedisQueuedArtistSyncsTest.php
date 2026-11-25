@@ -32,8 +32,13 @@ final class RedisQueuedArtistSyncsTest extends TestCase
     protected function tearDown(): void
     {
         $this->redis->borrow(static function (\Redis $redis): void {
-            $keys = $redis->keys(self::PREFIX . ':*');
-            if (is_array($keys) && $keys !== []) {
+            $keys = [];
+            $cursor = null;
+            // SCAN, not KEYS: KEYS is outside the application user's ACL.
+            while (($batch = $redis->scan($cursor, self::PREFIX . ':*', 1000)) !== false) {
+                $keys = [...$keys, ...$batch];
+            }
+            if ($keys !== []) {
                 $redis->del($keys);
             }
         });

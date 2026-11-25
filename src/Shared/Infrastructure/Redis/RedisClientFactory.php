@@ -31,7 +31,7 @@ class RedisClientFactory
     /** Connect timeout and read timeout, in seconds, of every connection this factory opens. */
     public const float TIMEOUT_SECONDS = 1.0;
 
-    /** @var array{host: string, port: int, password: string|null} */
+    /** @var array{host: string, port: int, user: string|null, password: string|null} */
     private readonly array $parsed;
 
     /** @var list<array{redis: Redis, idleSince: float}> Idle connections ready for reuse */
@@ -56,7 +56,7 @@ class RedisClientFactory
     private readonly mixed $cidExistsFn;
 
     /**
-     * @param string $dsn Redis DSN (redis://[user:pass@]host:port)
+     * @param string $dsn Redis DSN (redis://[user:pass@]host:port), user and password percent-encoded
      * @param int $maxSize Maximum connections in the pool
      * @param int $idleTimeoutSeconds Seconds before idle connections are evicted
      * @param (callable(): Redis)|null $connectionFactory Supplies a ready, connected client (for testing); the default connects a fresh client with the timeouts
@@ -72,14 +72,17 @@ class RedisClientFactory
         ?callable $getCidFn = null,
         ?callable $cidExistsFn = null,
     ) {
-        if (!preg_match('#^redis://(?:[^:@]+:(?<pass>[^@]+)@)?(?<host>[^:]+):(?<port>\d+)$#', $dsn, $m)) {
+        if (!preg_match('#^redis://(?:(?<user>[^:@/]*):(?<pass>[^@/]*)@)?(?<host>[^:@/]+):(?<port>\d+)$#D', $dsn, $m)) {
             throw new InvalidArgumentException('Cannot parse Redis DSN.');
         }
+        $user = rawurldecode($m['user']);
+        $password = rawurldecode($m['pass']);
 
         $this->parsed = [
             'host'     => $m['host'],
             'port'     => (int) $m['port'],
-            'password' => $m['pass'] !== '' ? $m['pass'] : null,
+            'user'     => $user !== '' ? $user : null,
+            'password' => $password !== '' ? $password : null,
         ];
 
         $this->maxSize = $maxSize;
@@ -267,7 +270,8 @@ class RedisClientFactory
     }
 
     /**
-     * Connects a Redis client to the parsed DSN with the connect and read timeouts and authenticates it.
+     * Connects a Redis client to the parsed DSN with the connect and read timeouts and
+     * authenticates it as the DSN's user, or as `default` when the DSN names none.
      *
      * The read timeout goes through connect(): phpredis builds the socket there, so an
      * OPT_READ_TIMEOUT set before connecting would not survive it.
@@ -277,7 +281,7 @@ class RedisClientFactory
         $redis->connect($this->parsed['host'], $this->parsed['port'], self::TIMEOUT_SECONDS, null, 0, self::TIMEOUT_SECONDS);
 
         if ($this->parsed['password'] !== null) {
-            $redis->auth($this->parsed['password']);
+            $redis->auth($this->parsed['user'] === null ? $this->parsed['password'] : [$this->parsed['user'], $this->parsed['password']]);
         }
 
         return $redis;

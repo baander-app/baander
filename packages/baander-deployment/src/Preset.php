@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Baander\Deployment;
 
 use Baander\Configuration\ApplicationLayout;
+use Baander\Core\EnvironmentVariable;
 use Baander\Configuration\Sources\JsonDocument;
 use Baander\Configuration\ToolingConfiguration;
 use Baander\Containers\Docker\Client;
@@ -20,6 +21,7 @@ use Baander\Deployment\Presets\StateStore;
 use Baander\Deployment\Presets\Configuration as PresetConfiguration;
 use Baander\Deployment\Presets\EdgeNetwork;
 use Baander\Deployment\Presets\EdgeSubnet;
+use Baander\Deployment\Presets\RedisCredentials;
 use Baander\Deployment\Workers\KillOrder;
 use Baander\Deployment\Profiles\ImageProfile;
 use Baander\Deployment\Database\PostgresConfiguration;
@@ -171,7 +173,8 @@ final readonly class Preset
         $this->assertOwnedServices($state);
         $this->assertEdgeSubnetFree($configuration);
         $this->prepareVolumes($configuration, $state);
-        $this->docker->compose($configuration->name, $this->composeFile(), ['up', '-d', '--wait', 'postgres', 'redis'], timeout: 180);
+        $this->redisCredentials($configuration, $state);
+        $this->docker->compose($configuration->name, $this->composeFile(), ['up', '-d', '--wait', 'postgres', RedisCredentials::SERVICE], timeout: 180);
         $this->poolerCredentials($configuration, $state);
         $this->docker->compose($configuration->name, $this->composeFile(), ['up', '-d', '--wait', Pooler::SERVICE], timeout: 180);
         $this->migrate($configuration, $state, $layout, $profile);
@@ -362,7 +365,7 @@ final readonly class Preset
                 $this->seedVolume($configuration, $state, $role, $name, '$path = "/seed/" . $argv[1]; if (file_put_contents($path, stream_get_contents(STDIN)) === false || !chmod($path, 0644)) { exit(1); }', [$files[$role]['name']], $files[$role]['content']);
                 continue;
             }
-            if (in_array($role, ['postgres', 'redis', 'pooler_credentials', 'log_index'], true)) {
+            if (in_array($role, ['postgres', 'redis', 'pooler_credentials', 'redis_credentials', 'log_index'], true)) {
                 continue;
             }
             $this->seedVolume($configuration, $state, $role, $name, 'if (!chown("/seed", "www-data") || !chgrp("/seed", "www-data")) { exit(1); }');
@@ -398,6 +401,22 @@ final readonly class Preset
             'postgres',
         );
         DisposableContainer::run($this->docker, $this->store->directory . '/pooler-credentials.json', [
+            '--cgroupns', 'private', ...$helper['arguments'],
+        ], array_replace($this->environment, $helper['environment']), $this->cleanupSeconds, timeout: 120, containerEnvironment: $helper['environment']);
+    }
+
+    /** Writes Redis's ACL file to its credentials volume and gives the data volume to Redis's user.
+     * @param array<string,mixed> $state
+     */
+    private function redisCredentials(PresetConfiguration $configuration, array $state): void
+    {
+        $helper = RedisCredentials::helper(
+            $state['images']['redis']['id'],
+            $configuration->volumes['redis_credentials'],
+            $configuration->volumes['redis'],
+            $configuration->environment[EnvironmentVariable::REDIS_PASSWORD],
+        );
+        DisposableContainer::run($this->docker, $this->store->directory . '/redis-credentials.json', [
             '--cgroupns', 'private', ...$helper['arguments'],
         ], array_replace($this->environment, $helper['environment']), $this->cleanupSeconds, timeout: 120, containerEnvironment: $helper['environment']);
     }

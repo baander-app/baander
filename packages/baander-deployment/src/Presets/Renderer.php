@@ -22,7 +22,7 @@ final class Renderer
     public static function environment(Configuration $configuration, ImageProfile $profile): array
     {
         $env = $configuration->environment;
-        $redis = 'redis://default:' . rawurlencode($env[EnvironmentVariable::REDIS_PASSWORD]) . '@redis:6379';
+        $redis = RedisCredentials::url($env[EnvironmentVariable::REDIS_PASSWORD]);
         return array_replace(self::ENVIRONMENT_DEFAULTS, $env, Pooler::urls($env['DB_USERNAME'], $env['DB_PASSWORD'], $env['DB_DATABASE']), [
             EnvironmentVariable::APP_ENV => 'prod', EnvironmentVariable::APP_DEBUG => '0', EnvironmentVariable::APP_URL => $configuration->origin,
             EnvironmentVariable::DEFAULT_URI => $configuration->origin, EnvironmentVariable::APP_DOMAIN => (string) parse_url($configuration->origin, PHP_URL_HOST),
@@ -98,12 +98,12 @@ final class Renderer
                 'pooler_credentials',
                 'postgres',
             ) + ['cap_drop' => ['ALL'], 'oom_score_adj' => KillOrder::POOLER],
-            'redis' => $common + [
-                'image' => $images['redis']['id'], 'environment' => [EnvironmentVariable::REDIS_PASSWORD => $environment[EnvironmentVariable::REDIS_PASSWORD]],
-                'command' => ['sh', '-ec', 'exec redis-server --dir /data --appendonly yes --maxmemory ' . $configuration->resources['redisMaxmemoryMiB'] . 'mb --maxmemory-policy noeviction --requirepass "$REDIS_PASSWORD"'],
-                'volumes' => [['type' => 'volume', 'source' => 'redis', 'target' => '/data']],
-                'oom_score_adj' => KillOrder::REDIS,
-                'healthcheck' => ['test' => ['CMD-SHELL', 'REDISCLI_AUTH="$REDIS_PASSWORD" redis-cli ping | grep -q PONG'], 'interval' => '5s', 'timeout' => '5s', 'retries' => 24],
+            RedisCredentials::SERVICE => $common + [
+                'image' => $images['redis']['id'], 'user' => RedisCredentials::RUN_AS,
+                'command' => ['redis-server', '--dir', '/data', '--appendonly', 'yes', '--maxmemory', $configuration->resources['redisMaxmemoryMiB'] . 'mb', '--maxmemory-policy', 'noeviction', '--aclfile', RedisCredentials::ACL_FILE],
+                'volumes' => [['type' => 'volume', 'source' => 'redis', 'target' => '/data'], ['type' => 'volume', 'source' => 'redis_credentials', 'target' => RedisCredentials::DIRECTORY, 'read_only' => true]],
+                'cap_drop' => ['ALL'], 'oom_score_adj' => KillOrder::REDIS,
+                'healthcheck' => RedisCredentials::healthcheck(),
             ],
             'gateway' => $common + [
                 'image' => $images['gateway']['id'], 'volumes' => [['type' => 'volume', 'source' => 'gateway_configuration', 'target' => '/etc/nginx/conf.d', 'read_only' => true]],

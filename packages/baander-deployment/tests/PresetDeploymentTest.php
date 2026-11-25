@@ -7,6 +7,7 @@ namespace Baander\Deployment\Tests;
 use Baander\Deployment\Presets\Configuration;
 use Baander\Deployment\Presets\StateStore;
 use Baander\Deployment\Presets\Renderer;
+use Baander\Deployment\Presets\RedisCredentials;
 use Baander\Deployment\Profiles\ImageProfile;
 use Baander\Configuration\ApplicationLayout;
 use Baander\Configuration\Sources\JsonDocument;
@@ -109,7 +110,7 @@ final class PresetDeploymentTest extends TestCase
                 self::assertSame($scores[$name], $service['oom_score_adj'], $configuration->capability . ' ' . $name);
                 self::assertSame($configuration->capability, $service['labels']['org.baander.deployment.capability'], $name);
             }
-            self::assertStringContainsString('--maxmemory 192mb', $compose['services']['redis']['command'][2]);
+            self::assertStringContainsString('--maxmemory 192mb', implode(' ', $compose['services']['redis']['command']));
         }
     }
 
@@ -586,7 +587,7 @@ final class PresetDeploymentTest extends TestCase
         self::assertSame('secret$$literal', $compose['services']['postgres']['environment']['POSTGRES_PASSWORD']);
         $gateway = Renderer::configurationFiles($configuration, 'max_connections = 36')['gateway_configuration']['content'];
         self::assertStringContainsString('$http_upgrade', $gateway);
-        self::assertStringContainsString('noeviction', $compose['services']['redis']['command'][2]);
+        self::assertContains('noeviction', $compose['services']['redis']['command']);
         self::assertSame('memory_limit=256M', $compose['services']['web']['command'][1]);
         self::assertSame($profile->fingerprint(), $compose['services']['web']['labels']['org.baander.deployment.fingerprint']);
         $roles = ['web' => 'application', 'postgres' => 'postgres', 'pooler' => 'postgres', 'redis' => 'redis', 'gateway' => 'gateway'];
@@ -931,6 +932,83 @@ final class PresetDeploymentTest extends TestCase
         }
     }
 
+    public function testRedisRunsAsANamedUnprivilegedIdentityWithNoPasswordInItsService(): void
+    {
+        $data = self::configuration();
+        $data['environment']['REDIS_PASSWORD'] = 'private@redis%password';
+        $configuration = Configuration::fromArray($data);
+        $compose = Renderer::render($configuration, $this->images(), ApplicationLayout::fromArray(['version' => 1, 'root' => '/srv/baander']), $this->profile(), 'max_connections = 20', 'owner');
+        $redis = $compose['services']['redis'];
+
+        self::assertSame('redis', $redis['user']);
+        self::assertSame(['ALL'], $redis['cap_drop']);
+        self::assertSame(['redis-server', '--dir', '/data', '--appendonly', 'yes', '--maxmemory', '192mb', '--maxmemory-policy', 'noeviction', '--aclfile', '/etc/baander-redis/users.acl'], $redis['command']);
+        self::assertArrayNotHasKey('environment', $redis);
+        self::assertStringNotContainsString('private@redis', json_encode($redis, JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES));
+        self::assertContains(['type' => 'volume', 'source' => 'redis_credentials', 'target' => '/etc/baander-redis', 'read_only' => true], $redis['volumes']);
+        self::assertSame(['name' => 'baander-preset-redis-credentials', 'external' => true], $compose['volumes']['redis_credentials']);
+        foreach ($compose['services'] as $name => $service) {
+            self::assertSame($name === 'redis', in_array('redis_credentials', array_column($service['volumes'] ?? [], 'source'), true), $name);
+        }
+        $url = 'redis://baander:private%40redis%25password@redis:6379';
+        $web = $compose['services']['web']['environment'];
+        self::assertSame([$url, $url . '/messages'], [$web['REDIS_URL'], $web['MESSENGER_TRANSPORT_DSN']]);
+        self::assertSame($url, Renderer::workerEnvironment($configuration, $this->profile())['REDIS_URL']);
+    }
+
+    public function testRedisAclTurnsTheDefaultUserOffAndAdmitsTheApplicationCommandsOnly(): void
+    {
+        $acl = RedisCredentials::aclFile(hash('sha256', 'private-redis-secret'));
+
+        self::assertSame([
+            'user default reset',
+            'user baander on #' . hash('sha256', 'private-redis-secret') . ' ' . RedisCredentials::APPLICATION_RULES,
+        ], explode("\n", trim($acl)));
+        self::assertSame('~* resetchannels -@all +@read +@write -@dangerous +eval +time +ping +select +info', RedisCredentials::APPLICATION_RULES);
+        // The functional suite's Redis grants the application user the same commands.
+        self::assertStringContainsString('--user baander on >', (string) file_get_contents(dirname(__DIR__, 3) . '/compose.test.yaml'));
+        self::assertStringContainsString(' ' . RedisCredentials::APPLICATION_RULES . ' ', (string) file_get_contents(dirname(__DIR__, 3) . '/compose.test.yaml'));
+    }
+
+    public function testRedisCredentialsRunFromTheRedisImageWithTheSecretByNameOnly(): void
+    {
+        $directory = sys_get_temp_dir() . '/baander.app-preset-' . bin2hex(random_bytes(8));
+        $store = new StateStore($directory);
+        copy(dirname(__DIR__, 3) . '/tests/Support/Tooling/Fixtures/development-lifecycle-docker.php', $directory . '/docker');
+        chmod($directory . '/docker', 0700);
+        AtomicFile::writeJson($directory . '/daemon.json', ['daemonId' => 'owned-daemon']);
+        $actual = new EngineExecutor(ExecutionContext::bounded(10, getenv()));
+        $executor = $this->createStub(CommandExecutor::class);
+        $created = null;
+        $executor->method('run')->willReturnCallback(static function (ProcessSpec $command, CompletionPolicy $policy) use ($actual, &$created): ProcessResult {
+            if (in_array('create', $command->argv, true)) {
+                $created = $command;
+            }
+            return $actual->run($command, $policy);
+        });
+        $target = new Target($directory . '/docker', 'unix:///run/baander.app-docker.sock', 'owned-daemon', null, null);
+        $deployment = new Preset($store, new Client($executor, $target, getenv()), $executor, getenv());
+        try {
+            new \ReflectionMethod(Preset::class, 'redisCredentials')->invoke(
+                $deployment,
+                Configuration::fromArray(self::configuration()),
+                ['owner' => 'fixture-owner', 'images' => ['redis' => ['id' => 'sha256:' . str_repeat('6', 64)]]],
+            );
+            self::assertInstanceOf(ProcessSpec::class, $created);
+            $arguments = implode(' ', $created->argv);
+            self::assertStringContainsString('--network none', $arguments);
+            self::assertStringContainsString('type=volume,src=baander-preset-redis-credentials,dst=/credentials', $arguments);
+            self::assertStringContainsString('type=volume,src=baander-preset-redis,dst=/data', $arguments);
+            self::assertStringContainsString('--env REDIS_PASSWORD', $arguments);
+            self::assertStringContainsString('sha256:' . str_repeat('6', 64) . ' -ec', $arguments);
+            self::assertStringNotContainsString('private-redis-secret', $arguments);
+            self::assertSame('private-redis-secret', $created->environment['REDIS_PASSWORD']);
+        } finally {
+            $actual->close();
+            Collector::remove($directory);
+        }
+    }
+
     public function testRendererRejectsAResolvedProfileOfAnotherCapability(): void
     {
         $this->expectException(\InvalidArgumentException::class);
@@ -971,7 +1049,7 @@ final class PresetDeploymentTest extends TestCase
             self::assertInstanceOf(ProcessSpec::class, $created);
             self::assertSame('postgresql://baander:private-database-secret@pooler:6432/baander?serverVersion=18&charset=utf8', $created->environment['DATABASE_URL']);
             self::assertSame('postgresql://baander_control:private-database-secret@pooler:6432/baander_control?serverVersion=18&charset=utf8', $created->environment['DATABASE_CONTROL_URL']);
-            self::assertSame('redis://default:private-redis-secret@redis:6379/messages', $created->environment['MESSENGER_TRANSPORT_DSN']);
+            self::assertSame('redis://baander:private-redis-secret@redis:6379/messages', $created->environment['MESSENGER_TRANSPORT_DSN']);
             self::assertSame('prod', $created->environment['APP_ENV']);
             self::assertContains('doctrine:migrations:migrate', $created->argv);
             self::assertContains('--cgroupns', $created->argv);

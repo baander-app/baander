@@ -11,7 +11,7 @@ use Throwable;
 final class StackIsolation
 {
     private const string DATABASE_URL = 'postgresql://baander:test-only@postgres:5432/functional_test?serverVersion=18&charset=utf8';
-    private const string REDIS_URL = 'redis://default:test-only@redis:6379';
+    private const string REDIS_URL = 'redis://baander:test-only-redis-password@redis:6379';
     private const string SOCKET = '/tmp/baander-stack-isolation.sock';
     private const string CONNECT = <<<'PHP_CODE'
 $database = parse_url(getenv('DATABASE_URL'));
@@ -151,7 +151,8 @@ PHP_CODE]);
         $failed = $this->command(['exec', '--user', 'www-data', $this->apps['left'], 'php', '-d', 'memory_limit=512M', '-r', self::CONNECT], false);
         $this->expect('left database outage observed', $failed->exitCode !== 0, true);
         $this->expect('peer survives database outage', $this->probe('right'), 'right:right');
-        $redis = "\$redis = new Redis(); \$redis->connect('redis', 6379, 2); \$redis->auth(['default', 'test-only']);";
+        // FLUSHALL and CLIENT PAUSE are outside the application user's ACL.
+        $redis = "\$redis = new Redis(); \$redis->connect('redis', 6379, 2); \$redis->auth(['admin', 'test-only-redis-admin-password']);";
         $this->php('left', $redis . '$redis->flushAll();');
         $this->expect('left Redis flushed', $this->php('left', $redis . 'echo $redis->dbSize();'), '0');
         $this->expect('peer survives Redis FLUSHALL', $this->probe('right'), 'right:right');

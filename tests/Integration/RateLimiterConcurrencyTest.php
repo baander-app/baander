@@ -211,7 +211,10 @@ final class RateLimiterConcurrencyTest extends TestCase
 
     public function testPausedRedisFailsClosedAndRecoversInANewProcess(): void
     {
-        $pool = new RedisClientFactory($this->dsn);
+        // CLIENT PAUSE is outside the application user's ACL.
+        $admin = getenv('REDIS_TEST_ADMIN_DSN');
+        self::assertIsString($admin, 'Run this acceptance test with the disposable Redis runner.');
+        $pool = new RedisClientFactory($admin);
         $control = $pool->createStandaloneConnection();
         $control->setOption(\Redis::OPT_READ_TIMEOUT, 8.0);
         try {

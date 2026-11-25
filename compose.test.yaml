@@ -15,10 +15,12 @@ services:
             DATABASE_URL: 'postgresql://baander:test-only@postgres:5432/functional_test?serverVersion=18&charset=utf8'
             DATABASE_CONTROL_URL: 'postgresql://baander:test-only@postgres:5432/functional_test?serverVersion=18&charset=utf8'
             OUTBOX_TEST_DATABASE_URL: 'postgresql://baander:test-only@postgres:5432/functional_test?serverVersion=18&charset=utf8'
-            REDIS_PASSWORD: test-only
-            REDIS_URL: 'redis://default:test-only@redis:6379'
-            MESSENGER_TEST_REDIS_DSN: 'redis://default:test-only@redis:6379'
-            MESSENGER_TRANSPORT_DSN: 'redis://default:test-only@redis:6379/messages'
+            REDIS_PASSWORD: test-only-redis-password
+            REDIS_URL: 'redis://baander:test-only-redis-password@redis:6379'
+            MESSENGER_TEST_REDIS_DSN: 'redis://baander:test-only-redis-password@redis:6379'
+            MESSENGER_TRANSPORT_DSN: 'redis://baander:test-only-redis-password@redis:6379/messages'
+            # Tests that issue ACL, CLIENT PAUSE, KEYS or FLUSHALL connect as this user.
+            REDIS_TEST_ADMIN_DSN: 'redis://admin:test-only-redis-admin-password@redis:6379'
             OAUTH_PRIVATE_KEY_PATH: /tmp/baander-oauth/private.key
             OAUTH_PUBLIC_KEY_PATH: /tmp/baander-oauth/public.key
         depends_on:
@@ -43,10 +45,13 @@ services:
     redis:
         image: ${BAANDER_TEST_REDIS_IMAGE:-redis/redis-stack-server:edge}
         environment:
-            REDIS_ARGS: '--requirepass test-only'
-            REDISCLI_AUTH: test-only
+            # The preset's ACL (RedisCredentials::APPLICATION_RULES): default cannot
+            # authenticate and the application user has the application's commands. The
+            # admin user is test-only.
+            REDIS_ARGS: '--user default off --user baander on >test-only-redis-password ~* resetchannels -@all +@read +@write -@dangerous +eval +time +ping +select +info --user admin on >test-only-redis-admin-password ~* &* +@all'
+            REDISCLI_AUTH: test-only-redis-admin-password
         healthcheck:
-            test: ['CMD', 'redis-cli', 'ping']
+            test: ['CMD', 'redis-cli', '--user', 'admin', '--no-auth-warning', 'ping']
             interval: 1s
             timeout: 3s
             retries: 60

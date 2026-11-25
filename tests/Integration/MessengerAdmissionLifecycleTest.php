@@ -72,7 +72,12 @@ final class MessengerAdmissionLifecycleTest extends TestCase
             'stream' => $this->stream, 'group' => 'test', 'consumer' => 'consumer-0', 'timeout' => 2.0, 'read_timeout' => 2.0,
         ]);
         $this->connection = Connection::fromDsn($dsn, $options);
-        $parts = parse_url($dsn);
+        // The test's own connection creates restricted users: ACL is outside the application user's ACL.
+        $admin = getenv('REDIS_TEST_ADMIN_DSN');
+        if (!$admin) {
+            self::markTestSkipped('Set REDIS_TEST_ADMIN_DSN to an administrator of the disposable Redis.');
+        }
+        $parts = parse_url($admin);
         self::assertIsArray($parts);
         $this->redis = new \Redis();
         $this->redis->connect($parts['host'], $parts['port'] ?? 6379, 2.0);

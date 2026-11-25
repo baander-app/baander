@@ -132,11 +132,22 @@ size, which refuses values outside their bounds, renders the PostgreSQL
 configuration from the size, and saves the private Compose document and release
 identity. Start creates owned named volumes, loads the rendered PostgreSQL
 configuration, gives the database
-role and the pooler's auth file one SCRAM verifier, runs pending schema
+role and the pooler's auth file one SCRAM verifier, writes Redis's access control list,
+runs pending schema
 migrations through the pooler, initializes a missing OAuth key pair, verifies
 effective database settings, starts web services and launches the worker pair.
 See [Connection pooler](../../docs-book/part-1-operator-guide/configuration/deployment-profiles.md#connection-pooler)
 for the pooler's aliases and pools.
+
+Redis runs as its image's `redis` user with every capability dropped, and holds no
+password in its arguments or environment. A one-off helper from the Redis image
+receives `REDIS_PASSWORD` by name, writes an access control list to the
+`baander-redis-credentials` volume and gives the `baander-redis` data volume to the
+`redis` user. The list turns the `default` user off and admits the application as
+the `baander` user with the commands it issues; `KEYS`, `FLUSHALL`, `CONFIG` and the
+other dangerous commands are refused. Web and the worker pair connect with
+`REDIS_URL` and `MESSENGER_TRANSPORT_DSN`, which the preset derives with the
+password percent-encoded, so a password may hold any character.
 
 The `remux` capability permits original media delivery and stream copy from its
 `copySlots`; it forbids audio and video encoding and refuses `videoSlots`,

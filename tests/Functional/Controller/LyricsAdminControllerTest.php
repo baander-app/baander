@@ -495,8 +495,13 @@ final class LyricsAdminControllerTest extends TestCase
     private function forgetRunTallies(): void
     {
         static::getContainer()->get(RedisClientFactory::class)->borrow(static function (\Redis $redis): void {
-            $keys = $redis->keys('lyrics:fetch:run:*');
-            $redis->del(['lyrics:fetch:latest_run', ...(is_array($keys) ? $keys : [])]);
+            $keys = [];
+            $cursor = null;
+            // SCAN, not KEYS: KEYS is outside the application user's ACL.
+            while (($batch = $redis->scan($cursor, 'lyrics:fetch:run:*', 1000)) !== false) {
+                $keys = [...$keys, ...$batch];
+            }
+            $redis->del(['lyrics:fetch:latest_run', ...$keys]);
         });
     }
 

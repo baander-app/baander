@@ -318,7 +318,7 @@ final class RedisClientFactoryTest extends TestCase
             ->method('connect')
             ->with('redis.baander.app', 6380, RedisClientFactory::TIMEOUT_SECONDS, null, 0, RedisClientFactory::TIMEOUT_SECONDS)
             ->willReturn(true);
-        $redis->expects($this->once())->method('auth')->with('secret')->willReturn(true);
+        $redis->expects($this->once())->method('auth')->with(['default', 'secret'])->willReturn(true);
 
         $factory = new RedisClientFactory(
             dsn: 'redis://default:secret@redis.baander.app:6380',
@@ -328,6 +328,32 @@ final class RedisClientFactoryTest extends TestCase
 
         $this->assertSame($redis, $factory->connect($redis));
         $this->assertSame(1.0, RedisClientFactory::TIMEOUT_SECONDS);
+    }
+
+    /** @return iterable<string, array{string, string|list<string>|null}> */
+    public static function credentialDsns(): iterable
+    {
+        yield 'named user, encoded password' => ['redis://baander:p%40ss%25word%3A1@redis.baander.app:6380', ['baander', 'p@ss%word:1']];
+        yield 'encoded user' => ['redis://app%2Dusr:secret@redis.baander.app:6380', ['app-usr', 'secret']];
+        yield 'password only' => ['redis://:secret@redis.baander.app:6380', 'secret'];
+        yield 'no credentials' => ['redis://redis.baander.app:6380', null];
+    }
+
+    /** @param string|list<string>|null $auth */
+    #[\PHPUnit\Framework\Attributes\DataProvider('credentialDsns')]
+    public function test_connect_authenticates_as_the_dsn_user_with_the_decoded_password(string $dsn, string|array|null $auth): void
+    {
+        $redis = $this->createMock(Redis::class);
+        $redis->method('connect')->willReturn(true);
+        if ($auth === null) {
+            $redis->expects($this->never())->method('auth');
+        } else {
+            $redis->expects($this->once())->method('auth')->with($auth)->willReturn(true);
+        }
+
+        $factory = new RedisClientFactory(dsn: $dsn, getCidFn: static fn (): int => -1, cidExistsFn: static fn (int $cid): bool => true);
+
+        $this->assertSame($redis, $factory->connect($redis));
     }
 
     public function test_an_injected_connection_factory_supplies_a_ready_client_that_is_not_reconnected(): void
@@ -350,7 +376,7 @@ final class RedisClientFactoryTest extends TestCase
     {
         $yaml = file_get_contents(__DIR__ . '/../../../../../config/packages/cache.yaml');
         $this->assertIsString($yaml);
-        preg_match_all('#redis://\S+#', $yaml, $matches);
+        preg_match_all('#%env\(REDIS_URL\)%\S*#', $yaml, $matches);
         $this->assertNotSame([], $matches[0]);
 
         $expected = sprintf('timeout=%d&read_timeout=%d', RedisClientFactory::TIMEOUT_SECONDS, RedisClientFactory::TIMEOUT_SECONDS);

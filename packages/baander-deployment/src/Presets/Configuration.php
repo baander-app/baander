@@ -12,7 +12,7 @@ use Baander\Deployment\Profiles\ImageProfile;
 final readonly class Configuration
 {
     public const array IMAGE_ROLES = ['application', 'worker', 'operator', 'postgres', 'gateway', 'redis'];
-    public const array VOLUME_ROLES = ['media', 'storage', 'conversions', 'transcode_state', 'postgres', 'redis', 'secrets', 'pooler_credentials'];
+    public const array VOLUME_ROLES = ['media', 'storage', 'conversions', 'transcode_state', 'postgres', 'redis', 'secrets', 'pooler_credentials', 'redis_credentials'];
     /** Redis's own dataset bound, enforced by Redis itself rather than by a container limit. */
     public const array RESOURCE_DEFAULTS = ['redisMaxmemoryMiB' => 192];
     /** Size settings every deployment states; the image validates the process settings' bounds. */

@@ -725,16 +725,17 @@ final class DpopStoreOutageTest extends TestCase
         return $pool;
     }
 
-    /** A connection of the test's own to the disposable Redis, outside every pool of the kernels. */
+    /**
+     * A connection of the test's own to the disposable Redis, outside every pool of the kernels,
+     * as the test-only admin user: CLIENT PAUSE is outside the application user's ACL.
+     */
     private function redis(float $readTimeoutSeconds): Redis
     {
-        $dsn = (string) getenv('REDIS_URL');
-        self::assertSame(1, preg_match('#^redis://(?:[^:@]+:(?<pass>[^@]+)@)?(?<host>[^:]+):(?<port>\d+)$#', $dsn, $parts), 'REDIS_URL is a plain redis:// DSN.');
+        $dsn = (string) getenv('REDIS_TEST_ADMIN_DSN');
+        self::assertSame(1, preg_match('#^redis://(?<user>[^:@]+):(?<pass>[^@]+)@(?<host>[^:]+):(?<port>\d+)$#', $dsn, $parts), 'REDIS_TEST_ADMIN_DSN names the admin user of a plain redis:// DSN.');
         $redis = new Redis();
         self::assertTrue($redis->connect($parts['host'], (int) $parts['port'], 2.0, null, 0, $readTimeoutSeconds));
-        if ($parts['pass'] !== '') {
-            self::assertTrue($redis->auth($parts['pass']));
-        }
+        self::assertTrue($redis->auth([rawurldecode($parts['user']), rawurldecode($parts['pass'])]));
 
         return $redis;
     }

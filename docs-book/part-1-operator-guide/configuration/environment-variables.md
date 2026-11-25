@@ -31,8 +31,8 @@ The test database uses `baander_test` as the database name — configured in `.e
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `REDIS_PASSWORD` | — | Password for the Redis instance. Optional in dev, **required in production**: with `APP_ENV=prod`, Baander refuses to boot while it is unset or the committed development password `baander`. Used by cache pools, messenger transport, and session storage. |
-| `REDIS_URL` | `redis://default:${REDIS_PASSWORD}@redis:6379` | Redis endpoint URL. Worker deployments require it to be pathless and queryless because the scheduler appends its stream and group. The password is interpolated from `REDIS_PASSWORD`. |
+| `REDIS_PASSWORD` | — | Password for the Redis instance. Optional in dev, **required in production**: with `APP_ENV=prod`, Baander refuses to boot while it is unset or the committed development password `baander`. The preset gives it to Redis's access control list and derives `REDIS_URL` and `MESSENGER_TRANSPORT_DSN` from it. |
+| `REDIS_URL` | `redis://default:${REDIS_PASSWORD}@redis:6379` | Redis endpoint URL. The cache pools, the session store, the rate limiters and every other Redis client authenticate as its user with its password; percent-encode both. The preset sets it to the `baander` user. Worker deployments require it to be pathless and queryless because the scheduler appends its stream and group. |
 
 Redis is used for:
 - **Cache** — tag-aware caching for API responses, OAuth tokens, and user sessions
