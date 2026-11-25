@@ -8,7 +8,6 @@ export const setCliFlags = (): void => {
     'high-dpi-support': '1',
     'force-device-scale-factor': '1',
     'max-connections-per-server': '10',
-    'allow-file-access-from-files': null,
   };
 
   const features: string[] = [

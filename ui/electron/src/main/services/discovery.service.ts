@@ -1,14 +1,56 @@
 import dgram from 'dgram';
 import { EventEmitter } from 'events';
+import { BlockList, isIP } from 'net';
 import os from 'os';
 
 export interface DiscoveredServer {
   name: string;
+  /** The origin of the announced URL; its path, query and fragment are dropped. */
   url: string;
+  /** False when the server is reached over plain `http:`. */
+  encrypted: boolean;
+  /** The address the announcement arrived from, which need not be the announced host. */
+  address: string;
   version: string;
   apiVersion: string;
   timestamp: string;
   lastSeen: number;
+}
+
+const MAX_SERVERS = 64;
+const MAX_FIELD_LENGTH = 256;
+
+/** Loopback and private ranges; Node's BlockList also matches IPv4-mapped IPv6 addresses against the IPv4 rules. */
+const localNetworks = new BlockList();
+localNetworks.addSubnet('127.0.0.0', 8, 'ipv4');
+localNetworks.addSubnet('10.0.0.0', 8, 'ipv4');
+localNetworks.addSubnet('172.16.0.0', 12, 'ipv4');
+localNetworks.addSubnet('192.168.0.0', 16, 'ipv4');
+localNetworks.addAddress('::1', 'ipv6');
+localNetworks.addSubnet('fc00::', 7, 'ipv6');
+
+/** Plain `http:` is accepted only for a host on the local network: a loopback or private address literal, or an mDNS `.local` name. */
+function isLocalHost(hostname: string): boolean {
+  if (hostname.endsWith('.local') && hostname.length > '.local'.length) return true;
+  const address = hostname.replace(/^\[(.*)\]$/, '$1');
+  const family = isIP(address);
+  return family !== 0 && localNetworks.check(address, family === 4 ? 'ipv4' : 'ipv6');
+}
+
+function announcedOrigin(value: string): { origin: string; encrypted: boolean } | null {
+  let url: URL;
+  try {
+    url = new URL(value);
+  } catch {
+    return null;
+  }
+  if (url.protocol === 'https:') return { origin: url.origin, encrypted: true };
+  if (url.protocol === 'http:' && isLocalHost(url.hostname)) return { origin: url.origin, encrypted: false };
+  return null;
+}
+
+function isBoundedString(value: unknown): value is string {
+  return typeof value === 'string' && value.length <= MAX_FIELD_LENGTH;
 }
 
 export interface DiscoveryOptions {
@@ -179,38 +221,44 @@ export class DiscoveryService extends EventEmitter {
     }
 
     const data = parsed as Record<string, unknown>;
-    if (typeof data.name !== 'string' || typeof data.url !== 'string'
-      || typeof data.version !== 'string' || typeof data.api_version !== 'string'
-      || typeof data.timestamp !== 'string') {
+    if (!isBoundedString(data.name) || !isBoundedString(data.url)
+      || !isBoundedString(data.version) || !isBoundedString(data.api_version)
+      || !isBoundedString(data.timestamp)) {
       return;
     }
 
-    try {
-      const url = new URL(data.url);
-      if ((url.protocol !== 'http:' && url.protocol !== 'https:') || !url.hostname) {
-        return;
-      }
-    } catch {
+    const announced = announcedOrigin(data.url);
+    if (!announced) {
       return;
     }
 
     const server: DiscoveredServer = {
       name: data.name,
-      url: data.url,
+      url: announced.origin,
+      encrypted: announced.encrypted,
+      address: rinfo.address,
       version: data.version,
       apiVersion: data.api_version,
       timestamp: data.timestamp,
       lastSeen: Date.now(),
     };
 
-    // Use URL as unique key
-    const key = server.url;
-    const existing = this.discoveredServers.get(key);
-
-    if (!existing || server.lastSeen > existing.lastSeen) {
-      this.discoveredServers.set(key, server);
-      this.emit('server-found', server);
+    const existing = this.discoveredServers.get(server.url);
+    if (existing && server.lastSeen <= existing.lastSeen) {
+      return;
     }
+
+    if (!existing && this.discoveredServers.size >= MAX_SERVERS) {
+      this.evictLeastRecentlySeen();
+    }
+    this.discoveredServers.set(server.url, server);
+    this.emit('server-found', server);
+  }
+
+  private evictLeastRecentlySeen(): void {
+    const oldest = Array.from(this.discoveredServers.values())
+      .reduce((least, server) => (server.lastSeen < least.lastSeen ? server : least));
+    this.discoveredServers.delete(oldest.url);
   }
 
   /**

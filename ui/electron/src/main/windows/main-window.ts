@@ -112,7 +112,7 @@ export function createMainWindow(onLoaded?: (window: BrowserWindow) => void) {
         : join(__dirname, '../preload/preload.cjs'),  // go up from dist/main to dist, then preload/
       contextIsolation: true,
       nodeIntegration: false,
-      sandbox: false,
+      sandbox: true,
       backgroundThrottling: false,
     },
   });

@@ -83,7 +83,8 @@
         .server-item:last-child { border-bottom: none; }
         .server-name { font-weight: 500; }
         .server-url { color: #666; }
-        .server-meta { color: #999; font-size: var(--text-caption-size); line-height: var(--text-caption-line-height); }
+        .server-meta, .server-address { color: #999; font-size: var(--text-caption-size); line-height: var(--text-caption-line-height); }
+        .server-unencrypted { color: #8a4b00; font-size: var(--text-caption-size); line-height: var(--text-caption-line-height); }
         .scanning-status { font-size: var(--text-caption-size); line-height: var(--text-caption-line-height); color: #666; margin-left: auto; }
         .spinner {
             display: inline-block;
@@ -213,11 +214,21 @@
       url.className = 'server-url mono';
       url.textContent = server.url;
 
+      const address = document.createElement('div');
+      address.className = 'server-address mono';
+      address.textContent = `Announced by ${server.address}`;
+
       const version = document.createElement('div');
       version.className = 'server-meta mono';
       version.textContent = `v${server.version}`;
 
-      row.append(name, url, version);
+      row.append(name, url, address, version);
+      if (!server.encrypted) {
+        const warning = document.createElement('div');
+        warning.className = 'server-unencrypted';
+        warning.textContent = 'Unencrypted: HTTP on the local network';
+        row.append(warning);
+      }
       row.addEventListener('click', () => {
         input.value = server.url;
       });

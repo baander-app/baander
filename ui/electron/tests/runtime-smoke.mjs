@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
 import { createServer } from 'node:http';
 import { createRequire } from 'node:module';
-import { mkdtemp, readdir, readFile, rm, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { dirname, resolve, extname, sep } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
@@ -88,6 +88,8 @@ await import(${JSON.stringify(pathToFileURL(resolve(desktop, 'dist/main/index.js
     const announcement = {
       name: '<img src="x" onerror="window.discoveryInjected = true">',
       url: advertisedUrl,
+      encrypted: false,
+      address: '<img src="x" onerror="window.discoveryInjected = true">',
       version: '<img src="x" onerror="window.discoveryInjected = true">',
       apiVersion: '1',
       timestamp: '2026-10-19T00:00:00Z',
@@ -105,12 +107,14 @@ await import(${JSON.stringify(pathToFileURL(resolve(desktop, 'dist/main/index.js
     assert.equal(await page.evaluate(() => window.discoveryInjected), undefined);
     assert.equal(await row.locator('.server-name').textContent(), announcement.name);
     assert.equal(await row.locator('.server-url').textContent(), advertisedUrl);
+    assert.equal(await row.locator('.server-address').textContent(), `Announced by ${announcement.address}`);
     assert.equal(await row.locator('.server-meta').textContent(), `v${announcement.version}`);
+    assert.equal(await row.locator('.server-unencrypted').count(), 1, 'a plain HTTP server is marked unencrypted');
     await row.click();
     assert.equal(await page.locator('#serverUrl').inputValue(), advertisedUrl);
     assert.equal(await page.evaluate(() => window.BaanderElectron.config.getServerUrl()), '', 'selecting a row must not save configuration');
 
-    await send({ ...announcement, name: 'Local Baander', url: `${apiUrl}/music`, version: '1.0' });
+    await send({ ...announcement, name: 'Local Baander', url: `${apiUrl}/music`, address: '127.0.0.1', version: '1.0' });
     await expect(page.locator('.server-item')).toHaveCount(2);
     await page.locator('.server-item').last().click();
     assert.equal(await page.locator('#serverUrl').inputValue(), `${apiUrl}/music`);
@@ -125,9 +129,58 @@ await import(${JSON.stringify(pathToFileURL(resolve(desktop, 'dist/main/index.js
     await page.locator('#discoverBtn').click();
     await expect(page.locator('.server-item')).toHaveCount(0);
     assert.equal(await page.locator('.no-servers').textContent(), 'No servers found on your network');
-    await send({ ...announcement, name: 'Local Baander', url: apiUrl, version: '1.0' });
+    await send({ ...announcement, name: 'Local Baander', url: apiUrl, address: '127.0.0.1', version: '1.0' });
     await page.locator('.server-item').click();
     assert.equal(await page.locator('#serverUrl').inputValue(), apiUrl);
+    assert.equal(await page.locator('.server-item .server-address').textContent(), 'Announced by 127.0.0.1');
+  }
+
+  // Without the file-access switch, a file:// renderer still loads DSP modules and worklets from its
+  // own directory; the dev server serves them from its root.
+  async function expectDspAssetsLoad(page) {
+    const loaded = await page.evaluate(async () => {
+      const base = location.protocol === 'file:' ? location.href : location.origin;
+      const response = await fetch(new URL('dsp/loudness_r128.wasm', base));
+      if (!response.ok) throw new Error(`DSP module answered ${response.status}`);
+      await WebAssembly.compile(await response.arrayBuffer());
+      const context = new AudioContext();
+      try {
+        await context.audioWorklet.addModule(new URL('audio-worklets/wasm-spectrum.js', base).href);
+      } finally {
+        await context.close();
+      }
+      return true;
+    });
+    assert.equal(loaded, true);
+  }
+
+  async function expectSandboxedWindows() {
+    const sandboxed = await application.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()
+      .map(window => window.webContents.getLastWebPreferences()?.sandbox));
+    assert.ok(sandboxed.length > 0);
+    assert.deepEqual(sandboxed.filter(value => value !== true), [], 'every application window runs sandboxed');
+  }
+
+  async function exerciseStartupFailure(mode) {
+    const userData = resolve(scratch, `${mode}-broken`);
+    await mkdir(userData, { recursive: true });
+    await writeFile(resolve(userData, 'config.json'), JSON.stringify({ serverUrl: 'not a server url' }));
+    const env = { ...process.env, DISPLAY: `:${displayNumber}`, BAANDER_SMOKE_DATA: userData };
+    delete env.ELECTRON_RUN_AS_NODE;
+    delete env.VITE_DEV_SERVER_URL;
+    if (mode === 'development') env.VITE_DEV_SERVER_URL = uiUrl;
+    application = await electron.launch({ executablePath: resolve(desktop, 'node_modules/electron/dist/electron'), args: ['--no-sandbox', entry], env, timeout: 30000 });
+    const page = await appPage(true);
+    const alert = page.getByRole('alert');
+    await expect(alert.getByRole('heading', { name: 'Bånder could not start' })).toBeVisible();
+    assert.equal(await page.locator('input[type=email]').count(), 0, 'the web client must not load');
+    assert.equal(await page.locator('meta[http-equiv="Content-Security-Policy"]').count(), 0);
+    await alert.getByRole('button', { name: 'Configure server' }).click();
+    const config = await appPage(false);
+    await config.waitForFunction(() => Boolean(window.BaanderElectron?.config));
+    await expect.poll(() => page.isClosed()).toBe(true);
+    await application.close();
+    application = undefined;
   }
 
   async function launch(mode, configured) {
@@ -162,6 +215,12 @@ await import(${JSON.stringify(pathToFileURL(resolve(desktop, 'dist/main/index.js
   async function exercise(page) {
     await page.locator('input[type=email]').waitFor();
     await expectLoadedFonts(page, ['Geist Variable']);
+    await expectSandboxedWindows();
+    assert.match(
+      await page.locator('meta[http-equiv="Content-Security-Policy"]').getAttribute('content'),
+      new RegExp(`connect-src [^;]* ${apiUrl.replaceAll('.', '\\.')} `),
+    );
+    await expectDspAssetsLoad(page);
     if (page.url().startsWith('file:')) assert.match(page.url(), /index\.html#\/login/);
     assert.equal(await page.evaluate(() => window.BaanderElectron.config.getServerUrl()), apiUrl);
     assert.equal(await page.evaluate(server => fetch(`${server}/smoke`).then(r => r.json()).then(r => r.smoke), apiUrl), true);
@@ -191,7 +250,8 @@ await import(${JSON.stringify(pathToFileURL(resolve(desktop, 'dist/main/index.js
     await exercise(page);
     await application.close();
     application = undefined;
-    console.log(`${mode}: literal discovery metadata/selection, Geist in both windows, setup handoff, configured startup, API access, reload, blocked navigation/popup and titlebar controls passed`);
+    await exerciseStartupFailure(mode);
+    console.log(`${mode}: literal discovery metadata/selection, Geist in both windows, setup handoff, configured startup, sandboxed windows, content policy, DSP modules and worklets, API access, reload, blocked navigation/popup, titlebar controls and the startup error view passed`);
   }
   assert.ok(apiCalls >= 4);
 } finally {

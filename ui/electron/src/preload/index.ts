@@ -21,9 +21,6 @@ contextBridge.exposeInMainWorld('BaanderElectron', {
     setServerUrl: async (url: string): Promise<boolean> => {
       return ipcRenderer.invoke('baander:config:set-server-url', url);
     },
-    getUser: async (username: string): Promise<string |undefined> => {
-      return ipcRenderer.invoke('baander:config:get-user', username);
-    },
     setUser: async (username: string, password: string): Promise<boolean> => {
       return ipcRenderer.invoke('baander:config:set-user', username, password);
     },
@@ -32,6 +29,9 @@ contextBridge.exposeInMainWorld('BaanderElectron', {
     },
     finishSetup: async (): Promise<boolean> => {
       return ipcRenderer.invoke('baander:config:finish');
+    },
+    openSetup: async (): Promise<boolean> => {
+      return ipcRenderer.invoke('baander:config:open-setup');
     },
     getThemeMood: async (): Promise<string> => {
       return ipcRenderer.invoke('baander:config:get-theme-mood');

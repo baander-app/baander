@@ -1,10 +1,10 @@
 import { handleTrusted } from '../guard';
 import { app } from 'electron';
 import { installOrUpdateCorsShim } from '../../main/security/cors-shim';
-import { createMainWindow } from '../../main/windows/main-window';
-import { getConfigWindow } from '../../main/windows/config-window';
+import { createMainWindow, getMainWindow } from '../../main/windows/main-window';
+import { createConfigWindow, getConfigWindow } from '../../main/windows/config-window';
 import type { IpcContext } from '../index';
-import { clearUser, getUser, setUser } from '../../shared/credentials';
+import { clearUser, setUser } from '../../shared/credentials';
 import { initMainProcessImpl } from '../../shared/config-store';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
@@ -14,6 +14,20 @@ const mainProcessImpl = initMainProcessImpl(app, fs, path);
 
 function validateUsername(value: unknown): asserts value is string {
   if (typeof value !== 'string' || value.length === 0 || value.includes('\0')) throw new Error('Invalid username');
+}
+
+/** The renderer interpolates the stored value into its content policy, so only an origin is stored. */
+function serverOrigin(value: unknown): string {
+  if (typeof value !== 'string') throw new Error('Invalid server URL');
+  if (value === '') return '';
+  let parsed: URL;
+  try {
+    parsed = new URL(value);
+  } catch {
+    throw new Error('Invalid server URL');
+  }
+  if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') throw new Error('Invalid server URL');
+  return parsed.origin;
 }
 
 export function registerConfigIpc(ctx: IpcContext) {
@@ -26,23 +40,13 @@ export function registerConfigIpc(ctx: IpcContext) {
   });
 
   handleTrusted('baander:config:set-server-url', (_e, url: unknown) => {
-    if (typeof url !== 'string') throw new Error('Invalid server URL');
-    if (url !== '') {
-      let parsed: URL;
-      try { parsed = new URL(url); } catch { throw new Error('Invalid server URL'); }
-      if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') throw new Error('Invalid server URL');
-    }
+    const origin = serverOrigin(url);
     if (mainProcessImpl) {
-      mainProcessImpl.setServerUrl(url);
-      installOrUpdateCorsShim(url, ctx.rendererOrigin);
+      mainProcessImpl.setServerUrl(origin);
+      installOrUpdateCorsShim(origin, ctx.rendererOrigin);
       return true;
     }
     return false;
-  });
-
-  handleTrusted('baander:config:get-user', (_, username: unknown) => {
-    validateUsername(username);
-    return getUser(username);
   });
 
   handleTrusted('baander:config:set-user', async (_, username: unknown, password: unknown) => {
@@ -66,6 +70,14 @@ export function registerConfigIpc(ctx: IpcContext) {
       mainLog.error('Failed to clear user:', e);
       return false;
     }
+  });
+
+  // The main window offers this when it cannot start; the next finish creates a fresh main window.
+  handleTrusted('baander:config:open-setup', () => {
+    createConfigWindow();
+    const main = getMainWindow();
+    if (main && !main.isDestroyed()) main.close();
+    return true;
   });
 
   let finishing = false;

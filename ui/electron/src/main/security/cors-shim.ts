@@ -18,7 +18,13 @@ export function installOrUpdateCorsShim(userServerURL: string | null, rendererOr
 
   if (!userServerURL) return;
 
-  const server = new URL(userServerURL);
+  // An unparsable stored value gets no shim; the renderer then shows its startup error with a way back to setup.
+  let server: URL;
+  try {
+    server = new URL(userServerURL);
+  } catch {
+    return;
+  }
   const serverOrigin = `${server.protocol}//${server.host}`;
 
   // Normalize origins (strip trailing slash), file:// pages send Origin: null

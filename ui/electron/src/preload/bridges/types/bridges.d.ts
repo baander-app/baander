@@ -21,10 +21,10 @@ export type BaanderElectronAPI = {
   config: {
     getServerUrl: () => Promise<string>;
     setServerUrl: (url: string) => Promise<boolean>;
-    getUser: (username: string) => Promise<string | undefined>;
     setUser: (username: string, password: string) => Promise<boolean>;
     clearUser: (username: string) => Promise<boolean>;
     finishSetup: () => Promise<boolean>;
+    openSetup: () => Promise<boolean>;
   };
   discovery: DiscoveryBridge;
 };

@@ -8,12 +8,19 @@ const handlers = new Map<string, Function>();
 const effects: unknown[][] = [];
 let server = ''; let main: any;
 const discovery = Object.assign(new EventEmitter(), { startScan: () => effects.push(['scan']), stopScan: () => effects.push(['stop']), getServers: () => [], isScanningActive: () => false });
-mock.module('electron', { exports: { app: {}, ipcMain: { handle: (name: string, fn: Function) => { assert.equal(handlers.has(name), false); handlers.set(name, fn); } }, BrowserWindow: { getAllWindows: () => [] } } });
+const exposed = new Map<string, any>();
+mock.module('electron', { exports: {
+  app: {},
+  ipcMain: { handle: (name: string, fn: Function) => { assert.equal(handlers.has(name), false); handlers.set(name, fn); } },
+  BrowserWindow: { getAllWindows: () => [] },
+  contextBridge: { exposeInMainWorld: (name: string, api: unknown) => exposed.set(name, api) },
+  ipcRenderer: { invoke: async (...args: unknown[]) => args, on() {}, removeListener() {}, removeAllListeners() {} },
+} });
 mock.module('../src/shared/config-store.ts', { exports: { initMainProcessImpl: () => ({ getServerUrl: () => { effects.push(['read']); return server; }, setServerUrl: (v: string) => { effects.push(['write', v]); server = v; }, getThemeMood: () => 'dark', setThemeMood: (v: string) => effects.push(['mood', v]) }) } });
-mock.module('../src/shared/credentials.ts', { exports: Object.fromEntries(['getUser', 'setUser', 'clearUser'].map(name => [name, (...args: unknown[]) => { effects.push([name, ...args]); return true; }])) });
+mock.module('../src/shared/credentials.ts', { exports: Object.fromEntries(['setUser', 'clearUser'].map(name => [name, (...args: unknown[]) => { effects.push([name, ...args]); return true; }])) });
 mock.module('../src/main/security/cors-shim.ts', { exports: { installOrUpdateCorsShim: (...args: unknown[]) => effects.push(['cors', ...args]) } });
 mock.module('../src/main/windows/main-window.ts', { exports: { getMainWindow: () => main, createMainWindow: () => main } });
-mock.module('../src/main/windows/config-window.ts', { exports: { getConfigWindow: () => null } });
+mock.module('../src/main/windows/config-window.ts', { exports: { getConfigWindow: () => null, createConfigWindow: () => effects.push(['config-window']) } });
 mock.module('../src/main/services/discovery.service.ts', { exports: { getDiscoveryService: () => discovery } });
 mock.module('../src/main/log.ts', { exports: { mainLog: { log() {}, error() {} } } });
 const { registerIpc } = await import('../src/ipc/index.ts');
@@ -50,16 +57,55 @@ test('trusted discovery and pending deep-link actions reach the existing service
 });
 test('configuration accepts current URL/mood contracts and rejects malformed payloads before mutations', async () => {
   const { event } = fixture(); assert.equal(await invoke('config:get-server-url', event), '');
-  for (const value of ['https://api.baander.app/path', 'http://192.168.1.2:8080', '']) assert.equal(await invoke('config:set-server-url', event, value), true);
+  for (const [value, origin] of [['https://api.baander.app/path', 'https://api.baander.app'], ['http://192.168.1.2:8080/', 'http://192.168.1.2:8080'], ['', '']]) {
+    effects.length = 0;
+    assert.equal(await invoke('config:set-server-url', event, value), true);
+    assert.deepEqual(effects, [['write', origin], ['cors', origin, 'http://baander.app:5175']]);
+  }
   for (const value of [null, false, 3, {}, 'broken', 'file:///tmp/app', 'javascript:alert(1)']) { effects.length = 0; await assert.rejects(async () => invoke('config:set-server-url', event, value), /invalid/i); assert.deepEqual(effects, []); }
   for (const mood of ['dark', 'warm', 'cool', 'balanced']) await invoke('config:set-theme-mood', event, mood);
   for (const mood of ['', 'other', 1, null]) { effects.length = 0; await assert.rejects(async () => invoke('config:set-theme-mood', event, mood), /invalid/i); assert.deepEqual(effects, []); }
 });
-test('keyring accepts strings and rejects invalid arguments before service calls', async () => {
+test('a server URL is stored as its origin, so trailing text cannot reach the content policy', async () => {
+  const { event } = fixture();
+  effects.length = 0;
+  assert.equal(await invoke('config:set-server-url', event, 'https://api.baander.app/path;script-src *'), true);
+  assert.deepEqual(effects, [['write', 'https://api.baander.app'], ['cors', 'https://api.baander.app', 'http://baander.app:5175']]);
+  assert.equal(await invoke('config:get-server-url', event), 'https://api.baander.app');
+});
+test('keyring stores and clears credentials and rejects invalid arguments before service calls', async () => {
   const { event } = fixture(); effects.length = 0;
-  await invoke('config:get-user', event, 'user@baander.app'); await invoke('config:set-user', event, 'user@baander.app', ''); await invoke('config:clear-user', event, 'user@baander.app');
-  assert.deepEqual(effects, [['getUser', 'user@baander.app'], ['setUser', 'user@baander.app', ''], ['clearUser', 'user@baander.app']]);
-  for (const [channel, args] of [['get-user', []], ['clear-user', []], ['clear-user', ['']], ['get-user', ['user\0name']], ['set-user', ['user']], ['set-user', ['user', 7]], ['set-user', [false, 'password']]] as const) { effects.length = 0; await assert.rejects(async () => invoke(`config:${channel}`, event, ...args), /invalid/i); assert.deepEqual(effects, []); }
+  await invoke('config:set-user', event, 'user@baander.app', ''); await invoke('config:clear-user', event, 'user@baander.app');
+  assert.deepEqual(effects, [['setUser', 'user@baander.app', ''], ['clearUser', 'user@baander.app']]);
+  for (const [channel, args] of [['clear-user', []], ['clear-user', ['']], ['clear-user', ['user\0name']], ['set-user', ['user']], ['set-user', ['user', 7]], ['set-user', [false, 'password']]] as const) { effects.length = 0; await assert.rejects(async () => invoke(`config:${channel}`, event, ...args), /invalid/i); assert.deepEqual(effects, []); }
+});
+test('no channel returns a stored credential to page script', async () => {
+  assert.equal(handlers.has('baander:config:get-user'), false);
+  await import('../src/preload/index.ts');
+  const config = exposed.get('BaanderElectron').config;
+  assert.deepEqual(Object.keys(config).sort(), [
+    'clearUser',
+    'finishSetup',
+    'getServerUrl',
+    'getThemeMood',
+    'openSetup',
+    'setServerUrl',
+    'setThemeMood',
+    'setUser',
+  ]);
+  for (const declarations of ['../src/preload/bridges/types/bridges.d.ts', '../../web/src/types.d.ts']) {
+    assert.doesNotMatch(readFileSync(new URL(declarations, import.meta.url), 'utf8'), /getUser|get-user/, declarations);
+  }
+});
+test('setup can be reopened from a trusted window, which opens the configuration window and closes the main window', async () => {
+  const own = fixture();
+  let closed = 0;
+  own.window.close = () => { closed++; };
+  main = own.window;
+  effects.length = 0;
+  assert.equal(await invoke('config:open-setup', own.event), true);
+  assert.deepEqual(effects, [['config-window']]);
+  assert.equal(closed, 1);
 });
 test('native controls require the live main owner and reject invalid colors', async () => {
   const own = fixture(); main = own.window;

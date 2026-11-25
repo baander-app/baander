@@ -3,6 +3,8 @@ import { ipcRenderer } from 'electron';
 export interface DiscoveredServer {
   name: string;
   url: string;
+  encrypted: boolean;
+  address: string;
   version: string;
   apiVersion: string;
   timestamp: string;

@@ -131,16 +131,40 @@ cd ui/electron
 yarn test              # node --import tsx --experimental-test-module-mocks --test tests/*.test.ts
 ```
 
-It covers the preload bridges, IPC validation and renderer trust, the
-discovery and deep-link services, DSP asset regeneration and the native AAC
-codec service (decoding, encoding in every profile including xHE-AAC with
-its loudness metadata, and the loudness meter). The codec tests use the
-compiled `@baander/audio-core` binding from `node_modules` or from a build in
-the codec directory, and skip the binding-dependent cases when neither
-exists. Without `tsx` the service test also runs under Node's own type
-stripping (`node --experimental-strip-types --experimental-test-module-mocks
---test tests/aac-service.test.ts`); the IPC test does not, since its sources
-import modules without extensions.
+It covers the preload bridges, IPC validation and renderer trust, window
+options (every window sandboxed, DevTools opened only in an unpackaged build), the
+renderer's startup (the server origin in the content policy, and an error view
+instead of the web client when no valid server is stored), the discovery and
+deep-link services, DSP asset regeneration and the native AAC codec service
+(decoding, encoding in every profile including xHE-AAC with its loudness
+metadata, and the loudness meter). The codec tests use the compiled
+`@baander/audio-core` binding from `node_modules` or from a build in the codec
+directory, and skip the binding-dependent cases when neither exists. Without
+`tsx` the service test also runs under Node's own type stripping (`node
+--experimental-strip-types --experimental-test-module-mocks --test
+tests/aac-service.test.ts`); the IPC test does not, since its sources import
+modules without extensions.
+
+The runtime smoke test starts a loopback API server and a loopback server for
+the renderer files, then launches the built app in real Electron under Xvfb
+twice: once loading the renderer from `file://`, once from that server in the
+development server's place. It needs `Xvfb`, the Electron binary that the
+`electron` package's install script downloads, and Playwright from
+`ui/web/node_modules`. CI does not run it yet, so run it locally after a change
+to the windows, the preload, the renderer startup or the command-line switches:
+
+```bash
+cd ui/electron
+yarn build
+yarn test:smoke        # node tests/runtime-smoke.mjs
+```
+
+It checks discovery rows and setup, that the main window runs sandboxed, that the
+content policy names the configured server, that DSP WebAssembly modules and
+audio worklets load from the renderer's directory without a file-access switch,
+API access, blocked navigation and popups, the title bar controls, and that a
+stored value that is not a server URL shows the startup error view, whose
+button reopens setup.
 
 The codec itself has CTest suites and a binding smoke test:
 

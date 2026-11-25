@@ -114,7 +114,7 @@ app.whenReady().then(async () => {
 
   registerMediaKeys();
 
-  win.webContents.openDevTools();
+  if (!app.isPackaged) win.webContents.openDevTools();
   win.show();
 });
 

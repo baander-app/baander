@@ -8,11 +8,12 @@ const shortcuts = new Map<string, Function>();
 const windows: FakeWindow[] = [];
 let configured = '';
 let registrationCount = 0;
+let devToolsOpened = 0;
 class FakeWindow extends EventEmitter {
   destroyed = false; visible = false; maximized = false; minimized = false;
   sent: unknown[][] = []; loading = true;
   webContents: any;
-  constructor(_options: unknown) {
+  constructor(readonly options: any) {
     super(); windows.push(this);
     const contents: any = new EventEmitter();
     contents.mainFrame = { url: '' }; contents.getURL = () => contents.mainFrame.url;
@@ -20,7 +21,7 @@ class FakeWindow extends EventEmitter {
     contents.isLoadingMainFrame = () => this.loading;
     contents.setWindowOpenHandler = () => {};
     contents.send = (...args: unknown[]) => this.sent.push(args);
-    contents.openDevTools = () => {};
+    contents.openDevTools = () => { devToolsOpened++; };
     this.webContents = contents;
   }
   loadURL(url: string) {
@@ -50,7 +51,7 @@ mock.module('electron', { exports: {
   session: { defaultSession: { setPermissionRequestHandler() {}, setPermissionCheckHandler() {} } },
 } });
 mock.module('../src/shared/config-store.ts', { exports: { getThemeMoodSync: () => 'dark', getServerUrlSync: () => configured, initMainProcessImpl: () => ({ getServerUrl: () => configured }) } });
-mock.module('../src/shared/credentials.ts', { exports: { getUser() {}, setUser() {}, clearUser() {} } });
+mock.module('../src/shared/credentials.ts', { exports: { setUser() {}, clearUser() {} } });
 mock.module('../src/main/security/cors-shim.ts', { exports: { installOrUpdateCorsShim() {} } });
 mock.module('../src/main/log.ts', { exports: { mainLog: { error: () => assert.fail('Unexpected load failure'), log() {} } } });
 mock.module('../src/main/flags.ts', { exports: { setCliFlags() {} } });
@@ -100,4 +101,27 @@ test('fresh setup and configured startup share controls, listeners and live medi
   assert.equal(next.listenerCount('maximize'), 1); assert.equal(registrationCount, registrations);
   shortcuts.get('MediaPlayPause')!(); assert.deepEqual(next.sent.at(-1), ['baander:playback:toggle']);
   next.close();
+});
+
+test('main windows run sandboxed, and DevTools open only in an unpackaged build', async () => {
+  const isMainWindow = (window: FakeWindow) => !window.webContents.mainFrame.url.includes('/config/');
+  assert.equal(devToolsOpened, 0, 'a packaged build opens no DevTools');
+
+  app.isPackaged = false;
+  configured = 'https://api.baander.app';
+  await import('../src/main/index.ts?unpackaged');
+  await new Promise(resolve => setImmediate(resolve));
+  const unpackaged = getMainWindow() as unknown as FakeWindow;
+  assert.ok(unpackaged);
+  unpackaged.finishLoad();
+  assert.equal(devToolsOpened, 1);
+
+  const mainWindows = windows.filter(isMainWindow);
+  assert.equal(mainWindows.length, 3);
+  for (const window of windows) {
+    assert.equal(window.options.webPreferences.sandbox, true);
+    assert.equal(window.options.webPreferences.contextIsolation, true);
+    assert.equal(window.options.webPreferences.nodeIntegration, false);
+  }
+  unpackaged.close();
 });
