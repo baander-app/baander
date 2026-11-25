@@ -23,7 +23,9 @@ final class RequestSuspension
     /** kernel.request priority below the firewall (8) and the listeners at 7 that read the token. */
     public const int PRIORITY = 0;
 
-    private const float WAIT_SECONDS = 10.0;
+    // A handshake deadline, not a delay: the first request of a freshly booted kernel can take
+    // more than ten seconds to reach the firewall on a loaded host.
+    private const float WAIT_SECONDS = 60.0;
 
     private readonly Channel $suspended;
     private readonly Channel $resumed;

@@ -104,7 +104,7 @@ final class RedisTransportStatusTest extends TestCase
                 return $this->count;
             }
 
-            public function page(int $page, int $limit): FailedMessagePage
+            public function newest(int $limit, int $offset): FailedMessagePage
             {
                 throw new \LogicException('Not used.');
             }

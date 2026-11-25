@@ -11,7 +11,7 @@ import {
   getSubscriptions,
   subscribeCountry,
   getStarredStations,
-  getStations,
+  getStationsByIds,
   unstarStation,
   type RadioStation,
 } from '@/features/radio/api/radio-api'
@@ -28,6 +28,7 @@ vi.mock('@/features/radio/api/radio-api', () => ({
   unsubscribeCountry: vi.fn(),
   getStarredStations: vi.fn(),
   getStations: vi.fn(),
+  getStationsByIds: vi.fn(),
   unstarStation: vi.fn(),
 }))
 
@@ -112,7 +113,7 @@ it('loads starred stations through shared query keys and keeps unstarred results
   vi.mocked(getStarredStations).mockResolvedValue([
     { userId: 'user', stationId: 'station', starredAt: '' },
   ])
-  vi.mocked(getStations).mockResolvedValue([
+  vi.mocked(getStationsByIds).mockResolvedValue([
     { publicId: 'station', name: 'Favorite station' } as RadioStation,
   ])
   vi.mocked(unstarStation).mockImplementation(async () => {

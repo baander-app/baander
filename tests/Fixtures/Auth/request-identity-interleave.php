@@ -87,7 +87,7 @@ Coroutine\run(static function () use ($coroutines, $suspension, $profile, $suspe
     });
     // The release of the second request's pooled services runs as its coroutine exits, after
     // its answer is stored, so the first request waits for the exit and not for the answer.
-    if (Coroutine::exists($completed) && !Coroutine::join([$completed], 10)) {
+    if (Coroutine::exists($completed) && !Coroutine::join([$completed], 60)) {
         throw new RuntimeException('The second request did not end.');
     }
     $suspension->resume();

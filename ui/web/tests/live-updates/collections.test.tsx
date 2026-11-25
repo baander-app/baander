@@ -149,7 +149,7 @@ describe('personal collection freshness', () => {
     client.setQueryData(inactive, { data: [{ name: 'Inactive old' }] })
     const hook = renderHook(() => ({
       index: useGetPlaylistIndex(),
-      variant: useGetPlaylistIndex({ query: { queryKey: ['/api/playlists/', { filter: 'mounted' }] } }),
+      variant: useGetPlaylistIndex(undefined, { query: { queryKey: ['/api/playlists/', { filter: 'mounted' }] } }),
       detail: useGetPlaylistShow('mix'),
       create: usePostPlaylistStore(), addSong: usePostPlaylistAddSong(), update: usePatchPlaylistUpdate(),
       remove: useDeletePlaylistDestroy(), collaborator: useDeletePlaylistRemoveCollaborator(),

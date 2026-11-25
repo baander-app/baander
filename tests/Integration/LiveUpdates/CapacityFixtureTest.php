@@ -247,7 +247,7 @@ final class CapacityFixtureTest extends TestCase
 
             return is_file($resolved) ? (string) file_get_contents($resolved, length: $maxBytes) : null;
         });
-        (fn (LibraryMediaFilesInterface $files) => $this->mediaFiles = $files)->call($handler, $mediaFiles);
+        new \ReflectionProperty(FilesDiscoveredHandler::class, 'mediaFiles')->setValue($handler, $mediaFiles);
         $lyricsReader = new \ReflectionMethod(FilesDiscoveredHandler::class, 'findLyricsFile');
         foreach ([$owned['song']['path'], $prepared['path']] as $audio) {
             $lyrics = $lyricsReader->invoke($handler, Uuid::fromString($owned['library']['id']), $audio);
