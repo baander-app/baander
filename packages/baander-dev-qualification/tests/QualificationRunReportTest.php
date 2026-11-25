@@ -95,7 +95,7 @@ final class QualificationRunReportTest extends TestCase
         unset($evidence['helperMeasurements']);
         self::assertContains('Startup helper measurement is incomplete or failed.', RunReport::evaluate($contract, $this->path, $evidence)['failures']);
         $evidence['helperMeasurements'] = $this->helperInput($contract);
-        self::assertCount(16, $evidence['helperMeasurements']['receipts']);
+        self::assertCount(count(Preset::helperRoles(true)), $evidence['helperMeasurements']['receipts']);
         self::assertSame('passed', RunReport::evaluate($contract, $this->path, $evidence)['status']);
         $evidence['helperMeasurements']['receipts'][10]['docker']['oomKilled'] = true;
         $evidence['helperMeasurements']['receipts'][10]['status'] = 'incomplete';

@@ -112,7 +112,7 @@ final class ProductionSecretsTest extends TestCase
         $project = dirname(__DIR__, 5);
         $committed = [];
         foreach (['.env.dev', '.env.example'] as $file) {
-            $values = new Dotenv()->parse((string) file_get_contents($project . '/' . $file), $file);
+            $values = self::parseWithoutProcessCredentials($project . '/' . $file);
             foreach ([...ProductionSecrets::VARIABLES, ...ProductionSecrets::CREDENTIAL_VARIABLES] as $variable) {
                 if (($values[$variable] ?? '') !== '') {
                     $committed[] = [$variable, $values[$variable]];
@@ -157,5 +157,27 @@ final class ProductionSecretsTest extends TestCase
         $values = array_replace(self::PRIVATE, $overrides);
 
         return static fn (string $name): ?string => $values[$name] ?? null;
+    }
+
+    /**
+     * Dotenv resolves ${NAME} from the process environment before the file's own values, so the
+     * test environment's credentials would stand in for what the committed file says.
+     *
+     * @return array<string, string>
+     */
+    private static function parseWithoutProcessCredentials(string $path): array
+    {
+        $names = [...ProductionSecrets::VARIABLES, ...ProductionSecrets::CREDENTIAL_VARIABLES];
+        $saved = [array_intersect_key($_ENV, array_flip($names)), array_intersect_key($_SERVER, array_flip($names))];
+        foreach ($names as $name) {
+            unset($_ENV[$name], $_SERVER[$name]);
+        }
+        try {
+            return new Dotenv()->parse((string) file_get_contents($path), basename($path));
+        } finally {
+            [$environment, $server] = $saved;
+            $_ENV += $environment;
+            $_SERVER += $server;
+        }
     }
 }
