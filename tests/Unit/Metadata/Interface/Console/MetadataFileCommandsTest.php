@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Metadata\Interface\Console;
 
+use App\Library\Domain\Repository\LibraryRepositoryInterface;
 use App\Metadata\Application\Exception\UnreadableMediaFileException;
 use App\Metadata\Interface\Console\MetadataFileExtractCommand;
 use App\Metadata\Interface\Console\MetadataFileInputReader;
@@ -11,6 +12,7 @@ use App\Metadata\Interface\Console\MetadataFileMatchCommand;
 use App\Metadata\Interface\Controller\MetadataSyncController;
 use App\Metadata\Interface\Request\ExtractMetadataRequest;
 use App\Metadata\Interface\Request\MatchMetadataRequest;
+use App\Metadata\Infrastructure\Reader\MediaFileMetadata;
 use App\Tests\Support\Metadata\MetadataReaderFixture;
 use Baander\MediaMetadata\Tests\Support\TaggedMediaFiles;
 use PHPUnit\Framework\TestCase;
@@ -22,7 +24,8 @@ use Symfony\Contracts\Translation\TranslatorInterface;
 
 /**
  * app:metadata:file:extract and app:metadata:file:match read tags through the port the extract and
- * match routes use, print the routes' data with --json, and reject the input the routes reject.
+ * match routes use, print the routes' data with --json, and reject the input the routes reject,
+ * including a file outside every library.
  */
 final class MetadataFileCommandsTest extends TestCase
 {
@@ -32,17 +35,24 @@ final class MetadataFileCommandsTest extends TestCase
     ];
 
     private TaggedMediaFiles $files;
+    private TaggedMediaFiles $outside;
+    private MediaFileMetadata $reader;
     private MetadataSyncController $controller;
 
     protected function setUp(): void
     {
         $this->files = new TaggedMediaFiles();
-        $this->controller = new MetadataSyncController(MetadataReaderFixture::reader());
+        $this->outside = new TaggedMediaFiles();
+        $libraries = self::createStub(LibraryRepositoryInterface::class);
+        $libraries->method('findAllOrdered')->willReturn([MetadataReaderFixture::library($this->files->directory())]);
+        $this->reader = MetadataReaderFixture::reader($libraries);
+        $this->controller = new MetadataSyncController($this->reader);
     }
 
     protected function tearDown(): void
     {
         $this->files->remove();
+        $this->outside->remove();
     }
 
     public function testExtractJsonIsTheDataTheRouteAnswers(): void
@@ -76,6 +86,18 @@ final class MetadataFileCommandsTest extends TestCase
 
         self::assertSame(Command::INVALID, $extract->execute(['path' => $this->files->missing()]));
         self::assertStringContainsString(UnreadableMediaFileException::missing()->getMessage(), self::oneLine($extract));
+    }
+
+    public function testBothCommandsExitInvalidForAFileOutsideEveryLibrary(): void
+    {
+        $outside = $this->outside->mp3();
+        $extract = $this->extract();
+        $match = $this->match();
+
+        self::assertSame(Command::INVALID, $extract->execute(['path' => $outside]));
+        self::assertSame(Command::INVALID, $match->execute(['path' => $outside, '--candidates' => '[{"title": "Test Song"}]']));
+        self::assertStringContainsString(UnreadableMediaFileException::missing()->getMessage(), self::oneLine($extract));
+        self::assertStringContainsString(UnreadableMediaFileException::missing()->getMessage(), self::oneLine($match));
     }
 
     public function testExtractRejectsABlankPathWithTheRequestsMessage(): void
@@ -151,12 +173,12 @@ final class MetadataFileCommandsTest extends TestCase
 
     private function extract(): CommandTester
     {
-        return new CommandTester(new MetadataFileExtractCommand(MetadataReaderFixture::reader(), $this->inputReader()));
+        return new CommandTester(new MetadataFileExtractCommand($this->reader, $this->inputReader()));
     }
 
     private function match(): CommandTester
     {
-        return new CommandTester(new MetadataFileMatchCommand(MetadataReaderFixture::reader(), $this->inputReader()));
+        return new CommandTester(new MetadataFileMatchCommand($this->reader, $this->inputReader()));
     }
 
     private function inputReader(): MetadataFileInputReader

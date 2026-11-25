@@ -35,7 +35,7 @@ final readonly class MetadataFileInputReader
 
     public static function addPathArgument(Command $command): void
     {
-        $command->addArgument(self::PATH, InputArgument::REQUIRED, 'Path of the media file, as this server sees it');
+        $command->addArgument(self::PATH, InputArgument::REQUIRED, 'Absolute path of a media file inside a library, as this server sees it');
     }
 
     public static function addCandidatesOption(Command $command): void

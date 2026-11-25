@@ -9,6 +9,7 @@ use App\Catalog\Application\Port\MetadataContentReaderPortInterface;
 use App\Catalog\Application\Port\SongPortInterface;
 use App\Catalog\Domain\Model\Album;
 use App\Catalog\Domain\Model\Song;
+use App\Library\Application\Port\LibraryMediaFileResolverInterface;
 use App\Media\Application\Port\ImagePortInterface;
 use App\Media\Application\Port\StoragePortInterface;
 use App\Media\Domain\Model\Image;
@@ -102,7 +103,7 @@ final class CoverExtractionRetryTest extends TestCase
             },
         );
         $storage->expects($this->never())->method('delete');
-        $handler = new ExtractAlbumCoverHandler($reader, $songs, $albums, $images, $storage, $em, new NullLogger());
+        $handler = new ExtractAlbumCoverHandler($reader, $songs, $albums, $images, $storage, $em, new NullLogger(), $this->libraryFiles());
         $bus = new MessageBus([
             new SendMessageMiddleware(new SendersLocator(
                 [ExtractAlbumCoverCommand::class => ['async']],
@@ -197,5 +198,14 @@ final class CoverExtractionRetryTest extends TestCase
             $connection->cleanup();
             $connection->close();
         }
+    }
+
+    /** Every song path counts as inside its library; these tests cover persistence and retries. */
+    private function libraryFiles(): LibraryMediaFileResolverInterface
+    {
+        $libraryFiles = $this->createStub(LibraryMediaFileResolverInterface::class);
+        $libraryFiles->method('resolve')->willReturnArgument(1);
+
+        return $libraryFiles;
     }
 }

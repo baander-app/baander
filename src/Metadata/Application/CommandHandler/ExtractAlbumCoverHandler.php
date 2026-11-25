@@ -7,6 +7,7 @@ namespace App\Metadata\Application\CommandHandler;
 use App\Catalog\Application\Port\AlbumPortInterface;
 use App\Catalog\Application\Port\MetadataContentReaderPortInterface;
 use App\Catalog\Application\Port\SongPortInterface;
+use App\Library\Application\Port\LibraryMediaFileResolverInterface;
 use App\Media\Application\Port\ImagePortInterface;
 use App\Media\Application\Port\StoragePortInterface;
 use App\Media\Domain\Model\Image;
@@ -35,6 +36,7 @@ final class ExtractAlbumCoverHandler
         private readonly StoragePortInterface $storage,
         private readonly EntityManagerInterface $entityManager,
         private readonly LoggerInterface $logger,
+        private readonly LibraryMediaFileResolverInterface $libraryFiles,
     ) {
     }
 
@@ -59,7 +61,7 @@ final class ExtractAlbumCoverHandler
             return;
         }
 
-        $coverArt = $this->extractCover($album->getId());
+        $coverArt = $this->extractCover($album->getId(), $album->getLibraryId());
 
         if ($coverArt === null) {
             return;
@@ -180,7 +182,7 @@ final class ExtractAlbumCoverHandler
         ]);
     }
 
-    private function extractCover(Uuid $albumId): ?CoverArt
+    private function extractCover(Uuid $albumId, Uuid $libraryId): ?CoverArt
     {
         try {
             $songs = $this->songService->findByAlbum($albumId, limit: 1);
@@ -188,8 +190,8 @@ final class ExtractAlbumCoverHandler
                 return null;
             }
 
-            $path = $songs[0]->getPath();
-            if (!file_exists($path) || !is_readable($path)) {
+            $path = $this->libraryFile($albumId, $libraryId, $songs[0]->getPath());
+            if ($path === null || !is_readable($path)) {
                 return null;
             }
 
@@ -206,6 +208,21 @@ final class ExtractAlbumCoverHandler
                 'error' => $e->getMessage(),
             ]);
             throw $e;
+        }
+    }
+
+    /** The song's file resolved inside the album's library, or null when it is missing there or a link leads out of it. */
+    private function libraryFile(Uuid $albumId, Uuid $libraryId, string $path): ?string
+    {
+        try {
+            return $this->libraryFiles->resolve($libraryId, $path);
+        } catch (\InvalidArgumentException $unavailable) {
+            $this->log('warning', 'Song file is not inside its library, skipping cover extraction', [
+                'album_id' => $albumId->toString(),
+                'error' => $unavailable->getMessage(),
+            ]);
+
+            return null;
         }
     }
 

@@ -9,7 +9,7 @@ use Symfony\Contracts\Translation\TranslatableInterface;
 use Symfony\Contracts\Translation\TranslatorInterface;
 
 /**
- * The path names no file, or a file whose format the tag readers do not support.
+ * The path names no file inside a library, or a file whose format the tag readers do not support.
  *
  * HTTP answers 422 in the request locale and console commands exit with INVALID.
  */
@@ -20,9 +20,10 @@ final class UnreadableMediaFileException extends InvalidInputException implement
         parent::__construct($message);
     }
 
+    /** Also the answer for a file outside every library, so it does not reveal which paths exist. */
     public static function missing(): self
     {
-        return new self('Valid "path" to an existing file is required.', 'errors.valid_path_required');
+        return new self('Valid "path" to an existing file inside a library is required.', 'errors.valid_path_required');
     }
 
     public static function unsupportedFormat(): self

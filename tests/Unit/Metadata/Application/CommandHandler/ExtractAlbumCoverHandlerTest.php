@@ -9,12 +9,20 @@ use App\Catalog\Application\Port\MetadataContentReaderPortInterface;
 use App\Catalog\Application\Port\SongPortInterface;
 use App\Catalog\Domain\Model\Album;
 use App\Catalog\Domain\Model\Song;
+use App\Library\Application\Port\LibraryMediaFileResolverInterface;
+use App\Library\Domain\Model\Library;
+use App\Library\Domain\Repository\LibraryRepositoryInterface;
+use App\Library\Domain\ValueObject\LibraryPath;
+use App\Library\Domain\ValueObject\LibrarySlug;
+use App\Library\Domain\ValueObject\LibraryType;
+use App\Library\Infrastructure\Filesystem\LibraryMediaFileResolver;
 use App\Media\Application\Port\ImagePortInterface;
 use App\Media\Application\Port\StoragePortInterface;
 use App\Media\Domain\Model\StoredFile;
 use App\Metadata\Application\CommandHandler\ExtractAlbumCoverHandler;
 use App\Metadata\Application\Command\ExtractAlbumCoverCommand;
 use App\Shared\Domain\Model\Uuid;
+use App\Shared\Domain\ValueObject\FilesystemType;
 use Baander\MediaMetadata\Model\CoverArt;
 use Baander\MediaMetadata\Model\ExtractedMetadata;
 use Doctrine\ORM\EntityManagerInterface;
@@ -33,6 +41,7 @@ final class ExtractAlbumCoverHandlerTest extends TestCase
     private StoragePortInterface&Stub $storage;
     private EntityManagerInterface&Stub $entityManager;
     private LoggerInterface&Stub $logger;
+    private LibraryMediaFileResolverInterface $libraryFiles;
     private ExtractAlbumCoverHandler $handler;
 
     protected function setUp(): void
@@ -44,6 +53,9 @@ final class ExtractAlbumCoverHandlerTest extends TestCase
         $this->storage = $this->createStub(StoragePortInterface::class);
         $this->entityManager = $this->createStub(EntityManagerInterface::class);
         $this->logger = $this->createStub(LoggerInterface::class);
+        $libraryFiles = $this->createStub(LibraryMediaFileResolverInterface::class);
+        $libraryFiles->method('resolve')->willReturnArgument(1);
+        $this->libraryFiles = $libraryFiles;
 
         $this->handler = $this->createExtractAlbumCoverHandlerFixture();
     }
@@ -58,6 +70,7 @@ final class ExtractAlbumCoverHandlerTest extends TestCase
             $this->storage,
             $this->entityManager,
             $this->logger,
+            $this->libraryFiles,
         );
         return $fixture;
     }
@@ -116,6 +129,67 @@ final class ExtractAlbumCoverHandlerTest extends TestCase
         $this->storage->expects($this->never())->method('storeFromBytes');
 
         ($this->handler)(new ExtractAlbumCoverCommand($album->getId()));
+    }
+
+    public function testReadsTheSongFileResolvedInsideTheAlbumsLibrary(): void
+    {
+        [$album, $path] = $this->prepareCoverExtraction(read: false, store: false);
+        $libraryFiles = $this->createMock(LibraryMediaFileResolverInterface::class);
+        $libraryFiles->expects($this->once())->method('resolve')
+            ->with($album->getLibraryId(), '/stored/library/path.mp3')
+            ->willReturn($path);
+        $this->libraryFiles = $libraryFiles;
+        $this->songService = $this->createStub(SongPortInterface::class);
+        $this->songService->method('findByAlbum')->willReturn([$this->createSongWithMockPath('/stored/library/path.mp3')]);
+        $this->metadataReader = $this->createMock(MetadataContentReaderPortInterface::class);
+        $this->metadataReader->expects($this->once())->method('readMetadata')->with($path)->willReturn(null);
+        $this->handler = $this->createExtractAlbumCoverHandlerFixture();
+        $this->storage->expects($this->never())->method('storeFromBytes');
+        $this->entityManager->expects($this->never())->method('beginTransaction');
+
+        try {
+            ($this->handler)(new ExtractAlbumCoverCommand($album->getId()));
+        } finally {
+            unlink($path);
+        }
+    }
+
+    public function testRefusesASongWhoseFileLinksOutOfItsLibrary(): void
+    {
+        $directory = sys_get_temp_dir() . '/baander-cover-escape-' . bin2hex(random_bytes(8));
+        self::assertTrue(mkdir($directory . '/library', 0700, true));
+        self::assertNotFalse(file_put_contents($directory . '/outside.mp3', 'audio with a cover'));
+        self::assertTrue(symlink($directory . '/outside.mp3', $directory . '/library/linked.mp3'));
+        $library = Library::create(
+            name: 'Cover library',
+            slug: new LibrarySlug('cover-library'),
+            path: new LibraryPath($directory . '/library'),
+            type: LibraryType::Music,
+            filesystemType: FilesystemType::Local,
+        );
+        $libraries = $this->createStub(LibraryRepositoryInterface::class);
+        $libraries->method('findByUuid')->willReturn($library);
+        $this->libraryFiles = new LibraryMediaFileResolver($libraries);
+        $album = Album::create($library->getId(), 'Test Album', 'album');
+        $this->albumService->method('findByUuid')->willReturn($album);
+        $this->songService->method('findByAlbum')->willReturn([$this->createSongWithMockPath($directory . '/library/linked.mp3')]);
+        $this->metadataReader = $this->createMock(MetadataContentReaderPortInterface::class);
+        $this->metadataReader->expects($this->never())->method('readMetadata');
+        $this->storage = $this->createMock(StoragePortInterface::class);
+        $this->storage->expects($this->never())->method('storeFromBytes');
+        $this->logger = $this->createMock(LoggerInterface::class);
+        $this->logger->expects($this->once())->method('warning')->with('Song file is not inside its library, skipping cover extraction');
+        $this->handler = $this->createExtractAlbumCoverHandlerFixture();
+
+        try {
+            ($this->handler)(new ExtractAlbumCoverCommand($album->getId()));
+            self::assertNull($album->getCoverImageId());
+        } finally {
+            unlink($directory . '/library/linked.mp3');
+            unlink($directory . '/outside.mp3');
+            rmdir($directory . '/library');
+            rmdir($directory);
+        }
     }
 
     public function testSkipsWhenNoCoverArtFound(): void

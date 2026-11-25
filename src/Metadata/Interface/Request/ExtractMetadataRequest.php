@@ -11,7 +11,7 @@ use Symfony\Component\Validator\Constraints\NotBlank;
     type: 'object',
     properties: [
         'path' => new OA\Schema(
-            description: 'Filesystem path to the media file to analyze',
+            description: 'Absolute path of the media file to analyze, as the server sees it. The file must lie inside a library; a symlink counts where its target lies',
             type: 'string',
             example: '/mnt/media/music/album/song.flac',
             default: '',

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Tests\Functional\Metadata\Interface\Console;
 
 use App\Auth\Domain\Model\User;
+use App\Library\Infrastructure\Doctrine\Entity\LibraryEntity;
 use App\Tests\Functional\TestCase;
 use Baander\MediaMetadata\Tests\Support\TaggedMediaFiles;
 use Symfony\Bundle\FrameworkBundle\Console\Application;
@@ -14,7 +15,8 @@ use Symfony\Component\HttpFoundation\Response;
 
 /**
  * app:metadata:file:extract and app:metadata:file:match read the tags the extract and match routes
- * read, print the routes' data with --json, and reject the input the routes reject.
+ * read, print the routes' data with --json, and reject the input the routes reject, including a
+ * file outside every library.
  */
 final class MetadataFileCliParityTest extends TestCase
 {
@@ -24,6 +26,7 @@ final class MetadataFileCliParityTest extends TestCase
     ];
 
     private TaggedMediaFiles $files;
+    private TaggedMediaFiles $outside;
     private User $admin;
 
     protected function setUp(): void
@@ -31,12 +34,15 @@ final class MetadataFileCliParityTest extends TestCase
         parent::setUp();
 
         $this->files = new TaggedMediaFiles();
+        $this->outside = new TaggedMediaFiles();
         $this->admin = $this->createAdminUser();
+        $this->libraryAt($this->files->directory());
     }
 
     protected function tearDown(): void
     {
         $this->files->remove();
+        $this->outside->remove();
 
         parent::tearDown();
     }
@@ -86,6 +92,31 @@ final class MetadataFileCliParityTest extends TestCase
             $this->authenticatedRequest('POST', '/api/metadata/match', $this->admin, ['path' => $missing, 'candidates' => [['title' => 'Test Song']]]),
             422,
         );
+    }
+
+    public function testAFileOutsideEveryLibraryAnswers422AndExits2WithTheMessageOfAMissingFile(): void
+    {
+        $outside = $this->outside->mp3();
+        $missing = $this->assertJsonResponse($this->extractRequest($this->files->missing()), 422, 'error')['error'];
+        $error = $this->assertJsonResponse($this->extractRequest($outside), 422, 'error')['error'];
+        self::assertSame($missing, $error);
+        $matchError = $this->assertJsonResponse(
+            $this->authenticatedRequest('POST', '/api/metadata/match', $this->admin, ['path' => $outside, 'candidates' => [['title' => 'Test Song']]]),
+            422,
+            'error',
+        )['error'];
+        self::assertSame($missing, $matchError);
+
+        $extract = $this->command('app:metadata:file:extract');
+        self::assertSame(Command::INVALID, $extract->execute(['path' => $outside], ['capture_stderr_separately' => true]));
+        self::assertStringContainsString((string) $error['message'], $extract->getErrorOutput() |> $this->flatten(...));
+
+        $match = $this->command('app:metadata:file:match');
+        self::assertSame(
+            Command::INVALID,
+            $match->execute(['path' => $outside, '--candidates' => '[{"title": "Test Song"}]'], ['capture_stderr_separately' => true]),
+        );
+        self::assertStringContainsString((string) $error['message'], $match->getErrorOutput() |> $this->flatten(...));
     }
 
     public function testAFileNoTagReaderSupportsAnswers422AndExits2WithTheSameMessage(): void
@@ -141,5 +172,17 @@ final class MetadataFileCliParityTest extends TestCase
     private function command(string $name): CommandTester
     {
         return new CommandTester(new Application($this->client->getKernel())->find($name));
+    }
+
+    private function libraryAt(string $directory): void
+    {
+        $this->entityManager->persist(new LibraryEntity(
+            name: 'Metadata file parity test',
+            slug: 'metadata-file-parity-' . (random_bytes(8) |> bin2hex(...)),
+            path: $directory,
+            type: 'music',
+            filesystemType: 'local',
+        ));
+        $this->entityManager->flush();
     }
 }

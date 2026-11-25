@@ -17,6 +17,7 @@ use App\Catalog\Domain\Repository\VideoRepositoryInterface;
 use App\Library\Application\Message\DiscoveredFile;
 use App\Library\Application\Message\FilesDiscovered;
 use App\Library\Application\Port\LibraryMediaFilesInterface;
+use App\Library\Domain\Repository\LibraryRepositoryInterface;
 use App\Library\Domain\ValueObject\LibraryPath;
 use App\Library\Infrastructure\Scanner\DirectoryScanner;
 use App\Lyrics\Application\Port\LyricsFetchRequestInterface;
@@ -43,7 +44,7 @@ final class AudioMetadataImportTest extends TestCase
         copy(dirname(__DIR__, 4) . '/Fixtures/AudioMetadata/tagged.' . $fixture, $path);
         try {
             $before = hash_file('sha256', $path);
-            $scanned = (new DirectoryScanner())->scan(new LibraryPath($directory));
+            $scanned = (new DirectoryScanner(new NullLogger()))->scan(new LibraryPath($directory));
             self::assertCount(1, $scanned);
             self::assertTrue($scanned[0]->isAudio());
             $file = $this->observedFile(new DiscoveredFile(
@@ -52,7 +53,9 @@ final class AudioMetadataImportTest extends TestCase
             ));
             self::assertTrue($file->isAudio());
 
-            $extracted = MetadataReaderFixture::reader()->extract($path);
+            $libraries = self::createStub(LibraryRepositoryInterface::class);
+            $libraries->method('findAllOrdered')->willReturn([MetadataReaderFixture::library($directory)]);
+            $extracted = MetadataReaderFixture::reader($libraries)->extract($path);
             self::assertSame($format, $extracted['format']);
             self::assertSame('Imported title', $extracted['metadata']['title']);
             self::assertSame('Imported artist', $extracted['metadata']['artist']);

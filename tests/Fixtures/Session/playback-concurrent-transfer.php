@@ -103,6 +103,11 @@ final class PlaybackPersistenceFixture
             {
                 throw new \LogicException('Playback authorization must not probe media files.');
             }
+
+            public function resolveInAnyLibrary(string $absolutePath): string
+            {
+                throw new \LogicException('Playback authorization must not probe media files.');
+            }
         };
         $songs = new \App\Catalog\Infrastructure\Doctrine\Repository\SongRepository(
             $manager,

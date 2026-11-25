@@ -41,7 +41,7 @@ The admin sync, `POST /api/admin/metadata/trigger-sync`, and `app:metadata:sync`
 | Port | Purpose |
 |------|---------|
 | `MetadataAdminPortInterface` | Sync status and provider list for the admin API and `app:metadata:status` and `app:metadata:providers` |
-| `MediaFileMetadataInterface` | Reads the tags of a file on the server and ranks candidate records against them, for the extract and match routes and `app:metadata:file:extract` and `app:metadata:file:match` |
+| `MediaFileMetadataInterface` | Reads the tags of a file inside a library and ranks candidate records against them, for the extract and match routes and `app:metadata:file:extract` and `app:metadata:file:match`. A path no library holds a file at, including a URL, gets the answer of a missing file |
 | `MusicBrainzLookupInterface` | Published contract for Catalog matching and the artist sync (the `Metadata MusicBrainz Lookup Contract` Deptrac layer, with its DTOs in `Application/DTO/MusicBrainz/`): searches and looks up MusicBrainz releases, recordings and artists, and fetches a release's front cover from the Cover Art Archive. No method throws; each answer tells a missing record, a refused request and an outage apart, and an artist lookup also answers `MusicBrainzMerged` for an ID MusicBrainz merged into another artist. `MusicBrainzAdapter` implements it |
 
 ## API Endpoints
@@ -55,8 +55,8 @@ All endpoints are prefixed with `/api`.
 | GET | `/api/metadata/search/song` | `MetadataSearchController` | Search external APIs for a song |
 | GET | `/api/metadata/browse/artist/{mbid}` | `MetadataBrowseController` | Browse MusicBrainz artist details |
 | GET | `/api/metadata/browse/release-group/{mbid}` | `MetadataBrowseController` | Browse MusicBrainz release group details |
-| POST | `/api/metadata/extract` | `MetadataSyncController` | Read the tags of a file on the server; admin only |
-| POST | `/api/metadata/match` | `MetadataSyncController` | Rank candidate records against the tags of a file on the server; admin only |
+| POST | `/api/metadata/extract` | `MetadataSyncController` | Read the tags of a file inside a library; admin only |
+| POST | `/api/metadata/match` | `MetadataSyncController` | Rank candidate records against the tags of a file inside a library; admin only |
 
 The search and browse routes are open to any signed-in user. A MusicBrainz search or lookup there first spends the user's own allowance of one call per 10 seconds, the `musicbrainz_user` limiter keyed by user ID, and answers 429 when it is spent. It then waits at most 10 seconds for a turn under the `musicbrainz` limiter that every process shares, and answers 503 when no turn comes or the limiter state cannot be read. Discogs and Last.fm searches spend no allowance.
 
@@ -88,7 +88,7 @@ Routes under `/api/admin/metadata` (controller `MetadataAdminController`, gated 
 |-----------|---------|-------------|
 | Depends on | Shared | Uses `Uuid` for identifiers, `PublicHttpClient` and `Async` for external HTTP calls, and `SettingDefinitionProviderInterface` to define `metadata.auto_sync` |
 | Depends on | Catalog | Reads and updates albums, songs, movies, and genres via `AlbumPortInterface`, `SongPortInterface`, `MoviePortInterface`, and `GenrePortInterface`; `MetadataContentReader` implements `MetadataContentReaderPortInterface` |
-| Depends on | Library | `MetadataSyncOrchestrator` looks up libraries through `LibraryPortInterface` |
+| Depends on | Library | `MetadataSyncOrchestrator` looks up libraries through `LibraryPortInterface`. `MediaFileMetadata` and `ExtractAlbumCoverHandler` resolve files inside a library through `LibraryMediaFileResolverInterface` (the Library Media Files Contract) |
 | Depends on | Media | `ExtractAlbumCoverHandler` stores cover art via `ImagePortInterface` and `StoragePortInterface` |
 | Depended on by | Catalog | Ingest reads embedded tags via `MetadataContentReaderPortInterface` and dispatches `ExtractAlbumCoverCommand`. `RequestAlbumMatchHandler` handles `SyncAlbumMessage`, `QueueArtistSyncsHandler` and `SyncArtistHandler` handle `SyncArtistsMessage` and `SyncArtistMessage`, and the album match queue and the artist sync requester read `metadata.auto_sync` through `MetadataSettingDefinitions` (the `Metadata Sync Contract` Deptrac layer) |
 | Depended on by | Catalog | MusicBrainz matching and the artist sync search and read MusicBrainz through `MusicBrainzLookupInterface` (the `Metadata MusicBrainz Lookup Contract` Deptrac layer) |
@@ -98,7 +98,7 @@ Routes under `/api/admin/metadata` (controller `MetadataAdminController`, gated 
 | Component | Purpose |
 |-----------|---------|
 | `MetadataContentReader` | Implements Catalog's `MetadataContentReaderPortInterface` by detecting audio format via `FormatDetector` and delegating to the matching tag reader |
-| `MediaFileMetadata` | Implements `MediaFileMetadataInterface` with `MetadataContentReader`'s readers and `MatchingStrategy`, so extract and match read every format the scan reads |
+| `MediaFileMetadata` | Implements `MediaFileMetadataInterface` with `MetadataContentReader`'s readers and `MatchingStrategy`, so extract and match read every format the scan reads. It reads the real path `LibraryMediaFileResolverInterface::resolveInAnyLibrary()` returns |
 | `MetadataAdminService` | Implements `MetadataAdminPortInterface`, querying `songs`, `genre_song`, and `job_monitors` for sync status and reporting configured providers |
 | `MetadataMessagePayloadCodec` | Encodes and decodes `ExtractAlbumCoverCommand`, `SyncMetadataCommand`, `SyncAlbumMessage`, `SyncLibraryMessage`, `SyncSongMessage`, `SyncArtistsMessage`, and `SyncArtistMessage` for the `async` transport and job monitor |
 

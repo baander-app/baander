@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Metadata\Infrastructure\Reader;
 
+use App\Library\Application\Port\LibraryMediaFileResolverInterface;
 use App\Metadata\Application\Exception\UnreadableMediaFileException;
 use App\Metadata\Application\Port\MediaFileMetadataInterface;
 use App\Metadata\Domain\Model\MetadataMatch;
@@ -12,8 +13,8 @@ use Baander\MediaMetadata\Model\ExtractedMetadata;
 use Baander\MediaMetadata\FormatDetector;
 
 /**
- * Reads a file's tags with the readers the library scan uses, so every format the scan reads
- * can be extracted and matched.
+ * Reads the tags of a file inside a library with the readers the library scan uses, so every
+ * format the scan reads can be extracted and matched.
  */
 final readonly class MediaFileMetadata implements MediaFileMetadataInterface
 {
@@ -21,6 +22,7 @@ final readonly class MediaFileMetadata implements MediaFileMetadataInterface
         private FormatDetector $formatDetector,
         private MetadataContentReaderAdapter $reader,
         private MatchingStrategy $matchingStrategy,
+        private LibraryMediaFileResolverInterface $libraryFiles,
     ) {
     }
 
@@ -49,17 +51,29 @@ final readonly class MediaFileMetadata implements MediaFileMetadataInterface
      */
     private function read(string $path): array
     {
-        if (!file_exists($path)) {
-            throw UnreadableMediaFileException::missing();
-        }
-
-        $format = $this->formatDetector->detect($path);
-        $metadata = $format === null ? null : $this->reader->readAs($path, $format);
+        $file = $this->libraryFile($path);
+        $format = $this->formatDetector->detect($file);
+        $metadata = $format === null ? null : $this->reader->readAs($file, $format);
         if ($format === null || $metadata === null) {
             throw UnreadableMediaFileException::unsupportedFormat();
         }
 
         return [$format, $metadata];
+    }
+
+    /**
+     * The real path of the file inside a library. A file outside every library gets the answer
+     * a missing file gets, so the routes cannot tell which paths exist on the server.
+     *
+     * @throws UnreadableMediaFileException
+     */
+    private function libraryFile(string $path): string
+    {
+        try {
+            return $this->libraryFiles->resolveInAnyLibrary($path);
+        } catch (\InvalidArgumentException) {
+            throw UnreadableMediaFileException::missing();
+        }
     }
 
     /** @return array<string, mixed> */

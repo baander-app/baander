@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Metadata\Interface\Controller;
 
+use App\Library\Domain\Repository\LibraryRepositoryInterface;
 use App\Metadata\Application\Exception\UnreadableMediaFileException;
 use App\Metadata\Interface\Controller\MetadataSyncController;
 use App\Metadata\Interface\Request\ExtractMetadataRequest;
@@ -18,6 +19,7 @@ final class MetadataSyncControllerTest extends TestCase
     private const string OTHER_ARTIST_ID = '7f8e9d0c-1b2a-4c3d-9e4f-5a6b7c8d9e0f';
 
     private TaggedMediaFiles $files;
+    private TaggedMediaFiles $outside;
     private string $path;
     /** @var list<string> */
     private array $temporaryFiles = [];
@@ -26,17 +28,21 @@ final class MetadataSyncControllerTest extends TestCase
     protected function setUp(): void
     {
         $this->files = new TaggedMediaFiles();
+        $this->outside = new TaggedMediaFiles();
         $this->path = $this->files->mp3();
-        $this->controller = new MetadataSyncController(MetadataReaderFixture::reader());
+        $libraries = self::createStub(LibraryRepositoryInterface::class);
+        $libraries->method('findAllOrdered')->willReturn([MetadataReaderFixture::library($this->files->directory())]);
+        $this->controller = new MetadataSyncController(MetadataReaderFixture::reader($libraries));
     }
 
     protected function tearDown(): void
     {
-        $this->files->remove();
-
         foreach ($this->temporaryFiles as $file) {
             unlink($file);
         }
+
+        $this->files->remove();
+        $this->outside->remove();
     }
 
     public function testExtractAnswersTheMusicBrainzArtistIdOfAFileWithOneId(): void
@@ -91,6 +97,25 @@ final class MetadataSyncControllerTest extends TestCase
         $this->expectExceptionObject(UnreadableMediaFileException::missing());
 
         $this->controller->match(new MatchMetadataRequest($this->files->missing(), [['title' => 'Test Song']]));
+    }
+
+    public function testExtractAndMatchRejectAFileOutsideEveryLibraryAsMissing(): void
+    {
+        $this->assertRejectedAsMissing($this->outside->mp3());
+    }
+
+    public function testExtractAndMatchRejectALinkInsideALibraryToAFileOutsideAsMissing(): void
+    {
+        $link = $this->files->directory() . '/linked.mp3';
+        self::assertTrue(symlink($this->outside->mp3(), $link));
+        $this->temporaryFiles[] = $link;
+
+        $this->assertRejectedAsMissing($link);
+    }
+
+    public function testExtractAndMatchRejectAUrlAsMissing(): void
+    {
+        $this->assertRejectedAsMissing('ftp://127.0.0.1:21/a.mp3');
     }
 
     public function testExtractAndMatchRejectAFileNoTagReaderSupports(): void
@@ -172,6 +197,21 @@ final class MetadataSyncControllerTest extends TestCase
         self::assertGreaterThan($data[1]['confidence'], $data[0]['confidence']);
     }
 
+    private function assertRejectedAsMissing(string $path): void
+    {
+        foreach ([
+            fn () => $this->controller->extract(new ExtractMetadataRequest($path)),
+            fn () => $this->controller->match(new MatchMetadataRequest($path, [['title' => 'Test Song']])),
+        ] as $call) {
+            try {
+                $call();
+                self::fail('A path no library holds was read: ' . $path);
+            } catch (UnreadableMediaFileException $rejected) {
+                self::assertSame(UnreadableMediaFileException::missing()->getMessage(), $rejected->getMessage());
+            }
+        }
+    }
+
     /** @return array<string, mixed> */
     private function extract(string $path): array
     {
@@ -192,8 +232,7 @@ final class MetadataSyncControllerTest extends TestCase
         $size = strlen($frames);
         $header = "ID3\x03\x00\x00" . chr(($size >> 21) & 0x7F) . chr(($size >> 14) & 0x7F) . chr(($size >> 7) & 0x7F) . chr($size & 0x7F);
 
-        $path = tempnam(sys_get_temp_dir(), 'baander-metadata-');
-        self::assertNotFalse($path);
+        $path = $this->files->directory() . '/artist-ids.mp3';
         $this->temporaryFiles[] = $path;
         file_put_contents($path, $header . $frames);
 

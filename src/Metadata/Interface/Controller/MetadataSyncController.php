@@ -17,9 +17,9 @@ use Symfony\Component\Routing\Attribute\Route;
 use Symfony\Component\Security\Http\Attribute\IsGranted;
 
 /**
- * Reads the tags of a file on the server and ranks candidate records against them.
+ * Reads the tags of a file inside a library and ranks candidate records against them.
  *
- * Both routes open any path the server can read, so only administrators reach them.
+ * Both routes take a server path, so only administrators reach them.
  */
 #[OA\Tag(name: 'Metadata', description: 'External metadata enrichment endpoints')]
 #[Route('/api/metadata', name: 'metadata_')]
@@ -34,7 +34,7 @@ final class MetadataSyncController
 
     #[OA\Operation\Post(
         path: '/api/metadata/extract',
-        summary: 'Extract embedded metadata from a local media file',
+        summary: 'Extract embedded metadata from a media file inside a library',
         requestBody: new OA\RequestBody(
             required: true,
             content: new OA\MediaType\Json(
@@ -117,7 +117,7 @@ final class MetadataSyncController
             new OA\Response(response: '403', description: 'Administrator role required'),
             new OA\Response(
                 response: '422',
-                description: 'Invalid request, or no file exists at the path, or the file is in a format the tag readers do not support',
+                description: 'Invalid request, or no library holds a file at the path, or the file is in a format the tag readers do not support',
                 content: new OA\MediaType\Json(
                     schema: new OA\Schema(ref: ValidationError::class),
                 ),
@@ -200,7 +200,7 @@ final class MetadataSyncController
             new OA\Response(response: '403', description: 'Administrator role required'),
             new OA\Response(
                 response: '422',
-                description: 'Invalid request, or no file exists at the path, or the file is in a format the tag readers do not support',
+                description: 'Invalid request, or no library holds a file at the path, or the file is in a format the tag readers do not support',
                 content: new OA\MediaType\Json(
                     schema: new OA\Schema(ref: ValidationError::class),
                 ),

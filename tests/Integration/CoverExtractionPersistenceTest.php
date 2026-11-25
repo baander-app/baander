@@ -11,6 +11,7 @@ use App\Catalog\Domain\Model\Album;
 use App\Catalog\Domain\Model\Song;
 use App\Kernel;
 use App\Library\Infrastructure\Doctrine\Entity\LibraryEntity;
+use App\Library\Application\Port\LibraryMediaFileResolverInterface;
 use App\Media\Application\Port\ImagePortInterface;
 use App\Media\Application\Port\StoragePortInterface;
 use App\Media\Domain\Model\StoredFile;
@@ -115,7 +116,7 @@ final class CoverExtractionPersistenceTest extends TestCase
             $storage->expects($this->once())->method('delete')->willReturnCallback(static function (string $path) use (&$deleted): void {
                 $deleted[] = $path;
             });
-            $handler = new ExtractAlbumCoverHandler($reader, $songs, $albums, $images, $storage, $em, new NullLogger());
+            $handler = new ExtractAlbumCoverHandler($reader, $songs, $albums, $images, $storage, $em, new NullLogger(), $this->libraryFiles());
             $bus = new MessageBus([
                 new SendMessageMiddleware(new SendersLocator(
                     [ExtractAlbumCoverCommand::class => ['async']],
@@ -223,5 +224,14 @@ final class CoverExtractionPersistenceTest extends TestCase
             $connection->cleanup();
             $connection->close();
         }
+    }
+
+    /** Every song path counts as inside its library; these tests cover persistence and retries. */
+    private function libraryFiles(): LibraryMediaFileResolverInterface
+    {
+        $libraryFiles = $this->createStub(LibraryMediaFileResolverInterface::class);
+        $libraryFiles->method('resolve')->willReturnArgument(1);
+
+        return $libraryFiles;
     }
 }
