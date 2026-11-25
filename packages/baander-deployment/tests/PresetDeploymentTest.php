@@ -72,12 +72,46 @@ final class PresetDeploymentTest extends TestCase
         self::assertSame('captured-daemon', $config['expectedDaemonId']);
         self::assertSame('owner', $config['containerGroups'][0]['labels']['org.baander.preset.owner']);
         self::assertSame('owner', $agent['labels']['org.baander.preset.owner']);
-        self::assertSame('/run/owner/docker.sock', $agent['volumes'][0]['source']);
+        self::assertSame('/run/baander-docker-proxy/docker.sock', $config['dockerSocket']);
         self::assertTrue($agent['volumes'][2]['read_only']);
         self::assertSame('/var/log/baander/web/fresh-web-boot', $compose['services']['web']['environment']['BAANDER_LOG_DIR']);
         self::assertTrue($compose['volumes']['logs']['external']);
         self::assertTrue($compose['volumes']['log_index']['external']);
         self::assertNotContains('/run/baander-log-docker.sock', array_column($compose['services']['web']['volumes'], 'target'));
+    }
+
+    public function testTheLogAgentReachesDockerOnlyThroughAReadOnlyProxy(): void
+    {
+        $configuration = Configuration::fromArray(self::configuration());
+        $target = new Target('/usr/bin/docker', 'unix:///run/owner/docker.sock', 'captured-daemon', null, null);
+        $compose = Renderer::render($configuration, $this->images(), ApplicationLayout::fromArray(['version' => 1, 'root' => '/srv/baander']), $this->profile(), 'max_connections = 21', 'owner', [
+            'target' => $target->toArray(), 'credentials' => '/private/log-credentials', 'boot' => 'fresh-web-boot',
+        ]);
+        $proxy = $compose['services']['docker-proxy'];
+        $sockets = static fn(array $service): array => array_values(array_filter($service['volumes'] ?? [], static fn(array $mount): bool => $mount['source'] === '/run/owner/docker.sock'));
+
+        foreach ($compose['services'] as $name => $service) {
+            self::assertSame($name === 'docker-proxy', $sockets($service) !== [], $name . ' mounts the Docker socket');
+            self::assertSame(in_array($name, ['docker-proxy', 'log-agent'], true), in_array('docker_proxy', array_column($service['volumes'] ?? [], 'source'), true), $name . ' shares the proxy socket');
+        }
+        self::assertSame($this->images()['gateway']['id'], $proxy['image']);
+        self::assertSame('none', $proxy['network_mode']);
+        self::assertArrayNotHasKey('networks', $proxy);
+        self::assertArrayNotHasKey('ports', $proxy);
+        self::assertSame(['ALL'], $proxy['cap_drop']);
+        self::assertArrayNotHasKey('cap_add', $proxy);
+        self::assertTrue($proxy['read_only']);
+        self::assertSame(KillOrder::DOCKER_PROXY, $proxy['oom_score_adj']);
+        self::assertSame('service_started', $compose['services']['log-agent']['depends_on']['docker-proxy']['condition']);
+        self::assertSame(['name' => 'baander-preset-docker-proxy', 'external' => true], $compose['volumes']['docker_proxy']);
+        $nginx = Renderer::configurationFiles($configuration, 'max_connections = 21')['docker_proxy_configuration'];
+        self::assertSame('nginx.conf', $nginx['name']);
+        self::assertStringContainsString("limit_except GET {\n                deny all;", $nginx['content']);
+        self::assertStringContainsString('server unix:/run/baander-log-docker.sock;', $nginx['content']);
+        self::assertStringContainsString('listen unix:/run/baander-docker-proxy/docker.sock;', $nginx['content']);
+        self::assertStringContainsString("location / {\n            return 403;", $nginx['content']);
+        self::assertContains(['type' => 'volume', 'source' => 'docker_proxy_configuration', 'target' => '/etc/baander-docker-proxy', 'read_only' => true], $proxy['volumes']);
+        self::assertSame('application', Preset::helperRoles(true)['seed-docker-proxy-configuration']);
     }
 
     public function testRenderedServicesCarryNoContainerLimitsAndRenderTheKillOrder(): void
@@ -662,14 +696,15 @@ final class PresetDeploymentTest extends TestCase
             ['target' => $target->toArray(), 'credentials' => '/private/log-credentials', 'boot' => 'fresh-web-boot'],
         );
         $networks = array_map(
-            static fn(array $service): array => array_is_list($service['networks']) ? $service['networks'] : array_keys($service['networks']),
+            static fn(array $service): array => array_is_list($service['networks'] ?? []) ? $service['networks'] ?? [] : array_keys($service['networks']),
             $compose['services'],
         );
 
         self::assertSame(
-            ['web' => ['private', 'edge'], 'postgres' => ['private'], 'pooler' => ['private'], 'redis' => ['private'], 'gateway' => ['edge'], 'log-agent' => ['private']],
+            ['web' => ['private', 'edge'], 'postgres' => ['private'], 'pooler' => ['private'], 'redis' => ['private'], 'gateway' => ['edge'], 'log-agent' => ['private'], 'docker-proxy' => []],
             $networks,
         );
+        self::assertSame('none', $compose['services']['docker-proxy']['network_mode']);
         self::assertSame('baander-preset-edge', $compose['networks']['edge']['name']);
         self::assertSame('owner', $compose['networks']['edge']['labels']['org.baander.preset.owner']);
         self::assertSame('baander-preset-private', $compose['networks']['private']['name']);

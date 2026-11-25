@@ -365,7 +365,7 @@ final readonly class Preset
                 $this->seedVolume($configuration, $state, $role, $name, '$path = "/seed/" . $argv[1]; if (file_put_contents($path, stream_get_contents(STDIN)) === false || !chmod($path, 0644)) { exit(1); }', [$files[$role]['name']], $files[$role]['content']);
                 continue;
             }
-            if (in_array($role, ['postgres', 'redis', 'pooler_credentials', 'redis_credentials', 'log_index', 'postgres_socket'], true)) {
+            if (in_array($role, ['postgres', 'redis', 'pooler_credentials', 'redis_credentials', 'log_index', 'postgres_socket', 'docker_proxy'], true)) {
                 continue;
             }
             $this->seedVolume($configuration, $state, $role, $name, 'if (!chown("/seed", "www-data") || !chgrp("/seed", "www-data")) { exit(1); }');
@@ -492,7 +492,7 @@ PHP;
             'verify-wrappers-application' => 'application', 'verify-wrappers-worker' => 'worker', 'verify-wrappers-operator' => 'operator',
             'seed-media' => 'application', 'seed-storage' => 'application', 'seed-conversions' => 'application',
             'seed-transcode-state' => 'application', 'seed-logs' => 'application', 'seed-secrets' => 'application', 'seed-postgres-configuration' => 'application',
-            'seed-gateway-configuration' => 'application', 'migration' => 'application', 'secrets-bootstrap' => 'application'];
+            'seed-gateway-configuration' => 'application', 'seed-docker-proxy-configuration' => 'application', 'migration' => 'application', 'secrets-bootstrap' => 'application'];
     }
 
     /** @param array<string,mixed> $state */

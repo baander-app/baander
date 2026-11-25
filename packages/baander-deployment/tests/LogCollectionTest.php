@@ -18,7 +18,10 @@ final class LogCollectionTest extends TestCase
         $service = LogCollection::service('sha256:' . str_repeat('a', 64), '/srv/baander', $target, '/private/credentials', $config);
         self::assertSame('captured-daemon', $config['expectedDaemonId']);
         self::assertSame($groups, $config['containerGroups']);
-        self::assertSame('/run/user/1000/docker.sock', $service['volumes'][0]['source']);
+        self::assertSame(['type' => 'volume', 'source' => 'docker_proxy', 'target' => '/run/baander-docker-proxy', 'read_only' => true], $service['volumes'][0]);
+        self::assertSame('/run/baander-docker-proxy/docker.sock', $config['dockerSocket']);
+        self::assertNotContains('/run/user/1000/docker.sock', array_column($service['volumes'], 'source'));
+        self::assertSame('/run/user/1000/docker.sock', LogCollection::proxyService('sha256:' . str_repeat('b', 64), $target, 'configuration')['volumes'][0]['source']);
         self::assertContains('label=disable', $service['security_opt']);
         self::assertSame('logs', $service['volumes'][2]['source']);
         self::assertTrue($service['volumes'][2]['read_only']);

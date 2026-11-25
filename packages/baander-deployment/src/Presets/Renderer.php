@@ -132,6 +132,9 @@ final class Renderer
                 }
             }
             unset($service);
+            // The agent's only way to Docker; it joins no network, so web and workers cannot reach it.
+            $services[LogCollection::PROXY_SERVICE] = LogCollection::proxyService($images['gateway']['id'], $target, 'docker_proxy_configuration') + ['labels' => $labels];
+            $services['log-agent']['depends_on'][LogCollection::PROXY_SERVICE] = ['condition' => 'service_started'];
         }
         $volumes = [];
         foreach (self::derivedVolumes($configuration) as $role => $name) {
@@ -155,20 +158,23 @@ final class Renderer
 
     /**
      * The volumes the preset names after the deployment rather than the configuration: the
-     * collected logs, the log index and PostgreSQL's socket directory.
+     * collected logs, the log index, PostgreSQL's socket directory and the log agent's Docker
+     * proxy socket.
      *
      * @return array<string,string>
      */
     public static function derivedVolumes(Configuration $configuration): array
     {
-        return ['logs' => $configuration->name . '-logs', 'log_index' => $configuration->name . '-log-index', 'postgres_socket' => $configuration->name . '-postgres-socket'];
+        return ['logs' => $configuration->name . '-logs', 'log_index' => $configuration->name . '-log-index', 'postgres_socket' => $configuration->name . '-postgres-socket',
+            'docker_proxy' => $configuration->name . '-docker-proxy'];
     }
 
     /** @return array<string,array{volume:string,name:string,content:string}> */
     public static function configurationFiles(Configuration $configuration, string $postgresConfiguration): array
     {
         $files = [];
-        foreach (['postgres_configuration' => ['postgresql.conf', $postgresConfiguration], 'gateway_configuration' => ['default.conf', self::gateway($configuration)]] as $role => [$name, $content]) {
+        foreach (['postgres_configuration' => ['postgresql.conf', $postgresConfiguration], 'gateway_configuration' => ['default.conf', self::gateway($configuration)],
+            'docker_proxy_configuration' => [basename(LogCollection::PROXY_CONFIGURATION), LogCollection::proxyConfiguration()]] as $role => [$name, $content]) {
             $files[$role] = ['volume' => $configuration->name . '-' . str_replace('_', '-', $role) . '-' . substr(hash('sha256', $content), 0, 16), 'name' => $name, 'content' => $content];
         }
         return $files;

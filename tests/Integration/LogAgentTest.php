@@ -578,4 +578,93 @@ final class LogAgentTest extends TestCase
         }
     }
 
+    public function testTheDockerProxyPassesTheFiveReadsAndRefusesEveryOtherCall(): void
+    {
+        $daemon = $this->directory.'/daemon.sock';
+        $proxy = $this->directory.'/proxy.sock';
+        $requests = $this->directory.'/daemon-requests';
+        $listener = stream_socket_server('unix://'.$daemon, $errno, $error);
+        self::assertIsResource($listener);
+        $id = str_repeat('d', 64);
+        $pid = pcntl_fork();
+        if (0 === $pid) {
+            while ($connection = @stream_socket_accept($listener, 20)) {
+                $request = (string) fgets($connection);
+                while (false !== ($header = fgets($connection)) && "\r\n" !== $header) {
+                }
+                file_put_contents($requests, trim($request)."\n", FILE_APPEND);
+                $path = (string) parse_url(explode(' ', $request)[1] ?? '', PHP_URL_PATH);
+                // The event and followed log streams are endless: no length, closed by the daemon.
+                if (str_ends_with($path, '/events') || str_ends_with($path, '/logs')) {
+                    fwrite($connection, "HTTP/1.0 200 OK\r\nContent-Type: application/octet-stream\r\n\r\nfirst;");
+                    usleep(300_000);
+                    fwrite($connection, 'second;');
+                } else {
+                    $body = json_encode(['Path' => $path]);
+                    fwrite($connection, "HTTP/1.0 200 OK\r\nContent-Type: application/json\r\nContent-Length: ".strlen($body)."\r\n\r\n".$body);
+                }
+                fclose($connection);
+            }
+            exit(0);
+        }
+        fclose($listener);
+        file_put_contents($this->directory.'/nginx.conf', \Baander\Deployment\Observability\LogCollection::proxyConfiguration($daemon, $proxy));
+        $nginx = new Process(['nginx', '-c', $this->directory.'/nginx.conf', '-p', $this->directory]);
+        $nginx->start();
+        try {
+            for ($attempt = 0; $attempt < 100 && !file_exists($proxy); ++$attempt) {
+                usleep(20_000);
+            }
+            self::assertFileExists($proxy, $nginx->getErrorOutput());
+            $client = new DockerClient($proxy);
+
+            self::assertSame(['Path' => '/v1.45/info'], $client->json('/info'));
+            self::assertSame(['Path' => '/v1.45/containers/json'], $client->json('/containers/json?all=1&filters=%7B%7D'));
+            self::assertSame(['Path' => '/v1.45/containers/'.$id.'/json'], $client->json('/containers/'.$id.'/json'));
+            self::assertSame('first;second;', implode('', iterator_to_array($client->chunks('/events?since=1&until=2'), false)));
+            self::assertSame('first;second;', implode('', iterator_to_array($client->chunks('/containers/'.$id.'/logs?follow=1&stdout=1&stderr=1&timestamps=1'), false)));
+
+            foreach ([
+                'POST /v1.45/containers/create',
+                'DELETE /v1.45/containers/'.$id,
+                'POST /v1.45/containers/'.$id.'/exec',
+                'POST /v1.45/containers/'.$id.'/start',
+                'POST /v1.45/containers/'.$id.'/json',
+                'GET /v1.45/containers/'.$id.'/attach/ws',
+                'GET /v1.45/containers/'.$id.'/export',
+                'GET /v1.45/containers/'.$id.'/archive?path=/',
+                'GET /v1.45/images/json',
+                'GET /v1.45/containers/'.$id.'%2Fexport%3F/json',
+            ] as $call) {
+                self::assertSame('403', $this->proxyStatus($proxy, $call), $call);
+            }
+            // nginx matches and forwards the normalized path, so an encoded segment cannot
+            // reach a path other than the one the allow list matched.
+            self::assertSame('200', $this->proxyStatus($proxy, 'GET /v1.45/containers/'.$id.'/x/..%2Fjson'));
+        } finally {
+            $nginx->stop(1);
+            posix_kill($pid, SIGTERM);
+            pcntl_waitpid($pid, $status);
+        }
+        $received = file($requests, FILE_IGNORE_NEW_LINES) ?: [];
+        self::assertSame([
+            'GET /v1.45/info HTTP/1.0',
+            'GET /v1.45/containers/json?all=1&filters=%7B%7D HTTP/1.0',
+            'GET /v1.45/containers/'.$id.'/json HTTP/1.0',
+            'GET /v1.45/events?since=1&until=2 HTTP/1.0',
+            'GET /v1.45/containers/'.$id.'/logs?follow=1&stdout=1&stderr=1&timestamps=1 HTTP/1.0',
+            'GET /v1.45/containers/'.$id.'/json HTTP/1.0',
+        ], $received);
+    }
+
+    private function proxyStatus(string $socket, string $call): string
+    {
+        $stream = stream_socket_client('unix://'.$socket, $errno, $error, 5);
+        self::assertIsResource($stream);
+        fwrite($stream, $call." HTTP/1.0\r\nHost: docker\r\nContent-Length: 0\r\n\r\n");
+        $status = (string) fgets($stream);
+        fclose($stream);
+
+        return explode(' ', $status)[1] ?? '';
+    }
 }

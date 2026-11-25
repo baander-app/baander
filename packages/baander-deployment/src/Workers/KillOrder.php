@@ -15,6 +15,8 @@ final class KillOrder
     public const int WEB = 900;
     public const int REDIS = 100;
     public const int GATEWAY = 0;
+    /** The log agent's Docker proxy; losing it costs collection coverage, not service. */
+    public const int DOCKER_PROXY = 0;
     public const int POSTGRES = -500;
     public const int POOLER = -500;
 
