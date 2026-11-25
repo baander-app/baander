@@ -6,6 +6,7 @@ namespace App\Tests\Fixtures\Catalog;
 
 use App\Catalog\Application\CommandHandler\MusicBrainzMatch\ApplyMatchHandler;
 use App\Catalog\Application\CommandHandler\MusicBrainzMatch\MatchCovers;
+use App\Filesystem\Mime\MimeDetector;
 use App\Catalog\Application\Port\AlbumMatchRequestInterface;
 use App\Catalog\Application\Port\ArtistSyncRequestInterface;
 use App\Catalog\Application\Port\IdentifiedArtist;
@@ -211,7 +212,7 @@ final class MatchApplyRace
             scorer: new CandidateScorer(new TrackPairing()),
             snapshots: $services['snapshots'],
             comparisons: $services['comparisons'],
-            covers: new MatchCovers($lookup, $storage, new NullLogger()),
+            covers: new MatchCovers($lookup, $storage, new NullLogger(), new MimeDetector()),
             albums: $services['albums'],
             songs: $services['songs'],
             artists: $services['artists'],

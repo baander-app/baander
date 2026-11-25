@@ -13,6 +13,9 @@ use Symfony\Contracts\HttpClient\ResponseStreamInterface;
 /** Provider requests with independent DNS validation and no automatic redirects. */
 final class PublicHttpClient
 {
+    /** The longest body content() reads when its caller names no other limit. */
+    public const int MAX_BODY_BYTES = 16 * 1024 * 1024;
+
     public function __construct(
         private readonly HttpClientInterface $httpClient,
         private readonly PublicDestinationPolicy $destinations,
@@ -95,6 +98,37 @@ final class PublicHttpClient
     public function stream(ResponseInterface $response): ResponseStreamInterface
     {
         return $this->httpClient->stream($response);
+    }
+
+    /**
+     * Reads a returned response's body, whatever its status. The read stops at the first chunk
+     * that would take the body past $maxBytes, so no more than $maxBytes are ever held, and the
+     * response is cancelled. The transport decodes a compressed body first, so its decoded size counts.
+     *
+     * @throws ResponseTooLargeException when the body is longer than $maxBytes
+     * @throws \RuntimeException         when the body cannot be read; the message names no URL
+     */
+    public function content(ResponseInterface $response, int $maxBytes = self::MAX_BODY_BYTES): string
+    {
+        $body = '';
+        try {
+            foreach ($this->httpClient->stream($response) as $chunk) {
+                $content = $chunk->getContent();
+                if (strlen($body) + strlen($content) > $maxBytes) {
+                    throw new ResponseTooLargeException($maxBytes);
+                }
+                $body .= $content;
+            }
+        } catch (ResponseTooLargeException $e) {
+            $response->cancel();
+            throw $e;
+        } catch (\Throwable) {
+            $response->cancel();
+            // Transport messages carry the URL, which can hold an API key.
+            throw new \RuntimeException('The provider response could not be read.');
+        }
+
+        return $body;
     }
 
     private function duration(mixed $value): float

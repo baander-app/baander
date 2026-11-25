@@ -7,8 +7,15 @@ Use this reference when diagnosing a provider request that is refused, times out
 Metadata lookups, Spotify token acquisition, IPRD catalog downloads and browser-push
 delivery use approved HTTPS providers on port 443. Each request validates the host
 and every DNS answer, rejects non-public destinations, and pins one approved
-address while preserving hostname verification. Proxies and automatic redirects
-are disabled, and each request uses a fresh connection. No LAN exception applies.
+address while preserving hostname verification. An IPv6 answer that carries an
+IPv4 address, such as a NAT64 (`64:ff9b::/96`) or 6to4 address, is judged by that
+IPv4 address. Proxies and automatic redirects are disabled, and each request uses
+a fresh connection. No LAN exception applies.
+
+An answer is read only up to a size limit: 16 MiB for metadata answers, 10 MiB
+for a Cover Art Archive image and 64 MiB for the IPRD catalog. A longer answer
+fails the request, as an unreachable provider does. A cover's image type is read
+from its bytes, not from the type the archive sends.
 
 Cover Art Archive is the only redirect exception: it may follow at most three GET
 redirects within `coverartarchive.org`, `archive.org` or their label-boundary

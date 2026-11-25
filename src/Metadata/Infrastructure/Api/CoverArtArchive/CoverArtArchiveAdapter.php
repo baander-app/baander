@@ -8,6 +8,7 @@ use App\Metadata\Application\DTO\MusicBrainz\MusicBrainzCoverImage;
 use App\Metadata\Application\DTO\MusicBrainz\MusicBrainzRejected;
 use App\Metadata\Application\DTO\MusicBrainz\MusicBrainzUnavailable;
 use Baander\HttpClient\PublicHttpClient;
+use Baander\HttpClient\ResponseTooLargeException;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\Serializer\Encoder\JsonEncoder;
 use Symfony\Component\Serializer\Exception\NotEncodableValueException;
@@ -26,6 +27,8 @@ final readonly class CoverArtArchiveAdapter
     private const int TIMEOUT_SECONDS = 10;
     /** Client errors that mean "try again later" rather than a refused request. */
     private const array NOT_REJECTIONS = [408, 429];
+    /** The largest cover image read; a larger one is an unusable answer. */
+    private const int MAX_IMAGE_BYTES = 10 * 1024 * 1024;
 
     public function __construct(
         private LoggerInterface $logger,
@@ -41,7 +44,8 @@ final readonly class CoverArtArchiveAdapter
      * The rendition caps the size of the image: originals are often large scans.
      * Never throws: returns null when the release has no front cover (404),
      * MusicBrainzRejected for another client error such as 400 for an invalid release ID, and
-     * MusicBrainzUnavailable when the archive gave no usable answer.
+     * MusicBrainzUnavailable when the archive gave no usable answer, an image over 10 MiB included.
+     * The image's type is the one the archive served; only its bytes can confirm it.
      */
     public function fetchFrontCover(string $releaseId): MusicBrainzCoverImage|MusicBrainzRejected|MusicBrainzUnavailable|null
     {
@@ -53,8 +57,10 @@ final readonly class CoverArtArchiveAdapter
                 'timeout' => self::TIMEOUT_SECONDS,
             ], self::REDIRECT_DOMAINS);
             $status = $response->getStatusCode();
-            $bytes = $status === 200 ? $response->getContent(false) : '';
+            $bytes = $status === 200 ? $this->httpClient->content($response, self::MAX_IMAGE_BYTES) : '';
             $type = $response->getHeaders(false)['content-type'][0] ?? '';
+        } catch (ResponseTooLargeException) {
+            return $this->unavailable($endpoint, sprintf('the image is larger than %d bytes', self::MAX_IMAGE_BYTES));
         } catch (\Throwable) {
             return $this->unavailable($endpoint, 'the request failed');
         } finally {
@@ -140,7 +146,7 @@ final readonly class CoverArtArchiveAdapter
             $response = $this->httpClient->request('GET', self::BASE_URL . $endpoint, ['coverartarchive.org'], [
                 'headers' => ['User-Agent' => self::USER_AGENT, 'Accept' => 'application/json'], 'timeout' => self::TIMEOUT_SECONDS,
             ], self::REDIRECT_DOMAINS);
-            $body = $response->getContent(false);
+            $body = $this->httpClient->content($response);
         } catch (\Throwable) {
             $this->logger->warning('CoverArtArchive request failed', ['service' => 'coverartarchive']);
 

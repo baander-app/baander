@@ -43,6 +43,8 @@ None. Notification is a pure consumer — it receives events and dispatches deli
 
 Webhook destinations are checked when configured and again before delivery. Each request pins a validated IP address, disables proxies, and refuses redirects. `WEBHOOK_LAN_ALLOWLIST` is a comma-separated list of permitted LAN IP addresses or CIDRs, empty by default. For example, `192.168.1.20,fd00:1234::20` permits those two addresses. Loopback, link-local, and metadata addresses remain blocked.
 
+An IPv6 address that carries an IPv4 address, in IPv4-mapped, IPv4-translated, IPv4-compatible, NAT64 (`64:ff9b::/96`), 6to4 or Teredo form, is judged by that IPv4 address, and the allowlist is matched against that address too: `10.0.0.0/8` permits `64:ff9b::a00:5`, while `64:ff9b::/96` permits nothing. Site-local `fec0::/10` and the local-use NAT64 prefix `64:ff9b:1::/48` are always refused. `AddressClassifier` in `packages/baander-http-client` makes this judgement for webhooks and provider requests alike.
+
 Webhooks use signature version 2. Retain the secret returned by creation or `POST /api/webhooks/{id}/rotate-secret`; it is returned only once. Verify the raw request body with:
 
 ```php
@@ -69,5 +71,11 @@ also returns that result during DNS outages.
 
 Every matching destination is attempted before a batch failure is reported. A
 retry after partial success can repeat delivery to successful destinations;
-receivers still need deduplication. Email failures and unsuccessful push reports
-also propagate to Messenger. Expired push subscriptions are removed.
+receivers still need deduplication. Email failures propagate to Messenger.
+
+Push is delivered one subscription per message: `SendPushHandler` queues a
+`SendPushToSubscriptionCommand` for each of the user's newest 20 subscriptions,
+and Messenger retries a failed one alone. `408`, `429`, `5xx` and no answer are
+retried; `404` and `410` remove the subscription; any other `4xx` is unrecoverable.
+A user keeps at most 20 subscriptions; registering a 21st evicts the
+longest-registered one under a per-user advisory lock.

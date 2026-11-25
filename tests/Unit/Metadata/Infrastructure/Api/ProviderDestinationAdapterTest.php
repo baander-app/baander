@@ -118,6 +118,23 @@ final class ProviderDestinationAdapterTest extends TestCase
         self::assertStringNotContainsString('Private transport error', json_encode($handler->getRecords(), JSON_THROW_ON_ERROR));
     }
 
+    /** The answer would map, but it is padded past the size cap, so its body is never decoded. */
+    #[DataProvider('providers')]
+    public function testAnAnswerOverTheSizeCapIsAFailure(string $provider): void
+    {
+        $padded = json_encode($this->successBody($provider), JSON_THROW_ON_ERROR) . str_repeat(' ', PublicHttpClient::MAX_BODY_BYTES);
+        $raw = new MockHttpClient(static fn (string $method, string $url): MockResponse => parse_url($url, PHP_URL_HOST) === 'accounts.spotify.com'
+            ? new MockResponse('{"access_token":"spotify-access-canary","expires_in":3600}')
+            : new MockResponse($padded));
+        $client = new PublicHttpClient($raw, new PublicDestinationPolicy(static fn(string $host): array => ['1.1.1.1']));
+        try {
+            self::assertNull($this->invokeProvider($provider, $client));
+        } catch (\RuntimeException $exception) {
+            self::assertSame('tmdb', $provider);
+            self::assertSame('TMDB API request failed.', $exception->getMessage());
+        }
+    }
+
     public function testCoverArtArchiveFollowsItsApprovedArchiveRedirect(): void
     {
         $hosts = [];

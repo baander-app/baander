@@ -182,7 +182,7 @@ final class TmdbAdapter implements ImdbPersonLookupInterface, TmdbPersonLookupIn
                 ]);
                 $status = $response->getStatusCode();
                 $headers = $response->getHeaders(false);
-                $body = $response->getContent(false);
+                $body = $this->httpClient->content($response);
             } catch (\Throwable) {
                 $this->logger->error('TMDB API request failed', ['service' => 'tmdb']);
 

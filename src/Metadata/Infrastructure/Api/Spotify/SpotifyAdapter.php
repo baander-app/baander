@@ -141,7 +141,7 @@ final class SpotifyAdapter
                 'body' => http_build_query(['grant_type' => 'client_credentials']),
                 'timeout' => 5,
             ]);
-            $body = $response->getContent(false);
+            $body = $this->httpClient->content($response);
         } catch (\Throwable) {
             $this->logger->error('Spotify authentication failed', ['service' => 'spotify']);
             throw new \RuntimeException('Failed to authenticate with Spotify API.');
@@ -178,7 +178,7 @@ final class SpotifyAdapter
                 ]);
                 $status = $response->getStatusCode();
                 $headers = $response->getHeaders(false);
-                $body = $response->getContent(false);
+                $body = $this->httpClient->content($response);
             } catch (\Throwable) {
                 $this->logger->error('Spotify API request failed', ['service' => 'spotify']);
 

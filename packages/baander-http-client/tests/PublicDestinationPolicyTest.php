@@ -28,6 +28,19 @@ final class PublicDestinationPolicyTest extends TestCase
             '2002:7f00:1::', '2001::1', 'not-an-address'] as $ip) {
             yield $ip => [$ip];
         }
+        // IPv6 forms that carry a private IPv4 address, and site-local addresses.
+        foreach (['::a00:5', '::7f00:1', '::ffff:0:a00:5', '64:ff9b::a00:5', '64:ff9b::a9fe:a9fe', '2002:a00:5::1',
+            '2001:0:4136:e378:8000:63bf:f5ff:fffa', '2001:0:a00:5:8000:63bf:fefe:fefe', '64:ff9b:1::101:101',
+            '64:ff9b:1:a00:5::', 'fec0::1', 'fec0:1::5'] as $ip) {
+            yield $ip => [$ip];
+        }
+    }
+
+    public function testAnIpv6AddressCarryingAPublicIpv4AddressIsAcceptedAsAnswered(): void
+    {
+        $answers = ['64:ff9b::101:101', '2002:101:101::1', '2001:0:4136:e378:8000:63bf:fefe:fefe'];
+        $policy = new PublicDestinationPolicy(static fn (): array => $answers);
+        self::assertSame($answers, $policy->resolve('https://api.baander.app/x', ['api.baander.app'])['ips']);
     }
 
     #[DataProvider('forbiddenUrls')]

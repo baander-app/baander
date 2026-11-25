@@ -39,9 +39,35 @@ final class WebhookDestinationPolicyTest extends TestCase
             'http://192.168.1.2/hook', 'http://[fd00::1]/hook',
             'https://user:secret@1.1.1.1/hook', 'ftp://1.1.1.1/hook',
             'https://1.1.1.1/hook#fragment', 'not-a-url',
+            // IPv6 forms that carry a private IPv4 address, and site-local addresses.
+            'http://[64:ff9b::a00:5]:8080/', 'http://[::7f00:1]:9200/', 'http://[fec0::1]/', 'http://[2002:a00:5::1]/',
+            'http://[::a00:5]/hook', 'http://[::ffff:0:a00:5]/hook', 'http://[64:ff9b:1::a00:5]/hook',
+            'http://[2001:0:4136:e378:8000:63bf:f5ff:fffa]/hook',
         ] as $url) {
             yield $url => [$url];
         }
+    }
+
+    public function testAnAaaaRecordCarryingAPrivateIpv4AddressOrASiteLocalAddressIsRefused(): void
+    {
+        foreach (['::a00:5', 'fec0::1', '64:ff9b::7f00:1'] as $answer) {
+            $policy = new WebhookDestinationPolicy(dnsResolver: static fn (string $host): array => ['93.184.216.34', $answer]);
+            self::assertNull($policy->resolve('https://hooks.baander.app/hook'), $answer);
+        }
+    }
+
+    public function testANat64AddressOfAPublicIpv4AddressIsAcceptedAndPinned(): void
+    {
+        self::assertSame(
+            ['host' => '64:ff9b::5db8:d822', 'ips' => ['64:ff9b::5db8:d822']],
+            (new WebhookDestinationPolicy())->resolve('https://[64:ff9b::5db8:d822]/hook'),
+        );
+    }
+
+    public function testTheLanAllowlistJudgesTheEmbeddedIpv4Address(): void
+    {
+        self::assertNotNull((new WebhookDestinationPolicy(['10.0.0.0/8']))->resolve('http://[64:ff9b::a00:5]:8080/'));
+        self::assertNull((new WebhookDestinationPolicy(['64:ff9b::/96']))->resolve('http://[64:ff9b::a00:5]:8080/'));
     }
 
     #[DataProvider('unsafeUrls')]
@@ -70,5 +96,8 @@ final class WebhookDestinationPolicyTest extends TestCase
         self::assertNull($policy->resolve('http://169.254.169.254/hook'));
         self::assertNull($policy->resolve('http://127.0.0.1/hook'));
         self::assertNull($policy->resolve('http://[::1]/hook'));
+        self::assertNull($policy->resolve('http://[64:ff9b::a9fe:a9fe]/hook'));
+        self::assertNull($policy->resolve('http://[::7f00:1]:9200/'));
+        self::assertNull($policy->resolve('http://[fec0::1]/hook'));
     }
 }

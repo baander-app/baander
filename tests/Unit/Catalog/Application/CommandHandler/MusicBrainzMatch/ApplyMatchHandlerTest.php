@@ -11,6 +11,7 @@ use App\Catalog\Application\Command\MusicBrainzMatch\MatchSelection;
 use App\Catalog\Application\Command\MusicBrainzMatch\SeenField;
 use App\Catalog\Application\CommandHandler\MusicBrainzMatch\ApplyMatchHandler;
 use App\Catalog\Application\CommandHandler\MusicBrainzMatch\MatchCovers;
+use App\Filesystem\Mime\MimeDetector;
 use App\Catalog\Application\CommandHandler\MusicBrainzMatch\MatchTicks;
 use App\Catalog\Application\Message\DrainAlbumMatchesMessage;
 use App\Catalog\Application\Port\AlbumMatchRequestInterface;
@@ -1212,7 +1213,7 @@ final class ApplyMatchHandlerTest extends TestCase
             scorer: $this->scorer(),
             snapshots: $this->snapshotsOverPorts(),
             comparisons: new MatchComparisonBuilder($this->catalog, $artists),
-            covers: new MatchCovers($this->lookup, $storage, new NullLogger()),
+            covers: new MatchCovers($this->lookup, $storage, new NullLogger(), new MimeDetector()),
             albums: $this->albumPort(),
             songs: $this->songPort(),
             artists: $artists,

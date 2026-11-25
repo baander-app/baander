@@ -6,12 +6,16 @@ namespace Baander\HttpClient\Tests;
 
 use Baander\HttpClient\PublicDestinationPolicy;
 use Baander\HttpClient\PublicHttpClient;
+use Baander\HttpClient\ResponseTooLargeException;
 use Baander\HttpClient\UnsafeDestinationException;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
+use Symfony\Component\HttpClient\Chunk\DataChunk;
 use Symfony\Component\HttpClient\MockHttpClient;
 use Symfony\Component\HttpClient\Response\MockResponse;
+use Symfony\Component\HttpClient\Response\ResponseStream;
 use Symfony\Contracts\HttpClient\HttpClientInterface;
+use Symfony\Contracts\HttpClient\ResponseInterface;
 
 final class PublicHttpClientTest extends TestCase
 {
@@ -221,6 +225,67 @@ final class PublicHttpClientTest extends TestCase
         $transport->expects(self::never())->method('request');
         $this->expectException(\InvalidArgumentException::class);
         $this->client($transport)->request('GET', 'https://api.baander.app/x', ['api.baander.app'], ['headers' => ['hOsT: private.baander.app']]);
+    }
+
+    public function testABodyWithinTheCapIsReturnedWhole(): void
+    {
+        $client = $this->client(new MockHttpClient(new MockResponse(str_repeat('x', 1000))));
+        $response = $client->request('GET', 'https://api.baander.app/x', ['api.baander.app']);
+
+        self::assertSame(str_repeat('x', 1000), $client->content($response, 1000));
+    }
+
+    public function testABodyOverTheCapFailsWithANamedErrorWithoutReadingFurther(): void
+    {
+        $pulled = 0;
+        $response = $this->createMock(ResponseInterface::class);
+        $response->expects(self::once())->method('cancel');
+        $transport = $this->createStub(HttpClientInterface::class);
+        $transport->method('stream')->willReturnCallback(static function () use ($response, &$pulled): ResponseStream {
+            return new ResponseStream((static function () use ($response, &$pulled): \Generator {
+                // A body that never ends: the reader must stop on its own.
+                for ($offset = 0; ; $offset += 400) {
+                    ++$pulled;
+                    yield $response => new DataChunk($offset, str_repeat('x', 400));
+                }
+            })());
+        });
+
+        try {
+            $this->client($transport)->content($response, 1000);
+            self::fail('A body over the cap was read.');
+        } catch (ResponseTooLargeException $e) {
+            self::assertSame(1000, $e->maxBytes);
+            self::assertSame(3, $pulled, 'The read stops at the chunk that crosses the cap.');
+        }
+    }
+
+    public function testADefaultCapBoundsEveryRead(): void
+    {
+        $client = $this->client(new MockHttpClient(new MockResponse(str_repeat('x', PublicHttpClient::MAX_BODY_BYTES + 1))));
+        $response = $client->request('GET', 'https://api.baander.app/x', ['api.baander.app']);
+
+        $this->expectException(ResponseTooLargeException::class);
+        $client->content($response);
+    }
+
+    public function testABodyReadFailureIsGenericAndNamesNoUrl(): void
+    {
+        $transport = new MockHttpClient(new MockResponse((static function (): \Generator {
+            yield 'partial';
+            yield new \RuntimeException('https://api.baander.app/?key=secret');
+        })()));
+        $client = $this->client($transport);
+        $response = $client->request('GET', 'https://api.baander.app/?key=secret', ['api.baander.app']);
+
+        try {
+            $client->content($response, 1000);
+            self::fail('A failed body read was accepted.');
+        } catch (\RuntimeException $e) {
+            self::assertNotInstanceOf(ResponseTooLargeException::class, $e);
+            self::assertSame('The provider response could not be read.', $e->getMessage());
+            self::assertNull($e->getPrevious());
+        }
     }
 
     private function client(HttpClientInterface $transport): PublicHttpClient

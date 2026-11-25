@@ -7,14 +7,18 @@ namespace App\Tests\Unit\Radio\Infrastructure\Sync;
 use App\Radio\Infrastructure\Sync\IprdStationSyncAdapter;
 use Baander\HttpClient\PublicDestinationPolicy;
 use Baander\HttpClient\PublicHttpClient;
+use Baander\HttpClient\ResponseTooLargeException;
 use Baander\HttpClient\UnsafeDestinationException;
-use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
+use Symfony\Component\HttpClient\MockHttpClient;
+use Symfony\Component\HttpClient\Response\MockResponse;
 use Symfony\Contracts\HttpClient\HttpClientInterface;
-use Symfony\Contracts\HttpClient\ResponseInterface;
 
 final class IprdStationSyncAdapterTest extends TestCase
 {
+    /** @var list<string> the method and URL of every request sent */
+    private array $requests = [];
+
     public function testSummaryCannotReachAnIpFromForbiddenDns(): void
     {
         $httpClient = $this->createMock(HttpClientInterface::class);
@@ -43,6 +47,19 @@ final class IprdStationSyncAdapterTest extends TestCase
         } catch (UnsafeDestinationException) {
             self::assertSame(1, $requests);
         }
+    }
+
+    /** The catalog would list a German station, but it is padded past 64 MiB, so its body is never decoded. */
+    public function testACatalogOverItsSizeCapFailsTheSync(): void
+    {
+        $padded = json_encode(self::CATALOG_DATA, JSON_THROW_ON_ERROR) . str_repeat(' ', 64 * 1024 * 1024);
+        $adapter = new IprdStationSyncAdapter(new PublicHttpClient(
+            new MockHttpClient(new MockResponse($padded)),
+            new PublicDestinationPolicy(static fn(string $host): array => ['1.1.1.1']),
+        ));
+
+        $this->expectException(ResponseTooLargeException::class);
+        $adapter->fetchStationsByCountry('DE');
     }
 
     private const CATALOG_DATA = [
@@ -85,15 +102,7 @@ final class IprdStationSyncAdapterTest extends TestCase
             ],
         ]);
 
-        // Only one HTTP call — the summary. No catalog fetch for country listing.
-        $httpClient = $this->createMock(HttpClientInterface::class);
-        $httpClient
-            ->expects($this->once())
-            ->method('request')
-            ->with('GET', $this->stringContains('summary.json'))
-            ->willReturn($summaryResponse);
-
-        $adapter = new IprdStationSyncAdapter(new PublicHttpClient($httpClient, new PublicDestinationPolicy(static fn(string $host): array => ['1.1.1.1'])));
+        $adapter = $this->adapter($summaryResponse);
         $countries = $adapter->fetchCountries();
 
         $this->assertCount(2, $countries);
@@ -103,16 +112,15 @@ final class IprdStationSyncAdapterTest extends TestCase
         $this->assertSame('FR', $countries[1]['code']);
         $this->assertSame('France', $countries[1]['name']);
         $this->assertSame(1534, $countries[1]['station_count']);
+        // Only the summary is fetched to list countries, not the catalog.
+        $this->assertSame(['GET https://iprd-org.github.io/iprd/site_data/summary.json'], $this->requests);
     }
 
     public function testFetchCountriesReturnsEmptyWhenNoCountriesKey(): void
     {
         $summaryResponse = $this->createResponse(200, ['total_stations' => 23088]);
 
-        $httpClient = $this->createStub(HttpClientInterface::class);
-        $httpClient->method('request')->willReturn($summaryResponse);
-
-        $adapter = new IprdStationSyncAdapter(new PublicHttpClient($httpClient, new PublicDestinationPolicy(static fn(string $host): array => ['1.1.1.1'])));
+        $adapter = $this->adapter($summaryResponse);
         $countries = $adapter->fetchCountries();
 
         $this->assertEmpty($countries);
@@ -126,10 +134,7 @@ final class IprdStationSyncAdapterTest extends TestCase
             ],
         ]);
 
-        $httpClient = $this->createStub(HttpClientInterface::class);
-        $httpClient->method('request')->willReturn($summaryResponse);
-
-        $adapter = new IprdStationSyncAdapter(new PublicHttpClient($httpClient, new PublicDestinationPolicy(static fn(string $host): array => ['1.1.1.1'])));
+        $adapter = $this->adapter($summaryResponse);
         $countries = $adapter->fetchCountries();
 
         $this->assertCount(1, $countries);
@@ -141,10 +146,7 @@ final class IprdStationSyncAdapterTest extends TestCase
     {
         $errorResponse = $this->createResponse(503);
 
-        $httpClient = $this->createStub(HttpClientInterface::class);
-        $httpClient->method('request')->willReturn($errorResponse);
-
-        $adapter = new IprdStationSyncAdapter(new PublicHttpClient($httpClient, new PublicDestinationPolicy(static fn(string $host): array => ['1.1.1.1'])));
+        $adapter = $this->adapter($errorResponse);
 
         $this->expectException(\RuntimeException::class);
         $this->expectExceptionMessage('HTTP 503');
@@ -156,14 +158,7 @@ final class IprdStationSyncAdapterTest extends TestCase
     {
         $catalogResponse = $this->createResponse(200, self::CATALOG_DATA);
 
-        $httpClient = $this->createMock(HttpClientInterface::class);
-        $httpClient
-            ->expects($this->once())
-            ->method('request')
-            ->with('GET', $this->stringContains('catalog.json'))
-            ->willReturn($catalogResponse);
-
-        $adapter = new IprdStationSyncAdapter(new PublicHttpClient($httpClient, new PublicDestinationPolicy(static fn(string $host): array => ['1.1.1.1'])));
+        $adapter = $this->adapter($catalogResponse);
         $stations = $adapter->fetchStationsByCountry('DE');
 
         $this->assertCount(1, $stations);
@@ -172,6 +167,7 @@ final class IprdStationSyncAdapterTest extends TestCase
         $this->assertSame('Germany', $stations[0]['country']);
         $this->assertCount(1, $stations[0]['streams']);
         $this->assertSame('https://stream.baander.app/rb', $stations[0]['streams'][0]['url']);
+        $this->assertSame(['GET https://iprd-org.github.io/iprd/site_data/metadata/catalog.json'], $this->requests);
     }
 
     public function testFetchStationsByCountryReturnsEmptyForUnknownCode(): void
@@ -190,10 +186,7 @@ final class IprdStationSyncAdapterTest extends TestCase
     {
         $catalogResponse = $this->createResponse(200, self::CATALOG_DATA);
 
-        $httpClient = $this->createStub(HttpClientInterface::class);
-        $httpClient->method('request')->willReturn($catalogResponse);
-
-        $adapter = new IprdStationSyncAdapter(new PublicHttpClient($httpClient, new PublicDestinationPolicy(static fn(string $host): array => ['1.1.1.1'])));
+        $adapter = $this->adapter($catalogResponse);
         $stations = $adapter->fetchStationsByCountry('JP');
 
         $this->assertEmpty($stations);
@@ -203,10 +196,7 @@ final class IprdStationSyncAdapterTest extends TestCase
     {
         $errorResponse = $this->createResponse(500);
 
-        $httpClient = $this->createStub(HttpClientInterface::class);
-        $httpClient->method('request')->willReturn($errorResponse);
-
-        $adapter = new IprdStationSyncAdapter(new PublicHttpClient($httpClient, new PublicDestinationPolicy(static fn(string $host): array => ['1.1.1.1'])));
+        $adapter = $this->adapter($errorResponse);
 
         $this->expectException(\RuntimeException::class);
         $this->expectExceptionMessage('HTTP 500');
@@ -229,10 +219,7 @@ final class IprdStationSyncAdapterTest extends TestCase
             ],
         ]);
 
-        $httpClient = $this->createStub(HttpClientInterface::class);
-        $httpClient->method('request')->willReturn($catalogResponse);
-
-        $adapter = new IprdStationSyncAdapter(new PublicHttpClient($httpClient, new PublicDestinationPolicy(static fn(string $host): array => ['1.1.1.1'])));
+        $adapter = $this->adapter($catalogResponse);
         $stations = $adapter->fetchStationsByCountry('DE');
 
         $this->assertCount(1, $stations);
@@ -240,15 +227,20 @@ final class IprdStationSyncAdapterTest extends TestCase
     }
 
     /** @param array<array-key, mixed>|null $data */
-    private function createResponse(int $statusCode, ?array $data = null): ResponseInterface
+    private function createResponse(int $statusCode, ?array $data = null): MockResponse
     {
-        $response = $this->createStub(ResponseInterface::class);
-        $response->method('getStatusCode')->willReturn($statusCode);
+        return new MockResponse($data === null ? '' : json_encode($data, JSON_THROW_ON_ERROR), ['http_code' => $statusCode]);
+    }
 
-        if ($data !== null) {
-            $response->method('toArray')->willReturn($data);
-        }
+    private function adapter(MockResponse $response): IprdStationSyncAdapter
+    {
+        return new IprdStationSyncAdapter(new PublicHttpClient(
+            new MockHttpClient(function (string $method, string $url) use ($response): MockResponse {
+                $this->requests[] = $method . ' ' . $url;
 
-        return $response;
+                return $response;
+            }),
+            new PublicDestinationPolicy(static fn(string $host): array => ['1.1.1.1']),
+        ));
     }
 }

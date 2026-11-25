@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Catalog\Application\CommandHandler\MusicBrainzMatch;
 
 use App\Catalog\Application\QueryHandler\MusicBrainzMatch\MusicBrainzAnswer;
+use App\Filesystem\Application\Port\MimeDetectorPortInterface;
 use App\Media\Application\Port\StoragePortInterface;
 use App\Media\Domain\Model\Image;
 use App\Metadata\Application\DTO\MusicBrainz\MusicBrainzRejected;
@@ -38,12 +39,14 @@ final readonly class MatchCovers
         private MusicBrainzLookupInterface $musicBrainz,
         private StoragePortInterface $storage,
         private LoggerInterface $logger,
+        private MimeDetectorPortInterface $mimeDetector,
     ) {
     }
 
     /**
      * Downloads the release's front cover and stores it as a file for the album. The image is not
-     * saved: the apply saves it, or hands it to discard().
+     * saved: the apply saves it, or hands it to discard(). Its type is read from its bytes, as an
+     * uploaded cover's is; the type the archive served is not trusted.
      *
      * @return Image|null null when the release has no front cover, or one that is not a JPEG, PNG or
      *                    WebP image of at most 10 MB
@@ -58,12 +61,16 @@ final readonly class MatchCovers
             throw self::refused($answer);
         }
         $cover = MusicBrainzAnswer::unwrap($answer);
-        $extension = self::EXTENSIONS[$cover->mimeType ?? ''] ?? null;
-        if ($cover === null || $extension === null || $cover->bytes === '' || strlen($cover->bytes) > self::MAX_SIZE) {
+        $mimeType = $cover !== null && $cover->bytes !== '' && strlen($cover->bytes) <= self::MAX_SIZE
+            ? $this->mimeDetector->detectFromBytes(substr($cover->bytes, 0, 32))
+            : null;
+        $extension = self::EXTENSIONS[$mimeType ?? ''] ?? null;
+        if ($cover === null || $mimeType === null || $extension === null) {
             $this->logger->info('The release has no front cover a match can use', [
                 'album_id' => $albumId->toString(),
                 'release_id' => $releaseId,
-                'mime_type' => $cover?->mimeType,
+                'mime_type' => $mimeType,
+                'served_mime_type' => $cover?->mimeType,
             ]);
 
             return null;
@@ -77,7 +84,7 @@ final readonly class MatchCovers
         return Image::create(
             path: $stored->getPath(),
             extension: $extension,
-            mimeType: $cover->mimeType,
+            mimeType: $mimeType,
             size: $stored->getSize(),
             width: $dimensions !== false ? $dimensions[0] : 0,
             height: $dimensions !== false ? $dimensions[1] : 0,

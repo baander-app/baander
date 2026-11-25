@@ -7,11 +7,15 @@ namespace App\Radio\Infrastructure\Sync;
 use App\Radio\Application\Port\StationSyncPortInterface;
 use RuntimeException;
 use Baander\HttpClient\PublicHttpClient;
+use Baander\HttpClient\ResponseTooLargeException;
+use Symfony\Contracts\HttpClient\ResponseInterface;
 
 final class IprdStationSyncAdapter implements StationSyncPortInterface
 {
     private const SUMMARY_URL = 'https://iprd-org.github.io/iprd/site_data/summary.json';
     private const CATALOG_URL = 'https://iprd-org.github.io/iprd/site_data/metadata/catalog.json';
+    /** The catalog lists every station of every country in one document. */
+    private const int MAX_CATALOG_BYTES = 64 * 1024 * 1024;
 
     /**
      * ISO 3166-1 alpha-2 → English country name, built from IPRD catalog.
@@ -115,7 +119,7 @@ final class IprdStationSyncAdapter implements StationSyncPortInterface
                     sprintf('Failed to fetch IPRD summary: HTTP %d', $response->getStatusCode()),
                 );
             }
-            $data = $response->toArray();
+            $data = $this->decode($response);
         } finally {
             $response->cancel();
         }
@@ -190,12 +194,25 @@ final class IprdStationSyncAdapter implements StationSyncPortInterface
                     sprintf('Failed to fetch IPRD catalog: HTTP %d', $response->getStatusCode()),
                 );
             }
-            $this->cachedCatalog = $response->toArray();
+            $this->cachedCatalog = $this->decode($response, self::MAX_CATALOG_BYTES);
         } finally {
             $response->cancel();
         }
 
         return $this->cachedCatalog;
+    }
+
+    /**
+     * @return array<array-key, mixed>
+     *
+     * @throws ResponseTooLargeException when the body is longer than $maxBytes
+     * @throws \JsonException            when the body is not JSON
+     */
+    private function decode(ResponseInterface $response, int $maxBytes = PublicHttpClient::MAX_BODY_BYTES): array
+    {
+        $data = json_decode($this->httpClient->content($response, $maxBytes), true, flags: JSON_THROW_ON_ERROR);
+
+        return is_array($data) ? $data : throw new RuntimeException('The IPRD answer is not a JSON object.');
     }
 
     /**

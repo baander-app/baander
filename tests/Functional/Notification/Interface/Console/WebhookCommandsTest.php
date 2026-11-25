@@ -80,6 +80,20 @@ final class WebhookCommandsTest extends TestCase
         self::assertSame([], $this->entityManager->getRepository(WebhookEntity::class)->findAll());
     }
 
+    public function testAnIpv6UrlCarryingAPrivateIpv4AddressIsInvalidInputOnBothPaths(): void
+    {
+        $admin = $this->createAdminUser();
+
+        foreach (['http://[64:ff9b::a00:5]:8080/', 'http://[::7f00:1]:9200/'] as $url) {
+            $error = $this->assertJsonResponse($this->authenticatedRequest('POST', '/api/webhooks/', $admin, ['url' => $url]), 422);
+            $create = $this->command('app:webhook:create');
+            self::assertSame(Command::INVALID, $create->execute(['url' => $url]), $url);
+            self::assertStringContainsString($error['error']['message'], $create->getDisplay());
+        }
+
+        self::assertSame([], $this->entityManager->getRepository(WebhookEntity::class)->findAll());
+    }
+
     public function testRotatingWithoutForceAndWithoutATerminalKeepsTheOldSecretAndWithForceReportsTheStoredSigningVersion(): void
     {
         $admin = $this->createAdminUser();

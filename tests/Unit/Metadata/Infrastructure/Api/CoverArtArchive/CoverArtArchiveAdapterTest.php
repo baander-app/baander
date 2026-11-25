@@ -43,6 +43,15 @@ final class CoverArtArchiveAdapterTest extends TestCase
         ], $this->urls);
     }
 
+    public function testAFrontCoverOverTenMebibytesIsUnavailable(): void
+    {
+        $cover = $this->adapter(
+            new MockResponse(str_repeat('x', 10 * 1024 * 1024 + 1), ['response_headers' => ['Content-Type' => 'image/jpeg']]),
+        )->fetchFrontCover(self::RELEASE_ID);
+
+        self::assertInstanceOf(MusicBrainzUnavailable::class, $cover);
+    }
+
     public function testAReleaseWithoutAFrontCoverHasNone(): void
     {
         self::assertNull($this->adapter(new MockResponse('Not Found', ['http_code' => 404]))->fetchFrontCover(self::RELEASE_ID));

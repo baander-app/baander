@@ -395,7 +395,7 @@ final readonly class MusicBrainzAdapter implements MusicBrainzLookupInterface
             $status = $response->getStatusCode();
             $location = $status >= 300 && $status < 400 ? ($response->getHeaders(false)['location'][0] ?? null) : null;
 
-            return [$status, $response->getContent(false), $location];
+            return [$status, $this->httpClient->content($response), $location];
         } catch (\Throwable) {
             return $this->unavailable($endpoint, 'the request failed');
         } finally {

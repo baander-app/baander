@@ -17,6 +17,7 @@ use Psr\Log\LoggerInterface;
 use Symfony\Component\RateLimiter\Exception\MaxWaitDurationExceededException;
 use Symfony\Component\RateLimiter\RateLimiterFactoryInterface;
 use Symfony\Contracts\HttpClient\HttpClientInterface;
+use Symfony\Contracts\HttpClient\ResponseInterface;
 
 /**
  * Anti-corruption adapter for the LRCLIB public API.
@@ -41,6 +42,8 @@ final readonly class LrclibClient implements LrclibClientInterface
     private const string USER_AGENT = 'Baander/1.0 (https://baander.app; contact@baander.app)';
     /** Seconds a request may wait for data, and may take in all, before LRCLIB counts as unavailable. */
     private const int TIMEOUT_SECONDS = 10;
+    /** The longest answer read, in bytes. */
+    private const int MAX_RESPONSE_BYTES = 4 * 1024 * 1024;
     /** Client errors that mean "no record" or "try again later" rather than a refused request. */
     private const array NOT_REJECTIONS = [404, 408, 429];
     /** The one subject of the shared limit, so every process spends the same budget. */
@@ -144,7 +147,7 @@ final readonly class LrclibClient implements LrclibClientInterface
      * LRCLIB answers with a client error other than 404, 408 or 429, and LrclibUnavailable
      * when the request cannot be sent within the wait, fails or times out, LRCLIB answers
      * 408, a redirect or a server error, still answers that requests come too fast after
-     * three sends, or the body is not JSON.
+     * three sends, or the body is not JSON or is longer than 4 MiB.
      * Never throws to callers.
      *
      * @param array<string, string> $params
@@ -239,10 +242,36 @@ final readonly class LrclibClient implements LrclibClientInterface
             ]);
             $status = $response->getStatusCode();
 
-            return [$status, $response->getHeaders(false)['retry-after'][0] ?? null, $status < 300 ? $response->toArray() : null];
+            return [$status, $response->getHeaders(false)['retry-after'][0] ?? null, $status < 300 ? $this->decode($response) : null];
         } catch (\Throwable $e) {
             return $this->unavailable($endpoint, $e->getMessage());
         }
+    }
+
+    /**
+     * Decode the body, read only up to MAX_RESPONSE_BYTES: the read stops at the first chunk that
+     * would take it further and cancels the response. The transport decodes a compressed body
+     * first, so its decoded size counts.
+     *
+     * @return array<array-key, mixed>
+     *
+     * @throws \RuntimeException when the body is longer, cannot be read or is not a JSON array or object
+     */
+    private function decode(ResponseInterface $response): array
+    {
+        $body = '';
+        foreach ($this->httpClient->stream($response) as $chunk) {
+            $content = $chunk->getContent();
+            if (strlen($body) + strlen($content) > self::MAX_RESPONSE_BYTES) {
+                $response->cancel();
+
+                throw new \RuntimeException(sprintf('the response is larger than %d bytes', self::MAX_RESPONSE_BYTES));
+            }
+            $body .= $content;
+        }
+        $data = json_decode($body, true, flags: JSON_THROW_ON_ERROR);
+
+        return is_array($data) ? $data : throw new \RuntimeException('the response is not a JSON array or object');
     }
 
     /** LRCLIB answers that requests come too fast with 429, or with 503 when it names a wait. */

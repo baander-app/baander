@@ -67,7 +67,7 @@ final readonly class TasteDiveAdapter
 
                 return [];
             }
-            $body = $response->getContent(false);
+            $body = $this->httpClient->content($response);
         } catch (\Throwable) {
             $this->logger->error('TasteDive API request failed', ['service' => 'tastedive']);
 

@@ -5,10 +5,13 @@ declare(strict_types=1);
 namespace App\Notification\Infrastructure\Webhook;
 
 use App\Notification\Application\Port\WebhookDestinationPortInterface;
+use Baander\HttpClient\AddressClassifier;
 use Symfony\Component\HttpFoundation\IpUtils;
 
 final class WebhookDestinationPolicy implements WebhookDestinationPortInterface
 {
+    private const array LAN_RANGES = ['10.0.0.0/8', '172.16.0.0/12', '192.168.0.0/16', 'fc00::/7'];
+
     /**
      * @param list<string> $lanAllowlist IP addresses or CIDRs, configured by the operator
      * @param ?\Closure(string): list<string> $dnsResolver DNS lookup only; every result is validated below
@@ -34,29 +37,28 @@ final class WebhookDestinationPolicy implements WebhookDestinationPortInterface
             return null;
         }
         $ips = $this->resolveHost($host);
-        if ($ips === []) {
+        if ($ips === [] || !array_all($ips, $this->admits(...))) {
             return null;
-        }
-        foreach ($ips as $ip) {
-            $packed = inet_pton($ip);
-            if ($packed !== false && strlen($packed) === 16 && substr($packed, 0, 12) === str_repeat("\0", 10) . "\xff\xff") {
-                $ip = inet_ntop(substr($packed, 12));
-            }
-            if ($ip === false) {
-                return null;
-            }
-            if (filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_GLOBAL_RANGE) !== false &&
-                !IpUtils::checkIp($ip, ['224.0.0.0/4', 'ff00::/8'])) {
-                continue;
-            }
-            // The allowlist opens only LAN ranges, never loopback, link-local, or metadata endpoints.
-            if (!IpUtils::checkIp($ip, ['10.0.0.0/8', '172.16.0.0/12', '192.168.0.0/16', 'fc00::/7']) ||
-                !IpUtils::checkIp($ip, array_values(array_filter($this->lanAllowlist)))) {
-                return null;
-            }
         }
 
         return ['host' => $host, 'ips' => $ips];
+    }
+
+    /** An IPv6 address that carries an IPv4 address is judged, and allowlisted, by that IPv4 address. */
+    private function admits(string $ip): bool
+    {
+        $destinations = AddressClassifier::destinations($ip);
+
+        return $destinations !== [] && array_all($destinations, $this->admitsDestination(...));
+    }
+
+    /** The allowlist opens only LAN ranges, never loopback, link-local, or metadata endpoints. */
+    private function admitsDestination(string $address): bool
+    {
+        return AddressClassifier::isPublic($address) || (
+            IpUtils::checkIp($address, self::LAN_RANGES) &&
+            IpUtils::checkIp($address, array_values(array_filter($this->lanAllowlist)))
+        );
     }
 
     /** @return list<string> */

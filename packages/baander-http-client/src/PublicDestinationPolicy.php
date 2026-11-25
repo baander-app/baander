@@ -49,19 +49,11 @@ final class PublicDestinationPolicy
         }
         $approved = [];
         foreach ($ips as $ip) {
-            $packed = @inet_pton($ip);
-            if ($packed === false) {
+            if (!AddressClassifier::isPublic($ip)) {
                 throw new UnsafeDestinationException();
             }
-            // Classify mapped IPv4 by its embedded address, never by the wrapper.
-            if (strlen($packed) === 16 && substr($packed, 0, 12) === str_repeat("\0", 10) . "\xff\xff") {
-                $ip = (string) inet_ntop(substr($packed, 12));
-            }
-            if (filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_GLOBAL_RANGE) === false ||
-                IpUtils::checkIp($ip, ['224.0.0.0/4', 'ff00::/8', '64:ff9b::/96', '64:ff9b:1::/48', '2002::/16', '2001::/32'])) {
-                throw new UnsafeDestinationException();
-            }
-            $approved[] = $ip;
+            // A mapped address is the IPv4 address on any dual-stack socket; other forms are pinned as answered.
+            $approved[] = IpUtils::checkIp($ip, '::ffff:0:0/96') ? AddressClassifier::destinations($ip)[0] : $ip;
         }
 
         return ['host' => $host, 'ips' => array_values(array_unique($approved))];

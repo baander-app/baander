@@ -129,7 +129,7 @@ final class MimeDetector implements \App\Filesystem\Application\Port\MimeDetecto
 
         // Fallback to finfo
         $finfo = new \finfo(FILEINFO_MIME_TYPE);
-        $detected = $finfo->file($path ?: 'php://memory');
+        $detected = $path !== '' ? $finfo->file($path) : $finfo->buffer($header);
 
         return $detected !== false ? $detected : 'application/octet-stream';
     }

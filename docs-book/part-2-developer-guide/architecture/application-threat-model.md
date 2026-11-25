@@ -137,7 +137,7 @@ counts and failures belong to the corresponding run artifacts.
 | Forged forwarding headers: direct client chooses apparent address, scheme or host | Rate-limit evasion and incorrect DPoP request identity | `Unit/Shared/Infrastructure/Http/ProxyTrustTest.php` exercises direct and explicit proxy trust and the IPv4 form of a mapped peer; both configuration layers now default to no trust. For the preset, `packages/baander-deployment/tests/PresetDeploymentTest.php` checks that web trusts exactly the gateway's pinned edge addresses, that only the gateway and web join the edge network and that the gateway sets every forwarding header itself; the preset qualification checks at runtime that a forged `X-Forwarded-For` is logged under the sender's own edge address in each family | Outside the preset, correct proxy header replacement and network isolation are deployment assumptions. The tests do not emulate every proxy vendor or multi-hop topology. |
 | Rate-counter outage or concurrent updates | Brute-force limits can admit more requests than configured | Configured factories execute Symfony's fixed- and sliding-window policies, or the project's continuous token bucket, on operation-local snapshots and commit through Redis compare-and-set. Store errors and exhausted conflict retries stop protected work with a generic 503. Named clears advance the same namespace generation used by consumption. `Integration/RateLimiterConcurrencyTest.php` and `RateLimiterHttpAvailabilityTest.php` target these boundaries; `Functional/Auth/AuthEndpointRateLimitTest.php` and `ApiRateLimitTest.php` retain ordinary exhaustion coverage | Local storage, HTTP and runtime checks pass; distributed load and Redis failover remain unqualified. The generic API limiter preserves the narrow logout/revoke availability exception; it still enforces confirmed exhaustion and every other authentication/proof check. |
 | Outbound SSRF through webhook URL or changed DNS | Access to internal services | `WebhookDestinationPolicy` checks every DNS answer, denies forbidden ranges and restricts optional LAN allowance; delivery pins the checked address, bypasses ambient proxies and refuses redirects. `Unit/Notification/Infrastructure/Webhook/` tests cover forbidden addresses, changing DNS and dispatch options | DNS tests are controlled resolver fixtures. Local TLS tests qualify transport certificate behavior separately; they do not certify public DNS or deployment trust stores. |
-| Metadata, radio-catalog or push destination changes through DNS or redirects | Internal-service access or provider credential disclosure | `PublicDestinationPolicy` requires an approved HTTPS hostname on port 443 and rejects the request if any DNS answer is not public. `PublicHttpClient` and `PushTransport` pin an approved address, verify TLS and disable proxies, automatic redirects and reused connections. `Unit/Shared/Infrastructure/Http/PublicDestinationPolicyTest.php`, `PublicHttpClientTest.php` and `Unit/Notification/Infrastructure/Push/PushTransportTest.php` cover these controls | Local adapter, destination-policy and TLS regressions pass in the CI image. Complete native DNS runs in a bounded helper within the caller deadline; helper admission, cleanup and scheduling limits are described below. Approved providers and application-origin script compromise remain separate trust boundaries. |
+| Metadata, radio-catalog or push destination changes through DNS or redirects | Internal-service access or provider credential disclosure | `PublicDestinationPolicy` requires an approved HTTPS hostname on port 443 and rejects the request if any DNS answer is not public. `PublicHttpClient` and `PushTransport` pin an approved address, verify TLS and disable proxies, automatic redirects and reused connections. `packages/baander-http-client/tests/PublicDestinationPolicyTest.php`, `PublicHttpClientTest.php` and `Unit/Notification/Infrastructure/Push/PushTransportTest.php` cover these controls | Local adapter, destination-policy and TLS regressions pass in the CI image. Complete native DNS runs in a bounded helper within the caller deadline; helper admission, cleanup and scheduling limits are described below. Approved providers and application-origin script compromise remain separate trust boundaries. |
 | Outbound TLS failure or HTTPS downgrade | Interception or connection to an unintended endpoint | `Unit/Lyrics/Infrastructure/Api/LrclibTransportSecurityTest.php` uses a disposable CA/server to check trusted success, untrusted certificate, hostname mismatch and redirect rejection. The lyrics client disables redirects | Other outbound transports have separate limits below. Operator-configured base URLs remain trusted configuration. |
 
 ## Outbound inventory
@@ -158,11 +158,21 @@ counts and failures belong to the corresponding run artifacts.
 The provider policy accepts HTTPS on port 443 with an approved ASCII hostname,
 without user information or a fragment. Exact host allowlists and explicitly
 approved domain suffixes use label boundaries. Every A/AAAA answer must be public;
-empty, mixed public/private, mapped-private, multicast and IPv6 translation or
-transition answers are rejected. No LAN exception applies. The transport pins one
-approved address while retaining the hostname for TLS peer/name verification and
-uses a fresh HTTP/1.1 connection with proxies disabled. Caller options cannot
-replace these controls.
+empty, mixed public/private, multicast and site-local answers are rejected. An IPv6
+answer that carries an IPv4 address, in IPv4-mapped, IPv4-translated,
+IPv4-compatible, NAT64 (`64:ff9b::/96`), 6to4 or Teredo form, is judged by that
+address; the local-use NAT64 prefix `64:ff9b:1::/48` is rejected because each
+network chooses where in it the IPv4 address sits. `AddressClassifier` makes the
+same judgement for webhook destinations. No LAN exception applies. The transport
+pins one approved address while retaining the hostname for TLS peer/name
+verification and uses a fresh HTTP/1.1 connection with proxies disabled. Caller
+options cannot replace these controls.
+
+Provider bodies are read through `PublicHttpClient::content()`, which stops at the
+first chunk past its limit and cancels the response: 16 MiB by default, 10 MiB for
+a Cover Art Archive image and 64 MiB for the IPRD catalog. LRCLIB answers are read
+up to 4 MiB in the same way. A match cover's type comes from its bytes, not from
+the served `Content-Type`.
 
 Metadata and IPRD requests reject redirects by default. Cover Art Archive alone may
 follow at most three manual GET redirects within `coverartarchive.org`,

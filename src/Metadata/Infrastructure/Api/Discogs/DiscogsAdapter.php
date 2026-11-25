@@ -203,7 +203,7 @@ final class DiscogsAdapter
                 ]);
                 $status = $response->getStatusCode();
                 $headers = $response->getHeaders(false);
-                $body = $response->getContent(false);
+                $body = $this->httpClient->content($response);
             } catch (\Throwable) {
                 $this->logger->warning('Discogs API request failed', ['service' => 'discogs']);
 

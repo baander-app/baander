@@ -87,9 +87,7 @@ final class LrclibClientTest extends TestCase
 
     public function testGetBySignatureMapsEveryFieldOfTheAnswer(): void
     {
-        $response = $this->createStub(ResponseInterface::class);
-        $response->method('getStatusCode')->willReturn(200);
-        $response->method('toArray')->willReturn([
+        $client = $this->clientAnswering(self::json([
             'id' => 123,
             'trackName' => 'Test Song',
             'artistName' => 'Test Artist',
@@ -98,11 +96,9 @@ final class LrclibClientTest extends TestCase
             'instrumental' => false,
             'plainLyrics' => 'Some lyrics',
             'syncedLyrics' => '[00:01.00] Some lyrics',
-        ]);
+        ]));
 
-        $this->httpClient->method('request')->willReturn($response);
-
-        $result = $this->client->getBySignature('Test Song', 'Test Artist', 'Test Album', 200.0);
+        $result = $client->getBySignature('Test Song', 'Test Artist', 'Test Album', 200.0);
 
         $this->assertInstanceOf(LrclibResult::class, $result);
         $this->assertSame(123, $result->id);
@@ -166,9 +162,7 @@ final class LrclibClientTest extends TestCase
 
     public function testGetByIdReturnsResult(): void
     {
-        $response = $this->createStub(ResponseInterface::class);
-        $response->method('getStatusCode')->willReturn(200);
-        $response->method('toArray')->willReturn([
+        $client = $this->clientAnswering(self::json([
             'id' => 555,
             'trackName' => 'ById Song',
             'artistName' => 'Artist',
@@ -177,11 +171,9 @@ final class LrclibClientTest extends TestCase
             'instrumental' => false,
             'plainLyrics' => 'lyrics',
             'syncedLyrics' => null,
-        ]);
+        ]));
 
-        $this->httpClient->method('request')->willReturn($response);
-
-        $result = $this->client->getById(555);
+        $result = $client->getById(555);
 
         $this->assertInstanceOf(LrclibResult::class, $result);
         $this->assertSame(555, $result->id);
@@ -254,9 +246,7 @@ final class LrclibClientTest extends TestCase
 
     public function testSearchReturnsArrayOfResults(): void
     {
-        $response = $this->createStub(ResponseInterface::class);
-        $response->method('getStatusCode')->willReturn(200);
-        $response->method('toArray')->willReturn([
+        $client = $this->clientAnswering(self::json([
             [
                 'id' => 1,
                 'trackName' => 'Still Alive',
@@ -277,11 +267,9 @@ final class LrclibClientTest extends TestCase
                 'plainLyrics' => 'Well here we are again',
                 'syncedLyrics' => '[00:01.00] Well here we are again',
             ],
-        ]);
+        ]));
 
-        $this->httpClient->method('request')->willReturn($response);
-
-        $results = $this->client->search('Portal');
+        $results = $client->search('Portal');
 
         $this->assertCount(2, $results);
         $this->assertInstanceOf(LrclibSearchResult::class, $results[0]);
@@ -305,13 +293,9 @@ final class LrclibClientTest extends TestCase
 
     public function testSearchReportsAResponseThatIsNotAListAsUnavailable(): void
     {
-        $response = $this->createStub(ResponseInterface::class);
-        $response->method('getStatusCode')->willReturn(200);
-        $response->method('toArray')->willReturn(['error' => 'something']);
+        $client = $this->clientAnswering(self::json(['error' => 'something']));
 
-        $this->httpClient->method('request')->willReturn($response);
-
-        $results = $this->client->search('test');
+        $results = $client->search('test');
 
         $this->assertInstanceOf(LrclibUnavailable::class, $results);
     }
@@ -373,6 +357,14 @@ final class LrclibClientTest extends TestCase
             $this->assertSame(10.0, (float) $requestOptions['timeout']);
             $this->assertSame(10.0, (float) $requestOptions['max_duration']);
         }
+    }
+
+    /** The answer would be an empty list, but it is padded past 4 MiB, so its body is never decoded. */
+    public function testAnAnswerOverFourMebibytesIsUnavailable(): void
+    {
+        $client = $this->clientAnswering(new MockResponse('[' . str_repeat(' ', 4 * 1024 * 1024) . ']'));
+
+        $this->assertInstanceOf(LrclibUnavailable::class, $client->search('Still Alive'));
     }
 
     public function testReportsAnUnexpectedExceptionAsUnavailable(): void
@@ -722,9 +714,7 @@ final class LrclibClientTest extends TestCase
 
     public function testHandlesInstrumentalTrackWithNullLyrics(): void
     {
-        $response = $this->createStub(ResponseInterface::class);
-        $response->method('getStatusCode')->willReturn(200);
-        $response->method('toArray')->willReturn([
+        $client = $this->clientAnswering(self::json([
             'id' => 777,
             'trackName' => 'Intro',
             'artistName' => 'Artist',
@@ -733,11 +723,9 @@ final class LrclibClientTest extends TestCase
             'instrumental' => true,
             'plainLyrics' => null,
             'syncedLyrics' => null,
-        ]);
+        ]));
 
-        $this->httpClient->method('request')->willReturn($response);
-
-        $result = $this->client->getBySignature('Intro', 'Artist', 'Album', 60.0);
+        $result = $client->getBySignature('Intro', 'Artist', 'Album', 60.0);
 
         $this->assertInstanceOf(LrclibResult::class, $result);
         $this->assertTrue($result->instrumental);
@@ -826,6 +814,12 @@ final class LrclibClientTest extends TestCase
 
             return $answer instanceof \Closure ? $answer() : $answer;
         }));
+    }
+
+    /** @param array<array-key, mixed> $data */
+    private static function json(array $data): MockResponse
+    {
+        return new MockResponse(json_encode($data, JSON_THROW_ON_ERROR));
     }
 
     private static function lyrics(): MockResponse

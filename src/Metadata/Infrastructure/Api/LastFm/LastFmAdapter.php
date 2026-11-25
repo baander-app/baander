@@ -143,7 +143,7 @@ final readonly class LastFmAdapter
 
                 return [];
             }
-            $body = $response->getContent(false);
+            $body = $this->httpClient->content($response);
         } catch (\Throwable) {
             $this->logger->error('LastFm API request failed', ['service' => 'lastfm']);
 

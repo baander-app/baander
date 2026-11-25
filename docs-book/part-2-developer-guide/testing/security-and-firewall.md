@@ -193,11 +193,19 @@ passes `verified: false`.
 - `tests/Functional/Auth/LoginAccountThrottleTest.php` limits failed logins per
   account across client addresses. The test environment raises every limit to 10000,
   so each test spends the bucket down to the failures it then makes over HTTP.
+- `tests/Integration/LoginFailureReservationRaceTest.php` releases 50 wrong-password
+  sign-ins for one account at once from a file barrier, over the disposable Redis, and
+  holds the password checks to the limit of 10.
+- `tests/Functional/Auth/SignInStorageBoundsTest.php` refuses a sign-in body over 64 KiB
+  with `413` before anything decodes it. It also checks that a login block stores at most
+  255 characters of valid UTF-8 per field, and that storing one deletes those older than
+  30 days.
 - `tests/Functional/Auth/AuthEndpointRateLimitTest.php` charges a percent-encoded
   registration path to the registration limit.
   `tests/Unit/Shared/Infrastructure/Security/LimitedRouteInventoryTest.php` holds every
   route a limiter names to its method and path, and fails when a listener declares a
-  route the inventory does not list.
+  route the inventory does not list or when a route the auth limits charge, other than
+  the pushed authorization request endpoint, has no request body cap.
 
 ## Exposure and hardening
 
@@ -283,17 +291,35 @@ CI image through the existing unit coordinator:
 
 ```bash
 bash scripts/test-unit-container.sh \
-  tests/Unit/Shared/Infrastructure/Http/PublicDestinationPolicyTest.php \
-  tests/Unit/Shared/Infrastructure/Http/PublicHttpClientTest.php \
+  packages/baander-http-client/tests \
   tests/Unit/Shared/Infrastructure/Http/PublicHttpTransportTest.php \
   tests/Unit/Metadata/Infrastructure/Api \
   tests/Unit/Radio/Infrastructure/Sync/IprdStationSyncAdapterTest.php \
-  tests/Unit/Notification/Infrastructure/Push
+  tests/Unit/Lyrics/Infrastructure/Api/LrclibClientTest.php \
+  tests/Unit/Catalog/Application/CommandHandler/MusicBrainzMatch/MatchCoversTest.php \
+  tests/Unit/Notification/Infrastructure/Push \
+  tests/Unit/Notification/Infrastructure/Webhook/WebhookDestinationPolicyTest.php
 ```
 
 Policy cases cover HTTPS port 443, exact and suffix host boundaries, every DNS
-answer, mixed public/forbidden answers, mapped IPv4 and IPv6 translation/transition
-ranges. Transport cases check connection pinning, forced peer/name verification,
+answer and mixed public/forbidden answers. An IPv6 answer that carries an IPv4
+address, in IPv4-mapped, IPv4-translated, IPv4-compatible, NAT64, 6to4 or Teredo
+form, is refused when that address is private and accepted when it is public.
+Site-local `fec0::/10` and the local-use NAT64 prefix `64:ff9b:1::/48`
+are always refused. The webhook policy cases keep their literal IP URLs:
+`http://[64:ff9b::a00:5]:8080/` and `http://[::7f00:1]:9200/`, which reach private
+addresses through NAT64 and the IPv4-compatible form, are refused, and a
+`10.0.0.0/8` LAN allowlist entry admits `64:ff9b::a00:5`.
+`tests/Functional/Notification/Interface/Console/WebhookCommandsTest.php` refuses
+both URLs through the API and the console.
+
+Body cases check that `PublicHttpClient::content()` stops at the chunk that would
+cross its limit, raises `ResponseTooLargeException` and cancels the response, and
+that every metadata provider, the IPRD catalog and LRCLIB answer a padded body
+over their limit as a failure. A match cover from the Cover Art Archive takes its
+type from its bytes: one served as `image/png` whose bytes are HTML is refused and
+not stored.
+Transport cases check connection pinning, forced peer/name verification,
 proxy exclusion, fresh HTTP/1.1 connections, protected options and sanitized errors.
 CAA redirect cases cover approved and relative locations, credential removal on
 cross-origin hops, changed DNS, downgrade/private/unapproved targets and the
