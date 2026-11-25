@@ -155,12 +155,17 @@ final class SchedulerWorkerRunnerTest extends TestCase
         }
     }
 
-    private function seed(string $expression = '* * * * *'): string
+    /**
+     * Without an expression the job is due only in the seed's own UTC minute, taken from now() like
+     * evaluated_through, so a minute that rolls over before the worker's first pass adds no second
+     * occurrence.
+     */
+    private function seed(?string $expression = null): string
     {
         $id = Uuid::v7()->toString();
         $this->database->executeStatement(<<<'SQL'
             INSERT INTO scheduled_jobs (public_id, id, revision, name, expression, job_type, command, created_at, updated_at, evaluated_through)
-            VALUES (substr(md5(random()::text), 1, 21), :id, :revision, 'Isolated worker fixture', :expression, 'console', 'app:fixture.baander.app', clock_timestamp(), clock_timestamp(), date_trunc('minute', clock_timestamp(), 'UTC') - INTERVAL '1 minute')
+            VALUES (substr(md5(random()::text), 1, 21), :id, :revision, 'Isolated worker fixture', COALESCE(:expression, extract(minute FROM now() AT TIME ZONE 'UTC')::int || ' * * * *'), 'console', 'app:fixture.baander.app', clock_timestamp(), clock_timestamp(), date_trunc('minute', now(), 'UTC') - INTERVAL '1 minute')
             SQL, ['id' => $id, 'revision' => Uuid::v7()->toString(), 'expression' => $expression]);
         return $id;
     }
