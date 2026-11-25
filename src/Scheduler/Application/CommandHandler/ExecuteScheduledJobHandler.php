@@ -21,7 +21,7 @@ use Symfony\Component\Messenger\Exception\UnrecoverableMessageHandlingException;
 use Symfony\Component\Messenger\Stamp\HandledStamp;
 use Throwable;
 
-#[AsMessageHandler]
+#[AsMessageHandler(sign: true)]
 final class ExecuteScheduledJobHandler
 {
     public function __construct(

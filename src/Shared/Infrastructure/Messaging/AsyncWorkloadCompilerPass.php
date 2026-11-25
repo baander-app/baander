@@ -69,13 +69,7 @@ final class AsyncWorkloadCompilerPass implements CompilerPassInterface
                 $definition = $this->definition($container, $definition->getArgument(0))
                     ?? throw new \LogicException('Admission requires a concrete inner transport.');
             }
-            $serializer = $this->definition($container, $definition->getArgument(2));
-            if ($serializer?->getClass() === SigningSerializer::class) {
-                $serializer = $this->definition($container, $serializer->getArgument(0));
-            }
-            if ($serializer?->getClass() !== JsonTransportSerializer::class) {
-                throw new \LogicException(sprintf('Transport "%s" must use the JSON transport serializer.', $transport));
-            }
+            $this->assertSignsEveryCodecType($container, $transport, $definition->getArgument(2), array_keys($codecClasses));
             $retry = $this->definition($container, $retryReferences[$transport] ?? null);
             if ($retry?->getClass() !== MultiplierRetryStrategy::class) {
                 throw new \LogicException(sprintf('Transport "%s" requires its bounded multiplier retry strategy.', $transport));
@@ -85,6 +79,30 @@ final class AsyncWorkloadCompilerPass implements CompilerPassInterface
                 if (!is_numeric($value) || (float) $value !== (float) $policy[$key]) {
                     throw new \LogicException(sprintf('Transport "%s" retry policy differs for "%s".', $transport, $key));
                 }
+            }
+        }
+    }
+
+    /**
+     * A transport reader accepts any type the codec decodes, so the signing serializer must
+     * cover every one of them: it passes an unsigned envelope of an unsigned type through.
+     * Handlers turn signing on with `sign: true`; the framework collects those types.
+     *
+     * @param list<class-string> $codecClasses
+     */
+    private function assertSignsEveryCodecType(ContainerBuilder $container, string $transport, mixed $serializer, array $codecClasses): void
+    {
+        $signing = $this->definition($container, $serializer);
+        if ($signing?->getClass() !== SigningSerializer::class) {
+            throw new \LogicException(sprintf('Transport "%s" must sign its messages with the signing serializer over the JSON transport serializer.', $transport));
+        }
+        if ($this->definition($container, $signing->getArgument(0))?->getClass() !== JsonTransportSerializer::class) {
+            throw new \LogicException(sprintf('Transport "%s" must use the JSON transport serializer inside the signing serializer.', $transport));
+        }
+        $signedTypes = $container->getParameterBag()->resolveValue($signing->getArgument(2));
+        foreach ($codecClasses as $class) {
+            if (!is_array($signedTypes) || !array_any($signedTypes, static fn (mixed $type): bool => is_string($type) && is_a($class, $type, true))) {
+                throw new \LogicException(sprintf('Message type "%s" is not signed; declare its handler with sign: true.', $class));
             }
         }
     }

@@ -15,9 +15,16 @@ Webhook delivery cannot decrypt its stored secrets until each webhook is rotated
 under the new value or the matching old value is restored. Comma-separated values
 are not a rotation mechanism in this application.
 
+`APP_SECRET` also keys the HMAC on every queued message and every cache value in
+Redis. After a rotation, workers drop each message signed under the old value,
+queued and failed messages alike: the worker logs `Error thrown while handling
+message Symfony\Component\Messenger\Exception\MessageDecodingFailedException`, and
+an administrator's read of the failed-message list removes those rows. Cache values
+read as misses and are rebuilt. Let the queues drain before rotating.
+
 ### Step-by-step
 
-1. **Prepare recovery and stop delivery.** Back up the database together with the current `APP_SECRET`. Drain traffic and stop web and worker instances so no webhook is delivered during the change; with the preset, `stop` does both. Keep the old value available for recovery.
+1. **Prepare recovery, drain the queues and stop delivery.** Back up the database together with the current `APP_SECRET`. Drain traffic, then wait until [app:monitor:transport](../commands/app-monitor-transport.md) reports an empty async queue; retry or remove what the failed queue holds. Stop web and worker instances so no webhook is delivered during the change; with the preset, `stop` does both. Keep the old value available for recovery.
 
 2. **Generate a new secret:**
 

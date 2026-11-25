@@ -103,6 +103,12 @@ final class AsyncWorkloadCompilerPassTest extends TestCase
                 $container->getDefinition('messenger.transport.async')->setArgument(2, new Reference('other.serializer'));
                 $container->register('other.serializer', \stdClass::class);
                 break;
+            case 'unsigned':
+                $container->getDefinition('messenger.transport.scheduler')->setArgument(2, new Reference(JsonTransportSerializer::class));
+                break;
+            case 'codec-unsigned':
+                $container->getDefinition('signing.serializer')->setArgument(2, [CompilerWorkload::class]);
+                break;
             case 'retry':
                 $container->getDefinition('retry.async')->setArgument(0, 4);
                 break;
@@ -129,6 +135,8 @@ final class AsyncWorkloadCompilerPassTest extends TestCase
         yield ['codec-duplicate-class', 'codec'];
         yield ['codec-duplicate-type', 'codec'];
         yield ['serializer', 'serializer'];
+        yield ['unsigned', 'must sign'];
+        yield ['codec-unsigned', 'CompilerExplicitWorkload" is not signed'];
         yield ['retry', 'retry'];
         yield ['retry-missing', 'retry'];
         yield ['codec-missing', 'codec', true];
@@ -152,9 +160,13 @@ final class AsyncWorkloadCompilerPassTest extends TestCase
     public function testFrameworkSigningDecoratorPreservesTheJsonSerializer(): void
     {
         $container = $this->container();
-        $container->register('signing.serializer', SigningSerializer::class)
-            ->setArguments([new Reference('signing.serializer.inner'), 'test-signing-key', []])
-            ->setDecoratedService(JsonTransportSerializer::class);
+        foreach (['async', 'scheduler'] as $transport) {
+            $container->getDefinition('messenger.transport.' . $transport)->setArgument(2, new Reference('messenger.default_serializer'));
+        }
+        $container->setAlias('messenger.default_serializer', JsonTransportSerializer::class);
+        $container->register('.signing.messenger.default_serializer', SigningSerializer::class)
+            ->setArguments([new Reference('.signing.messenger.default_serializer.inner'), 'test-signing-key', [CompilerWorkload::class, CompilerExplicitWorkload::class]])
+            ->setDecoratedService('messenger.default_serializer');
         (new DecoratorServicePass())->process($container);
         (new ResolveReferencesToAliasesPass())->process($container);
         (new AsyncWorkloadCompilerPass())->process($container);
@@ -195,8 +207,10 @@ final class AsyncWorkloadCompilerPassTest extends TestCase
         $container->setDefinition('descriptor', new Definition(HandlerDescriptor::class, [new Reference('handler'), []]));
         $container->register('codec', CompilerCodec::class)->addTag('baander.message_payload_codec');
         $container->register(JsonTransportSerializer::class, JsonTransportSerializer::class);
+        $container->register('signing.serializer', SigningSerializer::class)
+            ->setArguments([new Reference(JsonTransportSerializer::class), 'test-signing-key', [CompilerWorkload::class, CompilerExplicitWorkload::class]]);
         foreach (['async', 'scheduler'] as $transport) {
-            $container->register('messenger.transport.' . $transport)->setArgument(2, new Reference(JsonTransportSerializer::class));
+            $container->register('messenger.transport.' . $transport)->setArgument(2, new Reference('signing.serializer'));
             $container->register('retry.' . $transport, MultiplierRetryStrategy::class)->setArguments(array_values($policy));
         }
         $container->register('messenger.retry_strategy_locator')->setArgument(0, [

@@ -101,6 +101,9 @@ See the [CQRS and Messaging](../development/cqrs-and-messaging.md) page for disp
 | `AsyncWorkloadCatalog` | Validates admitted asynchronous message classes, their permitted transport (`async` or `scheduler`), resource class, and retry policies |
 | `FailureTransportAdministration` | Inspects, retries, and removes failed messages in the Doctrine failure transport |
 | `RedisTransportStatus` | Probes the `async` Redis stream depth, consumer liveness, and failure queue depth |
+| `UndecodableDeliverySubscriber` | Keeps an envelope that did not decode out of the failure transport |
+
+Every transport signs its envelopes with Symfony's `SigningSerializer`, keyed by `kernel.secret` (`APP_SECRET`). The handler of each type the message codec decodes declares `#[AsMessageHandler(sign: true)]`, and `AsyncWorkloadCompilerPass` fails the container build when a codec type is not signed: the serializer passes an unsigned envelope of an unsigned type through. A worker receives an envelope that is unsigned, altered after signing or undecodable as a `MessageDecodingFailedException`. The failure is unrecoverable, so Symfony's retry listener logs it once; `UndecodableDeliverySubscriber` marks it as already sent to the failure transport, and the worker rejects it. It starts no job attempt and is never relisted. `FailureTransportAdministration` removes such a row when it reads it. The signature carries no nonce or expiry, so a process that holds the Redis credentials can replay an envelope it captured. A fixture that writes to a stream an application worker consumes signs with `MessageCodecFactory::signingSerializer()`.
 
 ## Doctrine
 
@@ -123,7 +126,7 @@ API output keeps whole seconds (`Y-m-d\TH:i:sP`); cursors keep the microseconds.
 
 ## Caching
 
-Cache pools are Redis-backed and tag-aware (`RedisTagAwareAdapter`). Tag invalidation requires a Redis `maxmemory-policy` of `noeviction` or `volatile-*`.
+Cache pools are Redis-backed. `cache.tags` is Symfony's `TagAwareAdapter` over a `RedisAdapter`, which keeps its tag versions as ordinary cache items. `AuthenticatedMarshaller` decorates `cache.default_marshaller`: it prefixes every value with an HMAC-SHA256 tag under a key derived from `kernel.secret`. A value whose tag does not verify is a miss and never reaches `unserialize()`, which Symfony's default marshaller calls with every class allowed. The tag does not cover the cache key, so a process that can write to Redis can move an authenticated value to another key but cannot create one.
 
 ## Redis
 

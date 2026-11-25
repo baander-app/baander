@@ -20,7 +20,7 @@ final class RelayOutboxHandler
     ) {
     }
 
-    #[AsMessageHandler]
+    #[AsMessageHandler(sign: true)]
     public function __invoke(RelayOutboxCommand $command): int
     {
         $pending = $this->outboxRepository->fetchPending($command->batchSize);

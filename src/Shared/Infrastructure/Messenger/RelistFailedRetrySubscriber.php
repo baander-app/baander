@@ -34,7 +34,8 @@ final readonly class RelistFailedRetrySubscriber implements EventSubscriberInter
 
     public function onMessageFailed(WorkerMessageFailedEvent $event): void
     {
-        if ($event->willRetry() || $event->getReceiverName() !== $this->failureTransportName) {
+        if ($event->willRetry() || $event->getReceiverName() !== $this->failureTransportName
+            || UndecodableDeliverySubscriber::undecodable($event->getEnvelope())) {
             return;
         }
 

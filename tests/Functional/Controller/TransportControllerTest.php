@@ -6,7 +6,6 @@ namespace App\Tests\Functional\Controller;
 
 use App\Shared\Domain\Model\PublicId;
 use App\Shared\Infrastructure\Messenger\JobIdStamp;
-use App\Shared\Infrastructure\Messenger\JsonTransportSerializer;
 use App\Tests\Fixtures\Messaging\FailureTransportProbe;
 use App\Tests\Functional\TestCase;
 use Doctrine\DBAL\Connection as DbalConnection;
@@ -22,6 +21,7 @@ use Symfony\Component\Messenger\Stamp\ErrorDetailsStamp;
 use Symfony\Component\Messenger\Stamp\RedeliveryStamp;
 use Symfony\Component\Messenger\Stamp\SentToFailureTransportStamp;
 use Symfony\Component\Messenger\Stamp\TransportMessageIdStamp;
+use Symfony\Component\Messenger\Transport\Serialization\SigningSerializer;
 use Symfony\Component\Messenger\Transport\TransportInterface;
 
 /** Runs the failure transport endpoints against the migrated PostgreSQL table. */
@@ -263,8 +263,9 @@ final class TransportControllerTest extends TestCase
 
     private function sendCommittedFailed(DbalConnection $observer, string $label, PublicId $jobId, bool $fail): string
     {
-        $serializer = static::getContainer()->get(JsonTransportSerializer::class);
-        self::assertInstanceOf(JsonTransportSerializer::class, $serializer);
+        // The transports' serializer, which signs: the retry worker drops an unsigned envelope.
+        $serializer = static::getContainer()->get('messenger.default_serializer');
+        self::assertInstanceOf(SigningSerializer::class, $serializer);
         $transport = new DoctrineTransport(
             new DoctrineTransportConnection(['table_name' => 'failed_messages', 'queue_name' => 'failed', 'auto_setup' => false], $observer),
             $serializer,

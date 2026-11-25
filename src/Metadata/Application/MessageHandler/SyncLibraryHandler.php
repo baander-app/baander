@@ -26,7 +26,7 @@ final class SyncLibraryHandler
         private readonly MoviePortInterface $movieService,
     ) {}
 
-    #[AsMessageHandler(fromTransport: 'async')]
+    #[AsMessageHandler(fromTransport: 'async', sign: true)]
     public function __invoke(SyncLibraryMessage $message): void
     {
         $libraryId = $message->libraryId;

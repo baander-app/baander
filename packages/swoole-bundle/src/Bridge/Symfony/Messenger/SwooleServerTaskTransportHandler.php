@@ -8,6 +8,7 @@ use Assert\Assertion;
 use Swoole\Server;
 use SwooleBundle\SwooleBundle\Server\TaskHandler\TaskHandler;
 use Symfony\Component\Messenger\Envelope;
+use Symfony\Component\Messenger\Exception\MessageDecodingFailedException;
 use Symfony\Component\Messenger\MessageBusInterface;
 use Symfony\Component\Messenger\Stamp\ReceivedStamp;
 use Symfony\Component\Messenger\Transport\Serialization\SerializerInterface;
@@ -27,7 +28,14 @@ final readonly class SwooleServerTaskTransportHandler implements TaskHandler
         // Both modes accept the configured transport wire format.
         if (is_array($data)) {
             Assertion::notNull($this->serializer, 'Cannot deserialize task data: SerializerInterface not available.');
-            $data = $this->serializer->decode($data)->with(new ReceivedStamp('swoole_task'));
+            $data = $this->serializer->decode($data);
+            // A serializer returns a payload it refuses, such as an unsigned one, as an envelope
+            // that carries the failure. The task is dropped; the logging decorator records it.
+            $failure = $data->getMessage();
+            if ($failure instanceof MessageDecodingFailedException) {
+                throw $failure;
+            }
+            $data = $data->with(new ReceivedStamp('swoole_task'));
         }
 
         Assertion::isInstanceOf($data, Envelope::class);

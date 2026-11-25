@@ -28,6 +28,11 @@ final class WorkerJobMonitorSubscriber
     public function onMessageReceived(WorkerMessageReceivedEvent $event): void
     {
         $envelope = $event->getEnvelope();
+        // An envelope that did not decode is dropped; it starts no attempt, or a flood of
+        // forged envelopes would fill the job history.
+        if (UndecodableDeliverySubscriber::undecodable($envelope)) {
+            return;
+        }
 
         $jobIdStamp = $envelope->last(JobIdStamp::class);
         if ($jobIdStamp === null) {

@@ -19,7 +19,7 @@ final class PruneMissingImagesHandler
     ) {
     }
 
-    #[AsMessageHandler]
+    #[AsMessageHandler(sign: true)]
     public function __invoke(PruneMissingImagesCommand $command): int
     {
         $total = $this->imageRepository->countAll();

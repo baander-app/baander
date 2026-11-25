@@ -133,7 +133,7 @@ try {
     while (hrtime(true) / 1e9 < $waitUntil) { usleep(20000); }
     $transport = new Symfony\Component\Messenger\Bridge\Redis\Transport\RedisTransport(
         Symfony\Component\Messenger\Bridge\Redis\Transport\Connection::fromDsn('redis://default:test-only@redis:6379/messages/baander'),
-        new App\Shared\Infrastructure\Messenger\JsonTransportSerializer(new App\Shared\Infrastructure\Messaging\JsonMessageCodec([new WorkloadCodec()])),
+        App\Tests\Fixtures\Messaging\MessageCodecFactory::signingSerializer([new WorkloadCodec()]),
     );
     $sent = $transport->send(new Symfony\Component\Messenger\Envelope(new Workload('observation-gap', 0)));
     $messageId = $sent->last(Symfony\Component\Messenger\Stamp\TransportMessageIdStamp::class)?->getId();

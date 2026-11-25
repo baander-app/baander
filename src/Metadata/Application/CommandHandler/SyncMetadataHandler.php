@@ -15,7 +15,7 @@ use Symfony\Component\Messenger\Attribute\AsMessageHandler;
  * Returns the number of jobs queued: for the full sync one per library and one for the
  * artists and one for people, and for the genre sync one per album and song.
  */
-#[AsMessageHandler]
+#[AsMessageHandler(sign: true)]
 final readonly class SyncMetadataHandler
 {
     public function __construct(

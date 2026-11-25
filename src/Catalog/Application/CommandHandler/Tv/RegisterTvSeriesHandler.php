@@ -18,7 +18,7 @@ use App\Shared\Application\Exception\ServiceUnavailableException;
 use App\Shared\Application\Port\TransactionPortInterface;
 use Symfony\Component\Messenger\Attribute\AsMessageHandler;
 
-#[AsMessageHandler]
+#[AsMessageHandler(sign: true)]
 final readonly class RegisterTvSeriesHandler
 {
     public function __construct(

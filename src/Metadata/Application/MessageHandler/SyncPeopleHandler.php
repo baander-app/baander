@@ -23,7 +23,7 @@ final readonly class SyncPeopleHandler
         private JobCancellationCheckpointInterface $cancellation,
     ) {}
 
-    #[AsMessageHandler(fromTransport: 'async')]
+    #[AsMessageHandler(fromTransport: 'async', sign: true)]
     public function __invoke(SyncPeopleMessage $message): void
     {
         if (!$this->tmdb->isConfigured()) {

@@ -682,7 +682,7 @@ services:
     App\Tests\Fixtures\Worker\Autoscaling\WorkloadHandler:
         autowire: false
         autoconfigure: false
-        tags: [{name: messenger.message_handler}]
+        tags: [{name: messenger.message_handler, sign: true}]
 YAML;
 
     private const string FIXTURE_DOCKERFILE = <<<'DOCKERFILE'

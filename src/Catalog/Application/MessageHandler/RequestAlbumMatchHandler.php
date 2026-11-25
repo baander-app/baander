@@ -20,7 +20,7 @@ final readonly class RequestAlbumMatchHandler
     ) {
     }
 
-    #[AsMessageHandler(fromTransport: 'async')]
+    #[AsMessageHandler(fromTransport: 'async', sign: true)]
     public function __invoke(SyncAlbumMessage $message): void
     {
         $this->requests->requestForAdmin($message->albumId);

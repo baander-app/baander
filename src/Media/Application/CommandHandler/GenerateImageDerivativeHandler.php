@@ -14,7 +14,7 @@ final readonly class GenerateImageDerivativeHandler
     {
     }
 
-    #[AsMessageHandler(fromTransport: 'async')]
+    #[AsMessageHandler(fromTransport: 'async', sign: true)]
     public function __invoke(GenerateImageDerivativeCommand $command): void
     {
         $this->derivatives->generate($command->sourcePath, $command->preset);

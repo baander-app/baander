@@ -14,7 +14,7 @@ final readonly class ExecuteRecommendationJobHandler
     {
     }
 
-    #[AsMessageHandler(fromTransport: 'async')]
+    #[AsMessageHandler(fromTransport: 'async', sign: true)]
     public function __invoke(ExecuteRecommendationJobCommand $command): RecommendationGenerationResult
     {
         return $this->generator->execute($command->jobId);

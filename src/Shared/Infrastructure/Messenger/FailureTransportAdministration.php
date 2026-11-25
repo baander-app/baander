@@ -12,6 +12,7 @@ use App\Shared\Application\Port\FailedMessageAdministrationInterface;
 use Doctrine\DBAL\Connection;
 use Doctrine\DBAL\Exception as DBALException;
 use Doctrine\DBAL\ParameterType;
+use Psr\Log\LoggerInterface;
 use Symfony\Component\Messenger\Envelope;
 use Symfony\Component\Messenger\Exception\MessageDecodingFailedException;
 use Symfony\Component\Messenger\Exception\TransportException;
@@ -41,6 +42,7 @@ final readonly class FailureTransportAdministration implements FailedMessageAdmi
         private string $tableName,
         private string $queueName,
         private string $projectDir,
+        private LoggerInterface $logger,
     ) {
     }
 
@@ -112,15 +114,12 @@ final readonly class FailureTransportAdministration implements FailedMessageAdmi
     public function removeAll(): int
     {
         $removed = 0;
-        // Each id leaves the table: rejected here, rejected by the receiver when it
-        // cannot decode the row, or already removed by a concurrent operation.
+        // Each id leaves the table: rejected here, a row that does not decode included, or
+        // already removed by a concurrent operation.
         while (($ids = $this->ids(self::REMOVE_BATCH, 0)) !== []) {
             foreach ($ids as $id) {
                 try {
                     $envelope = $this->receiver->find($id);
-                } catch (MessageDecodingFailedException) {
-                    ++$removed;
-                    continue;
                 } catch (TransportException $exception) {
                     throw $this->unavailable($exception);
                 }
@@ -158,13 +157,20 @@ final readonly class FailureTransportAdministration implements FailedMessageAdmi
         }
 
         try {
-            return $this->receiver->find($id);
-        } catch (MessageDecodingFailedException) {
-            // The Doctrine receiver deletes a row it cannot decode before throwing.
-            return null;
+            $envelope = $this->receiver->find($id);
         } catch (TransportException $exception) {
             throw $this->unavailable($exception);
         }
+        $failure = $envelope?->getMessage();
+        if ($envelope === null || !$failure instanceof MessageDecodingFailedException) {
+            return $envelope;
+        }
+        // The receiver returns a row it cannot decode as a decoding failure: unsigned, altered
+        // after signing, or signed under an earlier APP_SECRET. No retry can decode it.
+        $this->logger->warning('Removed a failed message that does not decode.', ['id' => $id, 'reason' => $failure->getMessage()]);
+        $this->reject($envelope);
+
+        return null;
     }
 
     private function reject(Envelope $envelope): void

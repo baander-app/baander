@@ -564,7 +564,7 @@ if ($mode === 'verify-scheduler' || $mode === 'replay-scheduler') {
         // consumer's retained deduplication guard with an actual duplicate delivery.
         $transport = new Symfony\Component\Messenger\Bridge\Redis\Transport\RedisTransport(
             Symfony\Component\Messenger\Bridge\Redis\Transport\Connection::fromDsn('redis://default:test-only@redis:6379/scheduler_occurrences/baander'),
-            new App\Shared\Infrastructure\Messenger\JsonTransportSerializer(MessageCodecFactory::create()),
+            MessageCodecFactory::signingSerializer(),
         );
         $transport->send(new Symfony\Component\Messenger\Envelope(new App\Scheduler\Application\Command\ExecuteScheduledOccurrenceCommand(App\Shared\Domain\Model\Uuid::fromString($occurrence['id']))));
         echo "Replayed duplicate scheduler envelope after confirmed execution.\n";

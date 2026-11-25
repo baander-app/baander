@@ -37,7 +37,7 @@ final class SendEmailHandler
     ) {
     }
 
-    #[AsMessageHandler(fromTransport: 'async')]
+    #[AsMessageHandler(fromTransport: 'async', sign: true)]
     public function __invoke(SendEmailCommand $command): void
     {
         if (!$this->preferenceRepository->isEnabled(

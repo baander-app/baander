@@ -82,7 +82,7 @@ final class FilesDiscoveredHandler
     ) {
     }
 
-    #[AsMessageHandler]
+    #[AsMessageHandler(sign: true)]
     public function __invoke(FilesDiscovered $message): void
     {
         // A delete with files that holds the library may be about to unlink some of these files,

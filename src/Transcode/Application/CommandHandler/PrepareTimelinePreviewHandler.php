@@ -15,7 +15,7 @@ final readonly class PrepareTimelinePreviewHandler
     ) {
     }
 
-    #[AsMessageHandler(fromTransport: 'async')]
+    #[AsMessageHandler(fromTransport: 'async', sign: true)]
     public function __invoke(PrepareTimelinePreview $command): void
     {
         $this->previews->prepare(

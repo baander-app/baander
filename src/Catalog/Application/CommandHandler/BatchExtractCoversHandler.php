@@ -22,7 +22,7 @@ final class BatchExtractCoversHandler
     ) {
     }
 
-    #[AsMessageHandler(fromTransport: 'async')]
+    #[AsMessageHandler(fromTransport: 'async', sign: true)]
     public function __invoke(BatchExtractCoversCommand $command): int
     {
         $limit = 500;

@@ -70,7 +70,7 @@ if ($mode === 'prepare') {
 } elseif ($mode === 'send') {
     $transport = new Symfony\Component\Messenger\Bridge\Redis\Transport\RedisTransport(
         Symfony\Component\Messenger\Bridge\Redis\Transport\Connection::fromDsn(getenv('MESSENGER_TRANSPORT_DSN'), ['group' => 'baander']),
-        new App\Shared\Infrastructure\Messenger\JsonTransportSerializer(MessageCodecFactory::create()),
+        MessageCodecFactory::signingSerializer(),
     );
     // The job ID that JobMonitoringMiddleware assigns at dispatch.
     $transport->send(new Symfony\Component\Messenger\Envelope(new App\Shared\Domain\Event\Outbox\RelayOutboxCommand(), [

@@ -12,7 +12,7 @@ final readonly class UpdateTranscodePositionHandler
 {
     public function __construct(private TranscodePlaybackControl $playback) {}
 
-    #[AsMessageHandler]
+    #[AsMessageHandler(sign: true)]
     public function __invoke(UpdateTranscodePositionCommand $command): ?int
     {
         return $this->playback->apply(

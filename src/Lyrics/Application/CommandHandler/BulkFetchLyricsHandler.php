@@ -50,7 +50,7 @@ use Symfony\Component\Messenger\Stamp\TransportNamesStamp;
  * A run that finishes having queued fetches is recorded against its job for as long, so
  * cancelling the finished job in the job monitor cancels the run the same way.
  */
-#[AsMessageHandler]
+#[AsMessageHandler(sign: true)]
 final class BulkFetchLyricsHandler
 {
     private const int BATCH_SIZE = 50;

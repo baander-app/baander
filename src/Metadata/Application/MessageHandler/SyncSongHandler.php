@@ -19,7 +19,7 @@ final class SyncSongHandler
     ) {
     }
 
-    #[AsMessageHandler(fromTransport: 'async')]
+    #[AsMessageHandler(fromTransport: 'async', sign: true)]
     public function __invoke(SyncSongMessage $message): void
     {
         $song = $this->songService->findByUuid($message->songId);

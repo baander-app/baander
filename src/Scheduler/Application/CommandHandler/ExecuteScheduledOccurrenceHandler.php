@@ -9,7 +9,7 @@ use App\Scheduler\Application\Port\SchedulerOccurrenceExecutionStoreInterface;
 use App\Shared\Domain\Model\Uuid;
 use Symfony\Component\Messenger\Attribute\AsMessageHandler;
 
-#[AsMessageHandler]
+#[AsMessageHandler(sign: true)]
 final readonly class ExecuteScheduledOccurrenceHandler
 {
     public function __construct(

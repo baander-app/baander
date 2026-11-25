@@ -17,7 +17,7 @@ final class SendWebhookHandler
     ) {
     }
 
-    #[AsMessageHandler]
+    #[AsMessageHandler(sign: true)]
     public function __invoke(SendWebhookCommand $command): void
     {
         try {

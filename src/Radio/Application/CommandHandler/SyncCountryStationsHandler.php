@@ -8,7 +8,7 @@ use App\Radio\Application\Command\SyncCountryStationsCommand;
 use App\Radio\Application\Port\RadioStationPortInterface;
 use Symfony\Component\Messenger\Attribute\AsMessageHandler;
 
-#[AsMessageHandler(fromTransport: 'async')]
+#[AsMessageHandler(fromTransport: 'async', sign: true)]
 final class SyncCountryStationsHandler
 {
     public function __construct(

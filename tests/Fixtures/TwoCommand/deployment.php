@@ -782,7 +782,7 @@ if ($mode === 'prepare') {
     require_once $project . '/tests/Fixtures/Messaging/MessageCodecFactory.php';
     $transport = new Symfony\Component\Messenger\Bridge\Redis\Transport\RedisTransport(
         Symfony\Component\Messenger\Bridge\Redis\Transport\Connection::fromDsn('redis://default:test-only@redis:6379/messages/baander'),
-        new App\Shared\Infrastructure\Messenger\JsonTransportSerializer(App\Tests\Fixtures\Messaging\MessageCodecFactory::create()),
+        App\Tests\Fixtures\Messaging\MessageCodecFactory::signingSerializer(),
     );
     $redis = new Redis(); $redis->connect('redis', 6379, 1); $redis->auth(['default', 'test-only']);
     $sent = 0;

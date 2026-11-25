@@ -384,6 +384,14 @@ services:
         arguments:
             $dsn: '%env(REDIS_URL)%'
 
+    # Every cache pool that marshals its values authenticates them with a key derived from
+    # kernel.secret; a value that does not verify is a miss and is never unserialized.
+    App\Shared\Infrastructure\Cache\AuthenticatedMarshaller:
+        decorates: cache.default_marshaller
+        arguments:
+            $inner: '@.inner'
+            $secret: '%kernel.secret%'
+
     # Inline runs mark the message as received from its routed transport, so
     # transport-bound handlers run; the senders locator knows the routing.
     App\Shared\Infrastructure\Messenger\JobMonitorAdministration:
@@ -1827,7 +1835,7 @@ when@test:
         App\Tests\Fixtures\Messaging\FailureTransportProbeCodec:
             tags: ['baander.message_payload_codec']
         App\Tests\Fixtures\Messaging\FailureTransportProbeHandler:
-            tags: [{ name: 'messenger.message_handler' }]
+            tags: [{ name: 'messenger.message_handler', sign: true }]
         # A job with a cancellation checkpoint per item, for job cancellation tests.
         App\Tests\Fixtures\Messaging\CancellationProbeHandler:
             autowire: true

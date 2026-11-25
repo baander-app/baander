@@ -42,7 +42,7 @@ use Symfony\Component\Messenger\Attribute\AsMessageHandler;
  * skipped because its run was cancelled, or whose song no longer exists, counts toward no
  * outcome.
  */
-#[AsMessageHandler]
+#[AsMessageHandler(sign: true)]
 final class FetchLyricsHandler
 {
     public function __construct(

@@ -34,7 +34,7 @@ final class SendPushToSubscriptionHandler
     ) {
     }
 
-    #[AsMessageHandler(fromTransport: 'async')]
+    #[AsMessageHandler(fromTransport: 'async', sign: true)]
     public function __invoke(SendPushToSubscriptionCommand $command): void
     {
         // A retry may arrive after the server turned push off.

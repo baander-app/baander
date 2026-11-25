@@ -40,7 +40,7 @@ final class ExtractAlbumCoverHandler
     ) {
     }
 
-    #[AsMessageHandler(fromTransport: 'async')]
+    #[AsMessageHandler(fromTransport: 'async', sign: true)]
     public function __invoke(ExtractAlbumCoverCommand $command): void
     {
         $album = $this->albumService->findByUuid($command->getAlbumId());

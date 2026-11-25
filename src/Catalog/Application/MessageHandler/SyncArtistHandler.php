@@ -79,7 +79,7 @@ final readonly class SyncArtistHandler
     ) {
     }
 
-    #[AsMessageHandler(fromTransport: 'async')]
+    #[AsMessageHandler(fromTransport: 'async', sign: true)]
     public function __invoke(SyncArtistMessage $message): void
     {
         $queuedAgain = $message->runId !== null && $this->marks->isRunCancelled($message->runId)

@@ -45,7 +45,7 @@ final readonly class QueueArtistSyncsHandler
      *
      * @throws JobCancelledException when the job is cancelled; the syncs queued so far end without a request
      */
-    #[AsMessageHandler(fromTransport: 'async')]
+    #[AsMessageHandler(fromTransport: 'async', sign: true)]
     public function __invoke(SyncArtistsMessage $message): int
     {
         $runId = Uuid::v7();

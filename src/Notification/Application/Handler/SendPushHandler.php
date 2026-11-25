@@ -32,7 +32,7 @@ final class SendPushHandler
     ) {
     }
 
-    #[AsMessageHandler(fromTransport: 'async')]
+    #[AsMessageHandler(fromTransport: 'async', sign: true)]
     public function __invoke(SendPushCommand $command): void
     {
         // The notification already exists; only its browser push is skipped. Push has no

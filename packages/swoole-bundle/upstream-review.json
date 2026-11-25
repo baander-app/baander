@@ -4082,13 +4082,13 @@
             "recommended_disposition": "preserve-and-adapt",
             "rationale": "Consider appropriate consumed/received stamps while preserving decoder and named transport routing; qualify fallback and retry semantics.",
             "qualification": "Source-only recommendation; not a runtime proof or permission to change behavior.",
-            "current_local_sha256": "33e6779204dcca9cee2f753421d46db4fcb57d82b4c836bad213840929d82f80",
+            "current_local_sha256": "635491fa13893cff4784ccc57de303e9f2a4f2c46d56e7b1b33569cf77825105",
             "current_source_presence": "present",
             "final_disposition": "retained-local-behavior",
-            "final_reason": "Consider appropriate consumed/received stamps while preserving decoder and named transport routing; qualify fallback and retry semantics. Local contract retained; upstream behavior is not claimed byte-equivalent.",
+            "final_reason": "Consider appropriate consumed/received stamps while preserving decoder and named transport routing; qualify fallback and retry semantics. Local contract retained; upstream behavior is not claimed byte-equivalent. A decoded envelope that carries a MessageDecodingFailedException, which Symfony's SigningSerializer returns for an unsigned or altered payload instead of throwing, is thrown before dispatch, so ExceptionLoggingTransportHandler logs the dropped task once.",
             "source_review_status": "recorded",
             "runtime_qualification": {
-                "status": "not-requalified",
+                "status": "pending-authoritative-gates",
                 "scope": "Source disposition only; full build/native/static/application qualification is not claimed by this record."
             }
         },

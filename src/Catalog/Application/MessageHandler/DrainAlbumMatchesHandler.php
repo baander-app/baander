@@ -83,7 +83,7 @@ final readonly class DrainAlbumMatchesHandler
     ) {
     }
 
-    #[AsMessageHandler(fromTransport: 'async')]
+    #[AsMessageHandler(fromTransport: 'async', sign: true)]
     public function __invoke(DrainAlbumMatchesMessage $message): void
     {
         $chain = $message->chain;

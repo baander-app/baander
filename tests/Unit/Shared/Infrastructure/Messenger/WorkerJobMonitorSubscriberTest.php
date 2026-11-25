@@ -24,6 +24,7 @@ use Symfony\Component\Messenger\Envelope;
 use Symfony\Component\Messenger\Event\WorkerMessageFailedEvent;
 use Symfony\Component\Messenger\Event\WorkerMessageHandledEvent;
 use Symfony\Component\Messenger\Event\WorkerMessageReceivedEvent;
+use Symfony\Component\Messenger\Exception\MessageDecodingFailedException;
 use Symfony\Component\Messenger\Handler\HandlersLocator;
 use Symfony\Component\Messenger\MessageBus;
 use Symfony\Component\Messenger\Middleware\HandleMessageMiddleware;
@@ -164,6 +165,15 @@ final class WorkerJobMonitorSubscriberTest extends TestCase
         self::assertSame($jobId->toString(), $this->started['job_id']);
         self::assertNull($this->started['data']);
         self::assertTrue($this->started['data_truncated']);
+    }
+
+    public function testAnEnvelopeThatDidNotDecodeStartsNoAttempt(): void
+    {
+        $event = new WorkerMessageReceivedEvent(MessageDecodingFailedException::wrap(['body' => 'forged'], 'Invalid signature.'), 'async');
+        $this->subscriber->onMessageReceived($event);
+
+        self::assertNull($this->started);
+        self::assertNull($event->getEnvelope()->last(JobIdStamp::class));
     }
 
     /** @return iterable<string, array{Envelope}> */

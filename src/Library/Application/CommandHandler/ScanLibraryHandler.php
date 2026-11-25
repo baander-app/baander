@@ -38,7 +38,7 @@ final class ScanLibraryHandler
      * @throws LibraryBusyException when another scan holds a live claim on the library
      * @throws LibraryScanClaimLostException      when another scan took the claim over during the scan
      */
-    #[AsMessageHandler]
+    #[AsMessageHandler(sign: true)]
     public function __invoke(ScanLibraryCommand $command): LibraryScanSummary
     {
         $claimId = $command->getClaimId() ?? new Uuid();

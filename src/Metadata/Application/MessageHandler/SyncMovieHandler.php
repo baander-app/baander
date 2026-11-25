@@ -17,7 +17,7 @@ final readonly class SyncMovieHandler
         private MovieMetadataEnricher $enricher,
     ) {}
 
-    #[AsMessageHandler(fromTransport: 'async')]
+    #[AsMessageHandler(fromTransport: 'async', sign: true)]
     public function __invoke(SyncMovieMessage $message): void
     {
         $movie = $this->movies->findByUuid($message->movieId);

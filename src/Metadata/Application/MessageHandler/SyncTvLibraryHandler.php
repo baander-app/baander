@@ -20,7 +20,7 @@ final readonly class SyncTvLibraryHandler
         private JobCancellationCheckpointInterface $cancellation,
     ) {}
 
-    #[AsMessageHandler(fromTransport: 'async')]
+    #[AsMessageHandler(fromTransport: 'async', sign: true)]
     public function __invoke(SyncTvLibraryMessage $message): void
     {
         $after = null;
