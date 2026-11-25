@@ -556,6 +556,7 @@ final class HttpContract
             );
         }
         $this->malformed($encoded, $owned, $snapshot, $hostile);
+        $this->readBounds($hostile);
         $this->concurrencyAndLimits($registration, $owned);
         $this->databaseAndLifecycle($registration, $owned, $encoded, $api, $db);
         $this->noSecrets(file_get_contents($d . '/api.log'));
@@ -636,6 +637,76 @@ final class HttpContract
             'Pipeline changed owner metadata.',
         );
         self::check($this->request('GET', '/health')[0] === 200, 'Pipeline broke liveness.');
+    }
+
+    /**
+     * Sends a request line by line that never ends, then stays idle. An unbounded read buffer
+     * keeps reading until the session deadline; a bounded one refuses the request at once.
+     */
+    private function closedEarly(int $port, string $wire, string $label): void
+    {
+        $socket = $this->socket($port);
+        try {
+            stream_set_timeout($socket, 2);
+            $start = microtime(true);
+            while ($wire !== '') {
+                $written = @fwrite($socket, $wire);
+                if ($written === false || $written === 0) {
+                    break;
+                }
+                $wire = substr($wire, $written);
+            }
+            $response = '';
+            while (!feof($socket)) {
+                $chunk = @fread($socket, 65536);
+                self::check(!stream_get_meta_data($socket)['timed_out'], $label . ' kept the connection open.');
+                if ($chunk === false || $chunk === '') {
+                    break;
+                }
+                $response .= $chunk;
+            }
+            self::check(microtime(true) - $start < 2, $label . ' kept the connection open.');
+            // Unread request bytes make the kernel reset the connection, which can discard the 400.
+            self::check(
+                $response === '' || str_starts_with($response, 'HTTP/1.1 400 '),
+                $label . ' was not refused with 400.',
+            );
+        } finally {
+            fclose($socket);
+        }
+    }
+
+    private function readBounds(string $hostile): void
+    {
+        [$port, $process] = $this->graceful(1000, 'read-bounds', 10000);
+        $chunked = $hostile . "Transfer-Encoding: chunked\r\n\r\n";
+        $this->closedEarly($port, $chunked . '1;' . str_repeat('a', 65536), 'An unterminated chunk extension');
+        $this->closedEarly($port, $chunked . "0\r\nX-Trailer: " . str_repeat('a', 65536), 'An unterminated trailer');
+        self::check($this->request('GET', '/health', port: $port)[0] === 200, 'Unterminated chunk lines broke liveness.');
+        $prefix = 'https://largest.baander.app/';
+        $largest = [
+            'publicId' => str_repeat('L', 128),
+            'url' => $prefix . str_repeat('p', 2048 - strlen($prefix)),
+            'name' => str_repeat("\u{1F600}", 128),
+            'version' => str_repeat('9', 64),
+            'apiKey' => str_repeat('9f', 32),
+        ];
+        // The default encoder escapes every name code point as a surrogate pair, the longest form.
+        $payload = json_encode($largest, JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES);
+        $token = Enrollment::issueToken($this->enrollmentKey, $largest, (int) (microtime(true) * 1000) + 60000);
+        array_push($this->secrets, $largest['apiKey'], hash('sha256', $largest['apiKey']), $token);
+        [$status, $body] = $this->raw(
+            $hostile . "X-Baander-Enrollment: {$token}\r\nTransfer-Encoding: chunked\r\n\r\n"
+                . dechex(strlen($payload)) . "\r\n" . $payload . "\r\n0\r\n\r\n",
+        );
+        self::check($status === 200 && $body['data']['revision'] === 1, 'Largest chunked registration refused.');
+        [$status, $body] = $this->request('GET', '/api/servers/' . $largest['publicId']);
+        self::check(
+            $status === 200 && $body['data']['name'] === $largest['name'] && $body['data']['url'] === $largest['url'],
+            'Largest registration lookup failed.',
+        );
+        $process->signal(SIGTERM);
+        self::check($process->wait(3) === 0, 'Read-bounds instance did not stop.');
     }
 
     /**

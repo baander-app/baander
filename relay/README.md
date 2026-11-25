@@ -168,7 +168,8 @@ php relay/tests/run_rqlite_contract.php \
 The transport test uses a disposable CA, authenticated TLS upstream and client
 certificate. It checks SNI and hostname verification, untrusted and expired
 certificates, legacy TLS rejection, deadlines, pool saturation, reconnection
-within the same pool, connection reuse, redirects and invalid JSON.
+within the same pool, connection reuse, redirects, invalid JSON and a response
+chunk-size line that never ends.
 The API test uses native rqlite with authentication and mTLS, and verifies the
 public contract, concurrent claims, readiness, limits, outage and shutdown.
 
@@ -407,7 +408,10 @@ skew; the maximum is 300 seconds. Keep issuer and API clocks synchronized.
 The API is TLS only. Routes are `POST /api/servers/register`,
 `GET /api/servers/{publicId}`, `GET /health` and `GET /ready`. Each TLS connection
 serves one request and closes. Request headers and bodies are limited to 8 KiB,
-and registration JSON is limited to eight nesting levels during parsing.
+and registration JSON is limited to eight nesting levels during parsing. The read
+buffer holds at most 16 KiB, so a chunk-size line that never ends fails the request
+with 400 instead of growing memory; the database client's response buffer has the
+same bound. The limits live in `include/registry/http_limits.hpp`.
 Malformed JSON returns 400, invalid fields 422, unauthorized enrollment or
 wrong ownership 403, oversized bodies 413, rate limiting 429, and authoritative
 unavailability 503. Liveness never depends on rqlite. Readiness reads the schema
@@ -547,10 +551,11 @@ never permits unsafe automatic quorum reduction.
 
 The optimized release recipe already runs a bounded three-voter, three-API load
 smoke: 100 registrations, 20 lookups/s and 100/60 heartbeats/s for ten seconds,
-then fivefold rates for ten seconds. It fails on request errors, backlog, missed
-pacing, normal p95/p99 above one/two seconds, burst p99 above three seconds, or
-sampled API RSS above 64 MiB. This smoke does not establish the five-host resource,
-regional-network or five-minute burst acceptance. Select a stable performance
+then fivefold rates for ten seconds. It then holds 32 requests open against one
+API, each after 4 MiB of a chunk-size line that never ends. It fails on request
+errors, backlog, missed pacing, normal p95/p99 above one/two seconds, burst p99
+above three seconds, or sampled API RSS above 64 MiB. This smoke does not
+establish the five-host resource, regional-network or five-minute burst acceptance. Select a stable performance
 runner and record an accepted baseline before adding fixed-runner comparison
 that enforces confirmed regressions above 10%; existing smoke results do not
 establish that baseline.

@@ -106,6 +106,62 @@ final class LoadSmoke
             'maximum_dispatch_lag_ms' => round($maximumLag * 1000, 2),
         ];
     }
+    /**
+     * Holds `$connections` requests open, each after it sent `$bytes` of one chunk-size line
+     * that never ends, and returns the API's peak RSS over the following second, while the
+     * API drains what the kernel still buffers. A bounded read buffer closes each request
+     * early, which ends its write.
+     */
+    public static function pushUnterminatedChunkLines(Api $api, int $connections, int $bytes): int
+    {
+        $written = new Channel($connections);
+        $release = new Channel($connections);
+        $failures = [];
+        for ($index = 0; $index < $connections; ++$index) {
+            Coroutine::create(static function () use ($api, $bytes, $written, $release, &$failures): void {
+                $stream = null;
+                try {
+                    $stream = Http::connect('api.registry.baander.app', '127.0.0.1', $api->port, $api->cluster->apiTls, 6);
+                    $wire = "POST /api/servers/register HTTP/1.1\r\nHost: api.registry.baander.app\r\n"
+                        . "Transfer-Encoding: chunked\r\n\r\n1;";
+                    $piece = str_repeat('a', 65536);
+                    for ($sent = 0; $sent < $bytes; $sent += strlen($piece)) {
+                        if (!@fwrite($stream, $wire . $piece)) {
+                            break;
+                        }
+                        $wire = '';
+                    }
+                } catch (\Throwable $failure) {
+                    $failures[] = $failure;
+                } finally {
+                    $written->push(true);
+                    $release->pop(30);
+                    if (is_resource($stream)) {
+                        fclose($stream);
+                    }
+                }
+            });
+        }
+        try {
+            for ($index = 0; $index < $connections; ++$index) {
+                Runtime::requireThat($written->pop(30) !== false, 'Unterminated chunk-line writer did not finish.');
+            }
+            if ($failures !== []) {
+                throw $failures[0];
+            }
+            $peak = 0;
+            $until = Runtime::now() + 1;
+            do {
+                $peak = max($peak, self::processRssBytes($api->process));
+                Coroutine::sleep(0.05);
+            } while (Runtime::now() < $until);
+            return $peak;
+        } finally {
+            for ($index = 0; $index < $connections; ++$index) {
+                $release->push(true);
+            }
+        }
+    }
     private static function checkCancellation(): void
     {
         if (Coroutine::isCanceled()) {
@@ -146,8 +202,9 @@ final class LoadSmoke
             }
             $report = [];
             $peak = 0;
-            // Allow both ten-second drains, two seconds for the sampler,
-            // both permitted one-second dispatch lags and one second of overhead.
+            // Allow both ten-second drains, two seconds for the sampler, both permitted
+            // one-second dispatch lags, ten seconds for the held unterminated requests and one
+            // second of overhead.
             Runtime::runCoroutines(static function () use ($apis, $registrations, $normalSeconds, $burstSeconds, &$report, &$peak): void {
                 $sampling = new \stdClass();
                 $sampling->active = true;
@@ -170,6 +227,12 @@ final class LoadSmoke
                 try {
                     $normal = self::runPhase($apis, $registrations, $normalSeconds, 20, 100 / 60);
                     $burst = self::runPhase($apis, $registrations, $burstSeconds, 100, 500 / 60);
+                    $held = self::pushUnterminatedChunkLines($apis[0], 32, 4 * 1024 * 1024);
+                    $peak = max($peak, $held);
+                    Runtime::requireThat(
+                        $apis[0]->request('GET', '/health')[0] === 200,
+                        'Unterminated chunk lines broke liveness.',
+                    );
                 } finally {
                     $sampling->active = false;
                     Runtime::requireThat($stopped->pop(2) !== false, 'Registry API memory sampler did not stop.');
@@ -178,9 +241,10 @@ final class LoadSmoke
                 $report = [
                     'normal' => $normal,
                     'burst' => $burst,
+                    'unterminated_chunk_lines_rss_mib' => round($held / 1024 / 1024, 2),
                     'api_peak_rss_mib' => round($peak / 1024 / 1024, 2),
                 ];
-            }, $normalSeconds + $burstSeconds + 25);
+            }, $normalSeconds + $burstSeconds + 35);
             echo json_encode($report, JSON_THROW_ON_ERROR) . "\n";
             foreach (['lookup_p95_ms', 'heartbeat_p95_ms'] as $key) {
                 Runtime::requireThat($report['normal'][$key] <= 1000, 'Normal latency exceeded release threshold.');

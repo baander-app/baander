@@ -122,8 +122,14 @@ final class TransportFixture
                 }
                 $state = $response['state'];
                 $body = $state['body'];
-                $wire = 'HTTP/1.1 ' . $state['status'] . " Fixture\r\nContent-Length: " . strlen($body) . "\r\n\r\n" . $body;
-                @fwrite($clients[$id], $wire);
+                $wire = $state['wire'] ?? 'HTTP/1.1 ' . $state['status'] . " Fixture\r\nContent-Length: " . strlen($body) . "\r\n\r\n" . $body;
+                // A raw wire can exceed one TLS record; a blocking write sends all of it, or stops
+                // when the client closes the connection.
+                stream_set_blocking($clients[$id], true);
+                while ($wire !== '' && ($written = @fwrite($clients[$id], $wire))) {
+                    $wire = substr($wire, $written);
+                }
+                stream_set_blocking($clients[$id], false);
                 unset($pending[$id]);
             }
         }

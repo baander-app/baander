@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 #include "registry/transport.hpp"
+#include "registry/http_limits.hpp"
 #include <algorithm>
 #include <array>
 #include <boost/asio.hpp>
@@ -204,13 +205,13 @@ struct DatabasePool::Impl {
             outgoing.body() = request.statements.dump();
             outgoing.prepare_payload();
             co_await http::async_write(*slot.stream, outgoing, asio::use_awaitable);
-            beast::flat_buffer buffer;
+            auto buffer = bounded_read_buffer();
             http::response_parser<http::string_body> parser;
-            parser.header_limit(8192);
-            parser.body_limit(65536);
+            parser.header_limit(response_header_limit);
+            parser.body_limit(response_body_limit);
             co_await http::async_read(*slot.stream, buffer, parser, asio::use_awaitable);
             auto response = parser.release();
-            auto body = parse_json_body(response.body(), 65536, 8);
+            auto body = parse_json_body(response.body(), response_body_limit, 8);
             // rqlite can return HTTP200 while the quorum/statement failed. Evict this
             // connection for the NEXT request; never replay the uncertain current write.
             validate_database_result(response.result_int(), body, request.statements.size());

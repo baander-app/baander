@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 #include "registry/http_headers.hpp"
+#include "registry/http_limits.hpp"
 #include "registry/transport.hpp"
 #include <boost/asio.hpp>
 #include <boost/asio/ssl.hpp>
@@ -112,7 +113,7 @@ struct Server {
             throw Failure(503, "Registry schema is not ready.");
         if (request.method() == http::verb::post && target == "/api/servers/register") {
             const auto registration =
-                validate_registration(parse_json_body(request.body(), 8192, 8));
+                validate_registration(parse_json_body(request.body(), request_body_limit, 8));
             const auto timestamp = now_ms();
             std::string enrollment;
             unsigned enrollment_headers = 0;
@@ -222,10 +223,10 @@ struct Server::Session : std::enable_shared_from_this<Session> {
         try {
             beast::get_lowest_layer(stream).expires_at(deadline_time);
             co_await stream.async_handshake(ssl::stream_base::server, asio::use_awaitable);
-            beast::flat_buffer buffer;
+            auto buffer = bounded_read_buffer();
             http::request_parser<http::string_body> parser;
-            parser.header_limit(8192);
-            parser.body_limit(8192);
+            parser.header_limit(request_header_limit);
+            parser.body_limit(request_body_limit);
             boost::system::error_code error;
             co_await http::async_read(stream, buffer, parser,
                                       asio::redirect_error(asio::use_awaitable, error));

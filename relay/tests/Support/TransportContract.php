@@ -161,6 +161,14 @@ final class TransportContract
             $run(['503']);
             $change(['status' => 200, 'body' => 'not-json']);
             $run(['503']);
+            // A chunk-size line that never ends must fail the read long before the deadline.
+            $change(['wire' => "HTTP/1.1 200 Fixture\r\nTransfer-Encoding: chunked\r\n\r\n1;" . str_repeat('a', 65536)]);
+            $config['deadlineMs'] = 5000;
+            $begin = microtime(true);
+            $run(['503']);
+            Runtime::requireThat(microtime(true) - $begin < 2, 'An unterminated response chunk line held the database read.');
+            $config['deadlineMs'] = 250;
+            $change(['wire' => null]);
             $change(['body' => '{"results":[]}']);
             $config['url'] = 'https://wrong.registry.baander.app:' . $port;
             $before = count($requests());
@@ -219,7 +227,8 @@ final class TransportContract
             }
             $rejected('TLS 1.1 protocol', ['url' => 'https://rqlite.baander.app:' . $legacyPort]);
             echo "PASS: native TLS authentication/SNI, saturation/deadline, same-pool reconnect/keepalive, "
-                . "observed-error rotation without replay, redirect, malformed response, hostname verification, "
+                . "observed-error rotation without replay, redirect, malformed response, bounded response reads, "
+                . "hostname verification, "
                 . "untrusted server/client chains, expired server certificate, TLS 1.1 rejection with positive control, "
                 . "credential redaction and healthy recovery.\n";
         } finally {

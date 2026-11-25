@@ -128,17 +128,30 @@ owner credential. A future freshness or recovery protocol needs its own design.
 
 ### Malformed HTTP, JSON and field types
 
-Boost.Beast bounds request headers and bodies to 8 KiB. Each TLS connection serves
-one request and closes, and its deadline covers handshake, reads, database work
-and response writes. JSON parsing bounds nesting to eight levels; field validation
-checks object/string types, lengths, control characters, public identity syntax,
-credential syntax and the HTTPS URL shape. SQL binds registration values as
-parameters.
+Boost.Beast bounds request headers and bodies to 8 KiB. Those limits do not cover a
+chunk-size line: the parser leaves the line in the read buffer until its CRLF arrives,
+so a chunk extension that never ends grew an unbounded buffer for as long as the
+peer kept sending. A native test in `relay/tests/http_limits_test.cpp` reproduces
+that growth to 1 MiB on an unbounded buffer. The API's request buffer and the database
+client's response buffer are therefore capped at 16 KiB, which still holds a complete
+8 KiB header block or one chunk-size line; past the cap the read fails and the request
+gets `400`, or the database request gets `503`. An unterminated trailer block was
+never unbounded: the parser charges trailer fields to the remaining header limit.
+
+Each TLS connection serves one request and closes, and its deadline covers
+handshake, reads, database work and response writes. JSON parsing bounds nesting to
+eight levels; field validation checks object/string types, lengths, control
+characters, public identity syntax, credential syntax and the HTTPS URL shape. SQL
+binds registration values as parameters.
 
 The HTTP contract exercises conflicting framing, oversized fixed/chunked bodies,
-pipelined requests, malformed JSON bytes and wrong field types. For malformed JSON,
-wrong field types and the pipelined request, its rejection checks compare the
-public metadata/revision snapshot and require a fresh health request to succeed.
+unterminated chunk extensions and trailers on an instance with a 10-second session
+deadline, the largest valid registration sent chunked, pipelined requests, malformed
+JSON bytes and wrong field types. The transport contract sends a database response
+whose chunk extension never ends, and the release load smoke holds 32 such 4 MiB
+requests against one API while it samples RSS. For malformed JSON, wrong field types
+and the pipelined request, the HTTP contract's rejection checks compare the public
+metadata/revision snapshot and require a fresh health request to succeed.
 The framing and oversized-body cases check only the status and the error body.
 None of the checks inspects the private owner row for every case.
 Native security tests exercise malformed database envelopes, row types and values.
