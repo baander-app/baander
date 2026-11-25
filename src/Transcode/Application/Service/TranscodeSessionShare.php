@@ -25,7 +25,7 @@ use Psr\Clock\ClockInterface;
  * the user's share ends that user's own sessions with the oldest sign of life once they have reported
  * nothing for two minutes, and is refused when too few have. A start that finds no video slot free
  * ends the slot holder with the oldest sign of life, whoever holds it, once it has reported nothing
- * for seventy minutes; otherwise it waits for a slot as before. The sessions of the playback the start
+ * for seventy minutes; otherwise it waits for a slot. The sessions of the playback the start
  * continues, the same video and client session, never give way to it.
  *
  * Lock order: the user's advisory lock first in the start's transaction, then the start's video row,

@@ -34,7 +34,7 @@ use Symfony\Component\Validator\Constraints as Assert;
             default: null,
         ),
         'payload' => new OA\Schema(
-            description: 'Client EQ settings; at most 16384 bytes as compact JSON',
+            description: 'Client EQ settings; at most ' . UserPreferenceLimits::EQ_PAYLOAD_BYTES . ' bytes as compact JSON',
             type: 'object',
             nullable: true,
             default: null,

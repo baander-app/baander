@@ -13,7 +13,7 @@ use Symfony\Component\Validator\Constraints as Assert;
     type: 'object',
     properties: [
         'sections' => new OA\Schema(
-            description: 'At most 16384 bytes as compact JSON',
+            description: 'At most ' . UserPreferenceLimits::SIDEBAR_BYTES . ' bytes as compact JSON',
             type: 'array',
             items: new OA\Schema(
                 properties: [

@@ -92,7 +92,7 @@ final class RadioStationListCommand extends Command
         $stations = [];
         do {
             $page = $this->stations->listStations($country, $query, [], RadioStationPortInterface::MAX_LIMIT, count($stations));
-            $stations = [...$stations, ...$page->stations];
+            array_push($stations, ...$page->stations);
         } while ($page->stations !== [] && count($stations) < $page->total);
 
         return $stations;

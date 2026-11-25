@@ -233,17 +233,19 @@ final class RecommendationController
     public function bySource(string $sourceType, string $sourceId, Request $request): JsonResponse
     {
         $limit = min(100, max(1, (int) $request->query->get('limit', 100)));
+        $viewerId = $this->actorId();
+        $administrator = $this->security->isGranted('ROLE_ADMIN');
 
         $recommendations = $this->bus->dispatch(new GetRecommendationsBySourceQuery(
             sourceType: $sourceType,
-            sourceId: $this->identities->internalEntityId($sourceType, $sourceId, $this->actorId(), $this->security->isGranted('ROLE_ADMIN'))->toString(),
-            viewerId: $this->actorId(),
-            administrator: $this->security->isGranted('ROLE_ADMIN'),
+            sourceId: $this->identities->internalEntityId($sourceType, $sourceId, $viewerId, $administrator)->toString(),
+            viewerId: $viewerId,
+            administrator: $administrator,
             limit: $limit,
         ))->last(HandledStamp::class)?->getResult() ?? [];
 
         return $this->successResponse(array_values(array_filter(array_map(
-            fn($r) => $this->identities->project($r, $this->actorId(), $this->security->isGranted('ROLE_ADMIN')),
+            fn($r) => $this->identities->project($r, $viewerId, $administrator),
             $recommendations,
         ))));
     }
@@ -301,17 +303,19 @@ final class RecommendationController
     public function targeting(string $targetType, string $targetId, Request $request): JsonResponse
     {
         $limit = min(100, max(1, (int) $request->query->get('limit', 100)));
+        $viewerId = $this->actorId();
+        $administrator = $this->security->isGranted('ROLE_ADMIN');
 
         $recommendations = $this->bus->dispatch(new GetTargetingRecommendationsQuery(
             targetType: $targetType,
-            targetId: $this->identities->internalEntityId($targetType, $targetId, $this->actorId(), $this->security->isGranted('ROLE_ADMIN'))->toString(),
-            viewerId: $this->actorId(),
-            administrator: $this->security->isGranted('ROLE_ADMIN'),
+            targetId: $this->identities->internalEntityId($targetType, $targetId, $viewerId, $administrator)->toString(),
+            viewerId: $viewerId,
+            administrator: $administrator,
             limit: $limit,
         ))->last(HandledStamp::class)?->getResult() ?? [];
 
         return $this->successResponse(array_values(array_filter(array_map(
-            fn($r) => $this->identities->project($r, $this->actorId(), $this->security->isGranted('ROLE_ADMIN')),
+            fn($r) => $this->identities->project($r, $viewerId, $administrator),
             $recommendations,
         ))));
     }
