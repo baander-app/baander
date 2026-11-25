@@ -52,10 +52,16 @@ final readonly class DockerEvidence
         return $versions;
     }
 
+    /** Whether an image name carries a tag: a colon after its last slash, so a registry port does not count. */
+    public static function isTagged(string $name): bool
+    {
+        return str_contains(substr($name, (int) strrpos($name, '/')), ':');
+    }
+
     /** The digest a tag resolves to in its registry now: the index digest of a multi-platform image. */
     public function digest(string $reference): string
     {
-        if (preg_match('~^[^\s@]+:[A-Za-z0-9_][A-Za-z0-9_.-]{0,127}$~D', $reference) !== 1 || !str_contains(substr($reference, (int) strrpos($reference, '/')), ':')) {
+        if (preg_match('~^[^\s@]+:[A-Za-z0-9_][A-Za-z0-9_.-]{0,127}$~D', $reference) !== 1 || !self::isTagged($reference)) {
             throw new \RuntimeException('A registry digest is read for a tagged reference without a digest.');
         }
         $result = $this->client->run(['buildx', 'imagetools', 'inspect', $reference, '--format', '{{json .Manifest}}'], timeout: $this->timeout);

@@ -156,7 +156,7 @@ NGINX;
             'databasePath' => '/var/lib/baander-log-index/logs.sqlite',
             'dockerSocket' => self::PROXY_SOCKET, 'expectedDaemonId' => $target->daemonId,
             'containerGroups' => $groups,
-            'fileRoots' => array_map(static fn(string $service): array => ['path' => self::ROOT . '/' . $service, 'service' => $service, 'optional' => true], ['web', 'control', 'execution']),
+            'fileRoots' => array_map(static fn(string $service): array => ['path' => self::ROOT . '/' . $service, 'service' => $service, 'optional' => true], self::BOOT_SERVICES),
             'retentionDays' => 7, 'maxStorageBytes' => 1073741824,
         ];
     }

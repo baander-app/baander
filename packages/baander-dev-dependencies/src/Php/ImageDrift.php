@@ -23,7 +23,7 @@ final class ImageDrift
         ksort($locations);
         foreach ($locations as $reference => $where) {
             [$tagged, $pinned] = explode('@', $reference, 2);
-            if (!str_contains(substr($tagged, (int) strrpos($tagged, '/')), ':')) {
+            if (!DockerEvidence::isTagged($tagged)) {
                 $report->add('evidence', $reference, 'image-drift', 'policy', 'Pinned by digest alone; there is no tag to compare.', ['locations' => $where]);
                 continue;
             }
