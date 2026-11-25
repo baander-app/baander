@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Baander\ImageProcessing\Tests;
 
 use Baander\ImageProcessing\GdImageConverter as ImageProcessor;
+use Baander\ImageProcessing\ImageTooLargeException;
 use PHPUnit\Framework\TestCase;
 
 final class GdImageConverterTest extends TestCase
@@ -43,6 +44,57 @@ final class GdImageConverterTest extends TestCase
         $this->assertNotFalse($decoded);
         $this->assertSame(127, (imagecolorat($decoded, 0, 0) >> 24) & 0x7F);
         $this->assertSame([], (array) glob(dirname($destination) . '/*.tmp'));
+    }
+
+    public function testAnOrdinaryCoverConvertsAndResizes(): void
+    {
+        $source = $this->tmpDir . '/cover.jpg';
+        $image = imagecreatetruecolor(1200, 1200);
+        $this->assertNotFalse($image);
+        $this->assertTrue(imagejpeg($image, $source));
+
+        $converted = new ImageProcessor()->convertToWebp($source, $this->tmpDir . '/cover.webp');
+        $resized = new ImageProcessor()->resizeToWebp($source, $this->tmpDir . '/cover_small.webp', 300);
+
+        $this->assertSame([1200, 1200, IMAGETYPE_WEBP], array_slice(getimagesize($converted), 0, 3));
+        $this->assertSame([300, 300, IMAGETYPE_WEBP], array_slice(getimagesize($resized), 0, 3));
+    }
+
+    /**
+     * The header alone declares the size, so 66 bytes would make GD allocate a 3.6 GB bitmap.
+     * Both conversions refuse before GD decodes anything.
+     */
+    public function testAnImageDeclaringThirtyThousandByThirtyThousandPixelsIsRefusedBeforeDecoding(): void
+    {
+        $source = $this->tmpDir . '/declared-huge.png';
+        file_put_contents($source, self::pngDeclaring(30_000, 30_000));
+
+        foreach ([
+            fn () => new ImageProcessor()->convertToWebp($source, $this->tmpDir . '/huge.webp'),
+            fn () => new ImageProcessor()->resizeToWebp($source, $this->tmpDir . '/huge_small.webp', 300),
+        ] as $conversion) {
+            try {
+                $conversion();
+                $this->fail('A 900-megapixel image must be refused.');
+            } catch (ImageTooLargeException $exception) {
+                $this->assertStringContainsString('30000 by 30000', $exception->getMessage());
+            }
+        }
+        $this->assertSame([], (array) glob($this->tmpDir . '/*.webp*'));
+    }
+
+    /**
+     * A 66-byte PNG whose header declares the size and whose data holds one byte. GD allocates
+     * the whole bitmap from the header before it finds the data short.
+     */
+    public static function pngDeclaring(int $width, int $height): string
+    {
+        $chunk = static fn (string $type, string $data): string => pack('N', strlen($data)) . $type . $data . pack('N', crc32($type . $data));
+
+        return "\x89PNG\r\n\x1A\n"
+            . $chunk('IHDR', pack('NNCCCCC', $width, $height, 8, 6, 0, 0, 0))
+            . $chunk('IDAT', (string) gzcompress("\0"))
+            . $chunk('IEND', '');
     }
 
     private function removeTree(string $path): void

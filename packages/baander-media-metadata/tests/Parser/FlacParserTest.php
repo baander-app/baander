@@ -92,6 +92,74 @@ final class FlacParserTest extends TestCase
         $this->assertTrue($blocks[1]['isLast']);
     }
 
+    /**
+     * Three 12 MiB pictures exceed the parser's 32 MiB budget: the first two are read, the
+     * third is skipped unread, and the tags before them survive.
+     */
+    public function testMetadataBlocksBeyondTheByteBudgetAreSkipped(): void
+    {
+        $picture = $this->buildPictureBlock(false, str_repeat("\xFF", 12 * 1024 * 1024));
+        $file = $this->tempFile(
+            "fLaC"
+            . $this->buildStreamInfoBlock(false)
+            . $this->buildVorbisCommentBlock(['TITLE' => ['Big Art']], false)
+            . $picture . $picture . $picture
+            . $this->buildBlockHeader(1, "\0\0\0\0", true) . "\0\0\0\0",
+        );
+
+        $parser = new FlacParser($file, $this->logger);
+        $parser->parse();
+
+        $this->assertTrue($parser->isValid());
+        $this->assertSame(['Big Art'], $parser->getVorbisCommentBlock()['comments']['TITLE'] ?? null);
+        $this->assertCount(2, $parser->getPictureBlocks());
+        $this->assertSame(
+            ['STREAMINFO', 'VORBIS_COMMENT', 'PICTURE', 'PICTURE', 'PICTURE', 'PADDING'],
+            array_column($parser->getMetadataBlocks(), 'type'),
+        );
+        $this->assertArrayNotHasKey('data', $parser->getMetadataBlocks()[0], 'Raw block data is not kept.');
+    }
+
+    /** Empty blocks are valid; past the block limit the parser stops and keeps what it read. */
+    public function testAFloodOfEmptyBlocksParsesToABoundedList(): void
+    {
+        $file = $this->tempFile(
+            "fLaC"
+            . $this->buildStreamInfoBlock(false)
+            . $this->buildVorbisCommentBlock(['TITLE' => ['Flooded']], false)
+            . str_repeat($this->buildBlockHeader(1, '', false), 5_000)
+            . $this->buildBlockHeader(1, '', true),
+        );
+
+        $parser = new FlacParser($file, $this->logger);
+        $parser->parse();
+
+        $this->assertTrue($parser->isValid());
+        $this->assertSame(['Flooded'], $parser->getVorbisCommentBlock()['comments']['TITLE'] ?? null);
+        $this->assertCount(FlacParser::MAX_BLOCKS, $parser->getMetadataBlocks());
+    }
+
+    /** Each comment or seek point costs about twenty times its bytes in memory, so a block keeps at most the entry limit. */
+    public function testACommentBlockAndASeekTableKeepAtMostTheEntryLimit(): void
+    {
+        $points = '';
+        for ($i = 0; $i < 70_000; ++$i) {
+            $points .= pack('JJn', $i * 4096, $i * 1000, 4096);
+        }
+        $file = $this->tempFile(
+            "fLaC"
+            . $this->buildStreamInfoBlock(false)
+            . $this->buildVorbisCommentBlock(['LYRICS' => array_map(strval(...), range(1, 70_000))], false)
+            . $this->buildBlockHeader(3, $points, true) . $points,
+        );
+
+        $parser = new FlacParser($file, $this->logger);
+        $parser->parse();
+
+        $this->assertCount(FlacParser::MAX_BLOCK_ENTRIES, $parser->getVorbisCommentBlock()['comments']['LYRICS'] ?? []);
+        $this->assertSame(FlacParser::MAX_BLOCK_ENTRIES, $parser->getSeektableBlock()['pointCount'] ?? null);
+    }
+
     public function testThrowsOnInvalidSignature(): void
     {
         $file = $this->tempFile("RIFF\x00\x00\x00\x00WAVE");
@@ -215,11 +283,10 @@ final class FlacParserTest extends TestCase
         return $this->buildBlockHeader(4, $data, $isLast) . $data;
     }
 
-    private function buildPictureBlock(bool $isLast): string
+    private function buildPictureBlock(bool $isLast, string $imageData = "\xFF\xD8\xFF\xE0"): string
     {
         $mimeType = 'image/jpeg';
         $description = 'cover';
-        $imageData = "\xFF\xD8\xFF\xE0";
 
         $data = pack('N', 3)
              . pack('N', strlen($mimeType)) . $mimeType

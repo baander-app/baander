@@ -15,9 +15,19 @@ use Psr\Log\LoggerInterface;
  *       - 1 byte: Last block flag (1 bit) + Block type (7 bits)
  *       - 3 bytes: Block length (24-bit big endian)
  *       - N bytes: Block data
+ *
+ * The format bounds neither the number of blocks nor their total size. The parser reads only the
+ * block types it decodes, at most MAX_METADATA_BYTES of them per file; it seeks past every other
+ * block and past a block over the remaining budget, and stops after MAX_BLOCKS blocks. A decoded
+ * block keeps at most MAX_BLOCK_ENTRIES comments or seek points, which cost about twenty times
+ * their bytes in memory. What was read before a limit stays in the result.
  */
 final class FlacParser
 {
+    public const int MAX_METADATA_BYTES = 33_554_432;
+    public const int MAX_BLOCKS = 1_024;
+    public const int MAX_BLOCK_ENTRIES = 65_536;
+
     private const string FLAC_SIGNATURE = "fLaC";
 
     private const int BLOCK_STREAMINFO = 0;
@@ -28,8 +38,13 @@ final class FlacParser
     private const int BLOCK_CUESHEET = 5;
     private const int BLOCK_PICTURE = 6;
 
-    /** @var array<int, array{type: string, typeCode: int, isLast: bool, length: int, data: string}> */
+    /** The blocks the parser reads and decodes; it seeks past every other one. */
+    private const array DECODED_BLOCKS = [self::BLOCK_STREAMINFO, self::BLOCK_SEEKTABLE, self::BLOCK_VORBIS_COMMENT, self::BLOCK_PICTURE];
+
+    /** @var list<array{type: string, typeCode: int, isLast: bool, length: int}> */
     private array $metadataBlocks = [];
+    private int $bytesRemaining = self::MAX_METADATA_BYTES;
+    private bool $truncated = false;
     /** @var array{sampleRate: int, channels: int, bitsPerSample: int, totalSamples: int}|null */
     private ?array $streamInfo = null;
     /** @var array{vendor: string, comments: array<string, list<string>>}|null */
@@ -59,6 +74,13 @@ final class FlacParser
             $this->parseMetadataBlocks($handle);
             $this->isValid = true;
 
+            if ($this->truncated) {
+                $this->logger->warning('FlacParser: metadata over the parse limits; the blocks past them were skipped', [
+                    'path' => $this->filePath,
+                    'blocks' => count($this->metadataBlocks),
+                ]);
+            }
+
             $this->logger->debug('FlacParser: parsed FLAC file', [
                 'path' => $this->filePath,
                 'blocks' => count($this->metadataBlocks),
@@ -76,7 +98,7 @@ final class FlacParser
         return $this->isValid;
     }
 
-    /** @return array<int, array{type: string, typeCode: int, isLast: bool, length: int, data: string}> */
+    /** @return list<array{type: string, typeCode: int, isLast: bool, length: int}> */
     public function getMetadataBlocks(): array
     {
         return $this->metadataBlocks;
@@ -218,46 +240,78 @@ final class FlacParser
     private function parseMetadataBlocks($handle): void
     {
         $isLast = false;
-        $blockNumber = 0;
 
         while (!$isLast) {
+            if (count($this->metadataBlocks) === self::MAX_BLOCKS) {
+                $this->truncated = true;
+
+                return;
+            }
+
             $header = $this->readBlockHeader($handle);
             $isLast = $header['isLast'];
             $blockType = $header['type'];
             $blockLength = $header['length'];
 
             $this->logger->debug('FlacParser: reading metadata block', [
-                'block' => $blockNumber,
+                'block' => count($this->metadataBlocks),
                 'type' => $this->getBlockTypeName($blockType),
                 'length' => $blockLength,
                 'is_last' => $isLast,
             ]);
-
-            $blockData = fread($handle, $blockLength);
-
-            if ($blockData === false || strlen($blockData) !== $blockLength) {
-                throw new \RuntimeException(
-                    "Failed to read FLAC block data (expected {$blockLength} bytes) in: {$this->filePath}",
-                );
-            }
 
             $this->metadataBlocks[] = [
                 'type' => $this->getBlockTypeName($blockType),
                 'typeCode' => $blockType,
                 'isLast' => $isLast,
                 'length' => $blockLength,
-                'data' => $blockData,
             ];
+
+            if (!in_array($blockType, self::DECODED_BLOCKS, true)) {
+                $this->skip($handle, $blockLength);
+
+                continue;
+            }
+
+            if ($blockLength > $this->bytesRemaining) {
+                $this->truncated = true;
+                $this->skip($handle, $blockLength);
+
+                continue;
+            }
+
+            $this->bytesRemaining -= $blockLength;
+            $blockData = $this->read($handle, $blockLength);
 
             match ($blockType) {
                 self::BLOCK_STREAMINFO => $this->parseStreamInfo($blockData),
                 self::BLOCK_VORBIS_COMMENT => $this->parseVorbisCommentBlock($blockData),
                 self::BLOCK_PICTURE => $this->pictureBlocks[] = self::parsePictureBlock($blockData),
                 self::BLOCK_SEEKTABLE => $this->parseSeektableBlock($blockData),
-                default => null,
             };
+        }
+    }
 
-            $blockNumber++;
+    /** @param resource $handle */
+    private function read($handle, int $length): string
+    {
+        // fread() refuses a length of 0, and an empty block is valid.
+        $data = $length === 0 ? '' : fread($handle, $length);
+
+        if ($data === false || strlen($data) !== $length) {
+            throw new \RuntimeException(
+                "Failed to read FLAC block data (expected {$length} bytes) in: {$this->filePath}",
+            );
+        }
+
+        return $data;
+    }
+
+    /** @param resource $handle */
+    private function skip($handle, int $length): void
+    {
+        if (fseek($handle, $length, SEEK_CUR) !== 0) {
+            throw new \RuntimeException("Failed to skip a FLAC block of {$length} bytes in: {$this->filePath}");
         }
     }
 
@@ -267,19 +321,16 @@ final class FlacParser
      */
     private function readBlockHeader($handle): array
     {
-        $headerByte = ord(fread($handle, 1));
-        $isLast = ($headerByte & 0x80) !== 0;
-        $blockType = $headerByte & 0x7F;
+        $header = fread($handle, 4);
 
-        $lengthBytes = fread($handle, 3);
-
-        if (strlen($lengthBytes) !== 3) {
-            throw new \RuntimeException("Failed to read FLAC block header length in: {$this->filePath}");
+        if ($header === false || strlen($header) !== 4) {
+            throw new \RuntimeException("Failed to read FLAC block header in: {$this->filePath}");
         }
 
-        $length = unpack('N', "\x00" . $lengthBytes)[1];
+        $headerByte = ord($header[0]);
+        $length = unpack('N', "\x00" . substr($header, 1))[1];
 
-        return ['isLast' => $isLast, 'type' => $blockType, 'length' => $length];
+        return ['isLast' => ($headerByte & 0x80) !== 0, 'type' => $headerByte & 0x7F, 'length' => $length];
     }
 
     private function parseStreamInfo(string $data): void
@@ -340,7 +391,7 @@ final class FlacParser
 
         $comments = [];
 
-        for ($i = 0; $i < $commentCount; $i++) {
+        for ($i = 0; $i < min($commentCount, self::MAX_BLOCK_ENTRIES); $i++) {
             if (strlen($data) < $offset + 4) {
                 break;
             }
@@ -378,7 +429,7 @@ final class FlacParser
         $seekPoints = [];
         $offset = 0;
 
-        while (strlen($data) >= $offset + 18) {
+        while (strlen($data) >= $offset + 18 && count($seekPoints) < self::MAX_BLOCK_ENTRIES) {
             $sampleNumber = unpack('J', substr($data, $offset, 8))[1];
             $offset += 8;
             $byteOffset = unpack('J', substr($data, $offset, 8))[1];

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Media\Infrastructure\Converter;
 
+use Baander\ImageProcessing\ImageTooLargeException;
 use Psr\Log\LoggerInterface;
 
 /**
@@ -59,6 +60,8 @@ final class ImageConverter
 
     /**
      * Convert an image to a specific size.
+     *
+     * @throws ImageTooLargeException when the header declares more pixels than GD may decode
      */
     public function convertSingle(string $sourcePath, string $outputDirectory, string $preset, int $maxWidth, string $format = 'webp'): string
     {
@@ -78,6 +81,7 @@ final class ImageConverter
         $ratio = $maxWidth / $originalWidth;
         $newHeight = (int) round($originalHeight * $ratio);
 
+        ImageTooLargeException::assertDecodable($imageInfo, $sourcePath);
         $source = $this->createImage($sourcePath, $imageInfo[2]);
         if ($source === false) {
             throw new \RuntimeException(sprintf('Failed to load image "%s".', $sourcePath));

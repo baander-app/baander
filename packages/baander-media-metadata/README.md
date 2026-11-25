@@ -26,6 +26,9 @@ The [dispatcher](src/MetadataContentReader.php) accepts the aliases above with
 `readAs()`. WAV and AIFF use populated ID3 fields before container text fields.
 
 MP4, ASF, WAV and AIFF readers seek past audio payloads and bound metadata reads.
+The FLAC parser reads only the blocks it decodes, at most 32 MiB of them per file,
+seeks past the rest, stops after 1,024 blocks and keeps at most 65,536 comments or
+seek points per block.
 AAC exposes the transport's sample rate and channel configuration when available;
 duration and bitrate remain unset. The catalog's existing audio probe supplies
 authoritative stream properties. Reading tags never rewrites the source file.

@@ -20,10 +20,7 @@ final class GdImageConverter
             return $sourcePath;
         }
 
-        $source = $this->createImage($sourcePath, $imageInfo[2]);
-        if ($source === false) {
-            throw new \RuntimeException(sprintf('Failed to load image "%s".', $sourcePath));
-        }
+        $source = $this->decode($sourcePath, $imageInfo);
 
         $this->ensureDirectory(dirname($outputPath));
         $tempPath = $outputPath . '.' . bin2hex(random_bytes(8)) . '.tmp';
@@ -57,10 +54,7 @@ final class GdImageConverter
         $ratio = $maxWidth / $originalWidth;
         $newHeight = (int) round($originalHeight * $ratio);
 
-        $source = $this->createImage($sourcePath, $imageInfo[2]);
-        if ($source === false) {
-            throw new \RuntimeException(sprintf('Failed to load image "%s".', $sourcePath));
-        }
+        $source = $this->decode($sourcePath, $imageInfo);
 
         $canvas = imagecreatetruecolor($maxWidth, $newHeight);
         if ($canvas === false) {
@@ -93,6 +87,19 @@ final class GdImageConverter
         }
 
         return $outputPath;
+    }
+
+    /**
+     * @param array{0: int, 1: int, 2: int, ...} $imageInfo the getimagesize() result for $path
+     *
+     * @throws ImageTooLargeException when the header declares more pixels than GD may decode
+     */
+    private function decode(string $path, array $imageInfo): \GdImage
+    {
+        ImageTooLargeException::assertDecodable($imageInfo, $path);
+
+        return $this->createImage($path, $imageInfo[2])
+            ?: throw new \RuntimeException(sprintf('Failed to load image "%s".', $path));
     }
 
     private function createImage(string $path, int $type): \GdImage|false

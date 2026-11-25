@@ -8,9 +8,14 @@ logging; see [composer.json](composer.json).
 [`GdImageConverter`](src/GdImageConverter.php) accepts explicit output paths.
 `convertToWebp($source, $destination)` returns an existing WebP source unchanged;
 `resizeToWebp($source, $destination, $maxWidth)` writes a WebP without enlarging
-small images. Both publish new output through a temporary file and rename.
+small images. Both publish new output through a temporary file and rename. Both
+throw [`ImageTooLargeException`](src/ImageTooLargeException.php) before GD decodes
+an image whose header declares more than 50 megapixels, because GD allocates the
+whole bitmap from the header.
 [`BlurHash`](src/BlurHash/BlurHash.php) handles pixels or GD images;
 [`BlurHashGenerator`](src/BlurHash/BlurHashGenerator.php) adds file loading and logging.
+It applies the same pixel bound and encodes from a copy at most 128 pixels on its
+longer edge, since the encoder holds every pixel it reads as a PHP array.
 
 The application registers these services in [services_packages.yaml](../../config/services_packages.yaml).
 Its [conversion adapter](../../src/Media/Infrastructure/Converter/ImageConversionAdapter.php)
