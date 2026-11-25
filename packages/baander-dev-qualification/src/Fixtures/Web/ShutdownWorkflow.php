@@ -82,6 +82,8 @@ final class ShutdownWorkflow
             'DATABASE_CONTROL_URL=postgresql://baander:test-only@postgres:5432/web_shutdown_test?serverVersion=18&charset=utf8',
             '-e',
             'WEB_DRAIN_SECONDS=10',
+            '-e',
+            'APP_HOME=' . $this->appDirectory,
         ];
     }
     private function baked(): bool
@@ -240,7 +242,8 @@ final class ShutdownWorkflow
             'infinity',
         ], start: true);
         if (!$this->baked()) {
-            $this->exec('client', ['mkdir', '-p', $this->appDirectory]);
+            // exec() enters the app directory, which this call creates.
+            $this->docker(['exec', $this->id . '-client', 'mkdir', '-p', $this->appDirectory]);
             $this->stage(
                 [
                     'vendor',
