@@ -145,7 +145,8 @@ final class Check
             }
             $yarn = $classification['manager'] === 'yarn';
             try {
-                ['advisories' => $advisories, 'deprecations' => $deprecations] = self::classify($this->audit($root . '/' . dirname($path), $yarn), $yarn);
+                $response = $this->audit($root . '/' . dirname($path), $yarn);
+                ['advisories' => $advisories, 'deprecations' => $deprecations] = $yarn ? self::classifyYarn($response) : self::classifyNpm($response);
             } catch (\Throwable $error) {
                 $report->add('gap', $path, 'advisories', $error->getMessage());
                 continue;
@@ -192,32 +193,43 @@ final class Check
     }
 
     /**
-     * Reduces an audit response to one entry per package and advisory. Yarn mixes deprecation
-     * notices into its advisory records and marks them only through the ID suffix; npm lists a
-     * package affected through a dependency with that dependency's name in place of an advisory.
+     * Reduces a Yarn audit response to one entry per package and advisory. Yarn mixes deprecation
+     * notices into its advisory records and marks them only through the ID suffix.
      *
      * @param array<array-key,mixed> $response
      * @return array{advisories: list<array<string,mixed>>, deprecations: list<array<string,mixed>>}
      */
-    private static function classify(array $response, bool $yarn): array
+    private static function classifyYarn(array $response): array
     {
         $advisories = [];
         $deprecations = [];
         foreach ($response as $entry) {
-            if ($yarn) {
-                $package = $entry['value'] ?? null;
-                $record = $entry['children'];
-                if (!is_string($package) || $package === '') {
-                    throw new \RuntimeException('Unrecognized Yarn advisory response.');
-                }
-                if (is_string($record['ID']) && str_ends_with($record['ID'], ' (deprecation)')) {
-                    $deprecations[] = ['package' => $package, 'record' => $record];
-                    continue;
-                }
-                $advisory = self::identifier($record['URL'] ?? null, $record['ID']);
-                $advisories[$package . ' ' . $advisory] = ['package' => $package, 'advisory' => $advisory, 'severity' => $record['Severity'] ?? null, 'title' => $record['Issue'] ?? null, 'record' => $record];
+            $package = $entry['value'] ?? null;
+            $record = $entry['children'];
+            if (!is_string($package) || $package === '') {
+                throw new \RuntimeException('Unrecognized Yarn advisory response.');
+            }
+            if (is_string($record['ID']) && str_ends_with($record['ID'], ' (deprecation)')) {
+                $deprecations[] = ['package' => $package, 'record' => $record];
                 continue;
             }
+            $advisory = self::identifier($record['URL'] ?? null, $record['ID']);
+            $advisories[$package . ' ' . $advisory] = ['package' => $package, 'advisory' => $advisory, 'severity' => $record['Severity'] ?? null, 'title' => $record['Issue'] ?? null, 'record' => $record];
+        }
+        return ['advisories' => array_values($advisories), 'deprecations' => $deprecations];
+    }
+
+    /**
+     * Reduces an npm audit response to one entry per package and advisory. npm lists a package
+     * affected through a dependency with that dependency's name in place of an advisory.
+     *
+     * @param array<array-key,mixed> $response
+     * @return array{advisories: list<array<string,mixed>>, deprecations: list<array<string,mixed>>}
+     */
+    private static function classifyNpm(array $response): array
+    {
+        $advisories = [];
+        foreach ($response as $entry) {
             $via = is_array($entry) ? $entry['via'] ?? null : null;
             if (!is_array($via) || $via === []) {
                 throw new \RuntimeException('Unrecognized npm advisory response.');
@@ -233,10 +245,10 @@ final class Check
                 $advisories[$source['name'] . ' ' . $advisory] = ['package' => $source['name'], 'advisory' => $advisory, 'severity' => $source['severity'] ?? null, 'title' => $source['title'] ?? null, 'record' => $source];
             }
         }
-        if ($response !== [] && $advisories === [] && $deprecations === []) {
+        if ($response !== [] && $advisories === []) {
             throw new \RuntimeException('Audit reported vulnerable packages without an advisory.');
         }
-        return ['advisories' => array_values($advisories), 'deprecations' => $deprecations];
+        return ['advisories' => array_values($advisories), 'deprecations' => []];
     }
 
     /** The GitHub advisory identifier in the registry's link names an advisory the same way under Yarn and npm; the registry's numeric identifier is the fallback. */

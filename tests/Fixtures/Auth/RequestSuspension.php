@@ -18,7 +18,6 @@ use Symfony\Component\HttpKernel\Event\RequestEvent;
  */
 final class RequestSuspension
 {
-    /** The request attribute that marks the request to suspend. */
     public const string ATTRIBUTE = '_suspend_after_firewall';
 
     /** kernel.request priority below the firewall (8) and the listeners at 7 that read the token. */
@@ -46,7 +45,6 @@ final class RequestSuspension
         }
     }
 
-    /** Returns once a marked request is suspended. */
     public function awaitSuspended(): void
     {
         if ($this->suspended->pop(self::WAIT_SECONDS) !== true) {
