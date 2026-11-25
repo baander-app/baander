@@ -16,6 +16,56 @@ Read [AGENTS.md](AGENTS.md) for workflow, [CONCEPTS.md](CONCEPTS.md) for shared 
 and the [testing guide](docs-book/part-2-developer-guide/testing/README.md) for current
 runners and verification boundaries. Historical suite counts apply to their own trees.
 
+## README introduction, 2026-11-25
+
+The [README](README.md) now opens with a moment of rediscovery, explains Bånder
+through browsing and playback, and defines self-hosting before describing the
+deployment. It keeps the selected repository subtitle verbatim and gives hosting
+and contribution separate entry points. The
+[documentation plan](docs/plans/2026-11-25-2001-docs-readme-product-introduction-plan.md)
+passed document review with no findings before the rewrite.
+
+The capability comparison used the README at `a528cbb3d1620e5806115795b2300d70fd769823`.
+Existing capabilities, material qualifiers, documentation destinations, all five
+badge lines and the license section were retained. Known browser gaps are named
+where their features appear. The stale claim that the deployment-preset procedure
+had never run was replaced with the bounded
+[installation record](docs-book/part-1-operator-guide/getting-started/installation.md#verified);
+that earlier run is not new runtime evidence for this documentation change.
+
+Verification checkpoint:
+
+- The chosen subtitle appears once. All 37 unique relative link and image targets,
+  including local fragments, resolved against the working files or Git tree.
+  No original unique link target was removed. Badge lines and license text compare
+  exactly with the baseline.
+- `git diff --check` passed. The prose-fix preservation review found no lost or
+  gained inline-code tokens. PHP is unavailable, so the bundled PHP audit was not
+  run; token, number, normative-word and structural comparisons were inspected
+  separately, followed by a semantic comparison.
+- The new numeric tokens are explained in the ledger below. The added “cannot”
+  describes the recorded playlist-editing gap; “only” occurs in the installation
+  record's IPv4-only exclusion. Moving headings and adding the repository map are
+  intentional parts of the requested rewrite; existing section anchors remain.
+- Code simplification has no applicable code changes. Application tests and
+  deployment checks were not run for this documentation-only change. Final scoped
+  review returned no findings and confirmed all five requirements. It independently
+  checked the 37 README targets, the six targets in this entry, preserved content
+  and the screenshot caption.
+
+Opening claim ledger:
+
+| Claim | Source |
+| --- | --- |
+| Recognizing an old album and being taken back by its opening track. | Reader framing; no Bånder capability claim. |
+| Music and movie files become a browsable, playable library in the browser. | README at `a528cbb3d1620e5806115795b2300d70fd769823`, introduction and “Browse and play movies”; operator guide, [From files to playback](docs-book/part-1-operator-guide/getting-started/understanding-baander.md#from-files-to-playback). |
+| Artist and album browsing, continuous music while browsing, and adding songs to the queue. | README at the same revision, “Explore and organize your collection” and “Listen in the web player.” |
+| Users can make playlists and play movies from their collection. | README at the same revision, “Build and share playlists” and “Browse and play movies.” |
+| Separate accounts can receive access to selected libraries. | README at the same revision, introduction and “Manage accounts and access.” |
+| The operator supplies media, runs the server and controls access. | README at the same revision, introduction and “How an instance runs”; [user management](docs-book/part-1-operator-guide/administration/user-management.md). |
+| The image shows the music library in the web app. | Existing `ui/site/assets/screenshots/library.webp`, inspected during this rewrite; no image modification. |
+| Added numeric tokens: 1–4, 2, 8.5 and 4. | 1–4 label the editorial grouping of [From files to playback](docs-book/part-1-operator-guide/getting-started/understanding-baander.md#from-files-to-playback); 1 and 2 also occur in existing manual path names. cgroup v2 and PHP 8.5 come from [installation prerequisites](docs-book/part-1-operator-guide/getting-started/installation.md#prerequisites). IPv4-only is an explicit exclusion in that guide's [verification record](docs-book/part-1-operator-guide/getting-started/installation.md#verified). No calculated figures were added. |
+
 ## Security audit, 2026-11-24
 
 The security audit of `9524a6fd9` read the whole repository and attacked a
@@ -985,8 +1035,8 @@ Open:
 
 - The hero's copies in the homepage template, the search description and the social
   card are paraphrases kept in step by hand; no test compares their content.
-- The Bånder Audio Core lead, the `README.md` opening and the docs-book introductions
-  can use the register on request; the website feature pages already use it.
+- The Bånder Audio Core lead and the docs-book introductions can use the register
+  on request; the website feature pages already use it.
 
 ## docs-book rewrite
 
