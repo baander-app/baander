@@ -13242,11 +13242,11 @@
             "dist": {
                 "type": "path",
                 "url": "./packages/baander-phpstan-rules",
-                "reference": "723c20749bc919e6d186a1ec0c9ae0d63d550599"
+                "reference": "18108c954a9fd889a0c81b6d439ee82fb9b56e49"
             },
             "require": {
-                "php": "^8.4",
-                "phpstan/phpstan": "^2.1"
+                "php": ">=8.5",
+                "phpstan/phpstan": "^2.3"
             },
             "require-dev": {
                 "phpunit/phpunit": "^13.4.5"

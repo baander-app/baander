@@ -324,7 +324,8 @@ U4 to U7 touch disjoint files and can run in parallel. U7 is its own commit beca
 **Patterns to follow:** U2.
 
 **Test scenarios:**
-- Three assignments `$s = trim($s); $s = strtolower($s); $s = ucfirst($s);` give one error, at the first line, with the identifier `baander.pipeOperator.assignmentChain`.
+- Three assignments `$s = trim($raw); $s = strtolower($s); $s = ucfirst($s);` give one error, at the first line, with the identifier `baander.pipeOperator.assignmentChain`.
+- `$s = trim($s); $s = strtolower($s); $s = ucfirst($s);` is not reported: a first value that takes the variable does not open a chain.
 - Two such assignments are not reported. Ten are reported. Eleven are not.
 - A `//` comment between two assignments keeps the chain. A `/** */` docblock ends it, with the result U1 recorded.
 - A chain that starts with `$s .= 'x'` is not a chain start.

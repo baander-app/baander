@@ -4,8 +4,8 @@
     "type": "phpstan-extension",
     "license": "Apache-2.0",
     "require": {
-        "php": "^8.4",
-        "phpstan/phpstan": "^2.1"
+        "php": ">=8.5",
+        "phpstan/phpstan": "^2.3"
     },
     "autoload": {
         "psr-4": {
