@@ -389,12 +389,10 @@ final class Command
             'workerId' => 'media',
             'generation' => 1,
         ];
-        foreach (self::frames($logs, 'worker_media_ready') as $frame) {
-            if (($frame['identity'] ?? null) == $identity && ($frame['pid'] ?? null) === $roles['media']) {
-                return true;
-            }
-        }
-        return false;
+        return array_any(
+            self::frames($logs, 'worker_media_ready'),
+            static fn(array $frame): bool => ($frame['identity'] ?? null) == $identity && ($frame['pid'] ?? null) === $roles['media'],
+        );
     }
 
     public static function validateStopped(string $logs, int $exit, int $launches): void
@@ -581,7 +579,7 @@ final class Command
         $this->prepare();
         $this->invalidTopology();
         $id = $this->resources->id;
-        $claimBoot = bin2hex(random_bytes(16));
+        $claimBoot = random_bytes(16) |> bin2hex(...);
         $claimNamespace = 'baander.app:commandclaimcrash';
         $this->gate($id . '-claim-gate', 'hold-relay-claim', $claimNamespace, $claimBoot, 'Claim gate armed.');
         $this->launch($id . '-claim-crash', $claimNamespace, $claimBoot);
@@ -615,7 +613,7 @@ final class Command
         $this->removeGate($id . '-claim-gate');
         $this->journal('release-relay-claim', [$claimNamespace, $claimBoot]);
 
-        $projectionBoot = bin2hex(random_bytes(16));
+        $projectionBoot = random_bytes(16) |> bin2hex(...);
         $projectionNamespace = 'baander.app:commandprojectioncrash';
         $this->gate(
             $id . '-projection-gate',
@@ -668,7 +666,7 @@ final class Command
         $this->removeGate($id . '-projection-gate');
         $this->journal('release-relay-projection', [$projectionNamespace, $projectionBoot]);
 
-        $deliveryBoot = bin2hex(random_bytes(16));
+        $deliveryBoot = random_bytes(16) |> bin2hex(...);
         $deliveryNamespace = 'baander.app:commanddeliveryackcrash';
         $this->gate(
             $id . '-delivery-ack-gate',
@@ -714,7 +712,7 @@ final class Command
         $this->removeGate($id . '-delivery-ack-gate');
         $this->journal('release-relay-delivery-ack', [$deliveryNamespace, $deliveryBoot]);
 
-        $boot = bin2hex(random_bytes(16));
+        $boot = random_bytes(16) |> bin2hex(...);
         $this->launch($id . '-crash', self::NAMESPACE, $boot);
         $this->ready($id . '-crash', self::NAMESPACE, $boot);
         $this->check($id . '-crash', 'verify-delivery-ack-contained', [self::NAMESPACE, $boot, $delivery]);
@@ -748,7 +746,7 @@ final class Command
         $this->removeGate($id . '-consumer-ack-gate');
         $this->journal('release-consumer-ack', [self::NAMESPACE, $boot]);
         $this->journal('age-consumer-ack-pending', [self::NAMESPACE, $boot, $consumer]);
-        $recoveryBoot = bin2hex(random_bytes(16));
+        $recoveryBoot = random_bytes(16) |> bin2hex(...);
         $recoveryNamespace = 'baander.app:commandconsumerackrecovery';
         $this->launch($id . '-consumer-ack-recovery', $recoveryNamespace, $recoveryBoot);
         $this->ready($id . '-consumer-ack-recovery', $recoveryNamespace, $recoveryBoot);
@@ -778,7 +776,7 @@ final class Command
         $this->exited($id . '-denied', 1, 0);
         $this->journal('reserved', [self::NAMESPACE, $boot]);
         foreach (['scheduler', 'term', 'expiry'] as $scenario) {
-            $nextBoot = bin2hex(random_bytes(16));
+            $nextBoot = random_bytes(16) |> bin2hex(...);
             $namespace = 'baander.app:command' . ($scenario === 'scheduler' ? 'schedulercrash' : $scenario);
             $container = $id . '-' . ($scenario === 'scheduler' ? 'scheduler-crash' : $scenario);
             $this->launch($container, $namespace, $nextBoot);

@@ -50,7 +50,7 @@ if ($name === 'docker') {
         $save();
     } elseif (in_array($args[0] ?? '', ['volume', 'network'], true) && ($args[1] ?? '') === 'create') {
         $kind = $args[0];
-        $resource = end($args);
+        $resource = array_last($args);
         $intended($kind, $resource);
         $label = explode('=', $args[array_search('--label', $args, true) + 1], 2);
         $resources[$kind . 's'][$resource] = ['Name' => $resource, 'Id' => str_repeat('b', 64), 'Labels' => [$label[0] => $label[1]]];
@@ -58,7 +58,7 @@ if ($name === 'docker') {
         echo $kind === 'volume' ? $resource : str_repeat('b', 64);
     } elseif (in_array($args[0] ?? '', ['volume', 'network'], true) && ($args[1] ?? '') === 'rm') {
         $kind = $args[0];
-        $key = end($args);
+        $key = array_last($args);
         $resources[$kind . 's'] = array_filter($resources[$kind . 's'], static fn(array $entry): bool => ($kind === 'volume' ? $entry['Name'] : $entry['Id']) !== $key);
         $save();
     } elseif (($args[0] ?? '') === 'image' && ($args[1] ?? '') === 'ls') {
@@ -78,7 +78,7 @@ if ($name === 'docker') {
         $save();
         echo $id;
     } elseif (($args[0] ?? '') === 'start') {
-        $container = array_find($resources['containers'], static fn(array $entry): bool => $entry['Id'] === end($args));
+        $container = array_find($resources['containers'], static fn(array $entry): bool => $entry['Id'] === array_last($args));
         $cadence = in_array('tests/run_backup_cadence_contract.php', $container['arguments'], true);
         if (!$cadence && in_array(getenv('STUB_FAIL'), ['encrypted', 'encrypted-cleanup'], true)) {
             exit(27);
@@ -90,11 +90,11 @@ if ($name === 'docker') {
         if (in_array(getenv('STUB_FAIL'), ['cleanup', 'encrypted-cleanup'], true)) {
             exit(7);
         }
-        $resources['containers'] = array_filter($resources['containers'], static fn(array $entry): bool => $entry['Id'] !== end($args));
+        $resources['containers'] = array_filter($resources['containers'], static fn(array $entry): bool => $entry['Id'] !== array_last($args));
         $save();
     } elseif (($args[1] ?? '') === 'inspect') {
         $kind = $args[0];
-        $key = end($args);
+        $key = array_last($args);
         $entries = $resources[$kind === 'image' ? 'images' : $kind . 's'];
         $entry = $entries[$key] ?? ($kind === 'image' ? array_find($entries, static fn(array $item): bool => $item['Id'] === $key) : null);
         if ($entry === null) {
@@ -116,7 +116,7 @@ if ($name === 'docker') {
         if (getenv('STUB_FAIL') === 'image-cleanup') {
             exit(8);
         }
-        $resources['images'] = array_filter($resources['images'], static fn(array $entry): bool => $entry['Id'] !== end($args));
+        $resources['images'] = array_filter($resources['images'], static fn(array $entry): bool => $entry['Id'] !== array_last($args));
         $save();
     }
 } elseif ($name === 'curl') {
@@ -172,7 +172,7 @@ if ($name === 'docker') {
             if (getenv('STUB_FAIL') === 'stubborn') {
                 Swoole\Process::signal(15, static function (): void {});
             }
-            $storage = sys_get_temp_dir() . '/qualification-child-' . bin2hex(random_bytes(4));
+            $storage = sys_get_temp_dir() . '/qualification-child-' . (random_bytes(4) |> bin2hex(...));
             mkdir($storage);
             file_put_contents($state . '/storage', $storage);
             file_put_contents($state . '/child', (string) getmypid());

@@ -42,7 +42,7 @@ final class ShutdownWorkflow
         $this->image = $this->runtime->image('application')->id;
         $this->appDirectory = $this->baked() ? $this->runtime->layout()->root : '/tmp/baander-web-shutdown';
         $this->resources = $this->runtime->resources(Runtime::artifacts($root, $this->id));
-        $this->temporary = sys_get_temp_dir() . '/' . $this->id . '-' . bin2hex(random_bytes(4));
+        $this->temporary = sys_get_temp_dir() . '/' . $this->id . '-' . (random_bytes(4) |> bin2hex(...));
         Runtime::require(mkdir($this->temporary, 0700), 'Cannot create private shutdown workflow directory.');
         $this->appEnvironment = [
             '-e',
@@ -194,7 +194,7 @@ final class ShutdownWorkflow
     }
     private function file(string $container, string $path): string
     {
-        $destination = $this->temporary . '/copied-' . bin2hex(random_bytes(4));
+        $destination = $this->temporary . '/copied-' . (random_bytes(4) |> bin2hex(...));
         try {
             $this->docker(['cp', $this->id . '-' . $container . ':' . $path, $destination]);
             $body = file_get_contents($destination);
@@ -429,7 +429,7 @@ final class ShutdownWorkflow
     private function startWebContainer(): void
     {
         $log = rtrim($this->logs('web'), "\n");
-        $this->logOffset = $log === '' ? 0 : count(explode("\n", $log));
+        $this->logOffset = $log === '' ? 0 : explode("\n", $log) |> count(...);
         $this->docker(['start', $this->id . '-web']);
     }
     private function startWeb(): void

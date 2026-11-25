@@ -38,7 +38,7 @@ final class LogCollectionTest extends TestCase
 
     public function testGeneratedCredentialsRemainStableAndOnlyQueryFileIsReadableByWeb(): void
     {
-        $directory = sys_get_temp_dir() . '/baander-log-credentials-' . bin2hex(random_bytes(8));
+        $directory = sys_get_temp_dir() . '/baander-log-credentials-' . (random_bytes(8) |> bin2hex(...));
         try {
             $paths = LogCollection::credentials($directory);
             $query = file_get_contents($paths['query']);
@@ -59,7 +59,7 @@ final class LogCollectionTest extends TestCase
 
     public function testStartPrunesBootDirectoriesOlderThan14DaysButKeepsTheCurrentAndThePrevious(): void
     {
-        $root = sys_get_temp_dir() . '/baander-log-boots-' . bin2hex(random_bytes(8));
+        $root = sys_get_temp_dir() . '/baander-log-boots-' . (random_bytes(8) |> bin2hex(...));
         $days = static fn(int $age): int => time() - $age * 86400;
         $boots = [
             // The current and previous boots stay whatever their age.

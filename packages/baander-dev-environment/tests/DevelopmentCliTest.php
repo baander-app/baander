@@ -20,7 +20,7 @@ final class DevelopmentCliTest extends TestCase
 
     protected function setUp(): void
     {
-        $this->directory = '/tmp/baander-cli-' . bin2hex(random_bytes(8));
+        $this->directory = '/tmp/baander-cli-' . (random_bytes(8) |> bin2hex(...));
         mkdir($this->directory, 0700);
         mkdir($this->directory . '/checkout', 0700);
         $this->sourceLayout($this->directory . '/checkout');

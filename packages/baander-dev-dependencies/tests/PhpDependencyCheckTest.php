@@ -61,7 +61,7 @@ final class PhpDependencyCheckTest extends TestCase
         $report = new Report(false);
         $report->add('finding', 'composer.json', 'patch', 'patches/fix.patch', 'Hash mismatch.');
         try {
-            (new UpstreamEvidence($executor, 2))->fetch('https://repo.packagist.org/p2/public/package.json');
+            new UpstreamEvidence($executor, 2)->fetch('https://repo.packagist.org/p2/public/package.json');
             self::fail('Rate limit accepted.');
         } catch (\RuntimeException $error) {
             $report->add('gap', 'public/package', 'stable', 'packagist', $error->getMessage());
@@ -73,7 +73,7 @@ final class PhpDependencyCheckTest extends TestCase
 
     public function testOnlineCollectsBlockedStableAndRetainsFindingsAfterOtherSourceFailure(): void
     {
-        $root = sys_get_temp_dir() . '/baander-dependency-check-' . bin2hex(random_bytes(8));
+        $root = sys_get_temp_dir() . '/baander-dependency-check-' . (random_bytes(8) |> bin2hex(...));
         mkdir($root . '/packages/baander-dev-dependencies/resources', 0700, true);
         file_put_contents($root . '/composer.json', json_encode(['require' => ['public/package' => '^1.0', 'public/failed' => '^1.0']], JSON_THROW_ON_ERROR));
         file_put_contents($root . '/composer.lock', json_encode(['packages' => [['name' => 'public/package', 'version' => '1.0.0']], 'packages-dev' => []], JSON_THROW_ON_ERROR));
@@ -93,7 +93,7 @@ final class PhpDependencyCheckTest extends TestCase
             return new ProcessResult(0, null, false, false, $output, '', 0.01);
         });
         try {
-            $report = (new Check($executor, ToolingConfiguration::resolve()))->run($root);
+            $report = new Check($executor, ToolingConfiguration::resolve())->run($root);
             self::assertSame(2, $report->exitCode());
             $json = $report->render(true);
             self::assertStringContainsString('"constraintEligible": false', $json);
@@ -102,7 +102,7 @@ final class PhpDependencyCheckTest extends TestCase
             self::assertCount(6, $calls);
             $cancelledExecutor = $this->createMock(CommandExecutor::class);
             $cancelledExecutor->expects(self::once())->method('run')->willThrowException(new CommandFailure('Fixture cancellation.', 130, new ProcessResult(130, 2, false, true, '', '', 0.01)));
-            $cancelled = (new Check($cancelledExecutor, ToolingConfiguration::resolve()))->run($root);
+            $cancelled = new Check($cancelledExecutor, ToolingConfiguration::resolve())->run($root);
             self::assertSame(2, $cancelled->exitCode());
             self::assertStringContainsString('not performed after workflow cancellation', $cancelled->render());
         } finally {
@@ -119,7 +119,7 @@ final class PhpDependencyCheckTest extends TestCase
         $executor = $this->createStub(CommandExecutor::class);
         $executor->method('run')->willReturn(new ProcessResult(0, null, false, false, 'Composer version 2.10.0 2026-10-30 14:52:10', '', 0.01));
         $this->expectExceptionMessage('2.11.1');
-        (new ComposerEvidence($executor, 2, [], sys_get_temp_dir()))->version();
+        new ComposerEvidence($executor, 2, [], sys_get_temp_dir())->version();
     }
 
     public function testFreshnessWarningRejectsSuccessfulComposerExit(): void
@@ -127,7 +127,7 @@ final class PhpDependencyCheckTest extends TestCase
         $executor = $this->createStub(CommandExecutor::class);
         $executor->method('run')->willReturn(new ProcessResult(0, null, false, false, '{"advisories":[],"abandoned":[],"filter":[],"cooldown":[]}', 'Using cached package information', 0.01));
         $this->expectExceptionMessage('stale');
-        (new ComposerEvidence($executor, 2, [], sys_get_temp_dir()))->audit(sys_get_temp_dir());
+        new ComposerEvidence($executor, 2, [], sys_get_temp_dir())->audit(sys_get_temp_dir());
     }
 
     public function testAuditRetainsAdvisoryAbandonmentAndIgnoredCategories(): void
@@ -135,7 +135,7 @@ final class PhpDependencyCheckTest extends TestCase
         $data = ['advisories' => ['public/package' => [['advisoryId' => 'PKSA-fixture', 'title' => 'Fixture advisory', 'affectedVersions' => '<2']]], 'abandoned' => ['public/abandoned' => null], 'ignored-advisories' => [], 'filter' => [], 'cooldown' => []];
         $executor = $this->createStub(CommandExecutor::class);
         $executor->method('run')->willReturn(new ProcessResult(1, null, false, false, json_encode($data, JSON_THROW_ON_ERROR), '', 0.01));
-        self::assertSame($data, (new ComposerEvidence($executor, 2, [], sys_get_temp_dir()))->audit(sys_get_temp_dir()));
+        self::assertSame($data, new ComposerEvidence($executor, 2, [], sys_get_temp_dir())->audit(sys_get_temp_dir()));
     }
 
     public function testTimeoutRemainsAnExecutionFailure(): void
@@ -143,7 +143,7 @@ final class PhpDependencyCheckTest extends TestCase
         $executor = $this->createStub(CommandExecutor::class);
         $executor->method('run')->willThrowException(new CommandFailure('Fixture timeout.', 124, new ProcessResult(124, null, true, false, '', '', 0.01)));
         $this->expectException(CommandFailure::class);
-        (new UpstreamEvidence($executor, 2))->fetch('https://repo.packagist.org/p2/public/package.json');
+        new UpstreamEvidence($executor, 2)->fetch('https://repo.packagist.org/p2/public/package.json');
     }
 
     public function testDockerRegistryMetadataUsesClientWithoutPullingOrExecutingImages(): void
@@ -153,7 +153,7 @@ final class PhpDependencyCheckTest extends TestCase
         $executor = $this->createMock(CommandExecutor::class);
         $executor->expects(self::once())->method('run')->with(self::callback(static fn(ProcessSpec $spec): bool => $spec->argv === [PHP_BINARY, '--host', 'unix:///fixture.sock', 'buildx', 'imagetools', 'inspect', $reference, '--format', '{{json .Image}}'] && $spec->timeout === 2.0))->willReturn(new ProcessResult(0, null, false, false, json_encode($metadata, JSON_THROW_ON_ERROR), '', 0.01));
         $client = new Client($executor, new Target(PHP_BINARY, 'unix:///fixture.sock', 'fixture', null, null), []);
-        $versions = (new DockerEvidence($client, 2))->composerImage($reference);
+        $versions = new DockerEvidence($client, 2)->composerImage($reference);
         self::assertCount(2, $versions);
         self::assertSame('8.5.12', $versions['linux/arm64/v8']['php']);
     }
@@ -233,7 +233,7 @@ XML;
 
     public function testKnownComposerEmptyProjectResponsesRequireAnActuallyEmptyLock(): void
     {
-        $root = sys_get_temp_dir() . '/baander-empty-lock-' . bin2hex(random_bytes(8));
+        $root = sys_get_temp_dir() . '/baander-empty-lock-' . (random_bytes(8) |> bin2hex(...));
         mkdir($root, 0700);
         $diagnostic = 'No installed packages found. Please run "composer install" before running "audit" or pass "--locked" to audit the lock file.';
         $executor = $this->createStub(CommandExecutor::class);
@@ -264,7 +264,7 @@ XML;
 
     public function testUnknownComposerFailuresDoNotBecomeEmptyLockEvidence(): void
     {
-        $root = sys_get_temp_dir() . '/baander-empty-lock-failure-' . bin2hex(random_bytes(8));
+        $root = sys_get_temp_dir() . '/baander-empty-lock-failure-' . (random_bytes(8) |> bin2hex(...));
         mkdir($root, 0700);
         file_put_contents($root . '/composer.lock', '{"packages":[],"packages-dev":[]}');
         $executor = $this->createStub(CommandExecutor::class);
@@ -290,7 +290,7 @@ XML;
 
     public function testVerifiedEmptyLockOnlineAssessmentHasExplicitScopeAndNoFalseFinding(): void
     {
-        $root = sys_get_temp_dir() . '/baander-empty-assessment-' . bin2hex(random_bytes(8));
+        $root = sys_get_temp_dir() . '/baander-empty-assessment-' . (random_bytes(8) |> bin2hex(...));
         mkdir($root . '/packages/baander-dev-dependencies/resources', 0700, true);
         file_put_contents($root . '/composer.json', '{"name":"baander/fixture","require":{"php":">=8.5"}}');
         file_put_contents($root . '/composer.lock', '{"packages":[],"packages-dev":[]}');
@@ -306,7 +306,7 @@ XML;
             return new ProcessResult($exit, null, false, false, $stdout, $stderr, 0.01);
         });
         try {
-            $report = (new Check($executor, ToolingConfiguration::resolve()))->run($root);
+            $report = new Check($executor, ToolingConfiguration::resolve())->run($root);
             self::assertSame(0, $report->exitCode(), $report->render());
             self::assertStringContainsString('empty-lock', $report->render(true));
             self::assertStringContainsString('no auditable packages', $report->render());
@@ -325,7 +325,7 @@ XML;
         $diagnostic = "Cannot use lcobucci/jwt's latest version 5.6.1 as it requires ext-sodium * which is missing from your platform.\n";
         $executor = $this->createStub(CommandExecutor::class);
         $executor->method('run')->willReturn(new ProcessResult(0, null, false, false, json_encode(['locked' => $locked], JSON_THROW_ON_ERROR), $diagnostic, 0.01));
-        $data = (new ComposerEvidence($executor, 2, [], sys_get_temp_dir()))->outdated(sys_get_temp_dir());
+        $data = new ComposerEvidence($executor, 2, [], sys_get_temp_dir())->outdated(sys_get_temp_dir());
         self::assertSame($locked, $data['locked']);
         self::assertSame($diagnostic, $data['diagnostics']);
         $report = new Report(false);
@@ -342,7 +342,7 @@ XML;
             $executor = $this->createStub(CommandExecutor::class);
             $executor->method('run')->willReturn(new ProcessResult(0, null, false, false, '{"locked":[]}', $diagnostic, 0.01));
             try {
-                (new ComposerEvidence($executor, 2, [], sys_get_temp_dir()))->outdated(sys_get_temp_dir());
+                new ComposerEvidence($executor, 2, [], sys_get_temp_dir())->outdated(sys_get_temp_dir());
                 self::fail('Unavailable or stale evidence was accepted as a platform diagnostic.');
             } catch (\RuntimeException $error) {
                 self::assertStringContainsString('unavailable or stale', $error->getMessage());
@@ -352,7 +352,7 @@ XML;
 
     public function testIndependentStableChecksIncludeTransitiveLocksDespiteCleanComposerOutdated(): void
     {
-        $root = sys_get_temp_dir() . '/baander-transitive-stable-' . bin2hex(random_bytes(8));
+        $root = sys_get_temp_dir() . '/baander-transitive-stable-' . (random_bytes(8) |> bin2hex(...));
         mkdir($root . '/packages/baander-dev-dependencies/resources', 0700, true);
         mkdir($root . '/scripts');
         $manifest = ['name' => 'baander/fixture', 'require' => ['php' => '>=8.5', 'public/direct' => '^1.0']];
@@ -367,7 +367,7 @@ XML;
         $executor = $this->createStub(CommandExecutor::class);
         $executor->method('run')->willReturnCallback(static function (ProcessSpec $spec) use (&$requestedPackages): ProcessResult {
             if ($spec->argv[0] === 'curl') {
-                $url = $spec->argv[array_key_last($spec->argv)];
+                $url = array_last($spec->argv);
                 $path = parse_url($url, PHP_URL_PATH);
                 $name = substr($path, strlen('/p2/'), -strlen('.json'));
                 $requestedPackages[] = $name;
@@ -384,11 +384,11 @@ XML;
             return new ProcessResult(0, null, false, false, $stdout, '', 0.01);
         });
         try {
-            $report = (new Check($executor, ToolingConfiguration::resolve()))->run($root);
+            $report = new Check($executor, ToolingConfiguration::resolve())->run($root);
             self::assertSame(1, $report->exitCode(), $report->render());
             sort($requestedPackages);
             self::assertSame(['public/dev-transitive', 'public/direct', 'public/transitive'], $requestedPackages);
-            $stable = array_values(array_filter($report->toArray()['records'], static fn(array $record): bool => $record['kind'] === 'stable-releases'));
+            $stable = array_filter($report->toArray()['records'], static fn(array $record): bool => $record['kind'] === 'stable-releases') |> array_values(...);
             self::assertCount(6, $stable);
             foreach ($stable as $record) {
                 $details = $record['details'];
@@ -460,7 +460,7 @@ XML;
         $root = self::lockedProject(self::LOCKED_PACKAGE);
         $audit = json_encode([...json_decode(self::CLEAN_AUDIT, true, flags: JSON_THROW_ON_ERROR), ...$categories], JSON_THROW_ON_ERROR);
         try {
-            $report = (new Check($this->auditExecutor(new ProcessResult($composerExit, null, false, false, $audit, '', 0.01)), ToolingConfiguration::resolve()))->advisories($root);
+            $report = new Check($this->auditExecutor(new ProcessResult($composerExit, null, false, false, $audit, '', 0.01)), ToolingConfiguration::resolve())->advisories($root);
             self::assertSame($expected, $report->exitCode(), $report->render());
             self::assertStringContainsString($reported, $report->render());
         } finally {
@@ -485,7 +485,7 @@ XML;
     {
         $root = self::lockedProject(self::LOCKED_PACKAGE);
         try {
-            $report = (new Check($this->auditExecutor($audit), ToolingConfiguration::resolve()))->advisories($root);
+            $report = new Check($this->auditExecutor($audit), ToolingConfiguration::resolve())->advisories($root);
             self::assertSame(2, $report->exitCode(), $report->render());
             $advisories = array_filter($report->toArray()['records'], static fn(array $record): bool => $record['kind'] === 'advisories');
             self::assertContains('gap', array_column($advisories, 'status'));
@@ -515,7 +515,7 @@ XML;
         $root = self::lockedProject(['packages' => [], 'packages-dev' => []]);
         $refusal = new ProcessResult(1, null, false, false, '', 'No installed packages found. Please run "composer install" before running "audit" or pass "--locked" to audit the lock file.', 0.01);
         try {
-            $report = (new Check($this->auditExecutor($refusal), ToolingConfiguration::resolve()))->advisories($root);
+            $report = new Check($this->auditExecutor($refusal), ToolingConfiguration::resolve())->advisories($root);
             self::assertSame(0, $report->exitCode(), $report->render());
             $advisories = array_filter($report->toArray()['records'], static fn(array $record): bool => $record['kind'] === 'advisories') |> array_values(...);
             self::assertCount(1, $advisories);
@@ -532,7 +532,7 @@ XML;
         $root = self::lockedProject(self::LOCKED_PACKAGE);
         file_put_contents($root . '/packages/baander-dev-dependencies/resources/php-dependencies.json', '{"version":1,"projects":{"composer.json":{"kind":"locked","owner":"fixture","lock":"composer.lock"},"scripts/composer.json":{"kind":"locked","owner":"fixture","lock":"scripts/composer.lock"}}}');
         try {
-            $report = (new Check($this->auditExecutor(new ProcessResult(0, null, false, false, self::CLEAN_AUDIT, '', 0.01)), ToolingConfiguration::resolve()))->advisories($root);
+            $report = new Check($this->auditExecutor(new ProcessResult(0, null, false, false, self::CLEAN_AUDIT, '', 0.01)), ToolingConfiguration::resolve())->advisories($root);
             self::assertSame(2, $report->exitCode(), $report->render());
             self::assertStringContainsString('scripts/composer.json', $report->render());
         } finally {
@@ -546,7 +546,7 @@ XML;
         $executor = $this->createMock(CommandExecutor::class);
         $executor->expects(self::once())->method('run')->willReturn(new ProcessResult(0, null, false, false, 'Composer version 2.10.0 2026-10-30 14:52:10', '', 0.01));
         try {
-            $report = (new Check($executor, ToolingConfiguration::resolve()))->advisories($root);
+            $report = new Check($executor, ToolingConfiguration::resolve())->advisories($root);
             self::assertSame(2, $report->exitCode(), $report->render());
             self::assertStringContainsString('2.11.1', $report->render());
         } finally {
@@ -602,7 +602,7 @@ PHP_STUB;
     /** @param array{packages: list<array<string,string>>, packages-dev: list<array<string,string>>} $lock */
     private static function lockedProject(array $lock): string
     {
-        $root = sys_get_temp_dir() . '/baander-advisory-check-' . bin2hex(random_bytes(8));
+        $root = sys_get_temp_dir() . '/baander-advisory-check-' . (random_bytes(8) |> bin2hex(...));
         mkdir($root . '/packages/baander-dev-dependencies/resources', 0700, true);
         file_put_contents($root . '/composer.json', '{"name":"baander/fixture","require":{"php":">=8.5","public/package":"^1.0"}}');
         file_put_contents($root . '/composer.lock', json_encode($lock, JSON_THROW_ON_ERROR));

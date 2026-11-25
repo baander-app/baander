@@ -56,7 +56,7 @@ final class ContainerContract
         );
         $self->apiImage = $options['api-image'];
         $self->rqliteImage = $options['rqlite-image'];
-        $self->prefix = 'baander-registry-test-' . bin2hex(random_bytes(6));
+        $self->prefix = 'baander-registry-test-' . (random_bytes(6) |> bin2hex(...));
         $self->credential = str_repeat('bc', 32);
         $self->directory = Runtime::temporaryDirectory($self->prefix);
         chmod($self->directory, 0755);
@@ -192,7 +192,7 @@ final class ContainerContract
     }
     private function forgetContainer(string $name): void
     {
-        $this->containers = array_values(array_filter($this->containers, static fn(string $item): bool => $item !== $name));
+        $this->containers = array_filter($this->containers, static fn(string $item): bool => $item !== $name) |> array_values(...);
     }
     /**
      * @param array<string,string> $extra

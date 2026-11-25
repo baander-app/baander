@@ -122,7 +122,7 @@ final class BuildInputsTest extends TestCase
 
     public function testCatalogImagesNeedDigestsExceptRolesTheToolingBuilds(): void
     {
-        $this->root = sys_get_temp_dir() . '/baander-build-inputs-' . bin2hex(random_bytes(8));
+        $this->root = sys_get_temp_dir() . '/baander-build-inputs-' . (random_bytes(8) |> bin2hex(...));
         mkdir($this->root . '/catalog', 0700, true);
         file_put_contents($this->root . '/catalog/images.json', json_encode(['version' => 1, 'images' => [
             'application' => ['reference' => 'baander-app:latest', 'capabilities' => ['application']],
@@ -139,7 +139,7 @@ final class BuildInputsTest extends TestCase
 
     public function testLocalEvidenceReportsAnUnpinnedInputAsAFindingAtItsLine(): void
     {
-        $this->root = sys_get_temp_dir() . '/baander-build-inputs-' . bin2hex(random_bytes(8));
+        $this->root = sys_get_temp_dir() . '/baander-build-inputs-' . (random_bytes(8) |> bin2hex(...));
         mkdir($this->root . '/packages/baander-dev-dependencies/resources', 0700, true);
         mkdir($this->root . '/docker/tool', 0700, true);
         file_put_contents($this->root . '/composer.json', '{"name":"baander/fixture"}');
@@ -150,14 +150,14 @@ final class BuildInputsTest extends TestCase
         $report = new Report(true);
         LocalEvidence::collect($this->root, $inventory, $report);
         self::assertSame(1, $report->exitCode(), $report->render());
-        $findings = array_values(array_filter($report->toArray()['records'], static fn(array $record): bool => $record['status'] === 'finding'));
+        $findings = array_filter($report->toArray()['records'], static fn(array $record): bool => $record['status'] === 'finding') |> array_values(...);
         self::assertSame(['docker/tool/Dockerfile', 'build-input', 'docker/tool/Dockerfile:2', 'piped-installer'], [$findings[0]['project'], $findings[0]['kind'], $findings[0]['source'], $findings[0]['details']['rule']]);
         self::assertContains('build-inputs', $report->toArray()['requested']);
     }
 
     public function testImageDriftFlagSelectsTheDriftReport(): void
     {
-        $this->root = sys_get_temp_dir() . '/baander-build-inputs-' . bin2hex(random_bytes(8));
+        $this->root = sys_get_temp_dir() . '/baander-build-inputs-' . (random_bytes(8) |> bin2hex(...));
         mkdir($this->root . '/packages/baander-dev-dependencies/resources', 0700, true);
         file_put_contents($this->root . '/composer.json', '{"name":"baander/fixture"}');
         file_put_contents($this->root . '/packages/baander-dev-dependencies/resources/php-dependencies.json', '{"version":1,"projects":{"composer.json":{"kind":"package","owner":"fixture"}}}');

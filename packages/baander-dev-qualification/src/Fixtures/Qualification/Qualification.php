@@ -334,7 +334,7 @@ final class Qualification
         if (array_intersect(array_values($effective['volumes']), array_values($seedDeployment['configuration']['volumes'])) !== []) {
             throw new \RuntimeException('Every child data volume must be separate from the seed.');
         }
-        $borrowerId = bin2hex(random_bytes(16));
+        $borrowerId = random_bytes(16) |> bin2hex(...);
         $state = ['version' => 1, 'phase' => 'preparing', 'configuration' => $this->configuration, 'target' => $this->docker->target->toArray(),
             'runs' => [], 'freshCopyConsumed' => false, 'images' => $seed['images'], 'effectiveDeployment' => $effective,
             'datasetDigest' => $seed['datasetDigest'], 'borrowedFrom' => ['stateDirectory' => $from, 'borrowerId' => $borrowerId]];
@@ -461,7 +461,7 @@ CODE;
             }
             $users = [];
             for ($index = 0; $index < 6; ++$index) {
-                $users[] = ['email' => $this->configuration['name'] . '-' . $index . '@baander.app', 'name' => 'Qualification ' . $index, 'password' => bin2hex(random_bytes(24))];
+                $users[] = ['email' => $this->configuration['name'] . '-' . $index . '@baander.app', 'name' => 'Qualification ' . $index, 'password' => random_bytes(24) |> bin2hex(...)];
             }
             AtomicFile::writeJson($this->directory . '/users.json', $users);
             $application = new Application($this->docker, $this->deploymentState());
@@ -795,7 +795,7 @@ CODE;
         }
         $healthStatus = $this->webProgram(self::requestProgram(), ['http://gateway/health'])['httpStatus'] ?? null;
         $webAddresses = self::edgeAddresses($services['web'] ?? [], EdgeNetwork::name($configuration->name));
-        $token = bin2hex(random_bytes(8));
+        $token = random_bytes(8) |> bin2hex(...);
         $webAnswers = [];
         $forwardedClients = [];
         foreach (self::edgeSubnets($configuration) as $family => $subnet) {
@@ -1086,7 +1086,7 @@ PHP;
         if (($serving['proxyTrust']['status'] ?? null) !== 'passed') {
             $failures[] = 'The new boot does not see clients through exactly its gateway.';
         }
-        $failures = array_values(array_unique($failures));
+        $failures = array_unique($failures) |> array_values(...);
         return ['version' => 1, 'scenario' => 'deployment-replacement', 'status' => $failures === [] ? 'passed' : 'failed', 'failures' => $failures];
     }
 
@@ -1189,7 +1189,7 @@ PHP;
             if (!$shutdown['pairRetired'] || (!$retained && !$neverStarted)) {
                 throw new \RuntimeException('Fixture cleanup requires confirmed worker retirement and owned data-volume retention.');
             }
-            $volumes = array_values(array_unique([...array_values($deployment['configuration']['volumes']), ...$deployment['configurationVolumes']]));
+            $volumes = array_unique([...array_values($deployment['configuration']['volumes']), ...$deployment['configurationVolumes']]) |> array_values(...);
             foreach ($volumes as $volume) {
                 if ($this->ownedVolume($volume, $deployment['owner'])) {
                     $this->docker->run(['volume', 'rm', $volume]);
@@ -1305,7 +1305,7 @@ PHP;
      */
     public static function renamePlan(array $dataset, string $scenario, int $repeat, ?string $currentPath = null): array
     {
-        $songs = array_values(array_filter($dataset['files'], static fn(array $file): bool => $file['kind'] === 'song'));
+        $songs = array_filter($dataset['files'], static fn(array $file): bool => $file['kind'] === 'song') |> array_values(...);
         if (count($songs) !== 2000 || !in_array($scenario, RunContract::PLAYER_SCENARIOS, true) || $repeat < 1 || $repeat > 3) {
             throw new \InvalidArgumentException('A file change requires the complete dataset and a declared playback scenario.');
         }
@@ -1470,7 +1470,7 @@ CODE;
         }
         $content = preg_replace('/^BAANDER_MAINTENANCE_(?:START|FINISH):[0-9.]+\R/m', '', $content);
         $documents = explode('BAANDER_MAINTENANCE_RESULT_END', $content);
-        if (count($documents) !== 5 || trim(array_pop($documents)) !== '') {
+        if (count($documents) !== 5 || array_pop($documents) |> trim(...) !== '') {
             throw new \RuntimeException('Normal maintenance output did not contain all four command receipts.');
         }
         return array_map(static function (string $document): array {
@@ -1646,8 +1646,8 @@ CODE;
         }
         $worker = new StateStore($this->directory . '/deployment')->workers()->load();
         $deployment = $this->deploymentState();
-        $times = array_values(array_filter(array_column($receipts, 'startedMonotonic'), static fn(mixed $value): bool => is_int($value) || is_float($value)));
-        $ends = array_values(array_filter(array_column($receipts, 'finishedMonotonic'), static fn(mixed $value): bool => is_int($value) || is_float($value)));
+        $times = array_filter(array_column($receipts, 'startedMonotonic'), static fn(mixed $value): bool => is_int($value) || is_float($value)) |> array_values(...);
+        $ends = array_filter(array_column($receipts, 'finishedMonotonic'), static fn(mixed $value): bool => is_int($value) || is_float($value)) |> array_values(...);
         $context = ['namespace' => $deployment['configuration']['name'], 'bootId' => $helpers ? $deployment['owner'] : ($worker['boot_id'] ?? ''),
             'operatorImage' => $deployment['images']['operator']['id'] ?? null, 'workerImage' => $deployment['images']['worker']['id'] ?? null];
         if ($helpers) {
@@ -1744,7 +1744,7 @@ CODE;
         } catch (\Throwable $error) {
             $receipt['metadataProof'] = ['complete' => false, 'errors' => [$error->getMessage()]];
         }
-        $receipt['unexpectedExits'] = array_values(array_unique($this->unexpectedExits));
+        $receipt['unexpectedExits'] = array_unique($this->unexpectedExits) |> array_values(...);
         $receipt['webControlRetries'] = $this->webControlRetries;
         if (($receipt['observer']['normalExit'] ?? false) !== true) {
             $receipt['unexpectedExits'][] = 'Observer did not exit normally.';
@@ -1819,7 +1819,7 @@ CODE;
         $missing = array_diff_key($required, $seen);
         return ['complete' => $missing === [] && $errors === [], 'fromEpochSeconds' => $from, 'untilEpochSeconds' => $until,
             'requests' => $requests, 'requiredIdentities' => count($required), 'matchedIdentities' => count($seen),
-            'missingIdentities' => array_keys($missing), 'errors' => array_values(array_unique($errors)), 'journalSha256' => hash_file('sha256', $path)];
+            'missingIdentities' => array_keys($missing), 'errors' => array_unique($errors) |> array_values(...), 'journalSha256' => hash_file('sha256', $path)];
     }
 
     /**
@@ -1920,7 +1920,7 @@ CODE;
                 $containers[] = (string) ($attributes['name'] ?? $event['Actor']['ID'] ?? 'unknown');
             }
         }
-        return array_values(array_unique($containers));
+        return array_unique($containers) |> array_values(...);
     }
 
     /** @param array<string,mixed> $state
@@ -1955,7 +1955,7 @@ CODE;
                 $ids[] = $decision['jobId'];
             }
         }
-        $ids = array_values(array_unique($ids));
+        $ids = array_unique($ids) |> array_values(...);
         if (count($ids) !== $players) {
             throw new \RuntimeException('Fresh copy requires one distinct owned job per player.');
         }
@@ -1978,7 +1978,7 @@ CODE;
         foreach (['org.baander.preset.owner=' . $deployment['owner'], 'app.baander.worker.namespace=' . $this->configuration['name']] as $label) {
             $ids = [...$ids, ...(preg_split('/\s+/', trim($this->docker->run(['ps', '--all', '--quiet', '--no-trunc', '--filter', 'label=' . $label])->stdout), flags: PREG_SPLIT_NO_EMPTY) ?: [])];
         }
-        return $ids === [] ? [] : json_decode($this->docker->run(['inspect', ...array_values(array_unique($ids))])->stdout, true, flags: JSON_THROW_ON_ERROR);
+        return $ids === [] ? [] : json_decode($this->docker->run(['inspect', ...(array_unique($ids) |> array_values(...))])->stdout, true, flags: JSON_THROW_ON_ERROR);
     }
 
     private function ownedVolume(string $name, string $owner): bool
@@ -2162,7 +2162,7 @@ CODE;
         if ($ids === []) {
             return [];
         }
-        $roles = Observer::rolesFromInspection(json_decode($this->docker->run(['inspect', ...array_values(array_unique($ids))])->stdout, true, flags: JSON_THROW_ON_ERROR), $this->configuration['name'], $deployment['owner']);
+        $roles = Observer::rolesFromInspection(json_decode($this->docker->run(['inspect', ...(array_unique($ids) |> array_values(...))])->stdout, true, flags: JSON_THROW_ON_ERROR), $this->configuration['name'], $deployment['owner']);
         foreach ($this->observedRoles as $role => $pid) {
             if (!isset($this->restartingRoles[$role]) && ($roles[$role] ?? null) !== $pid) {
                 $this->unexpectedExits[] = 'Required role exited or changed PID: ' . $role;

@@ -170,7 +170,7 @@ final class Cli
      */
     public static function dockerTarget(CommandExecutor $runner, \Baander\Configuration\ToolingConfiguration $configuration, string $directory, array $environment): array
     {
-        $target = (new \Baander\Containers\Docker\TargetResolver($runner, $environment))->resolve($configuration->docker, $directory);
+        $target = new \Baander\Containers\Docker\TargetResolver($runner, $environment)->resolve($configuration->docker, $directory);
         $docker = new \Baander\Containers\Docker\Client($runner, $target, ProcessEnvironment::clean($environment));
         $docker->assertLocalPublishedPorts();
         if (!str_starts_with($target->endpoint, 'unix:///') || preg_match('/[\x00-\x1f\x7f,"]/', substr($target->endpoint, 7)) === 1) {
@@ -329,7 +329,7 @@ final class Cli
                 'worktree' => $root,
                 'phase' => 'configured',
                 'version' => 1,
-                'docker' => self::dockerTarget($runner, $configuration, $store->directory($identity) . '/transport-' . bin2hex(random_bytes(8)), $environment),
+                'docker' => self::dockerTarget($runner, $configuration, $store->directory($identity) . '/transport-' . (random_bytes(8) |> bin2hex(...)), $environment),
             ];
             $instance['tooling'] = $configuration->toArray();
             $instance['media'] = $media;
@@ -506,7 +506,7 @@ final class Cli
                 return 0;
             }
             if ($command === 'logs') {
-                $docker = (new CapturedConnections($runner, ProcessEnvironment::clean($environment)))->client($instance['docker']);
+                $docker = new CapturedConnections($runner, ProcessEnvironment::clean($environment))->client($instance['docker']);
                 $docker->validateIdentity();
                 return $docker->compose(
                     $instance['project'],
@@ -523,7 +523,7 @@ final class Cli
                 if ($instance === null || $instance['phase'] !== 'ready') {
                     throw new WorkflowError('The instance is not ready for commands; inspect its status.');
                 }
-                $docker = (new CapturedConnections($runner, ProcessEnvironment::clean($environment)))->client($instance['docker']);
+                $docker = new CapturedConnections($runner, ProcessEnvironment::clean($environment))->client($instance['docker']);
                 $docker->validateIdentity();
                 $values = [
                     'exec',

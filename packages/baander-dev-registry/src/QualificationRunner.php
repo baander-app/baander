@@ -47,7 +47,7 @@ final class QualificationRunner
         $status = 0;
         try {
             $this->configure($arguments);
-            $this->work = sys_get_temp_dir() . '/baander-registry-ci.' . bin2hex(random_bytes(8));
+            $this->work = sys_get_temp_dir() . '/baander-registry-ci.' . (random_bytes(8) |> bin2hex(...));
             $this->directory($this->work . '/tmp');
             $this->qualify();
             $this->write('Registry ' . $this->mode . " qualification passed.\n");

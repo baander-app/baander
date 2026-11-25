@@ -325,7 +325,7 @@ final class RuntimeWorkflow
             return;
         }
         $this->docker(['exec', $this->id . '-app', 'mkdir', '-p', $this->appDirectory]);
-        $directory = sys_get_temp_dir() . '/baander-web-checkout-' . bin2hex(random_bytes(8));
+        $directory = sys_get_temp_dir() . '/baander-web-checkout-' . (random_bytes(8) |> bin2hex(...));
         Runtime::require(mkdir($directory, 0700), 'Cannot reserve private checkout directory.');
         $this->archiveDirectory = $directory;
         $this->archive = $directory . '/checkout.tar';

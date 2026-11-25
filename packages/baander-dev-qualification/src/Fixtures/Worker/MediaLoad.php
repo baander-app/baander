@@ -192,7 +192,7 @@ final class MediaLoad
         $saved = is_file($artifacts . '/governor-state.json') ? Reports::json($artifacts . '/governor-state.json') : [];
         $learned = $saved['governor']['model']['samples'] ?? [];
         $receipt['governor']['savedAfterRun'] = ['state' => $saved['governor']['state'] ?? null, 'samples' => count($learned),
-            'hardwareSamples' => count(array_filter($learned, static fn(array $sample): bool => ($sample['hardware_accelerated'] ?? false) === true))];
+            'hardwareSamples' => array_filter($learned, static fn(array $sample): bool => ($sample['hardware_accelerated'] ?? false) === true) |> count(...)];
         $receipt['summary'] = self::summary($receipt);
         return $receipt;
     }
@@ -233,7 +233,7 @@ final class MediaLoad
             'beforeRun' => $client['governorBeforeRun'],
             'afterRun' => $client['governorAfterRun'],
             'runDecisions' => $decisions['run'],
-            'warmUpDecisionsByState' => array_count_values(array_map(static fn(array $decision): string => (string) ($decision['governorState'] ?? 'unrecorded'), $decisions['warmUp'])),
+            'warmUpDecisionsByState' => array_map(static fn(array $decision): string => (string) ($decision['governorState'] ?? 'unrecorded'), $decisions['warmUp']) |> array_count_values(...),
             'vetoes' => $vetoes,
             'runCostSamples' => $samples,
         ];
@@ -254,10 +254,10 @@ final class MediaLoad
             $arguments = $stream['launch']['argv'] ?? [];
             $codec = ($index = array_search('-c:v', $arguments, true)) === false ? null : ($arguments[$index + 1] ?? null);
             $timeline = $stream['timeline'];
-            $output = $timeline === [] ? null : (float) $timeline[array_key_last($timeline)][1];
-            $warm = array_values(array_filter($timeline, static fn(array $point): bool => $point[1] >= 3.0));
-            $steady = count($warm) >= 2 && $warm[array_key_last($warm)][0] > $warm[0][0]
-                ? ($warm[array_key_last($warm)][1] - $warm[0][1]) / ($warm[array_key_last($warm)][0] - $warm[0][0]) : null;
+            $output = $timeline === [] ? null : (float) array_last($timeline)[1];
+            $warm = array_filter($timeline, static fn(array $point): bool => $point[1] >= 3.0) |> array_values(...);
+            $steady = count($warm) >= 2 && array_last($warm)[0] > $warm[0][0]
+                ? (array_last($warm)[1] - $warm[0][1]) / (array_last($warm)[0] - $warm[0][0]) : null;
             $whole = $output === null ? null : $output / max(.001, $stream['completedAt'] - $stream['admittedAt']);
             $streams[] = [
                 'job' => $stream['job'],
@@ -274,13 +274,13 @@ final class MediaLoad
                 'timeline' => self::downsample($timeline, 5.0),
             ];
         }
-        $steady = array_values(array_filter(array_column($streams, 'steadySpeed'), is_float(...)));
+        $steady = array_filter(array_column($streams, 'steadySpeed'), is_float(...)) |> array_values(...);
         return [
             'expectedPath' => $pass,
             'streams' => $streams,
             'steadySpeed' => self::spread($steady),
             'realTimeMargin' => $steady === [] ? null : self::spread(array_map(static fn(float $speed): float => round($speed - 1, 3), $steady)),
-            'streamsAheadOfRealTime' => count(array_filter($steady, static fn(float $speed): bool => $speed > 1.0)),
+            'streamsAheadOfRealTime' => array_filter($steady, static fn(float $speed): bool => $speed > 1.0) |> count(...),
         ];
     }
 
@@ -298,13 +298,13 @@ final class MediaLoad
                 'status' => $rendition['status'], 'bytes' => $rendition['bytes'],
                 'startedAt' => round($rendition['startedAt'] - $client['runStartedAt'], 3), 'seconds' => round($wall, 3), 'speed' => round($seconds / max(.001, $wall), 2)];
         }
-        $first = array_values(array_filter($renditions, static fn(array $rendition): bool => $rendition['index'] === 0));
+        $first = array_filter($renditions, static fn(array $rendition): bool => $rendition['index'] === 0) |> array_values(...);
         return [
-            'lanes' => count(array_unique(array_column($renditions, 'lane'))),
-            'firstWave' => ['count' => count($first), 'ok' => count(array_filter($first, static fn(array $rendition): bool => $rendition['status'] === 200 && $rendition['bytes'] > 0)),
+            'lanes' => array_column($renditions, 'lane') |> array_unique(...) |> count(...),
+            'firstWave' => ['count' => count($first), 'ok' => array_filter($first, static fn(array $rendition): bool => $rendition['status'] === 200 && $rendition['bytes'] > 0) |> count(...),
                 'speed' => $first === [] ? null : self::spread(array_column($first, 'speed'))],
             'renditions' => count($renditions),
-            'failed' => count(array_filter($renditions, static fn(array $rendition): bool => $rendition['status'] !== 200 || $rendition['bytes'] === 0)),
+            'failed' => array_filter($renditions, static fn(array $rendition): bool => $rendition['status'] !== 200 || $rendition['bytes'] === 0) |> count(...),
             'speed' => $renditions === [] ? null : self::spread(array_column($renditions, 'speed')),
             'all' => $renditions,
         ];
@@ -318,11 +318,11 @@ final class MediaLoad
     {
         [$video, $audio] = [$client['profile']['videoEncoderSlots'], $client['profile']['audioEncoderSlots']];
         $samples = $client['occupancy'];
-        $full = array_values(array_filter($samples, static fn(array $sample): bool => $sample['claimedVideo'] >= $video && $sample['runningAudio'] >= $audio));
+        $full = array_filter($samples, static fn(array $sample): bool => $sample['claimedVideo'] >= $video && $sample['runningAudio'] >= $audio) |> array_values(...);
         return [
             'samples' => count($samples),
-            'peakClaimedVideo' => $samples === [] ? 0 : max(array_column($samples, 'claimedVideo')),
-            'peakRunningAudio' => $samples === [] ? 0 : max(array_column($samples, 'runningAudio')),
+            'peakClaimedVideo' => $samples === [] ? 0 : array_column($samples, 'claimedVideo') |> max(...),
+            'peakRunningAudio' => $samples === [] ? 0 : array_column($samples, 'runningAudio') |> max(...),
             'everySlotSamples' => count($full),
             'firstEverySlotAt' => $full[0]['t'] ?? null,
         ];
@@ -351,12 +351,12 @@ final class MediaLoad
     public static function nativeProbe(string $artifacts, float $start, float $end): array
     {
         $probes = Reports::samples($artifacts . '/native-probe.jsonl');
-        $run = array_values(array_filter($probes, static fn(array $probe): bool => $start <= $probe['t'] && $probe['t'] <= $end));
-        $seconds = static fn(array $probes): array => array_values(array_filter(array_column($probes, 'seconds'), is_numeric(...)));
+        $run = array_filter($probes, static fn(array $probe): bool => $start <= $probe['t'] && $probe['t'] <= $end) |> array_values(...);
+        $seconds = static fn(array $probes): array => array_filter(array_column($probes, 'seconds'), is_numeric(...)) |> array_values(...);
         return [
             'deadlineSeconds' => self::NATIVE_RPC_DEADLINE_SECONDS,
             'probes' => count($probes),
-            'errors' => array_values(array_filter($probes, static fn(array $probe): bool => isset($probe['error']))),
+            'errors' => array_filter($probes, static fn(array $probe): bool => isset($probe['error'])) |> array_values(...),
             'connectToAnswer' => $seconds($probes) === [] ? null : Reports::timings($seconds($probes)),
             'connectToAnswerDuringRun' => $seconds($run) === [] ? null : Reports::timings($seconds($run)),
         ];
@@ -409,10 +409,10 @@ final class MediaLoad
         foreach ([...Reports::json($artifacts . '/containers-before.json'), ...Reports::json($artifacts . '/services-before.json')] as $container) {
             $containers[$container['Id']] = ltrim($container['Name'], '/');
         }
-        $events = array_values(array_filter(
+        $events = array_filter(
             Reports::samples($artifacts . '/oom-events.jsonl', EvidenceMode::Live),
             static fn(array $event): bool => isset($containers[$event['Actor']['ID'] ?? $event['id'] ?? '']),
-        ));
+        ) |> array_values(...);
         $kills = [];
         foreach ($units as $unit => $samples) {
             $counts = array_map(static fn(array $sample): int => Reports::counters((string) $sample['memory.events'])['oom_kill'] ?? 0, self::sampleRecords($samples));
@@ -477,8 +477,8 @@ final class MediaLoad
         $pools = Pooler::defaultPools();
         $limits = ['application' => $pools['application'], 'control' => $pools['control'], 'direct' => $pools['direct'],
             'total' => $pools['application'] + $pools['control'] + $pools['direct'], 'maxConnections' => Pooler::maxConnections($pools)];
-        $peak = static fn(array $samples, string $key): int => $samples === [] ? 0 : max(array_map(static fn(array $sample): int => $sample['backends'][$key], $samples));
-        $run = array_values(array_filter($samples, static fn(array $sample): bool => $start <= $sample['monotonic'] && $sample['monotonic'] <= $end));
+        $peak = static fn(array $samples, string $key): int => $samples === [] ? 0 : array_map(static fn(array $sample): int => $sample['backends'][$key], $samples) |> max(...);
+        $run = array_filter($samples, static fn(array $sample): bool => $start <= $sample['monotonic'] && $sample['monotonic'] <= $end) |> array_values(...);
         $poolPeak = static function (array $samples, string $database, string $field): int {
             $values = array_map(static fn(array $sample): int => (int) ($sample['pools'][$database][$field] ?? 0), $samples);
             return $values === [] ? 0 : max($values);
@@ -494,7 +494,7 @@ final class MediaLoad
             'limits' => $limits,
             'samples' => count($samples),
             'runSamples' => count($run),
-            'errors' => array_sum(array_column($samples, 'errors')),
+            'errors' => array_column($samples, 'errors') |> array_sum(...),
             'peak' => ['application' => $peak($samples, 'application'), 'control' => $peak($samples, 'control'), 'direct' => $peak($samples, 'direct'), 'total' => $peak($samples, 'total')],
             'pools' => [
                 'application' => ['peakActiveServers' => $poolPeak($run, 'worker_operator_test', 'sv_active'), 'peakWaitingClients' => $poolPeak($run, 'worker_operator_test', 'cl_waiting'),
@@ -570,15 +570,15 @@ final class MediaLoad
             $samples = self::sampleRecords($records);
             // The helpers' clock is the boot clock; each sample pairs it with the monotonic clock.
             $offset = $samples === [] ? 0.0 : Reports::number($samples[0]['uptime']) - Reports::number($samples[0]['monotonic']);
-            $agents = array_values(array_filter($records, static fn(array $record): bool => ($record['type'] ?? null) === 'leaseAgent'));
-            $run = array_values(array_filter($agents, static fn(array $agent): bool => $start <= $agent['reapedBy'] - $offset && $agent['reapedBy'] - $offset <= $end));
+            $agents = array_filter($records, static fn(array $record): bool => ($record['type'] ?? null) === 'leaseAgent') |> array_values(...);
+            $run = array_filter($agents, static fn(array $agent): bool => $start <= $agent['reapedBy'] - $offset && $agent['reapedBy'] - $offset <= $end) |> array_values(...);
             $result[$unit] = [
                 'helpers' => count($agents),
-                'actions' => array_count_values(array_map(static fn(array $agent): string => (string) $agent['action'], $agents)),
+                'actions' => array_map(static fn(array $agent): string => (string) $agent['action'], $agents) |> array_count_values(...),
                 'lifetime' => $agents === [] ? null : Reports::timings(array_column($agents, 'seconds')),
                 'runHelpers' => count($run),
                 'runLifetime' => $run === [] ? null : Reports::timings(array_column($run, 'seconds')),
-                'overDeadline' => array_values(array_filter($agents, static fn(array $agent): bool => $agent['seconds'] >= self::LEASE_DEADLINE_SECONDS)),
+                'overDeadline' => array_filter($agents, static fn(array $agent): bool => $agent['seconds'] >= self::LEASE_DEADLINE_SECONDS) |> array_values(...),
             ];
         }
         return $result;
@@ -587,21 +587,21 @@ final class MediaLoad
     /** @return array<string,mixed> */
     public static function web(string $artifacts, float $start, float $end): array
     {
-        $requests = array_values(array_filter(
+        $requests = array_filter(
             Reports::samples($artifacts . '/web-latency.jsonl'),
             static fn(array $request): bool => $start <= $request['t'] && $request['t'] <= $end,
-        ));
-        $ok = array_values(array_filter($requests, static fn(array $request): bool => $request['status'] === 200 && $request['curl'] === 0));
+        ) |> array_values(...);
+        $ok = array_filter($requests, static fn(array $request): bool => $request['status'] === 200 && $request['curl'] === 0) |> array_values(...);
         $seconds = array_column($ok, 'seconds');
         sort($seconds);
         $rank = static fn(float $rank): ?float => $seconds === [] ? null : round(Reports::percentile($seconds, $rank), 4);
         return [
             'requests' => count($requests),
             'failed' => count($requests) - count($ok),
-            'failedStatuses' => array_count_values(array_map(
+            'failedStatuses' => array_map(
                 static fn(array $request): string => $request['status'] . '/' . $request['curl'],
                 array_filter($requests, static fn(array $request): bool => $request['status'] !== 200 || $request['curl'] !== 0),
-            )),
+            ) |> array_count_values(...),
             'p50Seconds' => $rank(.5), 'p95Seconds' => $rank(.95), 'p99Seconds' => $rank(.99), 'maxSeconds' => $rank(1.0),
         ];
     }
@@ -624,14 +624,14 @@ final class MediaLoad
      */
     private static function summary(array $receipt): array
     {
-        $paths = array_count_values(array_map(static fn(array $stream): string => (string) $stream['path'], $receipt['video']['streams']));
+        $paths = array_map(static fn(array $stream): string => (string) $stream['path'], $receipt['video']['streams']) |> array_count_values(...);
         return [
             'slots' => ['video' => $receipt['profile']['videoEncoderSlots'], 'audio' => $receipt['profile']['audioEncoderSlots']],
-            'videoCompleted' => count(array_filter($receipt['video']['streams'], static fn(array $stream): bool => $stream['completedAt'] !== null)),
+            'videoCompleted' => array_filter($receipt['video']['streams'], static fn(array $stream): bool => $stream['completedAt'] !== null) |> count(...),
             'encodePaths' => $paths,
             'videoSteadySpeed' => $receipt['video']['steadySpeed'],
             'audioFirstWaveSpeed' => $receipt['audio']['firstWave']['speed'],
-            'governor' => ['beforeRun' => $receipt['governor']['beforeRun'], 'runDecisionStates' => array_count_values(array_map(static fn(array $decision): string => (string) ($decision['governorState'] ?? 'unrecorded'), $receipt['governor']['runDecisions']))],
+            'governor' => ['beforeRun' => $receipt['governor']['beforeRun'], 'runDecisionStates' => array_map(static fn(array $decision): string => (string) ($decision['governorState'] ?? 'unrecorded'), $receipt['governor']['runDecisions']) |> array_count_values(...)],
             'occupancy' => $receipt['occupancy'],
             'oom' => ['dockerEvents' => $receipt['oom']['dockerEvents'], 'unitOomKills' => $receipt['oom']['unitOomKills']],
             'containment' => count($receipt['failures']['containment']),
@@ -664,7 +664,7 @@ final class MediaLoad
      */
     private static function sampleRecords(array $records): array
     {
-        return array_values(array_filter($records, static fn(array $record): bool => ($record['type'] ?? null) === 'sample'));
+        return array_filter($records, static fn(array $record): bool => ($record['type'] ?? null) === 'sample') |> array_values(...);
     }
 
     /**

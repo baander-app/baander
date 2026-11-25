@@ -285,7 +285,7 @@ final class Inventory
 
     private static function unresolvedLicense(mixed $value): bool
     {
-        return !is_string($value) || in_array(strtolower(trim($value)), ['', 'unknown', 'noassertion'], true);
+        return !is_string($value) || in_array(trim($value) |> strtolower(...), ['', 'unknown', 'noassertion'], true);
     }
 
     /**
@@ -297,14 +297,14 @@ final class Inventory
         sort($paths, SORT_STRING);
         $components = [];
         foreach ($paths as $path) {
-            if (basename(dirname($path)) === 'debian') {
+            if (dirname($path) |> basename(...) === 'debian') {
                 continue;
             }
             $value = self::readJson($path);
             $components = [...$components, ...(array_is_list($value) ? $value : $value['components'])];
         }
         $ids = array_column($components, 'id');
-        if (count($ids) !== count(array_unique($ids))) {
+        if (count($ids) !== array_unique($ids) |> count(...)) {
             throw new InventoryError('duplicate reviewed component identity');
         }
         foreach ($components as $component) {

@@ -119,9 +119,9 @@ final class TransportContract
             Runtime::requireThat(microtime(true) - $begin < 1.5, 'Pool saturation/deadline exceeded bound');
             $change(['delay' => 0.6, 'delayOnce' => true]);
             $run(['503', '200'], -2);
-            $before = count($names());
+            $before = $names() |> count(...);
             $run(['200', '200'], -2);
-            Runtime::requireThat(count($names()) === $before + 1, 'Sequential requests did not reuse TLS connection');
+            Runtime::requireThat($names() |> count(...) === $before + 1, 'Sequential requests did not reuse TLS connection');
             $healthyBody = json_encode(['results' => [[
                 'types' => [
                     'public_id' => 'text',
@@ -146,7 +146,7 @@ final class TransportContract
             $config['additionalUrls'] = ['https://rqlite.baander.app:' . $healthyPort];
             $config['rotateOnError'] = true;
             $change(['body' => '{"results":[],"error":"leadership lost while committing log"}']);
-            $before = count($requests());
+            $before = $requests() |> count(...);
             $run(['503', '200'], -2, true);
             $arrivals = array_slice($requests(), $before);
             Runtime::requireThat(
@@ -172,23 +172,23 @@ final class TransportContract
             $change(['wire' => null]);
             $change(['body' => '{"results":[]}']);
             $config['url'] = 'https://wrong.registry.baander.app:' . $port;
-            $before = count($requests());
+            $before = $requests() |> count(...);
             $run(['503']);
-            Runtime::requireThat(count($requests()) === $before, 'Wrong TLS hostname reached authenticated HTTP');
+            Runtime::requireThat($requests() |> count(...) === $before, 'Wrong TLS hostname reached authenticated HTTP');
             $config['url'] = 'https://rqlite.baander.app:' . $port;
             $change(['body' => '{"results":[{"values":[[1]]}]}']);
             $rejected = static function (string $label, array $changes) use (&$config, $requests, $run): void {
                 $previous = $config;
-                $before = count($requests());
+                $before = $requests() |> count(...);
                 $config = [...$config, ...$changes];
                 try {
                     $run(['503', '503'], -2, true);
-                    Runtime::requireThat(count($requests()) === $before, $label . ' reached authenticated HTTP');
+                    Runtime::requireThat($requests() |> count(...) === $before, $label . ' reached authenticated HTTP');
                 } finally {
                     $config = $previous;
                 }
                 $run(['200']);
-                Runtime::requireThat(count($requests()) === $before + 1, $label . ' prevented healthy recovery');
+                Runtime::requireThat($requests() |> count(...) === $before + 1, $label . ' prevented healthy recovery');
             };
             mkdir($directory . '/unrelated');
             Tls::authority($directory . '/unrelated');

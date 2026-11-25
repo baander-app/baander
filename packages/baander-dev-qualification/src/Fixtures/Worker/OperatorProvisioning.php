@@ -21,7 +21,7 @@ final readonly class OperatorProvisioning
     public function startWeb(): void
     {
         $s = $this->qualification->state;
-        $s->webName = $s->runId . '-web-' . bin2hex(random_bytes(4));
+        $s->webName = $s->runId . '-web-' . (random_bytes(4) |> bin2hex(...));
         $this->qualification->resources->startContainer($s->webName, [
             '--network',
             $s->runId . '-control',
@@ -444,7 +444,7 @@ final readonly class OperatorProvisioning
     {
         $s = $this->qualification->state;
         $s->daemonId = $this->qualification->output(['info', '--format', '{{.ID}}']);
-        $s->boot = bin2hex(random_bytes(16));
+        $s->boot = random_bytes(16) |> bin2hex(...);
         $s->namespace = 'baander.app:' . $s->runId;
         $s->workerName = OperatorConfiguration::workerName($s->namespace, $s->boot);
         $s->controlName = substr($s->workerName, 0, -strlen('execution')) . 'control';

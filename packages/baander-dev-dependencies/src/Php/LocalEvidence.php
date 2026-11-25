@@ -63,11 +63,11 @@ final class LocalEvidence
                 }
             }
             foreach ($hashes as $version => $digests) {
-                if (count(array_unique($digests)) > 1) {
+                if (array_unique($digests) |> count(...) > 1) {
                     $report->add('finding', $name, 'runtime-archive', 'policy', 'Equivalent runtime archive declarations have different hashes.', ['version' => $version, 'sha256' => $digests]);
                 }
             }
-            $versions = array_unique(array_column($result[$name], 'version'));
+            $versions = array_column($result[$name], 'version') |> array_unique(...);
             if (count($versions) > 1) {
                 $report->add('finding', $name, 'runtime-agreement', 'policy', 'Declared runtime versions disagree.', ['declarations' => $result[$name]]);
             }
@@ -152,7 +152,7 @@ final class LocalEvidence
             $metadata['archiveSha256'] = $matches[1][0];
         }
         if (preg_match_all('/https:\\/\\/[^\\s"\\x27]+(?:tar\\.xz|tgz)/', $text, $archives)) {
-            $metadata['archives'] = array_values(array_filter($archives[0], static fn(string $url): bool => str_contains($url, $runtime)));
+            $metadata['archives'] = array_filter($archives[0], static fn(string $url): bool => str_contains($url, $runtime)) |> array_values(...);
         }
         if ($runtime === 'php') {
             if ($declaration['kind'] === 'php-image' && preg_match('/^FROM\\s+php:[^\\s]+/m', $text, $image)) {

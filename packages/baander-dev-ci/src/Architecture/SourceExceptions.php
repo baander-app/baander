@@ -1311,7 +1311,7 @@ $child = proc_open([\'docker\', \'info\', \'--format\', \'{{json .}}\'], [0 => [
             }
             $matching = array_filter($diagnostics, static fn(array $diagnostic): bool => $diagnostic['rule'] === $exception['rule']
                 && array_any($ranges, static fn(array $range): bool => $diagnostic['offset'] >= $range[0] && $diagnostic['offset'] < $range[1]));
-            $matchedLines = array_unique(array_column($matching, 'line'));
+            $matchedLines = array_column($matching, 'line') |> array_unique(...);
             if (count($ranges) !== $exception['count'] || count($matchedLines) !== $exception['count']) {
                 $stale[] = ['path' => $path, 'line' => 1, 'rule' => 'stale-exception', 'message' => 'Review the ' . $exception['rule'] . ' exception: ' . $exception['reason']];
                 continue;

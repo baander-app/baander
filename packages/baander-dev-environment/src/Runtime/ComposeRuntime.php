@@ -525,7 +525,7 @@ class ComposeRuntime
             $directory . '/frontend.conf.template',
             str_replace('include /etc/nginx/preview.conf;', $preview, $content),
         );
-        $instance['log_boot_id'] = bin2hex(random_bytes(16));
+        $instance['log_boot_id'] = random_bytes(16) |> bin2hex(...);
         AtomicFile::writeJson($directory . '/compose.json', $this->config($instance, $release));
         $files = [];
         foreach ([$directory . '/compose.json', $directory . '/frontend.conf.template'] as $path) {

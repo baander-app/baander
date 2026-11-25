@@ -49,7 +49,7 @@ final class MediaClient
             'htm' => $method,
             'htu' => preg_replace('/[?#].*$/', '', $url),
             'iat' => time(),
-            'jti' => bin2hex(random_bytes(16)),
+            'jti' => random_bytes(16) |> bin2hex(...),
         ];
         if ($this->nonce !== null) {
             $claims['nonce'] = $this->nonce;

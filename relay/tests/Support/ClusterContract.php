@@ -100,7 +100,7 @@ final class ClusterContract
                     $leader = $state['leader']['node_id'] ?? null;
                     if (!is_string($leader)
                         || preg_match('/^node-(0|[1-9][0-9]*)$/D', $leader) !== 1
-                        || strlen(substr($leader, 5)) > strlen((string) ($cluster->count - 1))
+                        || substr($leader, 5) |> strlen(...) > strlen((string) ($cluster->count - 1))
                         || (int) substr($leader, 5) >= $cluster->count) {
                         throw new \RuntimeException("Voter {$index}: invalid cluster leader identity.");
                     }
@@ -109,7 +109,7 @@ final class ClusterContract
                     }
                     $states[] = $state;
                 }
-                $leaders = array_unique(array_map(static fn($state) => $state['leader']['node_id'], $states));
+                $leaders = array_map(static fn($state) => $state['leader']['node_id'], $states) |> array_unique(...);
                 if (count($leaders) === 1
                     && array_all($states, static fn($state) => $state['db_applied_index'] >= $acknowledgedIndex)) {
                     foreach ($indices as $voter) {
@@ -120,7 +120,7 @@ final class ClusterContract
                             );
                         }
                     }
-                    return (int) substr((string) reset($leaders), 5);
+                    return (int) substr((string) array_first($leaders), 5);
                 }
             } catch (\Throwable $e) {
                 $last = $e->getMessage();
@@ -291,9 +291,9 @@ final class ClusterContract
             self::verifyPeerTrust($cluster, $initial);
             $minority = [$initial];
             if ($nodes === 5) {
-                $minority[] = array_values(array_diff(range(0, $nodes - 1), [$initial]))[0];
+                $minority[] = (array_diff(range(0, $nodes - 1), [$initial]) |> array_values(...))[0];
             }
-            $majority = array_values(array_diff(range(0, $nodes - 1), $minority));
+            $majority = array_diff(range(0, $nodes - 1), $minority) |> array_values(...);
             $observer = new Observer($cluster, $initial);
             $endpoints = [[$initial, $observer->port]];
             foreach ([...$majority, ...array_diff($minority, [$initial])] as $index) {
@@ -459,14 +459,14 @@ final class ClusterContract
             echo 'PASS: ' . count($majority) . '–' . count($minority) . " partition, majority commits, leader recovery and voter rejoin\n";
             $failures = [$healed];
             if ($nodes === 5) {
-                $failures[] = array_values(array_diff(range(0, $nodes - 1), [$healed]))[0];
+                $failures[] = (array_diff(range(0, $nodes - 1), [$healed]) |> array_values(...))[0];
             }
             $started = Runtime::now();
             foreach ($failures as $voter) {
                 $cluster->processes[$voter]->signal(9);
                 $cluster->processes[$voter]->wait(3);
             }
-            $remaining = array_values(array_diff(range(0, $nodes - 1), $failures));
+            $remaining = array_diff(range(0, $nodes - 1), $failures) |> array_values(...);
             $surviving = $cluster->waitLeader($remaining, 30);
             Runtime::requireThat(Runtime::now() - $started <= 30);
             $survivor = new Api(
@@ -490,7 +490,7 @@ final class ClusterContract
             Runtime::requireThat($pinned->request('GET', '/api/servers/' . $absent)[0] === 404);
             $stopped = [
                 $recovered,
-                ...array_slice(array_values(array_diff(range(0, $nodes - 1), [$recovered])), 0, intdiv($nodes, 2)),
+                ...array_slice(array_diff(range(0, $nodes - 1), [$recovered]) |> array_values(...), 0, intdiv($nodes, 2)),
             ];
             foreach ($stopped as $voter) {
                 $cluster->processes[$voter]->signal(9);

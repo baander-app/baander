@@ -142,7 +142,7 @@ final readonly class Configuration
                 throw new \InvalidArgumentException('Persistent storage requires named Docker volumes.');
             }
         }
-        if (count(array_unique($volumes)) !== count($volumes)) {
+        if (array_unique($volumes) |> count(...) !== count($volumes)) {
             throw new \InvalidArgumentException('Persistent volume roles must have distinct names.');
         }
         return new self($name, $capability, rtrim($origin, '/'), $address, $listen['port'], $frontProxies, $edge, $selections, $environment, $resources, $volumes, $size, $hardware);
@@ -194,7 +194,9 @@ final readonly class Configuration
                 $problems[] = $variable . ' is a value the repository commits.';
             }
         }
-        $problems = array_values(array_unique(array_filter($problems)));
+        $problems = array_filter($problems)
+            |> array_unique(...)
+            |> array_values(...);
         if ($problems !== []) {
             throw new \InvalidArgumentException('Generate private values before deploying: ' . implode(' ', $problems));
         }

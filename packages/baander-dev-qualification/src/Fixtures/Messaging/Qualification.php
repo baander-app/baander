@@ -84,7 +84,7 @@ final class Qualification
         $ledger = $runtime->resources($artifacts);
         fwrite(STDERR, 'Fixture evidence: ' . $artifacts . "\n");
         $ledger->scoped(static function () use ($runtime, $mode, $commands, $inImage, $docker, $layout, $applicationImage, $redisImage, $postgresImage, $artifacts, $ledger): void {
-            $id = 'baander-' . $mode . '-' . bin2hex(random_bytes(8));
+            $id = 'baander-' . $mode . '-' . (random_bytes(8) |> bin2hex(...));
             $ledger->create(ResourceKind::Network, $id, $mode === 'messaging' ? [] : ['--internal']);
             $redis = $id . '-redis';
             $postgres = $id . '-postgres';

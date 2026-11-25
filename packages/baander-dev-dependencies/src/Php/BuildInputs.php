@@ -93,7 +93,7 @@ final class BuildInputs
                     $arguments[$name] = trim($default, '"\'');
                 }
             } elseif ($keyword === 'FROM') {
-                $words = array_values(array_filter(preg_split('/\s+/', trim($value)) ?: [], static fn(string $word): bool => !str_starts_with($word, '--')));
+                $words = array_filter(preg_split('/\s+/', trim($value)) ?: [], static fn(string $word): bool => !str_starts_with($word, '--')) |> array_values(...);
                 $image($line, $words[0] ?? '', $instruction);
                 if (strtoupper($words[1] ?? '') === 'AS' && isset($words[2])) {
                     $stages[strtolower($words[2])] = true;
@@ -106,7 +106,7 @@ final class BuildInputs
                         $image($line, substr($flag, 7), $instruction);
                     }
                 }
-                $sources = array_slice(array_values(array_diff($words, $flags)), 0, -1);
+                $sources = array_slice(array_diff($words, $flags) |> array_values(...), 0, -1);
                 $remote = array_filter($sources, static fn(string $source): bool => preg_match('~^(?:https?|git)://|^git@~', $source) === 1);
                 if ($keyword === 'ADD' && $remote !== [] && preg_grep('/^--checksum=sha256:[0-9a-f]{64}$/D', $flags) === []) {
                     $violation($line, 'download-checksum', $instruction);
@@ -205,12 +205,12 @@ final class BuildInputs
         $masked = preg_replace('/\'[^\']*\'|"(?:[^"\\\\]|\\\\.)*"/s', "''", $command) ?? $command;
         $commands = [];
         foreach (preg_split('/&&|\|\||[;|&(){}`\n]/', $masked) ?: [] as $segment) {
-            $words = array_values(array_filter(preg_split('/\s+/', trim($segment)) ?: [], static fn(string $word): bool => $word !== ''));
+            $words = array_filter(preg_split('/\s+/', trim($segment)) ?: [], static fn(string $word): bool => $word !== '') |> array_values(...);
             while ($words !== [] && (in_array($words[0], self::PREFIXES, true) || preg_match('/^[A-Za-z_]\w*=/', $words[0]) === 1)) {
                 array_shift($words);
             }
             if ($words !== []) {
-                $commands[] = [basename(array_shift($words)), $words];
+                $commands[] = [array_shift($words) |> basename(...), $words];
             }
         }
         return $commands;

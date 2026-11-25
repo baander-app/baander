@@ -15,7 +15,7 @@ final readonly class LifecycleCheckpoint
     {
         $q = $this->qualification;
         $s = $q->state;
-        $clientName = $s->runId . '-client-' . bin2hex(random_bytes(8));
+        $clientName = $s->runId . '-client-' . (random_bytes(8) |> bin2hex(...));
         $result = $q->resources->startContainer(
             $clientName,
             [
@@ -105,7 +105,7 @@ final readonly class LifecycleCheckpoint
     {
         foreach (explode("\n", $contents) as $line) {
             if (str_starts_with($line, 'run_id:')) {
-                return trim(substr($line, strlen('run_id:')));
+                return substr($line, strlen('run_id:')) |> trim(...);
             }
         }
         throw new RuntimeException('Redis server identity missing');
@@ -271,7 +271,7 @@ final readonly class LifecycleCheckpoint
                 'Stopped pair ownership changed',
             );
         }
-        $successor = bin2hex(random_bytes(16));
+        $successor = random_bytes(16) |> bin2hex(...);
         $q->boot($successor);
         $q->operator('create', 3);
         $q->copy($q->work('create.json'), $q->artifact('premature-create.json'));

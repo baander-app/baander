@@ -129,7 +129,7 @@ NGINX;
                 throw new \RuntimeException('Refusing symlink log credentials.');
             }
             if (!file_exists($path)) {
-                AtomicFile::write($path, bin2hex(random_bytes(32)) . "\n");
+                AtomicFile::write($path, (random_bytes(32) |> bin2hex(...)) . "\n");
             }
             if (!is_file($path) || preg_match('/\A[0-9a-f]{64}\n?\z/D', (string) file_get_contents($path)) !== 1) {
                 throw new \RuntimeException('Log collection credentials are not a valid generated token file.');

@@ -35,7 +35,7 @@ final class RegistryInventoryTest extends TestCase
 
     protected function setUp(): void
     {
-        $this->temporary = sys_get_temp_dir() . '/registry-inventory-test-' . bin2hex(random_bytes(8));
+        $this->temporary = sys_get_temp_dir() . '/registry-inventory-test-' . (random_bytes(8) |> bin2hex(...));
         $this->root = $this->temporary . '/root';
         $this->resolutions = $this->temporary . '/resolutions';
         $this->bundle = $this->root . Inventory::BUNDLE_PATH;
@@ -575,7 +575,7 @@ FIXTURE;
                     self::assertFileExists($ownership);
                     $saved = DockerOwnership::read($ownership);
                     self::assertNull($saved['resources'][0]['id']);
-                    self::assertSame('sha256:' . str_repeat('a', 64), $arguments[array_key_last($arguments)]);
+                    self::assertSame('sha256:' . str_repeat('a', 64), array_last($arguments));
                     $resource = ['Id' => $id, 'Name' => '/' . $saved['resources'][0]['name'],
                         'Config' => ['Labels' => ['org.baander.tooling.run' => $saved['token']]]];
                     $result['stdout'] = $id;
@@ -586,7 +586,7 @@ FIXTURE;
                 } elseif ($arguments[0] === 'container' && $arguments[1] === 'inspect') {
                     if ($resource === null) {
                         $result['code'] = 1;
-                        $result['stderr'] = 'Error: No such container: ' . $arguments[array_key_last($arguments)];
+                        $result['stderr'] = 'Error: No such container: ' . array_last($arguments);
                     } else {
                         $result['stdout'] = json_encode([$resource]);
                     }
@@ -601,7 +601,7 @@ FIXTURE;
                     }
                 } elseif ($arguments[0] === 'rm') {
                     self::assertLessThanOrEqual(2, $seconds);
-                    self::assertSame($id, $arguments[array_key_last($arguments)]);
+                    self::assertSame($id, array_last($arguments));
                     if (str_contains($scenario, 'cleanup')) {
                         $result['code'] = 6;
                         $result['stderr'] = 'cleanup failed';
@@ -653,7 +653,7 @@ FIXTURE;
             } else {
                 self::assertNull($resource);
                 self::assertFileDoesNotExist($ownership);
-                self::assertSame(['container', 'ls', '--all', '--no-trunc', '--format', '{"ID":{{json .ID}},"Names":{{json .Names}}}'], end($calls));
+                self::assertSame(['container', 'ls', '--all', '--no-trunc', '--format', '{"ID":{{json .ID}},"Names":{{json .Names}}}'], array_last($calls));
             }
             unset($verifier, $owner);
         }

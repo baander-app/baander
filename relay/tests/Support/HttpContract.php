@@ -227,7 +227,7 @@ final class HttpContract
 
     private function async(string $body, ?int $port = null): string
     {
-        $path = $this->directory . '/request-' . bin2hex(random_bytes(6)) . '.json';
+        $path = $this->directory . '/request-' . (random_bytes(6) |> bin2hex(...)) . '.json';
         $headers = $this->headers('POST', '/api/servers/register', $body, true);
         $input = $path . '.input';
         file_put_contents(
@@ -631,7 +631,7 @@ final class HttpContract
             );
         }
         $chunk = str_repeat(' ', 8193);
-        [$status, $error] = $this->raw($hostile . "Transfer-Encoding: chunked\r\n\r\n" . dechex(strlen($chunk)) . "\r\n" . $chunk . "\r\n0\r\n\r\n");
+        [$status, $error] = $this->raw($hostile . "Transfer-Encoding: chunked\r\n\r\n" . (strlen($chunk) |> dechex(...)) . "\r\n" . $chunk . "\r\n0\r\n\r\n");
         self::check(
             $status === 413 && $error === ['error' => 'Invalid or oversized HTTP request.'],
             'Oversized chunk accepted.',
@@ -718,7 +718,7 @@ final class HttpContract
         }
         $refused = false;
         try {
-            fclose($connect('AES128-GCM-SHA256:AES256-GCM-SHA384'));
+            $connect('AES128-GCM-SHA256:AES256-GCM-SHA384') |> fclose(...);
         } catch (\RuntimeException) {
             $refused = true;
         }
@@ -747,7 +747,7 @@ final class HttpContract
         array_push($this->secrets, $largest['apiKey'], hash('sha256', $largest['apiKey']), $token);
         [$status, $body] = $this->raw(
             $hostile . "X-Baander-Enrollment: {$token}\r\nTransfer-Encoding: chunked\r\n\r\n"
-                . dechex(strlen($payload)) . "\r\n" . $payload . "\r\n0\r\n\r\n",
+                . (strlen($payload) |> dechex(...)) . "\r\n" . $payload . "\r\n0\r\n\r\n",
         );
         self::check($status === 200 && $body['data']['revision'] === 1, 'Largest chunked registration refused.');
         [$status, $body] = $this->request('GET', '/api/servers/' . $largest['publicId']);

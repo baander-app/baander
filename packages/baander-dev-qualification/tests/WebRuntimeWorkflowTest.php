@@ -13,7 +13,7 @@ final class WebRuntimeWorkflowTest extends TestCase
     private string $directory;
     protected function setUp(): void
     {
-        $this->directory = sys_get_temp_dir() . '/baander-web-workflow-' . bin2hex(random_bytes(6));
+        $this->directory = sys_get_temp_dir() . '/baander-web-workflow-' . (random_bytes(6) |> bin2hex(...));
         mkdir($this->directory, 0700);
         $source = str_replace(
             "dirname(__DIR__, 4) . '/vendor/autoload.php'",
@@ -48,7 +48,7 @@ final class WebRuntimeWorkflowTest extends TestCase
         $environment['WEB_RUNTIME_ROOT'] = dirname(__DIR__, 3);
         $environment['BAANDER_TEST_CHECKOUT_IN_IMAGE'] = $baked ? '1' : '0';
         unset($environment['DOCKER_HOST'], $environment['DOCKER_CONTEXT'], $environment['BAANDER_TEST_DOCKER_ENDPOINT']);
-        $result = (new ProcessRunner())->run(new ProcessSpec(
+        $result = new ProcessRunner()->run(new ProcessSpec(
             $name === 'capacity'
                 ? ['php', $this->directory . '/capacity.php', dirname(__DIR__, 3)]
                 : ['bash', dirname(__DIR__, 3) . '/scripts/test-' . $name . '-runtime-container.sh'],
@@ -93,10 +93,10 @@ final class WebRuntimeWorkflowTest extends TestCase
             $phases,
         );
         // The request-identity drill verifies proofs against Redis, so it runs once, before the first outage.
-        $identity = array_keys(array_filter($commands, static fn(array $command): bool => in_array('tests/Fixtures/request-identity-runtime.php', $command, true)));
+        $identity = array_filter($commands, static fn(array $command): bool => in_array('tests/Fixtures/request-identity-runtime.php', $command, true)) |> array_keys(...);
         self::assertCount(1, $identity);
         self::assertLessThan(array_find_key($commands, static fn(array $command): bool => $command[0] === 'pause'), $identity[0]);
-        $tar = array_values(array_filter($calls, static fn(array $call): bool => $call['binary'] === 'tar'))[0]['arguments'];
+        $tar = (array_filter($calls, static fn(array $call): bool => $call['binary'] === 'tar') |> array_values(...))[0]['arguments'];
         self::assertContains('--exclude=config/secrets/oauth', $tar);
         self::assertContains('--exclude=config/secrets/*.decrypt.private.php', $tar);
         self::assertContains('packages', $tar);
@@ -159,14 +159,14 @@ final class WebRuntimeWorkflowTest extends TestCase
         self::assertSame(1, $status, $output);
         self::assertStringContainsString('wrong-baseline', $output);
         self::assertStringContainsString('differ from the baseline', $output);
-        $tar = array_values(array_filter($calls, static fn(array $call): bool => $call['binary'] === 'tar'))[0]['arguments'];
+        $tar = (array_filter($calls, static fn(array $call): bool => $call['binary'] === 'tar') |> array_values(...))[0]['arguments'];
         self::assertContains('scripts/web-runtime', $tar);
         self::assertFalse(array_any($tar, static fn(string $argument): bool => str_starts_with($argument, '--exclude=')));
         self::assertFalse(array_any(self::dockerCalls($calls), static fn(array $call): bool => $call[0] === 'stop'));
-        $passwords = array_values(array_filter(
+        $passwords = array_filter(
             array_column($calls, 'input'),
             static fn(string $input): bool => str_starts_with($input, 'Web-runtime-test-only-'),
-        ));
+        ) |> array_values(...);
         self::assertSame(["Web-runtime-test-only-1\n", "Web-runtime-test-only-2\n", "Web-runtime-test-only-3\n"], $passwords);
     }
 
@@ -176,19 +176,19 @@ final class WebRuntimeWorkflowTest extends TestCase
         self::assertSame(0, $status, $output);
         self::assertStringContainsString('Each administrator has one Redis alert', $output);
         $commands = self::dockerCalls($calls);
-        $application = array_values(array_filter($commands, static fn(array $command): bool => $command[0] === 'create' && in_array('APP_DOMAIN=http://127.0.0.1:9501', $command, true)));
+        $application = array_filter($commands, static fn(array $command): bool => $command[0] === 'create' && in_array('APP_DOMAIN=http://127.0.0.1:9501', $command, true)) |> array_values(...);
         self::assertCount(1, $application);
         self::assertSame(
             ['APP_URL=https://baander.app', 'DEFAULT_URI=https://baander.app', 'APP_DOMAIN=http://127.0.0.1:9501', 'AUTH_EXTRA_ORIGINS=http://127.0.0.1:9501'],
-            array_values(array_filter($application[0], static fn(string $argument): bool => preg_match('/^(APP_URL|DEFAULT_URI|APP_DOMAIN|AUTH_EXTRA_ORIGINS)=/', $argument) === 1)),
+            array_filter($application[0], static fn(string $argument): bool => preg_match('/^(APP_URL|DEFAULT_URI|APP_DOMAIN|AUTH_EXTRA_ORIGINS)=/', $argument) === 1) |> array_values(...),
         );
-        $preparations = array_values(array_filter($commands, static fn(array $command): bool => in_array('tests/Fixtures/web-runtime.php', $command, true) && in_array('prepare', $command, true)));
+        $preparations = array_filter($commands, static fn(array $command): bool => in_array('tests/Fixtures/web-runtime.php', $command, true) && in_array('prepare', $command, true)) |> array_values(...);
         self::assertCount(1, $preparations);
         self::assertSame(['php', 'tests/Fixtures/web-runtime.php', 'prepare', 'web-runtime-admin@baander.app'], array_slice($preparations[0], -4));
-        $alerts = array_values(array_filter($commands, static fn(array $command): bool => in_array('alert', $command, true)));
+        $alerts = array_filter($commands, static fn(array $command): bool => in_array('alert', $command, true)) |> array_values(...);
         self::assertCount(2, $alerts);
-        self::assertSame('wait', end($alerts[0]));
-        self::assertNotSame('wait', end($alerts[1]));
+        self::assertSame('wait', array_last($alerts[0]));
+        self::assertNotSame('wait', array_last($alerts[1]));
         self::assertTrue(array_any($commands, static fn(array $call): bool => in_array('PATCH', $call, true)));
         $phases = [];
         foreach ($commands as $command) {
@@ -242,15 +242,15 @@ PHP);
         self::assertSame(0, $status, $output);
         self::assertStringContainsString('Capacity prepared: https://127.0.0.1:32796', $output);
         $commands = self::dockerCalls($calls);
-        $networks = array_values(array_filter($commands, static fn(array $command): bool => array_slice($command, 0, 2) === ['network', 'create']));
+        $networks = array_filter($commands, static fn(array $command): bool => array_slice($command, 0, 2) === ['network', 'create']) |> array_values(...);
         self::assertCount(2, $networks);
         self::assertContains('--internal', $networks[0]);
         self::assertNotContains('--internal', $networks[1]);
-        $internal = $networks[0][array_key_last($networks[0])];
-        $connections = array_values(array_filter($commands, static fn(array $command): bool => array_slice($command, 0, 2) === ['network', 'connect']));
+        $internal = array_last($networks[0]);
+        $connections = array_filter($commands, static fn(array $command): bool => array_slice($command, 0, 2) === ['network', 'connect']) |> array_values(...);
         self::assertCount(1, $connections);
         self::assertStringEndsWith('-ingress', $connections[0][3]);
-        self::assertSame($networks[1][array_key_last($networks[1])], $connections[0][2]);
+        self::assertSame(array_last($networks[1]), $connections[0][2]);
         foreach ($commands as $command) {
             if ($command[0] !== 'create') {
                 continue;

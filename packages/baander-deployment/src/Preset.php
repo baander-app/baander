@@ -100,7 +100,7 @@ final readonly class Preset
         }
         KillOrder::assertApplicable($this->docker->validateIdentity());
         $this->docker->requireCompose();
-        $owner = $previous['owner'] ?? bin2hex(random_bytes(16));
+        $owner = $previous['owner'] ?? random_bytes(16) |> bin2hex(...);
         $images = [];
         $layout = null;
         $profile = null;
@@ -142,12 +142,12 @@ final readonly class Preset
         $postgres = PostgresConfiguration::render($configuration->size['sharedBuffersMiB'], $configuration->size['workMemMiB'], Pooler::pools($profile->deployment));
         new PostgresSettings($postgres);
         LogCollection::credentials($this->store->directory . '/log-credentials');
-        $compose = Renderer::render($configuration, $images, $layout, $profile, $postgres, $owner, ['target' => $this->docker->target->toArray(), 'credentials' => $this->store->directory . '/log-credentials', 'boot' => bin2hex(random_bytes(16))]);
+        $compose = Renderer::render($configuration, $images, $layout, $profile, $postgres, $owner, ['target' => $this->docker->target->toArray(), 'credentials' => $this->store->directory . '/log-credentials', 'boot' => random_bytes(16) |> bin2hex(...)]);
         $content = json_encode($compose, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR) . "\n";
         $state = ['version' => 1, 'phase' => 'prepared', 'owner' => $owner, 'configuration' => $configuration->toArray(),
             'target' => $this->docker->target->toArray(), 'images' => $images, 'layout' => $layout->toArray(),
             'profile' => $profile->toArray(), 'profileFingerprint' => $profile->fingerprint(), 'sourceRevision' => $revision,
-            'configurationVolumes' => array_values(array_unique([ ...($previous['configurationVolumes'] ?? []), ...array_column(Renderer::configurationFiles($configuration, $postgres), 'volume')])),
+            'configurationVolumes' => array_unique([ ...($previous['configurationVolumes'] ?? []), ...array_column(Renderer::configurationFiles($configuration, $postgres), 'volume')]) |> array_values(...),
             'composeHash' => hash('sha256', $content), 'composeFile' => $this->store->directory . '/compose-' . hash('sha256', $content) . '.json', 'postgresConfiguration' => $postgres];
         AtomicFile::write($state['composeFile'], $content);
         $this->store->save($state);

@@ -47,7 +47,7 @@ final class Check
                     if (!$localOnly && $project['classification']['kind'] === 'locked') {
                         $audit = $this->source($report, $path, 'advisories', 'composer', static fn(): array => $composer->audit($directory));
                         if ($audit !== null) {
-                            $report->add(array_filter(array_diff_key($audit, ['unreachable-repositories' => true, 'scope' => true])) === [] ? 'evidence' : 'finding', $path, 'advisories', 'composer', isset($audit['scope']) ? 'Owned lock contains no auditable packages; Composer skipped advisory collection.' : 'Fresh locked advisory, abandonment and policy assessment.', $audit);
+                            $report->add(array_diff_key($audit, ['unreachable-repositories' => true, 'scope' => true]) |> array_filter(...) === [] ? 'evidence' : 'finding', $path, 'advisories', 'composer', isset($audit['scope']) ? 'Owned lock contains no auditable packages; Composer skipped advisory collection.' : 'Fresh locked advisory, abandonment and policy assessment.', $audit);
                             if (!empty($audit['unreachable-repositories'])) {
                                 $report->add('gap', $path, 'advisories', 'composer', 'Composer reported unreachable advisory or policy repositories.', ['unreachable' => $audit['unreachable-repositories']]);
                             }
@@ -158,7 +158,7 @@ final class Check
             return $report;
         }
         $this->withHome($report, function (string $home) use ($images, $report): void {
-            $target = $this->source($report, 'repository', 'docker-target', 'docker', fn() => (new TargetResolver($this->executor, $this->environment))->resolve($this->configuration->docker, $home . '/docker'));
+            $target = $this->source($report, 'repository', 'docker-target', 'docker', fn() => new TargetResolver($this->executor, $this->environment)->resolve($this->configuration->docker, $home . '/docker'));
             if ($target !== null) {
                 ImageDrift::assess($images, new DockerEvidence(new Client($this->executor, $target, $this->environment), $this->configuration->budgets->seconds('process')), $report);
             }
@@ -183,7 +183,7 @@ final class Check
      */
     private function withHome(Report $report, \Closure $collect): void
     {
-        $home = sys_get_temp_dir() . '/baander-dependencies-' . bin2hex(random_bytes(12));
+        $home = sys_get_temp_dir() . '/baander-dependencies-' . (random_bytes(12) |> bin2hex(...));
         try {
             PrivateDirectory::prepare($home);
             $collect($home);
@@ -322,7 +322,7 @@ final class Check
         if ($images === []) {
             return;
         }
-        $target = $this->source($report, 'repository', 'docker-target', 'docker', fn() => (new TargetResolver($this->executor, $this->environment))->resolve($this->configuration->docker, $home . '/docker'));
+        $target = $this->source($report, 'repository', 'docker-target', 'docker', fn() => new TargetResolver($this->executor, $this->environment)->resolve($this->configuration->docker, $home . '/docker'));
         if ($target === null) {
             $report->add('gap', 'repository', 'composer-image-php', 'docker', 'Composer registry image metadata could not be collected without a selected Docker transport.');
             return;

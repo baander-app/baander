@@ -25,7 +25,7 @@ final class JavaScriptDependencyCheckTest extends TestCase
 
     protected function setUp(): void
     {
-        $this->root = sys_get_temp_dir() . '/baander-js-check-' . bin2hex(random_bytes(8));
+        $this->root = sys_get_temp_dir() . '/baander-js-check-' . (random_bytes(8) |> bin2hex(...));
         mkdir($this->root . '/packages/baander-dev-dependencies/resources', 0700, true);
         mkdir($this->root . '/ui/web', 0700, true);
         $this->write('ui/web/package.json', ['name' => '@baander/web', 'devDependencies' => ['typescript' => '^6.0.3', 'failed' => '^1.0.0']]);
@@ -56,7 +56,7 @@ final class JavaScriptDependencyCheckTest extends TestCase
         unlink($this->root . '/ui/web/yarn.lock');
         $executor = $this->createMock(CommandExecutor::class);
         $executor->expects(self::never())->method('run');
-        $report = (new Check($executor))->run($this->root);
+        $report = new Check($executor)->run($this->root);
         self::assertSame(1, $report->exitCode());
         self::assertStringContainsString('no scoped ownership', $report->render());
         self::assertStringContainsString('missing or empty', $report->render());
@@ -65,7 +65,7 @@ final class JavaScriptDependencyCheckTest extends TestCase
     public function testMalformedManifestIsFinding(): void
     {
         file_put_contents($this->root . '/ui/web/package.json', '{');
-        $report = (new Check($this->createStub(CommandExecutor::class)))->run($this->root);
+        $report = new Check($this->createStub(CommandExecutor::class))->run($this->root);
         self::assertSame(1, $report->exitCode());
         self::assertStringContainsString('Syntax error', $report->render());
     }
@@ -78,7 +78,7 @@ final class JavaScriptDependencyCheckTest extends TestCase
         $policy = json_decode(file_get_contents($this->root . '/' . $path), true, flags: JSON_THROW_ON_ERROR);
         $policy['patches'] = [['project' => 'ui/web/package.json', 'path' => 'ui/web/.yarn/patches/fix.patch', 'sha256' => hash('sha256', 'original'), 'reason' => 'Fix behavior.']];
         $this->write($path, $policy);
-        $report = (new Check($this->createStub(CommandExecutor::class)))->run($this->root);
+        $report = new Check($this->createStub(CommandExecutor::class))->run($this->root);
         self::assertSame(1, $report->exitCode());
         self::assertStringContainsString('unowned, changed', $report->render());
     }
@@ -97,7 +97,7 @@ final class JavaScriptDependencyCheckTest extends TestCase
             };
             return new ProcessResult(0, null, false, false, $output, '', 0.01);
         });
-        $report = (new Check($executor))->run($this->root, false);
+        $report = new Check($executor)->run($this->root, false);
         self::assertSame(2, $report->exitCode());
         $rendered = $report->render(true);
         foreach (['builtin-patch', 'Compiler peer range.', '7.0.2', 'advisories', 'high', 'gap'] as $text) {
@@ -109,7 +109,7 @@ final class JavaScriptDependencyCheckTest extends TestCase
     {
         $executor = $this->createStub(CommandExecutor::class);
         $executor->method('run')->willReturnCallback(static fn(ProcessSpec $spec): ProcessResult => new ProcessResult(in_array('info', $spec->argv, true) ? 1 : 0, null, false, false, in_array('audit', $spec->argv, true) ? '' : '{"version":"7.0.2","engines":{"node":">=24"}}', '', 0.01));
-        $report = (new Check($executor))->run($this->root, false);
+        $report = new Check($executor)->run($this->root, false);
         self::assertSame(2, $report->exitCode());
         self::assertStringContainsString('exited with status 1', $report->render());
         self::assertStringContainsString('7.0.2', $report->render());
@@ -119,7 +119,7 @@ final class JavaScriptDependencyCheckTest extends TestCase
     {
         $executor = $this->createStub(CommandExecutor::class);
         $executor->method('run')->willReturnCallback(static fn(ProcessSpec $spec): ProcessResult => new ProcessResult(in_array('audit', $spec->argv, true) ? 1 : 0, null, false, false, '', '', 0.01));
-        $report = (new Check($executor))->run($this->root, false);
+        $report = new Check($executor)->run($this->root, false);
         self::assertStringContainsString('Audit failed without advisory evidence', $report->render());
         self::assertSame(2, $report->exitCode());
     }
@@ -155,7 +155,7 @@ final class JavaScriptDependencyCheckTest extends TestCase
 
     public function testAdvisoryCheckFailsOnAnUnlistedAdvisoryAndOnlyReportsADeprecation(): void
     {
-        $report = (new Check($this->auditExecutor(1, self::MINIMATCH_ADVISORY . "\n" . self::DEPRECATION)))->advisories($this->root);
+        $report = new Check($this->auditExecutor(1, self::MINIMATCH_ADVISORY . "\n" . self::DEPRECATION))->advisories($this->root);
         self::assertSame(1, $report->exitCode(), $report->render());
         $records = $report->toArray()['records'];
         $finding = self::only($records, 'advisories');
@@ -166,7 +166,7 @@ final class JavaScriptDependencyCheckTest extends TestCase
         self::assertSame('evidence', $deprecations['status']);
         self::assertSame(['tldts-core'], array_column($deprecations['details']['deprecations'], 'package'));
 
-        $deprecated = (new Check($this->auditExecutor(1, self::DEPRECATION)))->advisories($this->root);
+        $deprecated = new Check($this->auditExecutor(1, self::DEPRECATION))->advisories($this->root);
         self::assertSame(0, $deprecated->exitCode(), $deprecated->render());
         self::assertStringContainsString('tldts-core', $deprecated->render());
     }
@@ -198,7 +198,7 @@ final class JavaScriptDependencyCheckTest extends TestCase
 
         $this->writeAdvisoryExceptions([$exception]);
         $second = str_replace(['GHSA-g3hv-75wg-m249', '1244623'], ['GHSA-3ppc-4f35-3m26', '1113465'], self::MINIMATCH_ADVISORY);
-        $partial = (new Check($this->auditExecutor(1, self::MINIMATCH_ADVISORY . "\n" . $second)))->advisories($this->root);
+        $partial = new Check($this->auditExecutor(1, self::MINIMATCH_ADVISORY . "\n" . $second))->advisories($this->root);
         self::assertSame(1, $partial->exitCode(), $partial->render());
         self::assertSame(['GHSA-3ppc-4f35-3m26'], array_column(self::only($partial->toArray()['records'], 'advisories')['details']['advisories'], 'advisory'));
     }
@@ -217,13 +217,13 @@ final class JavaScriptDependencyCheckTest extends TestCase
         $executor->expects(self::never())->method('run');
         foreach ($malformed as $case => $entry) {
             $this->writeAdvisoryExceptions([$entry]);
-            self::assertSame(2, (new Check($executor))->advisories($this->root)->exitCode(), $case);
+            self::assertSame(2, new Check($executor)->advisories($this->root)->exitCode(), $case);
         }
         $this->writeAdvisoryExceptions(['minimatch' => $exception]);
-        self::assertSame(2, (new Check($executor))->advisories($this->root)->exitCode(), 'exceptions keyed by name');
+        self::assertSame(2, new Check($executor)->advisories($this->root)->exitCode(), 'exceptions keyed by name');
         $policy = json_decode(file_get_contents($this->root . '/' . self::POLICY), true, flags: JSON_THROW_ON_ERROR);
         $this->write(self::POLICY, array_diff_key($policy, ['advisoryExceptions' => true]));
-        self::assertSame(2, (new Check($executor))->advisories($this->root)->exitCode(), 'no exception list');
+        self::assertSame(2, new Check($executor)->advisories($this->root)->exitCode(), 'no exception list');
     }
 
     public function testAdvisoriesOnlyFlagSelectsTheAdvisoryCheckAndItsExitStatus(): void
@@ -269,7 +269,7 @@ SH;
         $this->writeAdvisoryExceptions([['projects' => ['ui/web/package.json'], 'package' => 'minimatch', 'advisory' => 'GHSA-g3hv-75wg-m249', 'reason' => 'Reaches only the linter, which reads repository files.']]);
         self::assertSame(0, $check->advisories($this->root)->exitCode());
 
-        $clean = (new Check($this->auditExecutor(0, '{"auditReportVersion":2,"vulnerabilities":{}}')))->advisories($this->root);
+        $clean = new Check($this->auditExecutor(0, '{"auditReportVersion":2,"vulnerabilities":{}}'))->advisories($this->root);
         self::assertSame(0, $clean->exitCode(), $clean->render());
     }
 
@@ -279,7 +279,7 @@ SH;
         if ($manager === 'npm') {
             $this->useNpmLock();
         }
-        $report = (new Check($this->auditExecutor($exit, $stdout, $stderr)))->advisories($this->root);
+        $report = new Check($this->auditExecutor($exit, $stdout, $stderr))->advisories($this->root);
         self::assertSame(2, $report->exitCode(), $report->render());
         $advisories = self::only($report->toArray()['records'], 'advisories');
         self::assertSame('gap', $advisories['status']);
@@ -304,7 +304,7 @@ SH;
     public function testAdvisoryCheckDoesNotPassAProjectWhoseLockIsMissing(): void
     {
         unlink($this->root . '/ui/web/yarn.lock');
-        $report = (new Check($this->auditExecutor(0, '')))->advisories($this->root);
+        $report = new Check($this->auditExecutor(0, ''))->advisories($this->root);
         self::assertSame(1, $report->exitCode(), $report->render());
         self::assertStringContainsString('missing or empty', $report->render());
     }
@@ -324,8 +324,8 @@ SH;
             };
             return new ProcessResult(0, null, false, false, $output, '', 0.01);
         });
-        $report = (new Check($executor))->run($this->root, false);
-        $records = array_values(array_filter($report->toArray()['records'], static fn(array $record): bool => $record['kind'] === 'freshness' && ($record['details']['package'] ?? null) === 'typescript'));
+        $report = new Check($executor)->run($this->root, false);
+        $records = array_filter($report->toArray()['records'], static fn(array $record): bool => $record['kind'] === 'freshness' && ($record['details']['package'] ?? null) === 'typescript') |> array_values(...);
         self::assertSame('finding', $records[0]['status']);
         self::assertSame(['6.0.3'], $records[0]['details']['resolved']);
     }
@@ -338,7 +338,7 @@ SH;
             self::assertNotContains('view', $spec->argv);
             return new ProcessResult(0, null, false, false, in_array('info', $spec->argv, true) ? '{"value":"@baander/web@workspace:.","children":{"Version":"1.0.0"}}' : '', '', 0.01);
         });
-        self::assertSame(0, (new Check($executor))->run($this->root, false)->exitCode());
+        self::assertSame(0, new Check($executor)->run($this->root, false)->exitCode());
     }
 
     public function testNpmLockTreeAndAdvisoryEvidenceAreCollected(): void
@@ -357,7 +357,7 @@ SH;
             };
             return new ProcessResult(0, null, false, false, $output, '', 0.01);
         });
-        $report = (new Check($executor))->run($this->root, false);
+        $report = new Check($executor)->run($this->root, false);
         self::assertSame(1, $report->exitCode());
         self::assertStringContainsString('high', $report->render());
         self::assertStringContainsString('6.0.3', $report->render());
@@ -368,7 +368,7 @@ SH;
         $this->write('packages/baander-dev-dependencies/resources/javascript-dependencies.json', ['version' => 1]);
         $executor = $this->createMock(CommandExecutor::class);
         $executor->expects(self::never())->method('run');
-        $report = (new Check($executor))->run($this->root, false);
+        $report = new Check($executor)->run($this->root, false);
         self::assertSame(2, $report->exitCode());
         self::assertSame('gap', $report->toArray()['records'][0]['status']);
     }
@@ -392,7 +392,7 @@ SH;
         $executor->expects(self::never())->method('run');
         foreach ($invalid as $policy) {
             $this->write($path, $policy);
-            self::assertSame(2, (new Check($executor))->run($this->root, false)->exitCode());
+            self::assertSame(2, new Check($executor)->run($this->root, false)->exitCode());
         }
     }
 
@@ -429,11 +429,11 @@ SH;
             };
             return new ProcessResult(0, null, false, false, $output, '', 0.01);
         });
-        $report = (new Check($executor))->run($this->root, false);
+        $report = new Check($executor)->run($this->root, false);
         self::assertSame(0, $report->exitCode());
         $records = $report->toArray()['records'];
         self::assertNotContains('gap', array_column($records, 'status'));
-        $freshness = array_values(array_filter($records, static fn(array $record): bool => $record['kind'] === 'freshness'));
+        $freshness = array_filter($records, static fn(array $record): bool => $record['kind'] === 'freshness') |> array_values(...);
         self::assertCount(1, $freshness);
         self::assertSame('evidence', $freshness[0]['status']);
         self::assertSame(['1.21.0'], $freshness[0]['details']['resolved']);

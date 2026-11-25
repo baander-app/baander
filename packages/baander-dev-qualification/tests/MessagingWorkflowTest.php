@@ -13,7 +13,7 @@ final class MessagingWorkflowTest extends TestCase
 
     protected function setUp(): void
     {
-        $this->root = sys_get_temp_dir() . '/baander-messaging-contract-' . bin2hex(random_bytes(8));
+        $this->root = sys_get_temp_dir() . '/baander-messaging-contract-' . (random_bytes(8) |> bin2hex(...));
         mkdir($this->root . '/bin', 0700, true);
         mkdir($this->root . '/vendor', 0700);
         file_put_contents($this->root . '/.env.example', "FIXTURE=default-marker\n");
@@ -119,7 +119,7 @@ final class MessagingWorkflowTest extends TestCase
         self::assertTrue(array_any($calls, static fn(array $args): bool => in_array('REDISCLI_AUTH=test-only-redis-password', $args, true)));
         self::assertSame(
             2,
-            count(array_filter($calls, static fn(array $args): bool => in_array('app:outbox:consume', $args, true))),
+            array_filter($calls, static fn(array $args): bool => in_array('app:outbox:consume', $args, true)) |> count(...),
         );
         self::assertSame('CREATE EXTENSION fixture;', file_get_contents($this->root . '/sql'));
         self::assertTrue(array_any(

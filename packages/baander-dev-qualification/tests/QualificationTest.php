@@ -129,7 +129,7 @@ final class QualificationTest extends TestCase
         }, function (CommandExecutor&\PHPUnit\Framework\MockObject\Stub $executor) use (&$calls): void {
             $executor->method('run')->willReturnCallback(self::hostMemoryDocker(1024 ** 3, $calls));
         });
-        $created = array_values(array_filter($calls, static fn(ProcessSpec $call): bool => ($call->argv[3] ?? null) === 'create'));
+        $created = array_filter($calls, static fn(ProcessSpec $call): bool => ($call->argv[3] ?? null) === 'create') |> array_values(...);
         self::assertCount(2, $created);
         foreach ($created as $call) {
             self::assertContains('type=bind,src=/proc,dst=/host/proc,readonly', $call->argv);
@@ -280,7 +280,7 @@ final class QualificationTest extends TestCase
 
     public function testAccessLogProgramReportsTheClientWebChargedTheProbePathTo(): void
     {
-        $directory = sys_get_temp_dir() . '/baander.app-access-log-' . bin2hex(random_bytes(8));
+        $directory = sys_get_temp_dir() . '/baander.app-access-log-' . (random_bytes(8) |> bin2hex(...));
         mkdir($directory, 0700);
         $line = static fn(string $channel, string $message): string => json_encode(['message' => $message, 'context' => [], 'channel' => $channel], JSON_THROW_ON_ERROR) . "\n";
         file_put_contents($directory . '/prod.log', implode('', [
@@ -351,7 +351,7 @@ final class QualificationTest extends TestCase
 
     public function testSeedAndChildPathsMustBeSeparateAndNotNested(): void
     {
-        $directory = sys_get_temp_dir() . '/baander.app-paths-' . bin2hex(random_bytes(8));
+        $directory = sys_get_temp_dir() . '/baander.app-paths-' . (random_bytes(8) |> bin2hex(...));
         mkdir($directory, 0700);
         mkdir($directory . '/seed', 0700);
         mkdir($directory . '/child', 0700);
@@ -366,7 +366,7 @@ final class QualificationTest extends TestCase
 
     public function testParentImageCleanupWaitsForMatchingChildCleanupReceipt(): void
     {
-        $directory = sys_get_temp_dir() . '/baander.app-borrowers-' . bin2hex(random_bytes(8));
+        $directory = sys_get_temp_dir() . '/baander.app-borrowers-' . (random_bytes(8) |> bin2hex(...));
         mkdir($directory, 0700);
         mkdir($directory . '/child', 0700);
         $state = ['borrowers' => [$directory . '/child' => ['borrowerId' => 'child-identity']]];
@@ -389,7 +389,7 @@ final class QualificationTest extends TestCase
 
     public function testPreparedMediaCopyVerifiesHashesAndDoesNotShareMutableFiles(): void
     {
-        $directory = sys_get_temp_dir() . '/baander.app-copy-prepared-' . bin2hex(random_bytes(8));
+        $directory = sys_get_temp_dir() . '/baander.app-copy-prepared-' . (random_bytes(8) |> bin2hex(...));
         mkdir($directory, 0700);
         mkdir($directory . '/source', 0700);
         mkdir($directory . '/destination', 0700);
@@ -539,7 +539,7 @@ final class QualificationTest extends TestCase
 
     public function testRenameMovesMediaAndSidecarWithoutChangingContent(): void
     {
-        $directory = sys_get_temp_dir() . '/baander.app-rename-' . bin2hex(random_bytes(8));
+        $directory = sys_get_temp_dir() . '/baander.app-rename-' . (random_bytes(8) |> bin2hex(...));
         mkdir($directory, 0700);
         file_put_contents($directory . '/song.flac', 'fixture bytes');
         file_put_contents($directory . '/song.lrc', 'fixture lyrics');
@@ -598,7 +598,7 @@ final class QualificationTest extends TestCase
 
     public function testCopyStartsCanBeProvenBetweenSamplesWithoutInventingProcessConcurrency(): void
     {
-        $directory = sys_get_temp_dir() . '/baander.app-copy-' . bin2hex(random_bytes(8));
+        $directory = sys_get_temp_dir() . '/baander.app-copy-' . (random_bytes(8) |> bin2hex(...));
         mkdir($directory, 0700);
         file_put_contents($directory . '/maintenance.stdout', "BAANDER_MAINTENANCE_START:10.0\nBAANDER_MAINTENANCE_FINISH:20.0\n");
         $launch = ['executable' => 'ffmpeg', 'arguments' => ['-c:v', 'copy', '-c:a', 'copy']];
@@ -618,7 +618,7 @@ final class QualificationTest extends TestCase
 
     public function testCopyStartsAfterCommandDispatchWhileMetadataStillRuns(): void
     {
-        $directory = sys_get_temp_dir() . '/baander.app-copy-async-' . bin2hex(random_bytes(8));
+        $directory = sys_get_temp_dir() . '/baander.app-copy-async-' . (random_bytes(8) |> bin2hex(...));
         mkdir($directory, 0700);
         file_put_contents($directory . '/maintenance.stdout', "BAANDER_MAINTENANCE_START:10.0\nBAANDER_MAINTENANCE_FINISH:20.0\n");
         $launch = ['executable' => 'ffmpeg', 'arguments' => ['-c:v', 'copy', '-c:a', 'copy']];
@@ -644,7 +644,7 @@ final class QualificationTest extends TestCase
 
     public function testAQueuedAlbumMatchRunKeepsMetadataWorkPendingAndAFinishedOneDoesNot(): void
     {
-        $directory = sys_get_temp_dir() . '/baander.app-copy-match-queue-' . bin2hex(random_bytes(8));
+        $directory = sys_get_temp_dir() . '/baander.app-copy-match-queue-' . (random_bytes(8) |> bin2hex(...));
         mkdir($directory, 0700);
         file_put_contents($directory . '/maintenance.stdout', "BAANDER_MAINTENANCE_START:10.0\nBAANDER_MAINTENANCE_FINISH:20.0\n");
         $launch = ['executable' => 'ffmpeg', 'arguments' => ['-c:v', 'copy', '-c:a', 'copy']];
@@ -677,7 +677,7 @@ final class QualificationTest extends TestCase
     #[DataProvider('artistSyncJobs')]
     public function testAQueuedArtistSyncKeepsMetadataWorkPendingAndAFinishedOneDoesNot(string $job): void
     {
-        $directory = sys_get_temp_dir() . '/baander.app-copy-artist-sync-' . bin2hex(random_bytes(8));
+        $directory = sys_get_temp_dir() . '/baander.app-copy-artist-sync-' . (random_bytes(8) |> bin2hex(...));
         mkdir($directory, 0700);
         file_put_contents($directory . '/maintenance.stdout', "BAANDER_MAINTENANCE_START:10.0\nBAANDER_MAINTENANCE_FINISH:20.0\n");
         $launch = ['executable' => 'ffmpeg', 'arguments' => ['-c:v', 'copy', '-c:a', 'copy']];
@@ -814,7 +814,7 @@ final class QualificationTest extends TestCase
 
     private function withPreparedQualification(\Closure $test, ?\Closure $configureExecutor = null): void
     {
-        $directory = sys_get_temp_dir() . '/baander.app-start-' . bin2hex(random_bytes(8));
+        $directory = sys_get_temp_dir() . '/baander.app-start-' . (random_bytes(8) |> bin2hex(...));
         $configuration = Qualification::validateConfiguration($this->configuration());
         $runtime = new Runtime(dirname(__DIR__, 3), 5, getenv(), ToolingConfiguration::resolve());
         $executor = $this->createStub(CommandExecutor::class);

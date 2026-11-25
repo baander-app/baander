@@ -215,7 +215,7 @@ PHP_CODE]);
         $configuration = \Baander\Configuration\ToolingConfiguration::forRepository($root, $environment, $timeout === null ? [] : ['budgets' => ['backend' => $timeout]]);
         $timeout = $configuration->budgets->seconds('backend');
         \Baander\Configuration\ApplicationLayout::load($root . '/packages/baander-configuration/resources/application-layout.json');
-        $artifacts ??= sys_get_temp_dir() . '/baander-stack-isolation-' . bin2hex(random_bytes(8));
+        $artifacts ??= sys_get_temp_dir() . '/baander-stack-isolation-' . (random_bytes(8) |> bin2hex(...));
         if (!is_dir($artifacts) && !mkdir($artifacts, 0700, true)) {
             throw new RuntimeException('Cannot create stack-isolation artifacts');
         }

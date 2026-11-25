@@ -267,7 +267,7 @@ final class Check
     private function execute(array $argv, string $cwd, bool $audit = false): string
     {
         $result = $this->executor->run(new ProcessSpec($argv, $cwd, [...$this->environment, 'YARN_ENABLE_SCRIPTS' => 'false', 'npm_config_ignore_scripts' => 'true'], $this->timeout), new CompletionPolicy($audit ? [0, 1] : [0]));
-        (new CompletionPolicy($audit ? [0, 1] : [0]))->complete($result);
+        new CompletionPolicy($audit ? [0, 1] : [0])->complete($result);
         if ($audit && $result->exitCode !== 0 && trim($result->stdout) === '') {
             throw new \RuntimeException('Audit failed without advisory evidence.');
         }

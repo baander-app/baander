@@ -88,7 +88,7 @@ final class PresetDeploymentTest extends TestCase
             'target' => $target->toArray(), 'credentials' => '/private/log-credentials', 'boot' => 'fresh-web-boot',
         ]);
         $proxy = $compose['services']['docker-proxy'];
-        $sockets = static fn(array $service): array => array_values(array_filter($service['volumes'] ?? [], static fn(array $mount): bool => $mount['source'] === '/run/owner/docker.sock'));
+        $sockets = static fn(array $service): array => array_filter($service['volumes'] ?? [], static fn(array $mount): bool => $mount['source'] === '/run/owner/docker.sock') |> array_values(...);
 
         foreach ($compose['services'] as $name => $service) {
             self::assertSame($name === 'docker-proxy', $sockets($service) !== [], $name . ' mounts the Docker socket');
@@ -173,7 +173,7 @@ final class PresetDeploymentTest extends TestCase
         $sorted = $scores;
         rsort($sorted);
         self::assertSame($sorted, $scores);
-        self::assertSame(count($scores), count(array_unique($scores)));
+        self::assertSame(count($scores), array_unique($scores) |> count(...));
         self::assertSame(KillOrder::POSTGRES, KillOrder::POOLER);
         self::assertSame(KillOrder::POSTGRES, OutOfMemoryKillOrder::CONTROL_UNIT);
         self::assertLessThan(0, KillOrder::POSTGRES);
@@ -214,7 +214,7 @@ final class PresetDeploymentTest extends TestCase
                 self::assertStringContainsString('rootless', $error->getMessage());
             }
         }
-        $directory = sys_get_temp_dir() . '/baander.app-preset-' . bin2hex(random_bytes(8));
+        $directory = sys_get_temp_dir() . '/baander.app-preset-' . (random_bytes(8) |> bin2hex(...));
         $store = new StateStore($directory);
         $target = new Target('/usr/bin/docker', 'unix:///run/baander.app-docker.sock', 'owned-daemon', null, null);
         $commands = [];
@@ -244,7 +244,7 @@ final class PresetDeploymentTest extends TestCase
         $data = self::configuration();
         $data['environment']['STREAM_URL_HMAC_SECRET'] = 'replace-with-a-separate-private-random-value';
         $configuration = Configuration::fromArray($data);
-        $directory = sys_get_temp_dir() . '/baander.app-preset-' . bin2hex(random_bytes(8));
+        $directory = sys_get_temp_dir() . '/baander.app-preset-' . (random_bytes(8) |> bin2hex(...));
         $commands = [];
         $executor = $this->createStub(CommandExecutor::class);
         $executor->method('run')->willReturnCallback(static function (ProcessSpec $command) use (&$commands): ProcessResult {
@@ -310,7 +310,7 @@ final class PresetDeploymentTest extends TestCase
         yield '31-byte APP_SECRET' => ['APP_SECRET', str_repeat('a', 31), 'APP_SECRET is shorter than 32 bytes'];
         yield '15-byte database password' => ['DB_PASSWORD', str_repeat('d', 15), 'DB_PASSWORD is shorter than 16 bytes'];
         yield '15-byte Redis password' => ['REDIS_PASSWORD', str_repeat('r', 15), 'REDIS_PASSWORD is shorter than 16 bytes'];
-        yield '31-byte TOTP key' => ['AUTH_TOTP_ENCRYPTION_KEY', base64_encode(str_repeat("\x02", 31)), 'AUTH_TOTP_ENCRYPTION_KEY is shorter than 32 bytes'];
+        yield '31-byte TOTP key' => ['AUTH_TOTP_ENCRYPTION_KEY', str_repeat("\x02", 31) |> base64_encode(...), 'AUTH_TOTP_ENCRYPTION_KEY is shorter than 32 bytes'];
     }
 
     #[\PHPUnit\Framework\Attributes\DataProvider('shortSecrets')]
@@ -1004,7 +1004,7 @@ final class PresetDeploymentTest extends TestCase
 
     public function testPoolerCredentialsRunFromTheDatabaseImageWithTheCredentialsVolumeAndNoPasswordInArguments(): void
     {
-        $directory = sys_get_temp_dir() . '/baander.app-preset-' . bin2hex(random_bytes(8));
+        $directory = sys_get_temp_dir() . '/baander.app-preset-' . (random_bytes(8) |> bin2hex(...));
         $store = new StateStore($directory);
         copy(dirname(__DIR__, 3) . '/tests/Support/Tooling/Fixtures/development-lifecycle-docker.php', $directory . '/docker');
         chmod($directory . '/docker', 0700);
@@ -1085,7 +1085,7 @@ final class PresetDeploymentTest extends TestCase
 
     public function testRedisCredentialsRunFromTheRedisImageWithTheSecretByNameOnly(): void
     {
-        $directory = sys_get_temp_dir() . '/baander.app-preset-' . bin2hex(random_bytes(8));
+        $directory = sys_get_temp_dir() . '/baander.app-preset-' . (random_bytes(8) |> bin2hex(...));
         $store = new StateStore($directory);
         copy(dirname(__DIR__, 3) . '/tests/Support/Tooling/Fixtures/development-lifecycle-docker.php', $directory . '/docker');
         chmod($directory . '/docker', 0700);
@@ -1157,7 +1157,7 @@ final class PresetDeploymentTest extends TestCase
 
     public function testMigrationsTransferGeneratedCredentialsThroughTheRealDisposableWrapper(): void
     {
-        $directory = sys_get_temp_dir() . '/baander.app-preset-' . bin2hex(random_bytes(8));
+        $directory = sys_get_temp_dir() . '/baander.app-preset-' . (random_bytes(8) |> bin2hex(...));
         $store = new StateStore($directory);
         copy(dirname(__DIR__, 3) . '/tests/Support/Tooling/Fixtures/development-lifecycle-docker.php', $directory . '/docker');
         chmod($directory . '/docker', 0700);
@@ -1245,7 +1245,7 @@ final class PresetDeploymentTest extends TestCase
             $result = $deployment->stop();
             self::assertSame('stopped', $result['phase']);
             self::assertSame('stopped', $store->load()['phase']);
-            $down = array_values(array_filter($commands, static fn(array $arguments): bool => in_array('down', $arguments, true)));
+            $down = array_filter($commands, static fn(array $arguments): bool => in_array('down', $arguments, true)) |> array_values(...);
             self::assertCount(1, $down);
             self::assertNotContains('--volumes', $down[0]);
             self::assertNotContains('-v', $down[0]);
@@ -1263,13 +1263,13 @@ final class PresetDeploymentTest extends TestCase
                 self::assertStringContainsString('another deployment', $error->getMessage());
             }
             self::assertSame('starting', $store->load()['phase']);
-            self::assertSame([], array_values(array_filter($commands, static fn(array $arguments): bool => in_array('down', $arguments, true))));
+            self::assertSame([], array_filter($commands, static fn(array $arguments): bool => in_array('down', $arguments, true)) |> array_values(...));
         }, true);
     }
 
     private function withSavedDeployment(\Closure $test, bool $foreign = false): void
     {
-        $directory = sys_get_temp_dir() . '/baander.app-preset-' . bin2hex(random_bytes(8));
+        $directory = sys_get_temp_dir() . '/baander.app-preset-' . (random_bytes(8) |> bin2hex(...));
         $store = new StateStore($directory);
         $target = new Target('/usr/bin/docker', 'unix:///run/baander.app-docker.sock', 'owned-daemon', null, null);
         $commands = [];
@@ -1338,7 +1338,7 @@ final class PresetDeploymentTest extends TestCase
             return new ProcessResult(0, null, false, false, $output, '', 0);
         });
         $target = new Target('/usr/bin/docker', 'unix:///run/baander.app-docker.sock', 'owned-daemon', null, null);
-        $directory = sys_get_temp_dir() . '/baander.app-preset-' . bin2hex(random_bytes(8));
+        $directory = sys_get_temp_dir() . '/baander.app-preset-' . (random_bytes(8) |> bin2hex(...));
         $preset = new Preset(new StateStore($directory), new Client($executor, $target, []), $executor, []);
         try {
             new \ReflectionMethod(Preset::class, 'assertEdgeSubnetFree')->invoke($preset, Configuration::fromArray($data));
@@ -1361,7 +1361,7 @@ final class PresetDeploymentTest extends TestCase
             $command,
         ));
         $target = new Target('/usr/bin/docker', 'unix:///run/baander.app-docker.sock', 'owned-daemon', null, null);
-        $directory = sys_get_temp_dir() . '/baander.app-preset-' . bin2hex(random_bytes(8));
+        $directory = sys_get_temp_dir() . '/baander.app-preset-' . (random_bytes(8) |> bin2hex(...));
         $store = new StateStore($directory);
         AtomicFile::write($directory . '/compose-fixture.json', '{}');
         $store->save(['version' => 1, 'phase' => 'starting', 'composeFile' => $directory . '/compose-fixture.json']);
@@ -1400,7 +1400,7 @@ final class PresetDeploymentTest extends TestCase
 
     public function testStateUsesPrivateAtomicDocumentsAndExclusiveLock(): void
     {
-        $directory = sys_get_temp_dir() . '/baander.app-preset-' . bin2hex(random_bytes(8));
+        $directory = sys_get_temp_dir() . '/baander.app-preset-' . (random_bytes(8) |> bin2hex(...));
         $store = new StateStore($directory);
         try {
             self::assertNull($store->load());

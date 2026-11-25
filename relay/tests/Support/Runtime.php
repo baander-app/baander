@@ -56,7 +56,7 @@ final class Runtime
     }
     public static function temporaryDirectory(string $prefix): string
     {
-        $directory = sys_get_temp_dir() . '/' . $prefix . bin2hex(random_bytes(8));
+        $directory = sys_get_temp_dir() . '/' . $prefix . (random_bytes(8) |> bin2hex(...));
         self::requireThat(mkdir($directory, 0700), 'Cannot create temporary directory.');
         return $directory;
     }
