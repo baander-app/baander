@@ -45,8 +45,9 @@ final class ServerDiagnosticsCommandsTest extends TestCase
         foreach (['4101', '4102', '4103', '21.5', '22.25', '23'] as $figure) {
             self::assertStringContainsString($figure, $display);
         }
-        self::assertMatchesRegularExpression('/^\s*0\s+4101\b/m', $display);
-        self::assertMatchesRegularExpression('/^\s*2\s+4103\b/m', $display);
+        self::assertMatchesRegularExpression('/^\s*0\s+4101\s+315\b/m', $display);
+        self::assertMatchesRegularExpression('/^\s*2\s+4103\s+315\b/m', $display);
+        self::assertMatchesRegularExpression('/Worker\s+PID\s+Requests\b/', $display);
         self::assertMatchesRegularExpression('/DB size\s+42/', $display);
         self::assertMatchesRegularExpression('/Connected clients\s+7/', $display);
         self::assertMatchesRegularExpression('/Ping\s+PONG/', $display);
@@ -284,6 +285,7 @@ final class ServerDiagnosticsCommandsTest extends TestCase
         return [
             'memory' => ['usage' => $memory, 'peak' => $memory + 1, 'real' => 32.0, 'real_peak' => 34.0],
             'process' => ['pid' => $pid, 'uid' => 1000, 'gid' => 1000, 'user' => 'baander', 'uptime' => 3600],
+            'requests' => ['received' => 315],
             'swoole' => ['object_num' => 10, 'resource_num' => 3],
             'coroutines' => ['coroutine_num' => 5, 'coroutine_peak_num' => 17],
             'pools' => [['active' => 1, 'free' => 2, 'limit' => 2500]],

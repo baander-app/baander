@@ -1,6 +1,6 @@
 # Production Runtime Drills
 
-This page covers the drills that run the production runtime against disposable services: container startup, outbox and producer atomicity, the Swoole web server's runtime and drain, WebSocket handshake and proxy log security, and the manual Safari checks.
+This page covers the drills that run the production runtime against disposable services: container startup, outbox and producer atomicity, the Swoole web server's runtime and drain, WebSocket handshake and proxy log security, request identity across the web workers, and the manual Safari checks.
 
 ## Production Runtime Drills
 
@@ -130,7 +130,8 @@ PostgreSQL, Redis and OAuth keys on an internal network:
 BAANDER_TEST_IMAGE=baander-ci-prewarm:local bash scripts/test-security-runtime-container.sh
 ```
 
-Its 360-second deadline covers malformed HTTP probes and WebSocket ticket checks.
+Its 360-second deadline covers malformed HTTP probes, the
+[request-identity drill](#request-identity) and WebSocket ticket checks.
 The WebSocket fixture obtains tickets through the real OAuth/DPoP firewall, then
 upgrades with only a ticket query and an Origin, as a browser does. It checks
 proof replay, Origin/path/query rejection without consumption, single-use and
@@ -159,6 +160,69 @@ bash scripts/test-websocket-proxy-logs.sh
 ```
 
 CI runs both security drills as blocking steps.
+
+### Request identity
+
+The security runtime runner also checks that no worker answers a request with an
+identity that another request left behind.
+`tests/Fixtures/request-identity-runtime.php` runs after the malformed HTTP probes
+and before the first Redis outage, against the same `app:serve` and its four web
+workers, the default of the deployment profile.
+
+The web workers use fixed dispatch (`dispatch_mode: 2`): a connection's descriptor
+in the server selects its worker, and every request on that connection runs there.
+A check that keeps one connection, or opens a new one for each request, can reach
+a single worker and pass while the others fail. In the run of 2026-11-24 the
+37 requests sent before the drill, each on a connection of its own, had all
+reached worker 2, and the other three workers had received none.
+
+The drill therefore compares two sides, three times over: a signed-in user's
+requests, then requests without credentials. For each side it opens three
+connections per worker, twelve here, and it closes none before it ends, so that
+their descriptors in the server are consecutive. It reads every worker's request
+count through the fan-out behind `app:server:stats` before the signed-in side,
+between the two sides, and after the side without credentials. A reading is itself
+one request on the worker that accepts its control connection, so a count has to
+rise by at least two on each side. A count that rose less, a worker whose PID
+changed and a worker missing from a reading each make the drill inconclusive, and
+an inconclusive drill fails.
+
+The drill fails unless:
+
+- after an admin's `GET /api/admin/users` and `GET /api/auth/me` on twelve
+  connections, the same two requests without `Authorization`, `DPoP` or `Cookie`
+  headers answer `401` and `404` on twelve fresh connections, as a freshly started
+  server answers them;
+- the same holds after a member's requests, and again after the admin has signed
+  out through `POST /api/auth/logout`;
+- each of 120 profile requests of the admin and the member, written in five
+  rounds of 24 before any answer of the round is read, receives its own user's
+  profile.
+
+The last check places requests of both users in every worker at once. It cannot
+make a worker switch from one request to another between authentication and the
+read of the user: the web workers hook only curl and process calls (`hook_flags`
+in `config/packages/swoole.yaml`), and the profile route makes neither.
+`tests/Integration/RequestIdentityInterleaveTest.php` forces that switch. Its child
+process sends two users' profile requests through the production firewall, each in
+a coroutine of its own. `RequestSuspension` holds the first request on a channel
+between the firewall and its controller until the coroutine of the second has
+ended and released its pooled services. Each answer must name its own user.
+
+Both checks were run on 2026-11-24 against the code before the three fixes they
+guard: the pool resetter that runs every `kernel.reset` method of a service, the
+per-coroutine token storage and authorization checker, and `StaleTokenListener`.
+On commit `8b27243c2`, which has none of them, the drill failed, with every
+worker's count rising by at least three on each side: all twelve connections
+without credentials answered `200` and `200` with the admin's profile after the
+admin's requests, `403` and `200` with the member's profile after the member's,
+and `200` and `200` with the admin's profile after the admin had signed out. The
+120 concurrent profile requests passed on that commit too. The interleave test
+failed with the three fixes reverted on the branch head, where the suspended
+request received the other user's profile, and with only the per-coroutine token
+storage and authorization checker reverted, where it received `404`. With the
+fixes in place both pass, and the runner took 104 of its 360 seconds on a loaded
+development host, about one second more than without the drill.
 
 ### Safari Playback of an Encoding Rendition (Manual)
 

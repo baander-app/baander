@@ -111,6 +111,7 @@ The `data` object holds:
 | `workers` | One entry per worker that answered, each with `worker_id` and the groups below |
 | `workers[].memory` | Current usage, peak, real usage, real peak (all in MB) |
 | `workers[].process` | PID, UID, GID, user, uptime |
+| `workers[].requests` | Requests the worker has received since it started (`received`): HTTP requests and control-socket reads |
 | `workers[].swoole` | Swoole VM status, or `null` |
 | `workers[].coroutines` | Running coroutines and the peak count |
 | `workers[].pools` | Swoole connection pool stats (active, free, limit per connection) |

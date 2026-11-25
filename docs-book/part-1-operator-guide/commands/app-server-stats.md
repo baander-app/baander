@@ -27,11 +27,14 @@ Run the command in the web container: it talks to the web server running there. 
 |--------|---------|
 | Worker | The Swoole worker ID |
 | PID | The worker's process ID |
+| Requests | Requests the worker has received since it started |
 | Memory (MB) | Memory in use by PHP |
 | Peak (MB) | Highest memory in use by PHP since the worker started |
 | Real (MB), Real peak (MB) | Memory allocated from the system, now and at its peak |
 | Coroutines | Coroutines running in the worker |
 | Coroutine peak | Most coroutines the worker has run at once |
+
+The Requests column counts HTTP requests and reads over the control socket alike. Each run of this command is one such read, so the worker that accepted it shows one more request in the next run.
 
 The Redis section shows whether Redis answers, its key count, connected clients and memory. It is read once, not per worker.
 

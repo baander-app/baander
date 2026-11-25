@@ -35,7 +35,7 @@ final readonly class ServerStatsControllerWithCoroutines
                                 type: 'object',
                                 properties: [
                                     'workers' => new OA\Schema(
-                                        description: 'One entry per HTTP worker that answered: worker_id, memory, process, swoole, coroutines, pools, live_updates',
+                                        description: 'One entry per HTTP worker that answered: worker_id, memory, process, requests, swoole, coroutines, pools, live_updates',
                                         type: 'array',
                                         items: new OA\Schema(additionalProperties: true),
                                     ),

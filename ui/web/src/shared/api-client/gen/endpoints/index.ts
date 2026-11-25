@@ -9197,7 +9197,7 @@ export type GetDebugStats200DataWorkerErrorsItem = {
 export type GetDebugStats200DataRedis = { [key: string]: unknown };
 
 export type GetDebugStats200Data = {
-  /** One entry per HTTP worker that answered: worker_id, memory, process, swoole, coroutines, pools, live_updates */
+  /** One entry per HTTP worker that answered: worker_id, memory, process, requests, swoole, coroutines, pools, live_updates */
   workers?: GetDebugStats200DataWorkersItem[];
   /** Workers that did not answer in time */
   missing_workers?: number[];

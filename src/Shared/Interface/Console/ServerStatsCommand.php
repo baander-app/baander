@@ -49,10 +49,11 @@ final class ServerStatsCommand extends Command
 
         $io->section('Workers');
         $io->table(
-            ['Worker', 'PID', 'Memory (MB)', 'Peak (MB)', 'Real (MB)', 'Real peak (MB)', 'Coroutines', 'Coroutine peak'],
+            ['Worker', 'PID', 'Requests', 'Memory (MB)', 'Peak (MB)', 'Real (MB)', 'Real peak (MB)', 'Coroutines', 'Coroutine peak'],
             array_map(static fn (array $worker): array => [
                 $worker['worker_id'],
                 self::value($worker, 'process', 'pid'),
+                self::value($worker, 'requests', 'received'),
                 self::value($worker, 'memory', 'usage'),
                 self::value($worker, 'memory', 'peak'),
                 self::value($worker, 'memory', 'real'),

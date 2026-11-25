@@ -92,6 +92,10 @@ final class WebRuntimeWorkflowTest extends TestCase
             ['normal', 'prepare-outage', 'outage', 'recovered', 'prepare-outage', 'outage', 'recovered', 'logs'],
             $phases,
         );
+        // The request-identity drill verifies proofs against Redis, so it runs once, before the first outage.
+        $identity = array_keys(array_filter($commands, static fn(array $command): bool => in_array('tests/Fixtures/request-identity-runtime.php', $command, true)));
+        self::assertCount(1, $identity);
+        self::assertLessThan(array_find_key($commands, static fn(array $command): bool => $command[0] === 'pause'), $identity[0]);
         $tar = array_values(array_filter($calls, static fn(array $call): bool => $call['binary'] === 'tar'))[0]['arguments'];
         self::assertContains('--exclude=config/secrets/oauth', $tar);
         self::assertContains('--exclude=config/secrets/*.decrypt.private.php', $tar);

@@ -14,6 +14,7 @@ final class SecurityWorkflow
         $workflow = new RuntimeWorkflow($root, security: true);
         return $workflow->execute(static function (RuntimeWorkflow $workflow): void {
             $workflow->fixture(['php', 'tests/Fixtures/security-runtime.php']);
+            $workflow->fixture(['php', 'tests/Fixtures/request-identity-runtime.php']);
             $fixture = ['php', 'tests/Fixtures/websocket-runtime.php'];
             $workflow->fixture([...$fixture, 'normal']);
             $workflow->fixture([...$fixture, 'prepare-outage']);

@@ -22177,7 +22177,7 @@
                                             "properties": {
                                                 "workers": {
                                                     "type": "array",
-                                                    "description": "One entry per HTTP worker that answered: worker_id, memory, process, swoole, coroutines, pools, live_updates",
+                                                    "description": "One entry per HTTP worker that answered: worker_id, memory, process, requests, swoole, coroutines, pools, live_updates",
                                                     "items": {
                                                         "additionalProperties": true
                                                     }

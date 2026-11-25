@@ -25,6 +25,9 @@ use SwooleBundle\SwooleBundle\Bridge\Swoole\Swoole as SwooleBridge;
 use SwooleBundle\SwooleBundle\Bridge\Symfony\Container\CoWrapper;
 use SwooleBundle\SwooleBundle\Bridge\Symfony\Container\ServicePool\ServicePoolContainer;
 use SwooleBundle\SwooleBundle\Bridge\Symfony\Event\WorkerStartedEvent;
+use SwooleBundle\SwooleBundle\Server\Config\Socket;
+use SwooleBundle\SwooleBundle\Server\HttpServer;
+use SwooleBundle\SwooleBundle\Server\HttpServerConfiguration;
 
 final class LiveRuntimeDiagnosticsTest extends TestCase
 {
@@ -43,7 +46,7 @@ final class LiveRuntimeDiagnosticsTest extends TestCase
         $projector = $this->createMock(LiveChangeProjector::class);
         $projector->expects(self::never())->method('project');
         [$runtime] = $this->runtime($reader, $projector);
-        $operation = new DebugStatsOperation(new SwoolePoolStatsProvider(new ServicePoolContainer([])), $runtime);
+        $operation = $this->statsOperation($runtime, []);
         self::assertSame([
             'projector_enabled' => false,
             'last_successful_projection_check_age_ms' => null,
@@ -57,6 +60,19 @@ final class LiveRuntimeDiagnosticsTest extends TestCase
             'pending_send_count' => 0,
             'slow_peer_close_count' => 0,
         ], $operation->handle([])['live_updates']);
+    }
+
+    public function testDebugOperationReportsTheRequestsItsWorkerReceived(): void
+    {
+        if (!function_exists('posix_getuid')) {
+            self::markTestSkipped('Worker process diagnostics require POSIX.');
+        }
+        [$runtime] = $this->runtime($this->createStub(LiveSnapshotReader::class), $this->createStub(LiveChangeProjector::class));
+
+        $stats = $this->statsOperation($runtime, ['request_count' => 90, 'worker_request_count' => 27])->handle([]);
+
+        self::assertSame(['received' => 27], $stats['requests']);
+        self::assertSame(['received' => null], $this->statsOperation($runtime, [])->handle([])['requests']);
     }
 
     public function testProgressAndFailuresRemainVisibleWithoutInventingCurrentBacklog(): void
@@ -163,6 +179,21 @@ final class LiveRuntimeDiagnosticsTest extends TestCase
             $sender->close(7, 1008, 'Authorization ended');
             self::assertSame(1, $sender->diagnostics()['slow_peer_close_count']);
         });
+    }
+
+    /** @param array<string, int> $serverStats what Server::stats() answers in the worker */
+    private function statsOperation(LiveUpdateRuntime $runtime, array $serverStats): DebugStatsOperation
+    {
+        $server = $this->createStub(Server::class);
+        $server->port = 9501;
+        $server->ports = [];
+        $server->method('stats')->willReturn($serverStats);
+        $configuration = $this->createStub(HttpServerConfiguration::class);
+        $configuration->method('getServerSocket')->willReturn(new Socket('127.0.0.1', 9501));
+        $httpServer = new HttpServer($configuration);
+        $httpServer->attach($server);
+
+        return new DebugStatsOperation(new SwoolePoolStatsProvider(new ServicePoolContainer([])), $runtime, $httpServer);
     }
 
     /** @return array{LiveUpdateRuntime, LiveFrameSender, WebSocketConnectionRegistry} */

@@ -357,7 +357,11 @@
                 "tests/Unit/Shared/Infrastructure/Swoole/CoWrapperSchedulingTest.php",
                 "tests/Unit/Shared/Infrastructure/Swoole/WithWebSocketHandlerHandshakeTest.php",
                 "tests/Unit/Shared/Infrastructure/Http/StreamedResponseProcessorTest.php",
-                "scripts/test-web-shutdown-container.php"
+                "tests/Unit/Shared/Infrastructure/Swoole/FrameworkIsolationSecurityTest.php",
+                "tests/Integration/PooledServiceResetCoverageTest.php",
+                "tests/Integration/RequestIdentityInterleaveTest.php",
+                "scripts/test-web-shutdown-container.php",
+                "scripts/test-security-runtime-container.php"
             ]
         }
     },

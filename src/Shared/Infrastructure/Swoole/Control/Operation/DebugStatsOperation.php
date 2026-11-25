@@ -8,10 +8,19 @@ use App\Shared\Infrastructure\Swoole\Control\ServerControlOperation;
 use App\Shared\Infrastructure\LiveUpdates\LiveUpdateRuntime;
 use App\Shared\Infrastructure\Swoole\SwoolePoolStatsProvider;
 use Swoole\Coroutine;
+use SwooleBundle\SwooleBundle\Server\HttpServer;
 
 /**
- * One HTTP worker's process figures: memory, process identity, Swoole VM and
- * coroutine counts, and the service pools. Runs in every worker.
+ * One HTTP worker's process figures: memory, process identity, the requests it
+ * has received, Swoole VM and coroutine counts, and the service pools. Runs in
+ * every worker.
+ *
+ * The request count is `worker_request_count` of Server::stats(): the packets a
+ * listener has handed this worker since it started, HTTP requests and control-socket
+ * lines alike, each counted when its handler first yields or returns. Pipe messages,
+ * which carry the fan-out, are not counted. A read over the control socket takes the
+ * accepting worker's figure before its handler yields, so that figure leaves the read
+ * out and the worker's next one includes it.
  *
  * It must not touch pooled (stateful) services such as the EntityManager: the
  * bundle releases pool slots only for coroutines it starts itself, and a control
@@ -26,6 +35,7 @@ final readonly class DebugStatsOperation implements ServerControlOperation
     public function __construct(
         private SwoolePoolStatsProvider $poolStats,
         private LiveUpdateRuntime $liveUpdates,
+        private HttpServer $httpServer,
     ) {}
 
     public function name(): string
@@ -59,6 +69,9 @@ final readonly class DebugStatsOperation implements ServerControlOperation
                 'gid' => posix_getgid(),
                 'user' => is_array($user) ? $user['name'] : 'unknown',
                 'uptime' => time() - (int) filemtime('/proc/1/cmdline'),
+            ],
+            'requests' => [
+                'received' => $this->httpServer->getServer()->stats()['worker_request_count'] ?? null,
             ],
             'swoole' => $vm !== [] ? $vm : null,
             'coroutines' => [
