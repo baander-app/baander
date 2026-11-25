@@ -17,6 +17,8 @@ use App\Discovery\Interface\Resource\ServerInstanceResource;
 use App\Shared\Domain\Model\PublicId;
 use App\Shared\Interface\Attribute\CliCounterpart;
 use App\Shared\Interface\Controller\ApiResponsesTrait;
+use App\Shared\Interface\DTO\ApiError;
+use App\Shared\Interface\DTO\ValidationError;
 use OpenApi\Spec as OA;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Response;
@@ -119,6 +121,20 @@ final class DiscoveryController
                     schema: new OA\Schema(ref: PairingSessionResource::class),
                 ),
             ),
+            new OA\Response(
+                response: '404',
+                description: 'Server not found',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: ApiError::class),
+                ),
+            ),
+            new OA\Response(
+                response: '422',
+                description: 'Validation error',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: ValidationError::class),
+                ),
+            ),
         ],
     )]
     #[Route('/pairing-code', name: 'pairing_code', methods: ['POST'])]
@@ -169,13 +185,22 @@ final class DiscoveryController
                     ),
                 ),
             ),
+            new OA\Response(
+                response: '404',
+                description: 'Server not found',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: ApiError::class),
+                ),
+            ),
         ],
     )]
     #[Route('/qr-payload/{serverPublicId}', name: 'qr_payload', methods: ['POST'])]
     #[IsGranted('IS_AUTHENTICATED_FULLY')]
     public function qrPayload(string $serverPublicId): JsonResponse
     {
-        $server = $this->serverPort->findByPublicId(PublicId::fromString($serverPublicId));
+        $server = preg_match(PublicId::REGEX, $serverPublicId) === 1
+            ? $this->serverPort->findByPublicId(PublicId::fromString($serverPublicId))
+            : null;
         if ($server === null) {
             return $this->notFound('Server not found.');
         }
@@ -230,6 +255,20 @@ final class DiscoveryController
                             ),
                         ],
                     ),
+                ),
+            ),
+            new OA\Response(
+                response: '404',
+                description: 'Pairing code not found or expired: the same answer for an unknown code, an expired code and another server\'s code',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: ApiError::class),
+                ),
+            ),
+            new OA\Response(
+                response: '422',
+                description: 'Validation error',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: ValidationError::class),
                 ),
             ),
         ],

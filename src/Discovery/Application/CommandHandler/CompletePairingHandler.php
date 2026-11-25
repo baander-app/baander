@@ -8,7 +8,9 @@ use App\Discovery\Application\Command\CompletePairingCommand;
 use App\Discovery\Application\Port\DiscoveryPortInterface;
 use App\Discovery\Domain\Event\PairingCompleted;
 use App\Discovery\Domain\Model\PairingSession;
-use RuntimeException;
+use App\Discovery\Domain\ValueObject\PairingCode;
+use App\Shared\Application\Exception\NotFoundException;
+use InvalidArgumentException;
 use Symfony\Component\EventDispatcher\EventDispatcherInterface;
 use Symfony\Component\Messenger\Attribute\AsMessageHandler;
 
@@ -20,20 +22,29 @@ final class CompletePairingHandler
     ) {
     }
 
+    /**
+     * @throws NotFoundException for a code that matches no session, has expired or belongs to
+     *                           another server, alike, so the refusal does not tell whether the
+     *                           code is live for some server
+     */
     #[AsMessageHandler]
     public function __invoke(CompletePairingCommand $command): PairingSession
     {
+        if (!self::isPairingCode($command->getPairingCode())) {
+            throw self::refusal();
+        }
+
         $session = $this->discoveryPort->findByPairingCode($command->getPairingCode());
         if ($session === null) {
-            throw new RuntimeException('Pairing session not found.');
+            throw self::refusal();
         }
 
         if ($session->isExpired()) {
-            throw new RuntimeException('Pairing session has expired.');
+            throw self::refusal();
         }
 
         if (!$session->getServerPublicId()->equals($command->getServerPublicId())) {
-            throw new RuntimeException('Pairing session does not belong to this server.');
+            throw self::refusal();
         }
 
         if ($session->isCompleted()) {
@@ -50,5 +61,21 @@ final class CompletePairingHandler
         ));
 
         return $session;
+    }
+
+    private static function isPairingCode(string $code): bool
+    {
+        try {
+            PairingCode::fromString($code);
+        } catch (InvalidArgumentException) {
+            return false;
+        }
+
+        return true;
+    }
+
+    private static function refusal(): NotFoundException
+    {
+        return new NotFoundException('Pairing code not found or expired.');
     }
 }

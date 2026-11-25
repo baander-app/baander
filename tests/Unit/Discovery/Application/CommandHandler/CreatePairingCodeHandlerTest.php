@@ -11,11 +11,11 @@ use App\Discovery\Application\Port\ServerInstancePortInterface;
 use App\Discovery\Domain\Model\PairingSession;
 use App\Discovery\Domain\Model\ServerInstance;
 use App\Discovery\Domain\ValueObject\AuthenticationMethod;
+use App\Shared\Application\Exception\NotFoundException;
 use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
-use RuntimeException;
 
 final class CreatePairingCodeHandlerTest extends TestCase
 {
@@ -79,7 +79,7 @@ final class CreatePairingCodeHandlerTest extends TestCase
             ->willReturn(null);
         $this->discoveryPort->expects($this->never())->method('createPairingSession');
 
-        $this->expectException(RuntimeException::class);
+        $this->expectException(NotFoundException::class);
         $this->expectExceptionMessage('Server not found.');
 
         ($this->handler)(new CreatePairingCodeCommand($serverPublicId, AuthenticationMethod::QrCode));

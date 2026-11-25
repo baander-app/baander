@@ -12,13 +12,13 @@ use App\Discovery\Domain\Model\PairingSession;
 use App\Discovery\Domain\Model\PairingSessionState;
 use App\Discovery\Domain\ValueObject\AuthenticationMethod;
 use App\Discovery\Domain\ValueObject\PairingCode;
+use App\Shared\Application\Exception\NotFoundException;
 use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
 use DateTimeImmutable;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\MockObject\Stub;
 use PHPUnit\Framework\TestCase;
-use RuntimeException;
 use Symfony\Component\EventDispatcher\EventDispatcherInterface;
 
 final class CompletePairingHandlerTest extends TestCase
@@ -105,8 +105,7 @@ final class CompletePairingHandlerTest extends TestCase
         $session->complete();
         $this->discoveryPort->method('findByPairingCode')->willReturn($session);
 
-        $this->expectException(RuntimeException::class);
-        $this->expectExceptionMessage('does not belong to this server');
+        $this->expectRefusal();
 
         ($this->handler)(new CompletePairingCommand(
             $session->getPairingCode()->toString(),
@@ -119,8 +118,7 @@ final class CompletePairingHandlerTest extends TestCase
         $session = $this->createExpiredSession(new PublicId(), completedAt: new DateTimeImmutable('-5 minutes'));
         $this->discoveryPort->method('findByPairingCode')->willReturn($session);
 
-        $this->expectException(RuntimeException::class);
-        $this->expectExceptionMessage('Pairing session has expired.');
+        $this->expectRefusal();
 
         ($this->handler)(new CompletePairingCommand(
             $session->getPairingCode()->toString(),
@@ -132,8 +130,7 @@ final class CompletePairingHandlerTest extends TestCase
     {
         $this->discoveryPort->method('findByPairingCode')->willReturn(null);
 
-        $this->expectException(RuntimeException::class);
-        $this->expectExceptionMessage('Pairing session not found.');
+        $this->expectRefusal();
 
         ($this->handler)(new CompletePairingCommand('BCDF-GHJK', new PublicId()));
     }
@@ -143,8 +140,7 @@ final class CompletePairingHandlerTest extends TestCase
         $session = $this->createExpiredSession(new PublicId());
         $this->discoveryPort->method('findByPairingCode')->willReturn($session);
 
-        $this->expectException(RuntimeException::class);
-        $this->expectExceptionMessage('Pairing session has expired.');
+        $this->expectRefusal();
 
         ($this->handler)(new CompletePairingCommand(
             $session->getPairingCode()->toString(),
@@ -157,13 +153,30 @@ final class CompletePairingHandlerTest extends TestCase
         $session = $this->createPendingSession(new PublicId());
         $this->discoveryPort->method('findByPairingCode')->willReturn($session);
 
-        $this->expectException(RuntimeException::class);
-        $this->expectExceptionMessage('does not belong to this server');
+        $this->expectRefusal();
 
         ($this->handler)(new CompletePairingCommand(
             $session->getPairingCode()->toString(),
             new PublicId(),
         ));
+    }
+
+    public function testRefusesACodeOutsideThePairingCodeFormatWithoutALookup(): void
+    {
+        $this->discoveryPort = $this->createMock(DiscoveryPortInterface::class);
+        $this->discoveryPort->expects($this->never())->method('findByPairingCode');
+        $this->handler = $this->createCompletePairingHandlerFixture();
+
+        $this->expectRefusal();
+
+        ($this->handler)(new CompletePairingCommand('AEIO-UAEI', new PublicId()));
+    }
+
+    /** An unknown, expired or foreign code is refused alike, so the refusal tells nothing about the code. */
+    private function expectRefusal(): void
+    {
+        $this->expectException(NotFoundException::class);
+        $this->expectExceptionMessage('Pairing code not found or expired.');
     }
 
     private function createPendingSession(PublicId $serverPublicId): PairingSession

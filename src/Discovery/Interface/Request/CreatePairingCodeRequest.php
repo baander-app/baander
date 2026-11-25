@@ -8,6 +8,7 @@ use App\Shared\Domain\Model\PublicId;
 use OpenApi\Spec as OA;
 use Symfony\Component\Validator\Constraints\NotBlank;
 use Symfony\Component\Validator\Constraints\Choice;
+use Symfony\Component\Validator\Constraints\Regex;
 
 #[OA\Schema(
     type: 'object',
@@ -31,6 +32,7 @@ final readonly class CreatePairingCodeRequest
 {
     public function __construct(
         #[NotBlank(message: 'Server public ID is required.')]
+        #[Regex(pattern: PublicId::REGEX)]
         public string $serverPublicId = '',
         #[NotBlank(message: 'Authentication method is required.')]
         #[Choice(choices: ['qr_code', 'email_url', 'server_code'], message: 'Invalid authentication method.')]

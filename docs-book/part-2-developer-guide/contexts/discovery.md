@@ -29,7 +29,7 @@ The Discovery context handles local-network server discovery and device pairing.
 
 `RegisterServerCommand` carries the URL, name and version; `RegisterServerHandler` generates the API key (64 hex characters from `random_bytes(32)`). The handler rejects a URL that is not a valid `http` or `https` URL, and a blank name or version, with `InvalidInputException` (HTTP 422, console exit `INVALID`). `ServerInstanceResource` does not include the API key, so neither the route nor the command returns it.
 
-`CompletePairingHandler` refuses a session past its expiry or one that belongs to another server, completed or not, because the response carries the server's URL. A completed session that passes both checks is returned again without a second `PairingCompleted`.
+`CompletePairingHandler` refuses a session past its expiry or one that belongs to another server, completed or not, because the response carries the server's URL. A completed session that passes both checks is returned again without a second `PairingCompleted`. An unknown code, a code outside the pairing code format, an expired code and another server's code all raise the same `NotFoundException`. The route answers each with the same 404 body, "Pairing code not found or expired.", and logs none of them as an error, so a caller cannot tell whether a code is live for another server.
 
 ## Ports
 

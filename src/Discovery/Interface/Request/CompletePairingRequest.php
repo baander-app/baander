@@ -7,6 +7,7 @@ namespace App\Discovery\Interface\Request;
 use App\Shared\Domain\Model\PublicId;
 use OpenApi\Spec as OA;
 use Symfony\Component\Validator\Constraints\NotBlank;
+use Symfony\Component\Validator\Constraints\Regex;
 
 #[OA\Schema(
     type: 'object',
@@ -33,6 +34,7 @@ final readonly class CompletePairingRequest
         #[NotBlank(message: 'Pairing code is required.')]
         public string $pairingCode = '',
         #[NotBlank(message: 'Server public ID is required.')]
+        #[Regex(pattern: PublicId::REGEX)]
         public string $serverPublicId = '',
     ) {
     }
