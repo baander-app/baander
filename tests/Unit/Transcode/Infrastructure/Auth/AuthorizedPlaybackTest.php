@@ -49,6 +49,7 @@ final class AuthorizedPlaybackTest extends TestCase
         bool $unavailable = false,
         bool $qualified = true,
         int $videoSlots = 8,
+        int $sessionsPerUser = 6,
     ): void {
         $connection = DriverManager::getConnection(['driver' => 'pdo_sqlite', 'memory' => true]);
         $connection->executeStatement('CREATE TABLE videos (id TEXT PRIMARY KEY, height INTEGER, width INTEGER)');
@@ -114,7 +115,7 @@ final class AuthorizedPlaybackTest extends TestCase
             $bus,
             new MockClock(),
             $this->qualityTiers($qualified),
-            $this->freeSessionShare(),
+            $this->freeSessionShare(sessionsPerUser: $sessionsPerUser),
             new DeploymentProfile(videoEncoderSlots: $videoSlots),
         );
         if (!$allowed) {
@@ -130,7 +131,7 @@ final class AuthorizedPlaybackTest extends TestCase
         }
     }
 
-    /** @return iterable<array{0: string, 1: bool, 2: bool, 3?: ?int, 4?: list<int>, 5?: ?string, 6?: ?int, 7?: bool, 8?: bool, 9?: int}> */
+    /** @return iterable<array{0: string, 1: bool, 2: bool, 3?: ?int, 4?: list<int>, 5?: ?string, 6?: ?int, 7?: bool, 8?: bool, 9?: int, 10?: int}> */
     public static function actors(): iterable
     {
         yield ['member', true, true];
@@ -147,6 +148,12 @@ final class AuthorizedPlaybackTest extends TestCase
         ];
         yield 'one video slot preserves the exact manual tier' => [
             'member', true, true, 1080, [1080], '1080p', 1920, false, true, 1,
+        ];
+        yield 'a share of two sessions admits two automatic tiers' => [
+            'member', true, true, 1080, [360, 720], null, 3840, false, true, 3, 2,
+        ];
+        yield 'a share of one session admits only the automatic baseline' => [
+            'admin', true, true, 2160, [360], null, 3840, false, true, 3, 1,
         ];
         yield 'source below minimum tier' => ['member', true, true, 180, [360]];
         yield 'source at minimum tier' => ['member', true, true, 360, [360]];

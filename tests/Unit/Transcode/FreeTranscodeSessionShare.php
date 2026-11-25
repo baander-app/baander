@@ -16,10 +16,10 @@ use Symfony\Component\Clock\MockClock;
 /** For tests of start paths whose user holds no other session, on a deployment with free video slots. */
 trait FreeTranscodeSessionShare
 {
-    private function freeSessionShare(?TranscodeSessionSharePort $store = null): TranscodeSessionShare
+    private function freeSessionShare(?TranscodeSessionSharePort $store = null, int $sessionsPerUser = 6): TranscodeSessionShare
     {
         $settings = $this->createStub(SystemSettingsPortInterface::class);
-        $settings->method('get')->willReturnCallback(static fn (string $key): int => $key === TranscodeSettingDefinitions::SESSIONS_PER_USER ? 6 : throw new \LogicException($key));
+        $settings->method('get')->willReturnCallback(static fn (string $key): int => $key === TranscodeSettingDefinitions::SESSIONS_PER_USER ? $sessionsPerUser : throw new \LogicException($key));
         $transaction = $this->createStub(TransactionPortInterface::class);
         $transaction->method('run')->willReturnCallback(static fn (callable $operation): mixed => $operation());
 

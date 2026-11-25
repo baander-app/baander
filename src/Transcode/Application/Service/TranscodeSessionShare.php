@@ -204,7 +204,8 @@ final readonly class TranscodeSessionShare
         return count($this->profile->mediaClientIds('video'));
     }
 
-    private function limit(): int
+    /** How many sessions one user holds at most. */
+    public function limit(): int
     {
         return (int) $this->settings->get(TranscodeSettingDefinitions::SESSIONS_PER_USER);
     }

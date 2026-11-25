@@ -252,7 +252,9 @@ final readonly class AuthorizedPlayback implements PlaybackPortInterface
         if ($tiers === []) {
             $tiers = [QualityTier::p360()];
         }
-        return array_slice($tiers, 0, max(1, $this->deploymentProfile->videoEncoderSlots));
+        // Each tier is a session of the user's share, so a share below the tier count admits fewer
+        // renditions rather than refusing every automatic start.
+        return array_slice($tiers, 0, max(1, min($this->deploymentProfile->videoEncoderSlots, $this->share->limit())));
     }
 
     private function manualTier(Uuid $videoId, string $qualityTier): QualityTier
