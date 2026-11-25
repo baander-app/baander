@@ -52,6 +52,25 @@ final class PersonalAccessClientTest extends TestCase
         self::assertSame([], $this->listClients($owner));
     }
 
+    /** A revoked client no longer counts, so revoking one makes room for another. */
+    public function testAUserHoldsAtMostTwentyClients(): void
+    {
+        $owner = $this->createTestUser();
+        $clients = array_map(fn (int $number): array => $this->createPersonalAccessClient($owner, 'CLI ' . $number), range(1, 20));
+
+        $refused = $this->assertJsonResponse(
+            $this->authenticatedRequest('POST', '/api/oauth/clients/', $owner, ['name' => 'CLI 21']),
+            409,
+            'error',
+        );
+
+        self::assertSame(['reason' => 'personal_access_client_limit', 'limit' => 20], $refused['error']['details'] ?? null);
+        self::assertCount(20, $this->listClients($owner));
+        $this->assertJsonResponse($this->authenticatedRequest('DELETE', '/api/oauth/clients/' . $clients[0]['publicId'], $owner), 200);
+        $this->createPersonalAccessClient($owner, 'CLI 21');
+        self::assertCount(20, $this->listClients($owner));
+    }
+
     public function testAnonymousRequestsAreRejected(): void
     {
         self::assertSame(401, $this->anonymousRequest('GET', '/api/oauth/clients/')->getStatusCode());

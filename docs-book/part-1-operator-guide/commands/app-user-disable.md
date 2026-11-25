@@ -33,7 +33,7 @@ make exec cmd="php bin/console app:user:disable aB3dE5fG7hJ9kL1mN3pQr"
 
 ## Details
 
-Disabling revokes every access and refresh token the user has, in the same transaction that saves the disabled account. From then on, the API refuses the user's tokens, a refresh fails with `invalid_grant`, and a new WebSocket handshake is refused.
+Disabling revokes every access and refresh token the user has, in the same transaction that saves the disabled account. From then on, the API refuses the user's tokens, a refresh fails with `invalid_grant`, and a new WebSocket handshake is refused. A sign-in in progress, an authorization code or an approved device code from before the disable issues no tokens, even after the account is enabled again.
 
 After the disable is saved, the web server closes the user's open WebSocket connections on every worker, with close code 1008. A new connection needs a valid access token, and the account has none. The command reaches the server through its control socket, so run it in the web container, as `make exec` does. In a container without a web server, the command still disables the account and revokes its tokens but cannot reach the open connections, and it logs a warning that says so; the web server's socket reconciliation closes them within a minute. If the web server cannot close them, the command fails with a message that says so; the account stays disabled, and the reconciliation closes the connections on its next run. Run the command again to retry the close at once.
 

@@ -8,7 +8,7 @@ Register clients through [OAuth client administration](oauth-clients.md). For to
 
 ## Disabled accounts
 
-Disabling a user, from the admin panel or with [app:user:disable](../commands/app-user-disable.md), revokes the user's access and refresh tokens in the transaction that saves the disable. Every authenticator then refuses the account: API requests, token refresh and new WebSocket handshakes. After the commit, the web server closes the user's open WebSocket connections on every worker. The command reaches the server through its control socket, so run it in the web container.
+Disabling a user, from the admin panel or with [app:user:disable](../commands/app-user-disable.md), revokes the user's access and refresh tokens in the transaction that saves the disable. Every authenticator then refuses the account: API requests, token refresh and new WebSocket handshakes. The disable also ends what was approved before it and not yet exchanged for tokens: a sign-in in progress, an authorization code or an approved device code issues nothing, even after the account is enabled again. After the commit, the web server closes the user's open WebSocket connections on every worker. The command reaches the server through its control socket, so run it in the web container.
 
 In a container without a web server, it disables the account and logs a warning that it could not reach the open connections; the socket reconciliation (see [Sessions, logout and a Redis outage](#sessions-logout-and-a-redis-outage)) closes them within a minute.
 

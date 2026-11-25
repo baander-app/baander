@@ -55,6 +55,7 @@ final class RefreshEndpointTest extends TestCase
 
         $refused = $this->refresh((string) $tokens->getRefreshToken());
         self::assertSame(Response::HTTP_UNAUTHORIZED, $refused->getStatusCode(), (string) $refused->getContent());
+        self::assertSame(['message' => 'Invalid or expired token.', 'code' => 401], $this->json($refused)['error'] ?? null);
 
         // The refusal consumed nothing: the token still rotates where its client authenticates.
         $this->client->request('POST', '/api/oauth/token', [

@@ -10,6 +10,8 @@ use App\Auth\Application\Command\User\SetUserRolesCommand;
 use App\Auth\Application\CommandHandler\User\DeleteUserHandler;
 use App\Auth\Application\CommandHandler\User\DisableUserHandler;
 use App\Auth\Application\CommandHandler\User\SetUserRolesHandler;
+use App\Auth\Application\Service\ChainConnectionCloser;
+use App\Auth\Application\Service\CredentialChangeRevoker;
 use App\Auth\Application\Service\SuperAdminContinuity;
 use App\Auth\Application\Service\UserLookup;
 use App\Auth\Infrastructure\Doctrine\UserRepository;
@@ -61,8 +63,12 @@ final class SuperAdminRemovalRace
             SuperAdminRemoval::Disable => new DisableUserHandler(
                 $lookup,
                 $users,
-                new AccessTokenRepository($manager, new JsonEncoder()),
-                new RefreshTokenRepository($manager, new JsonEncoder()),
+                new CredentialChangeRevoker(
+                    $users,
+                    new AccessTokenRepository($manager, new JsonEncoder()),
+                    new RefreshTokenRepository($manager, new JsonEncoder()),
+                    new ChainConnectionCloser(self::noLiveConnections(), new NullLogger()),
+                ),
                 $transaction,
                 $continuity,
                 self::noLiveConnections(),

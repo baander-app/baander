@@ -423,6 +423,8 @@ final class OAuthGrantPathAcceptanceTest extends TestCase
 
         self::assertSame(401, $response->getStatusCode(), (string) $response->getContent());
         self::assertNull($response->headers->get('Retry-After'));
+        $error = json_decode((string) $response->getContent(), true, flags: JSON_THROW_ON_ERROR)['error'];
+        self::assertSame(['message' => 'Invalid or expired token.', 'code' => 401], $error);
     }
 
     /**

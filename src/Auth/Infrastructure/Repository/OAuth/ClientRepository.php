@@ -18,6 +18,13 @@ use Symfony\Component\Serializer\Encoder\JsonEncoder;
  */
 final class ClientRepository implements ClientRepositoryInterface
 {
+    /**
+     * Seed of hashtextextended(<user id>, seed) for the lock that serializes a user's personal
+     * access client creations. Its own seed keeps it apart from the application's other advisory
+     * locks; a hash collision only makes unrelated work wait.
+     */
+    private const int OWNER_CLIENTS_LOCK_SEED = 20261125175400;
+
     public function __construct(
         private readonly EntityManagerInterface $entityManager,
         private readonly JsonEncoder $jsonEncoder,
@@ -111,6 +118,32 @@ final class ClientRepository implements ClientRepositoryInterface
             );
 
         return array_map(fn (ClientEntity $entity): Client => $this->toDomain($entity), $entities);
+    }
+
+    public function lockPersonalAccessClientsOf(Uuid $userId): void
+    {
+        $connection = $this->entityManager->getConnection();
+        if (!$connection->isTransactionActive()) {
+            // Outside a transaction the lock would end with its own statement and serialize nothing.
+            throw new \LogicException('Lock a user\'s personal access clients inside the transaction that creates one.');
+        }
+
+        // SQL because DQL has no advisory lock. Not a row lock on the user: sign-in takes
+        // FOR NO KEY UPDATE on that row, and a create must not queue behind it.
+        $connection->executeQuery(
+            'SELECT pg_advisory_xact_lock(hashtextextended(:user, ' . self::OWNER_CLIENTS_LOCK_SEED . '))',
+            ['user' => $userId->toString()],
+        )->free();
+    }
+
+    public function countPersonalAccessClientsOf(Uuid $userId): int
+    {
+        // A statement of its own after the lock: under READ COMMITTED it sees what the lock's
+        // previous holder committed.
+        return (int) $this->entityManager->getConnection()->fetchOne(
+            'SELECT count(*) FROM oauth_clients WHERE user_id = :user AND personal_access_client AND NOT revoked',
+            ['user' => $userId->toString()],
+        );
     }
 
     public function findAllExceptPersonalAccess(): array

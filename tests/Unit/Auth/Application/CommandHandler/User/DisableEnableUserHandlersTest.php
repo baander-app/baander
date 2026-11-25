@@ -9,6 +9,8 @@ use App\Auth\Application\Command\User\EnableUserCommand;
 use App\Auth\Application\CommandHandler\User\DisableUserHandler;
 use App\Auth\Application\CommandHandler\User\EnableUserHandler;
 use App\Auth\Application\Exception\LiveConnectionsNotClosedException;
+use App\Auth\Application\Service\ChainConnectionCloser;
+use App\Auth\Application\Service\CredentialChangeRevoker;
 use App\Auth\Application\Service\SuperAdminContinuity;
 use App\Auth\Application\Service\UserLookup;
 use App\Auth\Domain\Model\OAuth\AccessToken;
@@ -25,10 +27,11 @@ use App\Shared\Domain\Model\Email;
 use App\Shared\Domain\Model\Uuid;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
+use Psr\Log\NullLogger;
 
 /**
- * Disabling ends every session in one transaction, then closes the user's live
- * connections; disable and enable are idempotent.
+ * Disabling advances the credential epoch and ends every session in one transaction, then
+ * closes the user's live connections; disable and enable are idempotent.
  */
 final class DisableEnableUserHandlersTest extends TestCase
 {
@@ -46,13 +49,17 @@ final class DisableEnableUserHandlersTest extends TestCase
         $this->user = User::register(new Email('member@baander.app'), 'hashed-password', 'Member');
     }
 
-    public function testDisablingRevokesEveryAccessAndRefreshTokenInTheSameTransaction(): void
+    /**
+     * Under the account's row lock the disable advances the credential epoch, as a credential
+     * change does, so a sign-in verified before the disable issues nothing after it.
+     */
+    public function testDisablingAdvancesTheCredentialEpochAndRevokesEveryTokenInTheSameTransaction(): void
     {
         $this->disableHandler()(new DisableUserCommand('member@baander.app'));
 
         self::assertTrue($this->user->isDisabled());
         self::assertSame(
-            ['begin', '+save', '+revoke access tokens', '+revoke refresh tokens', 'commit', 'close live connections'],
+            ['begin', '+lock credential epoch', '+save', '+advance credential epoch', '+revoke refresh tokens', '+revoke access tokens', 'commit', 'close live connections'],
             $this->log,
             'Live connections close after the commit, so a reconnect cannot pass on a token the commit has not yet revoked.',
         );
@@ -83,7 +90,7 @@ final class DisableEnableUserHandlersTest extends TestCase
         $this->disableHandler()(new DisableUserCommand('member@baander.app'));
 
         self::assertTrue($this->user->isDisabled());
-        self::assertSame(['begin', '+save', '+revoke access tokens', '+revoke refresh tokens', 'commit'], $this->log);
+        self::assertSame(['begin', '+lock credential epoch', '+save', '+advance credential epoch', '+revoke refresh tokens', '+revoke access tokens', 'commit'], $this->log);
         self::assertCount(1, $this->warnings);
         self::assertStringContainsString('web container', $this->warnings[0]);
     }
@@ -104,7 +111,7 @@ final class DisableEnableUserHandlersTest extends TestCase
         }
 
         self::assertTrue($this->user->isDisabled());
-        self::assertSame(['begin', '+save', '+revoke access tokens', '+revoke refresh tokens', 'commit'], $this->log);
+        self::assertSame(['begin', '+lock credential epoch', '+save', '+advance credential epoch', '+revoke refresh tokens', '+revoke access tokens', 'commit'], $this->log);
     }
 
     public function testAFailureWhileRevokingAbortsTheTransactionThatSavesTheDisable(): void
@@ -119,8 +126,8 @@ final class DisableEnableUserHandlersTest extends TestCase
         }
 
         self::assertSame($this->refreshRevocationFailure, $failure, 'A failed revocation must fail the disable.');
-        // The save ran inside the transaction that the failure rolled back.
-        self::assertSame(['begin', '+save', '+revoke access tokens', 'rollback'], $this->log);
+        // The save and the epoch ran inside the transaction that the failure rolled back.
+        self::assertSame(['begin', '+lock credential epoch', '+save', '+advance credential epoch', 'rollback'], $this->log);
     }
 
     public function testEnablingADisabledUserSavesIt(): void
@@ -202,8 +209,7 @@ final class DisableEnableUserHandlersTest extends TestCase
         return new DisableUserHandler(
             new UserLookup($users),
             $users,
-            $accessTokens,
-            $refreshTokens,
+            new CredentialChangeRevoker($users, $accessTokens, $refreshTokens, new ChainConnectionCloser($liveConnections, new NullLogger())),
             $this->transaction(),
             new SuperAdminContinuity($users),
             $liveConnections,
@@ -231,6 +237,18 @@ final class DisableEnableUserHandlersTest extends TestCase
         $users->method('save')->willReturnCallback(function (User $user): void {
             self::assertSame($this->user, $user);
             $this->record('save');
+        });
+        $users->method('lockCredentialEpoch')->willReturnCallback(function (Uuid $id): int {
+            self::assertTrue($this->user->getId()->equals($id));
+            $this->record('lock credential epoch');
+
+            return 3;
+        });
+        $users->method('advanceCredentialEpoch')->willReturnCallback(function (Uuid $id): int {
+            self::assertTrue($this->user->getId()->equals($id));
+            $this->record('advance credential epoch');
+
+            return 4;
         });
 
         return $users;

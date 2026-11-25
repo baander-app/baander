@@ -11,6 +11,8 @@ use App\Auth\Application\CommandHandler\User\DeleteUserHandler;
 use App\Auth\Application\CommandHandler\User\DisableUserHandler;
 use App\Auth\Application\CommandHandler\User\SetUserRolesHandler;
 use App\Auth\Application\Exception\LastSuperAdminException;
+use App\Auth\Application\Service\ChainConnectionCloser;
+use App\Auth\Application\Service\CredentialChangeRevoker;
 use App\Auth\Application\Service\SuperAdminContinuity;
 use App\Auth\Application\Service\UserLookup;
 use App\Auth\Domain\Model\User;
@@ -216,8 +218,12 @@ final class LastSuperAdminTest extends TestCase
         return new DisableUserHandler(
             new UserLookup($users),
             $users,
-            $this->createStub(AccessTokenRepositoryInterface::class),
-            $this->createStub(RefreshTokenRepositoryInterface::class),
+            new CredentialChangeRevoker(
+                $users,
+                $this->createStub(AccessTokenRepositoryInterface::class),
+                $this->createStub(RefreshTokenRepositoryInterface::class),
+                new ChainConnectionCloser($this->createStub(LiveConnectionsPortInterface::class), $this->createStub(LoggerInterface::class)),
+            ),
             $this->transaction(),
             new SuperAdminContinuity($users),
             $this->createStub(LiveConnectionsPortInterface::class),
@@ -241,6 +247,7 @@ final class LastSuperAdminTest extends TestCase
             unset($this->stored[$id->toString()]);
             $this->write('delete ' . $email);
         });
+        $users->method('lockCredentialEpoch')->willReturn(1);
         $users->method('lockSuperAdminRemovals')->willReturnCallback(function (): void {
             if ($this->storedAtBegin === null) {
                 throw new \LogicException('The lock holds only inside a transaction.');

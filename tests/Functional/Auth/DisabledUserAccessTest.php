@@ -146,6 +146,56 @@ final class DisabledUserAccessTest extends TestCase
         self::assertSame(['access' => 0, 'refresh' => 0], $this->activeTokenCounts($user));
     }
 
+    /**
+     * Disabling advances the account's credential epoch, so an authorization code approved
+     * before the disable stays unusable after the account is enabled again.
+     */
+    public function testAnAuthorizationCodeIssuedBeforeADisableIsRefusedAfterTheAccountIsEnabledAgain(): void
+    {
+        // RFC 7636 appendix B.
+        $verifier = 'dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk';
+        $challenge = 'E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM';
+        $redirectUri = 'https://player.baander.app/callback';
+        $user = $this->createTestUser();
+        $client = Client::create('Re-enabled user player', [$redirectUri]);
+        $this->service(ClientRepositoryInterface::class)->saveClient($client);
+        $clientId = $client->getPublicId()->toString();
+        $epoch = $this->credentialEpoch($user);
+
+        $pushed = $this->bus()
+            ->dispatch(new PushAuthorizationRequestCommand(new ClientCredentials($clientId), 'code', $redirectUri, ['library'], null, $challenge, 'S256', null, self::DPOP_JKT))
+            ->last(HandledStamp::class)?->getResult();
+        self::assertInstanceOf(PushedAuthorizationRequestDTO::class, $pushed);
+        $authorization = $this->bus()
+            ->dispatch(new CreateAuthorizationCodeCommand($user->getId(), $clientId, $pushed->requestUri, $epoch))
+            ->last(HandledStamp::class)?->getResult();
+        self::assertInstanceOf(AuthorizationResponseDTO::class, $authorization);
+        self::assertIsString($authorization->code);
+
+        $this->bus()->dispatch(new DisableUserCommand($user->getEmail()));
+        $this->bus()->dispatch(new EnableUserCommand($user->getEmail()));
+        $this->entityManager->clear();
+
+        self::assertSame($epoch + 1, $this->credentialEpoch($user), 'Disabling advances the credential epoch once.');
+        try {
+            $this->bus()->dispatch(new ExchangeAuthorizationCodeCommand(new ClientCredentials($clientId), $authorization->code, $redirectUri, $verifier, self::DPOP_JKT));
+            self::fail('An authorization code approved before the disable must not be exchangeable after the enable.');
+        } catch (HandlerFailedException $exception) {
+            $cause = $exception->getPrevious();
+            self::assertInstanceOf(OAuthProtocolException::class, $cause);
+            self::assertSame('invalid_grant', $cause->error);
+        }
+        self::assertSame(['access' => 0, 'refresh' => 0], $this->activeTokenCounts($user));
+    }
+
+    private function credentialEpoch(User $user): int
+    {
+        return (int) $this->entityManager->getConnection()->fetchOne(
+            'SELECT credential_epoch FROM users WHERE id = :userId',
+            ['userId' => $user->getId()->toString()],
+        );
+    }
+
     /** The response the production access token authenticator gives a DPoP-bound token presented under its scheme: 200 lets the request through. */
     private function accessTokenStatus(string $accessToken): int
     {
@@ -255,10 +305,11 @@ final class DisabledUserAccessTest extends TestCase
         return $data['data']['publicId'];
     }
 
+    /** Issues a pair as a sign-in that verified the user's credentials just now, under the current credential epoch. */
     private function issueTokens(User $user, string $clientPublicId): TokenResponseDTO
     {
         $result = $this->bus()
-            ->dispatch(new IssueTokenCommand(Uuid::fromString($this->clientUuids[$clientPublicId]), $user->getId(), self::DPOP_JKT, 0, SignInGrant::AuthorizationCode))
+            ->dispatch(new IssueTokenCommand(Uuid::fromString($this->clientUuids[$clientPublicId]), $user->getId(), self::DPOP_JKT, $this->credentialEpoch($user), SignInGrant::AuthorizationCode))
             ->last(HandledStamp::class)?->getResult();
         self::assertInstanceOf(TokenResponseDTO::class, $result);
 

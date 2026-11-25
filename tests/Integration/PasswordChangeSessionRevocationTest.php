@@ -7,6 +7,7 @@ namespace App\Tests\Integration;
 use App\Auth\Application\Command\Totp\DisableTotpCommand;
 use App\Auth\Application\Command\User\ChangePasswordCommand;
 use App\Auth\Application\Command\User\DisableUserCommand;
+use App\Auth\Application\Command\User\EnableUserCommand;
 use App\Auth\Application\Command\User\SetUserPasswordCommand;
 use App\Auth\Application\Command\User\SetUserRolesCommand;
 use App\Auth\Application\Port\EmailVerificationTokenRepositoryInterface;
@@ -599,6 +600,34 @@ final class PasswordChangeSessionRevocationTest extends TestCase
         self::assertIsString($storedHash);
         self::assertTrue(password_verify('changed-during-login-5', $storedHash), 'The pending hash upgrade must preserve the concurrently changed password.');
         $this->signIn($this->user, 'changed-during-login-5');
+    }
+
+    /**
+     * A login checks the password before an operator's disable commits and reaches issuance
+     * while the disable still holds the account's row. The disable advances the credential
+     * epoch, so the login refuses: it leaves no session that would work once the account is
+     * enabled again.
+     */
+    public function testALoginWhosePasswordCheckPassedBeforeADisableCommitsGetsNoSession(): void
+    {
+        $this->assertReadCommitted();
+        $this->connection->beginTransaction();
+        try {
+            $this->bus()->dispatch(new DisableUserCommand($this->user->getEmail()));
+            $login = $this->startLogin(self::PASSWORD);
+            $this->awaitWaitOnThisSession($login);
+            $this->connection->commit();
+        } catch (\Throwable $failure) {
+            $this->connection->rollBack();
+            throw $failure;
+        }
+
+        $answer = $this->finish($login);
+        $this->bus()->dispatch(new EnableUserCommand($this->user->getEmail()));
+
+        self::assertSame(401, $answer['status'], json_encode($answer, JSON_THROW_ON_ERROR));
+        self::assertSame(0, $this->liveAccessTokens(), 'The login issued no session that the enable could bring back.');
+        $this->signIn($this->user);
     }
 
     /**

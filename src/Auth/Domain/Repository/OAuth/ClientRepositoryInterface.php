@@ -40,6 +40,17 @@ interface ClientRepositoryInterface
     public function findPersonalAccessClientsByUser(Uuid $userId): array;
 
     /**
+     * Serializes the user's personal access client creations until the current transaction
+     * ends, so a create counts the clients the previous one left.
+     *
+     * @throws \LogicException When no transaction is active, because the lock would end at once
+     */
+    public function lockPersonalAccessClientsOf(Uuid $userId): void;
+
+    /** The user's personal access clients that are not revoked. */
+    public function countPersonalAccessClientsOf(Uuid $userId): int;
+
+    /**
      * Every client except personal access clients, revoked ones included, newest first.
      *
      * @return Client[]

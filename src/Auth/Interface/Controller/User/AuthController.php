@@ -1092,13 +1092,12 @@ final class AuthController
         $cause = $exception instanceof HandlerFailedException
             ? $exception->getPrevious() ?? $exception
             : $exception;
-        $message = $this->trans('errors.internal', domain: 'auth');
 
         // A revoked client is reported as invalid_client, the only protocol error of the grant.
         if ($cause instanceof RefreshTokenRejectedException || $cause instanceof OAuthProtocolException) {
             $this->logger->info('Token refresh rejected: {reason}', ['reason' => $cause->getMessage()]);
 
-            return $this->errorResponse($message, Response::HTTP_UNAUTHORIZED);
+            return $this->errorResponse($this->trans('errors.invalid_token', domain: 'auth'), Response::HTTP_UNAUTHORIZED);
         }
 
         $this->logger->error('Token refresh failed.', ['exception' => $cause]);

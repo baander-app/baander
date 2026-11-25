@@ -120,6 +120,13 @@ final class ClientController
                 ),
             ),
             new OA\Response(
+                response: '409',
+                description: 'The caller already holds 20 personal access clients that are not revoked (reason personal_access_client_limit)',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: ApiError::class),
+                ),
+            ),
+            new OA\Response(
                 response: '422',
                 description: 'Validation error',
                 content: new OA\MediaType\Json(

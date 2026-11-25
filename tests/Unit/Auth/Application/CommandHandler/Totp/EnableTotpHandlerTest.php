@@ -13,6 +13,7 @@ use App\Auth\Application\Port\TotpVerifierInterface;
 use App\Auth\Application\Service\PendingTotpSecrets;
 use App\Auth\Domain\Model\User;
 use App\Auth\Domain\Repository\UserRepositoryInterface;
+use App\Auth\Infrastructure\Security\Totp\SodiumTotpSecretCipher;
 use App\Shared\Domain\Model\Email;
 use App\Shared\Domain\Model\Uuid;
 use PHPUnit\Framework\TestCase;
@@ -33,7 +34,7 @@ final class EnableTotpHandlerTest extends TestCase
     protected function setUp(): void
     {
         $this->user = User::register(new Email('test@baander.app'), 'hashed', 'Alice');
-        $this->pendingSecrets = new PendingTotpSecrets(new ArrayAdapter());
+        $this->pendingSecrets = new PendingTotpSecrets(new ArrayAdapter(), self::pendingCipher());
     }
 
     /**
@@ -67,7 +68,7 @@ final class EnableTotpHandlerTest extends TestCase
             {
                 throw new \RuntimeException('Redis server went away');
             }
-        });
+        }, self::pendingCipher());
         $this->pendingSecrets->hold($this->user->getId(), self::SECRET);
         $session = $this->signedInSession($this->user);
 
@@ -136,6 +137,11 @@ final class EnableTotpHandlerTest extends TestCase
         }
         self::assertSame([], $this->writes);
         self::assertSame([], $this->credentialChanges);
+    }
+
+    private static function pendingCipher(): SodiumTotpSecretCipher
+    {
+        return new SodiumTotpSecretCipher(base64_encode(random_bytes(SODIUM_CRYPTO_SECRETBOX_KEYBYTES)));
     }
 
     private function handler(): EnableTotpHandler

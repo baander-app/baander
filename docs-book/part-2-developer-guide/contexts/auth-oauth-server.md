@@ -81,3 +81,5 @@ The command implements the Scheduler's `SchedulableCommandInterface`. The initia
 ## Personal Access Clients
 
 A signed-in user can create named clients for their own tools with `POST /api/oauth/clients/` and list them with `GET /api/oauth/clients/`; the list carries no secret. `Client::createPersonalAccess()` makes a public client owned by the user with the loopback redirect URI `http://localhost`. A personal access client is not first-party: `chk_oauth_clients_personal_access_not_first_party` keeps the first-party flag off it, and its tokens are delegated and limited to their scopes. `DELETE /api/oauth/clients/{publicId}` works only for the owner; another user's client answers `404`. Revoking a client also revokes its access and refresh tokens, through `ClientRevoker`.
+
+A user holds at most 20 personal access clients that are not revoked. `CreatePersonalAccessClientHandler` counts them under a transaction-scoped advisory lock on the user, so two concurrent creates take turns, and the 21st answers `409` with `details.reason` `personal_access_client_limit`. Revoking a client makes room for another.

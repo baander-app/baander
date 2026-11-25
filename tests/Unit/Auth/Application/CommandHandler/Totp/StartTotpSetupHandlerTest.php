@@ -17,6 +17,7 @@ use App\Auth\Application\Service\PendingTotpSecrets;
 use App\Auth\Application\Service\StepUpVerifier;
 use App\Auth\Domain\Model\User;
 use App\Auth\Domain\Repository\UserRepositoryInterface;
+use App\Auth\Infrastructure\Security\Totp\SodiumTotpSecretCipher;
 use App\Shared\Domain\Model\Email;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
@@ -39,7 +40,7 @@ final class StartTotpSetupHandlerTest extends TestCase
     {
         $user = User::register(new Email('unverified@baander.app'), 'hashed', 'Alice');
         $this->user = $user;
-        $pending = new PendingTotpSecrets(new ArrayAdapter());
+        $pending = new PendingTotpSecrets(new ArrayAdapter(), self::cipher());
 
         try {
             $this->handler($pending, ['FIRSTSECRET'])(new StartTotpSetupCommand($user->getId()->toString(), 'current-password'));
@@ -53,7 +54,7 @@ final class StartTotpSetupHandlerTest extends TestCase
 
     public function testEachSetupReplacesThePendingSecret(): void
     {
-        $pending = new PendingTotpSecrets(new ArrayAdapter());
+        $pending = new PendingTotpSecrets(new ArrayAdapter(), self::cipher());
         $handler = $this->handler($pending, ['FIRSTSECRET', 'SECONDSECRET']);
 
         $first = $handler(new StartTotpSetupCommand($this->user->getId()->toString(), 'current-password'));
@@ -66,20 +67,20 @@ final class StartTotpSetupHandlerTest extends TestCase
     public function testThePendingSecretExpiresAfterTenMinutes(): void
     {
         $item = $this->createMock(CacheItemInterface::class);
-        $item->expects($this->once())->method('set')->with('FIRSTSECRET')->willReturnSelf();
+        $item->expects($this->once())->method('set')->with($this->logicalNot($this->stringContains('FIRSTSECRET')))->willReturnSelf();
         $item->expects($this->once())->method('expiresAfter')->with(600)->willReturnSelf();
         $pool = $this->createMock(CacheItemPoolInterface::class);
         $pool->method('getItem')->willReturn($item);
         $pool->expects($this->once())->method('save')->with($item)->willReturn(true);
 
-        $this->handler(new PendingTotpSecrets($pool), ['FIRSTSECRET'])(new StartTotpSetupCommand($this->user->getId()->toString(), 'current-password'));
+        $this->handler(new PendingTotpSecrets($pool, self::cipher()), ['FIRSTSECRET'])(new StartTotpSetupCommand($this->user->getId()->toString(), 'current-password'));
     }
 
     /** TOTP is turned off first, which takes a current code. */
     public function testWhileTotpIsOnSetupIsRefused(): void
     {
         $this->user->enableTotp('sealed-secret');
-        $pending = new PendingTotpSecrets(new ArrayAdapter());
+        $pending = new PendingTotpSecrets(new ArrayAdapter(), self::cipher());
 
         try {
             $this->handler($pending, ['FIRSTSECRET'])(new StartTotpSetupCommand($this->user->getId()->toString(), 'current-password'));
@@ -92,7 +93,7 @@ final class StartTotpSetupHandlerTest extends TestCase
 
     public function testAWrongPasswordHoldsNoSecret(): void
     {
-        $pending = new PendingTotpSecrets(new ArrayAdapter());
+        $pending = new PendingTotpSecrets(new ArrayAdapter(), self::cipher());
 
         try {
             $this->handler($pending, ['FIRSTSECRET'])(new StartTotpSetupCommand($this->user->getId()->toString(), 'not-the-password'));
@@ -100,6 +101,11 @@ final class StartTotpSetupHandlerTest extends TestCase
         } catch (StepUpFailedException) {
         }
         $this->assertNull($pending->find($this->user->getId()));
+    }
+
+    private static function cipher(): SodiumTotpSecretCipher
+    {
+        return new SodiumTotpSecretCipher(base64_encode(random_bytes(SODIUM_CRYPTO_SECRETBOX_KEYBYTES)));
     }
 
     /** @param list<string> $secrets The secrets generated, in order */

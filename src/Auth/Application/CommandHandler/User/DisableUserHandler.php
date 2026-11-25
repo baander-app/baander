@@ -5,14 +5,14 @@ declare(strict_types=1);
 namespace App\Auth\Application\CommandHandler\User;
 
 use App\Auth\Application\Command\User\DisableUserCommand;
+use App\Auth\Application\DTO\RevokedSessions;
 use App\Auth\Application\Exception\LastSuperAdminException;
 use App\Auth\Application\Exception\LiveConnectionsNotClosedException;
 use App\Auth\Application\Exception\UserNotFoundException;
+use App\Auth\Application\Service\CredentialChangeRevoker;
 use App\Auth\Application\Service\SuperAdminContinuity;
 use App\Auth\Application\Service\UserLookup;
 use App\Auth\Domain\Model\User;
-use App\Auth\Domain\Repository\OAuth\AccessTokenRepositoryInterface;
-use App\Auth\Domain\Repository\OAuth\RefreshTokenRepositoryInterface;
 use App\Auth\Domain\Repository\UserRepositoryInterface;
 use App\Shared\Application\Port\LiveConnectionsPortInterface;
 use App\Shared\Application\Port\ServerControlException;
@@ -24,22 +24,24 @@ use Symfony\Component\Messenger\Attribute\AsMessageHandler;
 /**
  * Disables an account and ends every session it has.
  *
- * The user's access and refresh tokens are revoked in the transaction that saves the
- * disable, so a failed revocation leaves the account enabled. After the commit the
- * web server closes the user's open WebSocket connections; closing them earlier
- * would let a reconnect pass on a token the commit has not yet revoked. Enabling the
- * account later restores none of the tokens; the user signs in again. Disabling a
- * disabled account leaves it unchanged and closes any connection still open, which
- * is how an operator retries a close that failed. The install's only enabled super admin
- * is not disabled.
+ * The disable goes through CredentialChangeRevoker in one transaction: under the super admin
+ * continuity lock and then the user row's lock, it saves the disable, advances the credential
+ * epoch and revokes every access and refresh token, so a failed revocation leaves the account
+ * enabled. The advanced epoch also refuses what was verified before the disable and issues
+ * later: a sign-in waiting on the row, an unredeemed authorization code, an approved device
+ * code. Enabling the account later restores none of it; the user signs in again.
+ *
+ * After the commit the web server closes the user's open WebSocket connections; closing them
+ * earlier would let a reconnect pass on a token the commit has not yet revoked. Disabling a
+ * disabled account leaves it unchanged and closes any connection still open, which is how an
+ * operator retries a close that failed. The install's only enabled super admin is not disabled.
  */
 final readonly class DisableUserHandler
 {
     public function __construct(
         private UserLookup $userLookup,
         private UserRepositoryInterface $userRepository,
-        private AccessTokenRepositoryInterface $accessTokenRepository,
-        private RefreshTokenRepositoryInterface $refreshTokenRepository,
+        private CredentialChangeRevoker $credentialChangeRevoker,
         private TransactionPortInterface $transaction,
         private SuperAdminContinuity $superAdminContinuity,
         private LiveConnectionsPortInterface $liveConnections,
@@ -59,18 +61,23 @@ final readonly class DisableUserHandler
     {
         $user = $this->userLookup->byIdentifier($command->getIdentifier());
         if (!$user->isDisabled()) {
-            $this->transaction->run(function () use ($user): void {
-                $this->superAdminContinuity->assertAnotherRemains($user);
-                $user->disable();
-                $this->userRepository->save($user);
-                $this->accessTokenRepository->revokeForUser($user->getId());
-                $this->refreshTokenRepository->revokeForUser($user->getId());
-            });
+            // The revoked token ids are not needed: the connections close by user below.
+            $this->transaction->run(fn (): RevokedSessions => $this->endSessions($user));
         }
 
         $this->closeLiveConnections($user, $command->getIdentifier());
 
         return $user;
+    }
+
+    private function endSessions(User $user): RevokedSessions
+    {
+        $this->superAdminContinuity->assertAnotherRemains($user);
+
+        return $this->credentialChangeRevoker->revokeSessions($user, null, function () use ($user): void {
+            $user->disable();
+            $this->userRepository->save($user);
+        });
     }
 
     private function closeLiveConnections(User $user, string $identifier): void
