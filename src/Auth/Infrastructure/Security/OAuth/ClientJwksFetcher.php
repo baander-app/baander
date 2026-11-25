@@ -11,7 +11,6 @@ use InvalidArgumentException;
 use JsonException;
 use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
-use Symfony\Contracts\HttpClient\ResponseInterface;
 use Throwable;
 
 /**
@@ -76,21 +75,6 @@ final readonly class ClientJwksFetcher
             throw new \RuntimeException('The key set answer was not 200.');
         }
 
-        return $this->cappedBody($response);
-    }
-
-    private function cappedBody(ResponseInterface $response): string
-    {
-        $body = '';
-        foreach ($this->httpClient->stream($response) as $chunk) {
-            $body .= $chunk->getContent();
-            if (strlen($body) > ClientKeySource::MAX_JWKS_BYTES) {
-                $response->cancel();
-
-                throw new \RuntimeException('The key set is larger than the cap.');
-            }
-        }
-
-        return $body;
+        return $this->httpClient->content($response, ClientKeySource::MAX_JWKS_BYTES);
     }
 }
