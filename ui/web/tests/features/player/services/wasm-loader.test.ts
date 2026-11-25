@@ -42,14 +42,24 @@ describe('wasm-loader', () => {
     resetDspCache()
     vi.restoreAllMocks()
     vi.unstubAllGlobals()
+    vi.unstubAllEnvs()
   })
 
-  it('returns the static WASM and audio worklet URLs', () => {
+  it('returns the static WASM and audio worklet URLs under the web build base', () => {
     expect(getWasmUrl('loudness_r128.wasm')).toBe('/dsp/loudness_r128.wasm')
     expect(getWasmUrl('dynamics_meter.wasm')).toBe('/dsp/dynamics_meter.wasm')
     expect(getWasmUrl('fft2048.wasm')).toBe('/dsp/fft2048.wasm')
     expect(getAudioWorkletUrl('wasm-spectrum.js')).toBe('/audio-worklets/wasm-spectrum.js')
     expect(getAudioWorkletUrl('magic-soup-processor.js')).toBe('/audio-worklets/magic-soup-processor.js')
+  })
+
+  it('resolves the URLs against the document under the desktop build base', () => {
+    vi.stubEnv('BASE_URL', './')
+    const document = 'file:///opt/baander/resources/app/index.html#/music'
+
+    expect(getWasmUrl('loudness_r128.wasm')).toBe('./dsp/loudness_r128.wasm')
+    expect(getAudioWorkletUrl('wasm-spectrum.js')).toBe('./audio-worklets/wasm-spectrum.js')
+    expect(new URL(getWasmUrl('fft2048.wasm'), document).href).toBe('file:///opt/baander/resources/app/dsp/fft2048.wasm')
   })
 
   it.each(loaders)('shares $name compilation but creates private instances for every caller', async ({ name, load }) => {

@@ -34,6 +34,8 @@ export const test = base.extend<{ render: (options: RenderOptions) => Promise<Si
       })
       const wasmLoaderBundle = await build({ bundle: true, write: false, platform: 'browser', format: 'esm',
         entryPoints: [resolve(sourceRoot, 'features/player/services/wasm-loader.ts')],
+        // Vite replaces import.meta.env at build time; the web build's base is the site root.
+        define: { 'import.meta.env': JSON.stringify({ BASE_URL: '/' }) },
       })
       const dspDirectory = fileURLToPath(new URL('../../../../../public/dsp/', import.meta.url))
       server = createServer({ key: readFileSync(key), cert: readFileSync(cert) }, (request, response) => {

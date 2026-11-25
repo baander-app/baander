@@ -44,6 +44,18 @@ try {
   });
   await Promise.all([new Promise(r => api.listen(0, '127.0.0.1', r)), new Promise(r => ui.listen(0, '127.0.0.1', r))]);
   const apiUrl = `http://127.0.0.1:${api.address().port}`;
+  // Bundle the web client's DSP loader with the base the renderer was built with, as Vite does.
+  const builtBase = (await readFile(resolve(rendererRoot, 'index.html'), 'utf8'))
+    .match(/<script type="module"[^>]* src="([^"]*)assets\//)?.[1];
+  assert.equal(builtBase, './', 'the desktop renderer is built with a relative base');
+  const dspLoaderSource = (await webRequire('esbuild').build({
+    bundle: true,
+    write: false,
+    platform: 'browser',
+    format: 'esm',
+    entryPoints: [resolve(desktop, '../web/src/features/player/services/wasm-loader.ts')],
+    define: { 'import.meta.env': JSON.stringify({ BASE_URL: builtBase }) },
+  })).outputFiles[0].text;
   const uiUrl = `http://127.0.0.1:${ui.address().port}`;
   const entry = resolve(scratch, 'main.mjs');
   await writeFile(entry, `
@@ -135,23 +147,37 @@ await import(${JSON.stringify(pathToFileURL(resolve(desktop, 'dist/main/index.js
     assert.equal(await page.locator('.server-item .server-address').textContent(), 'Announced by 127.0.0.1');
   }
 
-  // Without the file-access switch, a file:// renderer still loads DSP modules and worklets from its
-  // own directory; the dev server serves them from its root.
+  // The web client's own DSP loader runs in the renderer exactly as the application calls it. Without the
+  // file-access switch it must load every WebAssembly module and worklet from the renderer's directory.
   async function expectDspAssetsLoad(page) {
-    const loaded = await page.evaluate(async () => {
-      const base = location.protocol === 'file:' ? location.href : location.origin;
-      const response = await fetch(new URL('dsp/loudness_r128.wasm', base));
-      if (!response.ok) throw new Error(`DSP module answered ${response.status}`);
-      await WebAssembly.compile(await response.arrayBuffer());
+    const loaded = await page.evaluate(async (source) => {
+      const moduleUrl = URL.createObjectURL(new Blob([source], { type: 'text/javascript' }));
+      const loader = await import(moduleUrl);
+      URL.revokeObjectURL(moduleUrl);
+      const modules = await Promise.all([loader.getLoudness(), loader.getDynamics(), loader.getSpectralFeatures()]);
+      const fft = await fetch(loader.getWasmUrl('fft2048.wasm'));
+      if (!fft.ok) throw new Error(`fft2048.wasm answered ${fft.status}`);
+      await WebAssembly.compile(await fft.arrayBuffer());
+      const worklets = ['wasm-spectrum.js', 'magic-soup-processor.js'];
       const context = new AudioContext();
       try {
-        await context.audioWorklet.addModule(new URL('audio-worklets/wasm-spectrum.js', base).href);
+        for (const worklet of worklets) await context.audioWorklet.addModule(loader.getAudioWorkletUrl(worklet));
       } finally {
         await context.close();
       }
-      return true;
-    });
-    assert.equal(loaded, true);
+      return {
+        initializers: modules.map(api => typeof api.init),
+        urls: [loader.getWasmUrl('fft2048.wasm'), ...worklets.map(loader.getAudioWorkletUrl)]
+          .map(url => new URL(url, document.baseURI).href),
+      };
+    }, dspLoaderSource);
+    assert.deepEqual(loaded.initializers, ['function', 'function', 'function']);
+    const rendererUrl = page.url().startsWith('file:') ? pathToFileURL(rendererRoot).href : uiUrl;
+    assert.deepEqual(loaded.urls, [
+      `${rendererUrl}/dsp/fft2048.wasm`,
+      `${rendererUrl}/audio-worklets/wasm-spectrum.js`,
+      `${rendererUrl}/audio-worklets/magic-soup-processor.js`,
+    ]);
   }
 
   async function expectSandboxedWindows() {
@@ -251,7 +277,7 @@ await import(${JSON.stringify(pathToFileURL(resolve(desktop, 'dist/main/index.js
     await application.close();
     application = undefined;
     await exerciseStartupFailure(mode);
-    console.log(`${mode}: literal discovery metadata/selection, Geist in both windows, setup handoff, configured startup, sandboxed windows, content policy, DSP modules and worklets, API access, reload, blocked navigation/popup, titlebar controls and the startup error view passed`);
+    console.log(`${mode}: literal discovery metadata/selection, Geist in both windows, setup handoff, configured startup, sandboxed windows, content policy, the web client's DSP loader, API access, reload, blocked navigation/popup, titlebar controls and the startup error view passed`);
   }
   assert.ok(apiCalls >= 4);
 } finally {

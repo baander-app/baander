@@ -149,9 +149,10 @@ The runtime smoke test starts a loopback API server and a loopback server for
 the renderer files, then launches the built app in real Electron under Xvfb
 twice: once loading the renderer from `file://`, once from that server in the
 development server's place. It needs `Xvfb`, the Electron binary that the
-`electron` package's install script downloads, and Playwright from
+`electron` package's install script downloads, and Playwright and esbuild from
 `ui/web/node_modules`. CI does not run it yet, so run it locally after a change
-to the windows, the preload, the renderer startup or the command-line switches:
+to the windows, the preload, the renderer startup, the command-line switches or
+the web client's DSP loader:
 
 ```bash
 cd ui/electron
@@ -160,11 +161,12 @@ yarn test:smoke        # node tests/runtime-smoke.mjs
 ```
 
 It checks discovery rows and setup, that the main window runs sandboxed, that the
-content policy names the configured server, that DSP WebAssembly modules and
-audio worklets load from the renderer's directory without a file-access switch,
-API access, blocked navigation and popups, the title bar controls, and that a
-stored value that is not a server URL shows the startup error view, whose
-button reopens setup.
+content policy names the configured server, and that the web client's DSP
+loader, bundled with the base the renderer was built with, loads its
+WebAssembly modules and audio worklets from the renderer's directory without a
+file-access switch. It also checks API access, blocked navigation and popups,
+the title bar controls, and that a stored value that is not a server URL shows
+the startup error view, whose button reopens setup.
 
 The codec itself has CTest suites and a binding smoke test:
 

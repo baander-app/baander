@@ -1,6 +1,5 @@
 import type { LoudnessR128API, DynamicsMeterAPI, SpectralFeaturesApi } from './wasm-types'
 
-const DSP_BASE = '/dsp/'
 type DspModuleType = 'dynamics_meter' | 'loudness_r128' | 'spectral_features'
 
 // Compilation is immutable and shareable. Instances, memories and DSP history are not.
@@ -89,10 +88,18 @@ export function resetDspCache(): void {
   compiledModules.clear()
 }
 
+/**
+ * Vite's base is `/` on the web and `./` in the desktop build, whose `file://` renderer
+ * finds these assets beside its own document rather than at the file system root.
+ */
+function staticAssetUrl(path: string): string {
+  return `${import.meta.env.BASE_URL}${path}`
+}
+
 export function getWasmUrl(filename: string): string {
-  return `${DSP_BASE}${filename}`
+  return staticAssetUrl(`dsp/${filename}`)
 }
 
 export function getAudioWorkletUrl(filename: string): string {
-  return `/audio-worklets/${filename}`
+  return staticAssetUrl(`audio-worklets/${filename}`)
 }
