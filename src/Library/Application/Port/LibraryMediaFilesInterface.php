@@ -74,15 +74,34 @@ interface LibraryMediaFilesInterface
     public function isHeldByDeleteForImport(Uuid $libraryId): bool;
 
     /**
-     * The paths at which no file exists now, or a symlink points to nothing, in request order,
-     * after marking their retained file-index rows unavailable. An import skips these paths;
-     * a file that returns unchanged is published again by the next incremental scan.
+     * The paths at which no file exists now, a symlink points to nothing, or the file resolves
+     * outside the library root, in request order, after marking their retained file-index rows
+     * unavailable. An import skips these paths; a file that returns unchanged is published again
+     * by the next incremental scan.
      *
      * @param list<string> $paths absolute paths, as the scanner stored them
      *
      * @return list<string>
      */
     public function markMissingUnavailable(Uuid $libraryId, array $paths): array;
+
+    /**
+     * Marks the retained file-index rows of files an import refused unavailable, although the
+     * files exist, so playback refuses what was imported from them before. The next incremental
+     * scan publishes them again.
+     *
+     * @param list<string> $paths absolute paths, as the scanner stored them
+     */
+    public function markUnavailable(Uuid $libraryId, array $paths): void;
+
+    /**
+     * The contents of a file beside a library's media, such as a lyrics sidecar, or null unless
+     * the path resolves inside the library root to a regular file of at most $maxBytes. A
+     * symlink is followed only while its target stays inside the root.
+     *
+     * @param positive-int $maxBytes
+     */
+    public function readSidecar(Uuid $libraryId, string $path, int $maxBytes): ?string;
 
     /**
      * Claims the library for a delete with files, with a lease that deleteFiles() renews. A claim

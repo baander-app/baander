@@ -20,6 +20,7 @@ use App\Shared\Domain\ValueObject\FilesystemType;
 use App\Shared\Infrastructure\Redis\RedisClientFactory;
 use App\Tests\Support\FinalSchemaBootstrap;
 use Doctrine\DBAL\Connection;
+use Psr\Log\NullLogger;
 use Symfony\Bundle\FrameworkBundle\Console\Application;
 use Symfony\Bundle\FrameworkBundle\Test\KernelTestCase;
 use Symfony\Component\Console\Command\Command;
@@ -135,7 +136,7 @@ final class LibraryScanCommandTest extends KernelTestCase
             {
                 ($this->beforeScan)();
 
-                return (new DirectoryScanner())->scan($path);
+                return (new DirectoryScanner(new NullLogger()))->scan($path);
             }
         });
 

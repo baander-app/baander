@@ -47,6 +47,53 @@ final class TranscodeProcessPoolTest extends TestCase
         self::assertSame([1, 2], $released);
     }
 
+    public function testLibraryProbesAndThePublishedPresentationProbeOpenTheirOwnContainerKinds(): void
+    {
+        $submitted = [];
+        $client = $this->createStub(NativeExecutionClientInterface::class);
+        $client->method('submit')->willReturnCallback(static function (array $argv) use (&$submitted): NativeExecutionHandle {
+            $submitted[] = $argv;
+            return new NativeExecutionHandle(str_repeat('a', 64), count($submitted));
+        });
+        $client->method('inspect')->willReturn(['state' => 'exited', 'exitCode' => 0, 'stdout' => '{}']);
+        $client->method('release')->willReturn(true);
+        $pool = new TranscodeProcessPool($client, new NullLogger(), new JsonEncoder(), new DeploymentProfile());
+        $job = TranscodeJob::create(Uuid::generate(), QualityTier::p720(), '/cache', Uuid::generate());
+
+        foreach ([
+            $pool->probeVideo($job, '/media/film.mkv', 1),
+            $pool->probeCopyKeyframes($job, '/media/film.mkv', 0, 1),
+            $pool->probePublishedPresentation($job, '/cache/output/manifest.mpd', 1),
+        ] as $key) {
+            $pool->readResult($key);
+        }
+
+        self::assertCount(3, $submitted);
+        $library = ['-format_whitelist', 'mov,matroska,avi,asf', '-protocol_whitelist', 'file', '-i', '/media/film.mkv'];
+        self::assertSame($library, array_slice($submitted[0], -6));
+        self::assertSame($library, array_slice($submitted[1], -6));
+        self::assertSame(
+            ['-format_whitelist', 'dash,mov', '-protocol_whitelist', 'file', '-i', '/cache/output/manifest.mpd'],
+            array_slice($submitted[2], -6),
+        );
+    }
+
+    public function testAHelperStoppedAtTheOutputBoundReportsTheReasonAfterItsErrorTail(): void
+    {
+        $client = $this->createStub(NativeExecutionClientInterface::class);
+        $client->method('submit')->willReturn(new NativeExecutionHandle(str_repeat('a', 64), 1));
+        $client->method('inspect')->willReturn(['state' => 'exited', 'exitCode' => 137, 'stdout' => '',
+            'stderr' => "[h264 @ 0x1] warning\n", 'error' => 'Native output byte limit exceeded.']);
+        $client->method('release')->willReturn(true);
+        $pool = new TranscodeProcessPool($client, new NullLogger(), new JsonEncoder(), new DeploymentProfile());
+        $job = TranscodeJob::create(Uuid::generate(), QualityTier::p720(), '/cache', Uuid::generate());
+
+        self::assertSame(
+            ['status' => 'error', 'data' => "[h264 @ 0x1] warning\nNative output byte limit exceeded."],
+            $pool->readResult($pool->probeCopyKeyframes($job, '/media/film.mkv', 0, 1)),
+        );
+    }
+
     public function testShutdownDiscardsQueuedHelpersWithoutLaunchingThem(): void
     {
         $client = $this->createMock(NativeExecutionClientInterface::class);

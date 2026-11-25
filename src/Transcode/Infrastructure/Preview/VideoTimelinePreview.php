@@ -7,6 +7,8 @@ namespace App\Transcode\Infrastructure\Preview;
 use App\Transcode\Application\Command\PrepareTimelinePreview;
 use App\Catalog\Application\Dto\VideoSourceMetadata;
 use App\Transcode\Application\Port\VideoTimelinePreviewPort;
+use App\Transcode\Infrastructure\FFmpeg\FFmpegArguments;
+use App\Transcode\Infrastructure\FFmpeg\FFmpegInputKind;
 use App\Transcode\Infrastructure\FFmpeg\ProcessExecutor;
 use Symfony\Component\Messenger\MessageBusInterface;
 use Symfony\Component\Messenger\Stamp\TransportNamesStamp;
@@ -137,8 +139,8 @@ final readonly class VideoTimelinePreview implements VideoTimelinePreviewPort
             );
             $arguments = [
                 '/usr/bin/ffmpeg', '-nostdin', '-v', 'fatal', '-y', '-threads', '2',
-                '-copyts', '-i', $path, '-map', '0:' . $videoStreamIndex,
-                '-an', '-sn', '-vf', $filter, '-frames:v', '1', '-q:v', '5',
+                '-copyts', ...FFmpegArguments::inputClause($path, FFmpegInputKind::LibraryVideo),
+                '-map', '0:' . $videoStreamIndex, '-an', '-sn', '-vf', $filter, '-frames:v', '1', '-q:v', '5',
                 '-fs', '4000000', '-f', 'image2', '-c:v', 'mjpeg', $temporary,
             ];
             $cancelled = $this->path($identity, 'cancelled');

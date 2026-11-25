@@ -47,7 +47,7 @@ Key infrastructure:
 
 ## Interactions
 
-- **Catalog** — `TranscodeSessionSubscriber` looks up `VideoRepositoryInterface` to resolve video metadata
+- **Catalog** — `TranscodeSessionSubscriber` resolves its source file through `VideoPortInterface`, inside one of the libraries that hold the video
 - **Party** — raises `PlaybackPositionChanged` to steer a party's transcode job, and checks a new party's video and job through `PlaybackAccessInterface`
 - **QoL** — Transcode Infrastructure calls QoL's stream-admission and allowed-tier contracts and implements its quality-ladder and encoder-profile contracts
 

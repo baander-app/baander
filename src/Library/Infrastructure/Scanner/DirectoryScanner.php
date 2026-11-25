@@ -6,25 +6,28 @@ namespace App\Library\Infrastructure\Scanner;
 
 use App\Library\Application\Port\DirectoryScannerPortInterface;
 use App\Library\Domain\ValueObject\LibraryPath;
+use App\Shared\Domain\ValueObject\MediaContainer;
+use Psr\Log\LoggerInterface;
 use RecursiveDirectoryIterator;
 use RecursiveIteratorIterator;
 use SplFileInfo;
 
 final class DirectoryScanner implements DirectoryScannerPortInterface
 {
-    /** Audio file extensions to discover. */
-    private const array AUDIO_EXTENSIONS = ['mp3', 'flac', 'ogg', 'oga', 'wav', 'wave', 'aac', 'm4a', 'mp4a', 'm4b', 'wma', 'opus', 'aif', 'aiff', 'aifc'];
-
-    /** Video file extensions to discover. */
-    private const array VIDEO_EXTENSIONS = ['mp4', 'mkv', 'avi', 'mov', 'wmv', 'webm', 'm4v'];
+    public function __construct(private readonly LoggerInterface $logger)
+    {
+    }
 
     /**
-     * Recursively scan a library path for media files.
+     * Recursively scan a library path for media files. A file symlink is followed only when its
+     * target stays inside the library; directory symlinks are not descended.
      *
      * @return MediaFile[]
      */
     public function scan(LibraryPath $path): array
     {
+        // A long-running worker must not judge a retargeted link by PHP's cached real path.
+        clearstatcache(true);
         $realPath = realpath($path->toString());
 
         if ($realPath === false || !is_dir($realPath)) {
@@ -32,7 +35,6 @@ final class DirectoryScanner implements DirectoryScannerPortInterface
         }
 
         $files = [];
-        $extensions = array_merge(self::AUDIO_EXTENSIONS, self::VIDEO_EXTENSIONS);
 
         $iterator = new RecursiveIteratorIterator(
             new RecursiveDirectoryIterator($realPath, RecursiveDirectoryIterator::SKIP_DOTS),
@@ -47,7 +49,16 @@ final class DirectoryScanner implements DirectoryScannerPortInterface
 
             $extension = strtolower($file->getExtension());
 
-            if (!in_array($extension, $extensions, true)) {
+            if (MediaContainer::forExtension($extension) === null) {
+                continue;
+            }
+
+            if (!self::contained($file, $realPath)) {
+                // The index row of a file imported earlier through this link is then marked
+                // unavailable by the scan, as for any indexed path the scan no longer finds.
+                $this->logger->warning('Skipping a file whose real path leaves the library: {path}', [
+                    'path' => $file->getPathname(),
+                ]);
                 continue;
             }
 
@@ -63,5 +74,12 @@ final class DirectoryScanner implements DirectoryScannerPortInterface
         }
 
         return $files;
+    }
+
+    private static function contained(SplFileInfo $file, string $root): bool
+    {
+        $target = $file->getRealPath();
+
+        return $target !== false && str_starts_with($target, $root . '/');
     }
 }

@@ -10,7 +10,11 @@ use Symfony\Component\DependencyInjection\Attribute\Exclude;
 final class NativeExecutionProtocol
 {
     public const int REQUEST_BYTES = 65_536;
+    /** Standard output past this fails its attempt: callers parse it whole. */
     public const int OUTPUT_BYTES = 1_048_576;
+    /** Standard error keeps its newest bytes up to this; callers report only its end. */
+    public const int ERROR_TAIL_BYTES = 65_536;
+    /** Base64 makes both outputs at their bounds about 1.49 MB of a reply. */
     public const int RESPONSE_BYTES = 3_000_000;
 
     /** @return array{commands:int, results:int, clients:int} */

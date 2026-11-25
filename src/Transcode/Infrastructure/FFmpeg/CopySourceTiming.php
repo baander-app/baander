@@ -57,6 +57,26 @@ final readonly class CopySourceTiming
         return new self($origin, $end - $origin);
     }
 
+    /**
+     * The keyframes of a compact listing: one `key_frame,best_effort_timestamp_time` line per
+     * frame ffprobe decoded. Text it appends after those two fields, such as a frame's side
+     * data, is ignored, and so is a frame without a timestamp.
+     *
+     * @return list<array{key_frame: int, best_effort_timestamp_time: float}>
+     */
+    public static function keyframes(string $listing): array
+    {
+        $frames = [];
+        foreach (explode("\n", $listing) as $line) {
+            $fields = explode(',', trim($line), 3);
+            if (count($fields) >= 2 && $fields[0] === '1' && is_numeric($fields[1])) {
+                $frames[] = ['key_frame' => 1, 'best_effort_timestamp_time' => (float) $fields[1]];
+            }
+        }
+
+        return $frames;
+    }
+
     /** @param list<array<string, mixed>> $frames */
     public function targetDuration(array $frames): float
     {

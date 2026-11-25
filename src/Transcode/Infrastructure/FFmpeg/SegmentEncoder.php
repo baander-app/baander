@@ -235,8 +235,7 @@ final class SegmentEncoder
             }
         }
 
-        $args[] = '-i';
-        $args[] = $sourcePath;
+        array_push($args, ...FFmpegArguments::inputClause($sourcePath, FFmpegInputKind::LibraryVideo));
 
         // Independent audio EOF lets silence publish before video ends. Sparse
         // video cues can follow newer audio packets, so retain one frame interval
@@ -273,7 +272,7 @@ final class SegmentEncoder
             if ($aacImplementation !== null && $sourceAudioCodec === 'aac') {
                 array_push($args, sprintf('-c:a:%d', $audioStreamIndex), $aacImplementation->decoderName());
             }
-            array_push($args, '-i', $sourcePath);
+            array_push($args, ...FFmpegArguments::inputClause($sourcePath, FFmpegInputKind::LibraryVideo));
         }
 
         // One encoder process produces separate video and available audio tracks.

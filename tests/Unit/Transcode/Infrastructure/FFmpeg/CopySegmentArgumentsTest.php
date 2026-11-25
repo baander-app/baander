@@ -56,6 +56,30 @@ final class CopySegmentArgumentsTest extends TestCase
 
         self::assertSame(['0:3'], $this->values($args, '-map'));
         self::assertSame(['id=0,streams=v'], $this->values($args, '-adaptation_sets'));
+        self::assertSame(['avc1'], $this->values($args, '-tag:v'));
+        self::assertSame([], $this->values($args, '-tag:a'));
+    }
+
+    public function testTheSourceOpensOnlyAsALibraryVideoContainerWithThePinnedOptionOrder(): void
+    {
+        $args = (new CopySegmentArguments())->build(
+            '/library/Holiday Clip (2021).avi',
+            new PresentationSelection('copy', 'source-hash', 0, 1, 'mp4'),
+            '/output',
+            6.0,
+        );
+
+        self::assertSame([
+            '/usr/bin/ffmpeg', '-nostdin', '-hide_banner', '-loglevel', 'error', '-y', '-threads', '1', '-copyts',
+            '-seek_timestamp', '1', '-ss', '6.000000', '-readrate_initial_burst', '48', '-readrate', '2.0',
+            '-format_whitelist', 'mov,matroska,avi,asf', '-protocol_whitelist', 'file', '-i', '/library/Holiday Clip (2021).avi',
+            '-map', '0:0', '-map', '0:1', '-c', 'copy', '-tag:v', 'avc1', '-tag:a', 'mp4a', '-sn', '-dn',
+            '-f', 'dash', '-seg_duration', '6', '-dash_segment_type', 'mp4', '-format_options', 'movflags=+negative_cts_offsets',
+            '-use_template', '1', '-use_timeline', '1', '-hls_playlist', '1', '-hls_master_name', 'master.m3u8',
+            '-adaptation_sets', 'id=0,streams=v id=1,streams=a', '-init_seg_name', 'init-$RepresentationID$.mp4',
+            '-media_seg_name', 'track-$RepresentationID$-seg-$Number%05d$.m4s', '-output_ts_offset', '-6.000000',
+            '/output/manifest.mpd',
+        ], $args);
     }
 
     /** @param list<string> $arguments

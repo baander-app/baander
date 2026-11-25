@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 namespace App\Library\Infrastructure\Scanner;
 
+use App\Shared\Domain\ValueObject\MediaContainer;
+use App\Shared\Domain\ValueObject\MediaKind;
+
 final readonly class MediaFile
 {
     public function __construct(
@@ -42,17 +45,11 @@ final readonly class MediaFile
 
     public function isAudio(): bool
     {
-        return match ($this->extension) {
-            'mp3', 'flac', 'ogg', 'oga', 'wav', 'wave', 'aac', 'm4a', 'mp4a', 'm4b', 'wma', 'opus', 'aif', 'aiff', 'aifc' => true,
-            default => false,
-        };
+        return MediaContainer::forExtension($this->extension)?->kind() === MediaKind::Audio;
     }
 
     public function isVideo(): bool
     {
-        return match ($this->extension) {
-            'mp4', 'mkv', 'avi', 'mov', 'wmv', 'flv', 'webm', 'm4v', 'mpg', 'mpeg', 'ts' => true,
-            default => false,
-        };
+        return MediaContainer::forExtension($this->extension)?->kind() === MediaKind::Video;
     }
 }

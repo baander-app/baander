@@ -15,13 +15,30 @@ final class FFmpegArguments
         if ($streamIndex < 0 || ($sourceTimestampOrigin !== null && (!is_finite($sourceTimestampOrigin) || $sourceTimestampOrigin < 0.0))) {
             throw new \InvalidArgumentException('Invalid subtitle stream index or source timestamp origin.');
         }
-        $arguments = [$ffmpegPath, '-nostdin', '-y', '-threads', '2'];
+        // FFmpeg's input dump prints every tag at the default level; errors are all a caller reads.
+        $arguments = [$ffmpegPath, '-nostdin', '-loglevel', 'error', '-nostats', '-y', '-threads', '2'];
         if ($sourceTimestampOrigin !== null) {
             array_push($arguments, '-copyts', '-itsoffset', sprintf('%.6f', -$sourceTimestampOrigin));
         }
-        array_push($arguments, '-i', $sourcePath, '-map', '0:' . $streamIndex,
-            '-vn', '-an', '-c:s', 'webvtt', '-f', 'webvtt', $outputPath);
+        array_push($arguments, ...self::inputClause($sourcePath, FFmpegInputKind::LibraryVideo));
+        array_push($arguments, '-map', '0:' . $streamIndex, '-vn', '-an', '-c:s', 'webvtt', '-f', 'webvtt', $outputPath);
         return $arguments;
+    }
+
+    /**
+     * The options that open one input, ending with its `-i`. FFmpeg checks the format
+     * whitelist against the demuxer it probed and hands the list to every nested
+     * demuxer, so a manifest or playlist that names another file is refused before
+     * that file is opened. Every input path is a local file.
+     *
+     * @return list<string>
+     */
+    public static function inputClause(string $input, FFmpegInputKind $kind): array
+    {
+        $whitelist = $kind->formatWhitelist();
+        return $whitelist === null
+            ? ['-f', 'lavfi', '-i', $input]
+            : ['-format_whitelist', $whitelist, '-protocol_whitelist', 'file', '-i', $input];
     }
 
     /** @return list<string> */

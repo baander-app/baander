@@ -68,6 +68,10 @@ trait DiscoveredFileObservations
         foreach (['findAvailableHashesByPaths', 'lockAvailableHashesByPathsForImport'] as $method) {
             $media->method($method)->willReturnCallback(fn (Uuid $libraryId, array $paths): array => array_intersect_key($this->availableHashes, array_fill_keys($paths, true)));
         }
+        // Sidecars are read as the test's files hold them; confinement is LibraryMediaFiles' own.
+        $media->method('readSidecar')->willReturnCallback(
+            static fn (Uuid $libraryId, string $path, int $maxBytes): ?string => is_file($path) ? (string) file_get_contents($path) : null,
+        );
 
         return $media;
     }

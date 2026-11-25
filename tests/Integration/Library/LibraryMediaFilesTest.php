@@ -71,7 +71,7 @@ final class LibraryMediaFilesTest extends TestCase
         $this->fileIndex = new LibraryFileIndexRepository($this->manager);
         $this->files = new LibraryMediaFiles($this->libraries, $this->fileIndex, new MediaFileGuard(), $this->manager, new NativeClock(), new NullLogger());
         $this->scanner = new MusicScanner(
-            new DirectoryScanner(),
+            new DirectoryScanner(new NullLogger()),
             $this->fileIndex,
             new NullLogger(),
             new class implements JobCancellationCheckpointInterface {

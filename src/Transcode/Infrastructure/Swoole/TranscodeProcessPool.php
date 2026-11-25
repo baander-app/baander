@@ -10,7 +10,9 @@ use App\Shared\Infrastructure\Worker\NativeExecutionException;
 use App\Shared\Infrastructure\Worker\NativeExecutionHandle;
 use App\Transcode\Domain\Model\TranscodeJob;
 use App\Transcode\Infrastructure\FFmpeg\FFmpegArguments;
+use App\Transcode\Infrastructure\FFmpeg\FFmpegInputKind;
 use App\Transcode\Infrastructure\FFmpeg\FFprobeArguments;
+use App\Transcode\Infrastructure\FFmpeg\ProcessExecutor;
 use App\Transcode\Infrastructure\HLS\WebVttTimeline;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\Serializer\Encoder\JsonEncoder;
@@ -48,12 +50,22 @@ final class TranscodeProcessPool
         return $key;
     }
 
+    public function probePublishedPresentation(TranscodeJob $job, string $manifestPath, int $generation): string
+    {
+        $key = sprintf('probe_presentation:%s:%d', $job->getId()->toString(), $generation);
+        $this->submit($key, FFprobeArguments::publishedPresentation($manifestPath, $this->ffprobePath), 60);
+        return $key;
+    }
+
     public function probeCopyKeyframes(TranscodeJob $job, string $sourcePath, int $streamIndex, int $generation): string
     {
         $key = sprintf('copy_keyframes:%s:%d', $job->getId()->toString(), $generation);
-        $this->submit($key, [$this->ffprobePath, '-threads', '1', '-v', 'error', '-print_format', 'json',
-            '-select_streams', (string) $streamIndex, '-skip_frame', 'nokey', '-show_frames',
-            '-show_entries', 'frame=best_effort_timestamp_time,key_frame', $sourcePath], 3600);
+        // About 12 bytes per keyframe, so the listing fits the native output bound up to some
+        // 87,000 keyframes; past that the copy session fails with the bound as its reason.
+        $this->submit($key, [$this->ffprobePath, '-threads', '1', '-v', 'error', '-print_format', 'csv=p=0',
+            '-select_streams', (string) $streamIndex, '-skip_frame', 'nokey',
+            '-show_entries', 'frame=key_frame,best_effort_timestamp_time',
+            ...FFmpegArguments::inputClause($sourcePath, FFmpegInputKind::LibraryVideo)], 3600);
         return $key;
     }
 
@@ -95,7 +107,9 @@ final class TranscodeProcessPool
             if ($attempt['output'] !== null) {
                 @unlink($attempt['output'] . '.part');
             }
-            return ['status' => 'error', 'data' => $status['stderr'] ?: ($status['error'] ?? 'Media helper failed.')];
+            $reason = ProcessExecutor::errorText((string) ($status['stderr'] ?? ''), $status['error'] ?? null);
+
+            return ['status' => 'error', 'data' => $reason !== '' ? $reason : 'Media helper failed.'];
         }
         if ($attempt['output'] !== null) {
             $temporary = $attempt['output'] . '.part';

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Transcode\Infrastructure\Transcode;
 
+use App\Catalog\Application\Dto\VideoSourceMetadata;
 use App\Catalog\Application\Port\VideoPortInterface;
 use App\Catalog\Domain\Model\Video;
 use App\Shared\Domain\Model\Uuid;
@@ -24,6 +25,9 @@ use PHPUnit\Framework\Attributes\DataProvider;
 
 final class CompletedVideoArtifactAdapterTest extends TestCase
 {
+    /** Whether the video's file still resolves inside one of its libraries. */
+    private bool $contained = true;
+
     #[DataProvider('audioCorrections')]
     public function testCompletedAudioCorrectionMustMatchTheRequestedPresentation(
         int $requestedOffset,
@@ -50,6 +54,7 @@ final class CompletedVideoArtifactAdapterTest extends TestCase
         );
         $videos = $this->createStub(VideoPortInterface::class);
         $videos->method('findByUuid')->willReturn($video);
+        $videos->method('getSourceMetadata')->willReturn(self::source($video));
         $jobs = $this->createStub(TranscodeJobRepositoryInterface::class);
         $jobs->method('findActiveByOwnerAndVideo')->willReturn([$job]);
         $runtime = $this->createMock(TranscodeExecutionOwnershipPort::class);
@@ -93,6 +98,9 @@ final class CompletedVideoArtifactAdapterTest extends TestCase
                 'sourceSize' => 6, 'sourceModified' => filemtime($video->getPath()), 'bitDepth' => 8, 'hdr' => false, 'pixelFormat' => 'yuv420p'], JSON_THROW_ON_ERROR));
             $videos = $this->createStub(VideoPortInterface::class);
             $videos->method('findByUuid')->willReturn($video);
+            $videos->method('getSourceMetadata')->willReturnCallback(
+                fn(): ?VideoSourceMetadata => $this->contained ? self::source($video) : null,
+            );
             $jobs = $this->createMock(TranscodeJobRepositoryInterface::class);
             $jobs->method('findActiveByOwnerAndVideo')->willReturn([$job]);
             $jobs->expects(self::never())->method('save');
@@ -127,6 +135,9 @@ final class CompletedVideoArtifactAdapterTest extends TestCase
             $video->updateProbe(['subtitleStreams' => [['codec' => 'subrip']]]);
             self::assertSame([], $lookup->findComplete($owner, $video->getId(), 'source-hash', 3, null));
             $video->updateProbe(['subtitleStreams' => []]);
+            $this->contained = false;
+            self::assertSame([], $lookup->findComplete($owner, $video->getId(), 'source-hash', 3, null), 'A source that left its library is not reused.');
+            $this->contained = true;
             unlink($directory . '/track-0-seg-00001.m4s');
             self::assertSame([], $lookup->findComplete($owner, $video->getId(), 'source-hash', 3, null));
         } finally {
@@ -142,5 +153,26 @@ final class CompletedVideoArtifactAdapterTest extends TestCase
             }
             rmdir($root);
         }
+    }
+
+    private static function source(Video $video): VideoSourceMetadata
+    {
+        return new VideoSourceMetadata(
+            videoId: $video->getId(),
+            publicId: $video->getPublicId()->toString(),
+            filePath: $video->getPath(),
+            filename: basename($video->getPath()),
+            size: 6,
+            mimeType: 'video/x-matroska',
+            hash: $video->getHash(),
+            containerFormat: 'matroska,webm',
+            videoCodec: 'h264',
+            videoStreamIndex: 3,
+            audioStreams: [],
+            width: 320,
+            height: 180,
+            framerate: 25.0,
+            duration: 6.0,
+        );
     }
 }

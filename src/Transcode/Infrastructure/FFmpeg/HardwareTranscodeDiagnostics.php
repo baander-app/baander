@@ -43,13 +43,14 @@ final readonly class HardwareTranscodeDiagnostics implements HardwareTranscodeDi
             $decoderFlags = $resolvedProfile->decoderFlags();
 
             $cmd = sprintf(
-                '%s -y %s%s -i source.mkv %s'
+                '%s -y %s%s%s %s'
                 . ' -b:v %d -maxrate %d -bufsize %d'
                 . ' -movflags +frag_keyframe+separate_moof+default_base_moof'
                 . ' -an -f mp4 %s',
                 $this->ffmpegPath,
                 $hwAccelFlags !== '' ? $hwAccelFlags . ' ' : '',
                 $decoderFlags !== '' ? $decoderFlags . ' ' : '',
+                implode(' ', FFmpegArguments::inputClause('source.mkv', FFmpegInputKind::LibraryVideo)),
                 $encoderFlags,
                 $tier->videoBitrate,
                 $tier->maxBitrate,

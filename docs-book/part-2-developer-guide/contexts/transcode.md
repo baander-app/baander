@@ -218,7 +218,7 @@ A signed URL is not bound to the user who presents it, but it serves only while 
 | Depended on by | Media | The track stream transcodes audio through `AudioRenditionPortInterface` and reads `TranscodeSettingDefinitions` keys (the `Transcode Audio Rendition Contract` Deptrac layer); playback delivery uses `MediaExecutionPolicyInterface`, `CompletedVideoArtifactPort`, `CompletedVideoDeliveryPort`, `CopyPresentationPortInterface` and `StreamAuthPortInterface` (the `Transcode Delivery Contract` layer) |
 | Depended on by | Catalog | Ingest probes audio and video files through `AudioProbePortInterface` and `VideoProbePortInterface` (the `Transcode Probe Contract` layer) |
 | Depended on by | Notification | Maps `TranscodeJobCompleted` and `TranscodeJobFailed` to its background-jobs category |
-| Depends on | Catalog | Reads videos through `VideoPortInterface` and `VideoRepositoryInterface` |
+| Depends on | Catalog | Reads videos through `VideoPortInterface`; the worker, session start and completed-artifact reuse resolve the source file with an unrestricted scope, so a file that no longer resolves inside one of the video's libraries is refused |
 | Depends on | Auth | `AuthenticatedUserIdentityInterface`, `UserIdentifierResolverInterface` |
 | Depends on | Media | `PlaybackMediaAccessInterface` |
 | Depends on | QoL | QoL contracts only. `TranscodeSessionSubscriber` injects `StreamAdmissionPortInterface` directly to evaluate stream admission and record completion; `QualityFilteringStreamingDecorator` wraps `TranscodeStreamingService` (decoration priority `-1`) to filter manifests by the allowed-tier contract; `QualityLadderPort` and `EncoderProfileFingerprintAdapter` implement QoL contracts |
@@ -232,12 +232,25 @@ The FFmpeg classes build commands and read their results. `ProcessExecutor` send
 | Component | Purpose |
 |-----------|---------|
 | `SegmentEncoder` | CMAF segment encoding: the quality tier's encoder profile, video and audio filter chains, and the segment duration |
-| `FFmpegArguments`, `FFprobeArguments` | Literal argument lists for encodes, subtitle extraction and probes |
+| `FFmpegArguments`, `FFprobeArguments` | Literal argument lists for encodes, subtitle extraction and probes. `FFmpegArguments::inputClause()` writes every input: a format whitelist and `-protocol_whitelist file` before `-i`, chosen by `FFmpegInputKind` |
 | `FFmpegAdapter` | `FFmpegPortInterface`: init and media segment encodes, loudness analysis and subtitle extraction |
 | `FFprobeAdapter` | Audio and video probing (duration, codecs, resolution) |
 | `VideoFilterBuilder`, `AudioFilterBuilder` | Scaling, tone mapping, loudness normalization and downmix filters from a probe result |
 | `HardwareCapabilitiesProber` | Qualifies the configured hardware encoder with a test encode at worker start; without one the software encoder is qualified |
 | `ProcessExecutor` | Sends each command through the native execution client in admitted workers and runs it locally only in standalone tools |
+
+Every FFmpeg and ffprobe input names what it is, and the kind decides which demuxers may open it. FFmpeg checks the format whitelist against the demuxer it probed and passes the list to every nested demuxer, so a DASH manifest, an HLS playlist, a concat script or an IMF playlist under a media file name is refused before it can open the file it names. A source test fails on a literal `-i` anywhere else in `src/`.
+
+| Input kind | Used by | Format whitelist |
+|------------|---------|------------------|
+| Library audio | Import probe, audio rendition and its probes | the audio demuxers of `MediaContainer`: `mp3,flac,ogg,wav,aac,mov,asf,aiff` |
+| Library video | Import probe, play-time probe, keyframe listing, encode, stream copy, subtitle extraction, timeline preview | the video demuxers of `MediaContainer`: `mov,matroska,avi,asf` |
+| Published presentation | The probe of a worker's own `manifest.mpd` | `dash,mov` |
+| Generated source | Hardware capability probes | none; the input is forced to `lavfi` |
+
+`MediaContainer` in the Shared kernel is the one table of supported containers: the extensions the scanner discovers, the FFmpeg demuxer that must recognize the content and the media type of the original. `docker/ffmpeg/expected-capabilities.txt` lists every whitelisted demuxer, so the FFmpeg capability gate proves the build has them. The whitelist is part of the encode argument list, which `EncodePresentationIdentity` hashes, so changing it changes every encode fingerprint and completed encode artifacts are encoded again on their next play.
+
+The probes name every entry they read: no container tag is printed, and of the stream tags only `DURATION`, `language` and `title`, which give a Matroska film's end and name its tracks. One named tag can still be large, so the output bound of native execution remains the barrier. The copy keyframe listing prints one compact `key_frame,best_effort_timestamp_time` line per keyframe, about 12 bytes, so it fits the bound up to some 87,000 keyframes; past that the copy session fails with `The source keyframe listing failed:` and the bound's reason. Subtitle extraction runs at `-loglevel error -nostats`, so FFmpeg's input dump, which prints every tag, stays out of its error output.
 
 ### Manifest Generation
 
@@ -270,7 +283,7 @@ Encoding runs in the worker deployment pair, not in the web server. The control 
 | `TranscodeStreamManager` | One continuous FFmpeg process per job and tier, started, paused, resumed and stopped through `ProcessSpawnerInterface` |
 | `NativeProcessSpawner`, `TranscodeProcessPool` | Submit the encoder, probes and subtitle helpers as native execution attempts through `NativeExecutionClientInterface` and retire them with a confirmed outcome |
 | `NativeExecutionClient` (Shared) | Speaks to the native execution daemon over the Unix socket on the private IPC volume; every request carries the deployment namespace, boot, lease epoch, client slot and generation |
-| Native execution daemon | `bin/worker-native.php` in the execution unit; runs FFmpeg, probes and helpers and reports each attempt's state, output and exit code |
+| Native execution daemon | `bin/worker-native.php` in the execution unit; runs FFmpeg, probes and helpers and reports each attempt's state, output and exit code. Standard output past `NativeExecutionProtocol::OUTPUT_BYTES` (1 MiB) fails that attempt: the daemon kills its process group, blanks its output and reports a non-zero exit with the reason, also when the overflow shows only in the final drain after the command exited 0. Standard error keeps its newest `ERROR_TAIL_BYTES` (64 KiB) behind a truncation marker and fails nothing. A process group not reaped within one second of its stop still poisons the daemon |
 | Lease loss | A child whose lease or deployment authority lapses stops its encoder and stops persisting state; after the lease expires the next claim starts a new transcode execution generation, so output of the old generation is not delivered as current output |
 
 ### Console Commands

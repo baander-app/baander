@@ -11,7 +11,11 @@ use App\Shared\Infrastructure\Worker\NativeExecutionException;
 use App\Shared\Infrastructure\Worker\NativeExecutionHandle;
 use App\Shared\Infrastructure\Worker\NativeExecutionProtocol;
 use App\Shared\Infrastructure\Worker\OutOfMemoryKillOrder;
+use App\Shared\Infrastructure\Worker\OutputTail;
+use App\Transcode\Domain\ValueObject\VideoProbeResult;
+use App\Transcode\Infrastructure\FFmpeg\FFprobeArguments;
 use PHPUnit\Framework\TestCase;
+use Symfony\Component\Process\Process;
 
 final class NativeExecutionDaemonTest extends TestCase
 {
@@ -345,20 +349,83 @@ final class NativeExecutionDaemonTest extends TestCase
         self::assertTrue($this->client->release($handle));
     }
 
-    public function testOutputOverflowFailsTheLauncherInsteadOfReturningTruncatedProbeJson(): void
+    public function testOutputOverflowFailsOnlyItsOwnAttemptAndTheDaemonKeepsServing(): void
     {
-        $this->client->submit(['ffprobe', '-f', 'lavfi', '-i', 'anullsrc', '-show_packets', '-of', 'json'], 10);
-        $deadline = microtime(true) + 5;
-        do {
-            $status = proc_get_status($this->daemon);
-            if (!$status['running']) {
-                self::assertSame(1, $status['exitcode']);
+        $earlier = $this->client->submit(['ffmpeg', '-nostdin', '-re', '-f', 'lavfi', '-i', 'anullsrc', '-f', 'null', '-'], 10);
+        $overflow = $this->client->submit(['ffprobe', '-f', 'lavfi', '-i', 'anullsrc', '-show_packets', '-of', 'json'], 10);
 
-                return;
-            }
-            usleep(10_000);
-        } while (microtime(true) < $deadline);
-        self::fail('Output overflow must terminate the supervised launcher.');
+        $result = $this->finish($overflow);
+
+        self::assertSame('Native output byte limit exceeded.', $result['error']);
+        self::assertNotSame(0, $result['exitCode']);
+        self::assertSame('', $result['stdout'], 'Truncated probe JSON is never returned.');
+        self::assertTrue($this->client->handshake()['ready']);
+        self::assertSame('running', $this->client->inspect($earlier)['state']);
+        self::assertTrue($this->client->release($overflow));
+        $this->client->signal($earlier, 'stop');
+        self::assertSame('exited', $this->finish($earlier)['state']);
+        self::assertTrue(proc_get_status($this->daemon)['running']);
+    }
+
+    public function testALargeContainerTagNoLongerFillsTheProbeAndALargeTrackTitleFailsOnlyItsOwnProbe(): void
+    {
+        $comment = $this->filmWithLargeTag("comment=%s\n");
+        $title = $this->filmWithLargeTag("[STREAM]\ntitle=%s\n");
+        $running = $this->client->submit(['ffmpeg', '-nostdin', '-re', '-f', 'lavfi', '-i', 'anullsrc', '-f', 'null', '-'], 30);
+
+        $clean = $this->client->submit(FFprobeArguments::video($comment), 60);
+        $cleanResult = $this->finish($clean, timeout: 10);
+        self::assertTrue($this->client->release($clean));
+        $overflow = $this->client->submit(FFprobeArguments::video($title), 60);
+        $overflowResult = $this->finish($overflow, timeout: 10);
+
+        self::assertSame(0, $cleanResult['exitCode'], (string) $cleanResult['error']);
+        $probe = VideoProbeResult::fromProbeOutput(json_decode($cleanResult['stdout'], true, 512, JSON_THROW_ON_ERROR));
+        self::assertSame('h264', $probe->videoCodec);
+        self::assertEqualsWithDelta(2.0, $probe->videoEnd, 0.01);
+        self::assertSame('Native output byte limit exceeded.', $overflowResult['error']);
+        self::assertNotSame(0, $overflowResult['exitCode']);
+        self::assertSame('', $overflowResult['stdout']);
+        self::assertSame('running', $this->client->inspect($running)['state'], 'The running transcode continues.');
+        self::assertTrue($this->client->release($overflow));
+        $next = $this->client->submit(['ffmpeg', '-version'], 5);
+        self::assertSame(0, $this->finish($next)['exitCode'], 'A new command starts.');
+        self::assertTrue($this->client->release($next));
+        $this->client->signal($running, 'stop');
+        self::assertSame('exited', $this->finish($running)['state']);
+        self::assertTrue(proc_get_status($this->daemon)['running']);
+    }
+
+    public function testMegabytesOfErrorsKeepABoundedTailAndTheCommandsOwnExitCode(): void
+    {
+        $handle = $this->client->submit(['ffmpeg', '-nostdin', '-debug_ts', '-f', 'lavfi',
+            '-i', 'anullsrc=sample_rate=8000:channel_layout=mono:nb_samples=64', '-t', '60', '-f', 'null', '-'], 30);
+
+        $result = $this->finish($handle, timeout: 20);
+
+        self::assertSame(0, $result['exitCode']);
+        self::assertNull($result['error']);
+        self::assertStringStartsWith(OutputTail::TRUNCATION_MARKER, $result['stderr']);
+        self::assertStringContainsString('elapsed=', $result['stderr'], 'The tail keeps the newest lines.');
+        self::assertLessThanOrEqual(
+            NativeExecutionProtocol::ERROR_TAIL_BYTES + strlen(OutputTail::TRUNCATION_MARKER),
+            strlen($result['stderr']),
+        );
+        self::assertTrue($this->client->handshake()['ready']);
+    }
+
+    public function testAReplyWithBothOutputsAtTheirBoundsFitsTheFrame(): void
+    {
+        // 524,288 mono 16-bit samples are exactly the standard output bound.
+        $handle = $this->client->submit(['ffmpeg', '-nostdin', '-debug_ts', '-f', 'lavfi',
+            '-i', 'anullsrc=sample_rate=8000:channel_layout=mono', '-af', 'atrim=end_sample=524288', '-f', 's16le', '-'], 30);
+
+        $result = $this->finish($handle, timeout: 20);
+
+        self::assertSame(0, $result['exitCode']);
+        self::assertSame(NativeExecutionProtocol::OUTPUT_BYTES, strlen($result['stdout']));
+        self::assertStringStartsWith(OutputTail::TRUNCATION_MARKER, $result['stderr']);
+        self::assertTrue($this->client->release($handle));
     }
 
     public function testOnlyTheProfilesDerivedClientsAreAdmitted(): void
@@ -650,6 +717,25 @@ PHP;
         }
     }
 
+    /**
+     * A two-second Matroska film carrying one 1.2 MB tag, written through an `ffmetadata` input
+     * because one command-line argument holds at most 128 KiB.
+     *
+     * @param string $section the metadata lines, with %s where the tag's value goes
+     */
+    private function filmWithLargeTag(string $section): string
+    {
+        $name = $this->directory . '/' . bin2hex(random_bytes(4));
+        file_put_contents($name . '.txt', ";FFMETADATA1\n" . sprintf($section, str_repeat('c', 1_200_000)));
+        $stream = str_starts_with($section, '[STREAM]');
+        (new Process(['/usr/bin/ffmpeg', '-nostdin', '-hide_banner', '-loglevel', 'error', '-y',
+            '-f', 'lavfi', '-i', 'testsrc2=size=64x64:rate=10:duration=2', '-i', $name . '.txt', '-map', '0',
+            ...($stream ? ['-map_metadata:s:v:0', '1:s:0'] : ['-map_metadata', '1']),
+            '-c:v', 'libx264', '-pix_fmt', 'yuv420p', $name . '.mkv']))->mustRun();
+
+        return $name . '.mkv';
+    }
+
     private function newClient(): NativeExecutionClient
     {
         return $this->clientNamed('media-video-0');
@@ -661,10 +747,10 @@ PHP;
     }
 
     /** @return array<string, mixed> */
-    private function finish(NativeExecutionHandle $handle, ?NativeExecutionClient $client = null): array
+    private function finish(NativeExecutionHandle $handle, ?NativeExecutionClient $client = null, int $timeout = 3): array
     {
         $client ??= $this->client;
-        $deadline = microtime(true) + 3;
+        $deadline = microtime(true) + $timeout;
         do {
             $result = $client->inspect($handle);
             if ($result['state'] === 'exited') {

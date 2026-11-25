@@ -31,6 +31,9 @@ use App\Library\Application\Port\LibraryMediaFileVerdict;
 use App\Lyrics\Application\Port\LyricsFetchRequestInterface;
 use App\Shared\Application\Port\TransactionPortInterface;
 use App\Shared\Domain\Model\Uuid;
+use App\Shared\Domain\ValueObject\MediaContainer;
+use App\Shared\Domain\ValueObject\MediaKind;
+use App\Transcode\Application\Exception\UnsupportedMediaContainerException;
 use App\Transcode\Application\Port\VideoProbePortInterface;
 use App\Transcode\Application\DTO\AudioProbeResult;
 use App\Transcode\Application\Port\AudioProbePortInterface;
@@ -55,6 +58,9 @@ final class FilesDiscoveredHandler
 
     /** How long an import waits before asking again whether a delete with files still holds its library. */
     private const int HELD_LIBRARY_RETRY_DELAY_MS = 30_000;
+
+    /** The largest `.lrc` sidecar an import reads as a song's lyrics. */
+    private const int LYRICS_SIDECAR_BYTES = 1_048_576;
 
     public function __construct(
         private readonly AlbumPortInterface $albumService,
@@ -174,6 +180,7 @@ final class FilesDiscoveredHandler
         $heldRemainder = null;
         foreach (array_chunk($audioFiles, self::BATCH_SIZE) as $batch) {
             $songs = [];
+            $refused = [];
             foreach ($this->currentFiles($libraryId, $batch) as $file) {
                 try {
                     $target = $targets[$file->absolutePath];
@@ -191,10 +198,14 @@ final class FilesDiscoveredHandler
                         $albumIds[$songAlbum->toString()] = $songAlbum;
                         $albumArtists[$songAlbum->toString()][$file->absolutePath] = $song['albumArtist'];
                     }
+                } catch (UnsupportedMediaContainerException $e) {
+                    $refused[] = $file->absolutePath;
+                    $failures[] = $this->fileFailed($file, $e);
                 } catch (\Throwable $e) {
                     $failures[] = $this->fileFailed($file, $e);
                 }
             }
+            $this->markRefusedUnavailable($libraryId, $refused);
             if ($songs === []) {
                 continue;
             }
@@ -346,6 +357,8 @@ final class FilesDiscoveredHandler
     {
         try {
             return $this->audioProbe->probeAudio($file->absolutePath);
+        } catch (UnsupportedMediaContainerException $e) {
+            throw $e;
         } catch (\Throwable $e) {
             $this->logger->warning('Could not probe a known file; its song keeps its stored length.', [
                 'path' => $file->absolutePath,
@@ -404,7 +417,7 @@ final class FilesDiscoveredHandler
             size: $file->size,
             mimeType: $this->detectMimeType($file->extension),
             length: $probe->length(),
-            lyrics: $this->findLyricsFile($file->absolutePath),
+            lyrics: $this->findLyricsFile($album->getLibraryId(), $file->absolutePath),
             track: $fields['track'],
             disc: $fields['disc'],
             year: $fields['year'],
@@ -1117,6 +1130,20 @@ final class FilesDiscoveredHandler
         }
     }
 
+    /**
+     * Marks the index rows of files whose content is not a container of their kind unavailable,
+     * so a song or video imported from one before no longer plays. This runs outside the write
+     * transactions, and the next incremental scan reads such a file again.
+     *
+     * @param list<string> $paths
+     */
+    private function markRefusedUnavailable(Uuid $libraryId, array $paths): void
+    {
+        if ($paths !== []) {
+            $this->mediaFiles->markUnavailable($libraryId, $paths);
+        }
+    }
+
     /** @return array{path: string, error: string} */
     private function fileFailed(DiscoveredFile $file, \Throwable $e): array
     {
@@ -1136,11 +1163,12 @@ final class FilesDiscoveredHandler
         $videoFiles = array_values(array_filter($files, static fn(DiscoveredFile $file): bool => $file->isVideo()));
         foreach (array_chunk($videoFiles, self::BATCH_SIZE) as $batch) {
             $prepared = [];
+            $refused = [];
             foreach ($this->currentFiles($message->libraryId, $batch) as $file) {
                 try {
                     $video = $this->videoRepository->findByHash($file->hash);
                     $isNew = $video === null;
-                    $probe = $video === null || $this->videoNeedsProbe($video)
+                    $probe = $video === null || $this->videoNeedsProbe($video, $file)
                         ? $this->ffprobeAdapter->probeVideo($file->absolutePath) : null;
                     if ($video === null) {
                         $video = Video::create(
@@ -1155,10 +1183,14 @@ final class FilesDiscoveredHandler
                         $video->updateProbe($probe->jsonSerialize());
                     }
                     $prepared[] = ['file' => $file, 'video' => $video, 'isNew' => $isNew, 'probe' => $probe];
+                } catch (UnsupportedMediaContainerException $error) {
+                    $refused[] = $file->absolutePath;
+                    $failures[] = $this->fileFailed($file, $error);
                 } catch (\Throwable $error) {
                     $failures[] = $this->fileFailed($file, $error);
                 }
             }
+            $this->markRefusedUnavailable($message->libraryId, $refused);
             if ($prepared === []) {
                 continue;
             }
@@ -1237,10 +1269,17 @@ final class FilesDiscoveredHandler
         }
     }
 
-    private function videoNeedsProbe(Video $video): bool
+    /**
+     * Whether a known video's stored probe is incomplete, or names a format that is not a video
+     * container of the table, as one imported before imports checked the container does.
+     */
+    private function videoNeedsProbe(Video $video, DiscoveredFile $file): bool
     {
         $probe = $video->getProbe();
         if (!array_key_exists('chapters', $probe) || !isset($probe['containerFormat'], $probe['videoStreamIndex'])) {
+            return true;
+        }
+        if (MediaContainer::identify(MediaKind::Video, (string) $probe['containerFormat'], $file->extension) === null) {
             return true;
         }
         foreach ($probe['audioStreams'] ?? [] as $stream) {
@@ -1371,7 +1410,7 @@ final class FilesDiscoveredHandler
             return $files;
         }
 
-        $this->logger->info('Skipping {count} file(s) deleted since the scan found them; a scan imports any that come back.', [
+        $this->logger->info('Skipping {count} file(s) deleted, or moved outside the library, since the scan found them; a scan imports any that come back.', [
             'count' => count($missing),
             'paths' => $missing,
         ]);
@@ -1402,18 +1441,7 @@ final class FilesDiscoveredHandler
 
     private function detectMimeType(string $extension): string
     {
-        return match ($extension) {
-            'mp3' => 'audio/mpeg',
-            'flac' => 'audio/flac',
-            'ogg', 'oga' => 'audio/ogg',
-            'm4a', 'mp4a', 'm4b' => 'audio/mp4',
-            'wav', 'wave' => 'audio/wav',
-            'aif', 'aiff', 'aifc' => 'audio/aiff',
-            'aac' => 'audio/aac',
-            'opus' => 'audio/opus',
-            'wma' => 'audio/x-ms-wma',
-            default => 'application/octet-stream',
-        };
+        return MediaContainer::forExtension($extension)?->mediaType() ?? 'application/octet-stream';
     }
 
     private function extractTrackNumberFromFilename(string $path): ?int
@@ -1428,17 +1456,15 @@ final class FilesDiscoveredHandler
         return null;
     }
 
-    private function findLyricsFile(string $audioPath): ?string
+    /** The `.lrc` file beside a song, read only when it resolves inside the song's library. */
+    private function findLyricsFile(Uuid $libraryId, string $audioPath): ?string
     {
         $lyricPath = pathinfo($audioPath, PATHINFO_DIRNAME)
             . DIRECTORY_SEPARATOR
             . pathinfo($audioPath, PATHINFO_FILENAME)
             . '.lrc';
 
-        if (file_exists($lyricPath) && is_readable($lyricPath)) {
-            return file_get_contents($lyricPath);
-        }
-        return null;
+        return $this->mediaFiles->readSidecar($libraryId, $lyricPath, self::LYRICS_SIDECAR_BYTES);
     }
 
     /**

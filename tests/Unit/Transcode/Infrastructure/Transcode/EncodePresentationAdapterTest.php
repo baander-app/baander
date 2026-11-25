@@ -4,10 +4,14 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Transcode\Infrastructure\Transcode;
 
+use App\Catalog\Application\Dto\VideoSourceMetadata;
 use App\Catalog\Application\Port\VideoPortInterface;
 use App\Catalog\Domain\Model\Video;
 use App\Shared\Application\DTO\DeploymentProfile;
+use App\Shared\Application\Exception\ConflictException;
+use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
+use App\Shared\Domain\ValueObject\LibraryReadScope;
 use App\Transcode\Application\Command\CreateTranscodeSessionCommand;
 use App\Transcode\Application\Exception\TranscodeStartupUnavailableException;
 use App\Transcode\Application\Port\FFmpegPortInterface;
@@ -100,10 +104,31 @@ final class EncodePresentationAdapterTest extends TestCase
         ));
     }
 
-    private function adapter(Video $video, WorkerEncoderCapabilitiesSnapshotStore $snapshots): EncodePresentationAdapter
+    public function testASourceThatNoLongerResolvesInsideItsLibraryIsRefusedBeforeAdmission(): void
+    {
+        $video = $this->video();
+        $snapshots = new WorkerEncoderCapabilitiesSnapshotStore($this->snapshotPath);
+        $snapshots->publish(EncoderProfile::software(), 1.0, 'worker');
+        $this->expectExceptionObject(new ConflictException('Playback media is unavailable.'));
+
+        $this->adapter($video, $snapshots, contained: false)->select(new CreateTranscodeSessionCommand(
+            Uuid::generate(),
+            $video->getId(),
+            QualityTier::p720(),
+            AudioProfile::streamingStereo(),
+        ));
+    }
+
+    private function adapter(Video $video, WorkerEncoderCapabilitiesSnapshotStore $snapshots, bool $contained = true): EncodePresentationAdapter
     {
         $videos = $this->createStub(VideoPortInterface::class);
         $videos->method('findByUuid')->willReturn($video);
+        $videos->method('getSourceMetadata')->willReturnCallback(
+            static fn(PublicId $publicId, LibraryReadScope $scope): ?VideoSourceMetadata => $contained && $scope->isUnrestricted()
+                ? new VideoSourceMetadata($video->getId(), $publicId->toString(), $video->getPath(), basename($video->getPath()), 1,
+                    'video/x-matroska', $video->getHash(), 'matroska,webm', 'h264', 3, [], 1920, 1080, 24.0, 12.0)
+                : null,
+        );
         return new EncodePresentationAdapter(
             $videos,
             $snapshots,

@@ -63,6 +63,9 @@ final class SegmentEncoderStreamArgsTest extends TestCase
         $audio = self::inputArguments($args, 1);
         self::assertSame('/source.mkv', $video[array_key_last($video)]);
         self::assertSame('/source.mkv', $audio[array_key_last($audio)]);
+        $clause = ['-format_whitelist', 'mov,matroska,avi,asf', '-protocol_whitelist', 'file', '-i', '/source.mkv'];
+        self::assertSame($clause, array_slice($video, -6), 'The video input opens only a library video container');
+        self::assertSame($clause, array_slice($audio, -6), 'The audio input opens only a library video container');
         self::assertSame('2', $audio[array_search('-threads', $audio, true) + 1]);
         foreach (['-vn', '-sn', '-dn'] as $flag) {
             self::assertContains($flag, $audio);
@@ -351,7 +354,8 @@ final class SegmentEncoderStreamArgsTest extends TestCase
             self::assertNotContains('-af', $videoOnly);
             $offset = $origin === null ? ['-itsoffset', '-10.000000'] : ['-seek_timestamp', '1', '-itsoffset', '-28.000000'];
             self::assertSame(['-threads', '2', '-vn', '-sn', '-dn', ...$offset,
-                '-ss', $origin === null ? '14.000000' : '18.000000', '-noaccurate_seek', '-i', '/source.mkv'],
+                '-ss', $origin === null ? '14.000000' : '18.000000', '-noaccurate_seek',
+                '-format_whitelist', 'mov,matroska,avi,asf', '-protocol_whitelist', 'file', '-i', '/source.mkv'],
                 self::inputArguments($args, 1));
             self::assertContains('1:a:2', $args);
             self::assertSame('2', $args[array_search('-threads:v', $args, true) + 1]);

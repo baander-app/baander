@@ -29,7 +29,7 @@ decoder libfdk_aac
 encoder aac
 decoder aac
 # Filters the video filter builder emits for software, VAAPI, QSV and NVENC
-# work, and the demuxer that probes published DASH manifests.
+# work.
 filter zscale
 filter tonemap
 filter tonemap_vaapi
@@ -42,6 +42,16 @@ filter scale_qsv
 filter deinterlace_qsv
 filter scale_cuda
 filter yadif_cuda
+# Every demuxer an input-kind format whitelist names: the library audio and
+# video containers, and DASH for the probe of a published presentation.
 demuxer dash
 demuxer mov
 demuxer matroska
+demuxer avi
+demuxer asf
+demuxer mp3
+demuxer flac
+demuxer ogg
+demuxer wav
+demuxer aac
+demuxer aiff

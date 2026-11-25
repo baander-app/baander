@@ -6,6 +6,7 @@ namespace App\Transcode\Infrastructure\Transcode;
 
 use App\Catalog\Application\Port\VideoPortInterface;
 use App\Shared\Domain\Model\Uuid;
+use App\Shared\Domain\ValueObject\LibraryReadScope;
 use App\Transcode\Application\DTO\CompletedVideoArtifact;
 use App\Transcode\Application\DTO\MediaTrack;
 use App\Transcode\Application\Port\CompletedVideoArtifactPort;
@@ -38,6 +39,12 @@ final readonly class CompletedVideoArtifactAdapter implements CompletedVideoArti
             $source === null || $source->getHash() !== $sourceHash
             || !array_key_exists('subtitleStreams', $source->getProbe()) || $source->getProbe()['subtitleStreams'] !== []
         ) {
+            return [];
+        }
+        // The artifact must still match a file inside one of the video's libraries; the caller
+        // checked the viewer's access, so the scope is unrestricted.
+        $file = $this->videos->getSourceMetadata($source->getPublicId(), LibraryReadScope::unrestricted())?->filePath;
+        if ($file === null) {
             return [];
         }
         $artifacts = [];
@@ -74,8 +81,8 @@ final readonly class CompletedVideoArtifactAdapter implements CompletedVideoArti
                     ($metadata['complete'] ?? null) !== true || ($metadata['generation'] ?? null) !== $runtime->generation
                     || ($metadata['presentationSelection'] ?? null) !== $selection->jsonSerialize()
                     || ($metadata['startTime'] ?? -1) != 0
-                    || ($metadata['sourceSize'] ?? null) !== @filesize($source->getPath())
-                    || ($metadata['sourceModified'] ?? null) !== @filemtime($source->getPath())
+                    || ($metadata['sourceSize'] ?? null) !== @filesize($file)
+                    || ($metadata['sourceModified'] ?? null) !== @filemtime($file)
                     || !is_int($metadata['bitDepth'] ?? null) || !is_bool($metadata['hdr'] ?? null) || !is_string($metadata['pixelFormat'] ?? null)
                 ) {
                     continue;

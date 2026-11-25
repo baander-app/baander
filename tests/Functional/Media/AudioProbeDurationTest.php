@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Tests\Functional\Media;
 
 use App\Transcode\Application\DTO\AudioProbeResult;
+use App\Transcode\Application\Exception\UnsupportedMediaContainerException;
 use App\Transcode\Application\Port\AudioProbePortInterface;
 use Symfony\Bundle\FrameworkBundle\Test\KernelTestCase;
 use Symfony\Component\Filesystem\Filesystem;
@@ -44,20 +45,20 @@ final class AudioProbeDurationTest extends KernelTestCase
         self::assertEqualsWithDelta(3.0, $probe->length(), 0.05);
     }
 
-    public function testMatroskaLengthIsTheContainerDurationMinusItsStartTime(): void
+    /**
+     * Matroska audio is not a song container, so the production probe refuses it; the
+     * container-span fallback of a song's length is covered by AudioProbeResultTest.
+     */
+    public function testMatroskaAudioIsRefusedAsASongContainer(): void
     {
-        $source = $this->encodeThreeSeconds('track.mka', ['-c:a', 'flac', '-output_ts_offset', '1']);
+        $source = $this->encodeThreeSeconds('track.mka', ['-c:a', 'flac']);
 
-        $probe = $this->probe($source);
-
-        // Matroska audio states no stream duration, and its container duration is the end timestamp.
-        self::assertNull($probe->duration);
-        self::assertNotNull($probe->containerStartTime);
-        self::assertEqualsWithDelta(1.0, $probe->containerStartTime, 0.001);
-        self::assertNotNull($probe->containerDuration);
-        self::assertEqualsWithDelta(4.0, $probe->containerDuration, 0.05);
-        self::assertNotNull($probe->length());
-        self::assertEqualsWithDelta(3.0, $probe->length(), 0.05);
+        try {
+            $this->probe($source);
+            self::fail('Matroska audio must not probe as a song.');
+        } catch (UnsupportedMediaContainerException $refusal) {
+            self::assertSame('matroska,webm', $refusal->format);
+        }
     }
 
     private function probe(string $source): AudioProbeResult

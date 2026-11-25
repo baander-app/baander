@@ -77,10 +77,11 @@ final class AudioRenditionWorkerHandoffTest extends TestCase
 
     public function testSelectedNonzeroAacStreamIsCopiedWithoutTheVideoStream(): void
     {
-        $source = $this->root . '/audio-with-video.mkv';
+        // A song container may carry a picture stream first, as an MPEG-4 file with its cover does.
+        $source = $this->root . '/audio-with-video.m4a';
         $fixture = new Process(['/usr/bin/ffmpeg', '-nostdin', '-hide_banner', '-loglevel', 'error',
             '-f', 'lavfi', '-i', 'color=c=black:s=16x16:r=1:d=3', '-i', $this->source,
-            '-map', '0:v:0', '-map', '1:a:0', '-c:v', 'mpeg4', '-c:a', 'aac', '-shortest', $source]);
+            '-map', '0:v:0', '-map', '1:a:0', '-c:v', 'mpeg4', '-c:a', 'aac', '-shortest', '-f', 'mp4', $source]);
         $fixture->mustRun();
         $reference = $this->root . '/reference.aac';
         (new Process(['/usr/bin/ffmpeg', '-nostdin', '-hide_banner', '-loglevel', 'error', '-i', $source,

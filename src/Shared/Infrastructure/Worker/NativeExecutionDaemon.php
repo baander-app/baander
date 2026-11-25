@@ -355,22 +355,19 @@ final class NativeExecutionDaemon
                     $attempt->error = 'Native process group signalling was not proven.';
                 }
             }
-            foreach ([1 => 'stdout', 2 => 'stderr'] as $index => $field) {
+            foreach ([1, 2] as $index) {
                 $chunk = @fread($attempt->pipes[$index], 65_536);
                 if ($chunk === false) {
                     $this->poisoned = true;
                     $attempt->error = 'Native output drainage failed.';
-                } elseif (strlen($attempt->{$field}) + strlen($chunk) > NativeExecutionProtocol::OUTPUT_BYTES) {
-                    $attempt->error = 'Native output byte limit exceeded.';
-                    $this->poisoned = true;
-                } else {
-                    $attempt->{$field} .= $chunk;
+                } elseif ($attempt->collect($index, $chunk)) {
+                    // Too much output is the command's own failure: stop it as the deadline does.
+                    $this->stop($attempt);
                 }
             }
             if (self::now() >= $attempt->deadline && $attempt->stopDeadline === null) {
                 $attempt->error = 'Native execution deadline exceeded.';
-                @posix_kill(-$attempt->pid, SIGKILL);
-                $attempt->stopDeadline = self::now() + 1;
+                $this->stop($attempt);
             }
             $reapedBefore = self::reapedChildrenCpu();
             $status = proc_get_status($attempt->process);
@@ -379,18 +376,18 @@ final class NativeExecutionDaemon
                 // CPU time is exactly what the command and its waited descendants consumed.
                 $attempt->cpuSeconds = max($attempt->cpuSeconds, self::reapedChildrenCpu() - $reapedBefore);
                 // Drain the remaining bounded pipe buffers before publishing the terminal receipt.
-                foreach ([1 => 'stdout', 2 => 'stderr'] as $index => $field) {
+                foreach ([1, 2] as $index) {
                     $tail = stream_get_contents($attempt->pipes[$index], NativeExecutionProtocol::OUTPUT_BYTES + 1);
-                    if ($tail === false || strlen($attempt->{$field}) + strlen($tail) > NativeExecutionProtocol::OUTPUT_BYTES) {
-                        $attempt->error = 'Native output byte limit exceeded.';
+                    if ($tail === false) {
+                        $attempt->error = 'Native output drainage failed.';
                         $this->poisoned = true;
                     } else {
-                        $attempt->{$field} .= $tail;
+                        $attempt->collect($index, $tail);
                     }
                     fclose($attempt->pipes[$index]);
                 }
                 $attempt->pipes = [];
-                $attempt->exitCode = $status['signaled'] ? 128 + $status['termsig'] : $status['exitcode'];
+                $attempt->exit($status['signaled'] ? 128 + $status['termsig'] : $status['exitcode']);
                 proc_close($attempt->process);
                 if (posix_kill(-$attempt->pid, 0)) {
                     @posix_kill(-$attempt->pid, SIGKILL);
@@ -403,6 +400,15 @@ final class NativeExecutionDaemon
             } elseif ($attempt->stopDeadline !== null && self::now() >= $attempt->stopDeadline) {
                 $this->poisoned = true;
             }
+        }
+    }
+
+    /** A group not reaped by the stop deadline poisons the daemon: its stop outcome is unknown. */
+    private function stop(NativeExecutionAttempt $attempt): void
+    {
+        if ($attempt->stopDeadline === null) {
+            @posix_kill(-$attempt->pid, SIGKILL);
+            $attempt->stopDeadline = self::now() + 1;
         }
     }
 

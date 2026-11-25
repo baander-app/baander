@@ -15,6 +15,8 @@ use App\Transcode\Application\Settings\TranscodeSettingDefinitions;
 use App\Transcode\Domain\ValueObject\AacImplementation;
 use App\Transcode\Infrastructure\Storage\SegmentFileResolver;
 use App\Transcode\Infrastructure\FFmpeg\AacImplementationProbe;
+use App\Transcode\Infrastructure\FFmpeg\FFmpegArguments;
+use App\Transcode\Infrastructure\FFmpeg\FFmpegInputKind;
 use App\Transcode\Infrastructure\FFmpeg\ProcessExecutor;
 use App\Shared\Infrastructure\Worker\NativeExecutionException;
 use Psr\Log\LoggerInterface;
@@ -141,7 +143,8 @@ final class AudioRenditionExecutor
         }
         $arguments = [
             $this->ffmpegPath, '-nostdin', '-hide_banner', '-loglevel', 'error', '-y',
-            '-threads', '1', '-filter_threads', '1', '-filter_complex_threads', '1', ...$decoder, '-i', $input->sourcePath,
+            '-threads', '1', '-filter_threads', '1', '-filter_complex_threads', '1', ...$decoder,
+            ...FFmpegArguments::inputClause($input->sourcePath, FFmpegInputKind::LibraryAudio),
         ];
         if ($input->mode === 'copy') {
             array_push($arguments, '-map', '0:' . $input->streamIndex, '-c:a', 'copy', '-vn', '-sn', '-dn', '-movflags', '+faststart', '-f', 'mp4', $partial);
@@ -169,7 +172,8 @@ final class AudioRenditionExecutor
     {
         $input = $claim->runtime->input;
         $probe = $this->execute($claim, [$this->ffprobePath, '-v', 'error', '-select_streams', 'a:0',
-            '-show_entries', 'stream=codec_name', '-of', 'json', $input->sourcePath], 60, $stopRequested);
+            '-show_entries', 'stream=codec_name', '-of', 'json', ...FFmpegArguments::inputClause($input->sourcePath, FFmpegInputKind::LibraryAudio)],
+            60, $stopRequested);
         if ($probe === null) {
             return false;
         }
@@ -216,7 +220,8 @@ final class AudioRenditionExecutor
             throw new RuntimeException('The admitted audio source changed before copying.');
         }
         $probe = $this->execute($claim, [$this->ffprobePath, '-v', 'error', '-select_streams', (string) $input->streamIndex,
-            '-show_entries', 'stream=index,codec_type,codec_name', '-of', 'json', $input->sourcePath], 60, $stopRequested);
+            '-show_entries', 'stream=index,codec_type,codec_name', '-of', 'json',
+            ...FFmpegArguments::inputClause($input->sourcePath, FFmpegInputKind::LibraryAudio)], 60, $stopRequested);
         if ($probe === null) {
             return false;
         }

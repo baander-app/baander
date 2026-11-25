@@ -6,9 +6,17 @@ namespace App\Tests\Unit\Transcode\Infrastructure\Swoole;
 
 use App\Catalog\Domain\Model\Video;
 use App\Catalog\Domain\Repository\VideoRepositoryInterface;
+use App\Catalog\Infrastructure\VideoService;
+use App\Library\Domain\Model\Library;
+use App\Library\Domain\Repository\LibraryRepositoryInterface;
+use App\Library\Domain\ValueObject\LibraryPath;
+use App\Library\Domain\ValueObject\LibrarySlug;
+use App\Library\Domain\ValueObject\LibraryType;
+use App\Library\Infrastructure\Filesystem\LibraryMediaFileResolver;
 use App\QoL\Application\Port\StreamAdmissionPortInterface;
 use App\QoL\Domain\ValueObject\EncoderWork;
 use App\Shared\Domain\Model\Uuid;
+use App\Shared\Domain\ValueObject\FilesystemType;
 use App\Tests\Support\PublishedPresentationFixture;
 use App\Shared\Infrastructure\Worker\NativeExecutionClientInterface;
 use App\Shared\Infrastructure\Worker\NativeExecutionHandle;
@@ -77,6 +85,7 @@ final class TranscodeWorkerExecutionTest extends TestCase
     /** @var list<list<string>> */
     private array $probeCommands = [];
     private bool $sourceHasAudio = true;
+    private bool $keyframeListingOverflows = false;
     private bool $forbidEncoder = false;
     /** @var list<array<string, mixed>> */
     private array $subtitleStreams = [];
@@ -109,8 +118,20 @@ final class TranscodeWorkerExecutionTest extends TestCase
         });
         $sessions = $this->createStub(TranscodeSessionPortInterface::class);
         $sessions->method('findByUuid')->willReturnCallback(fn() => $this->session);
-        $videos = $this->createStub(VideoRepositoryInterface::class);
-        $videos->method('findByUuid')->willReturn($video);
+        // The worker resolves its source as playback does: inside the library that holds the video.
+        $rows = $this->createStub(VideoRepositoryInterface::class);
+        $rows->method('findByUuid')->willReturn($video);
+        $rows->method('findByPublicId')->willReturn($video);
+        $rows->method('getLibraryIdsByPublicId')->willReturn([Uuid::generate()]);
+        $libraries = $this->createStub(LibraryRepositoryInterface::class);
+        $libraries->method('findByUuid')->willReturn(Library::create(
+            'Worker films',
+            new LibrarySlug('worker-films'),
+            new LibraryPath($this->root),
+            LibraryType::Movie,
+            FilesystemType::Local,
+        ));
+        $videos = new VideoService($rows, new LibraryMediaFileResolver($libraries));
         $pool = $this->createStub(NativeExecutionClientInterface::class);
         $pool->method('handshake')->willReturn(['ready' => true]);
         $pool->method('signal')->willReturnCallback(function (NativeExecutionHandle $handle): array {
@@ -141,6 +162,9 @@ final class TranscodeWorkerExecutionTest extends TestCase
                 $arguments = $this->subtitleCommands[$handle->attempt];
                 file_put_contents($arguments[array_key_last($arguments)], "WEBVTT\n\n00:01.000 --> 00:02.000\nCue\n");
                 return ['state' => 'exited', 'exitCode' => $this->subtitleFails ? 1 : 0, 'stderr' => $this->subtitleFails ? 'Failed subtitle conversion' : '', 'error' => null, 'stdout' => '', 'cpuSeconds' => 0.0];
+            }
+            if (in_array('-skip_frame', $this->probeCommands[array_key_last($this->probeCommands)] ?? [], true)) {
+                return $this->keyframeListing();
             }
             return ['state' => 'exited', 'exitCode' => 0, 'stderr' => '', 'error' => null, 'cpuSeconds' => 0.0, 'stdout' => json_encode($this->sourceProbeOutput ?? [
                 'format' => ['duration' => $this->sourceDuration + ($this->sourceTimestampOrigin ?? 0.0),
@@ -207,6 +231,7 @@ final class TranscodeWorkerExecutionTest extends TestCase
             $entry->isDir() ? rmdir($entry->getPathname()) : unlink($entry->getPathname());
         }
         rmdir($this->root);
+        (new \Symfony\Component\Filesystem\Filesystem())->remove($this->root . '-outside');
     }
 
     public function testAMissingSelectedAacImplementationFailsTheJobBeforeTheEncoderStarts(): void
@@ -338,6 +363,38 @@ final class TranscodeWorkerExecutionTest extends TestCase
         self::assertSame(TranscodeStatus::Completed, $this->job->getStatus());
         self::assertStringEndsWith('/generation-2', $this->job->getOutputDirectory());
         self::assertSame(0, $this->allocations);
+    }
+
+    public function testAKeyframeListingOverTheOutputBoundFailsThatCopySessionWithItsReason(): void
+    {
+        $worker = $this->copyWorker();
+        $this->keyframeListingOverflows = true;
+
+        $worker->run($this->current, static fn(): bool => false);
+
+        self::assertSame(['accepted', 'failed'], $this->observed);
+        self::assertSame(
+            "The source keyframe listing failed: [h264 @ 0x1] warning\nNative output byte limit exceeded.",
+            $this->observedErrors[1],
+        );
+        self::assertSame([], $this->spawner->commands);
+        self::assertSame(TranscodeStatus::Failed, $this->job->getStatus());
+        self::assertSame(1, $this->releases);
+    }
+
+    /** @return array<string, mixed> the native status of the compact keyframe listing */
+    private function keyframeListing(): array
+    {
+        if ($this->keyframeListingOverflows) {
+            return ['state' => 'exited', 'exitCode' => 137, 'stdout' => '', 'stderr' => "[h264 @ 0x1] warning\n",
+                'error' => 'Native output byte limit exceeded.', 'cpuSeconds' => 0.0];
+        }
+        $lines = array_map(
+            static fn(array $frame): string => sprintf("%d,%s,\n", $frame['key_frame'], $frame['best_effort_timestamp_time']),
+            $this->sourceProbeOutput['frames'] ?? [],
+        );
+
+        return ['state' => 'exited', 'exitCode' => 0, 'stdout' => implode('', $lines), 'stderr' => '', 'error' => null, 'cpuSeconds' => 0.0];
     }
 
     private function copyWorker(): TranscodeSessionSubscriber
@@ -697,6 +754,40 @@ final class TranscodeWorkerExecutionTest extends TestCase
         self::assertContains('complete', $this->observed);
         self::assertSame(1, $this->job->getCompletedSegments());
         self::assertSame(0, $this->allocations);
+    }
+
+    public function testASourceLinkRetargetedOutsideItsLibraryFailsTheSessionBeforeAnyFfmpegCommand(): void
+    {
+        $this->retargetSourceOutsideTheLibrary();
+
+        $this->worker->run($this->current, static fn(): bool => false);
+
+        self::assertSame([], $this->probeCommands);
+        self::assertSame([], $this->spawner->commands);
+        self::assertSame(['accepted', 'failed'], $this->observed);
+        self::assertSame('The source video is not available inside its library.', $this->observedErrors[1]);
+        self::assertSame(TranscodeStatus::Failed, $this->job->getStatus());
+        self::assertSame(1, $this->releases);
+    }
+
+    public function testAControlRevisionAtTheFenceDoesNotLoseTheSourceRefusal(): void
+    {
+        $this->retargetSourceOutsideTheLibrary();
+        $fences = 0;
+        $this->onFence = function () use (&$fences): void {
+            if (++$fences === 1) {
+                // A playback progress report commits a new desired revision while the failure persists.
+                $this->current = $this->claim(1, 2);
+            }
+        };
+
+        $this->worker->run($this->current, static fn(): bool => false);
+
+        self::assertSame(2, $fences, 'The refused failure is written once more under the refreshed claim.');
+        self::assertSame([], $this->probeCommands);
+        self::assertSame(['accepted', 'failed'], $this->observed);
+        self::assertSame(TranscodeStatus::Failed, $this->job->getStatus());
+        self::assertSame('The source video is not available inside its library.', $this->job->getFailReason());
     }
 
     public function testControlRevisionDuringCompletionStillCompletesTheSealedGeneration(): void
@@ -1103,6 +1194,16 @@ final class TranscodeWorkerExecutionTest extends TestCase
         return new TranscodeExecutionClaim(new TranscodeRuntimeSnapshot($this->job->getId(), $this->session->getId(), 'request',
             new DesiredTranscodeState($profile ?? AudioProfile::streamingStereo(), $status, $position, presentationSelection: $this->job->getPresentationSelection(), aacImplementation: $implementation), $revision, 0, $generation, 'pending', null, null, true),
             new MediaWorkerIdentity('test', str_repeat('a', 32), 'media', 1), str_repeat('b', 64));
+    }
+
+    /** The stored path stays in the library but becomes a link to a file outside it. */
+    private function retargetSourceOutsideTheLibrary(): void
+    {
+        $outside = $this->root . '-outside';
+        mkdir($outside, 0700);
+        file_put_contents($outside . '/film.mkv', 'source');
+        unlink($this->root . '/source');
+        self::assertTrue(symlink($outside . '/film.mkv', $this->root . '/source'));
     }
 
     private function claimMatches(TranscodeExecutionClaim $claim): bool

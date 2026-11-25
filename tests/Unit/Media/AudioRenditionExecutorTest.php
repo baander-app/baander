@@ -402,6 +402,20 @@ final class AudioRenditionExecutorTest extends TestCase
         self::assertSame('libopus', $encode[array_search('-c:a', $encode, true) + 1]);
     }
 
+    public function testTheProbeAndTheEncoderOpenTheSourceOnlyAsALibraryAudioContainer(): void
+    {
+        $source = $this->claim->runtime->input->sourcePath;
+        foreach ($this->runEncode('flac', AudioRenditionFormat::Mp3, 'bac') as $command) {
+            $input = array_search('-i', $command, true);
+            self::assertIsInt($input);
+            self::assertSame(
+                ['-format_whitelist', 'mp3,flac,ogg,wav,aac,mov,asf,aiff', '-protocol_whitelist', 'file', '-i', $source],
+                array_slice($command, $input - 4, 6),
+            );
+            self::assertCount(1, array_keys($command, '-i', true));
+        }
+    }
+
     public function testANonAacSourceGetsNoForcedDecoderAndNoAacCodecName(): void
     {
         $encode = $this->runEncode('flac', AudioRenditionFormat::Mp3, 'bac')[1];

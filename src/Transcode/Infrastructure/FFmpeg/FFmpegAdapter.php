@@ -102,7 +102,8 @@ final class FFmpegAdapter implements FFmpegPortInterface
         $resolvedProfile = $this->encoderProfile->withDecoderForSource($sourceCodec);
         $cmd = [
             $this->ffmpegPath, '-nostdin', '-y', ...FFmpegArguments::input($resolvedProfile),
-            '-ss', sprintf('%.6f', $startTime), '-t', sprintf('%.6f', $duration), '-i', $sourcePath,
+            '-ss', sprintf('%.6f', $startTime), '-t', sprintf('%.6f', $duration),
+            ...FFmpegArguments::inputClause($sourcePath, FFmpegInputKind::LibraryVideo),
             ...FFmpegArguments::flags($encoderFlags),
             '-b:v', (string) $qualityTier->videoBitrate, '-maxrate', (string) $qualityTier->maxBitrate,
             '-bufsize', (string) $qualityTier->bufferSize, ...$vf,
@@ -130,7 +131,10 @@ final class FFmpegAdapter implements FFmpegPortInterface
     {
         $filter = AudioProcessingRules::loudnessFilter($standard);
 
-        $cmd = [$this->ffmpegPath, '-nostdin', '-i', $sourcePath, '-af', $filter, '-f', 'null', '-'];
+        $cmd = [
+            $this->ffmpegPath, '-nostdin', ...FFmpegArguments::inputClause($sourcePath, FFmpegInputKind::LibraryVideo),
+            '-af', $filter, '-f', 'null', '-',
+        ];
 
         $result = ProcessExecutor::exec($cmd, 600);
 
@@ -162,7 +166,8 @@ final class FFmpegAdapter implements FFmpegPortInterface
         $codecOptions = AudioProcessingRules::codecOptions($profile, $this->aacImplementation());
 
         $cmd = [
-            $this->ffmpegPath, '-nostdin', '-y', '-i', $sourcePath, '-vn', '-t', '0.001',
+            $this->ffmpegPath, '-nostdin', '-y', ...FFmpegArguments::inputClause($sourcePath, FFmpegInputKind::LibraryVideo),
+            '-vn', '-t', '0.001',
             ...FFmpegArguments::flags($codecOptions), '-ar', (string) ($audioProfile['sampleRate'] ?? 48000),
             '-ac', (string) ($audioProfile['channelCount'] ?? 2),
             '-movflags', '+frag_keyframe+empty_moov+default_base_moof', '-f', 'mp4', $outputPath,
@@ -202,7 +207,8 @@ final class FFmpegAdapter implements FFmpegPortInterface
 
         $cmd = [
             $this->ffmpegPath, '-nostdin', '-y', '-ss', sprintf('%.6f', $startTime),
-            '-t', sprintf('%.6f', $duration), '-i', $sourcePath, '-vn',
+            '-t', sprintf('%.6f', $duration), ...FFmpegArguments::inputClause($sourcePath, FFmpegInputKind::LibraryVideo),
+            '-vn',
             ...FFmpegArguments::flags($codecOptions), '-ar', (string) ($audioProfile['sampleRate'] ?? 48000),
             '-ac', (string) ($audioProfile['channelCount'] ?? 2), ...$afArg,
             '-movflags', '+frag_keyframe+separate_moof+default_base_moof', '-f', 'mp4', $outputPath,
@@ -227,7 +233,10 @@ final class FFmpegAdapter implements FFmpegPortInterface
             mkdir($dir, 0755, true);
         }
 
-        $cmd = [$this->ffmpegPath, '-nostdin', '-y', '-i', $sourcePath, '-map', '0:s:m:language:' . $language, '-vn', '-an', '-f', 'webvtt', $outputPath];
+        $cmd = [
+            $this->ffmpegPath, '-nostdin', '-y', ...FFmpegArguments::inputClause($sourcePath, FFmpegInputKind::LibraryVideo),
+            '-map', '0:s:m:language:' . $language, '-vn', '-an', '-f', 'webvtt', $outputPath,
+        ];
 
         $result = ProcessExecutor::exec($cmd, 120);
         if ($result['code'] !== 0) {

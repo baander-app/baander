@@ -114,6 +114,13 @@ final class TranscodeSessionController
                 ),
             ),
             new OA\Response(
+                response: '409',
+                description: 'Playback media is unavailable: the video file no longer resolves inside one of its libraries',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
+            ),
+            new OA\Response(
                 response: '422',
                 description: 'Validation error',
                 content: new OA\MediaType\Json(

@@ -184,6 +184,39 @@ final class VideoTimelinePreviewTest extends TestCase
         self::assertSame('unavailable', $previews->describe($source)['state']);
     }
 
+    public function testAManifestNamedLikeAFilmGetsNoContactSheetOfTheFilmItNames(): void
+    {
+        $film = $this->directory . '/elsewhere.mp4';
+        $result = \App\Transcode\Infrastructure\FFmpeg\ProcessExecutor::exec([
+            '/usr/bin/ffmpeg', '-v', 'error', '-y', '-f', 'lavfi', '-i', 'color=c=red:s=320x180:r=2:d=2',
+            '-c:v', 'libx264', '-pix_fmt', 'yuv420p', $film,
+        ], 10);
+        self::assertSame(0, $result['code'], $result['error']);
+        $manifest = $this->directory . '/Holiday Clip (2021).mkv';
+        file_put_contents($manifest, '<?xml version="1.0" encoding="utf-8"?><MPD xmlns="urn:mpeg:dash:schema:mpd:2011"'
+            . ' profiles="urn:mpeg:dash:profile:isoff-on-demand:2011" type="static" mediaPresentationDuration="PT2S" minBufferTime="PT1S">'
+            . '<Period><AdaptationSet mimeType="video/mp4"><Representation id="1" bandwidth="100000" codecs="avc1.64000d">'
+            . '<BaseURL>' . $film . '</BaseURL><SegmentBase indexRange="0-0"/></Representation></AdaptationSet></Period></MPD>');
+        $source = new VideoSourceMetadata(new Uuid(), '123456789012345678902', $manifest, 'Holiday Clip (2021).mkv', 1,
+            'video/x-matroska', 'hash', 'matroska', 'h264', 0, [], 320, 180, 2.0, 2.0);
+        $command = null;
+        $bus = $this->createMock(MessageBusInterface::class);
+        $bus->expects(self::once())->method('dispatch')->willReturnCallback(static function (object $message) use (&$command): Envelope {
+            $command = $message;
+            return new Envelope($message);
+        });
+        $previews = new VideoTimelinePreview($bus, $this->directory);
+        $previews->describe($source);
+
+        try {
+            $previews->prepare($command->path, $command->identity, $command->duration, $command->origin,
+                $command->sourceHash, $command->videoStreamIndex);
+            self::fail('A manifest must not yield a contact sheet.');
+        } catch (\RuntimeException) {
+            self::assertNull($previews->image($source));
+        }
+    }
+
     public function testGenerationFailureIsRecordedAndNeverPublished(): void
     {
         $command = null;

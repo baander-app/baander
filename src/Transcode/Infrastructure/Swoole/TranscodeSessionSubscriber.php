@@ -7,8 +7,11 @@ namespace App\Transcode\Infrastructure\Swoole;
 use App\Transcode\Application\DTO\MediaOperation;
 use App\Transcode\Application\Exception\MediaEncodingProhibitedException;
 use App\Transcode\Application\Service\MediaExecutionPolicy;
-use App\Catalog\Domain\Repository\VideoRepositoryInterface;
+use App\Catalog\Application\Dto\VideoSourceMetadata;
+use App\Catalog\Application\Port\VideoPortInterface;
 use App\QoL\Application\Port\StreamAdmissionPortInterface;
+use App\Shared\Domain\Model\Uuid;
+use App\Shared\Domain\ValueObject\LibraryReadScope;
 use App\Shared\Infrastructure\Swoole\Async;
 use App\Shared\Infrastructure\Worker\NativeExecutionException;
 use App\Transcode\Application\DTO\TranscodeExecutionClaim;
@@ -39,6 +42,8 @@ use Throwable;
 final class TranscodeSessionSubscriber implements TranscodeLoopStarterInterface
 {
     private const int LEASE_SECONDS = 15;
+    /** How often a failure is recorded again after a control revision refused its fenced write. */
+    private const int FAILURE_RECORD_ATTEMPTS = 3;
     /** The lead throttle stops a producer this far ahead of the playhead and resumes it at the lower mark. */
     public const float PAUSE_LEAD_SECONDS = 72.0;
     public const float RESUME_LEAD_SECONDS = 36.0;
@@ -51,7 +56,7 @@ final class TranscodeSessionSubscriber implements TranscodeLoopStarterInterface
         private readonly TranscodeStoragePortInterface $storage,
         private readonly TranscodeProcessPool $processPool,
         private readonly Closure $segmentEncoder,
-        private readonly VideoRepositoryInterface $videoRepository,
+        private readonly VideoPortInterface $videos,
         private readonly LoggerInterface $logger,
         private readonly TranscodeExecutionOwnershipPort $ownership,
         private readonly TranscodeExecutionOwnershipPort $controlOwnership,
@@ -125,15 +130,12 @@ final class TranscodeSessionSubscriber implements TranscodeLoopStarterInterface
                 }
                 $active = $latest;
             }
-            $video = $this->videoRepository->findByUuid($job->getVideoId());
-            if ($video === null || !is_file($video->getPath())) {
-                throw new RuntimeException('Source video not found.');
-            }
-            $source = $video->getPath();
+            $video = $this->source($job->getVideoId());
+            $source = $video->filePath;
             if ($copy) {
                 if (
                     $job->getPresentationSelection()?->canonicalKey() !== $selection->canonicalKey()
-                    || $video->getHash() !== $selection->sourceHash
+                    || $video->hash !== $selection->sourceHash
                 ) {
                     throw new RuntimeException('The admitted copy source identity changed.');
                 }
@@ -172,12 +174,9 @@ final class TranscodeSessionSubscriber implements TranscodeLoopStarterInterface
                     $selection->videoStreamIndex,
                     $active->runtime->generation,
                 );
-                $copyFrames = json_decode(
-                    $this->awaitHelper($keyframes, $active, $local, $stopRequested),
-                    true,
-                    512,
-                    JSON_THROW_ON_ERROR,
-                )['frames'] ?? [];
+                $copyFrames = CopySourceTiming::keyframes(
+                    $this->awaitHelper($keyframes, 'The source keyframe listing', $active, $local, $stopRequested),
+                );
                 $targetDuration = $copyTiming->targetDuration($copyFrames);
             }
             $total = (int) ceil($duration / SegmentEncoder::getSegmentDuration());
@@ -240,7 +239,7 @@ final class TranscodeSessionSubscriber implements TranscodeLoopStarterInterface
                         }
                         $startTime = $copyTiming === null ? $start * SegmentEncoder::getSegmentDuration() : $sourceBoundary - $copyTiming->origin;
                         $actualSelection = $copy ? $selection : ($selection === null ? null : EncodePresentationIdentity::derive(
-                            $video->getHash(),
+                            $video->hash,
                             $probe,
                             $tier,
                             $active->runtime->desired->audioProfile,
@@ -424,7 +423,7 @@ final class TranscodeSessionSubscriber implements TranscodeLoopStarterInterface
                             $this->assertCurrent($active, $local, $stopRequested);
                             $this->streamManager->stopStream($jobId);
                             if ($selection !== null) {
-                                $outputProbeKey = $this->processPool->probeVideo(
+                                $outputProbeKey = $this->processPool->probePublishedPresentation(
                                     $job,
                                     $output . '/manifest.mpd',
                                     $active->runtime->generation,
@@ -432,6 +431,7 @@ final class TranscodeSessionSubscriber implements TranscodeLoopStarterInterface
                                 $outputProbe = VideoProbeResult::fromProbeOutput(json_decode(
                                     $this->awaitHelper(
                                         $outputProbeKey,
+                                        'The published presentation probe',
                                         $active,
                                         $local,
                                         $stopRequested,
@@ -476,8 +476,7 @@ final class TranscodeSessionSubscriber implements TranscodeLoopStarterInterface
             $this->streamManager->stopStream($jobId);
             if ($local->isActive() && !$stopRequested()) {
                 try {
-                    $this->persist($active, static fn(TranscodeJob $fresh) => $fresh->markFailed($error->getMessage()));
-                    $this->ownership->observe($active, 'failed', error: $error->getMessage());
+                    $this->recordFailure($active, $local, $stopRequested, $error->getMessage());
                 } catch (TranscodeLoopOwnershipLost|TranscodeStreamReplaced) {
                 }
             }
@@ -526,6 +525,48 @@ final class TranscodeSessionSubscriber implements TranscodeLoopStarterInterface
             if ($nativeFailure !== null) {
                 throw $nativeFailure;
             }
+        }
+    }
+
+    /**
+     * The video's file as it resolves inside one of the libraries that hold the video. The
+     * session was authorized when it was created, so the scope is unrestricted: the worker
+     * needs containment, not a second access check. A stored path that now leaves its library,
+     * such as a link retargeted after import, resolves to nothing.
+     */
+    private function source(Uuid $videoId): VideoSourceMetadata
+    {
+        $video = $this->videos->findByUuid($videoId);
+        $source = $video === null ? null : $this->videos->getSourceMetadata($video->getPublicId(), LibraryReadScope::unrestricted());
+
+        return $source ?? throw new RuntimeException('The source video is not available inside its library.');
+    }
+
+    /**
+     * A control revision, such as a playback report, refuses a write fenced on the claim it
+     * moved past. The failure is then recorded again under the refreshed claim, so it is
+     * neither lost nor decided again; markFailed() leaves a failed job as it is.
+     *
+     * @param callable(): bool $stopRequested
+     */
+    private function recordFailure(
+        TranscodeExecutionClaim $claim,
+        TranscodeLoopOwnership $local,
+        callable $stopRequested,
+        string $reason,
+    ): void {
+        for ($attempt = 1; ; $attempt++) {
+            try {
+                $this->persist($claim, static fn(TranscodeJob $fresh) => $fresh->markFailed($reason));
+                if ($this->ownership->observe($claim, 'failed', error: $reason) || $attempt >= self::FAILURE_RECORD_ATTEMPTS) {
+                    return;
+                }
+            } catch (TranscodeStreamReplaced $replaced) {
+                if ($attempt >= self::FAILURE_RECORD_ATTEMPTS) {
+                    throw $replaced;
+                }
+            }
+            $claim = $this->refresh($claim, $local, $stopRequested);
         }
     }
 
@@ -588,9 +629,13 @@ final class TranscodeSessionSubscriber implements TranscodeLoopStarterInterface
         }
     }
 
-    /** @param callable(): bool $stopRequested */
+    /**
+     * @param string $helper what the helper does, named in its failure
+     * @param callable(): bool $stopRequested
+     */
     private function awaitHelper(
         string $key,
+        string $helper,
         TranscodeExecutionClaim $claim,
         TranscodeLoopOwnership $local,
         callable $stopRequested,
@@ -600,7 +645,7 @@ final class TranscodeSessionSubscriber implements TranscodeLoopStarterInterface
             $result = $this->processPool->readResult($key);
             if ($result !== null) {
                 if ($result['status'] !== 'ok') {
-                    throw new RuntimeException('Copy source verification failed: ' . $result['data']);
+                    throw new RuntimeException(sprintf('%s failed: %s', $helper, $result['data']));
                 }
                 return $result['data'];
             }

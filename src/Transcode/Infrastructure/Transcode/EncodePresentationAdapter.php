@@ -5,7 +5,9 @@ declare(strict_types=1);
 namespace App\Transcode\Infrastructure\Transcode;
 
 use App\Catalog\Application\Port\VideoPortInterface;
+use App\Shared\Application\Exception\ConflictException;
 use App\Shared\Application\Exception\InvalidInputException;
+use App\Shared\Domain\ValueObject\LibraryReadScope;
 use App\Transcode\Application\Command\CreateTranscodeSessionCommand;
 use App\Transcode\Application\Exception\TranscodeStartupUnavailableException;
 use App\Transcode\Application\Port\EncodePresentationPort;
@@ -34,9 +36,16 @@ final readonly class EncodePresentationAdapter implements EncodePresentationPort
 
     public function select(CreateTranscodeSessionCommand $command): PresentationSelection
     {
-        $video = $this->videos->findByUuid($command->getVideoId());
+        $video = $this->videos->findByUuid($command->getVideoId())
+            ?? throw new TranscodeStartupUnavailableException();
+        // Every session start selects its presentation here, before anything is admitted. A file
+        // that no longer resolves inside one of the video's libraries, such as a link retargeted
+        // after import, is refused as delivery refuses it; the caller checked the viewer's access.
+        if ($this->videos->getSourceMetadata($video->getPublicId(), LibraryReadScope::unrestricted()) === null) {
+            throw new ConflictException('Playback media is unavailable.');
+        }
         $snapshot = $this->snapshots->read();
-        if ($video === null || $snapshot === null || $video->getProbe() === []) {
+        if ($snapshot === null || $video->getProbe() === []) {
             throw new TranscodeStartupUnavailableException();
         }
         try {

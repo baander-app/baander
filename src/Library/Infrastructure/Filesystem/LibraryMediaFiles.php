@@ -22,7 +22,9 @@ use App\Library\Domain\Repository\LibraryFileIndexRepositoryInterface;
 use App\Library\Domain\Repository\LibraryRepositoryInterface;
 use App\Library\Domain\ValueObject\LibraryClaimKind;
 use App\Shared\Domain\Model\Uuid;
+use App\Shared\Infrastructure\Filesystem\StoragePathBoundary;
 use Doctrine\ORM\EntityManagerInterface;
+use InvalidArgumentException;
 use LogicException;
 use Psr\Clock\ClockInterface;
 use Psr\Log\LoggerInterface;
@@ -74,12 +76,11 @@ final readonly class LibraryMediaFiles implements LibraryMediaFilesInterface
 
     public function markMissingUnavailable(Uuid $libraryId, array $paths): array
     {
-        // PHP caches file status; a file deleted since an earlier check must count.
-        $missing = array_values(array_filter($paths, static function (string $path): bool {
-            clearstatcache(true, $path);
-
-            return !file_exists($path);
-        }));
+        $root = $this->libraries->findByUuid($libraryId)?->getPath()->toString();
+        $missing = array_values(array_filter(
+            $paths,
+            static fn(string $path): bool => !self::presentInside($root, $path),
+        ));
 
         // Unavailable paths are republished if a later scan finds them unchanged.
         if ($missing !== []) {
@@ -87,6 +88,52 @@ final readonly class LibraryMediaFiles implements LibraryMediaFilesInterface
         }
 
         return $missing;
+    }
+
+    public function markUnavailable(Uuid $libraryId, array $paths): void
+    {
+        $this->fileIndex->markUnavailableByPaths($libraryId, $paths);
+    }
+
+    public function readSidecar(Uuid $libraryId, string $path, int $maxBytes): ?string
+    {
+        $root = $this->libraries->findByUuid($libraryId)?->getPath()->toString();
+        if ($root === null) {
+            return null;
+        }
+        try {
+            $resolved = StoragePathBoundary::resolve($root, $path);
+        } catch (InvalidArgumentException) {
+            return null;
+        }
+        if (!is_file($resolved) || !is_readable($resolved) || filesize($resolved) > $maxBytes) {
+            return null;
+        }
+        $contents = file_get_contents($resolved, length: $maxBytes + 1);
+
+        return $contents === false || strlen($contents) > $maxBytes ? null : $contents;
+    }
+
+    /**
+     * Whether a file exists at the path and, for a known library, resolves inside its root. PHP
+     * caches file status, and a file deleted since an earlier check must count as missing.
+     */
+    private static function presentInside(?string $root, string $path): bool
+    {
+        clearstatcache(true, $path);
+        if (!file_exists($path)) {
+            return false;
+        }
+        if ($root === null) {
+            return true;
+        }
+        try {
+            StoragePathBoundary::resolve($root, $path);
+        } catch (InvalidArgumentException) {
+            return false;
+        }
+
+        return true;
     }
 
     public function claim(Uuid $libraryId): LibraryMediaFileClaim

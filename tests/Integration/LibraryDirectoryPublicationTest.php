@@ -630,7 +630,7 @@ final class LibraryDirectoryPublicationTest extends TestCase
     private function scanner(LibraryType $type, ?TransactionPortInterface $transaction = null): MusicScanner|MovieScanner
     {
         $container = $this->kernel->getContainer()->get('test.service_container');
-        $arguments = [new DirectoryScanner(), $this->index, new NullLogger(), $this->createStub(JobCancellationCheckpointInterface::class), $transaction ?? $container->get(TransactionPortInterface::class)];
+        $arguments = [new DirectoryScanner(new NullLogger()), $this->index, new NullLogger(), $this->createStub(JobCancellationCheckpointInterface::class), $transaction ?? $container->get(TransactionPortInterface::class)];
         return $type === LibraryType::Music ? new MusicScanner(...$arguments) : new MovieScanner(...$arguments);
     }
 

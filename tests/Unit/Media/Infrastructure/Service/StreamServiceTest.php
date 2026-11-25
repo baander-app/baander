@@ -19,6 +19,7 @@ use App\Shared\Domain\Model\Uuid;
 use App\Shared\Domain\ValueObject\FilesystemType;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
+use Psr\Log\NullLogger;
 
 final class StreamServiceTest extends TestCase
 {
@@ -69,7 +70,7 @@ final class StreamServiceTest extends TestCase
 
     public function testResolvesTheAbsoluteSourceProducedByDirectoryDiscovery(): void
     {
-        $files = (new DirectoryScanner())->scan(new LibraryPath($this->root));
+        $files = (new DirectoryScanner(new NullLogger()))->scan(new LibraryPath($this->root));
         self::assertCount(1, $files);
         self::assertSame($this->source, $files[0]->getAbsolutePath());
         self::assertSame('album/track.flac', $files[0]->getRelativePath());

@@ -12,6 +12,7 @@ use App\Transcode\Domain\ValueObject\HardwareAccelerator;
 use App\Transcode\Domain\ValueObject\QualityTier;
 use App\Transcode\Infrastructure\FFmpeg\ProcessExecutor;
 use App\Transcode\Infrastructure\FFmpeg\FFmpegArguments;
+use App\Transcode\Infrastructure\FFmpeg\FFmpegInputKind;
 use RuntimeException;
 
 final class FMP4SegmentWriter
@@ -44,7 +45,8 @@ final class FMP4SegmentWriter
         $encoderFlags = VideoProcessingRules::initSegmentFlags($this->encoderProfile->encoder);
         $cmd = [
             $this->ffmpegPath, '-nostdin', '-y', ...FFmpegArguments::input($this->encoderProfile),
-            '-i', $sourcePath, ...FFmpegArguments::flags($encoderFlags), '-an', '-t', '0.001',
+            ...FFmpegArguments::inputClause($sourcePath, FFmpegInputKind::LibraryVideo),
+            ...FFmpegArguments::flags($encoderFlags), '-an', '-t', '0.001',
             '-movflags', '+frag_keyframe+empty_moov+default_base_moof', '-f', 'mp4', $outputPath,
         ];
 

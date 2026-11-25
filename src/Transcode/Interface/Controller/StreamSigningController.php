@@ -122,6 +122,13 @@ final class StreamSigningController
             ),
             new OA\Response(response: '400', description: 'Invalid request'),
             new OA\Response(
+                response: '409',
+                description: 'Playback media is unavailable: the video file no longer resolves inside one of its libraries',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
+            ),
+            new OA\Response(
                 response: '410',
                 description: 'A refresh named only sessions that have ended. Sessions that expired may be started again; failed or cancelled ones may not',
                 content: new OA\MediaType\Json(

@@ -8,6 +8,7 @@ use App\Transcode\Infrastructure\FFmpeg\ProcessExecutor;
 use App\Shared\Infrastructure\Worker\NativeExecutionClientInterface;
 use App\Shared\Infrastructure\Worker\NativeExecutionException;
 use App\Shared\Infrastructure\Worker\NativeExecutionHandle;
+use App\Shared\Infrastructure\Worker\OutputTail;
 use PHPUnit\Framework\TestCase;
 
 final class ProcessExecutorTest extends TestCase
@@ -28,6 +29,21 @@ final class ProcessExecutorTest extends TestCase
         $client->expects(self::never())->method('signal');
         ProcessExecutor::configureNativeExecution($client);
         self::assertSame(['code' => 7, 'output' => 'output', 'error' => 'diagnostic'], ProcessExecutor::exec($argv, 60));
+    }
+
+    public function testARemoteFailureReasonFollowsTheErrorOutput(): void
+    {
+        $client = $this->createStub(NativeExecutionClientInterface::class);
+        $client->method('submit')->willReturn(new NativeExecutionHandle(str_repeat('a', 64), 1));
+        $client->method('inspect')->willReturn(['state' => 'exited', 'exitCode' => 137, 'stdout' => '',
+            'stderr' => "[matroska @ 0x1] warning\n", 'error' => 'Native output byte limit exceeded.']);
+        $client->method('release')->willReturn(true);
+        ProcessExecutor::configureNativeExecution($client);
+
+        self::assertSame(
+            ['code' => 137, 'output' => '', 'error' => "[matroska @ 0x1] warning\nNative output byte limit exceeded."],
+            ProcessExecutor::exec(['ffprobe', '/media/film.mkv'], 60),
+        );
     }
 
     public function testStopConfirmsRemoteTerminationBeforeReleasing(): void
@@ -80,5 +96,37 @@ final class ProcessExecutorTest extends TestCase
         $result = ProcessExecutor::exec($command);
 
         self::assertSame(['code' => 7, 'output' => 'output', 'error' => 'diagnostic'], $result);
+    }
+
+    public function testNativeProcessKeepsABoundedTailOfMegabytesOfErrors(): void
+    {
+        $command = escapeshellarg(PHP_BINARY) . ' -r ' . escapeshellarg(
+            'for ($i = 0; $i < 9000; $i++) { fwrite(STDERR, str_repeat("e", 999) . "\n"); } fwrite(STDERR, "last line"); exit(3);',
+        );
+
+        $result = ProcessExecutor::exec($command);
+
+        self::assertSame(3, $result['code']);
+        self::assertSame('', $result['output']);
+        self::assertStringStartsWith(OutputTail::TRUNCATION_MARKER, $result['error']);
+        self::assertStringEndsWith('last line', $result['error']);
+        self::assertLessThanOrEqual(
+            ProcessExecutor::ERROR_TAIL_BYTES + strlen(OutputTail::TRUNCATION_MARKER),
+            strlen($result['error']),
+        );
+    }
+
+    public function testNativeProcessOutputPastTheBoundFailsWithoutPartialOutput(): void
+    {
+        $command = escapeshellarg(PHP_BINARY) . ' -r ' . escapeshellarg(
+            'fwrite(STDERR, "probing"); for ($i = 0; $i < 3000; $i++) { fwrite(STDOUT, str_repeat("o", 1000)); } exit(0);',
+        );
+
+        $result = ProcessExecutor::exec($command);
+
+        self::assertNotSame(0, $result['code']);
+        self::assertSame('', $result['output']);
+        self::assertStringStartsWith('probing', $result['error']);
+        self::assertStringEndsWith(sprintf('output exceeded %d bytes.', ProcessExecutor::OUTPUT_BYTES), $result['error']);
     }
 }

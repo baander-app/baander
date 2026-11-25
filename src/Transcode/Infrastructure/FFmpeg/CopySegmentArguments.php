@@ -44,18 +44,21 @@ final class CopySegmentArguments
             (string) self::INITIAL_BURST_SECONDS,
             '-readrate',
             sprintf('%.1f', self::READ_RATE),
-            '-i',
-            $sourcePath,
-            '-map',
-            '0:' . $selection->videoStreamIndex,
         );
+        array_push($arguments, ...FFmpegArguments::inputClause($sourcePath, FFmpegInputKind::LibraryVideo));
+        array_push($arguments, '-map', '0:' . $selection->videoStreamIndex);
         if ($selection->audioStreamIndex !== null) {
             array_push($arguments, '-map', '0:' . $selection->audioStreamIndex);
         }
+        // Copy is offered for H.264 and AAC only. A stream copy keeps the source's codec
+        // tag, and the MP4 muxer refuses AVI's `H264` FourCC and AAC format tag, so the
+        // MP4 sample entries are named outright.
+        array_push($arguments, '-c', 'copy', '-tag:v', 'avc1');
+        if ($selection->audioStreamIndex !== null) {
+            array_push($arguments, '-tag:a', 'mp4a');
+        }
         array_push(
             $arguments,
-            '-c',
-            'copy',
             '-sn',
             '-dn',
             '-f',

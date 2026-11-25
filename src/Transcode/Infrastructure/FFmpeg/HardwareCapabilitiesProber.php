@@ -223,7 +223,10 @@ class HardwareCapabilitiesProber
         // The test frame takes the smallest tier the ladder encodes: hardware encoders have
         // minimum sizes, and AMD's RDNA4 HEVC encoder refuses widths below 384.
         $tier = QualityTier::p360();
-        array_push($command, '-f', 'lavfi', '-i', sprintf('nullsrc=s=%dx%d:d=0.1', $tier->width, $tier->height));
+        array_push($command, ...FFmpegArguments::inputClause(
+            sprintf('nullsrc=s=%dx%d:d=0.1', $tier->width, $tier->height),
+            FFmpegInputKind::GeneratedSource,
+        ));
         if ($accel->requiresDevicePath()) {
             array_push($command, '-vf', 'format=nv12,hwupload');
         }

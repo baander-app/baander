@@ -75,4 +75,15 @@ final class CopySourceTimingTest extends TestCase
             }
         }
     }
+
+    public function testTheCompactListingKeepsKeyframeTimestampsAndIgnoresWhatFFprobeAppends(): void
+    {
+        $listing = "1,3.250000,H.26[45] User Data Unregistered SEI message\n1,5.500000,\n0,6.000000,\n1,N/A,\n\n1,11.000000\n";
+
+        self::assertSame([
+            ['key_frame' => 1, 'best_effort_timestamp_time' => 3.25],
+            ['key_frame' => 1, 'best_effort_timestamp_time' => 5.5],
+            ['key_frame' => 1, 'best_effort_timestamp_time' => 11.0],
+        ], CopySourceTiming::keyframes($listing));
+    }
 }

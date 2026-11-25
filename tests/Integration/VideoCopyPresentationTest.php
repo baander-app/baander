@@ -6,8 +6,16 @@ namespace App\Tests\Integration;
 
 use App\Catalog\Domain\Model\Video;
 use App\Catalog\Domain\Repository\VideoRepositoryInterface;
+use App\Catalog\Infrastructure\VideoService;
+use App\Library\Domain\Model\Library;
+use App\Library\Domain\Repository\LibraryRepositoryInterface;
+use App\Library\Domain\ValueObject\LibraryPath;
+use App\Library\Domain\ValueObject\LibrarySlug;
+use App\Library\Domain\ValueObject\LibraryType;
+use App\Library\Infrastructure\Filesystem\LibraryMediaFileResolver;
 use App\Shared\Application\DTO\DeploymentProfile;
 use App\Shared\Domain\Model\Uuid;
+use App\Shared\Domain\ValueObject\FilesystemType;
 use App\Tests\Support\NativeExecutionFixture;
 use App\Transcode\Application\DTO\DesiredTranscodeState;
 use App\Transcode\Application\DTO\MediaTrack;
@@ -82,8 +90,14 @@ final class VideoCopyPresentationTest extends TestCase
             $jobs->method('save')->willReturnCallback(static function (TranscodeJob $saved) use (&$job): void { $job = $saved; });
             $sessions = $this->createStub(TranscodeSessionPortInterface::class);
             $sessions->method('findByUuid')->willReturn($session);
-            $videos = $this->createStub(VideoRepositoryInterface::class);
-            $videos->method('findByUuid')->willReturn($video);
+            $rows = $this->createStub(VideoRepositoryInterface::class);
+            $rows->method('findByUuid')->willReturn($video);
+            $rows->method('findByPublicId')->willReturn($video);
+            $rows->method('getLibraryIdsByPublicId')->willReturn([Uuid::generate()]);
+            $libraries = $this->createStub(LibraryRepositoryInterface::class);
+            $libraries->method('findByUuid')->willReturn(Library::create('Copied films', new LibrarySlug('copied-films'),
+                new LibraryPath($root), LibraryType::Movie, FilesystemType::Local));
+            $videos = new VideoService($rows, new LibraryMediaFileResolver($libraries));
             $ownership = $this->createStub(TranscodeExecutionOwnershipPort::class);
             $ownership->method('refresh')->willReturnCallback(static function () use (&$claim): TranscodeExecutionClaim { return $claim; });
             $ownership->method('renew')->willReturn(true);

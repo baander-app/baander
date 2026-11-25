@@ -351,6 +351,16 @@ final class CatalogDeleteHandlersTest extends TestCase
                 throw new \LogicException('A delete does not look for missing paths.');
             }
 
+            public function markUnavailable(Uuid $libraryId, array $paths): void
+            {
+                throw new \LogicException('A delete does not refuse files.');
+            }
+
+            public function readSidecar(Uuid $libraryId, string $path, int $maxBytes): ?string
+            {
+                throw new \LogicException('A delete reads no sidecar.');
+            }
+
             public function claim(Uuid $libraryId): LibraryMediaFileClaim
             {
                 return $this->test->recordClaim($libraryId);

@@ -7,11 +7,19 @@ namespace App\Transcode\Infrastructure\FFmpeg;
 use App\Shared\Infrastructure\Swoole\Async;
 use App\Shared\Infrastructure\Worker\NativeExecutionClientInterface;
 use App\Shared\Infrastructure\Worker\NativeExecutionException;
+use App\Shared\Infrastructure\Worker\NativeExecutionProtocol;
+use App\Shared\Infrastructure\Worker\OutputTail;
 use RuntimeException;
 
 /** Executes media work remotely in admitted workers and locally in standalone tools. */
 final class ProcessExecutor
 {
+    /** Standard output past this many bytes fails a local command: callers parse it whole. */
+    public const int OUTPUT_BYTES = NativeExecutionProtocol::OUTPUT_BYTES;
+
+    /** Standard error keeps its newest bytes only: callers report its end. */
+    public const int ERROR_TAIL_BYTES = NativeExecutionProtocol::ERROR_TAIL_BYTES;
+
     private static ?NativeExecutionClientInterface $nativeExecution = null;
     private static bool $nativeRequired = false;
 
@@ -69,7 +77,11 @@ final class ProcessExecutor
                 $status = $client->inspect($handle);
                 if (($status['state'] ?? '') === 'exited') {
                     $terminal = true;
-                    return ['code' => (int) ($status['exitCode'] ?? -1), 'output' => (string) ($status['stdout'] ?? ''), 'error' => (string) ($status['stderr'] ?? '')];
+                    return [
+                        'code' => (int) ($status['exitCode'] ?? -1),
+                        'output' => (string) ($status['stdout'] ?? ''),
+                        'error' => self::errorText((string) ($status['stderr'] ?? ''), $status['error'] ?? null),
+                    ];
                 }
                 if (($status['state'] ?? '') !== 'running') {
                     throw new NativeExecutionException('Native media execution state is unknown.');
@@ -124,7 +136,8 @@ final class ProcessExecutor
         stream_set_blocking($pipes[2], false);
 
         $stdout = '';
-        $stderr = '';
+        $stderr = new OutputTail(self::ERROR_TAIL_BYTES);
+        $exitCode = null;
         $startTime = time();
 
         while (true) {
@@ -132,7 +145,7 @@ final class ProcessExecutor
 
             if (!$status['running']) {
                 $stdout .= stream_get_contents($pipes[1]);
-                $stderr .= stream_get_contents($pipes[2]);
+                $stderr->append((string) stream_get_contents($pipes[2]));
                 $exitCode = $status['exitcode'];
                 break;
             }
@@ -158,10 +171,14 @@ final class ProcessExecutor
                         if ($stream === $pipes[1]) {
                             $stdout .= $data;
                         } else {
-                            $stderr .= $data;
+                            $stderr->append($data);
                         }
                     }
                 }
+            }
+            if (strlen($stdout) > self::OUTPUT_BYTES) {
+                proc_terminate($process, 9);
+                break;
             }
         }
 
@@ -169,10 +186,31 @@ final class ProcessExecutor
         fclose($pipes[2]);
         proc_close($process);
 
+        // The read after the command exited can pass the bound as well.
+        if (strlen($stdout) > self::OUTPUT_BYTES) {
+            return ['code' => -1, 'output' => '', 'error' => self::errorText(
+                $stderr->contents(),
+                sprintf('Media process output exceeded %d bytes.', self::OUTPUT_BYTES),
+            )];
+        }
+
         return [
-            'code' => $exitCode,
+            'code' => $exitCode ?? -1,
             'output' => $stdout,
-            'error' => $stderr,
+            'error' => $stderr->contents(),
         ];
+    }
+
+    /**
+     * A command's error output followed by the reason it failed, when there is one. The reason
+     * goes last, where callers that keep the end of the error text find it.
+     */
+    public static function errorText(string $stderr, ?string $reason): string
+    {
+        return match (true) {
+            $reason === null || $reason === '' => $stderr,
+            $stderr === '' => $reason,
+            default => rtrim($stderr, "\n") . "\n" . $reason,
+        };
     }
 }
