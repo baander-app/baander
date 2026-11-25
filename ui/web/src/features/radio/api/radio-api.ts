@@ -3,7 +3,7 @@ import { AXIOS_INSTANCE } from '@/shared/api-client/axios-instance'
 import { readAllPages, type OffsetPage } from '@/shared/utils/read-all-pages'
 
 /** The largest page of the station list. */
-const STATION_PAGE_LIMIT = 500
+export const STATION_PAGE_LIMIT = 500
 
 /** The most stations one station-list request names by public ID. */
 const STATION_IDS_PER_REQUEST = 100
