@@ -565,4 +565,74 @@ final class NginxTemplateTest extends TestCase
 
         return null;
     }
+
+    /** @return iterable<string, array{string}> */
+    public static function nginxConfigurations(): iterable
+    {
+        yield 'production' => [self::PROD_CONFIG_PATH];
+        yield 'development' => [self::DEV_TEMPLATE_PATH];
+    }
+
+    #[\PHPUnit\Framework\Attributes\DataProvider('nginxConfigurations')]
+    public function testEveryAccessLogUsesAFormatWithoutTheQueryStringOrReferrer(string $path): void
+    {
+        $config = (string) file_get_contents($path);
+        preg_match_all('/^\s*access_log\s+\S+\s*(\S*?);/m', $config, $logs);
+        self::assertNotSame([], $logs[1]);
+        foreach ($logs[1] as $format) {
+            self::assertNotSame('', $format, 'An access_log without a format uses combined, which logs $request.');
+            $definition = $this->logFormat($config, $format);
+            self::assertStringContainsString('$uri', $definition);
+            foreach (['$request ', '$request"', '$request_uri', '$args', '$query_string', '$is_args', '$http_referer'] as $field) {
+                self::assertStringNotContainsString($field, $definition, $format);
+            }
+        }
+    }
+
+    #[\PHPUnit\Framework\Attributes\DataProvider('nginxConfigurations')]
+    public function testAnAccessLogLineForASignedDeliveryUrlHasNoQueryString(string $path): void
+    {
+        $directory = sys_get_temp_dir() . '/baander-nginx-log-' . bin2hex(random_bytes(6));
+        mkdir($directory, 0700);
+        $config = (string) file_get_contents($path);
+        file_put_contents($directory . '/nginx.conf', implode("\n", [
+            'daemon off;', 'master_process off;', 'pid ' . $directory . '/nginx.pid;', 'error_log ' . $directory . '/error.log;',
+            'events { worker_connections 8; }',
+            'http {',
+            $this->logFormat($config, 'path') . ';',
+            'client_body_temp_path ' . $directory . '/body; proxy_temp_path ' . $directory . '/proxy;',
+            'fastcgi_temp_path ' . $directory . '/fastcgi; uwsgi_temp_path ' . $directory . '/uwsgi; scgi_temp_path ' . $directory . '/scgi;',
+            'access_log ' . $directory . '/access.log path;',
+            'server { listen unix:' . $directory . '/nginx.sock; location / { return 204; } }',
+            '}',
+        ]));
+        $nginx = new \Symfony\Component\Process\Process(['nginx', '-c', $directory . '/nginx.conf', '-p', $directory]);
+        $nginx->start();
+        try {
+            for ($attempt = 0; $attempt < 100 && !file_exists($directory . '/nginx.sock'); ++$attempt) {
+                usleep(20_000);
+            }
+            $client = stream_socket_client('unix://' . $directory . '/nginx.sock', $errno, $error, 5);
+            self::assertIsResource($client, $nginx->getErrorOutput());
+            fwrite($client, "GET /api/stream/original/track?id=a1&exp=1792065607&sig=e27974ef93f1f0dc HTTP/1.0\r\nHost: baander.app\r\nReferer: https://baander.app/play?sig=e27974ef93f1f0dc\r\n\r\n");
+            self::assertStringStartsWith('HTTP/1.1 204', (string) fgets($client));
+            fclose($client);
+        } finally {
+            $nginx->stop(1);
+        }
+        $line = (string) file_get_contents($directory . '/access.log');
+        new Filesystem()->remove($directory);
+
+        self::assertStringContainsString('"GET /api/stream/original/track HTTP/1.0" 204', $line);
+        self::assertStringNotContainsString('sig=', $line);
+        self::assertStringNotContainsString('exp=', $line);
+    }
+
+    /** The definition of a named log_format, which may continue over several quoted lines. */
+    private function logFormat(string $config, string $name): string
+    {
+        self::assertSame(1, preg_match('/^log_format\s+' . preg_quote($name, '/') . '\s+[^;]+/m', $config, $match), 'log_format ' . $name);
+
+        return $match[0];
+    }
 }

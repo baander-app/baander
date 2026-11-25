@@ -7,6 +7,7 @@ namespace Baander\Deployment\Tests;
 use Baander\Deployment\Observability\LogCollection;
 use Baander\Containers\Docker\Target;
 use PHPUnit\Framework\TestCase;
+use Symfony\Component\Process\Process;
 
 final class LogCollectionTest extends TestCase
 {
@@ -54,6 +55,51 @@ final class LogCollectionTest extends TestCase
             }
             rmdir($directory);
         }
+    }
+
+    public function testStartPrunesBootDirectoriesOlderThan14DaysButKeepsTheCurrentAndThePrevious(): void
+    {
+        $root = sys_get_temp_dir() . '/baander-log-boots-' . bin2hex(random_bytes(8));
+        $days = static fn(int $age): int => time() - $age * 86400;
+        $boots = [
+            // The current and previous boots stay whatever their age.
+            'web/current' => $days(30), 'web/previous' => $days(31), 'web/older' => $days(32),
+            'control/current' => $days(1), 'control/previous' => $days(2), 'control/stale' => $days(15), 'control/recent' => $days(10),
+            'control/appended' => $days(20),
+            'execution/only' => $days(40),
+        ];
+        try {
+            foreach ($boots as $boot => $modified) {
+                mkdir($root . '/' . $boot, 0700, true);
+                file_put_contents($root . '/' . $boot . '/prod.log', "{}\n");
+                touch($root . '/' . $boot . '/prod.log', $modified);
+                touch($root . '/' . $boot, $modified);
+            }
+            // A file appended three days ago makes its boot recent though the directory is old.
+            touch($root . '/control/appended/prod.log', $days(3));
+            mkdir($root . '/outside');
+            touch($root . '/outside', $days(60));
+            symlink($root . '/outside', $root . '/execution/linked');
+
+            $process = new Process([PHP_BINARY, '-r', LogCollection::pruneBootsProgram(), $root]);
+            $process->mustRun();
+
+            self::assertSame(['current', 'previous'], self::boots($root, 'web'));
+            self::assertSame(['appended', 'current', 'previous', 'recent'], self::boots($root, 'control'));
+            self::assertSame(['linked', 'only'], self::boots($root, 'execution'));
+            self::assertFileExists($root . '/outside/.');
+        } finally {
+            new Process(['rm', '-rf', '--', $root])->run();
+        }
+    }
+
+    /** @return list<string> */
+    private static function boots(string $root, string $service): array
+    {
+        $names = array_map(basename(...), glob($root . '/' . $service . '/*') ?: []);
+        sort($names);
+
+        return $names;
     }
 
     public function testCollectorRejectsImplicitRemoteSocketMapping(): void

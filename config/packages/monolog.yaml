@@ -71,10 +71,12 @@ when@test:
 when@prod:
     monolog:
         handlers:
+            # Production logs at info: debug records multiply the volume of both copies, the
+            # per-boot file and the container's output, which Docker's local driver bounds.
             file:
                 type: stream
                 path: "%kernel.logs_dir%/%kernel.environment%.log"
-                level: debug
+                level: info
                 channels: [ '!events' ]
                 formatter: monolog.formatter.json
             error:
@@ -86,7 +88,7 @@ when@prod:
             stdout:
                 type: stream
                 path: php://stderr
-                level: debug
+                level: info
                 channels: [ '!events' ]
                 formatter: monolog.formatter.json
             console:

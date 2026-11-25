@@ -71,6 +71,14 @@ final class PooledServiceResetCoverageTest extends TestCase
         );
     }
 
+    public function testTheLogProcessorsThatHoldRequestStateArePooled(): void
+    {
+        // Each coroutine logs its own request's URL and correlation ID.
+        foreach ([\App\Shared\Infrastructure\Logging\BoundedWebProcessor::class, \App\Shared\Infrastructure\Logging\CorrelationIdProcessor::class] as $processor) {
+            self::assertSame(['reset'], self::$kernel->pools[$processor]['methods'] ?? null, $processor);
+        }
+    }
+
     /**
      * @return array<string, list<string>> by service id, the kernel.reset methods its pool's resetter does not run
      */

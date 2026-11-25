@@ -25,6 +25,46 @@ final class LogCollection
     public const string PROXY_SOCKET = self::PROXY_DIRECTORY . '/docker.sock';
     public const string PROXY_CONFIGURATION = '/etc/baander-docker-proxy/nginx.conf';
     private const string DAEMON_SOCKET = '/run/baander-log-docker.sock';
+    /** Per-boot log directories older than this are removed, the newest two of each service kept. */
+    public const int BOOT_RETENTION_DAYS = 14;
+    /** The services that write a directory per boot under ROOT. */
+    public const array BOOT_SERVICES = ['web', 'control', 'execution'];
+
+    /**
+     * Removes the per-boot directories under the root its first argument names that last
+     * changed more than BOOT_RETENTION_DAYS ago, except each service's two most recent, the
+     * current boot and the previous one, whatever their age. A directory's age is its newest
+     * entry's, because appending to a log file does not change the directory. Symbolic links
+     * are removed, never followed.
+     */
+    private const string PRUNE_BOOTS = <<<'PHP'
+$root = rtrim($argv[1], '/');
+$lastWrite = static function (string $directory): int {
+    $newest = (int) filemtime($directory);
+    foreach (new RecursiveIteratorIterator(new RecursiveDirectoryIterator($directory, FilesystemIterator::SKIP_DOTS), RecursiveIteratorIterator::SELF_FIRST) as $entry) {
+        $newest = max($newest, (int) $entry->getMTime());
+    }
+    return $newest;
+};
+foreach (@SERVICES@ as $service) {
+    $boots = [];
+    foreach (glob($root . '/' . $service . '/*', GLOB_ONLYDIR) ?: [] as $boot) {
+        if (!is_link($boot)) {
+            $boots[$boot] = $lastWrite($boot);
+        }
+    }
+    arsort($boots);
+    foreach (array_slice($boots, 2, null, true) as $boot => $written) {
+        if ($written >= time() - @DAYS@ * 86400) {
+            continue;
+        }
+        foreach (new RecursiveIteratorIterator(new RecursiveDirectoryIterator($boot, FilesystemIterator::SKIP_DOTS), RecursiveIteratorIterator::CHILD_FIRST) as $entry) {
+            $entry->isDir() && !$entry->isLink() ? rmdir($entry->getPathname()) : unlink($entry->getPathname());
+        }
+        rmdir($boot);
+    }
+}
+PHP;
 
     /**
      * The proxy's whole main configuration. The gateway image's own runs workers as an
@@ -166,6 +206,12 @@ NGINX;
             ],
             'oom_score_adj' => KillOrder::DOCKER_PROXY,
         ];
+    }
+
+    /** PHP code for `php -r` that prunes the per-boot directories under its first argument. */
+    public static function pruneBootsProgram(): string
+    {
+        return strtr(self::PRUNE_BOOTS, ['@SERVICES@' => var_export(self::BOOT_SERVICES, true), '@DAYS@' => (string) self::BOOT_RETENTION_DAYS]);
     }
 
     /** The proxy's nginx.conf; tests point it at sockets of their own. */

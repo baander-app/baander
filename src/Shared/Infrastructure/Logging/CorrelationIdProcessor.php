@@ -15,7 +15,9 @@ use Symfony\Contracts\Service\ResetInterface;
  *
  * Resolution order:
  *  1. Explicit ID set via setCorrelationId() (used by Messenger stamp propagation)
- *  2. X-Baander-Correlation-ID HTTP request header
+ *  2. X-Baander-Correlation-ID HTTP request header, when it is at most 512 bytes and holds
+ *     no control character; a longer or binary header is replaced like a missing one, so
+ *     the Messenger stamp and every log record carry the bounded value
  *  3. Generated random ID (once per lifecycle, then reused)
  *
  * Tagged with kernel.reset so the Swoole bundle proxifies this service into a
@@ -25,6 +27,8 @@ use Symfony\Contracts\Service\ResetInterface;
  */
 final class CorrelationIdProcessor implements ProcessorInterface, ResetInterface
 {
+    public const int MAXIMUM_BYTES = 512;
+
     private ?string $correlationId = null;
 
     public function __construct(
@@ -35,13 +39,8 @@ final class CorrelationIdProcessor implements ProcessorInterface, ResetInterface
     public function __invoke(LogRecord $record): LogRecord
     {
         if ($this->correlationId === null) {
-            $request = $this->requestStack->getCurrentRequest();
-
-            if ($request !== null && $request->headers->has(BaanderHeader::CorrelationId->value)) {
-                $this->correlationId = $request->headers->get(BaanderHeader::CorrelationId->value);
-            } else {
-                $this->correlationId = bin2hex(random_bytes(16));
-            }
+            $header = $this->requestStack->getCurrentRequest()?->headers->get(BaanderHeader::CorrelationId->value);
+            $this->correlationId = is_string($header) && self::acceptable($header) ? $header : bin2hex(random_bytes(16));
         }
 
         $record->extra['correlation_id'] = $this->correlationId;
@@ -66,5 +65,10 @@ final class CorrelationIdProcessor implements ProcessorInterface, ResetInterface
     public function reset(): void
     {
         $this->correlationId = null;
+    }
+
+    private static function acceptable(string $correlationId): bool
+    {
+        return $correlationId !== '' && strlen($correlationId) <= self::MAXIMUM_BYTES && preg_match('/[\x00-\x1F\x7F]/', $correlationId) !== 1;
     }
 }

@@ -368,7 +368,9 @@ final readonly class Preset
             if (in_array($role, ['postgres', 'redis', 'pooler_credentials', 'redis_credentials', 'log_index', 'postgres_socket', 'docker_proxy'], true)) {
                 continue;
             }
-            $this->seedVolume($configuration, $state, $role, $name, 'if (!chown("/seed", "www-data") || !chgrp("/seed", "www-data")) { exit(1); }');
+            // The logs volume keeps every boot's directory; each start removes the stale ones.
+            $prune = $role === 'logs' ? "\n" . LogCollection::pruneBootsProgram() : '';
+            $this->seedVolume($configuration, $state, $role, $name, 'if (!chown("/seed", "www-data") || !chgrp("/seed", "www-data")) { exit(1); }' . $prune, $prune === '' ? [] : ['/seed']);
         }
     }
 

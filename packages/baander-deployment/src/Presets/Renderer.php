@@ -15,6 +15,12 @@ final class Renderer
 {
     public const string POSTGRES_CONFIG_PATH = '/etc/baander/postgresql.conf';
 
+    /**
+     * Docker's local log driver with five files of 50 MB, so each container's output stays
+     * bounded on the host. It is not a container limit: it bounds the daemon's log files.
+     */
+    public const array LOGGING = ['driver' => 'local', 'options' => ['max-size' => '50m', 'max-file' => '5']];
+
     /** OpenTelemetry export stays off unless the configuration's environment sets a collector. */
     public const array ENVIRONMENT_DEFAULTS = [EnvironmentVariable::OTEL_ENABLED => 'false'];
 
@@ -136,6 +142,10 @@ final class Renderer
             $services[LogCollection::PROXY_SERVICE] = LogCollection::proxyService($images['gateway']['id'], $target, 'docker_proxy_configuration') + ['labels' => $labels];
             $services['log-agent']['depends_on'][LogCollection::PROXY_SERVICE] = ['condition' => 'service_started'];
         }
+        foreach ($services as &$service) {
+            $service['logging'] = self::LOGGING;
+        }
+        unset($service);
         $volumes = [];
         foreach (self::derivedVolumes($configuration) as $role => $name) {
             $volumes[$role] = ['name' => $name, 'external' => true];

@@ -146,6 +146,16 @@ final class PresetDeploymentTest extends TestCase
             }
             self::assertStringContainsString('--maxmemory 192mb', implode(' ', $compose['services']['redis']['command']));
         }
+        $target = new Target('/usr/bin/docker', 'unix:///run/owner/docker.sock', 'captured-daemon', null, null);
+        $logged = Renderer::render($remux, $this->images(), $layout, $this->profile(), 'max_connections = 21', 'owner', [
+            'target' => $target->toArray(), 'credentials' => '/private/log-credentials', 'boot' => 'fresh-web-boot',
+        ]);
+        foreach ($logged['services'] as $name => $service) {
+            self::assertSame(['driver' => 'local', 'options' => ['max-size' => '50m', 'max-file' => '5']], $service['logging'] ?? null, $name);
+            foreach (['mem_limit', 'memswap_limit', 'mem_reservation', 'pids_limit', 'cpus', 'cpu_shares', 'cpuset', 'cpu_quota', 'cpu_period', 'deploy'] as $limit) {
+                self::assertArrayNotHasKey($limit, $service, $name . ' ' . $limit);
+            }
+        }
     }
 
     public function testKillOrderSacrificesWebAndMediaWorkBeforeStatefulServices(): void

@@ -1156,8 +1156,10 @@ services:
     App\Shared\Infrastructure\Logging\BoundedContextProcessor:
         tags: [ 'monolog.processor' ]
 
-    Symfony\Bridge\Monolog\Processor\WebProcessor:
-        tags: [ 'monolog.processor' ]
+    App\Shared\Infrastructure\Logging\BoundedWebProcessor:
+        tags:
+            - { name: 'monolog.processor' }
+            - { name: 'kernel.reset', method: 'reset' }
 
     # Runs after the web processor (lower priority) so the request URL it adds is redacted too.
     App\Shared\Infrastructure\Logging\StreamSignatureRedactionProcessor:
