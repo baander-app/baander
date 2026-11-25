@@ -84,11 +84,15 @@ final class Renderer
                 'oom_score_adj' => KillOrder::WEB,
                 'depends_on' => [Pooler::SERVICE => ['condition' => 'service_healthy'], 'redis' => ['condition' => 'service_healthy']],
             ],
+            // The bootstrap superuser initializes the cluster with a password no other service
+            // receives, which the credentials helper clears; afterwards it logs in only over the
+            // local socket, whose directory the socket volume shares with that helper.
             'postgres' => $common + [
                 'image' => $images['postgres']['id'],
                 'command' => ['postgres', '-c', 'config_file=' . self::POSTGRES_CONFIG_PATH],
-                'volumes' => [['type' => 'volume', 'source' => 'postgres_configuration', 'target' => '/etc/baander', 'read_only' => true], ['type' => 'volume', 'source' => 'postgres', 'target' => '/var/lib/postgresql']],
-                'environment' => ['POSTGRES_USER' => $environment['DB_USERNAME'], 'POSTGRES_PASSWORD' => $environment['DB_PASSWORD'], 'POSTGRES_DB' => $environment['DB_DATABASE'], 'PGDATA' => '/var/lib/postgresql/data/baander'],
+                'volumes' => [['type' => 'volume', 'source' => 'postgres_configuration', 'target' => '/etc/baander', 'read_only' => true], ['type' => 'volume', 'source' => 'postgres', 'target' => '/var/lib/postgresql'],
+                    ['type' => 'volume', 'source' => 'postgres_socket', 'target' => Pooler::SOCKET_DIRECTORY]],
+                'environment' => ['POSTGRES_USER' => Pooler::SUPERUSER, 'POSTGRES_PASSWORD' => bin2hex(random_bytes(32)), 'POSTGRES_DB' => $environment['DB_DATABASE'], 'PGDATA' => '/var/lib/postgresql/data/baander'],
                 'oom_score_adj' => KillOrder::POSTGRES,
                 'healthcheck' => ['test' => ['CMD-SHELL', 'pg_isready -h 127.0.0.1 -U "$POSTGRES_USER" -d "$POSTGRES_DB"'], 'interval' => '5s', 'timeout' => '5s', 'retries' => 24],
             ],
@@ -129,7 +133,10 @@ final class Renderer
             }
             unset($service);
         }
-        $volumes = ['logs' => ['name' => $configuration->name . '-logs', 'external' => true], 'log_index' => ['name' => $configuration->name . '-log-index', 'external' => true]];
+        $volumes = [];
+        foreach (self::derivedVolumes($configuration) as $role => $name) {
+            $volumes[$role] = ['name' => $name, 'external' => true];
+        }
         foreach ($configuration->volumes as $role => $name) {
             $volumes[$role] = ['name' => $name, 'external' => true];
         }
@@ -144,6 +151,17 @@ final class Renderer
         ];
 
         return self::escapeInterpolation(['name' => $configuration->name, 'services' => $services, 'volumes' => $volumes, 'networks' => $networks]);
+    }
+
+    /**
+     * The volumes the preset names after the deployment rather than the configuration: the
+     * collected logs, the log index and PostgreSQL's socket directory.
+     *
+     * @return array<string,string>
+     */
+    public static function derivedVolumes(Configuration $configuration): array
+    {
+        return ['logs' => $configuration->name . '-logs', 'log_index' => $configuration->name . '-log-index', 'postgres_socket' => $configuration->name . '-postgres-socket'];
     }
 
     /** @return array<string,array{volume:string,name:string,content:string}> */

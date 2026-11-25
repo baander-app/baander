@@ -20,6 +20,10 @@ final class Pooler
     public const int PORT = 6432;
     public const string CREDENTIALS_PATH = '/etc/baander-pooler/credentials';
     public const string CONTROL_SUFFIX = '_control';
+    /** The cluster's bootstrap superuser in the separate layout; it logs in over the local socket alone. */
+    public const string SUPERUSER = 'postgres';
+    /** PostgreSQL's local socket directory, which the database image's build compiles in. */
+    public const string SOCKET_DIRECTORY = '/var/run/postgresql';
 
     /** Application server connections per web worker. */
     public const int APPLICATION_CONNECTIONS_PER_WEB_WORKER = 5;
@@ -137,14 +141,24 @@ final class Pooler
      * verifier per role over a direct connection and writes the same verifiers to the
      * credentials volume. The caller passes the listed environment names.
      *
+     * Given a socket volume, the helper uses the separate superuser layout: it joins no
+     * network, reaches PostgreSQL's local socket through that volume as SUPERUSER, and
+     * creates the application role as a NOSUPERUSER owner of the database with the
+     * extensions present. Without one, the application role is the bootstrap superuser,
+     * as on a development instance, and the helper logs in as it over the network.
+     *
      * @return array{arguments:list<string>,environment:array<string,string>}
      */
-    public static function credentialsHelper(string $image, string $network, string $credentialsVolume, string $user, #[\SensitiveParameter] string $password, string $database, string $serverHost): array
+    public static function credentialsHelper(string $image, string $network, string $credentialsVolume, string $user, #[\SensitiveParameter] string $password, string $database, string $serverHost, ?string $socketVolume = null): array
     {
-        $environment = self::credentialsEnvironment($user, $password, $database, $serverHost);
-        $arguments = ['--network', $network, '--tmpfs', self::DATA_TMPFS, '--cap-drop', 'ALL', '--cap-add', 'CHOWN', '--cap-add', 'FOWNER', '--cap-add', 'DAC_OVERRIDE',
+        $environment = $socketVolume === null
+            ? self::credentialsEnvironment($user, $password, $database, $serverHost)
+            : self::credentialsEnvironment($user, $password, $database, self::SOCKET_DIRECTORY, self::SUPERUSER);
+        $arguments = ['--network', $socketVolume === null ? $network : 'none', '--tmpfs', self::DATA_TMPFS, '--cap-drop', 'ALL', '--cap-add', 'CHOWN', '--cap-add', 'FOWNER', '--cap-add', 'DAC_OVERRIDE',
             '--security-opt', 'no-new-privileges', '--user', '0:0',
-            '--mount', 'type=volume,src=' . $credentialsVolume . ',dst=/credentials', '--entrypoint', 'baander-pooler-credentials'];
+            '--mount', 'type=volume,src=' . $credentialsVolume . ',dst=/credentials',
+            ...($socketVolume === null ? [] : ['--mount', 'type=volume,src=' . $socketVolume . ',dst=' . self::SOCKET_DIRECTORY]),
+            '--entrypoint', 'baander-pooler-credentials'];
         foreach ($environment as $key => $_) {
             array_push($arguments, '--env', $key);
         }
@@ -152,8 +166,9 @@ final class Pooler
     }
 
     /** @return array<string,string> */
-    public static function credentialsEnvironment(string $user, #[\SensitiveParameter] string $password, string $database, string $serverHost): array
+    public static function credentialsEnvironment(string $user, #[\SensitiveParameter] string $password, string $database, string $serverHost, ?string $superuser = null): array
     {
-        return ['PGPASSWORD' => $password, EnvironmentVariable::BAANDER_POOLER_USER => $user, EnvironmentVariable::BAANDER_POOLER_DATABASE => $database, EnvironmentVariable::BAANDER_POOLER_SERVER_HOST => $serverHost];
+        return ['PGPASSWORD' => $password, EnvironmentVariable::BAANDER_POOLER_USER => $user, EnvironmentVariable::BAANDER_POOLER_DATABASE => $database, EnvironmentVariable::BAANDER_POOLER_SERVER_HOST => $serverHost]
+            + ($superuser === null ? [] : [EnvironmentVariable::BAANDER_POOLER_SUPERUSER => $superuser]);
     }
 }

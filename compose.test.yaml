@@ -12,9 +12,9 @@ services:
             APP_ENV: test
             APP_DEBUG: '0'
             XDEBUG_MODE: ${BAANDER_TEST_XDEBUG_MODE:-off}
-            DATABASE_URL: 'postgresql://baander:test-only@postgres:5432/functional_test?serverVersion=18&charset=utf8'
-            DATABASE_CONTROL_URL: 'postgresql://baander:test-only@postgres:5432/functional_test?serverVersion=18&charset=utf8'
-            OUTBOX_TEST_DATABASE_URL: 'postgresql://baander:test-only@postgres:5432/functional_test?serverVersion=18&charset=utf8'
+            DATABASE_URL: 'postgresql://baander:test-only-database-password@postgres:5432/functional_test?serverVersion=18&charset=utf8'
+            DATABASE_CONTROL_URL: 'postgresql://baander:test-only-database-password@postgres:5432/functional_test?serverVersion=18&charset=utf8'
+            OUTBOX_TEST_DATABASE_URL: 'postgresql://baander:test-only-database-password@postgres:5432/functional_test?serverVersion=18&charset=utf8'
             REDIS_PASSWORD: test-only-redis-password
             REDIS_URL: 'redis://baander:test-only-redis-password@redis:6379'
             MESSENGER_TEST_REDIS_DSN: 'redis://baander:test-only-redis-password@redis:6379'
@@ -31,10 +31,22 @@ services:
         networks: [private]
     postgres:
         image: ${BAANDER_TEST_POSTGRES_IMAGE:-baander-database:latest}
+        # The preset's role layout: the bootstrap superuser is postgres, and the application
+        # role owns the database without being a superuser, with the extensions created in
+        # the database and in the template new databases copy. Unlike the preset's, this
+        # role may create databases, which the migration tests do, and may end an autovacuum
+        # worker's connection (pg_signal_backend), which their DROP DATABASE WITH (FORCE) does.
+        command:
+            - sh
+            - -ec
+            - 'printf "%s\n" "$$BAANDER_TEST_ROLES" "\\c functional_test" "$$BAANDER_TEST_EXTENSIONS" "\\c template1" "$$BAANDER_TEST_EXTENSIONS" > /docker-entrypoint-initdb.d/baander-roles.sql; exec docker-entrypoint.sh postgres'
         environment:
-            POSTGRES_USER: baander
-            POSTGRES_PASSWORD: test-only
+            POSTGRES_PASSWORD: test-only-postgres-superuser-password
             POSTGRES_DB: functional_test
+            BAANDER_TEST_ROLES: "CREATE ROLE baander LOGIN NOSUPERUSER CREATEDB NOCREATEROLE PASSWORD 'test-only-database-password'; GRANT pg_signal_backend TO baander; ALTER DATABASE functional_test OWNER TO baander;"
+            # The statements of tests/Fixtures/postgres-extensions.sql; PoolerRoleLayoutTest
+            # keeps the two the same.
+            BAANDER_TEST_EXTENSIONS: 'CREATE EXTENSION IF NOT EXISTS "uuid-ossp" WITH SCHEMA public; CREATE EXTENSION IF NOT EXISTS "pg_stat_statements" WITH SCHEMA public; CREATE EXTENSION IF NOT EXISTS "pg_trgm" WITH SCHEMA public; CREATE EXTENSION IF NOT EXISTS "pgcrypto" WITH SCHEMA public; CREATE EXTENSION IF NOT EXISTS "citext" WITH SCHEMA public; CREATE EXTENSION IF NOT EXISTS "ltree" WITH SCHEMA public; CREATE EXTENSION IF NOT EXISTS "pgroonga" WITH SCHEMA public;'
         healthcheck:
             test: ['CMD', 'pg_isready', '-h', '127.0.0.1', '-U', 'baander', '-d', 'functional_test']
             interval: 1s

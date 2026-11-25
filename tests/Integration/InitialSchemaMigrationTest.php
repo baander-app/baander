@@ -104,9 +104,11 @@ final class InitialSchemaMigrationTest extends TestCase
 
     public function testExtensionsAndEmptyMetadataCanInitializeAndRerunAndAcceptFutureMigrations(): void
     {
-        foreach (['citext', 'ltree', 'pg_stat_statements', 'pg_trgm', 'pgcrypto', 'pgroonga', 'uuid-ossp'] as $extension) {
-            $this->connection->executeStatement('CREATE EXTENSION ' . $this->connection->quoteIdentifier($extension));
-        }
+        // A new database copies the extensions from the template, as the preset's helper creates them.
+        self::assertSame(
+            ['citext', 'ltree', 'pg_stat_statements', 'pg_trgm', 'pgcrypto', 'pgroonga', 'uuid-ossp'],
+            $this->connection->fetchFirstColumn("SELECT extname FROM pg_extension WHERE extname <> 'plpgsql' ORDER BY extname"),
+        );
         $factory = $this->factory();
         $factory->getMetadataStorage()->ensureInitialized();
         self::assertCount(43, $factory->getMigrationRepository()->getMigrations());
@@ -548,8 +550,15 @@ SQL, [$jobs[0], $runtimeSession, $desired, str_repeat('a', 32)]);
         self::assertSame(1, (int) $this->connection->fetchOne('SELECT count(*) FROM users WHERE id = ?', [$user]));
     }
 
-    public function testFreshDatabaseInitializesWithoutPreprovisionedExtensions(): void
+    public function testAFreshDatabaseMigratesToTheEndAsItsUnprivilegedOwner(): void
     {
+        self::assertSame(
+            [false, true],
+            [
+                (bool) $this->connection->fetchOne('SELECT rolsuper FROM pg_roles WHERE rolname = current_user'),
+                (bool) $this->connection->fetchOne('SELECT datdba = (SELECT oid FROM pg_roles WHERE rolname = current_user) FROM pg_database WHERE datname = current_database()'),
+            ],
+        );
         self::assertSame(0, $this->migrate($this->factory()));
         $this->assertSchedules();
         self::assertSame(7, (int) $this->connection->fetchOne("SELECT count(*) FROM pg_extension WHERE extname <> 'plpgsql'"));

@@ -350,7 +350,7 @@ final readonly class Preset
     private function prepareVolumes(PresetConfiguration $configuration, array $state): void
     {
         $files = Renderer::configurationFiles($configuration, $state['postgresConfiguration']);
-        $volumes = $configuration->volumes + ['logs' => $configuration->name . '-logs', 'log_index' => $configuration->name . '-log-index'] + array_map(static fn(array $file): string => $file['volume'], $files);
+        $volumes = $configuration->volumes + Renderer::derivedVolumes($configuration) + array_map(static fn(array $file): string => $file['volume'], $files);
         foreach ($volumes as $role => $name) {
             $inspection = $this->docker->run(['volume', 'inspect', $name], check: false);
             if ($inspection->exitCode === 0) {
@@ -365,7 +365,7 @@ final readonly class Preset
                 $this->seedVolume($configuration, $state, $role, $name, '$path = "/seed/" . $argv[1]; if (file_put_contents($path, stream_get_contents(STDIN)) === false || !chmod($path, 0644)) { exit(1); }', [$files[$role]['name']], $files[$role]['content']);
                 continue;
             }
-            if (in_array($role, ['postgres', 'redis', 'pooler_credentials', 'redis_credentials', 'log_index'], true)) {
+            if (in_array($role, ['postgres', 'redis', 'pooler_credentials', 'redis_credentials', 'log_index', 'postgres_socket'], true)) {
                 continue;
             }
             $this->seedVolume($configuration, $state, $role, $name, 'if (!chown("/seed", "www-data") || !chgrp("/seed", "www-data")) { exit(1); }');
@@ -385,7 +385,11 @@ final readonly class Preset
         ], $this->environment, $this->cleanupSeconds, input: $input, onCompletion: $measurement['onCompletion']);
     }
 
-    /** Gives the database roles and the pooler's auth file one SCRAM verifier each, over a direct connection.
+    /**
+     * Creates the application role as a NOSUPERUSER owner of the database with the extensions
+     * present, as the bootstrap superuser over PostgreSQL's local socket, and gives the database
+     * roles and the pooler's auth file one SCRAM verifier each.
+     *
      * @param array<string,mixed> $state
      */
     private function poolerCredentials(PresetConfiguration $configuration, array $state): void
@@ -399,6 +403,7 @@ final readonly class Preset
             $environment['DB_PASSWORD'],
             $environment['DB_DATABASE'],
             'postgres',
+            Renderer::derivedVolumes($configuration)['postgres_socket'],
         );
         DisposableContainer::run($this->docker, $this->store->directory . '/pooler-credentials.json', [
             '--cgroupns', 'private', ...$helper['arguments'],
@@ -494,7 +499,7 @@ PHP;
     private function verifyPostgres(PresetConfiguration $configuration, array $state): void
     {
         $settings = new PostgresSettings($state['postgresConfiguration']);
-        $output = $this->docker->compose($configuration->name, $this->composeFile(), ['exec', '-T', 'postgres', 'psql', '-X', '-A', '-t', '-v', 'ON_ERROR_STOP=1', '-U', $configuration->environment['DB_USERNAME'], '-d', $configuration->environment['DB_DATABASE']], input: $settings->verificationSql())->stdout;
+        $output = $this->docker->compose($configuration->name, $this->composeFile(), ['exec', '-T', 'postgres', 'psql', '-X', '-A', '-t', '-v', 'ON_ERROR_STOP=1', '-U', Pooler::SUPERUSER, '-d', $configuration->environment['DB_DATABASE']], input: $settings->verificationSql())->stdout;
         $snapshot = null;
         foreach (explode("\n", $output) as $line) {
             if (str_starts_with(trim($line), '{')) {

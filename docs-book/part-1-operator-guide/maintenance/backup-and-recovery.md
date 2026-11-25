@@ -57,6 +57,14 @@ on the installation host in its checkout. These steps interrupt new work.
    dc exec -T postgres sh -ec 'pg_dump --format=custom --username="$POSTGRES_USER" --dbname="$POSTGRES_DB"' > "$backup_dir/application.dump"
    ```
 
+   `$POSTGRES_USER` is the cluster's bootstrap superuser, `postgres`, which the
+   preset admits only over the PostgreSQL container's local socket; web, the pooler
+   and the workers connect as `DB_USERNAME`, which owns the database without being a
+   superuser. Statements that need the superuser or an extension's owner take the
+   same path, for example
+   `dc exec -T postgres sh -ec 'psql -v ON_ERROR_STOP=1 --username="$POSTGRES_USER" --dbname="$POSTGRES_DB" -c "ALTER EXTENSION pgroonga UPDATE"'`;
+   so do `REINDEX DATABASE` and `ALTER DATABASE … REFRESH COLLATION VERSION`.
+
    Check the command's exit status and stderr. A failed command can leave a partial
    file; do not accept it as a backup. This exports one database, not cluster roles
    or tablespaces. Preserve any required role definitions separately. PostgreSQL's

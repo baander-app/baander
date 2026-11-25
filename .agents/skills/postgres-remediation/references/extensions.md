@@ -36,7 +36,23 @@ indexes answered a `&@~` search through the index.
 [Version20261017000000](../../../../migrations/Version20261017000000.php)
 creates `citext`, `ltree`, `pg_stat_statements`, `pg_trgm`, `pgcrypto`, `pgroonga`
 and `uuid-ossp`. Installation in the image, availability to CREATE EXTENSION,
-and installation in the selected database are distinct. Creation alone does
+and installation in the selected database are distinct.
+
+Who creates them depends on the role layout. On a development instance the
+application role is the cluster's bootstrap superuser and the migration creates
+them. In the preset and the functional test stack the application role is a
+`NOSUPERUSER` owner of its database, which cannot create `pg_stat_statements` or
+`pgroonga`: the preset's `baander-pooler-credentials` creates all seven as the
+`postgres` superuser over the local socket before the first migration, whose
+`CREATE EXTENSION IF NOT EXISTS` then finds each present and checks no privilege, and
+the test stack creates them from
+[postgres-extensions.sql](../../../../tests/Fixtures/postgres-extensions.sql) in its
+database and in `template1`, so a database the tests create copies them. The
+superuser therefore owns the extensions: `ALTER EXTENSION pgroonga UPDATE` runs as
+`postgres` over the local socket. A disposable drill on 2026-11-25
+(`baander-development-postgres` image, PGroonga 4.1.0) showed the owner's
+`CREATE EXTENSION IF NOT EXISTS pgroonga` skipping with a notice, and its
+`COPY … TO PROGRAM` refused with SQLSTATE 42501. Creation alone does
 not establish application use: do not infer ltree/vector/spatial features from
 a package list. No blanket removal of apparently unused extensions; check
 column types, functions, defaults, operator/index dependencies and deployment consumers.

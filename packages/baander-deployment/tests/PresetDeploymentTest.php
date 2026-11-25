@@ -584,7 +584,7 @@ final class PresetDeploymentTest extends TestCase
         $layout = ApplicationLayout::fromArray(['version' => 1, 'root' => '/srv/baander']);
         $compose = Renderer::render($configuration, $images, $layout, $profile, 'max_connections = 36', 'owner');
         self::assertSame(['postgres', '-c', 'config_file=/etc/baander/postgresql.conf'], $compose['services']['postgres']['command']);
-        self::assertSame('secret$$literal', $compose['services']['postgres']['environment']['POSTGRES_PASSWORD']);
+        self::assertSame('secret$$literal', $compose['services']['web']['environment']['DB_PASSWORD']);
         $gateway = Renderer::configurationFiles($configuration, 'max_connections = 36')['gateway_configuration']['content'];
         self::assertStringContainsString('$http_upgrade', $gateway);
         self::assertContains('noeviction', $compose['services']['redis']['command']);
@@ -918,13 +918,16 @@ final class PresetDeploymentTest extends TestCase
             );
             self::assertInstanceOf(ProcessSpec::class, $created);
             $arguments = implode(' ', $created->argv);
-            self::assertStringContainsString('--network baander-preset-private', $arguments);
+            // The superuser is reachable only over PostgreSQL's local socket, which the helper
+            // reaches through the socket volume, joining no network.
+            self::assertStringContainsString('--network none', $arguments);
+            self::assertStringContainsString('type=volume,src=baander-preset-postgres-socket,dst=/var/run/postgresql', $arguments);
             self::assertStringContainsString('type=volume,src=baander-preset-pooler-credentials,dst=/credentials', $arguments);
             self::assertStringContainsString('--entrypoint baander-pooler-credentials', $arguments);
             self::assertStringEndsWith('sha256:' . str_repeat('d', 64) . ' /credentials', $arguments);
             self::assertStringNotContainsString('private-database-secret', $arguments);
             self::assertSame('private-database-secret', $created->environment['PGPASSWORD']);
-            self::assertSame(['baander', 'baander', 'postgres'], [$created->environment['BAANDER_POOLER_USER'], $created->environment['BAANDER_POOLER_DATABASE'], $created->environment['BAANDER_POOLER_SERVER_HOST']]);
+            self::assertSame(['baander', 'baander', '/var/run/postgresql', 'postgres'], [$created->environment['BAANDER_POOLER_USER'], $created->environment['BAANDER_POOLER_DATABASE'], $created->environment['BAANDER_POOLER_SERVER_HOST'], $created->environment['BAANDER_POOLER_SUPERUSER']]);
             self::assertStringNotContainsString('secrets', $arguments);
         } finally {
             $actual->close();
@@ -1007,6 +1010,32 @@ final class PresetDeploymentTest extends TestCase
             $actual->close();
             Collector::remove($directory);
         }
+    }
+
+    public function testWebAndWorkersHoldNoSuperuserCredential(): void
+    {
+        $configuration = Configuration::fromArray(self::configuration());
+        $compose = Renderer::render($configuration, $this->images(), ApplicationLayout::fromArray(['version' => 1, 'root' => '/srv/baander']), $this->profile(), 'max_connections = 20', 'owner');
+        $postgres = $compose['services']['postgres'];
+
+        self::assertSame('postgres', $postgres['environment']['POSTGRES_USER']);
+        self::assertSame('baander', $postgres['environment']['POSTGRES_DB']);
+        $bootstrap = $postgres['environment']['POSTGRES_PASSWORD'];
+        self::assertMatchesRegularExpression('/\A[0-9a-f]{64}\z/', $bootstrap);
+        foreach ($compose['services'] as $name => $service) {
+            if ($name !== 'postgres') {
+                self::assertStringNotContainsString($bootstrap, json_encode($service, JSON_THROW_ON_ERROR), $name);
+            }
+        }
+        self::assertNotContains('private-database-secret', $postgres['environment']);
+        self::assertContains(['type' => 'volume', 'source' => 'postgres_socket', 'target' => '/var/run/postgresql'], $postgres['volumes']);
+        self::assertSame(['name' => 'baander-preset-postgres-socket', 'external' => true], $compose['volumes']['postgres_socket']);
+        foreach ($compose['services'] as $name => $service) {
+            self::assertSame($name === 'postgres', in_array('postgres_socket', array_column($service['volumes'] ?? [], 'source'), true), $name);
+        }
+        $url = 'postgresql://baander:private-database-secret@pooler:6432/baander?serverVersion=18&charset=utf8';
+        self::assertSame($url, $compose['services']['web']['environment']['DATABASE_URL']);
+        self::assertSame($url, Renderer::workerEnvironment($configuration, $this->profile())['DATABASE_URL']);
     }
 
     public function testRendererRejectsAResolvedProfileOfAnotherCapability(): void

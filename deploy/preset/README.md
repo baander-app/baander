@@ -139,6 +139,26 @@ effective database settings, starts web services and launches the worker pair.
 See [Connection pooler](../../docs-book/part-1-operator-guide/configuration/deployment-profiles.md#connection-pooler)
 for the pooler's aliases and pools.
 
+Web, the pooler and the worker pair connect to PostgreSQL as `DB_USERNAME`, which
+owns the `DB_DATABASE` database and is not a superuser: it cannot create roles or
+run programs on the server. PostgreSQL initializes the cluster with the bootstrap
+superuser `postgres` and a password generated at each render that no other service
+receives. The pooler-credentials helper joins no network; it reaches PostgreSQL's
+local socket through the `<name>-postgres-socket` volume, creates the application
+and control roles and the seven extensions the migrations use, and clears the
+superuser's password. After that, `postgres` logs in only over the local socket, as
+the commands in [Backup and recovery](../../docs-book/part-1-operator-guide/maintenance/backup-and-recovery.md#capture-a-maintenance-checkpoint)
+do. A data volume that an earlier preset initialized has no `postgres` role, so
+`start` stops at the pooler-credentials step with PostgreSQL running. Create the role
+over the local socket as the old superuser, in the installation's
+[command context](../../docs-book/part-1-operator-guide/getting-started/installation.md#command-context),
+then run `start` again; the helper then
+removes the superuser attribute from `DB_USERNAME`. This path has not been drilled:
+
+```sh
+dc exec -T postgres psql -U <DB_USERNAME> -d <DB_DATABASE> -c 'CREATE ROLE postgres SUPERUSER LOGIN'
+```
+
 Redis runs as its image's `redis` user with every capability dropped, and holds no
 password in its arguments or environment. A one-off helper from the Redis image
 receives `REDIS_PASSWORD` by name, writes an access control list to the

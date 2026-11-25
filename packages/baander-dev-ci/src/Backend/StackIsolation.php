@@ -10,7 +10,7 @@ use Throwable;
 
 final class StackIsolation
 {
-    private const string DATABASE_URL = 'postgresql://baander:test-only@postgres:5432/functional_test?serverVersion=18&charset=utf8';
+    private const string DATABASE_URL = 'postgresql://baander:test-only-database-password@postgres:5432/functional_test?serverVersion=18&charset=utf8';
     private const string REDIS_URL = 'redis://baander:test-only-redis-password@redis:6379';
     private const string SOCKET = '/tmp/baander-stack-isolation.sock';
     private const string CONNECT = <<<'PHP_CODE'
