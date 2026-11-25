@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Transcode\Infrastructure\Transcode;
 
+use App\Tests\Unit\Transcode\FreeTranscodeSessionShare;
 use App\Auth\Infrastructure\Security\SecurityUser;
 use App\QoL\Application\Port\AllowedQualityTiersPortInterface;
 use App\Shared\Application\Port\SleeperInterface;
@@ -51,6 +52,8 @@ use Symfony\Component\Messenger\MessageBusInterface;
 
 final class AdaptiveDeliveryTest extends TestCase
 {
+    use FreeTranscodeSessionShare;
+
     private string $root;
     private Uuid $video;
     private PublicId $videoPublic;
@@ -132,6 +135,7 @@ final class AdaptiveDeliveryTest extends TestCase
             $bus,
             new \Symfony\Component\Clock\MockClock(),
             $this->createStub(AllowedQualityTiersPortInterface::class),
+            $this->freeSessionShare(),
         );
         $jobs = $this->createMock(TranscodeJobRepositoryInterface::class);
         $jobs->expects(self::never())->method('findActiveByVideo');

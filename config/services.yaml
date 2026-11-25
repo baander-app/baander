@@ -1240,6 +1240,9 @@ services:
         arguments:
             $basePath: '%env(CONVERT_STORAGE_PATH)%'
 
+    App\Transcode\Application\Port\TranscodeSessionSharePort:
+        alias: App\Transcode\Infrastructure\Doctrine\TranscodeSessionShareStore
+
     App\Transcode\Infrastructure\Storage\TranscodeFileStorage:
         arguments:
             $resolver: '@App\Transcode\Infrastructure\Storage\SegmentFileResolver'

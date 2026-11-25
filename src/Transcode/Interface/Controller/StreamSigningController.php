@@ -123,7 +123,7 @@ final class StreamSigningController
             new OA\Response(response: '400', description: 'Invalid request'),
             new OA\Response(
                 response: '409',
-                description: 'Playback media is unavailable: the video file no longer resolves inside one of its libraries',
+                description: 'Playback cannot start: the video file no longer resolves inside one of its libraries, or the account already holds as many transcode sessions as the server allows and too few have been silent for two minutes to give way (`error.details.reason` is `transcode_session_limit` and `error.details.limit` the limit)',
                 content: new OA\MediaType\Json(
                     schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
                 ),

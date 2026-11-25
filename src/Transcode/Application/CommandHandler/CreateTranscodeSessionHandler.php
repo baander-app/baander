@@ -6,6 +6,7 @@ namespace App\Transcode\Application\CommandHandler;
 
 use App\Transcode\Application\DTO\MediaOperation;
 use App\Transcode\Application\Service\MediaExecutionPolicy;
+use App\Transcode\Application\Service\TranscodeSessionShare;
 use App\Shared\Application\Port\SleeperInterface;
 use App\Shared\Application\Port\SystemSettingsPortInterface;
 use App\Shared\Application\Port\TransactionPortInterface;
@@ -38,6 +39,7 @@ final readonly class CreateTranscodeSessionHandler
         private SleeperInterface $sleeper,
         private EncodePresentationPort $presentations,
         private SystemSettingsPortInterface $settings,
+        private TranscodeSessionShare $share,
     ) {}
 
     #[AsMessageHandler]
@@ -47,6 +49,8 @@ final readonly class CreateTranscodeSessionHandler
         $selection = $this->presentations->select($command);
         $outputDirectory = $this->storagePort->resolveJobDirectory($command->getVideoId(), $command->getQualityTier());
         $session = $this->transaction->run(function () use ($command, $outputDirectory, $selection): TranscodeSession {
+            // The user's lock comes before any row lock, so one user's starts count their sessions in turn.
+            $this->share->lock($command->getUserId());
             $this->ownership->lockAdmission($command->getVideoId());
             $job = $this->jobPort->getOrCreateJob($command->getVideoId(), $command->getQualityTier(), $outputDirectory, $command->getUserId(), $command->getAudioLanguages(), presentationSelection: $selection, requestId: $command->requestId);
             $runtime = $this->ownership->find($job->getId());
@@ -64,6 +68,7 @@ final readonly class CreateTranscodeSessionHandler
                     return $existing;
                 }
             }
+            $this->share->makeRoom($command->getUserId(), $command->getVideoId(), $command->requestId);
             if (in_array($job->getStatus(), [TranscodeStatus::Failed, TranscodeStatus::Cancelled], true)) {
                 $job->retry();
             }

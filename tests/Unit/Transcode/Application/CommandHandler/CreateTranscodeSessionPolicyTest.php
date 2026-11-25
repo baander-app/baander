@@ -8,6 +8,7 @@ use App\Shared\Application\DTO\DeploymentProfile;
 use App\Shared\Application\Port\SleeperInterface;
 use App\Shared\Application\Port\TransactionPortInterface;
 use App\Shared\Domain\Model\Uuid;
+use App\Tests\Unit\Transcode\FreeTranscodeSessionShare;
 use App\Transcode\Application\Command\CreateTranscodeSessionCommand;
 use App\Transcode\Application\CommandHandler\CreateTranscodeSessionHandler;
 use App\Transcode\Application\Exception\MediaEncodingProhibitedException;
@@ -23,6 +24,8 @@ use PHPUnit\Framework\TestCase;
 
 final class CreateTranscodeSessionPolicyTest extends TestCase
 {
+    use FreeTranscodeSessionShare;
+
     public function testRemuxRefusesFreshEncodingBeforeDurableAdmission(): void
     {
         $jobs = $this->createMock(TranscodeJobPortInterface::class);
@@ -37,7 +40,7 @@ final class CreateTranscodeSessionPolicyTest extends TestCase
         $storage->expects(self::never())->method('resolveJobDirectory');
         $presentations = $this->createMock(EncodePresentationPort::class);
         $presentations->expects(self::never())->method('select');
-        $handler = new CreateTranscodeSessionHandler(new MediaExecutionPolicy(new DeploymentProfile('remux', 2, 4, 1, sharedCopySlots: 2)), $jobs, $sessions, $storage, $ownership, $transaction, $this->createStub(SleeperInterface::class), $presentations, $this->settings());
+        $handler = new CreateTranscodeSessionHandler(new MediaExecutionPolicy(new DeploymentProfile('remux', 2, 4, 1, sharedCopySlots: 2)), $jobs, $sessions, $storage, $ownership, $transaction, $this->createStub(SleeperInterface::class), $presentations, $this->settings(), $this->freeSessionShare());
         $this->expectException(MediaEncodingProhibitedException::class);
         $handler(new CreateTranscodeSessionCommand(Uuid::generate(), Uuid::generate(), QualityTier::p720(), AudioProfile::streamingStereo()));
     }

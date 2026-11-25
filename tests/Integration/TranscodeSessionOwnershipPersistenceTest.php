@@ -7,6 +7,7 @@ namespace App\Tests\Integration;
 use App\QoL\Application\Port\AllowedQualityTiersPortInterface;
 use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
+use App\Tests\Unit\Transcode\FreeTranscodeSessionShare;
 use App\Transcode\Domain\Model\TranscodeSession;
 use App\Transcode\Domain\Model\TranscodeSessionState;
 use App\Transcode\Domain\ValueObject\AudioProfile;
@@ -24,6 +25,7 @@ use PHPUnit\Framework\Attributes\DataProvider;
 final class TranscodeSessionOwnershipPersistenceTest extends TestCase
 {
     use OwnershipPersistenceHarness;
+    use FreeTranscodeSessionShare;
 
     private ?Uuid $video = null;
 
@@ -117,6 +119,7 @@ final class TranscodeSessionOwnershipPersistenceTest extends TestCase
             $this->createStub(\Symfony\Component\Messenger\MessageBusInterface::class),
             new \Symfony\Component\Clock\NativeClock(),
             $this->createStub(AllowedQualityTiersPortInterface::class),
+            $this->freeSessionShare(),
         );
         foreach ($expected as $request => $sessions) {
             self::assertSame($sessions, array_map(static fn (PublicId $id): string => $id->toString(), $playback->findSessions($video, $request, [PublicId::fromString(array_key_first($sessions))])));
@@ -261,6 +264,7 @@ final class TranscodeSessionOwnershipPersistenceTest extends TestCase
             $this->createStub(\Symfony\Component\Messenger\MessageBusInterface::class),
             new \Symfony\Component\Clock\NativeClock(),
             $this->createStub(AllowedQualityTiersPortInterface::class),
+            $this->freeSessionShare(),
         );
         $playback->touchSessions([$ids['paused'][2]]);
         self::assertTrue((bool) $connection->fetchOne("SELECT updated_at > clock_timestamp() - interval '1 minute' FROM transcode_sessions WHERE id = ?", [$ids['paused'][1]->toString()]));
@@ -343,6 +347,7 @@ final class TranscodeSessionOwnershipPersistenceTest extends TestCase
             $this->createStub(\Symfony\Component\Messenger\MessageBusInterface::class),
             new \Symfony\Component\Clock\NativeClock(),
             $this->createStub(AllowedQualityTiersPortInterface::class),
+            $this->freeSessionShare(),
         );
         self::assertSame([], $playback->findSessions($video, 'held-client', [$job->getPublicId()]));
         self::assertSame(\App\Transcode\Application\DTO\PlaybackEndReason::Expired, $playback->endReason($video, 'held-client', [$job->getPublicId()]));
@@ -440,7 +445,15 @@ final class TranscodeSessionOwnershipPersistenceTest extends TestCase
             'configuration',
         ));
         $settings = $this->createStub(\App\Shared\Application\Port\SystemSettingsPortInterface::class);
-        $settings->method('get')->willReturn('fdk_aac');
+        $settings->method('get')->willReturnCallback(static fn (string $key): int|string => $key === \App\Transcode\Application\Settings\TranscodeSettingDefinitions::SESSIONS_PER_USER ? 6 : 'fdk_aac');
+        $share = new \App\Transcode\Application\Service\TranscodeSessionShare(
+            new \App\Transcode\Infrastructure\Doctrine\TranscodeSessionShareStore($connection),
+            $runtime,
+            $transaction,
+            $settings,
+            new \App\Shared\Application\DTO\DeploymentProfile(),
+            new \Symfony\Component\Clock\NativeClock(),
+        );
         $handler = new \App\Transcode\Application\CommandHandler\CreateTranscodeSessionHandler(
             new \App\Transcode\Application\Service\MediaExecutionPolicy(new \App\Shared\Application\DTO\DeploymentProfile()),
             $jobService,
@@ -451,6 +464,7 @@ final class TranscodeSessionOwnershipPersistenceTest extends TestCase
             $sleeper,
             $presentations,
             $settings,
+            $share,
         );
         $security = $this->createStub(\Symfony\Bundle\SecurityBundle\Security::class);
         $security->method('getUser')->willReturn(new \App\Auth\Infrastructure\Security\SecurityUser(
@@ -479,6 +493,7 @@ final class TranscodeSessionOwnershipPersistenceTest extends TestCase
             $bus,
             new \Symfony\Component\Clock\NativeClock(),
             $qualityPolicy,
+            $share,
         );
         $endPresentation = function (PublicId $session) use (
             $connection,

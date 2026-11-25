@@ -83,6 +83,18 @@ Private media jobs use one asynchronous file-I/O thread, configured before the j
 
 Ordinary admission can change within the profile's bounds; all ordinary consumers remain resident when parked. Media slots remain independent of the ordinary target. [System Requirements](../getting-started/system-requirements.md#choose-media-slots) gives the measured cost of each job and how to choose the slots; see [Worker deployment](../workers/worker-deployment.md) for the storage recipe.
 
+## Video sessions per user
+
+The video slots bound how much encoding runs. A second bound keeps one account from holding all of them: an account holds at most `transcode.sessions_per_user` transcode sessions at once, six by default, admins included. An automatic start takes one session per quality tier, up to three, so six sessions cover two films playing at once. A session counts from its start until it ends, whether it encodes, waits for a slot or has finished encoding. A super administrator changes it under **Admin → Settings → Media → Video sessions per user** or with the [settings commands](../commands/app-settings.md).
+
+A session's sign of life is the last playback report, playback control or stream signing that touched it. A playing client reports every second. A paused client renews its stream URL and so renews the sign of life once an hour.
+
+- **A start past the limit** ends that account's own session with the oldest sign of life, once it has gone two minutes without one. This can end a film paused on another device. When too few of the account's other sessions have been silent that long, the start is refused with `409` and the reason `transcode_session_limit`; it creates no session and ends none.
+- **A start that finds no video slot free** ends the slot holder with the oldest sign of life, whichever account holds it, once it has gone 70 minutes without one. A paused film that is still open signs within the hour and keeps its slot. When no session has been silent that long, the start waits for a slot and is refused with `503` as before.
+- **The sessions of the playback a start continues**, the same film and client, never give way to it.
+
+An ended session's client sees it as expired and may start again, which counts toward the limit like any other start. Sessions that nobody ends this way expire after 24 hours; see [app:transcode:job:cleanup](../commands/app-transcode-job-cleanup.md).
+
 ## Configuration
 
 Enable and cap audio transcoding with its [server settings](audio-transcoding.md#settings). Execution uses the worker deployment's admitted resources and shared storage:

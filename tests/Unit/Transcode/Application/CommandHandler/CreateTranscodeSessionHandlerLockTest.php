@@ -11,7 +11,11 @@ use App\Transcode\Application\Command\CreateTranscodeSessionCommand;
 use App\Transcode\Application\CommandHandler\CreateTranscodeSessionHandler;
 use App\Transcode\Application\DTO\DesiredTranscodeState;
 use App\Transcode\Application\DTO\TranscodeRuntimeSnapshot;
+use App\Tests\Unit\Transcode\FreeTranscodeSessionShare;
+use App\Transcode\Application\DTO\HeldTranscodeSession;
+use App\Transcode\Application\Exception\TranscodeSessionLimitException;
 use App\Transcode\Application\Exception\TranscodeStartupUnavailableException;
+use App\Transcode\Application\Port\TranscodeSessionSharePort;
 use App\Transcode\Application\Port\TranscodeExecutionOwnershipPort;
 use App\Transcode\Application\Port\TranscodeJobPortInterface;
 use App\Transcode\Application\Port\TranscodeSessionPortInterface;
@@ -27,7 +31,12 @@ use PHPUnit\Framework\TestCase;
 
 final class CreateTranscodeSessionHandlerLockTest extends TestCase
 {
+    use FreeTranscodeSessionShare;
+
     private TranscodeJobPortInterface&MockObject $jobs;
+    private TranscodeSessionSharePort&MockObject $share;
+    /** @var list<string> */
+    private array $locks = [];
     private TranscodeSessionPortInterface&MockObject $sessions;
     private TranscodeExecutionOwnershipPort&MockObject $ownership;
     private TranscodeJob $job;
@@ -50,6 +59,13 @@ final class CreateTranscodeSessionHandlerLockTest extends TestCase
         $this->jobs = $this->createMock(TranscodeJobPortInterface::class);
         $this->sessions = $this->createMock(TranscodeSessionPortInterface::class);
         $this->ownership = $this->createMock(TranscodeExecutionOwnershipPort::class);
+        $this->share = $this->createMock(TranscodeSessionSharePort::class);
+        // Every start takes the user's lock, also one that hands an existing session back.
+        $this->share->expects(self::once())->method('lockUser')->willReturnCallback(function (Uuid $locked) use ($user): void {
+            self::assertTrue($this->insideTransaction);
+            self::assertTrue($locked->equals($user));
+            $this->locks[] = 'user';
+        });
         $storage = $this->createStub(TranscodeStoragePortInterface::class);
         $storage->method('resolveJobDirectory')->willReturn('/fixture/video');
         $selection = new PresentationSelection('encode', 'source', 0, 1, 'mp4', 'configuration');
@@ -70,7 +86,7 @@ final class CreateTranscodeSessionHandlerLockTest extends TestCase
             self::assertFalse($this->insideTransaction, 'Waiting cannot hold the producer transaction.');
             $this->sleeps[] = $seconds;
         });
-        $this->handler = new CreateTranscodeSessionHandler(new \App\Transcode\Application\Service\MediaExecutionPolicy(new \App\Shared\Application\DTO\DeploymentProfile()), $this->jobs, $this->sessions, $storage, $this->ownership, $transaction, $sleeper, $presentations, $this->settings());
+        $this->handler = new CreateTranscodeSessionHandler(new \App\Transcode\Application\Service\MediaExecutionPolicy(new \App\Shared\Application\DTO\DeploymentProfile()), $this->jobs, $this->sessions, $storage, $this->ownership, $transaction, $sleeper, $presentations, $this->settings(), $this->freeSessionShare($this->share));
     }
 
     private function snapshot(string $outcome): TranscodeRuntimeSnapshot
@@ -80,7 +96,11 @@ final class CreateTranscodeSessionHandlerLockTest extends TestCase
 
     public function testDurableIntentIsWrittenInsideTransactionAndStartupWaitsForAcceptance(): void
     {
-        $this->ownership->expects(self::once())->method('lockAdmission')->willReturnCallback(function (): void { self::assertTrue($this->insideTransaction); });
+        $this->ownership->expects(self::once())->method('lockAdmission')->willReturnCallback(function (): void {
+            self::assertTrue($this->insideTransaction);
+            $this->locks[] = 'video';
+        });
+        $this->share->expects(self::once())->method('heldBy')->willReturn([]);
         $this->sessions->expects(self::once())->method('createSession')->willReturn($this->session);
         $this->jobs->expects(self::once())->method('save');
         $this->ownership->expects(self::once())->method('admit')->willReturnCallback(function (): TranscodeRuntimeSnapshot {
@@ -90,10 +110,27 @@ final class CreateTranscodeSessionHandlerLockTest extends TestCase
         $this->ownership->method('find')->willReturnOnConsecutiveCalls(null, $this->snapshot('pending'), $this->snapshot('accepted'));
         self::assertSame($this->session, ($this->handler)($this->command));
         self::assertSame([0.1], $this->sleeps);
+        self::assertSame(['user', 'video'], $this->locks, 'The user\'s lock comes before the video row.');
+    }
+
+    public function testAStartTheUsersShareCannotMakeRoomForCreatesNoSession(): void
+    {
+        $held = array_map(
+            fn (int $index): HeldTranscodeSession => new HeldTranscodeSession(Uuid::generate(), Uuid::generate(), Uuid::generate(), 'other-' . $index, '720p', new \DateTimeImmutable(), true),
+            range(1, 6),
+        );
+        $this->share->method('heldBy')->willReturn($held);
+        $this->share->expects(self::never())->method('lock');
+        $this->sessions->expects(self::never())->method('createSession');
+        $this->jobs->expects(self::never())->method('save');
+        $this->ownership->expects(self::never())->method('admit');
+        $this->expectException(TranscodeSessionLimitException::class);
+        ($this->handler)($this->command);
     }
 
     public function testExistingAcceptedSessionIsReusedWithoutAnotherAdmission(): void
     {
+        $this->share->expects(self::never())->method('heldBy');
         $this->ownership->method('find')->willReturn($this->snapshot('accepted'));
         $this->sessions->expects(self::once())->method('findByUuid')->with($this->session->getId())->willReturn($this->session);
         $this->sessions->expects(self::never())->method('createSession');

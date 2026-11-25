@@ -7,11 +7,14 @@ namespace App\Transcode\Infrastructure\Auth;
 use App\Shared\Domain\Model\Uuid;
 use App\Shared\Application\DTO\DeploymentProfile;
 use App\QoL\Application\Port\AllowedQualityTiersPortInterface;
+use App\Shared\Application\Exception\HandlerFailure;
 use App\Shared\Domain\Model\PublicId;
 use App\Transcode\Application\Command\CreateTranscodeSessionCommand;
 use App\Transcode\Application\DTO\PlaybackEndReason;
+use App\Transcode\Application\Exception\TranscodeSessionLimitException;
 use App\Transcode\Application\Exception\TranscodeStartupUnavailableException;
 use App\Transcode\Application\Port\PlaybackPortInterface;
+use App\Transcode\Application\Service\TranscodeSessionShare;
 use App\Transcode\Domain\Model\TranscodeSession;
 use App\Transcode\Domain\ValueObject\AudioProfile;
 use App\Transcode\Domain\ValueObject\QualityTier;
@@ -41,6 +44,7 @@ final readonly class AuthorizedPlayback implements PlaybackPortInterface
         private MessageBusInterface $commandBus,
         private ClockInterface $clock,
         private AllowedQualityTiersPortInterface $qualityTiers,
+        private TranscodeSessionShare $share,
         private DeploymentProfile $deploymentProfile = new DeploymentProfile(),
     ) {}
 
@@ -138,10 +142,11 @@ final readonly class AuthorizedPlayback implements PlaybackPortInterface
         );
         $failed = static fn(array $row): bool => $row['job_status'] === 'failed' || $row['state'] === 'failed'
             || in_array($row['outcome'], ['failed', 'refused'], true);
-        // Expiry releases a job without cancelling it and never ends the session of a finished
-        // presentation, so a cancelled job, or a cancelled session on a finished one, was cancelled on purpose.
+        // Expiry and a start that needs room release a job without cancelling it, and leave a finished
+        // execution complete when they end its session. A cancelled job, or a cancelled session whose
+        // finished execution was cancelled with it, was cancelled on purpose.
         $cancelled = static fn(array $row): bool => $row['job_status'] === 'cancelled'
-            || ($row['job_status'] === 'completed' && $row['state'] === 'cancelled');
+            || ($row['job_status'] === 'completed' && $row['state'] === 'cancelled' && $row['outcome'] === 'cancelled');
         return match (true) {
             array_any($rows, $failed) => PlaybackEndReason::Failed,
             array_any($rows, $cancelled) => PlaybackEndReason::Cancelled,
@@ -193,22 +198,37 @@ final readonly class AuthorizedPlayback implements PlaybackPortInterface
             throw new AccessDeniedException('Authentication required.');
         }
         $tiers = $qualityTier === null ? $this->automaticTiers($videoId) : [$this->manualTier($videoId, $qualityTier)];
+        $userId = Uuid::fromString($user->getId());
+        // Each tier is admitted in a transaction of its own, so the whole start must fit before the first.
+        $held = $this->share->assertRoomFor($userId, $videoId, $requestId, array_map(static fn (QualityTier $tier): string => $tier->name, $tiers));
         $jobIds = [];
+        $created = [];
         foreach ($tiers as $tier) {
-            $envelope = $this->commandBus->dispatch(new CreateTranscodeSessionCommand(
-                userId: Uuid::fromString($user->getId()),
-                videoId: $videoId,
-                qualityTier: $tier,
-                audioProfile: AudioProfile::streamingStereo(),
-                priority: SessionPriority::Normal,
-                audioLanguages: [],
-                requestId: $requestId,
-                audioStreamIndex: $audioStreamIndex,
-                audioOffsetMs: $audioOffsetMs,
-            ));
+            try {
+                $envelope = $this->commandBus->dispatch(new CreateTranscodeSessionCommand(
+                    userId: $userId,
+                    videoId: $videoId,
+                    qualityTier: $tier,
+                    audioProfile: AudioProfile::streamingStereo(),
+                    priority: SessionPriority::Normal,
+                    audioLanguages: [],
+                    requestId: $requestId,
+                    audioStreamIndex: $audioStreamIndex,
+                    audioOffsetMs: $audioOffsetMs,
+                ));
+            } catch (\Throwable $failure) {
+                if (HandlerFailure::cause($failure) instanceof TranscodeSessionLimitException) {
+                    // Another start of the user took the room after the check; the tiers this start created end too.
+                    $this->share->withdraw($created);
+                }
+                throw $failure;
+            }
             $session = $envelope->last(HandledStamp::class)?->getResult();
             if (!$session instanceof TranscodeSession) {
                 throw new \LogicException('Video admission did not return a playback session.');
+            }
+            if (!array_any($held, static fn (Uuid $id): bool => $id->equals($session->getId()))) {
+                $created[] = $session->getId();
             }
             $jobIds[] = $session->getJobId()->toString();
         }

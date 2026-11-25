@@ -6,6 +6,7 @@ namespace App\Tests\Unit\Transcode\Infrastructure\Transcode;
 
 use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
+use App\Tests\Unit\Transcode\FreeTranscodeSessionShare;
 use App\Transcode\Application\Port\TranscodeStoragePortInterface;
 use App\Transcode\Application\Port\TranscodeExecutionOwnershipPort;
 use App\Transcode\Application\Port\TranscodeSessionPortInterface;
@@ -29,6 +30,8 @@ use Symfony\Component\EventDispatcher\EventDispatcher;
 
 final class OwnedTranscodeJobTest extends TestCase
 {
+    use FreeTranscodeSessionShare;
+
     public function testTwoUsersAdmitIndependentJobsForTheSameVideoAndTier(): void
     {
         $repository = new OwnedJobRepository();
@@ -116,7 +119,7 @@ final class OwnedTranscodeJobTest extends TestCase
         $transaction->method('run')->willReturnCallback(static fn(callable $operation): mixed => $operation());
         $presentations = $this->createStub(\App\Transcode\Application\Port\EncodePresentationPort::class);
         $presentations->method('select')->willReturn(new PresentationSelection('encode', 'source-hash', 0, 1, 'mp4', 'encoder-config'));
-        $handler = new CreateTranscodeSessionHandler(new \App\Transcode\Application\Service\MediaExecutionPolicy(new \App\Shared\Application\DTO\DeploymentProfile()), $jobs, $sessions, $storage, $ownership, $transaction, $this->createStub(SleeperInterface::class), $presentations, $this->settings());
+        $handler = new CreateTranscodeSessionHandler(new \App\Transcode\Application\Service\MediaExecutionPolicy(new \App\Shared\Application\DTO\DeploymentProfile()), $jobs, $sessions, $storage, $ownership, $transaction, $this->createStub(SleeperInterface::class), $presentations, $this->settings(), $this->freeSessionShare());
         $video = Uuid::generate();
         $alice = Uuid::generate();
         $bob = Uuid::generate();

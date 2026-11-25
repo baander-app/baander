@@ -9,9 +9,14 @@ use App\QoL\Application\Port\AllowedQualityTiersPortInterface;
 use App\Shared\Domain\Model\Uuid;
 use App\Shared\Application\DTO\DeploymentProfile;
 use App\Shared\Domain\Model\PublicId;
+use App\Tests\Unit\Transcode\FreeTranscodeSessionShare;
+use App\Shared\Application\Exception\HandlerFailure;
 use App\Transcode\Application\Command\CreateTranscodeSessionCommand;
+use App\Transcode\Application\DTO\HeldTranscodeSession;
 use App\Transcode\Application\DTO\PlaybackEndReason;
+use App\Transcode\Application\Exception\TranscodeSessionLimitException;
 use App\Transcode\Application\Exception\TranscodeStartupUnavailableException;
+use App\Transcode\Application\Port\TranscodeSessionSharePort;
 use App\Transcode\Domain\Model\TranscodeSession;
 use App\Transcode\Domain\ValueObject\AudioProfile;
 use App\Transcode\Domain\ValueObject\QualityTier;
@@ -22,12 +27,15 @@ use PHPUnit\Framework\TestCase;
 use Symfony\Bundle\SecurityBundle\Security;
 use Symfony\Component\Clock\MockClock;
 use Symfony\Component\Messenger\Envelope;
+use Symfony\Component\Messenger\Exception\HandlerFailedException;
 use Symfony\Component\Messenger\MessageBusInterface;
 use Symfony\Component\Messenger\Stamp\HandledStamp;
 use Symfony\Component\Security\Core\Exception\AccessDeniedException;
 
 final class AuthorizedPlaybackTest extends TestCase
 {
+    use FreeTranscodeSessionShare;
+
     /** @param list<int> $expectedHeights */
     #[DataProvider('actors')]
     public function testPlaybackChecksLibraryMembership(
@@ -106,6 +114,7 @@ final class AuthorizedPlaybackTest extends TestCase
             $bus,
             new MockClock(),
             $this->qualityTiers($qualified),
+            $this->freeSessionShare(),
             new DeploymentProfile(videoEncoderSlots: $videoSlots),
         );
         if (!$allowed) {
@@ -161,6 +170,47 @@ final class AuthorizedPlaybackTest extends TestCase
 
     }
 
+    public function testATierRefusedForTheUsersShareCancelsOnlyTheSessionsTheStartCreated(): void
+    {
+        $connection = DriverManager::getConnection(['driver' => 'pdo_sqlite', 'memory' => true]);
+        $connection->executeStatement('CREATE TABLE videos (id TEXT PRIMARY KEY, height INTEGER, width INTEGER)');
+        $userId = new Uuid();
+        $videoId = new Uuid();
+        $requestId = new Uuid()->toString();
+        $connection->insert('videos', ['id' => $videoId->toString(), 'height' => 1080, 'width' => 1920]);
+        $security = $this->createStub(Security::class);
+        $security->method('getUser')->willReturn(new SecurityUser($userId->toString(), 'test@baander.app', ''));
+        $security->method('isGranted')->willReturn(true);
+        $handedBack = TranscodeSession::create($userId, new Uuid(), $videoId, AudioProfile::streamingStereo());
+        $created = TranscodeSession::create($userId, new Uuid(), $videoId, AudioProfile::streamingStereo());
+        $bus = $this->createStub(MessageBusInterface::class);
+        $bus->method('dispatch')->willReturnCallback(static function (CreateTranscodeSessionCommand $command) use ($handedBack, $created): Envelope {
+            $envelope = new Envelope($command);
+
+            return match ($command->getQualityTier()->name) {
+                '360p' => $envelope->with(new HandledStamp($handedBack, 'test-handler')),
+                '720p' => $envelope->with(new HandledStamp($created, 'test-handler')),
+                default => throw new HandlerFailedException($envelope, [TranscodeSessionLimitException::at(6)]),
+            };
+        });
+        $store = $this->createMock(TranscodeSessionSharePort::class);
+        $store->method('heldBy')->willReturn([
+            new HeldTranscodeSession($handedBack->getId(), $handedBack->getJobId(), $videoId, $requestId, '360p', new \DateTimeImmutable(), true),
+        ]);
+        $store->method('lock')->willReturnCallback(static fn (Uuid $session): HeldTranscodeSession => new HeldTranscodeSession($session, $created->getJobId(), $videoId, $requestId, '720p', new \DateTimeImmutable(), false));
+        $store->expects(self::once())->method('end')->with(self::callback(static fn (HeldTranscodeSession $session): bool => $session->sessionId->equals($created->getId())));
+        $playback = new AuthorizedPlayback($security, $connection, $bus, new MockClock(), $this->qualityTiers(), $this->freeSessionShare($store));
+
+        try {
+            $playback->start($videoId, $requestId);
+            self::fail('The third tier was refused.');
+        } catch (HandlerFailedException $failure) {
+            self::assertInstanceOf(TranscodeSessionLimitException::class, HandlerFailure::cause($failure));
+        } finally {
+            $connection->close();
+        }
+    }
+
     public function testSigningRenewsOnlyAnAgedSignOfLifeOfTheActorsOwnSessions(): void
     {
         $connection = DriverManager::getConnection(['driver' => 'pdo_sqlite', 'memory' => true]);
@@ -192,7 +242,7 @@ final class AuthorizedPlaybackTest extends TestCase
             'updated_at' => '2026-11-10 10:00:00.000000+00:00',
         ]);
         $clock = new MockClock(new \DateTimeImmutable('2026-11-10 12:00:00', new \DateTimeZone('UTC')));
-        $playback = new AuthorizedPlayback($security, $connection, $this->createStub(MessageBusInterface::class), $clock, $this->qualityTiers());
+        $playback = new AuthorizedPlayback($security, $connection, $this->createStub(MessageBusInterface::class), $clock, $this->qualityTiers(), $this->freeSessionShare());
         $signs = static fn(string $id): string => (string) $connection->fetchOne('SELECT updated_at FROM transcode_sessions WHERE id = :id', ['id' => $id]);
         try {
             $playback->touchSessions([$paused, $playing, $foreign]);
@@ -283,7 +333,7 @@ final class AuthorizedPlaybackTest extends TestCase
             'job_id' => 'copy-job',
         ]);
         $connection->insert('transcode_runtime_state', ['job_id' => 'copy-job', 'session_id' => 'copy-session', 'request_id' => $requestId]);
-        $playback = new AuthorizedPlayback($security, $connection, $this->createStub(MessageBusInterface::class), new MockClock(), $this->qualityTiers());
+        $playback = new AuthorizedPlayback($security, $connection, $this->createStub(MessageBusInterface::class), new MockClock(), $this->qualityTiers(), $this->freeSessionShare());
         try {
             self::assertSame([$job->toString()], array_keys($this->currentSessions($playback, $video, $requestId, $job)));
             self::assertSame($session->toString(), $this->currentSessions($playback, $video, $requestId, $job)[$job->toString()]->toString());
@@ -363,7 +413,7 @@ final class AuthorizedPlaybackTest extends TestCase
             'status' => 'failed',
             'request_id' => new Uuid()->toString(),
         ]);
-        $playback = new AuthorizedPlayback($security, $connection, $this->createStub(MessageBusInterface::class), new MockClock(), $this->qualityTiers());
+        $playback = new AuthorizedPlayback($security, $connection, $this->createStub(MessageBusInterface::class), new MockClock(), $this->qualityTiers(), $this->freeSessionShare());
         try {
             self::assertSame($held, array_keys($playback->findSessions($video, $requestId, $named)));
             if ($reason !== null) {
@@ -387,6 +437,7 @@ final class AuthorizedPlaybackTest extends TestCase
         yield 'session failed after an interruption' => [[360 => $row('in_progress', 'failed', 'accepted')], PlaybackEndReason::Failed];
         yield 'cancelled job' => [[360 => $row('cancelled', 'cancelled', 'cancelled'), 720 => $row('cancelled', 'cancelled', 'cancelled')], PlaybackEndReason::Cancelled];
         yield 'cancelled session of a finished presentation' => [[360 => $row('completed', 'cancelled', 'cancelled')], PlaybackEndReason::Cancelled];
+        yield 'finished presentation that gave way to another start' => [[360 => $row('completed', 'cancelled', 'complete')], PlaybackEndReason::Expired];
     }
 
     private function qualityTiers(bool $qualified = true): AllowedQualityTiersPortInterface
@@ -416,7 +467,7 @@ final class AuthorizedPlaybackTest extends TestCase
         $videoId = new Uuid();
         $connection->insert('transcode_jobs', ['id' => $jobId->toString(), 'video_id' => $videoId->toString(), 'owner_user_id' => $owner->toString()]);
         $connection->insert('transcode_jobs', ['id' => $ownerlessJobId->toString(), 'video_id' => $videoId->toString(), 'owner_user_id' => null]);
-        $playback = new AuthorizedPlayback($this->createStub(Security::class), $connection, $this->createStub(MessageBusInterface::class), new MockClock(), $this->qualityTiers());
+        $playback = new AuthorizedPlayback($this->createStub(Security::class), $connection, $this->createStub(MessageBusInterface::class), new MockClock(), $this->qualityTiers(), $this->freeSessionShare());
 
         try {
             self::assertTrue($playback->findOwnedTranscodeJobVideoId($jobId, $owner)?->equals($videoId));

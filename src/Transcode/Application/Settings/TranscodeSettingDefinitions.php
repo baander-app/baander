@@ -14,6 +14,7 @@ final class TranscodeSettingDefinitions implements SettingDefinitionProviderInte
     public const string ENABLED = 'transcode.enabled';
     public const string MAX_BITRATE = 'transcode.max_bitrate';
     public const string AAC_IMPLEMENTATION = 'transcode.aac_implementation';
+    public const string SESSIONS_PER_USER = 'transcode.sessions_per_user';
 
     public function definitions(): iterable
     {
@@ -51,6 +52,18 @@ final class TranscodeSettingDefinitions implements SettingDefinitionProviderInte
             default: 'bac',
             allowedValues: ['bac', 'fdk_aac', 'ffmpeg'],
             valueLabels: ['bac' => 'Bånder Audio Core', 'fdk_aac' => 'Fraunhofer fdk-aac', 'ffmpeg' => 'FFmpeg built-in'],
+        );
+
+        // Six is two automatic starts of three quality tiers.
+        yield new SettingDefinition(
+            key: self::SESSIONS_PER_USER,
+            type: SettingValueType::Integer,
+            scope: SettingScope::System,
+            label: 'Video sessions per user',
+            description: 'How many video transcode sessions one account holds at once, admins included. A start past it ends that account\'s session that has reported no playback for the longest, after two minutes of silence, or is refused.',
+            group: 'Media',
+            default: 6,
+            min: 1,
         );
     }
 }
