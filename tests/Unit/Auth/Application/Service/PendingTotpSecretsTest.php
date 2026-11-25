@@ -46,6 +46,6 @@ final class PendingTotpSecretsTest extends TestCase
 
     private static function cipher(): SodiumTotpSecretCipher
     {
-        return new SodiumTotpSecretCipher(base64_encode(random_bytes(SODIUM_CRYPTO_SECRETBOX_KEYBYTES)));
+        return new SodiumTotpSecretCipher(random_bytes(SODIUM_CRYPTO_SECRETBOX_KEYBYTES) |> base64_encode(...));
     }
 }

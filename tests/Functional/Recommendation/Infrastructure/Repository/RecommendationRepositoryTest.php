@@ -27,7 +27,7 @@ final class RecommendationRepositoryTest extends TestCase
     private function createAndPersistUser(): User
     {
         $user = User::register(
-            new Email('rec-test-' . bin2hex(random_bytes(4)) . '@baander.app'),
+            new Email('rec-test-' . (random_bytes(4) |> bin2hex(...)) . '@baander.app'),
             password_hash('password', PASSWORD_BCRYPT),
             'Recommendation Test User',
         );
@@ -139,7 +139,7 @@ final class RecommendationRepositoryTest extends TestCase
         for ($i = 0; $i < 150; $i++) {
             $recommendations[] = Recommendation::create(
                 sourceType: 'song',
-                sourceId: 'batch-source-' . bin2hex(random_bytes(2)) . '-' . $i,
+                sourceId: 'batch-source-' . (random_bytes(2) |> bin2hex(...)) . '-' . $i,
                 targetType: 'song',
                 targetId: 'batch-target-' . $i,
                 score: $i,
@@ -161,8 +161,8 @@ final class RecommendationRepositoryTest extends TestCase
     public function testSaveManyEntitiesCanBeQueriedIndividually(): void
     {
         $recommendations = [
-            Recommendation::create('song', 'src-a-' . bin2hex(random_bytes(4)), 'song', 'tgt-a', 10),
-            Recommendation::create('song', 'src-b-' . bin2hex(random_bytes(4)), 'song', 'tgt-b', 20),
+            Recommendation::create('song', 'src-a-' . (random_bytes(4) |> bin2hex(...)), 'song', 'tgt-a', 10),
+            Recommendation::create('song', 'src-b-' . (random_bytes(4) |> bin2hex(...)), 'song', 'tgt-b', 20),
         ];
 
         $this->recommendationRepository->saveMany($recommendations);
@@ -179,7 +179,7 @@ final class RecommendationRepositoryTest extends TestCase
     public function testFindBySourceReturnsResultsSortedByScoreAndRespectsLimit(): void
     {
         $sourceType = 'song';
-        $sourceId = 'findby-src-' . bin2hex(random_bytes(4));
+        $sourceId = 'findby-src-' . (random_bytes(4) |> bin2hex(...));
 
         for ($i = 0; $i < 5; $i++) {
             $rec = Recommendation::create(
@@ -204,7 +204,7 @@ final class RecommendationRepositoryTest extends TestCase
 
     public function testFindBySourceFiltersByName(): void
     {
-        $sourceId = 'name-filter-src-' . bin2hex(random_bytes(4));
+        $sourceId = 'name-filter-src-' . (random_bytes(4) |> bin2hex(...));
 
         $rec1 = Recommendation::create('song', $sourceId, 'song', 'tgt-1', 50, name: 'default');
         $rec2 = Recommendation::create('song', $sourceId, 'song', 'tgt-2', 60, name: 'custom');
@@ -225,7 +225,7 @@ final class RecommendationRepositoryTest extends TestCase
 
     public function testFindTargetingReturnsResultsSortedByScoreAndRespectsLimit(): void
     {
-        $targetId = 'findby-tgt-' . bin2hex(random_bytes(4));
+        $targetId = 'findby-tgt-' . (random_bytes(4) |> bin2hex(...));
 
         for ($i = 0; $i < 5; $i++) {
             $rec = Recommendation::create(
@@ -254,7 +254,7 @@ final class RecommendationRepositoryTest extends TestCase
         for ($i = 0; $i < 5; $i++) {
             $rec = Recommendation::create(
                 sourceType: 'song',
-                sourceId: 'fuser-src-' . bin2hex(random_bytes(2)) . '-' . $i,
+                sourceId: 'fuser-src-' . (random_bytes(2) |> bin2hex(...)) . '-' . $i,
                 targetType: 'song',
                 targetId: 'fuser-tgt-' . $i,
                 score: $i * 10,
@@ -285,7 +285,7 @@ final class RecommendationRepositoryTest extends TestCase
         for ($i = 0; $i < 5; $i++) {
             $rec = Recommendation::create(
                 sourceType: 'song',
-                sourceId: 'clamp-src-' . bin2hex(random_bytes(2)) . '-' . $i,
+                sourceId: 'clamp-src-' . (random_bytes(2) |> bin2hex(...)) . '-' . $i,
                 targetType: 'song',
                 targetId: 'clamp-tgt-' . $i,
                 score: $i * 10,
@@ -353,7 +353,7 @@ final class RecommendationRepositoryTest extends TestCase
 
     public function testDeleteBySourceRemovesAllMatchingRecommendations(): void
     {
-        $sourceId = 'del-src-' . bin2hex(random_bytes(4));
+        $sourceId = 'del-src-' . (random_bytes(4) |> bin2hex(...));
 
         $recs = [
             Recommendation::create('song', $sourceId, 'song', 'del-tgt-1', 10),
@@ -363,7 +363,7 @@ final class RecommendationRepositoryTest extends TestCase
         $this->recommendationRepository->saveMany($recs);
 
         // Create a recommendation with different sourceId that should NOT be deleted
-        $otherRec = Recommendation::create('song', 'other-src-' . bin2hex(random_bytes(4)), 'song', 'other-tgt', 40);
+        $otherRec = Recommendation::create('song', 'other-src-' . (random_bytes(4) |> bin2hex(...)), 'song', 'other-tgt', 40);
         $this->recommendationRepository->save($otherRec);
 
         $this->recommendationRepository->deleteBySource('song', $sourceId);
@@ -381,7 +381,7 @@ final class RecommendationRepositoryTest extends TestCase
     {
         $recommendation = Recommendation::create(
             sourceType: 'song',
-            sourceId: 'del-existing-src-' . bin2hex(random_bytes(4)),
+            sourceId: 'del-existing-src-' . (random_bytes(4) |> bin2hex(...)),
             targetType: 'song',
             targetId: 'del-existing-tgt',
             score: 42,

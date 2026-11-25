@@ -16,7 +16,7 @@ final class AuthorizationServerMetadataTest extends TestCase
 {
     public function testAdvertisedDpopAlgorithmsAreThoseTheProofValidatorAccepts(): void
     {
-        $accepted = (new ReflectionClassConstant(DpopProofValidator::class, 'SUPPORTED_ALGORITHMS'))->getValue();
+        $accepted = new ReflectionClassConstant(DpopProofValidator::class, 'SUPPORTED_ALGORITHMS')->getValue();
 
         self::assertSame($accepted, AuthorizationServerMetadataController::DPOP_SIGNING_ALGORITHMS);
     }

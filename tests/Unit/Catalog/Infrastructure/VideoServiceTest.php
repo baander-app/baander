@@ -27,7 +27,7 @@ final class VideoServiceTest extends TestCase
         $videos->expects(self::never())->method('findByPublicId');
         $files->expects(self::never())->method('resolve');
 
-        self::assertNull((new VideoService($videos, $files))->getSourceMetadata($id, $scope));
+        self::assertNull(new VideoService($videos, $files)->getSourceMetadata($id, $scope));
     }
 
     public function testSourceRequiresConfinementWithinOneOfItsScopedLibraries(): void
@@ -41,7 +41,7 @@ final class VideoServiceTest extends TestCase
         $files->expects(self::once())->method('resolve')->with($library, '/outside/video.mkv')
             ->willThrowException(new InvalidArgumentException('Path is outside library.'));
 
-        self::assertNull((new VideoService($videos, $files))->getSourceMetadata($video->getPublicId(), LibraryReadScope::restricted([$library])));
+        self::assertNull(new VideoService($videos, $files)->getSourceMetadata($video->getPublicId(), LibraryReadScope::restricted([$library])));
     }
 
     /** @return iterable<string, array{string, ?string, string}> */
@@ -72,7 +72,7 @@ final class VideoServiceTest extends TestCase
             $videos->method('findByPublicId')->willReturn($video);
             $files->method('resolve')->willReturn($path);
 
-            $source = (new VideoService($videos, $files))->getSourceMetadata($video->getPublicId(), LibraryReadScope::unrestricted());
+            $source = new VideoService($videos, $files)->getSourceMetadata($video->getPublicId(), LibraryReadScope::unrestricted());
 
             self::assertNotNull($source);
             self::assertSame($type, $source->mimeType);
@@ -113,7 +113,7 @@ final class VideoServiceTest extends TestCase
                 },
             );
 
-            $source = (new VideoService($videos, $files))->getSourceMetadata($video->getPublicId(), LibraryReadScope::restricted([$first, $second]));
+            $source = new VideoService($videos, $files)->getSourceMetadata($video->getPublicId(), LibraryReadScope::restricted([$first, $second]));
             self::assertNotNull($source);
             self::assertSame($path, $source->filePath);
             self::assertSame(6, $source->size);

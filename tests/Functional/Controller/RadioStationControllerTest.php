@@ -62,7 +62,7 @@ final class RadioStationControllerTest extends TestCase
     public function testMalformedOrTooManyPublicIdsAreRefused(): void
     {
         $user = $this->createTestUser();
-        $tooMany = implode(',', array_map(static fn (): string => (new PublicId())->toString(), range(1, 101)));
+        $tooMany = implode(',', array_map(static fn (): string => new PublicId()->toString(), range(1, 101)));
 
         foreach (['not-a-public-id', $tooMany] as $publicIds) {
             $error = $this->assertJsonResponse($this->authenticatedRequest('GET', '/api/radio/stations?publicIds=' . $publicIds, $user), 400, 'error');
@@ -73,7 +73,7 @@ final class RadioStationControllerTest extends TestCase
     /** A country code no other test uses, so each test counts only its own stations. */
     private static function country(): string
     {
-        return 'T' . strtoupper(bin2hex(random_bytes(3)));
+        return 'T' . (random_bytes(3) |> bin2hex(...) |> strtoupper(...));
     }
 
     private function insertNumberedStations(string $country, int $count): void
@@ -84,7 +84,7 @@ final class RadioStationControllerTest extends TestCase
                 SELECT gen_random_uuid(), ? || lpad(i::text, 15, '0'), ?, 'numbered-' || i, 'Station ' || lpad(i::text, 3, '0'), ?, now(), now()
                 FROM generate_series(1, ?) AS i
                 SQL,
-            [bin2hex(random_bytes(3)), $this->source(), $country, $count],
+            [random_bytes(3) |> bin2hex(...), $this->source(), $country, $count],
         );
     }
 
@@ -99,7 +99,7 @@ final class RadioStationControllerTest extends TestCase
         $source = $this->source();
         $publicIds = [];
         foreach ($names as $name) {
-            $publicId = (new PublicId())->toString();
+            $publicId = new PublicId()->toString();
             $connection->executeStatement(
                 'INSERT INTO radio_stations (id, public_id, source_id, external_id, name, country, created_at, updated_at) VALUES (gen_random_uuid(), ?, ?, ?, ?, ?, now(), now())',
                 [$publicId, $source, 'named-' . $publicId, $name, $country],
@@ -114,7 +114,7 @@ final class RadioStationControllerTest extends TestCase
     {
         return (string) $this->entityManager->getConnection()->fetchOne(
             "INSERT INTO radio_sources (id, public_id, name, type, sync_url, created_at, updated_at) VALUES (gen_random_uuid(), ?, 'Test source', 'iprd', 'https://radio.baander.app/catalog', now(), now()) RETURNING id",
-            [(new PublicId())->toString()],
+            [new PublicId()->toString()],
         );
     }
 }

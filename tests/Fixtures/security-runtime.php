@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 // Raw HTTP probes run next to app:serve on a disposable, isolated container network.
 require dirname(__DIR__, 2) . '/vendor/autoload.php';
-(new Symfony\Component\Dotenv\Dotenv())->bootEnv(dirname(__DIR__, 2) . '/.env');
+new Symfony\Component\Dotenv\Dotenv()->bootEnv(dirname(__DIR__, 2) . '/.env');
 
 function check(bool $condition, string $message): void
 {
@@ -40,7 +40,7 @@ function status(string $answer): int
 
 function healthy(): void
 {
-    check(status(exchange("GET /live HTTP/1.1\r\nHost: baander.app\r\nConnection: close\r\n\r\n")) === 200, 'Server did not recover on a fresh connection.');
+    check(exchange("GET /live HTTP/1.1\r\nHost: baander.app\r\nConnection: close\r\n\r\n") |> status(...) === 200, 'Server did not recover on a fresh connection.');
 }
 
 /** The nonce the token endpoint hands out when it refuses a request without a proof. */
@@ -68,7 +68,7 @@ function rsaProofRequest(string $origin, string $nonce, string $exponent): strin
 {
     $encode = App\Tests\Fixtures\Auth\SignedDpopProof::encode(...);
     $header = ['typ' => 'dpop+jwt', 'alg' => 'PS256', 'jwk' => ['kty' => 'RSA', 'n' => $encode(odd2048BitNumber()), 'e' => $encode($exponent)]];
-    $claims = ['jti' => bin2hex(random_bytes(16)), 'htm' => 'POST', 'htu' => $origin . '/api/oauth/token', 'iat' => time(), 'nonce' => $nonce];
+    $claims = ['jti' => random_bytes(16) |> bin2hex(...), 'htm' => 'POST', 'htu' => $origin . '/api/oauth/token', 'iat' => time(), 'nonce' => $nonce];
     $proof = $encode(json_encode($header, JSON_THROW_ON_ERROR)) . '.' . $encode(json_encode($claims, JSON_THROW_ON_ERROR)) . '.' . $encode("\0" . random_bytes(255));
 
     return "POST /api/oauth/token HTTP/1.1\r\nHost: baander.app\r\nDPoP: " . $proof . "\r\nContent-Length: 0\r\nConnection: close\r\n\r\n";

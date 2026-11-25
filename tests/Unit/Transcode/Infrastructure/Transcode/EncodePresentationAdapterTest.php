@@ -31,7 +31,7 @@ final class EncodePresentationAdapterTest extends TestCase
 
     protected function setUp(): void
     {
-        $this->snapshotPath = sys_get_temp_dir() . '/encode-presentation-' . bin2hex(random_bytes(8)) . '.json';
+        $this->snapshotPath = sys_get_temp_dir() . '/encode-presentation-' . (random_bytes(8) |> bin2hex(...)) . '.json';
     }
 
     protected function tearDown(): void

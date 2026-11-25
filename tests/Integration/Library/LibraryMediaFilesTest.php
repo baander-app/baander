@@ -62,7 +62,7 @@ final class LibraryMediaFilesTest extends TestCase
     {
         $this->harnessSetUp();
 
-        $this->base = sys_get_temp_dir() . '/baander-media-files-' . bin2hex(random_bytes(6));
+        $this->base = sys_get_temp_dir() . '/baander-media-files-' . (random_bytes(6) |> bin2hex(...));
         $this->album = $this->base . '/library/Artist/Album';
         self::assertTrue(mkdir($this->album, 0777, true));
         self::assertTrue(mkdir($this->base . '/elsewhere'));
@@ -527,7 +527,7 @@ final class LibraryMediaFilesTest extends TestCase
     {
         $this->write($this->album . '/01.flac', 'first');
         $this->write($this->album . '/02.flac', 'second');
-        $suffix = bin2hex(random_bytes(6));
+        $suffix = random_bytes(6) |> bin2hex(...);
         $library = Library::create(
             name: 'Media files ' . $suffix,
             slug: new LibrarySlug('media-files-' . $suffix),

@@ -80,7 +80,7 @@ final class AdaptiveDeliveryTest extends TestCase
 
     protected function setUp(): void
     {
-        $this->root = sys_get_temp_dir().'/baander-adaptive-'.bin2hex(random_bytes(5));
+        $this->root = sys_get_temp_dir().'/baander-adaptive-'.(random_bytes(5) |> bin2hex(...));
         $this->beforeGroupRead = static function (): void {};
         $this->requestId = Uuid::generate()->toString();
         $this->video = Uuid::generate(); $this->videoPublic = new PublicId();
@@ -654,7 +654,7 @@ final class AdaptiveDeliveryTest extends TestCase
      */
     private function tiers(array $signed): array
     {
-        $members = array_map(static fn (string $entry): string => explode('.', $entry)[0], array_filter(explode(',', $signed['renditionSet'])));
+        $members = array_map(static fn (string $entry): string => explode('.', $entry)[0], explode(',', $signed['renditionSet']) |> array_filter(...));
         $tiers = [];
         foreach (array_slice(array_values($this->jobs), 0, 3) as $job) {
             if (in_array($job->getPublicId()->toString(), $members, true)) {

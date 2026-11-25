@@ -54,8 +54,8 @@ final class MessengerAdmissionLifecycleTest extends TestCase
         if (!$dsn) {
             self::markTestSkipped('Set MESSENGER_TEST_REDIS_DSN to disposable Redis.');
         }
-        $this->directory = sys_get_temp_dir() . '/baander-admission-lifecycle-' . bin2hex(random_bytes(8));
-        $this->boot = bin2hex(random_bytes(16));
+        $this->directory = sys_get_temp_dir() . '/baander-admission-lifecycle-' . (random_bytes(8) |> bin2hex(...));
+        $this->boot = random_bytes(16) |> bin2hex(...);
         mkdir($this->directory, 0700);
         mkdir($this->directory . '/' . $this->boot, 0700);
         $this->ledger = new AdmissionLedger(
@@ -67,7 +67,7 @@ final class MessengerAdmissionLifecycleTest extends TestCase
         $this->ledger->initialize(hrtime(true) / 1e9);
         $this->publishTarget(2);
 
-        $this->stream = 'messenger_admission_' . bin2hex(random_bytes(12));
+        $this->stream = 'messenger_admission_' . (random_bytes(12) |> bin2hex(...));
         $options = array_replace(MessengerConfiguration::messenger()['transports']['async']['options'], [
             'stream' => $this->stream, 'group' => 'test', 'consumer' => 'consumer-0', 'timeout' => 2.0, 'read_timeout' => 2.0,
         ]);
@@ -213,7 +213,7 @@ final class MessengerAdmissionLifecycleTest extends TestCase
         self::assertNotNull($originalId);
         $this->publishTarget(2);
         $peer = new WorkerLaunchIdentity('worker.baander.app', $this->boot, 'consumer-1', 1);
-        $peerRequest = bin2hex(random_bytes(16));
+        $peerRequest = random_bytes(16) |> bin2hex(...);
         if ($target === 1) {
             self::assertTrue($this->ledger->acquire($peer, 1, $peerRequest, hrtime(true) / 1e9));
         }
@@ -308,8 +308,8 @@ final class MessengerAdmissionLifecycleTest extends TestCase
         $message = new ExtractAlbumCoverCommand(Uuid::v4());
         $originalId = $original->send(new Envelope($message))->last(TransportMessageIdStamp::class)?->getId();
         self::assertNotNull($originalId);
-        $user = 'admission_test_' . bin2hex(random_bytes(12));
-        $password = bin2hex(random_bytes(16));
+        $user = 'admission_test_' . (random_bytes(12) |> bin2hex(...));
+        $password = random_bytes(16) |> bin2hex(...);
         $restricted = null;
         try {
             // Restrict only a disposable principal; the admin connection stays
@@ -427,7 +427,7 @@ final class MessengerAdmissionLifecycleTest extends TestCase
         };
         $dispatcher->addListener(WorkerRunningEvent::class, $stop);
         try {
-            (new Worker(['async' => $transport], $bus, $dispatcher))->run(['sleep' => 0]);
+            new Worker(['async' => $transport], $bus, $dispatcher)->run(['sleep' => 0]);
         } finally {
             $dispatcher->removeListener(WorkerRunningEvent::class, $stop);
         }
@@ -437,7 +437,7 @@ final class MessengerAdmissionLifecycleTest extends TestCase
     {
         $now = hrtime(true) / 1e9;
         foreach (['control', 'execution'] as $unit) {
-            (new \App\Shared\Infrastructure\Worker\WorkerPeerHandshake($this->directory, 'worker.baander.app', $this->boot, $unit, $now, new \App\Shared\Application\DTO\DeploymentProfile()))->publish(1, true, false, $now);
+            new \App\Shared\Infrastructure\Worker\WorkerPeerHandshake($this->directory, 'worker.baander.app', $this->boot, $unit, $now, new \App\Shared\Application\DTO\DeploymentProfile())->publish(1, true, false, $now);
         }
         $this->ledger->publishDecision($target, 'test-demand', [], $now);
     }

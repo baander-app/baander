@@ -141,7 +141,7 @@ final class CoverExtractionRetryTest extends TestCase
                 $event->getWorker()->stop();
             }
         });
-        (new Worker(['async' => $async], $bus, $events))->run(['sleep' => 1000, 'time_limit' => 3]);
+        new Worker(['async' => $async], $bus, $events)->run(['sleep' => 1000, 'time_limit' => 3]);
 
         self::assertSame(2, $attempts);
         self::assertSame([$command->getAlbumId()->toString(), $command->getAlbumId()->toString()], $identities);
@@ -179,7 +179,7 @@ final class CoverExtractionRetryTest extends TestCase
             self::markTestSkipped('Set MESSENGER_TEST_REDIS_DSN to an isolated Redis instance.');
         }
         $connection = Connection::fromDsn($dsn, [
-            'stream' => 'cover_extraction_retry_' . bin2hex(random_bytes(12)),
+            'stream' => 'cover_extraction_retry_' . (random_bytes(12) |> bin2hex(...)),
             'group' => 'test',
             'consumer' => 'test',
         ]);

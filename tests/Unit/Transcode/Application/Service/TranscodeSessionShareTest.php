@@ -330,7 +330,7 @@ final class InMemorySessionShare implements TranscodeSessionSharePort
      */
     private function ordered(callable $filter): array
     {
-        $sessions = array_map(static fn (array $entry): HeldTranscodeSession => $entry['session'], array_values(array_filter($this->sessions, $filter)));
+        $sessions = array_map(static fn (array $entry): HeldTranscodeSession => $entry['session'], array_filter($this->sessions, $filter) |> array_values(...));
         usort($sessions, static fn (HeldTranscodeSession $a, HeldTranscodeSession $b): int => [$a->lastSignOfLife, $a->sessionId->toString()] <=> [$b->lastSignOfLife, $b->sessionId->toString()]);
 
         return $sessions;

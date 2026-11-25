@@ -54,7 +54,7 @@ final class CopyPresentationServiceTest extends TestCase
     {
         $owner = new Uuid();
         $video = new Uuid();
-        $requestId = (new Uuid())->toString();
+        $requestId = new Uuid()->toString();
         $selection = new PresentationSelection('copy', 'source-hash', 0, 1, 'mp4');
         $job = TranscodeJob::createCopy($video, '/tmp/copy', $owner, $selection, 1920, 1080, $requestId);
         $session = TranscodeSession::create($owner, $job->getId(), $video, AudioProfile::streamingStereo());
@@ -63,7 +63,7 @@ final class CopyPresentationServiceTest extends TestCase
         $accepted = new TranscodeRuntimeSnapshot(
             $job->getId(),
             $sameSession ? $session->getId() : new Uuid(),
-            $sameRequest ? $requestId : (new Uuid())->toString(),
+            $sameRequest ? $requestId : new Uuid()->toString(),
             $desired,
             1,
             1,

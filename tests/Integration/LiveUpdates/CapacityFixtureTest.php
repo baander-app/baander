@@ -55,10 +55,10 @@ final class CapacityFixtureTest extends TestCase
         if (!$url) {
             self::markTestSkipped('Set OUTBOX_TEST_DATABASE_URL to disposable PostgreSQL.');
         }
-        $params = (new DsnParser(['postgresql' => 'pdo_pgsql']))->parse($url);
+        $params = new DsnParser(['postgresql' => 'pdo_pgsql'])->parse($url);
         $this->writer = DriverManager::getConnection($params);
         $this->observer = DriverManager::getConnection($params);
-        $this->schema = 'live_capacity_' . bin2hex(random_bytes(8));
+        $this->schema = 'live_capacity_' . (random_bytes(8) |> bin2hex(...));
         $this->writer->executeStatement('CREATE SCHEMA ' . $this->schema);
         foreach ([$this->writer, $this->observer] as $connection) {
             $connection->executeStatement('SET search_path TO ' . $this->schema . ', public');
@@ -131,8 +131,8 @@ final class CapacityFixtureTest extends TestCase
         self::assertSame(0755, fileperms($owned['mediaDirectory']) & 0777);
         self::assertSame(0644, fileperms($owned['song']['path']) & 0777);
         self::assertCount(32, $owned['users']);
-        self::assertCount(32, array_unique(array_column($owned['users'], 'id')));
-        self::assertSame([false], array_values(array_unique(array_column($owned['users'], 'admin'))));
+        self::assertCount(32, array_column($owned['users'], 'id') |> array_unique(...));
+        self::assertSame([false], array_column($owned['users'], 'admin') |> array_unique(...) |> array_values(...));
         self::assertTrue($owned['observer']['admin']);
         $hash = $this->observer->fetchOne('SELECT password FROM users WHERE id = ?', [$owned['users'][0]['id']]);
         self::assertTrue(password_verify($owned['users'][0]['password'], $hash));
@@ -160,7 +160,7 @@ final class CapacityFixtureTest extends TestCase
         self::assertSame(32, (int) $this->observer->fetchOne("SELECT count(*) FROM query_change_inbox WHERE family = 'notifications'"));
         $burst = $this->fixture->execute(['op' => 'burst', 'run' => 'owned', 'count' => 100, 'durationMs' => 0, 'sequence' => 2]);
         self::assertSame(100, $burst['capturedRows']);
-        self::assertSame(132, array_sum(array_column($burst['users'], 'count')));
+        self::assertSame(132, array_column($burst['users'], 'count') |> array_sum(...));
         $observerNotice = $this->fixture->execute(['op' => 'observer-notification', 'run' => 'owned', 'sequence' => 77]);
         self::assertSame(1, $observerNotice['capturedRows']);
         self::assertSame([['id' => $owned['observer']['id'], 'count' => 1, 'title' => 'Live owned 77:0']], $observerNotice['users']);
@@ -231,7 +231,7 @@ final class CapacityFixtureTest extends TestCase
         self::assertSame($originalHash, hash_file('sha256', $owned['song']['path']));
         self::assertSame(0, (int) $this->writer->fetchOne('SELECT count(*) FROM songs WHERE path = ?', [$prepared['path']]));
         self::assertSame(0, (int) $this->writer->fetchOne('SELECT count(*) FROM library_file_index WHERE path = ?', [$prepared['path']]));
-        $metadata = (new WavReader(new NullLogger()))->read($prepared['path']);
+        $metadata = new WavReader(new NullLogger())->read($prepared['path']);
         self::assertSame($prepared['title'], $metadata->getTitle());
         self::assertSame('Live album 00000', $metadata->getAlbum());
         self::assertNull($metadata->getArtist());

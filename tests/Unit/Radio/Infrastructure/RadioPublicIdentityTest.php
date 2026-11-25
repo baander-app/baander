@@ -19,7 +19,7 @@ final class RadioPublicIdentityTest extends TestCase
     public function testStationAndSourceUsePublicIdsWhileProviderUuidRemainsExternal(): void
     {
         $source = RadioSource::create('Provider', 'iprd', new SyncConfig('https://radio.baander.app', null, []));
-        $externalId = (new Uuid())->toString();
+        $externalId = new Uuid()->toString();
         $station = RadioStation::create($source->getId(), $externalId, 'Station', 'DK', []);
         $stations = $this->createMock(RadioStationRepositoryInterface::class);
         $stations->expects(self::once())->method('findMatching')->with(null, null, [], 50, 0)->willReturn([$station]);

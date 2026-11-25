@@ -14,7 +14,7 @@ final class RadioSourceControllerTest extends TestCase
 {
     public function testCreateIsForbiddenForNonAdmin(): void
     {
-        $name = 'Listener source ' . bin2hex(random_bytes(4));
+        $name = 'Listener source ' . (random_bytes(4) |> bin2hex(...));
 
         $response = $this->authenticatedRequest('POST', '/api/radio/sources', $this->createTestUser(), [
             'name' => $name,
@@ -28,7 +28,7 @@ final class RadioSourceControllerTest extends TestCase
 
     public function testAdminCreatesSource(): void
     {
-        $name = 'Admin source ' . bin2hex(random_bytes(4));
+        $name = 'Admin source ' . (random_bytes(4) |> bin2hex(...));
 
         $response = $this->authenticatedRequest('POST', '/api/radio/sources', $this->createAdminUser(), [
             'name' => $name,
@@ -43,7 +43,7 @@ final class RadioSourceControllerTest extends TestCase
 
     public function testAMemberListsSourcesWithoutTheirSyncConfiguration(): void
     {
-        $name = 'Projected source ' . bin2hex(random_bytes(4));
+        $name = 'Projected source ' . (random_bytes(4) |> bin2hex(...));
         $this->sources()->createSource($name, 'iprd', 'https://radio.baander.app/private-catalog', ['token' => 'operator-only'], '0 */6 * * *');
 
         $member = $this->assertJsonResponse($this->authenticatedRequest('GET', '/api/radio/sources', $this->createTestUser()), 200, 'data');
@@ -74,7 +74,7 @@ final class RadioSourceControllerTest extends TestCase
             'data',
         )['data'];
 
-        $tester = new CommandTester((new Application(self::$kernel))->find('app:radio:source:create'));
+        $tester = new CommandTester(new Application(self::$kernel)->find('app:radio:source:create'));
         $exitCode = $tester->execute([
             '--name' => 'Console source',
             '--type' => $fields['type'],
@@ -99,7 +99,7 @@ final class RadioSourceControllerTest extends TestCase
      */
     private static function named(array $sources, string $name): array
     {
-        $matches = array_values(array_filter($sources, static fn (array $source): bool => $source['name'] === $name));
+        $matches = array_filter($sources, static fn (array $source): bool => $source['name'] === $name) |> array_values(...);
         self::assertCount(1, $matches);
 
         return $matches[0];

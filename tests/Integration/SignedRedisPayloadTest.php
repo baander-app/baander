@@ -111,7 +111,7 @@ final class SignedRedisPayloadTest extends TestCase
     public function testACacheValueWrittenWithoutATagIsAMissAndIsNeverInstantiated(): void
     {
         $redis = $this->redis();
-        $namespace = 'signed_payload_' . bin2hex(random_bytes(6));
+        $namespace = 'signed_payload_' . (random_bytes(6) |> bin2hex(...));
         $pool = new RedisAdapter($redis, $namespace, 0, new AuthenticatedMarshaller(new DefaultMarshaller(), self::SECRET));
         $pool->save($pool->getItem('kept')->set(['keys' => ['kid-1']]));
         self::assertSame(['keys' => ['kid-1']], $pool->getItem('kept')->get());
@@ -129,7 +129,7 @@ final class SignedRedisPayloadTest extends TestCase
     public function testACacheValueTaggedUnderAnotherSecretIsAMiss(): void
     {
         $redis = $this->redis();
-        $namespace = 'signed_payload_' . bin2hex(random_bytes(6));
+        $namespace = 'signed_payload_' . (random_bytes(6) |> bin2hex(...));
         $this->cacheKeys[] = $namespace . ':entry';
         $other = new RedisAdapter($redis, $namespace, 0, new AuthenticatedMarshaller(new DefaultMarshaller(), 'another-secret-of-at-least-32-bytes'));
         $other->save($other->getItem('entry')->set(new UnserializeProbe()));
@@ -170,7 +170,7 @@ final class SignedRedisPayloadTest extends TestCase
             new DecodeFailedMessageMiddleware(new ServiceLocator(['async' => fn(): SigningSerializer => $this->signing()])),
             new HandleMessageMiddleware(new HandlersLocator([ExtractAlbumCoverCommand::class => [$this->complete(...)]])),
         ]);
-        (new Worker(['async' => $transport], $bus, $events))->run(['sleep' => 100, 'time_limit' => 5]);
+        new Worker(['async' => $transport], $bus, $events)->run(['sleep' => 100, 'time_limit' => 5]);
 
         return [$failed, $logger->cleanLogs()];
     }
@@ -178,7 +178,7 @@ final class SignedRedisPayloadTest extends TestCase
     /** @return array{string, array<string, mixed>} The body and headers the JSON serializer writes, unsigned. */
     private function unsigned(object $message): array
     {
-        $encoded = (new JsonTransportSerializer(MessageCodecFactory::create()))->encode(new Envelope($message));
+        $encoded = new JsonTransportSerializer(MessageCodecFactory::create())->encode(new Envelope($message));
 
         return [$encoded['body'], $encoded['headers'] ?? []];
     }
@@ -195,7 +195,7 @@ final class SignedRedisPayloadTest extends TestCase
         if (!$dsn) {
             self::markTestSkipped('Set MESSENGER_TEST_REDIS_DSN to an isolated Redis instance.');
         }
-        $connection = Connection::fromDsn($dsn, ['stream' => 'test_' . bin2hex(random_bytes(12)), 'group' => 'test', 'consumer' => 'test', 'delete_after_ack' => true]);
+        $connection = Connection::fromDsn($dsn, ['stream' => 'test_' . (random_bytes(12) |> bin2hex(...)), 'group' => 'test', 'consumer' => 'test', 'delete_after_ack' => true]);
         $this->connections[] = $connection;
         $transport = new RedisTransport($connection, $this->signing());
         $transport->setup();

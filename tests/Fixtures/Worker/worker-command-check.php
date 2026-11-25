@@ -95,14 +95,14 @@ $url = getenv('DATABASE_URL');
 if (!$url) {
     throw new RuntimeException('Disposable DATABASE_URL is required.');
 }
-$db = DriverManager::getConnection((new DsnParser(['postgresql' => 'pdo_pgsql']))->parse($url));
+$db = DriverManager::getConnection(new DsnParser(['postgresql' => 'pdo_pgsql'])->parse($url));
 if (in_array($mode, ['reserve-pair', 'claim-unit', 'register-unit', 'start-unit'], true)) {
     $inventory = new App\Shared\Infrastructure\Worker\DoctrineDeploymentInventory($db);
     $daemon = 'baander.app:command-drill';
     if ($mode === 'reserve-pair') {
         $controlRecipe = hash('sha256', 'control:2944:129:cpu0');
         $executionRecipe = hash('sha256', 'execution:4480:256:cpu1,2:console320');
-        $accepted = $inventory->reserveBoot($namespace, $bootId, hash('sha256', $controlRecipe . $executionRecipe), (new App\Shared\Application\DTO\DeploymentProfile())->fingerprint(), $daemon, $controlRecipe, $executionRecipe);
+        $accepted = $inventory->reserveBoot($namespace, $bootId, hash('sha256', $controlRecipe . $executionRecipe), new App\Shared\Application\DTO\DeploymentProfile()->fingerprint(), $daemon, $controlRecipe, $executionRecipe);
     } else {
         $unit = App\Shared\Application\DTO\DeploymentUnit::from($arguments[4] ?? '');
         if ($mode === 'claim-unit') {
@@ -527,8 +527,8 @@ if ($mode === 'seed-scheduler') {
     $db->executeStatement(<<<'SQL'
         INSERT INTO scheduled_jobs (id, public_id, revision, name, expression, job_type, command, status, parameters, created_at, updated_at, run_count)
         VALUES (:id, :public_id, :revision, 'Worker command scheduler fixture', '* * * * *', 'console', 'app:transcode:cache-sweep', 'paused', '{"dry-run":true}', clock_timestamp(), clock_timestamp(), 0)
-        SQL, ['id' => $job->toString(), 'public_id' => (new App\Shared\Domain\Model\PublicId())->toString(), 'revision' => App\Shared\Domain\Model\Uuid::v7()->toString()]);
-    if ((new App\Scheduler\Infrastructure\Doctrine\DoctrineSchedulerManualOccurrenceRecorder($db))->record($job, $request) === null
+        SQL, ['id' => $job->toString(), 'public_id' => new App\Shared\Domain\Model\PublicId()->toString(), 'revision' => App\Shared\Domain\Model\Uuid::v7()->toString()]);
+    if (new App\Scheduler\Infrastructure\Doctrine\DoctrineSchedulerManualOccurrenceRecorder($db)->record($job, $request) === null
         || (int) $db->fetchOne('SELECT count(*) FROM scheduler_occurrences WHERE dispatched_at IS NOT NULL') !== 0
         || (int) $db->fetchOne('SELECT count(*) FROM scheduler_occurrence_executions') !== 0) {
         throw new RuntimeException('Manual request must remain durable and undispatched before lease admission.');
@@ -574,7 +574,7 @@ if ($mode === 'verify-scheduler' || $mode === 'replay-scheduler') {
     exit(0);
 }
 if ($mode === 'seed-outbox') {
-    (new Symfony\Component\Dotenv\Dotenv())->bootEnv(dirname(__DIR__, 3) . '/.env');
+    new Symfony\Component\Dotenv\Dotenv()->bootEnv(dirname(__DIR__, 3) . '/.env');
     $kernel = new App\Kernel('prod', false);
     $kernel->boot();
     $em = $kernel->getContainer()->get('doctrine')->getManager();
@@ -646,7 +646,7 @@ if ($mode === 'reserved') {
 $roles = [];
 $profile = null;
 foreach (glob('/proc/[0-9]*/cmdline') ?: [] as $path) {
-    $pid = (int) basename(dirname($path));
+    $pid = (int) (dirname($path) |> basename(...));
     $command = @file_get_contents($path);
     if ($pid === 1 || $pid === getmypid() || $command === false) {
         continue;
@@ -743,7 +743,7 @@ foreach (['messages' => ($profile ?? throw new RuntimeException('No resident aut
 }
 if ($mode === 'readiness-observation') {
     try {
-        $observed = \App\Shared\Infrastructure\Worker\WorkerReadinessObservation::observe($namespace, $bootId, $expectedEpoch, $unit, $profile->toJson(), dirname(__DIR__, 3), (new \App\Shared\Application\DTO\DeploymentProfile())->toJson());
+        $observed = \App\Shared\Infrastructure\Worker\WorkerReadinessObservation::observe($namespace, $bootId, $expectedEpoch, $unit, $profile->toJson(), dirname(__DIR__, 3), new \App\Shared\Application\DTO\DeploymentProfile()->toJson());
         $observation = ['success' => true, 'roles' => $observed];
     } catch (Throwable $error) {
         $safeMessages = [

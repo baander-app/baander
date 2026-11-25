@@ -55,7 +55,7 @@ final class PasskeyEndpointsTest extends RateLimitTestCase
         $credential = $this->storePasskey($user);
         $unregistered = new WebAuthnTestCredential($user->getPublicId()->toString(), $this->relyingPartyId());
         $badSignature = $this->assertion($credential);
-        $badSignature['response']['response']['signature'] = rtrim(strtr(base64_encode(str_repeat('x', 64)), '+/', '-_'), '=');
+        $badSignature['response']['response']['signature'] = rtrim(strtr(str_repeat('x', 64) |> base64_encode(...), '+/', '-_'), '=');
         $reused = $this->assertion($credential);
         $this->assertJsonResponse($this->check($reused), 200);
 

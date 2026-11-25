@@ -60,25 +60,25 @@ final class WebhookDestinationPolicyTest extends TestCase
     {
         self::assertSame(
             ['host' => '64:ff9b::5db8:d822', 'ips' => ['64:ff9b::5db8:d822']],
-            (new WebhookDestinationPolicy())->resolve('https://[64:ff9b::5db8:d822]/hook'),
+            new WebhookDestinationPolicy()->resolve('https://[64:ff9b::5db8:d822]/hook'),
         );
     }
 
     public function testTheLanAllowlistJudgesTheEmbeddedIpv4Address(): void
     {
-        self::assertNotNull((new WebhookDestinationPolicy(['10.0.0.0/8']))->resolve('http://[64:ff9b::a00:5]:8080/'));
-        self::assertNull((new WebhookDestinationPolicy(['64:ff9b::/96']))->resolve('http://[64:ff9b::a00:5]:8080/'));
+        self::assertNotNull(new WebhookDestinationPolicy(['10.0.0.0/8'])->resolve('http://[64:ff9b::a00:5]:8080/'));
+        self::assertNull(new WebhookDestinationPolicy(['64:ff9b::/96'])->resolve('http://[64:ff9b::a00:5]:8080/'));
     }
 
     #[DataProvider('unsafeUrls')]
     public function testUnsafeDestinationsAreRejected(string $url): void
     {
-        self::assertNull((new WebhookDestinationPolicy())->resolve($url));
+        self::assertNull(new WebhookDestinationPolicy()->resolve($url));
     }
 
     public function testPublicLiteralIsPinnedWithoutDnsLookup(): void
     {
-        self::assertSame(['host' => '1.1.1.1', 'ips' => ['1.1.1.1']], (new WebhookDestinationPolicy())->resolve('https://1.1.1.1/hook'));
+        self::assertSame(['host' => '1.1.1.1', 'ips' => ['1.1.1.1']], new WebhookDestinationPolicy()->resolve('https://1.1.1.1/hook'));
     }
 
     public function testOnlyExplicitlyAllowedLanAddressesAreAccepted(): void

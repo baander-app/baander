@@ -63,7 +63,7 @@ final class PlaylistWriteRace
         if (!is_string($url) || $url === '') {
             throw new \LogicException('OUTBOX_TEST_DATABASE_URL must name a disposable PostgreSQL database.');
         }
-        $connection = DriverManager::getConnection((new DsnParser(['postgresql' => 'pdo_pgsql']))->parse($url));
+        $connection = DriverManager::getConnection(new DsnParser(['postgresql' => 'pdo_pgsql'])->parse($url));
         $connection->executeStatement('SET search_path TO ' . $connection->quoteIdentifier($schema) . ', public');
         $connection->executeStatement("SET lock_timeout = '10s'");
         if ($application !== null) {

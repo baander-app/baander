@@ -111,10 +111,10 @@ final class RecommendationControllerTest extends TestCase
 
         self::assertSame([1.0, 0.0], array_map(
             static fn (Recommendation $stored): float => $stored->getScore(),
-            array_values(array_filter(
+            array_filter(
                 $this->recommendations->findForUser($user->getId(), 200),
                 static fn (Recommendation $stored): bool => mb_strlen($stored->getName()) === 255 && $stored->getPosition() === 2147483647,
-            )),
+            ) |> array_values(...),
         ));
     }
 
@@ -244,7 +244,7 @@ final class RecommendationControllerTest extends TestCase
         [$source, $public] = $this->song($owner);
         $db = $this->entityManager->getConnection();
         $library = $db->fetchOne('SELECT album.library_id FROM songs song JOIN albums album ON album.id = song.album_id WHERE song.id = ?', [$source]);
-        $db->insert('user_library_access', ['user_id' => $other->getId()->toString(), 'library_id' => $library, 'granted_at' => (new \DateTimeImmutable())->format('Y-m-d H:i:s.uP')]);
+        $db->insert('user_library_access', ['user_id' => $other->getId()->toString(), 'library_id' => $library, 'granted_at' => new \DateTimeImmutable()->format('Y-m-d H:i:s.uP')]);
         $rec = Recommendation::create('song', $source, 'song', $source, 0.5, $owner->getId());
         $this->recommendations->save($rec);
         self::assertSame([], $this->assertJsonResponse($this->authenticatedRequest('GET', '/api/recommendations/source/song/' . $public, $other), 200, 'data')['data']);
@@ -258,7 +258,7 @@ final class RecommendationControllerTest extends TestCase
     public function testAnonymousRequestsRemainRejected(): void
     {
         foreach (['GET', 'POST', 'DELETE'] as $method) {
-            $this->assertJsonResponse($this->anonymousRequest($method, '/api/recommendations/' . ($method === 'DELETE' ? (new PublicId())->toString() : '')), 401);
+            $this->assertJsonResponse($this->anonymousRequest($method, '/api/recommendations/' . ($method === 'DELETE' ? new PublicId()->toString() : '')), 401);
         }
     }
 
@@ -291,7 +291,7 @@ final class RecommendationControllerTest extends TestCase
     {
         $db = $this->entityManager->getConnection();
         $library = $db->fetchOne('SELECT album.library_id FROM songs song JOIN albums album ON album.id = song.album_id WHERE song.id = ?', [$song]);
-        $db->insert('user_library_access', ['user_id' => $user->getId()->toString(), 'library_id' => $library, 'granted_at' => (new \DateTimeImmutable())->format('Y-m-d H:i:s.uP')]);
+        $db->insert('user_library_access', ['user_id' => $user->getId()->toString(), 'library_id' => $library, 'granted_at' => new \DateTimeImmutable()->format('Y-m-d H:i:s.uP')]);
     }
 
     /**
@@ -312,11 +312,11 @@ final class RecommendationControllerTest extends TestCase
         $library = Uuid::v7()->toString();
         $album = Uuid::v7()->toString();
         $song = Uuid::v7()->toString();
-        $public = (new PublicId())->toString();
-        $now = (new \DateTimeImmutable())->format('Y-m-d H:i:s.uP');
-        $db->insert('libraries', ['id' => $library, 'public_id' => (new PublicId())->toString(), 'slug' => 'recommendation-' . bin2hex(random_bytes(6)), 'name' => 'Recommendation fixture', 'path' => '/tmp/recommendation-' . bin2hex(random_bytes(6)), 'type' => 'music', 'sort_order' => 0, 'created_at' => $now, 'updated_at' => $now]);
+        $public = new PublicId()->toString();
+        $now = new \DateTimeImmutable()->format('Y-m-d H:i:s.uP');
+        $db->insert('libraries', ['id' => $library, 'public_id' => new PublicId()->toString(), 'slug' => 'recommendation-' . (random_bytes(6) |> bin2hex(...)), 'name' => 'Recommendation fixture', 'path' => '/tmp/recommendation-' . (random_bytes(6) |> bin2hex(...)), 'type' => 'music', 'sort_order' => 0, 'created_at' => $now, 'updated_at' => $now]);
         $db->insert('user_library_access', ['user_id' => $user->getId()->toString(), 'library_id' => $library, 'granted_at' => $now]);
-        $db->insert('albums', ['id' => $album, 'public_id' => (new PublicId())->toString(), 'library_id' => $library, 'title' => 'Recommendation album', 'type' => 'studio', 'locked_fields' => '{}', 'merged_from' => '[]', 'created_at' => $now, 'updated_at' => $now]);
+        $db->insert('albums', ['id' => $album, 'public_id' => new PublicId()->toString(), 'library_id' => $library, 'title' => 'Recommendation album', 'type' => 'studio', 'locked_fields' => '{}', 'merged_from' => '[]', 'created_at' => $now, 'updated_at' => $now]);
         $db->insert('songs', ['id' => $song, 'public_id' => $public, 'album_id' => $album, 'path' => '/tmp/' . $public . '.mp3', 'hash' => hash('sha256', $song), 'title' => 'Recommendation song', 'size' => 1000, 'mime_type' => 'audio/mpeg', 'created_at' => $now, 'updated_at' => $now]);
         return [$song, $public];
     }

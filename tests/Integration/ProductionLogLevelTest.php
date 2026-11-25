@@ -16,7 +16,7 @@ final class ProductionLogLevelTest extends TestCase
 {
     public function testTheCompiledProductionConfigurationLogsBothCopiesAtInfo(): void
     {
-        $directory = sys_get_temp_dir() . '/baander-log-level-' . bin2hex(random_bytes(8));
+        $directory = sys_get_temp_dir() . '/baander-log-level-' . (random_bytes(8) |> bin2hex(...));
         $kernel = new ProductionLogLevelKernel($directory);
         try {
             $kernel->boot();

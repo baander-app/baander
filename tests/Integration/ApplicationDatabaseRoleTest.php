@@ -26,7 +26,7 @@ final class ApplicationDatabaseRoleTest extends TestCase
         if (!$url) {
             self::markTestSkipped('Requires the disposable PostgreSQL of the test stack.');
         }
-        $this->connection = DriverManager::getConnection((new DsnParser(['postgresql' => 'pdo_pgsql']))->parse($url));
+        $this->connection = DriverManager::getConnection(new DsnParser(['postgresql' => 'pdo_pgsql'])->parse($url));
     }
 
     protected function tearDown(): void

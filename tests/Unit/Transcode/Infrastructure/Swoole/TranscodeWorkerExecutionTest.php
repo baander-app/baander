@@ -101,7 +101,7 @@ final class TranscodeWorkerExecutionTest extends TestCase
 
     protected function setUp(): void
     {
-        $this->root = sys_get_temp_dir() . '/baander-worker-video-' . bin2hex(random_bytes(8));
+        $this->root = sys_get_temp_dir() . '/baander-worker-video-' . (random_bytes(8) |> bin2hex(...));
         mkdir($this->root, 0700);
         file_put_contents($this->root . '/source', 'source');
         $video = Video::create($this->root . '/source', hash_file('xxh3', $this->root . '/source'));
@@ -160,10 +160,10 @@ final class TranscodeWorkerExecutionTest extends TestCase
                     return ['state' => 'running', 'stdout' => '', 'stderr' => '', 'exitCode' => null, 'error' => null, 'cpuSeconds' => 0.0];
                 }
                 $arguments = $this->subtitleCommands[$handle->attempt];
-                file_put_contents($arguments[array_key_last($arguments)], "WEBVTT\n\n00:01.000 --> 00:02.000\nCue\n");
+                file_put_contents(array_last($arguments), "WEBVTT\n\n00:01.000 --> 00:02.000\nCue\n");
                 return ['state' => 'exited', 'exitCode' => $this->subtitleFails ? 1 : 0, 'stderr' => $this->subtitleFails ? 'Failed subtitle conversion' : '', 'error' => null, 'stdout' => '', 'cpuSeconds' => 0.0];
             }
-            if (in_array('-skip_frame', $this->probeCommands[array_key_last($this->probeCommands)] ?? [], true)) {
+            if (in_array('-skip_frame', array_last($this->probeCommands) ?? [], true)) {
                 return $this->keyframeListing();
             }
             return ['state' => 'exited', 'exitCode' => 0, 'stderr' => '', 'error' => null, 'cpuSeconds' => 0.0, 'stdout' => json_encode($this->sourceProbeOutput ?? [
@@ -231,7 +231,7 @@ final class TranscodeWorkerExecutionTest extends TestCase
             $entry->isDir() ? rmdir($entry->getPathname()) : unlink($entry->getPathname());
         }
         rmdir($this->root);
-        (new \Symfony\Component\Filesystem\Filesystem())->remove($this->root . '-outside');
+        new \Symfony\Component\Filesystem\Filesystem()->remove($this->root . '-outside');
     }
 
     public function testAMissingSelectedAacImplementationFailsTheJobBeforeTheEncoderStarts(): void
@@ -294,7 +294,7 @@ final class TranscodeWorkerExecutionTest extends TestCase
     private function probeWithout(string $codec): \App\Tests\Support\StubAacImplementationProbe
     {
         $all = ['libbac', 'libfdk_aac', 'aac'];
-        $present = array_values(array_diff($all, [$codec]));
+        $present = array_diff($all, [$codec]) |> array_values(...);
 
         return new \App\Tests\Support\StubAacImplementationProbe($present, $present);
     }
@@ -426,7 +426,7 @@ final class TranscodeWorkerExecutionTest extends TestCase
         self::assertSame(3.5, $this->completedWork[0]);
         self::assertGreaterThan(0.0, $this->completedWork[1]);
         self::assertNotSame([], $this->observedWork);
-        self::assertSame(3.5, $this->observedWork[array_key_last($this->observedWork)][0]);
+        self::assertSame(3.5, array_last($this->observedWork)[0]);
         self::assertSame(['accepted', 'ready', 'complete'], $this->observed);
         self::assertSame(TranscodeStatus::Completed, $this->job->getStatus());
         self::assertStringEndsWith('/generation-1', $this->job->getOutputDirectory());
@@ -482,7 +482,7 @@ final class TranscodeWorkerExecutionTest extends TestCase
         self::assertNotContains('complete', $this->observed);
         self::assertSame(0, $this->allocations);
         $second = $this->spawner->commands[1];
-        self::assertStringContainsString('/generation-2/', $second[array_key_last($second)]);
+        self::assertStringContainsString('/generation-2/', array_last($second));
         self::assertSame('32000', $second[array_search('-b:a', $second, true) + 1]);
     }
 
@@ -629,7 +629,7 @@ final class TranscodeWorkerExecutionTest extends TestCase
                 self::assertNotContains('-noaccurate_seek', $command);
                 self::assertStringStartsWith('atrim=start=0', $command[array_search('-af', $command, true) + 1]);
             }
-            $metadata = json_decode(file_get_contents(dirname($command[array_key_last($command)]) . '/generation.json'), true, 512, JSON_THROW_ON_ERROR);
+            $metadata = json_decode(file_get_contents((array_last($command) |> dirname(...)) . '/generation.json'), true, 512, JSON_THROW_ON_ERROR);
             self::assertSame($sourceStart, (float) $metadata['startTime']);
             self::assertSame(60.0, (float) $metadata['duration']);
         }
@@ -809,7 +809,7 @@ final class TranscodeWorkerExecutionTest extends TestCase
         $this->worker->run($this->current, static fn(): bool => false);
         self::assertTrue($raced);
         self::assertNotContains('failed', $this->observed);
-        self::assertSame('complete', $this->observed[array_key_last($this->observed)]);
+        self::assertSame('complete', array_last($this->observed));
         self::assertSame(TranscodeStatus::Completed, $this->job->getStatus());
         self::assertSame(1, $this->releases);
     }
@@ -824,7 +824,7 @@ final class TranscodeWorkerExecutionTest extends TestCase
         $this->spawner->onRunning = function () use (&$polls, &$progressed): void {
             ++$polls;
             $command = $this->spawner->commands[0];
-            $directory = dirname($command[array_key_last($command)]);
+            $directory = array_last($command) |> dirname(...);
             if ($polls === 1) {
                 $this->spawner->publish(4);
             } elseif ($polls === 2) {
@@ -884,7 +884,7 @@ final class TranscodeWorkerExecutionTest extends TestCase
         $this->spawner->onRunning = function () use (&$polls, &$readyBeforeTarget): void {
             ++$polls;
             $command = $this->spawner->commands[0];
-            $path = dirname($command[array_key_last($command)]) . '/track-0-seg-00004.m4s';
+            $path = (array_last($command) |> dirname(...)) . '/track-0-seg-00004.m4s';
             if ($polls === 1) {
                 file_put_contents($path . '.tmp', PublishedPresentationFixture::fragment());
             } elseif ($polls === 2) {
@@ -914,7 +914,7 @@ final class TranscodeWorkerExecutionTest extends TestCase
         $this->spawner->onRunning = function () use (&$polls, &$pausedBeforeTarget): void {
             ++$polls;
             $command = $this->spawner->commands[0];
-            $directory = dirname($command[array_key_last($command)]);
+            $directory = array_last($command) |> dirname(...);
             if ($polls === 1) {
                 $this->spawner->publish(3);
             } elseif ($polls === 2) {
@@ -944,8 +944,8 @@ final class TranscodeWorkerExecutionTest extends TestCase
         $this->onSubtitlePoll = function () use (&$maximumActive): void {
             $active = 0;
             foreach ($this->subtitleCommands as $arguments) {
-                $temporary = $arguments[array_key_last($arguments)];
-                if (!is_file(substr($temporary, 0, -5))) {
+                $temporary = array_last($arguments);
+                if (!(substr($temporary, 0, -5) |> is_file(...))) {
                     ++$active;
                 }
             }
@@ -1003,7 +1003,7 @@ final class TranscodeWorkerExecutionTest extends TestCase
         $this->worker->run($this->current, static fn (): bool => false);
         self::assertSame([1], $this->subtitleStopped);
         self::assertCount(2, $this->subtitleCommands);
-        $oldPath = $this->subtitleCommands[1][array_key_last($this->subtitleCommands[1])];
+        $oldPath = array_last($this->subtitleCommands[1]);
         self::assertStringContainsString('/generation-1/', $oldPath);
         self::assertFileDoesNotExist($oldPath);
         self::assertFileDoesNotExist(substr($oldPath, 0, -5));
@@ -1022,7 +1022,7 @@ final class TranscodeWorkerExecutionTest extends TestCase
         $active = [$key => $track];
         $storage = new TranscodeFileStorage(new SegmentFileResolver($this->root));
         $arguments = [$this->current, $this->job, $this->root.'/source', $storage, 0.0, null, &$queue, &$active, hrtime(true) - 1];
-        (new \ReflectionMethod(TranscodeSessionSubscriber::class, 'pollSubtitles'))->invokeArgs($this->worker, $arguments);
+        new \ReflectionMethod(TranscodeSessionSubscriber::class, 'pollSubtitles')->invokeArgs($this->worker, $arguments);
         self::assertSame([], $queue);
         self::assertSame([], $active);
         self::assertSame([1], $this->subtitleStopped);
@@ -1058,7 +1058,7 @@ final class TranscodeWorkerExecutionTest extends TestCase
         $this->current = $this->claim(1, 1, 'paused', position: 12.0);
         $this->spawner->onSpawn = function () use ($fullAudioTail): void {
             $command = $this->spawner->commands[0];
-            $path = $command[array_key_last($command)];
+            $path = array_last($command);
             $directory = dirname($path);
             PublishedPresentationFixture::write($directory, 3, audio: true);
             $xml = new \DOMDocument();
@@ -1117,7 +1117,7 @@ final class TranscodeWorkerExecutionTest extends TestCase
         $this->current = $this->claim(1, 1, 'paused', position: 6.0);
         $this->spawner->onSpawn = function (): void {
             $command = $this->spawner->commands[0];
-            $path = $command[array_key_last($command)];
+            $path = array_last($command);
             $xml = new \DOMDocument();
             $xml->load($path);
             $xpath = new \DOMXPath($xml);
@@ -1162,7 +1162,7 @@ final class TranscodeWorkerExecutionTest extends TestCase
         $this->spawner->onRunning = function () use (&$polls, &$pausedBeforeTarget, &$readyBeforeTarget, &$pausedWithTarget, &$readyWithTarget, $target, $position): void {
             ++$polls;
             $command = $this->spawner->commands[0];
-            $directory = dirname($command[array_key_last($command)]);
+            $directory = array_last($command) |> dirname(...);
             $path = $directory . sprintf('/track-0-seg-%05d.m4s', $target + 1);
             if ($polls === 1) {
                 file_put_contents($path . '.tmp', PublishedPresentationFixture::fragment());
@@ -1232,15 +1232,15 @@ final class VideoExecutionSpawner implements ProcessSpawnerInterface
         $this->commands[] = $command;
         $pid = count($this->commands);
         $this->events[] = 'spawn:' . $pid;
-        $directory = dirname($command[array_key_last($command)]);
+        $directory = array_last($command) |> dirname(...);
         $this->publish($this->initialCount);
         ($this->onSpawn)?->__invoke();
         return $pid;
     }
     public function publish(int $count, ?bool $complete = null): void
     {
-        $command = $this->commands[array_key_last($this->commands)];
-        $directory = dirname($command[array_key_last($command)]);
+        $command = array_last($this->commands);
+        $directory = array_last($command) |> dirname(...);
         PublishedPresentationFixture::write($directory, $count, $this->publishAudio ?? array_any($command, static fn (string $argument): bool => preg_match('/^1:a:[0-9]+$/D', $argument) === 1), $complete ?? !$this->running);
         file_put_contents($directory . '/init-0.mp4', $this->initBytes);
     }

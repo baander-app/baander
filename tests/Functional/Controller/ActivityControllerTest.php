@@ -13,7 +13,7 @@ final class ActivityControllerTest extends TestCase
     public function testPlayRequiresAuth(): void
     {
         $response = $this->anonymousRequest('POST', '/api/activity/play', [
-            'songId' => (new \App\Shared\Domain\Model\PublicId())->toString(),
+            'songId' => new \App\Shared\Domain\Model\PublicId()->toString(),
         ]);
 
         $this->assertJsonResponse($response, 401);
@@ -126,11 +126,11 @@ final class ActivityControllerTest extends TestCase
 
         $conn->executeStatement(
             'INSERT INTO libraries (id, public_id, slug, name, path, type, sort_order, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
-            [$libraryId->toString(), (new PublicId())->toString(), 'lib-' . bin2hex(random_bytes(4)), 'Test Library', '/tmp/test-' . bin2hex(random_bytes(4)), 'music', 0, $now->format('Y-m-d H:i:s.uP'), $now->format('Y-m-d H:i:s.uP')],
+            [$libraryId->toString(), new PublicId()->toString(), 'lib-' . (random_bytes(4) |> bin2hex(...)), 'Test Library', '/tmp/test-' . (random_bytes(4) |> bin2hex(...)), 'music', 0, $now->format('Y-m-d H:i:s.uP'), $now->format('Y-m-d H:i:s.uP')],
         );
         $conn->executeStatement(
             'INSERT INTO albums (id, public_id, library_id, title, type, year, locked_fields, merged_from, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-            [$albumId->toString(), (new PublicId())->toString(), $libraryId->toString(), 'Album', 'studio', 2023, '{}', '[]', $now->format('Y-m-d H:i:s.uP'), $now->format('Y-m-d H:i:s.uP')],
+            [$albumId->toString(), new PublicId()->toString(), $libraryId->toString(), 'Album', 'studio', 2023, '{}', '[]', $now->format('Y-m-d H:i:s.uP'), $now->format('Y-m-d H:i:s.uP')],
         );
         $conn->executeStatement(
             'INSERT INTO songs (id, public_id, album_id, path, hash, title, size, mime_type, length, track, disc, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',

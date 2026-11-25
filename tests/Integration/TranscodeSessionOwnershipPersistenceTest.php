@@ -868,7 +868,7 @@ final class TranscodeSessionOwnershipPersistenceTest extends TestCase
         $created = $ids([$firstShared, $secondShared, $firstOwn, $firstDone]);
         self::assertSame(
             $expected($firstShared, $secondShared, $firstOwn),
-            array_values(array_intersect($ids($repository->findAllActiveSessions()), $created)),
+            array_intersect($ids($repository->findAllActiveSessions()), $created) |> array_values(...),
         );
 
         foreach ($repository->findByJob($own) as $session) {
@@ -904,12 +904,12 @@ final class TranscodeSessionOwnershipPersistenceTest extends TestCase
 
         $this->expectException(ForeignKeyConstraintViolationException::class);
 
-        (new TranscodeSessionRepository($this->manager))->save($this->session(Uuid::generate(), $job));
+        new TranscodeSessionRepository($this->manager)->save($this->session(Uuid::generate(), $job));
     }
 
     public function testJobIsRequiredByMappingAndCatalog(): void
     {
-        $mapped = (new SchemaTool($this->manager))->getSchemaFromMetadata($this->manager->getMetadataFactory()->getAllMetadata());
+        $mapped = new SchemaTool($this->manager)->getSchemaFromMetadata($this->manager->getMetadataFactory()->getAllMetadata());
         self::assertTrue($mapped->getTable('transcode_sessions')->getColumn('job_id')->getNotnull());
         self::assertTrue($this->manager->getConnection()->createSchemaManager()->introspectTable('transcode_sessions')->getColumn('job_id')->getNotnull());
 
@@ -960,7 +960,7 @@ final class TranscodeSessionOwnershipPersistenceTest extends TestCase
         $id = Uuid::generate();
         $this->manager->getConnection()->insert('transcode_sessions', [
             'id' => $id->toString(),
-            'public_id' => (new PublicId())->toString(),
+            'public_id' => new PublicId()->toString(),
             'user_id' => $owner->toString(),
             'job_id' => $job?->toString(),
             'video_id' => $this->video()->toString(),

@@ -98,7 +98,7 @@ final class DpopProofValidatorTest extends TestCase
             'DPoP proof "ath" does not match access token.',
         ];
         yield 'wrong key' => [
-            static fn (SignedDpopProof $key): array => [$key->create('POST', self::LOGOUT_URI, self::ACCESS_TOKEN), Request::create(self::LOGOUT_URI, 'POST'), self::ACCESS_TOKEN, (new SignedDpopProof())->thumbprint()],
+            static fn (SignedDpopProof $key): array => [$key->create('POST', self::LOGOUT_URI, self::ACCESS_TOKEN), Request::create(self::LOGOUT_URI, 'POST'), self::ACCESS_TOKEN, new SignedDpopProof()->thumbprint()],
             'DPoP proof jwk thumbprint does not match token binding.',
         ];
         yield 'wrong htm' => [
@@ -337,7 +337,7 @@ final class DpopProofValidatorTest extends TestCase
                 'e' => SignedDpopProof::encode($details['rsa']['e']),
             ],
         ];
-        $claims = ['jti' => bin2hex(random_bytes(16)), 'htm' => $method, 'htu' => $uri, 'iat' => time()];
+        $claims = ['jti' => random_bytes(16) |> bin2hex(...), 'htm' => $method, 'htu' => $uri, 'iat' => time()];
         $body = SignedDpopProof::encode(json_encode($header, JSON_THROW_ON_ERROR)) . '.'
             . SignedDpopProof::encode(json_encode($claims, JSON_THROW_ON_ERROR));
         $padding = $alg === 'PS256' ? OPENSSL_PKCS1_PSS_PADDING : OPENSSL_PKCS1_PADDING;

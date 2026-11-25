@@ -350,7 +350,7 @@ final class AuthorizedPlaybackTest extends TestCase
             self::assertSame([], $playback->findSessions($video, $otherRequestId, [$copyJob]));
             self::assertSame([], $playback->findSessions($video, $requestId, [new PublicId()]));
             self::assertSame([], $playback->findSessions($video, $requestId, []));
-            $connection->update('transcode_sessions', ['user_id' => (new Uuid())->toString()], ['id' => 'session']);
+            $connection->update('transcode_sessions', ['user_id' => new Uuid()->toString()], ['id' => 'session']);
             self::assertSame([], $this->currentSessions($playback, $video, $requestId, $job));
             $connection->update('transcode_sessions', ['user_id' => $actor->toString()], ['id' => 'session']);
             $connection->update('transcode_runtime_state', ['session_id' => 'retired-session'], ['job_id' => 'job']);

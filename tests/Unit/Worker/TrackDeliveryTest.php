@@ -22,7 +22,7 @@ final class TrackDeliveryTest extends TestCase
 
     protected function setUp(): void
     {
-        $this->directory = sys_get_temp_dir() . '/baander-track-delivery-' . bin2hex(random_bytes(8));
+        $this->directory = sys_get_temp_dir() . '/baander-track-delivery-' . (random_bytes(8) |> bin2hex(...));
         mkdir($this->directory, 0700);
         new Process([
             '/usr/bin/ffmpeg', '-nostdin', '-v', 'error', '-y', '-filter_threads', '1',
@@ -131,7 +131,7 @@ PHP);
         $delivery = TrackDelivery::inspect($this->resources(), $this->directory . '/delivered');
         self::assertGreaterThan(.5, $delivery['availableAt'] - $started);
         $requests = $this->requests();
-        $audio = array_values(array_filter($requests, static fn(array $request): bool => $request['kind'] === 'audio' && $request['part'] === 'segment.m4s' && !$request['tampered']));
+        $audio = array_filter($requests, static fn(array $request): bool => $request['kind'] === 'audio' && $request['part'] === 'segment.m4s' && !$request['tampered']) |> array_values(...);
         self::assertCount(1, $audio);
         self::assertGreaterThanOrEqual($audio[0]['completedAt'], $delivery['availableAt']);
     }

@@ -43,7 +43,7 @@ final class FFmpegInputClauseSourceTest extends TestCase
             |> (static fn(string $list): array => explode(',', $list))
             |> array_unique(...);
 
-        self::assertSame([], array_values(array_diff($whitelisted, $matches[1])));
+        self::assertSame([], array_diff($whitelisted, $matches[1]) |> array_values(...));
     }
 
     public function testTheScanFindsAnInputOptionInEveryStringForm(): void
@@ -72,7 +72,7 @@ final class FFmpegInputClauseSourceTest extends TestCase
                 $lines[] = $token[2];
             }
         }
-        return array_values(array_unique($lines));
+        return array_unique($lines) |> array_values(...);
     }
 
     /** @return iterable<string, string> */

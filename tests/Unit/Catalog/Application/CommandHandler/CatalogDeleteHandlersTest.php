@@ -457,7 +457,7 @@ final class CatalogDeleteHandlersTest extends TestCase
         $left = array_map(static fn (LibraryMediaFileLeft $file): string => $file->path, $this->leftOnDisk);
 
         return new LibraryMediaFileDeletionResult(
-            array_values(array_diff($deletion->paths(), $left)),
+            array_diff($deletion->paths(), $left) |> array_values(...),
             [],
             $this->leftOnDisk,
         );

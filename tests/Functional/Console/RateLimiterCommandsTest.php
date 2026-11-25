@@ -42,7 +42,7 @@ final class RateLimiterCommandsTest extends KernelTestCase
 
     public function testClearResetsOnlyTheNamedLimiter(): void
     {
-        $key = 'u27-cli-' . bin2hex(random_bytes(4));
+        $key = 'u27-cli-' . (random_bytes(4) |> bin2hex(...));
         $this->exhaust('batch_cover_extract', $key);
         $this->exhaust('config_check', $key);
 
@@ -55,7 +55,7 @@ final class RateLimiterCommandsTest extends KernelTestCase
 
     public function testClearAllResetsEveryLimiter(): void
     {
-        $key = 'u27-cli-' . bin2hex(random_bytes(4));
+        $key = 'u27-cli-' . (random_bytes(4) |> bin2hex(...));
         $this->exhaust('batch_cover_extract', $key);
         $this->exhaust('config_check', $key);
 
@@ -119,7 +119,7 @@ final class RateLimiterCommandsTest extends KernelTestCase
 
     private function command(string $name): CommandTester
     {
-        return new CommandTester((new Application(self::$kernel))->find($name));
+        return new CommandTester(new Application(self::$kernel)->find($name));
     }
 
     private function exhaust(string $name, string $key): void

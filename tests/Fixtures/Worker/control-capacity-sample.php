@@ -9,7 +9,7 @@ $seconds = (float) ($argv[1] ?? 65);
 $mode = $argv[2] ?? 'control';
 $db = null;
 if ($mode === 'control') {
-    $db = Doctrine\DBAL\DriverManager::getConnection((new Doctrine\DBAL\Tools\DsnParser(['postgresql' => 'pdo_pgsql']))->parse((string) getenv('DATABASE_URL')));
+    $db = Doctrine\DBAL\DriverManager::getConnection(new Doctrine\DBAL\Tools\DsnParser(['postgresql' => 'pdo_pgsql'])->parse((string) getenv('DATABASE_URL')));
 }
 $redis = null;
 if ($db !== null) {
@@ -30,7 +30,7 @@ while (hrtime(true) < $deadline) {
         foreach (glob('/proc/[0-9]*/cmdline') ?: [] as $path) {
             $raw = @file_get_contents($path);
             if (is_string($raw) && str_contains($raw, 'ffmpeg')) {
-                $sample['nativeProcesses'][] = ['pid' => (int) basename(dirname($path)), 'argv' => explode("\0", rtrim($raw, "\0")), 'stat' => @file_get_contents(dirname($path) . '/stat')];
+                $sample['nativeProcesses'][] = ['pid' => (int) (dirname($path) |> basename(...)), 'argv' => explode("\0", rtrim($raw, "\0")), 'stat' => @file_get_contents(dirname($path) . '/stat')];
             }
         }
     }

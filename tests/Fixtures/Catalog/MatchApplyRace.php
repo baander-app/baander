@@ -171,10 +171,10 @@ final class MatchApplyRace
      */
     public static function seed(Connection $connection, string $tag): array
     {
-        $library = (new Uuid())->toString();
+        $library = new Uuid()->toString();
         $connection->executeStatement(
             "INSERT INTO libraries (id, public_id, name, slug, path, type, created_at, updated_at) VALUES (?, ?, 'Country', ?, ?, 'music', now(), now())",
-            [$library, (new PublicId())->toString(), 'country-' . $tag, '/music/' . $tag],
+            [$library, new PublicId()->toString(), 'country-' . $tag, '/music/' . $tag],
         );
         [$album, $albumPublicId] = self::insertAlbum($connection, $library, 'F-1 Trillion');
         [$other] = self::insertAlbum($connection, $library, 'Austin');
@@ -182,7 +182,7 @@ final class MatchApplyRace
         $duetArtist = self::insertArtist($connection, self::duet($tag));
         $connection->executeStatement(
             "INSERT INTO artist_album (id, artist_id, album_id, role, credited_name) VALUES (?, ?, ?, 'primary', ?)",
-            [(new Uuid())->toString(), $postMalone, $album, self::postMalone($tag)],
+            [new Uuid()->toString(), $postMalone, $album, self::postMalone($tag)],
         );
 
         return [
@@ -399,8 +399,8 @@ final class MatchApplyRace
     /** @return array{string, string} the album's ID and public ID */
     private static function insertAlbum(Connection $connection, string $library, string $title): array
     {
-        $id = (new Uuid())->toString();
-        $publicId = (new PublicId())->toString();
+        $id = new Uuid()->toString();
+        $publicId = new PublicId()->toString();
         $connection->executeStatement(
             "INSERT INTO albums (id, public_id, library_id, title, type, created_at, updated_at) VALUES (?, ?, ?, ?, 'album', now(), now())",
             [$id, $publicId, $library, $title],
@@ -412,10 +412,10 @@ final class MatchApplyRace
     /** Stores an artist without a MusicBrainz ID; returns its ID. */
     public static function insertArtist(Connection $connection, string $name): string
     {
-        $id = (new Uuid())->toString();
+        $id = new Uuid()->toString();
         $connection->executeStatement(
             'INSERT INTO artists (id, public_id, name, created_at, updated_at) VALUES (?, ?, ?, clock_timestamp(), clock_timestamp())',
-            [$id, (new PublicId())->toString(), $name],
+            [$id, new PublicId()->toString(), $name],
         );
 
         return $id;
@@ -428,15 +428,15 @@ final class MatchApplyRace
      */
     public static function insertSong(Connection $connection, string $album, string $title, int $track, float $length, ?array $primary): string
     {
-        $id = (new Uuid())->toString();
+        $id = new Uuid()->toString();
         $connection->executeStatement(
             "INSERT INTO songs (id, public_id, album_id, title, path, size, mime_type, length, track, disc, hash, created_at, updated_at) VALUES (?, ?, ?, ?, ?, 1000000, 'audio/flac', ?, ?, 1, 'tagged', now(), now())",
-            [$id, (new PublicId())->toString(), $album, $title, '/music/' . $id . '.flac', $length, $track],
+            [$id, new PublicId()->toString(), $album, $title, '/music/' . $id . '.flac', $length, $track],
         );
         if ($primary !== null) {
             $connection->executeStatement(
                 "INSERT INTO artist_song (id, artist_id, song_id, role, credited_name) VALUES (?, ?, ?, 'primary', ?)",
-                [(new Uuid())->toString(), $primary[0], $id, $primary[1]],
+                [new Uuid()->toString(), $primary[0], $id, $primary[1]],
             );
         }
 

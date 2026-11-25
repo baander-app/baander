@@ -22,7 +22,7 @@ final class LibraryMediaFileResolverTest extends TestCase
 
     protected function setUp(): void
     {
-        $this->directory = (realpath(sys_get_temp_dir()) ?: sys_get_temp_dir()) . '/baander-library-files-' . bin2hex(random_bytes(8));
+        $this->directory = (sys_get_temp_dir() |> realpath(...) ?: sys_get_temp_dir()) . '/baander-library-files-' . (random_bytes(8) |> bin2hex(...));
         self::assertTrue(mkdir($this->directory . '/music/album', 0700, true));
         self::assertTrue(mkdir($this->directory . '/films', 0700));
         foreach (['/music/album/track.flac', '/films/film.mkv', '/outside.flac'] as $file) {

@@ -414,7 +414,7 @@ final class PasswordAuthenticatorTest extends TestCase
     public function testAProofWithoutANonceIsChallengedBeforeTheCredentialsAreRead(): void
     {
         $this->userRepository->method('findByEmail')->willReturnCallback(static fn (): never => self::fail('Credentials must not be read before the proof is accepted.'));
-        $request = $this->request(['email' => 'alice@baander.app', 'password' => 'secret', 'totpCode' => '123456'], (new SignedDpopProof())->create('POST', self::URI, 'no-access-token'));
+        $request = $this->request(['email' => 'alice@baander.app', 'password' => 'secret', 'totpCode' => '123456'], new SignedDpopProof()->create('POST', self::URI, 'no-access-token'));
 
         $exception = $this->failure($request);
 
@@ -490,7 +490,7 @@ final class PasswordAuthenticatorTest extends TestCase
     private function request(array $body, ?string $proof = null): Request
     {
         $request = Request::create(self::URI, 'POST', server: ['CONTENT_TYPE' => 'application/json'], content: json_encode($body, JSON_THROW_ON_ERROR));
-        $request->headers->set('DPoP', $proof ?? (new SignedDpopProof())->createWithNonce('POST', self::URI, 'issued-nonce'));
+        $request->headers->set('DPoP', $proof ?? new SignedDpopProof()->createWithNonce('POST', self::URI, 'issued-nonce'));
 
         return $request;
     }

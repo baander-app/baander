@@ -39,13 +39,13 @@ final class UnsupportedContainerScanTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        $this->directory = sys_get_temp_dir() . '/baander-unsupported-container-' . bin2hex(random_bytes(6));
+        $this->directory = sys_get_temp_dir() . '/baander-unsupported-container-' . (random_bytes(6) |> bin2hex(...));
         mkdir($this->directory . '/elsewhere', 0700, true);
     }
 
     protected function tearDown(): void
     {
-        (new Filesystem())->remove($this->directory);
+        new Filesystem()->remove($this->directory);
         parent::tearDown();
     }
 
@@ -94,19 +94,19 @@ final class UnsupportedContainerScanTest extends TestCase
     private function scan(LibraryType $type, string $path): array
     {
         $container = self::getContainer();
-        $slug = new LibrarySlug('unsupported-container-' . bin2hex(random_bytes(6)));
+        $slug = new LibrarySlug('unsupported-container-' . (random_bytes(6) |> bin2hex(...)));
         $library = Library::create('Unsupported containers', $slug, new LibraryPath($path), $type, FilesystemType::Local);
         $container->get(LibraryPortInterface::class)->save($library);
         $transport = $container->get('messenger.transport.async');
         self::assertInstanceOf(InMemoryTransport::class, $transport);
         $transport->reset();
-        $scan = new CommandTester((new Application(self::$kernel))->find('app:library:scan'));
+        $scan = new CommandTester(new Application(self::$kernel)->find('app:library:scan'));
         self::assertSame(Command::SUCCESS, $scan->execute(['library' => $slug->toString()]), $scan->getDisplay());
         $container->get(RelayOutboxHandler::class)(new RelayOutboxCommand());
-        $messages = array_values(array_filter(
+        $messages = array_filter(
             array_map(static fn(Envelope $envelope): object => $envelope->getMessage(), $transport->getSent()),
             static fn(object $message): bool => $message instanceof FilesDiscovered,
-        ));
+        ) |> array_values(...);
         self::assertCount(1, $messages);
         $message = $messages[0];
         self::assertInstanceOf(FilesDiscovered::class, $message);
@@ -126,7 +126,7 @@ final class UnsupportedContainerScanTest extends TestCase
     /** @param list<string> $arguments */
     private function media(string $path, array $arguments): string
     {
-        (new Process(['ffmpeg', '-nostdin', '-hide_banner', '-loglevel', 'error', '-y', ...$arguments, $path]))->mustRun();
+        new Process(['ffmpeg', '-nostdin', '-hide_banner', '-loglevel', 'error', '-y', ...$arguments, $path])->mustRun();
 
         return $path;
     }

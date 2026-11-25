@@ -21,7 +21,7 @@ final class DirectoryScannerTest extends TestCase
 
     protected function setUp(): void
     {
-        $this->directory = sys_get_temp_dir() . '/baander-directory-scanner-' . bin2hex(random_bytes(6));
+        $this->directory = sys_get_temp_dir() . '/baander-directory-scanner-' . (random_bytes(6) |> bin2hex(...));
         $this->root = $this->directory . '/library';
         mkdir($this->root . '/album', 0700, true);
         mkdir($this->directory . '/elsewhere', 0700, true);
@@ -32,7 +32,7 @@ final class DirectoryScannerTest extends TestCase
 
     protected function tearDown(): void
     {
-        (new Filesystem())->remove($this->directory);
+        new Filesystem()->remove($this->directory);
     }
 
     public function testALinkWhoseTargetLeavesTheLibraryIsSkippedAndReported(): void
@@ -85,7 +85,7 @@ final class DirectoryScannerTest extends TestCase
     {
         $paths = array_map(
             static fn(MediaFile $file): string => $file->getAbsolutePath(),
-            (new DirectoryScanner($this->logger))->scan(new LibraryPath($root)),
+            new DirectoryScanner($this->logger)->scan(new LibraryPath($root)),
         );
         sort($paths);
 

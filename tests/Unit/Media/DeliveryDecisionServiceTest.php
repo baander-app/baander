@@ -42,7 +42,7 @@ final class DeliveryDecisionServiceTest extends TestCase
         $videos = $this->createStub(VideoPortInterface::class);
         $videos->method('getSourceMetadata')->willReturn(new VideoSourceMetadata(
             new Uuid(),
-            (new PublicId())->toString(),
+            new PublicId()->toString(),
             '/library/movie.mkv',
             'movie.mkv',
             100,
@@ -59,7 +59,7 @@ final class DeliveryDecisionServiceTest extends TestCase
             pixFmt: 'yuv420p',
             colorSpace: ['transfer' => 'bt709'],
         ));
-        $requestId = (new Uuid())->toString();
+        $requestId = new Uuid()->toString();
         $presentation = new CopyPresentation(new PublicId(), new PublicId(), $requestId);
         $copies = $this->createMock(CopyPresentationPortInterface::class);
         $copies->expects(self::once())->method('start')->willReturn($presentation);
@@ -171,7 +171,7 @@ final class DeliveryDecisionServiceTest extends TestCase
         $videos = $this->createStub(VideoPortInterface::class);
         $videos->method('getSourceMetadata')->willReturn(new VideoSourceMetadata(
             new Uuid(),
-            (new PublicId())->toString(),
+            new PublicId()->toString(),
             '/library/movie.mp4',
             'movie.mp4',
             100,
@@ -233,7 +233,7 @@ final class DeliveryDecisionServiceTest extends TestCase
         $videos = $this->createStub(VideoPortInterface::class);
         $videos->method('getSourceMetadata')->willReturn(new VideoSourceMetadata(
             new Uuid(),
-            (new PublicId())->toString(),
+            new PublicId()->toString(),
             '/library/movie.mkv',
             'movie.mkv',
             100,
@@ -285,7 +285,7 @@ final class DeliveryDecisionServiceTest extends TestCase
         $videos = $this->createStub(VideoPortInterface::class);
         $videos->method('getSourceMetadata')->willReturn(new VideoSourceMetadata(
             new Uuid(),
-            (new PublicId())->toString(),
+            new PublicId()->toString(),
             '/library/movie.mp4',
             'movie.mp4',
             100,
@@ -362,7 +362,7 @@ final class DeliveryDecisionServiceTest extends TestCase
         $videos = $this->createStub(VideoPortInterface::class);
         $videos->method('getSourceMetadata')->willReturn(new VideoSourceMetadata(
             new Uuid(),
-            (new PublicId())->toString(),
+            new PublicId()->toString(),
             '/library/movie.mp4',
             'movie.mp4',
             100,
@@ -504,7 +504,7 @@ final class DeliveryDecisionServiceTest extends TestCase
         $videos = $this->createStub(VideoPortInterface::class);
         $videos->method('getSourceMetadata')->willReturn(new VideoSourceMetadata(
             new Uuid(),
-            (new PublicId())->toString(),
+            new PublicId()->toString(),
             '/library/movie.mkv',
             'movie.mkv',
             100,
@@ -601,7 +601,7 @@ final class DeliveryDecisionServiceTest extends TestCase
         $videos = $this->createStub(VideoPortInterface::class);
         $videos->method('getSourceMetadata')->willReturn(new VideoSourceMetadata(
             new Uuid(),
-            (new PublicId())->toString(),
+            new PublicId()->toString(),
             '/library/movie.mkv',
             'movie.mkv',
             100,
@@ -725,7 +725,7 @@ final class DeliveryDecisionServiceTest extends TestCase
         $videos = $this->createStub(VideoPortInterface::class);
         $videos->method('getSourceMetadata')->willReturn(new VideoSourceMetadata(
             new Uuid(),
-            (new PublicId())->toString(),
+            new PublicId()->toString(),
             '/library/' . $filename,
             $filename,
             100,
@@ -765,7 +765,7 @@ final class DeliveryDecisionServiceTest extends TestCase
         ));
         $streams = $this->createStub(StreamPortInterface::class);
         $streams->method('getTrackMetadata')->willReturn($metadata ?? new TrackStreamMetadata(
-            (new PublicId())->toString(),
+            new PublicId()->toString(),
             'song.flac',
             '/library/song.flac',
             'audio/flac',

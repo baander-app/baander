@@ -39,7 +39,7 @@ final class FrameworkIsolationOwnershipTest extends TestCase
             $container->setDefinition('debug.' . $id, new Definition(EventDispatcher::class));
             $container->setDefinition('debug.' . $id . '.inner', new Definition(EventDispatcher::class));
         }
-        (new EventDispatcherProcessor())->process($container, $this->proxifier($container));
+        new EventDispatcherProcessor()->process($container, $this->proxifier($container));
         foreach (['event_dispatcher', 'security.event_dispatcher.api'] as $id) {
             self::assertFalse($container->getDefinition('debug.' . $id . '.inner')->isShared());
             self::assertTrue($container->getDefinition('debug.' . $id)->hasTag(ContainerConstants::TAG_STATEFUL_SERVICE));
@@ -49,12 +49,12 @@ final class FrameworkIsolationOwnershipTest extends TestCase
     public function testFactoryTransportAndUntaggedTraceClientBecomePoolableWithoutAutoloadingOptionalDefinitions(): void
     {
         $container = new ContainerBuilder();
-        $container->setDefinition('http_client.uri_template.inner', (new Definition(HttpClientInterface::class))->setFactory([HttpClient::class, 'create']));
+        $container->setDefinition('http_client.uri_template.inner', new Definition(HttpClientInterface::class)->setFactory([HttpClient::class, 'create']));
         $container->setDefinition('traced', new Definition(TraceableHttpClient::class));
         $customFactory = [HttpClient::class, 'createForBaseUri'];
-        $container->setDefinition('custom', (new Definition(HttpClientInterface::class))->setFactory($customFactory));
+        $container->setDefinition('custom', new Definition(HttpClientInterface::class)->setFactory($customFactory));
         $container->setDefinition('optional', new Definition('Absent\\OptionalIntegration'));
-        (new HttpClientProcessor())->process($container, $this->proxifier($container));
+        new HttpClientProcessor()->process($container, $this->proxifier($container));
         self::assertSame(HttpClient::create()::class, $container->getDefinition('http_client.uri_template.inner')->getClass());
         self::assertTrue($container->getDefinition('traced')->hasTag(ContainerConstants::TAG_STATEFUL_SERVICE));
         self::assertSame(HttpClientInterface::class, $container->getDefinition('custom')->getClass());
@@ -68,8 +68,8 @@ final class FrameworkIsolationOwnershipTest extends TestCase
         $container->setDefinition('debug.security.access.decision_manager', new Definition());
         $container->setDefinition('debug.security.access.decision_manager.inner', new Definition());
         $container->setDefinition('authenticator', new Definition(TraceableAuthenticator::class));
-        $container->setDefinition('authenticator.template', (new Definition(TraceableAuthenticator::class))->setAbstract(true));
-        (new SecurityProcessor())->process($container, $this->proxifier($container));
+        $container->setDefinition('authenticator.template', new Definition(TraceableAuthenticator::class)->setAbstract(true));
+        new SecurityProcessor()->process($container, $this->proxifier($container));
         self::assertFalse($container->getDefinition('debug.security.access.decision_manager.inner')->isShared());
         self::assertTrue($container->getDefinition('authenticator')->hasTag(ContainerConstants::TAG_STATEFUL_SERVICE));
         $resetterId = $container->getDefinition('authenticator')->getTag(ContainerConstants::TAG_STATEFUL_SERVICE)[0]['resetter'];
@@ -83,7 +83,7 @@ final class FrameworkIsolationOwnershipTest extends TestCase
         $container->setParameter('kernel.bundles', ['SecurityBundle' => 'Symfony\\Bundle\\SecurityBundle\\SecurityBundle']);
         $container->setDefinition('security.untracked_token_storage', new Definition(TokenStorage::class));
         $container->setDefinition('security.authorization_checker', new Definition(AuthorizationChecker::class));
-        (new SecurityProcessor())->process($container, $this->proxifier($container));
+        new SecurityProcessor()->process($container, $this->proxifier($container));
         foreach (['security.untracked_token_storage', 'security.authorization_checker'] as $id) {
             // No attributes: the pass then picks reset() for a ResetInterface class and no resetter otherwise.
             self::assertSame([[]], $container->getDefinition($id)->getTag(ContainerConstants::TAG_STATEFUL_SERVICE), $id);
@@ -106,7 +106,7 @@ final class FrameworkIsolationOwnershipTest extends TestCase
         self::assertSame($exception, $trace->getInfo()['exception']);
         self::assertNotNull($trace->getInfo()['duration']);
 
-        (new TraceableAuthenticatorResetter())->reset($trace);
+        new TraceableAuthenticatorResetter()->reset($trace);
 
         self::assertFalse($trace->supports(new Request()));
         $info = $trace->getInfo();
@@ -123,7 +123,7 @@ final class FrameworkIsolationOwnershipTest extends TestCase
         foreach (['twig', 'twig.profile', 'twig.extension.profiler', 'twig.extension.webprofiler'] as $id) {
             $container->setDefinition($id, new Definition());
         }
-        (new TwigProcessor())->process($container, $this->proxifier($container));
+        new TwigProcessor()->process($container, $this->proxifier($container));
         self::assertFalse($container->getDefinition('twig.extension.profiler')->isShared());
         self::assertFalse($container->getDefinition('twig.extension.webprofiler')->isShared());
         self::assertTrue($container->getDefinition('twig.profile')->hasTag(ContainerConstants::TAG_STATEFUL_SERVICE));

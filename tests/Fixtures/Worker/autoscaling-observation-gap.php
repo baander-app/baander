@@ -28,7 +28,7 @@ $profileFields['maximumConcurrency'] = count($ledger['slots']);
 $profile = WorkerAutoscalingProfile::fromJson(json_encode($profileFields, JSON_THROW_ON_ERROR));
 if ($profile->maxSampleAgeMs > 6000) { throw new RuntimeException('Observation gap exceeds qualification time budget.'); }
 $status = new AutoscalingStatus(dirname($directory), $lease, $profile, \App\Shared\Application\DTO\DeploymentProfile::fromEnvironment());
-$db = Doctrine\DBAL\DriverManager::getConnection((new Doctrine\DBAL\Tools\DsnParser(['postgresql' => 'pdo_pgsql']))->parse((string) getenv('DATABASE_URL')));
+$db = Doctrine\DBAL\DriverManager::getConnection(new Doctrine\DBAL\Tools\DsnParser(['postgresql' => 'pdo_pgsql'])->parse((string) getenv('DATABASE_URL')));
 $db->executeStatement("SET statement_timeout = '1000ms'");
 $startTicks = static function (int $pid): ?string {
     $raw = @file_get_contents('/proc/' . $pid . '/stat');
@@ -49,7 +49,7 @@ foreach (glob('/proc/[0-9]*/environ') ?: [] as $path) {
     if (($identity['BAANDER_WORKER_NAMESPACE'] ?? null) === $namespace && ($identity['BAANDER_WORKER_BOOT_ID'] ?? null) === $boot
         && ($identity['BAANDER_WORKER_ID'] ?? null) === 'autoscaler' && ($identity['BAANDER_WORKER_GENERATION'] ?? null) === '1'
         && ($identity['BAANDER_WORKER_UNIT'] ?? null) === 'control') {
-        $pid = (int) basename(dirname($path));
+        $pid = (int) (dirname($path) |> basename(...));
         $ticks = $startTicks($pid);
         if ($ticks !== null) { $matches[] = ['pid' => $pid, 'startTicks' => $ticks, 'role' => 'autoscaler', 'generation' => 1]; }
     }

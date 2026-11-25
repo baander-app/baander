@@ -55,7 +55,7 @@ final class OAuthFirewallAcceptanceTest extends TestCase
     public static function tearDownAfterClass(): void
     {
         if (isset(self::$sharedDirectory)) {
-            (new Filesystem())->remove(self::$sharedDirectory);
+            new Filesystem()->remove(self::$sharedDirectory);
         }
         parent::tearDownAfterClass();
     }
@@ -67,7 +67,7 @@ final class OAuthFirewallAcceptanceTest extends TestCase
             self::markTestSkipped('Disposable PostgreSQL and Redis services are required.');
         }
         if (!isset(self::$sharedDirectory)) {
-            self::$sharedDirectory = sys_get_temp_dir() . '/baander-oauth-firewall-' . bin2hex(random_bytes(8));
+            self::$sharedDirectory = sys_get_temp_dir() . '/baander-oauth-firewall-' . (random_bytes(8) |> bin2hex(...));
             self::assertTrue(mkdir(self::$sharedDirectory, 0700));
             $key = openssl_pkey_new(['private_key_type' => OPENSSL_KEYTYPE_RSA, 'private_key_bits' => 2048]);
             self::assertNotFalse($key);
@@ -91,7 +91,7 @@ final class OAuthFirewallAcceptanceTest extends TestCase
         $this->manager = $manager;
         $users = $container->get('oauth.acceptance.users');
         self::assertInstanceOf(UserRepositoryInterface::class, $users);
-        $this->user = User::register(new Email('oauth-' . bin2hex(random_bytes(8)) . '@baander.app'), 'test-only-password', 'OAuth acceptance user');
+        $this->user = User::register(new Email('oauth-' . (random_bytes(8) |> bin2hex(...)) . '@baander.app'), 'test-only-password', 'OAuth acceptance user');
         $this->user->verifyEmail();
         $users->save($this->user);
         $userEntity = $this->manager->find(UserEntity::class, $this->user->getId());
@@ -338,7 +338,7 @@ final class OAuthFirewallAcceptanceTest extends TestCase
     {
         $users = $this->kernel->getContainer()->get('oauth.acceptance.users');
         self::assertInstanceOf(UserRepositoryInterface::class, $users);
-        $admin = User::createByOperator(new Email('oauth-admin-' . bin2hex(random_bytes(8)) . '@baander.app'), 'test-only-password', 'OAuth administrator', ['ROLE_USER', 'ROLE_ADMIN']);
+        $admin = User::createByOperator(new Email('oauth-admin-' . (random_bytes(8) |> bin2hex(...)) . '@baander.app'), 'test-only-password', 'OAuth administrator', ['ROLE_USER', 'ROLE_ADMIN']);
         $users->save($admin);
         $adminEntity = $this->manager->find(UserEntity::class, $admin->getId());
         self::assertInstanceOf(UserEntity::class, $adminEntity);
@@ -348,7 +348,7 @@ final class OAuthFirewallAcceptanceTest extends TestCase
             'third-party' => new ClientEntity(new PublicId(), 'Third-party player', json_encode(['https://baander.app/callback'], JSON_THROW_ON_ERROR)),
         };
         $token = new AccessTokenEntity(
-            (new Uuid())->toString(),
+            new Uuid()->toString(),
             $client,
             $grant,
             $adminEntity,
@@ -385,7 +385,7 @@ final class OAuthFirewallAcceptanceTest extends TestCase
         $userEntity = $this->manager->find(UserEntity::class, $this->user->getId());
         self::assertInstanceOf(UserEntity::class, $userEntity);
         $token = new AccessTokenEntity(
-            (new Uuid())->toString(),
+            new Uuid()->toString(),
             $this->client,
             SignInGrant::AuthorizationCode,
             $userEntity,
@@ -425,7 +425,7 @@ final class OAuthFirewallAcceptanceTest extends TestCase
     {
         $logger = $this->kernel->getContainer()->get('oauth.acceptance.auth_logger');
         self::assertInstanceOf(LoggerInterface::class, $logger);
-        $marker = 'Security response logging check ' . bin2hex(random_bytes(8));
+        $marker = 'Security response logging check ' . (random_bytes(8) |> bin2hex(...));
         $logger->warning($marker);
         $jwt = $this->accessJwt();
         $proof = $this->proof->create('GET', 'https://baander.app/api/auth/me', $jwt);
@@ -522,7 +522,7 @@ final class OAuthFirewallAcceptanceTest extends TestCase
 
     public function testActualRedisExpiresTheTicketIndependentlyOfTheApplicationClock(): void
     {
-        $ticket = bin2hex(random_bytes(32));
+        $ticket = random_bytes(32) |> bin2hex(...);
         $store = $this->kernel->getContainer()->get('oauth.acceptance.websocket_store');
         self::assertInstanceOf(WebSocketTicketStoreInterface::class, $store);
         $store->put($ticket, new StoredWebSocketTicket(
@@ -578,7 +578,7 @@ final class OAuthFirewallAcceptanceTest extends TestCase
         $response = $this->request($jwt, $this->proof->create('POST', $uri, $jwt), $uri, 'POST', 'https://baander.app');
         self::assertSame(200, $response->getStatusCode(), (string) $response->getContent());
         $data = json_decode((string) $response->getContent(), true, flags: JSON_THROW_ON_ERROR)['data'];
-        self::assertLessThanOrEqual($this->token->getExpiryDateTime()->getTimestamp(), (new \DateTimeImmutable($data['expiresAt']))->getTimestamp());
+        self::assertLessThanOrEqual($this->token->getExpiryDateTime()->getTimestamp(), new \DateTimeImmutable($data['expiresAt'])->getTimestamp());
     }
 
     public function testUnavailableActualRedisCannotRedeemAnIdentity(): void

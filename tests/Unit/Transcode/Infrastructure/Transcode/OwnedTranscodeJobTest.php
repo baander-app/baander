@@ -154,12 +154,10 @@ final class OwnedJobRepository implements TranscodeJobRepositoryInterface
     public function findByPublicId(PublicId $publicId): ?TranscodeJob { return null; }
     public function findByOwnerVideoAndQuality(Uuid $ownerUserId, Uuid $videoId, string $qualityTierName, ?string $presentationKey = null, ?string $requestId = null): ?TranscodeJob
     {
-        foreach ($this->jobs as $job) {
-            if ($job->getOwnerUserId()?->equals($ownerUserId) && $job->getVideoId()->equals($videoId) && $job->getQualityTierName() === $qualityTierName && $job->getPresentationSelection()?->canonicalKey() === $presentationKey && $job->getRequestId() === $requestId) {
-                return $job;
-            }
-        }
-        return null;
+        return array_find(
+            $this->jobs,
+            static fn(TranscodeJob $job): bool => $job->getOwnerUserId()?->equals($ownerUserId) && $job->getVideoId()->equals($videoId) && $job->getQualityTierName() === $qualityTierName && $job->getPresentationSelection()?->canonicalKey() === $presentationKey && $job->getRequestId() === $requestId,
+        );
     }
     public function findActiveByOwnerAndVideo(Uuid $ownerUserId, Uuid $videoId): array { return []; }
     public function findActiveByVideo(Uuid $videoId): array { return []; }

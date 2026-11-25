@@ -263,7 +263,7 @@ final class PartyInvitationTest extends TestCase
      */
     private function assertAnsweredAsForAMissingParty(User $caller, PublicId $namedUser): void
     {
-        $unknown = (new PublicId())->toString();
+        $unknown = new PublicId()->toString();
         $hidden = [...$this->routes($this->party, $namedUser), ['GET', self::URI . $this->party], ['GET', self::URI . $this->party . '/members/']];
         $missing = [...$this->routes($unknown, $namedUser), ['GET', self::URI . $unknown], ['GET', self::URI . $unknown . '/members/']];
 
@@ -342,7 +342,7 @@ final class PartyInvitationTest extends TestCase
 
         return $user === null
             ? $rows
-            : array_values(array_filter($rows, static fn (array $row): bool => $row['user_id'] === $user->getId()->toString()));
+            : array_filter($rows, static fn (array $row): bool => $row['user_id'] === $user->getId()->toString()) |> array_values(...);
     }
 
     /** @return list<string> */

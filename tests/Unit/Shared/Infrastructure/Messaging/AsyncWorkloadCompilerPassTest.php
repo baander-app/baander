@@ -26,7 +26,7 @@ final class AsyncWorkloadCompilerPassTest extends TestCase
 {
     public function testValidEffectiveMetadataCompiles(): void
     {
-        (new AsyncWorkloadCompilerPass())->process($this->container());
+        new AsyncWorkloadCompilerPass()->process($this->container());
         $this->addToAssertionCount(1);
     }
 
@@ -35,13 +35,13 @@ final class AsyncWorkloadCompilerPassTest extends TestCase
         $container = $this->container();
         $inner = $container->getDefinition('messenger.transport.async');
         $container->setDefinition('admission.inner', $inner);
-        $container->setDefinition('messenger.transport.async', (new Definition(\App\Shared\Infrastructure\Messenger\OrdinaryAdmissionTransport::class, [new Reference('admission.inner')]))
+        $container->setDefinition('messenger.transport.async', new Definition(\App\Shared\Infrastructure\Messenger\OrdinaryAdmissionTransport::class, [new Reference('admission.inner')])
             ->setFactory([\App\Shared\Infrastructure\Messenger\OrdinaryAdmissionTransport::class, 'forEnvironment']));
-        (new AsyncWorkloadCompilerPass())->process($container);
+        new AsyncWorkloadCompilerPass()->process($container);
         $inner->setArgument(2, new Definition(\stdClass::class));
         $this->expectException(\LogicException::class);
         $this->expectExceptionMessage('JSON transport serializer');
-        (new AsyncWorkloadCompilerPass())->process($container);
+        new AsyncWorkloadCompilerPass()->process($container);
     }
 
     public function testExplicitOnlyWorkloadRequiresCoverageWithoutADefaultRoute(): void
@@ -53,7 +53,7 @@ final class AsyncWorkloadCompilerPassTest extends TestCase
         $handlers = $container->getDefinition('messenger.bus.default.messenger.handlers_locator')->getArgument(0);
         $handlers[CompilerExplicitWorkload::class] = new IteratorArgument([new Reference('descriptor')]);
         $container->getDefinition('messenger.bus.default.messenger.handlers_locator')->setArgument(0, $handlers);
-        (new AsyncWorkloadCompilerPass())->process($container);
+        new AsyncWorkloadCompilerPass()->process($container);
         $this->addToAssertionCount(1);
     }
 
@@ -118,7 +118,7 @@ final class AsyncWorkloadCompilerPassTest extends TestCase
         }
         $this->expectException(\LogicException::class);
         $this->expectExceptionMessage($reason);
-        (new AsyncWorkloadCompilerPass())->process($container);
+        new AsyncWorkloadCompilerPass()->process($container);
     }
 
     /** @return iterable<int, array{0: string, 1: string, 2?: bool}> */
@@ -151,9 +151,9 @@ final class AsyncWorkloadCompilerPassTest extends TestCase
         $container->register('debug.traced.messenger.bus.default', TraceableMessageBus::class)
             ->setArguments([new Reference('debug.traced.messenger.bus.default.inner')])
             ->setDecoratedService('messenger.bus.default');
-        (new DecoratorServicePass())->process($container);
-        (new ResolveReferencesToAliasesPass())->process($container);
-        (new AsyncWorkloadCompilerPass())->process($container);
+        new DecoratorServicePass()->process($container);
+        new ResolveReferencesToAliasesPass()->process($container);
+        new AsyncWorkloadCompilerPass()->process($container);
         $this->addToAssertionCount(1);
     }
 
@@ -167,9 +167,9 @@ final class AsyncWorkloadCompilerPassTest extends TestCase
         $container->register('.signing.messenger.default_serializer', SigningSerializer::class)
             ->setArguments([new Reference('.signing.messenger.default_serializer.inner'), 'test-signing-key', [CompilerWorkload::class, CompilerExplicitWorkload::class]])
             ->setDecoratedService('messenger.default_serializer');
-        (new DecoratorServicePass())->process($container);
-        (new ResolveReferencesToAliasesPass())->process($container);
-        (new AsyncWorkloadCompilerPass())->process($container);
+        new DecoratorServicePass()->process($container);
+        new ResolveReferencesToAliasesPass()->process($container);
+        new AsyncWorkloadCompilerPass()->process($container);
         $this->addToAssertionCount(1);
     }
 
@@ -182,7 +182,7 @@ final class AsyncWorkloadCompilerPassTest extends TestCase
         $container->getDefinition('messenger.transport.async')->setArgument(2, new Reference('signing.serializer'));
         $this->expectException(\LogicException::class);
         $this->expectExceptionMessage('serializer');
-        (new AsyncWorkloadCompilerPass())->process($container);
+        new AsyncWorkloadCompilerPass()->process($container);
     }
 
     public function testDecoratedSenderLocatorIsValidated(): void
@@ -190,7 +190,7 @@ final class AsyncWorkloadCompilerPassTest extends TestCase
         $container = $this->container();
         $container->setDefinition('App\\Shared\\Infrastructure\\Messenger\\ValidatedSendersLocator.inner', $container->getDefinition('messenger.senders_locator'));
         $container->register('messenger.senders_locator', \stdClass::class);
-        (new AsyncWorkloadCompilerPass())->process($container);
+        new AsyncWorkloadCompilerPass()->process($container);
         $this->addToAssertionCount(1);
     }
 

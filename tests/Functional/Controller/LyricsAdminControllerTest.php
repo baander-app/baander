@@ -66,7 +66,7 @@ final class LyricsAdminControllerTest extends TestCase
             'data',
         )['data'];
 
-        $tester = new CommandTester((new Application(static::$kernel))->find('app:lyrics:coverage'));
+        $tester = new CommandTester(new Application(static::$kernel)->find('app:lyrics:coverage'));
         $this->assertSame(Command::SUCCESS, $tester->execute(['--json' => true]));
 
         $this->assertSame($endpoint, json_decode($tester->getDisplay(), true, flags: JSON_THROW_ON_ERROR));
@@ -142,7 +142,7 @@ final class LyricsAdminControllerTest extends TestCase
         $this->forgetQueuedFetches();
         $this->asyncTransport()->reset();
 
-        $tester = new CommandTester((new Application(static::$kernel))->find('app:lyrics:fetch'));
+        $tester = new CommandTester(new Application(static::$kernel)->find('app:lyrics:fetch'));
         $this->assertSame(Command::SUCCESS, $tester->execute(['--limit' => '10']), $tester->getDisplay());
 
         $this->assertSame($web, $this->queuedFetches());
@@ -170,11 +170,11 @@ final class LyricsAdminControllerTest extends TestCase
         $this->assertCount(2, $first);
 
         // The fetches of the first run have not run yet when the console run starts.
-        $tester = new CommandTester((new Application(static::$kernel))->find('app:lyrics:fetch'));
+        $tester = new CommandTester(new Application(static::$kernel)->find('app:lyrics:fetch'));
         $this->assertSame(Command::SUCCESS, $tester->execute([]), $tester->getDisplay());
 
         $all = $this->queuedFetches();
-        $this->assertSame(array_values(array_unique($all)), $all, 'No song is queued twice.');
+        $this->assertSame(array_unique($all) |> array_values(...), $all, 'No song is queued twice.');
         $this->assertSame(1, preg_match('/Queued (\d+) lyrics fetch/', $tester->getDisplay(), $queued), $tester->getDisplay());
         $this->assertSame(count($all) - 2, (int) $queued[1]);
         foreach ($songs as $songId) {
@@ -220,10 +220,10 @@ final class LyricsAdminControllerTest extends TestCase
 
         // A run from the console, cancelled with app:monitor:job:cancel.
         $consoleJob = $this->consoleRun();
-        $show = new CommandTester((new Application(static::$kernel))->find('app:monitor:job:show'));
+        $show = new CommandTester(new Application(static::$kernel)->find('app:monitor:job:show'));
         $this->assertSame(Command::SUCCESS, $show->execute(['jobId' => $consoleJob, '--json' => true]));
         $this->assertTrue(json_decode($show->getDisplay(), true, flags: JSON_THROW_ON_ERROR)['cancellable']);
-        $cancel = new CommandTester((new Application(static::$kernel))->find('app:monitor:job:cancel'));
+        $cancel = new CommandTester(new Application(static::$kernel)->find('app:monitor:job:cancel'));
         $this->assertSame(Command::SUCCESS, $cancel->execute(['jobId' => $consoleJob]), $cancel->getDisplay());
         $this->assertStringContainsString('skipped', $cancel->getDisplay());
         $this->assertSame('cancelled', $this->jobStatus($consoleJob));
@@ -277,7 +277,7 @@ final class LyricsAdminControllerTest extends TestCase
             array_intersect_key($tally, array_flip(['queued', 'found', 'noMatch', 'skippedNoArtist', 'skippedNoLength', 'rejected', 'unavailable'])),
         );
 
-        $tester = new CommandTester((new Application(static::$kernel))->find('app:lyrics:status'));
+        $tester = new CommandTester(new Application(static::$kernel)->find('app:lyrics:status'));
         $this->assertSame(Command::SUCCESS, $tester->execute(['--json' => true]));
         $this->assertSame($status, json_decode($tester->getDisplay(), true, flags: JSON_THROW_ON_ERROR));
     }
@@ -287,14 +287,14 @@ final class LyricsAdminControllerTest extends TestCase
         $this->createSongs(2, credited: false);
         $uncredited = $this->uncreditedSongsWithoutLyrics();
 
-        $fetch = new CommandTester((new Application(static::$kernel))->find('app:lyrics:fetch'));
+        $fetch = new CommandTester(new Application(static::$kernel)->find('app:lyrics:fetch'));
         $this->assertSame(Command::SUCCESS, $fetch->execute(['--json' => true]), $fetch->getDisplay());
         $run = json_decode($fetch->getDisplay(), true, flags: JSON_THROW_ON_ERROR);
         $this->assertSame(0, $run['jobsEnqueued']);
         $this->assertSame($uncredited, $run['skippedNoArtist']);
         $this->assertSame([], $this->queuedFetches());
 
-        $status = new CommandTester((new Application(static::$kernel))->find('app:lyrics:status'));
+        $status = new CommandTester(new Application(static::$kernel)->find('app:lyrics:status'));
         $this->assertSame(Command::SUCCESS, $status->execute(['--json' => true]));
         $tally = json_decode($status->getDisplay(), true, flags: JSON_THROW_ON_ERROR)['latestRun'];
         $this->assertSame($run['jobId'], $tally['jobId']);
@@ -302,7 +302,7 @@ final class LyricsAdminControllerTest extends TestCase
         $this->assertSame($uncredited, $tally['skippedNoArtist']);
 
         // Nothing waits, so the finished job has nothing to cancel.
-        $show = new CommandTester((new Application(static::$kernel))->find('app:monitor:job:show'));
+        $show = new CommandTester(new Application(static::$kernel)->find('app:monitor:job:show'));
         $this->assertSame(Command::SUCCESS, $show->execute(['jobId' => $run['jobId'], '--json' => true]));
         $this->assertFalse(json_decode($show->getDisplay(), true, flags: JSON_THROW_ON_ERROR)['cancellable']);
     }
@@ -353,7 +353,7 @@ final class LyricsAdminControllerTest extends TestCase
     {
         $admin = $this->createAdminUser();
         $this->createSongs(1, credited: false);
-        $tester = new CommandTester((new Application(static::$kernel))->find('app:lyrics:fetch'));
+        $tester = new CommandTester(new Application(static::$kernel)->find('app:lyrics:fetch'));
         $this->assertSame(Command::SUCCESS, $tester->execute([]), $tester->getDisplay());
         $this->assertNotNull($this->latestRun($admin));
 
@@ -370,18 +370,18 @@ final class LyricsAdminControllerTest extends TestCase
         $admin = $this->createAdminUser();
         $before = $this->assertJsonResponse($this->authenticatedRequest('GET', '/api/admin/lyrics/sync-status', $admin), 200, 'data')['data'];
         $this->insertJob('FetchLyricsCommand', 'finished', '2099-01-02 03:04:05');
-        $this->insertJob('FetchLyricsCommand', 'failed', (new \DateTimeImmutable('-1 day'))->format('Y-m-d H:i:s'));
-        $this->insertJob('BulkFetchLyricsCommand', 'finished', (new \DateTimeImmutable('-30 days'))->format('Y-m-d H:i:s'));
-        $this->insertJob('SyncAlbumMessage', 'failed', (new \DateTimeImmutable('-1 day'))->format('Y-m-d H:i:s'));
+        $this->insertJob('FetchLyricsCommand', 'failed', new \DateTimeImmutable('-1 day')->format('Y-m-d H:i:s'));
+        $this->insertJob('BulkFetchLyricsCommand', 'finished', new \DateTimeImmutable('-30 days')->format('Y-m-d H:i:s'));
+        $this->insertJob('SyncAlbumMessage', 'failed', new \DateTimeImmutable('-1 day')->format('Y-m-d H:i:s'));
 
         $after = $this->assertJsonResponse($this->authenticatedRequest('GET', '/api/admin/lyrics/sync-status', $admin), 200, 'data')['data'];
 
         $this->assertSame($before['recentJobs'] + 2, $after['recentJobs']);
         $this->assertSame($before['completedJobs'] + 2, $after['completedJobs']);
         $this->assertSame($before['failedJobs'] + 1, $after['failedJobs']);
-        $this->assertSame((new \DateTimeImmutable('2099-01-02 03:04:05'))->format(\DateTimeInterface::ATOM), $after['lastSyncAt']);
+        $this->assertSame(new \DateTimeImmutable('2099-01-02 03:04:05')->format(\DateTimeInterface::ATOM), $after['lastSyncAt']);
 
-        $tester = new CommandTester((new Application(static::$kernel))->find('app:lyrics:status'));
+        $tester = new CommandTester(new Application(static::$kernel)->find('app:lyrics:status'));
         $this->assertSame(Command::SUCCESS, $tester->execute(['--json' => true]));
         $this->assertSame($after, json_decode($tester->getDisplay(), true, flags: JSON_THROW_ON_ERROR));
     }
@@ -405,7 +405,7 @@ final class LyricsAdminControllerTest extends TestCase
     /** Runs app:lyrics:fetch and returns its job ID. */
     private function consoleRun(): string
     {
-        $tester = new CommandTester((new Application(static::$kernel))->find('app:lyrics:fetch'));
+        $tester = new CommandTester(new Application(static::$kernel)->find('app:lyrics:fetch'));
         $this->assertSame(Command::SUCCESS, $tester->execute(['--json' => true]), $tester->getDisplay());
 
         return json_decode($tester->getDisplay(), true, flags: JSON_THROW_ON_ERROR)['jobId'];
@@ -469,11 +469,11 @@ final class LyricsAdminControllerTest extends TestCase
     private function giveArtist(array $songs): void
     {
         $conn = $this->entityManager->getConnection();
-        $now = (new \DateTimeImmutable())->format('Y-m-d H:i:s');
+        $now = new \DateTimeImmutable()->format('Y-m-d H:i:s');
         $artistId = Uuid::v7()->toString();
         $conn->executeStatement(
             'INSERT INTO artists (id, public_id, name, locked_fields, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)',
-            [$artistId, (new PublicId())->toString(), 'Lyrics admin artist', '{}', $now, $now],
+            [$artistId, new PublicId()->toString(), 'Lyrics admin artist', '{}', $now, $now],
         );
         foreach ($songs as $songId) {
             $conn->executeStatement(
@@ -532,7 +532,7 @@ final class LyricsAdminControllerTest extends TestCase
     {
         $this->entityManager->getConnection()->executeStatement(
             'INSERT INTO job_monitors (id, job_id, name, status, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)',
-            [Uuid::v7()->toString(), (new PublicId())->toString(), $name, $status, $createdAt, $createdAt],
+            [Uuid::v7()->toString(), new PublicId()->toString(), $name, $status, $createdAt, $createdAt],
         );
     }
 
@@ -544,16 +544,16 @@ final class LyricsAdminControllerTest extends TestCase
     private function createSongs(int $count, bool $credited = true): array
     {
         $conn = $this->entityManager->getConnection();
-        $now = (new \DateTimeImmutable())->format('Y-m-d H:i:s');
+        $now = new \DateTimeImmutable()->format('Y-m-d H:i:s');
         $libraryId = Uuid::v7();
         $albumId = Uuid::v7();
         $conn->executeStatement(
             'INSERT INTO libraries (id, public_id, slug, name, path, type, sort_order, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
-            [$libraryId->toString(), (new PublicId())->toString(), 'lyrics-admin-' . bin2hex(random_bytes(4)), 'Lyrics admin', '/music/lyrics-admin', 'music', 0, $now, $now],
+            [$libraryId->toString(), new PublicId()->toString(), 'lyrics-admin-' . (random_bytes(4) |> bin2hex(...)), 'Lyrics admin', '/music/lyrics-admin', 'music', 0, $now, $now],
         );
         $conn->executeStatement(
             'INSERT INTO albums (id, public_id, library_id, title, type, locked_fields, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-            [$albumId->toString(), (new PublicId())->toString(), $libraryId->toString(), 'Lyrics admin album', 'studio', '{}', $now, $now],
+            [$albumId->toString(), new PublicId()->toString(), $libraryId->toString(), 'Lyrics admin album', 'studio', '{}', $now, $now],
         );
 
         $songs = [];
@@ -562,7 +562,7 @@ final class LyricsAdminControllerTest extends TestCase
             $songs[] = $songId;
             $conn->executeStatement(
                 'INSERT INTO songs (id, public_id, album_id, title, path, size, mime_type, length, locked_fields, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-                [$songId->toString(), (new PublicId())->toString(), $albumId->toString(), 'Track ' . $i, '/music/lyrics-admin/' . $i . '.flac', 1000, 'audio/flac', 180.0, '{}', $now, $now],
+                [$songId->toString(), new PublicId()->toString(), $albumId->toString(), 'Track ' . $i, '/music/lyrics-admin/' . $i . '.flac', 1000, 'audio/flac', 180.0, '{}', $now, $now],
             );
         }
         if ($credited) {

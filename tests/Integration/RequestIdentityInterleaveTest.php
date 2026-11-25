@@ -35,7 +35,7 @@ final class RequestIdentityInterleaveTest extends TestCase
         if ($url === false || $url === '') {
             self::markTestSkipped('Disposable PostgreSQL and Redis services are required.');
         }
-        $this->directory = sys_get_temp_dir() . '/baander-request-identity-' . bin2hex(random_bytes(8));
+        $this->directory = sys_get_temp_dir() . '/baander-request-identity-' . (random_bytes(8) |> bin2hex(...));
         self::assertTrue(mkdir($this->directory, 0700));
         $key = openssl_pkey_new(['private_key_type' => OPENSSL_KEYTYPE_RSA, 'private_key_bits' => 2048]);
         self::assertNotFalse($key);
@@ -106,7 +106,7 @@ final class RequestIdentityInterleaveTest extends TestCase
      */
     private function session(string $name): array
     {
-        $user = new UserEntity(new PublicId(), 'Request identity ' . $name, 'identity-' . bin2hex(random_bytes(8)) . '@baander.app', 'test-only-unused-password');
+        $user = new UserEntity(new PublicId(), 'Request identity ' . $name, 'identity-' . (random_bytes(8) |> bin2hex(...)) . '@baander.app', 'test-only-unused-password');
         $user->markEmailAsVerified();
         $this->manager->persist($user);
         $this->users[] = $user;

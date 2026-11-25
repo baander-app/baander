@@ -84,7 +84,7 @@ final class PartySessionAccessTest extends TestCase
 
     public function testAnOutsiderSeesNeitherTheSessionNorItsMembers(): void
     {
-        $unknown = (new PublicId())->toString();
+        $unknown = new PublicId()->toString();
 
         $session = $this->assertJsonResponse($this->authenticatedRequest('GET', self::URI . $this->party, $this->outsider), 404);
         $members = $this->assertJsonResponse($this->authenticatedRequest('GET', $this->membersUri($this->party), $this->outsider), 404);
@@ -395,7 +395,7 @@ final class PartySessionAccessTest extends TestCase
      */
     private function assertAnsweredAsForAMissingParty(User $user, string $party, string $method, string $path, array $body = []): void
     {
-        $unknown = (new PublicId())->toString();
+        $unknown = new PublicId()->toString();
 
         foreach ([null, 'da'] as $language) {
             $route = $method . ' ' . $path . ' in ' . ($language ?? 'the default language');
@@ -433,7 +433,7 @@ final class PartySessionAccessTest extends TestCase
             'ending the party' => ['DELETE', '', []],
             'handing the host role to the host' => ['POST', '/members/transfer-host', ['newHostUserId' => $this->host->getPublicId()->toString()]],
             // Whether a user has the public ID is for the host alone to learn.
-            'handing the host role to an unknown user' => ['POST', '/members/transfer-host', ['newHostUserId' => (new PublicId())->toString()]],
+            'handing the host role to an unknown user' => ['POST', '/members/transfer-host', ['newHostUserId' => new PublicId()->toString()]],
             'inviting themself' => ['PUT', '/invitations/' . $caller->getPublicId()->toString(), []],
             'revoking the host' => ['DELETE', '/invitations/' . $this->host->getPublicId()->toString(), []],
             'listing the invitations' => ['GET', '/invitations/', []],

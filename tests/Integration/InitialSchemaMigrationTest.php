@@ -37,12 +37,12 @@ final class InitialSchemaMigrationTest extends TestCase
         if (!$url) {
             self::markTestSkipped('Requires disposable PostgreSQL with permission to create test databases.');
         }
-        $parameters = (new DsnParser(['postgresql' => 'pdo_pgsql']))->parse($url);
+        $parameters = new DsnParser(['postgresql' => 'pdo_pgsql'])->parse($url);
         $this->password = (string) ($parameters['password'] ?? '');
         $configuration = new Configuration();
         $configuration->setMiddlewares([new BaanderDriverMiddleware()]);
         $this->admin = DriverManager::getConnection($parameters, $configuration);
-        $this->database = 'initial_migration_test_' . bin2hex(random_bytes(8));
+        $this->database = 'initial_migration_test_' . (random_bytes(8) |> bin2hex(...));
         $this->admin->executeStatement('CREATE DATABASE ' . $this->admin->quoteIdentifier($this->database));
         $parameters['dbname'] = $this->database;
         $this->connection = DriverManager::getConnection($parameters, $configuration);
@@ -193,13 +193,13 @@ final class InitialSchemaMigrationTest extends TestCase
         foreach ([[$admin, 'ROLE_ADMIN'], [$superAdmin, 'ROLE_SUPER_ADMIN']] as [$user, $role]) {
             $this->connection->executeStatement(
                 "INSERT INTO users (id, public_id, name, email, password, roles, created_at, updated_at) VALUES (?, ?, 'Capture upgrade', ?, 'hash', ?::jsonb, clock_timestamp(), clock_timestamp())",
-                [$user, (new PublicId())->toString(), 'capture-upgrade-' . $role . '@baander.app', json_encode([$role], JSON_THROW_ON_ERROR)],
+                [$user, new PublicId()->toString(), 'capture-upgrade-' . $role . '@baander.app', json_encode([$role], JSON_THROW_ON_ERROR)],
             );
         }
         $library = Uuid::generate()->toString();
         $this->connection->executeStatement(
             "INSERT INTO libraries (id, public_id, name, slug, path, type, created_at, updated_at) VALUES (?, ?, 'Capture upgrade', 'capture-upgrade', '/capture-upgrade', 'music', clock_timestamp(), clock_timestamp())",
-            [$library, (new PublicId())->toString()],
+            [$library, new PublicId()->toString()],
         );
         $file = Uuid::generate()->toString();
         $this->connection->insert('library_file_index', [
@@ -292,7 +292,7 @@ final class InitialSchemaMigrationTest extends TestCase
         self::assertSame(0, $this->migrate($this->factory(), 'DoctrineMigrations\\Version20261017150000'));
         $users = [Uuid::generate()->toString(), Uuid::generate()->toString()];
         foreach ($users as $index => $user) {
-            $this->connection->executeStatement("INSERT INTO users (id, public_id, name, email, password, created_at, updated_at) VALUES (?, ?, 'Media upgrade', ?, 'hash', clock_timestamp(), clock_timestamp())", [$user, (new PublicId())->toString(), 'media-upgrade-' . $index . '@baander.app']);
+            $this->connection->executeStatement("INSERT INTO users (id, public_id, name, email, password, created_at, updated_at) VALUES (?, ?, 'Media upgrade', ?, 'hash', clock_timestamp(), clock_timestamp())", [$user, new PublicId()->toString(), 'media-upgrade-' . $index . '@baander.app']);
         }
         $jobs = [];
         $videos = [];
@@ -301,14 +301,14 @@ final class InitialSchemaMigrationTest extends TestCase
             $job = Uuid::generate()->toString();
             $videos[] = $video;
             $jobs[] = $job;
-            $this->connection->executeStatement("INSERT INTO videos (id, public_id, path, hash, created_at, updated_at) VALUES (?, ?, ?, ?, clock_timestamp(), clock_timestamp())", [$video, (new PublicId())->toString(), '/media-upgrade/' . $index . '.mp4', $video]);
-            $this->connection->executeStatement("INSERT INTO transcode_jobs (id, public_id, video_id, quality_tier_name, created_at, updated_at) VALUES (?, ?, ?, '720p', clock_timestamp(), clock_timestamp())", [$job, (new PublicId())->toString(), $video]);
+            $this->connection->executeStatement("INSERT INTO videos (id, public_id, path, hash, created_at, updated_at) VALUES (?, ?, ?, ?, clock_timestamp(), clock_timestamp())", [$video, new PublicId()->toString(), '/media-upgrade/' . $index . '.mp4', $video]);
+            $this->connection->executeStatement("INSERT INTO transcode_jobs (id, public_id, video_id, quality_tier_name, created_at, updated_at) VALUES (?, ?, ?, '720p', clock_timestamp(), clock_timestamp())", [$job, new PublicId()->toString(), $video]);
         }
         $runtimeSession = null;
         foreach ([[$users[0], $users[1]], [$users[0], $users[0]], [$users[0], $users[1]]] as $index => $owners) {
             foreach ($owners as $ownerIndex => $owner) {
                 $session = Uuid::generate()->toString();
-                $this->connection->executeStatement('INSERT INTO transcode_sessions (id, public_id, user_id, job_id, video_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?, clock_timestamp(), clock_timestamp())', [$session, (new PublicId())->toString(), $owner, $jobs[$index], $videos[$index]]);
+                $this->connection->executeStatement('INSERT INTO transcode_sessions (id, public_id, user_id, job_id, video_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?, clock_timestamp(), clock_timestamp())', [$session, new PublicId()->toString(), $owner, $jobs[$index], $videos[$index]]);
                 if ($index === 0 && $ownerIndex === 0) {
                     $runtimeSession = $session;
                 }
@@ -346,7 +346,7 @@ SQL, [$jobs[0], $runtimeSession, $desired, str_repeat('a', 32)]);
         self::assertNull($runtime['claim_token']);
         self::assertNull($runtime['worker_boot_id']);
         self::assertNull($runtime['lease_expires_at']);
-        $this->connection->executeStatement("INSERT INTO transcode_jobs (id, public_id, video_id, owner_user_id, request_id, quality_tier_name, created_at, updated_at) VALUES (?, ?, ?, ?, ?, '720p', clock_timestamp(), clock_timestamp())", [Uuid::generate()->toString(), (new PublicId())->toString(), $videos[0], $users[1], Uuid::generate()->toString()]);
+        $this->connection->executeStatement("INSERT INTO transcode_jobs (id, public_id, video_id, owner_user_id, request_id, quality_tier_name, created_at, updated_at) VALUES (?, ?, ?, ?, ?, '720p', clock_timestamp(), clock_timestamp())", [Uuid::generate()->toString(), new PublicId()->toString(), $videos[0], $users[1], Uuid::generate()->toString()]);
         self::assertSame(5, (int) $this->connection->fetchOne('SELECT count(*) FROM transcode_jobs'));
     }
 
@@ -354,50 +354,50 @@ SQL, [$jobs[0], $runtimeSession, $desired, str_repeat('a', 32)]);
     {
         self::assertSame(0, $this->migrate($this->factory(), 'DoctrineMigrations\\Version20261017000000'));
         self::assertSame(1, (int) $this->connection->fetchOne('SELECT count(*) FROM doctrine_migration_versions'));
-        $ownerId = (new Uuid())->toString();
-        $collaboratorId = (new Uuid())->toString();
-        $libraryId = (new Uuid())->toString();
-        $albumId = (new Uuid())->toString();
-        $playlistId = (new Uuid())->toString();
+        $ownerId = new Uuid()->toString();
+        $collaboratorId = new Uuid()->toString();
+        $libraryId = new Uuid()->toString();
+        $albumId = new Uuid()->toString();
+        $playlistId = new Uuid()->toString();
         foreach ([$ownerId => 'owner', $collaboratorId => 'collaborator'] as $id => $name) {
             $this->connection->executeStatement(
                 "INSERT INTO users (id, public_id, name, email, password, created_at, updated_at)
                  VALUES (?, ?, ?, ?, 'hash', '2026-10-01 10:00:00+00', '2026-10-02 11:00:00+00')",
-                [$id, (new PublicId())->toString(), $name, $name . '@baander.app'],
+                [$id, new PublicId()->toString(), $name, $name . '@baander.app'],
             );
         }
         $this->connection->executeStatement(
             "INSERT INTO libraries (id, public_id, name, slug, path, type, created_at, updated_at)
              VALUES (?, ?, 'Upgrade library', 'upgrade', '/upgrade', 'music', '2026-10-01 10:00:00+00', '2026-10-02 11:00:00+00')",
-            [$libraryId, (new PublicId())->toString()],
+            [$libraryId, new PublicId()->toString()],
         );
         $this->connection->executeStatement(
             "INSERT INTO albums (id, public_id, library_id, title, type, created_at, updated_at)
              VALUES (?, ?, ?, 'Upgrade album', 'album', '2026-10-01 10:00:00+00', '2026-10-02 11:00:00+00')",
-            [$albumId, (new PublicId())->toString(), $libraryId],
+            [$albumId, new PublicId()->toString(), $libraryId],
         );
         $this->connection->executeStatement(
             "INSERT INTO playlists (id, public_id, user_id, name, description, is_public, is_collaborative, is_smart, smart_rules, created_at, updated_at)
              VALUES (?, ?, ?, 'Kept playlist', 'Kept description', true, true, false, '{\"limit\":17}', '2026-10-01 10:00:00+00', '2026-10-02 11:00:00+00')",
-            [$playlistId, (new PublicId())->toString(), $ownerId],
+            [$playlistId, new PublicId()->toString(), $ownerId],
         );
         foreach ([3, 9] as $position) {
-            $songId = (new Uuid())->toString();
+            $songId = new Uuid()->toString();
             $this->connection->executeStatement(
                 "INSERT INTO songs (id, public_id, album_id, title, path, size, mime_type, created_at, updated_at)
                  VALUES (?, ?, ?, ?, ?, 512, 'audio/flac', '2026-10-01 10:00:00+00', '2026-10-02 11:00:00+00')",
-                [$songId, (new PublicId())->toString(), $albumId, 'Song ' . $position, '/upgrade/' . $position . '.flac'],
+                [$songId, new PublicId()->toString(), $albumId, 'Song ' . $position, '/upgrade/' . $position . '.flac'],
             );
             $this->connection->executeStatement(
                 "INSERT INTO playlist_song (id, playlist_id, song_id, position, created_at, updated_at)
                  VALUES (?, ?, ?, ?, '2026-10-03 12:00:00+00', '2026-10-04 13:00:00+00')",
-                [(new Uuid())->toString(), $playlistId, $songId, $position],
+                [new Uuid()->toString(), $playlistId, $songId, $position],
             );
         }
         $this->connection->executeStatement(
             "INSERT INTO playlist_collaborators (id, playlist_id, user_id, role, created_at, updated_at)
              VALUES (?, ?, ?, 'editor', '2026-10-05 14:00:00+00', '2026-10-06 15:00:00+00')",
-            [(new Uuid())->toString(), $playlistId, $collaboratorId],
+            [new Uuid()->toString(), $playlistId, $collaboratorId],
         );
         $snapshot = function (): array {
             $rows = [];
@@ -446,14 +446,14 @@ SQL, [$jobs[0], $runtimeSession, $desired, str_repeat('a', 32)]);
         [$user, $client] = [Uuid::generate()->toString(), Uuid::generate()->toString()];
         $this->connection->executeStatement(
             "INSERT INTO users (id, public_id, name, email, password, created_at, updated_at) VALUES (?, ?, 'Key binding upgrade', 'key-binding-upgrade@baander.app', 'hash', clock_timestamp(), clock_timestamp())",
-            [$user, (new PublicId())->toString()],
+            [$user, new PublicId()->toString()],
         );
         $this->connection->insert('oauth_clients', [
-            'id' => $client, 'public_id' => (new PublicId())->toString(), 'name' => 'Key binding upgrade',
+            'id' => $client, 'public_id' => new PublicId()->toString(), 'name' => 'Key binding upgrade',
             'redirect' => '["https://app.baander.app/callback"]', 'created_at' => '2026-11-19 12:00:00+00', 'updated_at' => '2026-11-19 12:00:00+00',
         ]);
         $this->connection->insert('oauth_auth_codes', [
-            'id' => Uuid::generate()->toString(), 'code_id' => bin2hex(random_bytes(16)), 'client_id' => $client, 'user_id' => $user,
+            'id' => Uuid::generate()->toString(), 'code_id' => random_bytes(16) |> bin2hex(...), 'client_id' => $client, 'user_id' => $user,
             'redirect_uri' => 'https://app.baander.app/callback', 'code_challenge' => 'E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM',
             'code_challenge_method' => 'S256', 'expires_at' => '2026-11-19 12:01:00+00', 'created_at' => '2026-11-19 12:00:00+00', 'updated_at' => '2026-11-19 12:00:00+00',
         ]);
@@ -481,19 +481,19 @@ SQL, [$jobs[0], $runtimeSession, $desired, str_repeat('a', 32)]);
         $times = ['created_at' => '2026-11-20 12:00:00+00', 'updated_at' => '2026-11-20 12:00:00+00'];
         $this->connection->executeStatement(
             "INSERT INTO users (id, public_id, name, email, password, created_at, updated_at) VALUES (?, ?, 'Epoch upgrade', 'epoch-upgrade@baander.app', 'hash', clock_timestamp(), clock_timestamp())",
-            [$user, (new PublicId())->toString()],
+            [$user, new PublicId()->toString()],
         );
-        $this->connection->insert('oauth_clients', ['id' => $client, 'public_id' => (new PublicId())->toString(), 'name' => 'Epoch upgrade', 'redirect' => '["https://app.baander.app/callback"]', ...$times]);
-        $this->connection->insert('oauth_access_tokens', ['id' => $access, 'token_id' => bin2hex(random_bytes(40)), 'client_id' => $client, 'user_id' => $user, ...$times]);
-        $this->connection->insert('oauth_refresh_tokens', ['id' => $refresh, 'token_id' => bin2hex(random_bytes(40)), 'access_token_id' => $access, ...$times]);
+        $this->connection->insert('oauth_clients', ['id' => $client, 'public_id' => new PublicId()->toString(), 'name' => 'Epoch upgrade', 'redirect' => '["https://app.baander.app/callback"]', ...$times]);
+        $this->connection->insert('oauth_access_tokens', ['id' => $access, 'token_id' => random_bytes(40) |> bin2hex(...), 'client_id' => $client, 'user_id' => $user, ...$times]);
+        $this->connection->insert('oauth_refresh_tokens', ['id' => $refresh, 'token_id' => random_bytes(40) |> bin2hex(...), 'access_token_id' => $access, ...$times]);
         $this->connection->insert('oauth_token_metadata', ['id' => Uuid::generate()->toString(), 'token_id' => $access, ...$times]);
         $this->connection->insert('oauth_auth_codes', [
-            'id' => Uuid::generate()->toString(), 'code_id' => bin2hex(random_bytes(16)), 'client_id' => $client, 'user_id' => $user,
+            'id' => Uuid::generate()->toString(), 'code_id' => random_bytes(16) |> bin2hex(...), 'client_id' => $client, 'user_id' => $user,
             'redirect_uri' => 'https://app.baander.app/callback', 'code_challenge' => 'E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM',
             'code_challenge_method' => 'S256', 'dpop_jkt' => 'NzbLsXh8uDCcd-6MNwXF4W_7noWXFZAfHkxZsRGC9Xs', 'expires_at' => '2026-11-20 12:01:00+00', ...$times,
         ]);
         $this->connection->insert('oauth_device_codes', [
-            'id' => $device, 'device_code' => bin2hex(random_bytes(16)), 'user_code' => 'BCDFGHJK', 'user_id' => $user, 'client_id' => $client,
+            'id' => $device, 'device_code' => random_bytes(16) |> bin2hex(...), 'user_code' => 'BCDFGHJK', 'user_id' => $user, 'client_id' => $client,
             'verification_uri' => 'https://app.baander.app/device', 'approved' => 'true', ...$times,
         ]);
 
@@ -532,17 +532,17 @@ SQL, [$jobs[0], $runtimeSession, $desired, str_repeat('a', 32)]);
         $times = ['created_at' => '2026-11-22 12:00:00+00', 'updated_at' => '2026-11-22 12:00:00+00'];
         $this->connection->executeStatement(
             "INSERT INTO users (id, public_id, name, email, password, created_at, updated_at) VALUES (?, ?, 'Code hashing upgrade', 'code-hashing-upgrade@baander.app', 'hash', clock_timestamp(), clock_timestamp())",
-            [$user, (new PublicId())->toString()],
+            [$user, new PublicId()->toString()],
         );
-        $this->connection->insert('oauth_clients', ['id' => $client, 'public_id' => (new PublicId())->toString(), 'name' => 'Code hashing upgrade', 'redirect' => '["https://app.baander.app/callback"]', ...$times]);
+        $this->connection->insert('oauth_clients', ['id' => $client, 'public_id' => new PublicId()->toString(), 'name' => 'Code hashing upgrade', 'redirect' => '["https://app.baander.app/callback"]', ...$times]);
         $this->connection->insert('oauth_auth_codes', [
-            'id' => Uuid::generate()->toString(), 'code_id' => bin2hex(random_bytes(40)), 'client_id' => $client, 'user_id' => $user,
+            'id' => Uuid::generate()->toString(), 'code_id' => random_bytes(40) |> bin2hex(...), 'client_id' => $client, 'user_id' => $user,
             'redirect_uri' => 'https://app.baander.app/callback', 'code_challenge' => 'E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM',
             'code_challenge_method' => 'S256', 'dpop_jkt' => 'NzbLsXh8uDCcd-6MNwXF4W_7noWXFZAfHkxZsRGC9Xs', 'credential_epoch' => 0,
             'expires_at' => '2026-11-22 12:01:00+00', ...$times,
         ]);
         $this->connection->insert('oauth_device_codes', [
-            'id' => Uuid::generate()->toString(), 'device_code' => bin2hex(random_bytes(40)), 'user_code' => 'BCDF-GHJK', 'user_id' => $user,
+            'id' => Uuid::generate()->toString(), 'device_code' => random_bytes(40) |> bin2hex(...), 'user_code' => 'BCDF-GHJK', 'user_id' => $user,
             'client_id' => $client, 'verification_uri' => 'https://app.baander.app/device', 'approved' => 'true', 'credential_epoch' => 0, ...$times,
         ]);
 
@@ -586,7 +586,7 @@ SQL, [$jobs[0], $runtimeSession, $desired, str_repeat('a', 32)]);
     public function testTimeZoneMigrationSetsTheDatabaseDefaultAndDownRestoresIt(): void
     {
         // Upper case and a hyphen: the statement must quote the database name.
-        $database = 'Time-Zone-' . bin2hex(random_bytes(6));
+        $database = 'Time-Zone-' . (random_bytes(6) |> bin2hex(...));
         $this->admin->executeStatement('CREATE DATABASE ' . $this->admin->quoteIdentifier($database));
         $connection = DriverManager::getConnection(['dbname' => $database] + $this->connection->getParams());
         try {
@@ -613,7 +613,7 @@ SQL, [$jobs[0], $runtimeSession, $desired, str_repeat('a', 32)]);
             'table_storage' => ['table_name' => 'doctrine_migration_versions'],
         ]), new ExistingConnection($connection));
 
-        return (new CommandTester(new ExecuteCommand($factory)))->execute(['versions' => ['DoctrineMigrations\\Version20261103210000'], $direction => true], ['interactive' => false]);
+        return new CommandTester(new ExecuteCommand($factory))->execute(['versions' => ['DoctrineMigrations\\Version20261103210000'], $direction => true], ['interactive' => false]);
     }
 
     /** @return list<string> the current database's own settings, for every role */
@@ -718,7 +718,7 @@ SQL, [$jobs[0], $runtimeSession, $desired, str_repeat('a', 32)]);
         self::assertFalse($snapshot->execution->createClaimed);
         self::assertNull($snapshot->execution->binding);
         self::assertNull($snapshot->execution->recipeHash);
-        self::assertNull((new \App\Shared\Infrastructure\Worker\DoctrineDeploymentLease($this->connection))->acquire($namespace, $boot, 60));
+        self::assertNull(new \App\Shared\Infrastructure\Worker\DoctrineDeploymentLease($this->connection)->acquire($namespace, $boot, 60));
         self::assertNotNull($snapshot->control->binding);
         self::assertFalse($inventory->claimStart($snapshot->control->binding));
         self::assertSame(0, $this->migrate($this->factory()));
@@ -794,7 +794,7 @@ SQL, [$jobs[0], $runtimeSession, $desired, str_repeat('a', 32)]);
 
     private function migrate(DependencyFactory $factory, string $version = 'latest'): int
     {
-        return (new CommandTester(new MigrateCommand($factory)))->execute(['version' => $version], ['interactive' => false]);
+        return new CommandTester(new MigrateCommand($factory))->execute(['version' => $version], ['interactive' => false]);
     }
 
     private function refused(DependencyFactory $factory, string $version = 'latest'): string

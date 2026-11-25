@@ -21,13 +21,13 @@ final class AudioProbeDurationTest extends KernelTestCase
 
     protected function setUp(): void
     {
-        $this->directory = sys_get_temp_dir() . '/baander-probe-duration-' . bin2hex(random_bytes(6));
+        $this->directory = sys_get_temp_dir() . '/baander-probe-duration-' . (random_bytes(6) |> bin2hex(...));
         self::assertTrue(mkdir($this->directory, 0700));
     }
 
     protected function tearDown(): void
     {
-        (new Filesystem())->remove($this->directory);
+        new Filesystem()->remove($this->directory);
         parent::tearDown();
     }
 
@@ -70,11 +70,11 @@ final class AudioProbeDurationTest extends KernelTestCase
     private function encodeThreeSeconds(string $name, array $output): string
     {
         $path = $this->directory . '/' . $name;
-        (new Process([
+        new Process([
             'ffmpeg', '-nostdin', '-hide_banner', '-loglevel', 'error', '-y',
             '-f', 'lavfi', '-i', 'sine=frequency=440:duration=3',
             '-ac', '2', '-ar', '44100', ...$output, $path,
-        ]))->mustRun();
+        ])->mustRun();
 
         return $path;
     }

@@ -61,8 +61,8 @@ final class SegmentEncoderStreamArgsTest extends TestCase
         self::assertCount(2, array_keys($args, '-i', true));
         $video = self::inputArguments($args, 0);
         $audio = self::inputArguments($args, 1);
-        self::assertSame('/source.mkv', $video[array_key_last($video)]);
-        self::assertSame('/source.mkv', $audio[array_key_last($audio)]);
+        self::assertSame('/source.mkv', array_last($video));
+        self::assertSame('/source.mkv', array_last($audio));
         $clause = ['-format_whitelist', 'mov,matroska,avi,asf', '-protocol_whitelist', 'file', '-i', '/source.mkv'];
         self::assertSame($clause, array_slice($video, -6), 'The video input opens only a library video container');
         self::assertSame($clause, array_slice($audio, -6), 'The audio input opens only a library video container');
@@ -90,7 +90,7 @@ final class SegmentEncoderStreamArgsTest extends TestCase
         } else {
             self::assertNotContains('-itsoffset', $audio);
         }
-        self::assertSame($origin === null ? 0 : 1, count(array_keys($args, '-copyts', true)));
+        self::assertSame($origin === null ? 0 : 1, array_keys($args, '-copyts', true) |> count(...));
         foreach ([$video, $audio] as $input) {
             if ($origin !== null) {
                 self::assertSame('1', $input[array_search('-seek_timestamp', $input, true) + 1]);
@@ -171,7 +171,7 @@ final class SegmentEncoderStreamArgsTest extends TestCase
         self::assertSame('id=0,streams=v id=1,streams=a', $args[array_search('-adaptation_sets', $args, true) + 1]);
         self::assertSame('init-$RepresentationID$.mp4', $args[array_search('-init_seg_name', $args, true) + 1]);
         self::assertSame('track-$RepresentationID$-seg-$Number%05d$.m4s', $args[array_search('-media_seg_name', $args, true) + 1]);
-        self::assertSame('/out/p720/manifest.mpd', $args[array_key_last($args)]);
+        self::assertSame('/out/p720/manifest.mpd', array_last($args));
         self::assertContains('0:V:0', $args);
         self::assertContains('1:a:0', $args);
         self::assertContains('aac', $args);
@@ -183,7 +183,7 @@ final class SegmentEncoderStreamArgsTest extends TestCase
         $args = $this->encoder()->buildStreamArgs('/source.mkv', QualityTier::p720(), '', '/output',
             audioProfile: $profile, audioFilters: 'volume=0.5', sourceFrameRate: 25.0);
 
-        self::assertSame(1, count(array_keys($args, '-shortest', true)));
+        self::assertSame(1, array_keys($args, '-shortest', true) |> count(...));
         self::assertLessThan(array_search('-f', $args, true), array_search('-shortest', $args, true));
         foreach ([
             '-c:a' => $encoder,
@@ -382,7 +382,7 @@ final class SegmentEncoderStreamArgsTest extends TestCase
     {
         $args = $this->encoder()->buildStreamArgs('/source.mkv', QualityTier::p720(), '', '/output',
             startSegment: 1, audioProfile: $profile, audioFilters: 'volume=0.5', sourceFrameRate: 0.1);
-        self::assertSame(1, count(array_keys($args, '-shortest', true)));
+        self::assertSame(1, array_keys($args, '-shortest', true) |> count(...));
         self::assertLessThan(array_search('-f', $args, true), array_search('-shortest', $args, true));
         foreach ([
             '-c:a' => $encoder,
@@ -487,7 +487,7 @@ final class SegmentEncoderStreamArgsTest extends TestCase
             self::assertNotContains('-rc-lookahead:v', $args);
         }
         if ($codec === 'libx265') {
-            self::assertSame(1, count(array_keys($args, '-x265-params', true)));
+            self::assertSame(1, array_keys($args, '-x265-params', true) |> count(...));
             $parameters = $args[array_search('-x265-params', $args, true) + 1];
             self::assertSame('pools=6:frame-threads=2:log-level=error:rc-lookahead=0:no-sao=1:no-deblock=1:no-scenecut=1:keyint=180:min-keyint=180', $parameters);
         } else {

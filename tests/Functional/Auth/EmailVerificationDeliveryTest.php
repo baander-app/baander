@@ -295,7 +295,7 @@ final class EmailVerificationDeliveryTest extends RateLimitTestCase
         $kernel = static::$kernel;
         $this->assertNotNull($kernel);
 
-        $tester = new CommandTester((new Application($kernel))->find('app:user:change-email'));
+        $tester = new CommandTester(new Application($kernel)->find('app:user:change-email'));
         $tester->execute(['identifier' => $user->getEmail(), 'email' => $newAddress]);
 
         $tester->assertCommandIsSuccessful();
@@ -518,7 +518,7 @@ final class EmailVerificationDeliveryTest extends RateLimitTestCase
 
     private function uniqueEmail(): string
     {
-        return 'verify-' . bin2hex(random_bytes(6)) . '@baander.app';
+        return 'verify-' . (random_bytes(6) |> bin2hex(...)) . '@baander.app';
     }
 
     private function ip(): string

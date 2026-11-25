@@ -62,7 +62,7 @@ final class UpdatePreferenceRequestTest extends TestCase
 
     public function testEnabledKeyRemainsRequired(): void
     {
-        $decoded = (new JsonEncoder())->decode('{"preferences":[{"category":"media_changes","channel":"in_app"}]}', 'json');
+        $decoded = new JsonEncoder()->decode('{"preferences":[{"category":"media_changes","channel":"in_app"}]}', 'json');
         $request = new UpdatePreferenceRequest($decoded['preferences']);
         $validator = Validation::createValidatorBuilder()->enableAttributeMapping()->getValidator();
         $violations = $validator->validate($request);
@@ -88,7 +88,7 @@ final class UpdatePreferenceRequestTest extends TestCase
 
     private function decodeRequest(string $enabled): UpdatePreferenceRequest
     {
-        $decoded = (new JsonEncoder())->decode('{"preferences":[{"category":"media_changes","channel":"in_app","enabled":' . $enabled . '}]}', 'json');
+        $decoded = new JsonEncoder()->decode('{"preferences":[{"category":"media_changes","channel":"in_app","enabled":' . $enabled . '}]}', 'json');
 
         return new UpdatePreferenceRequest($decoded['preferences']);
     }

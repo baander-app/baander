@@ -66,7 +66,7 @@ final class PushSubscriptionControllerTest extends TestCase
     {
         $user = $this->createTestUser();
         $payload = $this->validPayload('http://push.baander.app/abc');
-        $payload['endpoint'] = 'http://push.baander.app/' . bin2hex(random_bytes(6));
+        $payload['endpoint'] = 'http://push.baander.app/' . (random_bytes(6) |> bin2hex(...));
 
         $response = $this->authenticatedRequest('POST', '/api/push/subscribe', $user, $payload);
 
@@ -318,7 +318,7 @@ final class PushSubscriptionControllerTest extends TestCase
 
     private function fcmEndpoint(): string
     {
-        return 'https://push.baander.app/' . bin2hex(random_bytes(8));
+        return 'https://push.baander.app/' . (random_bytes(8) |> bin2hex(...));
     }
 
     /**
@@ -329,8 +329,8 @@ final class PushSubscriptionControllerTest extends TestCase
         return [
             'endpoint' => $endpoint,
             'keys' => [
-                'p256dh' => 'BNc-' . bin2hex(random_bytes(16)),
-                'auth' => bin2hex(random_bytes(8)),
+                'p256dh' => 'BNc-' . (random_bytes(16) |> bin2hex(...)),
+                'auth' => random_bytes(8) |> bin2hex(...),
             ],
             'contentEncoding' => 'aes128gcm',
         ];

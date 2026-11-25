@@ -43,7 +43,7 @@ final class ControlPlaybackQueueBoundsTest extends TestCase
             $paths[] = $violation->getPropertyPath();
         }
 
-        return array_values(array_unique($paths));
+        return array_unique($paths) |> array_values(...);
     }
 
     private function validator(): ValidatorInterface

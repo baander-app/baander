@@ -245,12 +245,12 @@ final class TranscodeSessionSharePersistenceTest extends TestCase
         CustomTypesRegistrar::register();
         $url = getenv('OUTBOX_TEST_DATABASE_URL');
         self::assertIsString($url);
-        $params = (new DsnParser(['postgresql' => 'pdo_pgsql']))->parse($url);
+        $params = new DsnParser(['postgresql' => 'pdo_pgsql'])->parse($url);
         $configuration = new Configuration();
         $configuration->setMiddlewares([new BaanderDriverMiddleware()]);
         $writer = DriverManager::getConnection($params, $configuration);
         $observer = DriverManager::getConnection($params, $configuration);
-        $schema = 'transcode_share_race_' . bin2hex(random_bytes(6));
+        $schema = 'transcode_share_race_' . (random_bytes(6) |> bin2hex(...));
         $process = null;
         $output = tmpfile();
         self::assertIsResource($output);
@@ -274,7 +274,7 @@ final class TranscodeSessionSharePersistenceTest extends TestCase
             $share->lock($user);
             $share->makeRoom($user, Uuid::generate(), 'first-start');
             $this->seed($stack, $user, Uuid::generate(), 'first-start', '360p', '0 seconds');
-            $applicationName = 'transcode_share_race_' . bin2hex(random_bytes(6));
+            $applicationName = 'transcode_share_race_' . (random_bytes(6) |> bin2hex(...));
             $process = proc_open(
                 [PHP_BINARY, '-r', self::CONTENDER, '--', dirname(__DIR__, 2) . '/vendor/autoload.php', $schema, $applicationName, ($sameUser ? $user : Uuid::generate())->toString()],
                 [0 => ['file', '/dev/null', 'r'], 1 => $output, 2 => $output],
@@ -472,7 +472,7 @@ final class TranscodeSessionSharePersistenceTest extends TestCase
     {
         $writer = CopyStartRace::connect();
         $observer = CopyStartRace::connect();
-        $schema = 'transcode_copy_race_' . bin2hex(random_bytes(6));
+        $schema = 'transcode_copy_race_' . (random_bytes(6) |> bin2hex(...));
         $contender = null;
         try {
             $writer->executeStatement('CREATE SCHEMA ' . $schema);
@@ -487,7 +487,7 @@ final class TranscodeSessionSharePersistenceTest extends TestCase
             foreach (range(1, 5) as $index) {
                 $this->seed($stack, $user, Uuid::generate(), 'playing-' . $index, '360p', '5 seconds');
             }
-            $application = 'transcode_copy_race_' . bin2hex(random_bytes(6));
+            $application = 'transcode_copy_race_' . (random_bytes(6) |> bin2hex(...));
             $contender = $this->contender($schema, $application, $user);
             // The first start has created its session and not yet committed when the second one starts.
             $first = CopyStartRace::service($writer, self::beforeCommit($writer, function () use ($contender, $observer, $application, $user): void {
@@ -557,7 +557,7 @@ PHP;
     private function isolate(): Connection
     {
         $connection = $this->manager->getConnection();
-        $schema = 'transcode_share_' . bin2hex(random_bytes(6));
+        $schema = 'transcode_share_' . (random_bytes(6) |> bin2hex(...));
         $connection->executeStatement('CREATE SCHEMA ' . $schema);
         foreach (self::TABLES as $table) {
             $connection->executeStatement(sprintf('CREATE TABLE %1$s.%2$s (LIKE public.%2$s INCLUDING ALL)', $schema, $table));
@@ -573,7 +573,7 @@ PHP;
         $this->manager->getConnection()->executeStatement(
             'INSERT INTO videos (id, public_id, path, hash, width, height, created_at, updated_at)'
             . " VALUES (:id, :public, '/media/share.mkv', :hash, :width, :height, clock_timestamp(), clock_timestamp())",
-            ['id' => $video->toString(), 'public' => new PublicId()->toString(), 'hash' => bin2hex(random_bytes(16)), 'width' => intdiv($height * 16, 9), 'height' => $height],
+            ['id' => $video->toString(), 'public' => new PublicId()->toString(), 'hash' => random_bytes(16) |> bin2hex(...), 'width' => intdiv($height * 16, 9), 'height' => $height],
         );
 
         return $video;

@@ -88,7 +88,7 @@ final class SwooleFallbackHandlerRegistrationTest extends TestCase
         $framework->setParameter('kernel.bundles_metadata', []);
         $framework->setParameter('kernel.bundles', []);
         $framework->setParameter('kernel.project_dir', dirname(__DIR__, 5));
-        (new FrameworkExtension())->load([['secret' => 'registration-test']], $framework);
+        new FrameworkExtension()->load([['secret' => 'registration-test']], $framework);
 
         $container = new ContainerBuilder();
         foreach ($framework->getAttributeAutoconfigurators()[AsMessageHandler::class] as $configurator) {
@@ -100,7 +100,7 @@ final class SwooleFallbackHandlerRegistrationTest extends TestCase
         $container->addCompilerPass(new MessengerPass());
         $container->compile();
         // Selection needs a callable, but must not execute application work or its dependencies.
-        $container->set($handlerClass, (new \ReflectionClass($handlerClass))->newInstanceWithoutConstructor());
+        $container->set($handlerClass, new \ReflectionClass($handlerClass)->newInstanceWithoutConstructor());
 
         return $container->get('test.handlers');
     }

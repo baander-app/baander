@@ -38,8 +38,8 @@ final class LoginFailureReservationRaceTest extends TestCase
         self::assertIsString($dsn, 'Run this test with the disposable Redis runner.');
         self::assertNotSame('', $dsn);
         $this->dsn = $dsn;
-        $this->name = 'login-failure-race-' . bin2hex(random_bytes(12));
-        $this->directory = sys_get_temp_dir() . '/baander-login-race-' . bin2hex(random_bytes(12));
+        $this->name = 'login-failure-race-' . (random_bytes(12) |> bin2hex(...));
+        $this->directory = sys_get_temp_dir() . '/baander-login-race-' . (random_bytes(12) |> bin2hex(...));
         self::assertTrue(mkdir($this->directory, 0700));
     }
 
@@ -80,7 +80,7 @@ final class LoginFailureReservationRaceTest extends TestCase
 
         $results = array_map($this->finish(...), $signIns);
 
-        $checks = count(array_filter($results, static fn (array $result): bool => $result['checked']));
+        $checks = array_filter($results, static fn (array $result): bool => $result['checked']) |> count(...);
         self::assertGreaterThan(0, $checks);
         self::assertLessThanOrEqual(self::LIMIT, $checks, json_encode($results, JSON_THROW_ON_ERROR));
     }

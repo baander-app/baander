@@ -16,7 +16,7 @@ final class PairingCodeRefusalTest extends TestCase
     public function testAPairingCodeForAnUnknownServerIsNotFound(): void
     {
         $response = $this->authenticatedRequest('POST', '/api/discovery/pairing-code', $this->createTestUser(), [
-            'serverPublicId' => (new PublicId())->toString(),
+            'serverPublicId' => new PublicId()->toString(),
             'method' => 'server_code',
         ]);
 

@@ -24,14 +24,14 @@ final class FFmpegInputWhitelistMediaTest extends TestCase
 
     protected function setUp(): void
     {
-        $this->directory = sys_get_temp_dir() . '/baander-input-whitelist-' . bin2hex(random_bytes(6));
+        $this->directory = sys_get_temp_dir() . '/baander-input-whitelist-' . (random_bytes(6) |> bin2hex(...));
         mkdir($this->directory . '/library', 0700, true);
         mkdir($this->directory . '/elsewhere', 0700, true);
     }
 
     protected function tearDown(): void
     {
-        (new Filesystem())->remove($this->directory);
+        new Filesystem()->remove($this->directory);
     }
 
     public function testADashManifestNamedLikeAFilmOpensNoOtherFile(): void
@@ -43,7 +43,7 @@ final class FFmpegInputWhitelistMediaTest extends TestCase
 
         self::assertNotSame(0, $probe->getExitCode(), 'The video probe read the film the manifest names: ' . $probe->getOutput());
         self::assertStringNotContainsString('h264', $probe->getOutput());
-        $copy = $this->process((new CopySegmentArguments())->build(
+        $copy = $this->process(new CopySegmentArguments()->build(
             $manifest,
             new PresentationSelection('copy', 'source-hash', 0, null, 'mp4'),
             $this->directory . '/copy',
@@ -150,7 +150,7 @@ final class FFmpegInputWhitelistMediaTest extends TestCase
         $output = $this->directory . '/presentation';
         mkdir($output);
 
-        $this->runMedia((new CopySegmentArguments())->build(
+        $this->runMedia(new CopySegmentArguments()->build(
             $source,
             new PresentationSelection('copy', 'source-hash', 0, 1, 'mp4'),
             $output,

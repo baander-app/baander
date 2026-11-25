@@ -41,7 +41,7 @@ final class ProductionSecretsTest extends TestCase
         yield 'committed TOTP key' => ['AUTH_TOTP_ENCRYPTION_KEY', 'vhDAUukeCl95XW2ZyaTcQbB67hk3cv0yLDiezobAarA=', 'AUTH_TOTP_ENCRYPTION_KEY is a committed default'];
         yield 'placeholder stream secret' => ['STREAM_URL_HMAC_SECRET', 'replace-with-a-separate-private-random-value', 'STREAM_URL_HMAC_SECRET is a placeholder'];
         yield 'short APP_SECRET' => ['APP_SECRET', str_repeat('a', 31), 'APP_SECRET is shorter than 32 bytes'];
-        yield 'short TOTP key' => ['AUTH_TOTP_ENCRYPTION_KEY', base64_encode(str_repeat("\x01", 31)), 'AUTH_TOTP_ENCRYPTION_KEY is shorter than 32 bytes'];
+        yield 'short TOTP key' => ['AUTH_TOTP_ENCRYPTION_KEY', str_repeat("\x01", 31) |> base64_encode(...), 'AUTH_TOTP_ENCRYPTION_KEY is shorter than 32 bytes'];
         yield 'TOTP key that is not base64' => ['AUTH_TOTP_ENCRYPTION_KEY', str_repeat('!', 44), 'AUTH_TOTP_ENCRYPTION_KEY is not base64'];
         yield 'unset Redis password' => ['REDIS_PASSWORD', null, 'REDIS_PASSWORD is not set'];
         yield 'committed Redis password' => ['REDIS_PASSWORD', 'baander', 'REDIS_PASSWORD is a committed default'];
@@ -49,7 +49,7 @@ final class ProductionSecretsTest extends TestCase
         yield 'Redis URL with a 15-byte password' => ['REDIS_URL', 'redis://baander:' . str_repeat('r', 15) . '@redis:6379', 'REDIS_URL carries a password shorter than 16 bytes'];
         yield 'Redis URL without a password' => ['REDIS_URL', 'redis://redis:6379', 'REDIS_URL has no password'];
         yield 'database URL with a 15-byte password' => ['DATABASE_URL', 'postgresql://baander:' . str_repeat('d', 15) . '@pooler:6432/baander', 'DATABASE_URL carries a password shorter than 16 bytes'];
-        yield 'control database URL with a 15-byte encoded password' => ['DATABASE_CONTROL_URL', 'postgresql://baander_control:' . rawurlencode(str_repeat('@', 15)) . '@pooler:6432/baander_control', 'DATABASE_CONTROL_URL carries a password shorter than 16 bytes'];
+        yield 'control database URL with a 15-byte encoded password' => ['DATABASE_CONTROL_URL', 'postgresql://baander_control:' . (str_repeat('@', 15) |> rawurlencode(...)) . '@pooler:6432/baander_control', 'DATABASE_CONTROL_URL carries a password shorter than 16 bytes'];
         yield 'unset database URL' => ['DATABASE_URL', null, 'DATABASE_URL is not set'];
         yield 'database URL without a password' => ['DATABASE_URL', 'postgresql://baander@pooler:6432/baander', 'DATABASE_URL has no password'];
         yield 'database URL with the committed password' => ['DATABASE_URL', 'postgresql://baander:baander@pooler:6432/baander?serverVersion=18', 'DATABASE_URL uses a committed default password'];
@@ -61,7 +61,7 @@ final class ProductionSecretsTest extends TestCase
     {
         $lookup = $this->lookup([
             'REDIS_PASSWORD' => str_repeat('r', 16),
-            'REDIS_URL' => 'redis://baander:' . rawurlencode(str_repeat('%', 16)) . '@redis:6379',
+            'REDIS_URL' => 'redis://baander:' . (str_repeat('%', 16) |> rawurlencode(...)) . '@redis:6379',
             'DATABASE_URL' => 'postgresql://baander:' . str_repeat('d', 16) . '@pooler:6432/baander',
         ]);
 

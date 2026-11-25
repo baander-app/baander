@@ -99,7 +99,7 @@ final class LimitedRouteInventoryTest extends TestCase
         $charged = self::routeConstants(RateLimitListener::class);
 
         self::assertEqualsCanonicalizing(
-            array_values(array_diff($charged, [RateLimitListener::PAR_ROUTE])),
+            array_diff($charged, [RateLimitListener::PAR_ROUTE]) |> array_values(...),
             AuthRequestBodyLimitListener::ROUTES,
         );
     }

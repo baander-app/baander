@@ -80,7 +80,7 @@ final class CreateRecommendationRequestTest extends TestCase
         foreach ($this->validator()->validate($request) as $violation) {
             $fields[] = $violation->getPropertyPath();
         }
-        $fields = array_values(array_unique($fields));
+        $fields = array_unique($fields) |> array_values(...);
         sort($fields);
 
         return $fields;

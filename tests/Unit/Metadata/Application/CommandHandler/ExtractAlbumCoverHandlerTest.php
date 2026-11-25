@@ -156,7 +156,7 @@ final class ExtractAlbumCoverHandlerTest extends TestCase
 
     public function testRefusesASongWhoseFileLinksOutOfItsLibrary(): void
     {
-        $directory = sys_get_temp_dir() . '/baander-cover-escape-' . bin2hex(random_bytes(8));
+        $directory = sys_get_temp_dir() . '/baander-cover-escape-' . (random_bytes(8) |> bin2hex(...));
         self::assertTrue(mkdir($directory . '/library', 0700, true));
         self::assertNotFalse(file_put_contents($directory . '/outside.mp3', 'audio with a cover'));
         self::assertTrue(symlink($directory . '/outside.mp3', $directory . '/library/linked.mp3'));

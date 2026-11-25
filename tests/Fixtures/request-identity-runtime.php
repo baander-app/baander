@@ -16,7 +16,7 @@ use App\Tests\Fixtures\WebRuntime\WorkerRequestCounts;
 use Doctrine\ORM\EntityManagerInterface;
 
 require dirname(__DIR__, 2) . '/vendor/autoload.php';
-(new Symfony\Component\Dotenv\Dotenv())->bootEnv(dirname(__DIR__, 2) . '/.env');
+new Symfony\Component\Dotenv\Dotenv()->bootEnv(dirname(__DIR__, 2) . '/.env');
 
 const IDENTITY_SERVER = 'http://127.0.0.1:9501';
 const IDENTITY_USERS = '/api/admin/users';
@@ -85,7 +85,7 @@ $firstParty = FirstPartyOAuthClient::entity($container, $manager);
  * @return array{name: string, id: string, session: StreamClient}
  */
 $signIn = static function (string $name, array $roles) use ($manager, $privateKey, $firstParty): array {
-    $email = 'identity-' . bin2hex(random_bytes(6)) . '@baander.app';
+    $email = 'identity-' . (random_bytes(6) |> bin2hex(...)) . '@baander.app';
     $user = new UserEntity(new PublicId(), 'Request identity ' . $name, $email, 'test-only-unused-password', roles: $roles);
     $user->markEmailAsVerified();
     $manager->persist($user);

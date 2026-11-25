@@ -77,7 +77,7 @@ final class RedisApplicationIdentityTest extends KernelTestCase
     {
         self::bootKernel();
         $container = static::getContainer();
-        $marker = 'identity-' . bin2hex(random_bytes(8));
+        $marker = 'identity-' . (random_bytes(8) |> bin2hex(...));
 
         $factory = $container->get(RedisClientFactory::class);
         self::assertInstanceOf(RedisClientFactory::class, $factory);
@@ -105,12 +105,12 @@ final class RedisApplicationIdentityTest extends KernelTestCase
 
     public function testAPasswordWithAtAndPercentSignsConnectsEveryClient(): void
     {
-        $user = 'identity_' . bin2hex(random_bytes(6));
-        $password = 'p@ss%word/with:separators-' . bin2hex(random_bytes(4));
+        $user = 'identity_' . (random_bytes(6) |> bin2hex(...));
+        $password = 'p@ss%word/with:separators-' . (random_bytes(4) |> bin2hex(...));
         $this->users[] = $user;
         $this->admin()->rawCommand('ACL', 'SETUSER', $user, 'on', '>' . $password, ...explode(' ', self::applicationRules()));
         $dsn = 'redis://' . $user . ':' . rawurlencode($password) . '@' . parse_url($this->environment('REDIS_URL'), PHP_URL_HOST) . ':6379';
-        $marker = 'identity-' . bin2hex(random_bytes(8));
+        $marker = 'identity-' . (random_bytes(8) |> bin2hex(...));
         $this->keys[] = $marker;
 
         $factory = new RedisClientFactory($dsn);
@@ -125,7 +125,7 @@ final class RedisApplicationIdentityTest extends KernelTestCase
             $factory->dispose();
         }
 
-        $pool = new RedisAdapter(RedisAdapter::createConnection($dsn . '?timeout=1&read_timeout=1'), 'identity_' . bin2hex(random_bytes(6)));
+        $pool = new RedisAdapter(RedisAdapter::createConnection($dsn . '?timeout=1&read_timeout=1'), 'identity_' . (random_bytes(6) |> bin2hex(...)));
         self::assertTrue($pool->save($pool->getItem('entry')->set('cache')));
         self::assertSame('cache', $pool->getItem('entry')->get());
         self::assertTrue($pool->clear());
@@ -155,7 +155,7 @@ final class RedisApplicationIdentityTest extends KernelTestCase
 
     private function stream(string $dsn): Connection
     {
-        $connection = Connection::fromDsn($dsn, ['stream' => 'identity_' . bin2hex(random_bytes(8)), 'group' => 'identity', 'consumer' => 'identity', 'delete_after_ack' => true]);
+        $connection = Connection::fromDsn($dsn, ['stream' => 'identity_' . (random_bytes(8) |> bin2hex(...)), 'group' => 'identity', 'consumer' => 'identity', 'delete_after_ack' => true]);
         $connection->setup();
         $this->streams[] = $connection;
 

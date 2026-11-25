@@ -308,7 +308,7 @@ final class NginxTemplateTest extends TestCase
         $nginxPath = $this->findNginxBinary();
         $this->assertNotNull($nginxPath, 'nginx must be installed to validate configuration syntax.');
 
-        $directory = sys_get_temp_dir() . '/baander-nginx-' . bin2hex(random_bytes(8));
+        $directory = sys_get_temp_dir() . '/baander-nginx-' . (random_bytes(8) |> bin2hex(...));
         $filesystem = new Filesystem();
         $filesystem->mkdir($directory, 0700);
 
@@ -592,7 +592,7 @@ final class NginxTemplateTest extends TestCase
     #[\PHPUnit\Framework\Attributes\DataProvider('nginxConfigurations')]
     public function testAnAccessLogLineForASignedDeliveryUrlHasNoQueryString(string $path): void
     {
-        $directory = sys_get_temp_dir() . '/baander-nginx-log-' . bin2hex(random_bytes(6));
+        $directory = sys_get_temp_dir() . '/baander-nginx-log-' . (random_bytes(6) |> bin2hex(...));
         mkdir($directory, 0700);
         $config = (string) file_get_contents($path);
         file_put_contents($directory . '/nginx.conf', implode("\n", [

@@ -39,7 +39,7 @@ final class DeliveryRequestBoundsTest extends TestCase
         }
         self::assertSame(
             ['containers[0]', 'videoCodecs[0]', 'audioCodecs[0]', 'transports[0]', 'pixelFormats[0]'],
-            array_values(array_unique($paths)),
+            array_unique($paths) |> array_values(...),
         );
     }
 

@@ -150,7 +150,7 @@ final class HealthCheckServiceTest extends TestCase
                 self::assertSame(HealthStatus::NotAvailable, $environmentResults[$variable]->status);
                 self::assertSame('warning', $environmentResults[$variable]->details['severity']);
             }
-            $results = array_values(array_filter($configuration, static fn (HealthCheckResult $result): bool => $result->component === 'api_keys'));
+            $results = array_filter($configuration, static fn (HealthCheckResult $result): bool => $result->component === 'api_keys') |> array_values(...);
             self::assertCount($expectedWarnings, $results);
             foreach ($results as $index => $result) {
                 self::assertSame(HealthStatus::NotAvailable, $result->status);
@@ -250,7 +250,7 @@ final class HealthCheckServiceTest extends TestCase
         $connection->method('executeQuery')->willReturn($result);
         $connection->method('fetchAllAssociative')->willReturn([[
             'namespace' => 'workers.baander.app', 'boot_id' => str_repeat('a', 32),
-            'deployment_profile_fingerprint' => (new DeploymentProfile(videoEncoderSlots: 4, audioEncoderSlots: 12))->fingerprint(),
+            'deployment_profile_fingerprint' => new DeploymentProfile(videoEncoderSlots: 4, audioEncoderSlots: 12)->fingerprint(),
         ]]);
         ini_set('memory_limit', '1G');
         $table = $this->memoryTable();
@@ -281,15 +281,15 @@ final class HealthCheckServiceTest extends TestCase
     /** @return list<HealthCheckResult> */
     private function registrationResults(HealthCheckService $service): array
     {
-        return array_values(array_filter(
+        return array_filter(
             $service->checkConfiguration(),
             static fn (HealthCheckResult $result): bool => $result->component === 'registration',
-        ));
+        ) |> array_values(...);
     }
 
     private function memory(HealthCheckService $service): HealthCheckResult
     {
-        $results = array_values(array_filter($service->check(), static fn (HealthCheckResult $result): bool => $result->component === 'memory'));
+        $results = array_filter($service->check(), static fn (HealthCheckResult $result): bool => $result->component === 'memory') |> array_values(...);
         self::assertCount(1, $results);
 
         return $results[0];

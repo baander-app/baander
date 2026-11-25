@@ -16,7 +16,7 @@ final class PageParameterTest extends TestCase
     /** @return array<string, array{string, bool}> path => [path, needs an administrator] */
     private static function routes(): array
     {
-        $unknown = (new PublicId())->toString();
+        $unknown = new PublicId()->toString();
 
         return [
             'artists' => ['/api/artists/', false],

@@ -56,7 +56,7 @@ final class HardwareTranscodeDiagnosticsTest extends TestCase
 
     public function testMissingWorkerEvidenceIsUnavailable(): void
     {
-        $store = new WorkerEncoderCapabilitiesSnapshotStore(sys_get_temp_dir() . '/absent-baander-' . bin2hex(random_bytes(8)));
+        $store = new WorkerEncoderCapabilitiesSnapshotStore(sys_get_temp_dir() . '/absent-baander-' . (random_bytes(8) |> bin2hex(...)));
         $this->expectException(\RuntimeException::class);
         $this->expectExceptionMessage('Worker encoder capabilities are unavailable');
         new HardwareTranscodeDiagnostics($store, new StubAacImplementationProbe(['libbac', 'aac'], ['libbac', 'aac']), '/usr/bin/ffmpeg')->inspect();
@@ -64,7 +64,7 @@ final class HardwareTranscodeDiagnosticsTest extends TestCase
 
     private function inspectPublishedProfile(EncoderProfile $profile, float $multiplier): \App\Transcode\Application\DTO\HardwareTranscodeDiagnosticsReport
     {
-        $directory = sys_get_temp_dir() . '/baander-diagnostics-' . bin2hex(random_bytes(8));
+        $directory = sys_get_temp_dir() . '/baander-diagnostics-' . (random_bytes(8) |> bin2hex(...));
         $path = $directory . '/capabilities.json';
         $store = new WorkerEncoderCapabilitiesSnapshotStore($path);
         try {

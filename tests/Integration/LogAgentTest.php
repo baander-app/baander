@@ -21,7 +21,7 @@ final class LogAgentTest extends TestCase
 
     protected function setUp(): void
     {
-        $this->directory = sys_get_temp_dir().'/baander-log-agent-'.bin2hex(random_bytes(8));
+        $this->directory = sys_get_temp_dir().'/baander-log-agent-'.(random_bytes(8) |> bin2hex(...));
         mkdir($this->directory, 0700);
         mkdir($this->directory.'/logs', 0700);
         file_put_contents($this->directory.'/token', str_repeat('a', 40));
@@ -51,7 +51,7 @@ final class LogAgentTest extends TestCase
         $collector->tick('abcdef123456');
         $first = $index->query(new LogQuery());
         self::assertCount(3, $first['items']);
-        (new Collector($this->config(), $index))->tick('abcdef123456');
+        new Collector($this->config(), $index)->tick('abcdef123456');
         self::assertCount(3, $index->query(new LogQuery())['items']);
         $protocol = new AgentProtocol($this->config(), new LogIndex($this->directory.'/logs.sqlite', true));
         self::assertSame(401, $protocol->handle('GET', '/entries', [], 'Bearer incorrect')[0]);
@@ -66,11 +66,11 @@ final class LogAgentTest extends TestCase
         file_put_contents($this->directory.'/secret.log', "secret\n");
         symlink($this->directory.'/secret.log', $this->directory.'/logs/link.log');
         $index = new LogIndex($this->directory.'/logs.sqlite');
-        (new Collector($this->config(), $index))->tick('abcdef123456');
+        new Collector($this->config(), $index)->tick('abcdef123456');
         self::assertSame([], $index->query(new LogQuery())['items']);
         unlink($this->directory.'/logs/link.log');
         rmdir($this->directory.'/logs');
-        (new Collector($this->config(), $index))->tick();
+        new Collector($this->config(), $index)->tick();
         self::assertSame('gap', $index->sources()['items'][0]['status']);
     }
     public function testDockerInventoryFramesReplayAndOwnerAdmission(): void
@@ -135,7 +135,7 @@ final class LogAgentTest extends TestCase
             $collector->tick();
             self::assertCount(3, $index->query(new LogQuery())['items']);
             self::assertTrue($index->query(new LogQuery())['coverage']['complete']);
-            (new Collector($config, $index))->tick();
+            new Collector($config, $index)->tick();
             $records = $index->query(new LogQuery())['items'];
             self::assertCount(6, $records);
             self::assertTrue($records[0]['extra']['collectionReplay']['uncertain']);
@@ -149,7 +149,7 @@ final class LogAgentTest extends TestCase
             self::assertCount(6, $index->query(new LogQuery())['items']);
             self::assertStringContainsString('boundary is missing', implode(' ', array_merge(...array_column($index->sources()['items'], 'issues'))));
             $wrongDaemon = new AgentConfiguration(array_replace($config->values, ['expectedDaemonId' => 'other-daemon']));
-            (new Collector($wrongDaemon, $index))->tick();
+            new Collector($wrongDaemon, $index)->tick();
             self::assertCount(6, $index->query(new LogQuery())['items']);
             self::assertStringContainsString('identity mismatch', implode(' ', array_merge(...array_column($index->sources()['items'], 'issues'))));
 
@@ -167,7 +167,7 @@ final class LogAgentTest extends TestCase
             $received = [];
             $consume = static function (array $record) use ($index, $sourceId, &$collected, &$received): void {
                 $received[] = strstr($record['raw'], ' ', true);
-                $index->append($sourceId, 'backlog', ++$collected, (new \App\Shared\Infrastructure\LogViewer\LogNormalizer())->normalize('backlog-'.$collected), ['sequence' => $collected]);
+                $index->append($sourceId, 'backlog', ++$collected, new \App\Shared\Infrastructure\LogViewer\LogNormalizer()->normalize('backlog-'.$collected), ['sequence' => $collected]);
             };
             self::assertFalse($session->collect($consume, seconds: 10));
             self::assertGreaterThan(0, $index->checkpoint($sourceId)['sequence']);
@@ -176,7 +176,7 @@ final class LogAgentTest extends TestCase
             self::assertSame(140, $collected);
             self::assertSame(140, $index->checkpoint($sourceId)['sequence']);
             self::assertSame(array_map(static fn (int $number): string => 'backlog-'.$number, range(0, 139)), $received);
-            (new Collector($config, $index))->tick($id, microtime(true) + 10);
+            new Collector($config, $index)->tick($id, microtime(true) + 10);
             $containerSource = LogIndex::sourceId('local:container:'.$id);
             self::assertSame(146, $index->checkpoint($containerSource)['sequence']);
             $sources = array_column($index->sources()['items'], null, 'id');
@@ -192,7 +192,7 @@ final class LogAgentTest extends TestCase
             try {
                 $interleaved->collect(static function (array $record) use ($index, $containerSource, $secondTime): void {
                     self::assertSame('committed stdout', $record['raw']);
-                    $index->append($containerSource, 'boot', 147, (new \App\Shared\Infrastructure\LogViewer\LogNormalizer())->normalize($record['raw']), ['timestamp' => $record['checkpointTimestamp'], 'resumeThrough' => $secondTime, 'sequence' => 147, 'boundary' => []]);
+                    $index->append($containerSource, 'boot', 147, new \App\Shared\Infrastructure\LogViewer\LogNormalizer()->normalize($record['raw']), ['timestamp' => $record['checkpointTimestamp'], 'resumeThrough' => $secondTime, 'sequence' => 147, 'boundary' => []]);
                     throw new \RuntimeException('Simulated collector interruption.');
                 });
                 self::fail('Interruption must stop the session.');
@@ -201,7 +201,7 @@ final class LogAgentTest extends TestCase
             }
             unset($interleaved);
             self::assertSame($firstTime, $index->checkpoint($containerSource)['timestamp']);
-            (new Collector($config, $index))->tick();
+            new Collector($config, $index)->tick();
             self::assertCount(1, $index->query(new LogQuery(search: 'pending stderr before restart'))['items']);
             self::assertSame($thirdTime, $index->checkpoint($containerSource)['timestamp']);
 
@@ -246,7 +246,7 @@ final class LogAgentTest extends TestCase
             self::assertTrue($currentSources[$containerSource]['available']);
             $limitedIndex = new LogIndex($this->directory.'/limited.sqlite', maxStorageBytes: 1);
             try {
-                (new Collector($config, $limitedIndex))->tick();
+                new Collector($config, $limitedIndex)->tick();
                 self::fail('The impossible index budget must suspend collection.');
             } catch (\App\Shared\Infrastructure\LogViewer\LogStorageLimitException) {
             }
@@ -314,7 +314,7 @@ final class LogAgentTest extends TestCase
     {
         file_put_contents($this->directory.'/logs/collection-gaps.jsonl', json_encode(['timestamp' => gmdate('c'), 'level' => 'warning', 'message' => 'Final collection failed', 'coverage' => 'gap'])."\n");
         $index = new LogIndex($this->directory.'/logs.sqlite');
-        (new Collector($this->config(), $index))->tick('abcdef123456');
+        new Collector($this->config(), $index)->tick('abcdef123456');
         self::assertFalse($index->query(new LogQuery())['coverage']['complete']);
         self::assertSame('gap', $index->sources()['items'][0]['status']);
     }
@@ -336,7 +336,7 @@ final class LogAgentTest extends TestCase
         $collector->tick();
         $records = $index->query(new LogQuery())['items'];
         self::assertCount(2, $records);
-        $fragments = array_values(array_filter($records, static fn (array $record): bool => isset($record['extra']['collectionFragment'])));
+        $fragments = array_filter($records, static fn (array $record): bool => isset($record['extra']['collectionFragment'])) |> array_values(...);
         self::assertCount(1, $fragments);
         self::assertSame(0, $fragments[0]['extra']['collectionFragment']['previousSequence']);
         self::assertStringContainsString('delayed frame', $fragments[0]['raw']);
@@ -410,7 +410,7 @@ final class LogAgentTest extends TestCase
         $source = LogIndex::sourceId('channel-fixture');
         $index->upsertSource(['id' => $source, 'status' => 'following']);
         foreach (['app', 'security', 'messenger'] as $sequence => $channel) {
-            $record = (new \App\Shared\Infrastructure\LogViewer\LogNormalizer())->normalize(json_encode(['message' => 'channel fixture', 'channel' => $channel]));
+            $record = new \App\Shared\Infrastructure\LogViewer\LogNormalizer()->normalize(json_encode(['message' => 'channel fixture', 'channel' => $channel]));
             $index->append($source, 'boot', $sequence, $record);
         }
         $protocol = new AgentProtocol($this->config(), $index);
@@ -443,7 +443,7 @@ final class LogAgentTest extends TestCase
         self::assertTrue($index->sources()['items'][0]['available']);
         self::assertSame('gap', $index->sources()['items'][0]['status']);
         $collector->finalGap('abcdef123456');
-        $synthetic = array_values(array_filter($index->sources()['items'], static fn (array $item): bool => 'collector' === $item['kind']));
+        $synthetic = array_filter($index->sources()['items'], static fn (array $item): bool => 'collector' === $item['kind']) |> array_values(...);
         self::assertFalse($synthetic[0]['available']);
     }
 
@@ -492,7 +492,7 @@ final class LogAgentTest extends TestCase
         }
         $checkpointId = LogIndex::sourceId('local:checkpoint:abcdef123456');
         $index->upsertSource(['id' => $checkpointId, 'name' => 'local:checkpoint:abcdef123456', 'kind' => 'collector', 'status' => 'gap']);
-        (new Collector($this->config(), $index))->tick('abcdef123456');
+        new Collector($this->config(), $index)->tick('abcdef123456');
         $sources = array_column($index->sources()['items'], null, 'id');
         self::assertTrue($sources[LogIndex::sourceId('local:file:'.$present)]['available']);
         self::assertSame('gap', $sources[LogIndex::sourceId('local:file:'.$present)]['status']);
@@ -507,7 +507,7 @@ final class LogAgentTest extends TestCase
         $archive = $this->directory.'/logs/ready.log.gz';
         file_put_contents($file, "readable file\n");
         file_put_contents($archive, gzencode("readable archive\n"));
-        $member = (new \App\Shared\Infrastructure\LogViewer\ArchiveReader())->members($archive)[0];
+        $member = new \App\Shared\Infrastructure\LogViewer\ArchiveReader()->members($archive)[0];
         $fileId = LogIndex::sourceId('local:file:'.$file);
         $archiveId = LogIndex::sourceId('local:file:'.$archive.':member:'.$member);
         $index = new LogIndex($this->directory.'/logs.sqlite');
@@ -521,7 +521,7 @@ final class LogAgentTest extends TestCase
         $pid = pcntl_fork();
         if (0 === $pid) {
             fclose($listener);
-            (new Collector($config, new LogIndex($this->directory.'/logs.sqlite')))->tick();
+            new Collector($config, new LogIndex($this->directory.'/logs.sqlite'))->tick();
             exit(0);
         }
         $reaped = false;

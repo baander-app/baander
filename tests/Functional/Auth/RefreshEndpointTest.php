@@ -96,8 +96,8 @@ final class RefreshEndpointTest extends TestCase
     {
         $this->client->request('POST', '/api/auth/refresh', [], [], [
             'CONTENT_TYPE' => 'application/json',
-            'HTTP_DPOP' => (new SignedDpopProof())->create('POST', self::REFRESH_URI, 'no-access-token'),
-        ], json_encode(['refreshToken' => 'nonce-probe-' . bin2hex(random_bytes(8))], JSON_THROW_ON_ERROR));
+            'HTTP_DPOP' => new SignedDpopProof()->create('POST', self::REFRESH_URI, 'no-access-token'),
+        ], json_encode(['refreshToken' => 'nonce-probe-' . (random_bytes(8) |> bin2hex(...))], JSON_THROW_ON_ERROR));
         $nonce = $this->client->getResponse()->headers->get('DPoP-Nonce');
         self::assertIsString($nonce, (string) $this->client->getResponse()->getContent());
 

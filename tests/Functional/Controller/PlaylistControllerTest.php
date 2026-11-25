@@ -293,10 +293,10 @@ final class PlaylistControllerTest extends TestCase
             'INSERT INTO libraries (id, public_id, slug, name, path, type, sort_order, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
             [
                 $libraryId->toString(),
-                (new PublicId())->toString(),
-                'test-lib-' . bin2hex(random_bytes(4)),
+                new PublicId()->toString(),
+                'test-lib-' . (random_bytes(4) |> bin2hex(...)),
                 'Test Library',
-                '/tmp/test-' . bin2hex(random_bytes(4)),
+                '/tmp/test-' . (random_bytes(4) |> bin2hex(...)),
                 'music',
                 0,
                 $now->format('Y-m-d H:i:s.uP'),

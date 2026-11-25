@@ -116,7 +116,7 @@ final class OriginalMediaControllerTest extends TestCase
     #[DataProvider('libraryFileNames')]
     public function testAnyLibraryFileNameIsServedAsADownload(string $resource, string $name): void
     {
-        $this->directory = sys_get_temp_dir() . '/baander-original-' . bin2hex(random_bytes(8));
+        $this->directory = sys_get_temp_dir() . '/baander-original-' . (random_bytes(8) |> bin2hex(...));
         self::assertTrue(mkdir($this->directory, 0700));
         self::assertTrue(rename($this->file, $this->directory . '/' . $name));
         $this->file = $this->directory . '/' . $name;
@@ -190,7 +190,7 @@ final class OriginalMediaControllerTest extends TestCase
         $controller = $this->controller();
         self::assertSame(403, $controller->video(Request::create('/api/stream/video?id=' . $this->video))->getStatusCode());
         self::assertSame(403, $controller->video(Request::create($this->url() . 'x'))->getStatusCode());
-        $url = str_replace($this->owner->toString(), (new Uuid())->toString(), $this->url());
+        $url = str_replace($this->owner->toString(), new Uuid()->toString(), $this->url());
         self::assertSame(403, $controller->video(Request::create($url))->getStatusCode());
     }
 

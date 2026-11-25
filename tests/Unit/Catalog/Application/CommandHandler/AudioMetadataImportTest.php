@@ -38,13 +38,13 @@ final class AudioMetadataImportTest extends TestCase
     #[DataProvider('formats')]
     public function testScannedAudioReachesCatalogWithEmbeddedTags(string $fixture, string $extension, string $format, string $mime): void
     {
-        $directory = sys_get_temp_dir() . '/baander-audio-import-' . bin2hex(random_bytes(8));
+        $directory = sys_get_temp_dir() . '/baander-audio-import-' . (random_bytes(8) |> bin2hex(...));
         mkdir($directory, 0700);
         $path = $directory . '/unrelated-filename.' . $extension;
         copy(dirname(__DIR__, 4) . '/Fixtures/AudioMetadata/tagged.' . $fixture, $path);
         try {
             $before = hash_file('sha256', $path);
-            $scanned = (new DirectoryScanner(new NullLogger()))->scan(new LibraryPath($directory));
+            $scanned = new DirectoryScanner(new NullLogger())->scan(new LibraryPath($directory));
             self::assertCount(1, $scanned);
             self::assertTrue($scanned[0]->isAudio());
             $file = $this->observedFile(new DiscoveredFile(

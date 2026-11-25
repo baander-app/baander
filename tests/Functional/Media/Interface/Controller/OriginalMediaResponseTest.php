@@ -33,19 +33,19 @@ final class OriginalMediaResponseTest extends TestCase
     {
         parent::setUp();
 
-        $this->directory = sys_get_temp_dir() . '/baander-original-response-' . bin2hex(random_bytes(8));
+        $this->directory = sys_get_temp_dir() . '/baander-original-response-' . (random_bytes(8) |> bin2hex(...));
         self::assertTrue(mkdir($this->directory, 0700));
         $markup = '<?xml version="1.0"?><x:script xmlns:x="http://www.w3.org/1999/xhtml">alert(document.domain)</x:script><!--';
         file_put_contents($this->directory . '/' . self::NAME, $markup . str_repeat('padding ', 10240) . "\x47\x40\x00\x10");
 
         $library = new LibraryEntity(
             name: 'Original response test',
-            slug: 'original-response-' . bin2hex(random_bytes(8)),
+            slug: 'original-response-' . (random_bytes(8) |> bin2hex(...)),
             path: $this->directory,
             type: 'movie',
             filesystemType: 'local',
         );
-        $video = new VideoEntity(new PublicId(), $this->directory . '/' . self::NAME, bin2hex(random_bytes(16)));
+        $video = new VideoEntity(new PublicId(), $this->directory . '/' . self::NAME, random_bytes(16) |> bin2hex(...));
         $video->setProbe(['containerFormat' => 'matroska,webm', 'videoCodec' => 'h264', 'videoStreamIndex' => 0]);
         $movie = new MovieEntity(new PublicId(), $library, 'Original response test movie');
         $this->entityManager->persist($library);

@@ -28,7 +28,7 @@ final class CopySegmentArgumentsTest extends TestCase
         foreach (['-vf', '-af', '-b:v', '-b:a', '-force_key_frames', '-shortest', '-r', '-itsoffset'] as $option) {
             self::assertNotContains($option, $args);
         }
-        self::assertSame('/output/manifest.mpd', $args[array_key_last($args)]);
+        self::assertSame('/output/manifest.mpd', array_last($args));
     }
 
     public function testReadsTheSourceInOneBurstAndThenAtABoundedRateSoTheLeadThrottleGoverns(): void
@@ -62,7 +62,7 @@ final class CopySegmentArgumentsTest extends TestCase
 
     public function testTheSourceOpensOnlyAsALibraryVideoContainerWithThePinnedOptionOrder(): void
     {
-        $args = (new CopySegmentArguments())->build(
+        $args = new CopySegmentArguments()->build(
             '/library/Holiday Clip (2021).avi',
             new PresentationSelection('copy', 'source-hash', 0, 1, 'mp4'),
             '/output',

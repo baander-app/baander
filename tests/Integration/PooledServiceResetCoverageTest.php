@@ -27,7 +27,7 @@ final class PooledServiceResetCoverageTest extends TestCase
 
     public static function setUpBeforeClass(): void
     {
-        $directory = sys_get_temp_dir() . '/baander-reset-coverage-' . bin2hex(random_bytes(8));
+        $directory = sys_get_temp_dir() . '/baander-reset-coverage-' . (random_bytes(8) |> bin2hex(...));
         self::$kernel = new PooledServiceResetCoverageKernel($directory);
         try {
             self::$kernel->boot();

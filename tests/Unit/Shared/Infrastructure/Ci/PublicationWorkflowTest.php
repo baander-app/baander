@@ -36,7 +36,7 @@ final class PublicationWorkflowTest extends TestCase
 
     protected function setUp(): void
     {
-        $this->directory = sys_get_temp_dir() . '/baander-publication-' . bin2hex(random_bytes(8));
+        $this->directory = sys_get_temp_dir() . '/baander-publication-' . (random_bytes(8) |> bin2hex(...));
         new Filesystem()->mkdir($this->directory);
     }
 
@@ -648,7 +648,7 @@ SH;
 
     public function testForkPullRequestsRunGatesOnGitHubOnlyAndSkipEveryWriteStep(): void
     {
-        $pullRequestWorkflows = array_keys(array_filter(self::documents(dirname(__DIR__, 5)), static fn(array $entry, string $path): bool => str_starts_with($path, '.github/workflows/') && isset($entry['document']['on']['pull_request']), ARRAY_FILTER_USE_BOTH));
+        $pullRequestWorkflows = array_filter(self::documents(dirname(__DIR__, 5)), static fn(array $entry, string $path): bool => str_starts_with($path, '.github/workflows/') && isset($entry['document']['on']['pull_request']), ARRAY_FILTER_USE_BOTH) |> array_keys(...);
         self::assertSame(['.github/workflows/audio-core.yml', '.github/workflows/ci.yaml', '.github/workflows/dsp-analysis.yaml', '.github/workflows/frontend.yaml', '.github/workflows/website.yaml'], $pullRequestWorkflows);
         foreach ($pullRequestWorkflows as $path) {
             foreach ($this->workflow(basename($path))['jobs'] as $jobName => $job) {
@@ -983,7 +983,7 @@ SH;
         $prepare = $this->step($gate, 'Prepare BuildKit container builder');
         $remove = $this->step($gate, 'Remove BuildKit container builder');
         self::assertSame('always()', $remove['if']);
-        self::assertSame('Remove BuildKit container builder', $gate['steps'][array_key_last($gate['steps'])]['name']);
+        self::assertSame('Remove BuildKit container builder', array_last($gate['steps'])['name']);
         foreach ([self::GITHUB, self::FORGEJO] as $server) {
             foreach ([self::context($server), self::context($server, 'pull_request'), self::context($server, 'pull_request', self::FORK)] as $context) {
                 self::assertTrue(self::runs($prepare, $context, $gate), $server);
@@ -1059,7 +1059,7 @@ SH;
             $isWorkflow = str_starts_with($path, '.github/workflows/');
             $forgejoComposite = str_starts_with($path, '.github/actions/forgejo-');
             $steps = $isWorkflow
-                ? array_merge(...array_values(array_map(static fn(array $job): array => $job['steps'] ?? [], $document['jobs'] ?? [])))
+                ? array_merge(...(array_map(static fn(array $job): array => $job['steps'] ?? [], $document['jobs'] ?? []) |> array_values(...)))
                 : $document['runs']['steps'] ?? [];
             foreach ($steps as $step) {
                 $uses = $step['uses'] ?? null;

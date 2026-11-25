@@ -119,7 +119,7 @@ final class WebhookCommandsTest extends TestCase
     public function testDeletingAnUnknownWebhookAnswers404AndExits1AndAMalformedIdIsInvalidInput(): void
     {
         $admin = $this->createAdminUser();
-        $unknown = (new PublicId())->toString();
+        $unknown = new PublicId()->toString();
 
         $this->assertJsonResponse($this->authenticatedRequest('DELETE', '/api/webhooks/' . $unknown, $admin), 404);
         $delete = $this->command('app:webhook:delete');
@@ -183,6 +183,6 @@ final class WebhookCommandsTest extends TestCase
 
     private function command(string $name): CommandTester
     {
-        return new CommandTester((new Application($this->client->getKernel()))->find($name));
+        return new CommandTester(new Application($this->client->getKernel())->find($name));
     }
 }

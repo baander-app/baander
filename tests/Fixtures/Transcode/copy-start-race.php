@@ -56,7 +56,7 @@ final class CopyStartRace
         CustomTypesRegistrar::register();
         $configuration = new Configuration();
         $configuration->setMiddlewares([new BaanderDriverMiddleware()]);
-        $connection = DriverManager::getConnection((new DsnParser(['postgresql' => 'pdo_pgsql']))->parse($url), $configuration);
+        $connection = DriverManager::getConnection(new DsnParser(['postgresql' => 'pdo_pgsql'])->parse($url), $configuration);
         if ($schema !== null) {
             $connection->executeStatement('SET search_path TO ' . $connection->quoteIdentifier($schema) . ', public');
         }

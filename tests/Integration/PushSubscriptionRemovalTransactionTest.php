@@ -35,12 +35,12 @@ final class PushSubscriptionRemovalTransactionTest extends TestCase
         CustomTypesRegistrar::register();
         $url = getenv('OUTBOX_TEST_DATABASE_URL');
         self::assertNotFalse($url, 'Run with disposable PostgreSQL.');
-        $params = (new DsnParser(['postgresql' => 'pdo_pgsql']))->parse($url);
+        $params = new DsnParser(['postgresql' => 'pdo_pgsql'])->parse($url);
         $dbal = new Configuration();
         $dbal->setMiddlewares([new BaanderDriverMiddleware()]);
         $this->writer = DriverManager::getConnection($params, $dbal);
         $this->observer = DriverManager::getConnection($params, $dbal);
-        $this->schema = 'push_removal_tx_' . bin2hex(random_bytes(8));
+        $this->schema = 'push_removal_tx_' . (random_bytes(8) |> bin2hex(...));
         $this->writer->executeStatement('CREATE SCHEMA ' . $this->schema);
         $this->writer->executeStatement('SET search_path TO ' . $this->schema . ', public');
         $this->observer->executeStatement('SET search_path TO ' . $this->schema . ', public');
@@ -83,7 +83,7 @@ final class PushSubscriptionRemovalTransactionTest extends TestCase
         self::assertNotNull($managed);
         self::assertSame(1, $this->countFrom($this->observer));
         $this->writer->beginTransaction();
-        (new PushSubscriptionRepository($this->manager))->removeForUser($owner->getId(), $target->getEndpoint());
+        new PushSubscriptionRepository($this->manager)->removeForUser($owner->getId(), $target->getEndpoint());
         self::assertSame(0, $this->countFrom($this->writer));
         self::assertSame(1, $this->countFrom($this->observer));
         self::assertFalse($this->manager->contains($managed));
@@ -114,7 +114,7 @@ final class PushSubscriptionRemovalTransactionTest extends TestCase
         self::assertNotNull($reference);
         self::assertTrue($this->manager->isUninitializedObject($reference));
         $this->writer->beginTransaction();
-        (new PushSubscriptionRepository($this->manager))->removeForUser($owner->getId(), $target->getEndpoint());
+        new PushSubscriptionRepository($this->manager)->removeForUser($owner->getId(), $target->getEndpoint());
         self::assertFalse($this->manager->contains($reference));
         self::assertTrue($this->manager->isUninitializedObject($reference));
         self::assertNull($this->manager->find(PushSubscriptionEntity::class, $target->getId()));
@@ -224,10 +224,10 @@ final class PushSubscriptionRemovalTransactionTest extends TestCase
         $this->manager->flush();
         $this->writer->beginTransaction();
         $endpoint = 'https://push.baander.app/race';
-        self::assertSame(PushSubscriptionRegistrationResult::Created, (new PushSubscriptionRepository($this->manager))
+        self::assertSame(PushSubscriptionRegistrationResult::Created, new PushSubscriptionRepository($this->manager)
             ->registerForUser($owner->getId(), new PushSubscriptionRegistration($endpoint, 'first', 'first-auth', 'aes128gcm')));
         $firstId = $this->writer->fetchOne('SELECT id FROM push_subscriptions');
-        $applicationName = 'push_race_' . bin2hex(random_bytes(8));
+        $applicationName = 'push_race_' . (random_bytes(8) |> bin2hex(...));
         [$process, $output] = $this->registerInChild(($differentOwner ? $other : $owner)->getId(), $endpoint, $applicationName);
         try {
             $deadline = microtime(true) + 3;
@@ -277,9 +277,9 @@ final class PushSubscriptionRemovalTransactionTest extends TestCase
             [$owner->getId()->toString()],
         );
         $this->writer->beginTransaction();
-        self::assertSame(PushSubscriptionRegistrationResult::Created, (new PushSubscriptionRepository($this->manager))
+        self::assertSame(PushSubscriptionRegistrationResult::Created, new PushSubscriptionRepository($this->manager)
             ->registerForUser($owner->getId(), new PushSubscriptionRegistration('https://push.baander.app/first-new', 'first', 'first-auth', 'aes128gcm')));
-        $applicationName = 'push_cap_race_' . bin2hex(random_bytes(8));
+        $applicationName = 'push_cap_race_' . (random_bytes(8) |> bin2hex(...));
         [$process, $output] = $this->registerInChild($owner->getId(), 'https://push.baander.app/second-new', $applicationName);
         try {
             $deadline = microtime(true) + 3;

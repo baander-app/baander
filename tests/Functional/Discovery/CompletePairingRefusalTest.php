@@ -55,7 +55,7 @@ final class CompletePairingRefusalTest extends TestCase
 
         self::assertSame([], array_map(
             static fn ($record): string => $record->level->getName() . ': ' . $record->message,
-            array_values(array_filter($logs->getRecords(), static fn ($record): bool => $record->level->value >= Level::Error->value)),
+            array_filter($logs->getRecords(), static fn ($record): bool => $record->level->value >= Level::Error->value) |> array_values(...),
         ));
         self::assertSame(array_fill_keys(array_keys($statuses), Response::HTTP_NOT_FOUND), $statuses, json_encode($bodies, JSON_THROW_ON_ERROR));
         self::assertCount(1, array_unique($bodies), json_encode($bodies, JSON_THROW_ON_ERROR));

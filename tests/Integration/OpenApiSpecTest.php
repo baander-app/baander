@@ -393,7 +393,7 @@ final class OpenApiSpecTest extends KernelTestCase
         self::assertSame(PublicId::LENGTH, $schema['minLength']);
         self::assertSame(PublicId::LENGTH, $schema['maxLength']);
         self::assertSame(PublicId::SCHEMA_PATTERN, $schema['pattern']);
-        self::assertMatchesRegularExpression('~' . $schema['pattern'] . '~', (new PublicId())->toString());
+        self::assertMatchesRegularExpression('~' . $schema['pattern'] . '~', new PublicId()->toString());
     }
 
     public function test_configuration_object_defaults_match_their_schema_type(): void
@@ -637,7 +637,7 @@ final class OpenApiSpecTest extends KernelTestCase
         self::assertSame('object', $error['properties']['details']['type']);
 
         foreach ([[], ['limit' => ['Must be positive.']]] as $details) {
-            $payload = (new ApiError('Invalid query parameters.', 400, $details))->toArray();
+            $payload = new ApiError('Invalid query parameters.', 400, $details)->toArray();
             self::assertSame(array_keys($apiError['properties']), array_keys($payload));
             self::assertSame([], array_diff(array_keys($payload['error']), array_keys($error['properties'])));
             self::assertSame([], array_diff($error['required'], array_keys($payload['error'])));

@@ -241,7 +241,7 @@ final class FrameworkIsolationSecurityTest extends TestCase
         $container->setParameter(ContainerConstants::PARAM_COROUTINES_MAX_SVC_INSTANCES, 4);
         $container->setParameter(ContainerConstants::PARAM_COROUTINES_STATEFUL_SERVICES, []);
         $container->setParameter(ContainerConstants::PARAM_COROUTINES_COMPILE_PROCESSORS, []);
-        $container->setDefinition('kernel_proxy', (new Definition(FrameworkIsolationSecurityKernel::class))
+        $container->setDefinition('kernel_proxy', new Definition(FrameworkIsolationSecurityKernel::class)
             ->addTag(ContainerConstants::TAG_SAFE_STATEFUL_SERVICE));
         $container->register(ServicePoolContainer::class, ServicePoolContainer::class)->setPublic(true);
         $container->setDefinition('services_resetter', new Definition(null, [
@@ -264,7 +264,7 @@ final class FrameworkIsolationSecurityTest extends TestCase
         new StatefulServicesPass()->process($container);
 
         $configuration = new Configuration();
-        $configuration->setProxiesNamespace('FrameworkIsolationSecurity' . bin2hex(random_bytes(8)));
+        $configuration->setProxiesNamespace('FrameworkIsolationSecurity' . (random_bytes(8) |> bin2hex(...)));
         $configuration->setGeneratorStrategy(new EvaluatingGeneratorStrategy());
         $container->set(Swoole::class, new Swoole());
         $container->set(Instantiator::class, new Instantiator(new Generator($configuration)));

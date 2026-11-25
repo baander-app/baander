@@ -68,7 +68,7 @@ final class ProxifierPoolLifetimeTest extends TestCase
         $container->set(ServicePoolContainer::class, $registry);
         $container->set(Swoole::class, new Swoole());
         $configuration = new Configuration();
-        $configuration->setProxiesNamespace('ProxifierPoolLifetime' . bin2hex(random_bytes(8)));
+        $configuration->setProxiesNamespace('ProxifierPoolLifetime' . (random_bytes(8) |> bin2hex(...)));
         $configuration->setGeneratorStrategy(new EvaluatingGeneratorStrategy());
         $container->set(Instantiator::class, new Instantiator(new Generator($configuration)));
         $container->set('swoole_bundle.service_pool.locking', new class implements MutexFactory {

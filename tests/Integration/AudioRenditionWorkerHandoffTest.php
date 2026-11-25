@@ -34,7 +34,7 @@ final class AudioRenditionWorkerHandoffTest extends TestCase
     protected function setUp(): void
     {
         $this->prepareDatabase();
-        $this->root = sys_get_temp_dir() . '/audio-handoff-' . bin2hex(random_bytes(8));
+        $this->root = sys_get_temp_dir() . '/audio-handoff-' . (random_bytes(8) |> bin2hex(...));
         mkdir($this->root);
         $this->source = $this->root . '/source.flac';
         $source = new Process(['/usr/bin/ffmpeg', '-nostdin', '-hide_banner', '-loglevel', 'error',
@@ -84,16 +84,16 @@ final class AudioRenditionWorkerHandoffTest extends TestCase
             '-map', '0:v:0', '-map', '1:a:0', '-c:v', 'mpeg4', '-c:a', 'aac', '-shortest', '-f', 'mp4', $source]);
         $fixture->mustRun();
         $reference = $this->root . '/reference.aac';
-        (new Process(['/usr/bin/ffmpeg', '-nostdin', '-hide_banner', '-loglevel', 'error', '-i', $source,
-            '-map', '0:1', '-c:a', 'copy', '-f', 'adts', $reference]))->mustRun();
+        new Process(['/usr/bin/ffmpeg', '-nostdin', '-hide_banner', '-loglevel', 'error', '-i', $source,
+            '-map', '0:1', '-c:a', 'copy', '-f', 'adts', $reference])->mustRun();
         $this->startWorker(.1);
         $copy = $this->cache()->openCopy('track', $source, hash_file('xxh3', $source), 1);
         self::assertTrue($copy->isComplete());
         self::assertSame('audio/mp4', $copy->mimeType());
         self::assertSame(0, $this->workerProcess->wait(), $this->workerProcess->getErrorOutput());
         $roundtrip = $this->root . '/roundtrip.aac';
-        (new Process(['/usr/bin/ffmpeg', '-nostdin', '-hide_banner', '-loglevel', 'error', '-i', $copy->path,
-            '-map', '0:a:0', '-c:a', 'copy', '-f', 'adts', $roundtrip]))->mustRun();
+        new Process(['/usr/bin/ffmpeg', '-nostdin', '-hide_banner', '-loglevel', 'error', '-i', $copy->path,
+            '-map', '0:a:0', '-c:a', 'copy', '-f', 'adts', $roundtrip])->mustRun();
         self::assertSame(hash_file('sha256', $reference), hash_file('sha256', $roundtrip));
         $probe = new Process(['/usr/bin/ffprobe', '-v', 'error', '-show_entries', 'stream=codec_type,codec_name', '-of', 'json', $copy->path]);
         $probe->mustRun();
@@ -140,7 +140,7 @@ final class AudioRenditionWorkerHandoffTest extends TestCase
         self::assertSame(0, $this->workerProcess->wait(), $this->workerProcess->getErrorOutput());
         self::assertFileDoesNotExist($final);
         self::assertFileDoesNotExist($final . '.part');
-        self::assertCount(1, (new AudioRenditionRuntime($this->second))->pending());
+        self::assertCount(1, new AudioRenditionRuntime($this->second)->pending());
         $this->startWorker(.1);
         $deadline = microtime(true) + 2;
         while ((int) $this->first->fetchOne('SELECT generation FROM audio_rendition_runtime') < 2 && microtime(true) < $deadline) {

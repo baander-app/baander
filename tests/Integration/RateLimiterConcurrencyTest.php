@@ -27,8 +27,8 @@ final class RateLimiterConcurrencyTest extends TestCase
         self::assertIsString($dsn, 'Run this acceptance test with the disposable Redis runner.');
         self::assertNotSame('', $dsn);
         $this->dsn = $dsn;
-        $this->name = 'acceptance-' . bin2hex(random_bytes(12));
-        $this->directory = sys_get_temp_dir() . '/baander-limiter-' . bin2hex(random_bytes(12));
+        $this->name = 'acceptance-' . (random_bytes(12) |> bin2hex(...));
+        $this->directory = sys_get_temp_dir() . '/baander-limiter-' . (random_bytes(12) |> bin2hex(...));
         self::assertTrue(mkdir($this->directory, 0700));
     }
 

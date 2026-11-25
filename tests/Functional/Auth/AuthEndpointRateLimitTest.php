@@ -28,7 +28,7 @@ final class AuthEndpointRateLimitTest extends RateLimitTestCase
 
         // Case variants normalize to the same account bucket.
         $limited = $this->requestFrom('198.51.100.41', 'POST', '/api/auth/password/reset-request', content: ['email' => strtoupper($user->getEmail())]);
-        $unknown = $this->requestFrom('198.51.100.41', 'POST', '/api/auth/password/reset-request', content: ['email' => 'nobody-' . bin2hex(random_bytes(4)) . '@baander.app']);
+        $unknown = $this->requestFrom('198.51.100.41', 'POST', '/api/auth/password/reset-request', content: ['email' => 'nobody-' . (random_bytes(4) |> bin2hex(...)) . '@baander.app']);
 
         self::assertSame(200, $limited->getStatusCode(), (string) $limited->getContent());
         self::assertSame(200, $unknown->getStatusCode(), (string) $unknown->getContent());
@@ -122,7 +122,7 @@ final class AuthEndpointRateLimitTest extends RateLimitTestCase
 
     public function testTheRefreshLimiterIsKeyedOnTheHashOfThePresentedToken(): void
     {
-        $token = 'refresh-limit-' . bin2hex(random_bytes(16));
+        $token = 'refresh-limit-' . (random_bytes(16) |> bin2hex(...));
         $this->trackLimiter('auth_refresh_client', hash('sha256', $token));
         $this->trackLimiter('auth_refresh_client', $token);
 

@@ -44,14 +44,14 @@ final class FrameworkIsolationPipelineTest extends TestCase
             bundles: ['SecurityBundle' => 'Symfony\\Bundle\\SecurityBundle\\SecurityBundle'],
             processors: [['class' => TagInterfaceServicesProcessor::class, 'priority' => 0]],
         );
-        $container->setDefinition('event_dispatcher', (new Definition(FrameworkIsolationResettableDispatcher::class))
+        $container->setDefinition('event_dispatcher', new Definition(FrameworkIsolationResettableDispatcher::class)
             ->addTag('kernel.reset', ['method' => 'reset']));
         $container->setDefinition('security.access.decision_manager', new Definition(AccessDecisionManager::class));
-        $container->setDefinition('http_client.uri_template.inner', (new Definition(HttpClientInterface::class))
+        $container->setDefinition('http_client.uri_template.inner', new Definition(HttpClientInterface::class)
             ->setFactory([HttpClient::class, 'create'])->addTag('kernel.reset', ['method' => '?reset']));
         $container->setDefinition('traced', new Definition(TraceableHttpClient::class));
 
-        (new StatefulServicesPass())->process($container);
+        new StatefulServicesPass()->process($container);
 
         self::assertNull($container->getDefinition('event_dispatcher.swoole_coop.wrapped')->getFactory());
         self::assertNull($container->getDefinition('security.access.decision_manager.swoole_coop.wrapped')->getFactory());
@@ -71,11 +71,11 @@ final class FrameworkIsolationPipelineTest extends TestCase
     public function testPoolResetterRunsEveryKernelResetMethodInTagOrder(): void
     {
         $container = $this->container(['security.token_storage' => ['disableUsageTracking', 'setToken']]);
-        $container->setDefinition('security.token_storage', (new Definition(UsageTrackingTokenStorage::class))
+        $container->setDefinition('security.token_storage', new Definition(UsageTrackingTokenStorage::class)
             ->addTag('kernel.reset', ['method' => 'disableUsageTracking'])
             ->addTag('kernel.reset', ['method' => 'setToken']));
 
-        (new StatefulServicesPass())->process($container);
+        new StatefulServicesPass()->process($container);
 
         $resetter = $this->poolResetter($container, 'security.token_storage');
         self::assertSame(['disableUsageTracking', 'setToken'], $resetter->getArgument(0));
@@ -93,11 +93,11 @@ final class FrameworkIsolationPipelineTest extends TestCase
     public function testOptionalResetMethodIsKeptOnlyWhenTheClassDeclaresIt(): void
     {
         $container = $this->container(['optional_reset' => ['?absentReset', '?presentReset']]);
-        $container->setDefinition('optional_reset', (new Definition(FrameworkIsolationOptionalResetService::class))
+        $container->setDefinition('optional_reset', new Definition(FrameworkIsolationOptionalResetService::class)
             ->addTag('kernel.reset', ['method' => 'absentReset', 'on_invalid' => 'ignore'])
             ->addTag('kernel.reset', ['method' => 'presentReset', 'on_invalid' => 'ignore']));
 
-        (new StatefulServicesPass())->process($container);
+        new StatefulServicesPass()->process($container);
 
         $resetter = $this->poolResetter($container, 'optional_reset');
         self::assertSame(['presentReset'], $resetter->getArgument(0));
@@ -113,10 +113,10 @@ final class FrameworkIsolationPipelineTest extends TestCase
     public function testResetterOnStatefulTagReplacesKernelResetMethods(): void
     {
         $container = $this->container(['cache.traced' => ['reset']]);
-        $container->setDefinition('cache.traced', (new Definition(TraceableAdapter::class))
+        $container->setDefinition('cache.traced', new Definition(TraceableAdapter::class)
             ->addTag('kernel.reset', ['method' => 'reset']));
 
-        (new StatefulServicesPass())->process($container);
+        new StatefulServicesPass()->process($container);
 
         $resetter = $container->getDefinition('cache.traced.swoole_coop.service_pool')->getArgument(5);
         self::assertInstanceOf(Reference::class, $resetter);
@@ -130,10 +130,10 @@ final class FrameworkIsolationPipelineTest extends TestCase
     {
         $container = $this->container(['twig.extension.webprofiler' => ['reset']]);
         $container->setDefinition('twig', new Definition(Environment::class));
-        $container->setDefinition('twig.extension.webprofiler', (new Definition(WebProfilerExtension::class))
+        $container->setDefinition('twig.extension.webprofiler', new Definition(WebProfilerExtension::class)
             ->addTag('kernel.reset', ['method' => 'reset']));
 
-        (new StatefulServicesPass())->process($container);
+        new StatefulServicesPass()->process($container);
 
         $extension = $container->getDefinition('twig.extension.webprofiler');
         self::assertSame(WebProfilerExtension::class, $extension->getClass());
@@ -156,7 +156,7 @@ final class FrameworkIsolationPipelineTest extends TestCase
         $container->setParameter(ContainerConstants::PARAM_COROUTINES_MAX_SVC_INSTANCES, 4);
         $container->setParameter(ContainerConstants::PARAM_COROUTINES_STATEFUL_SERVICES, []);
         $container->setParameter(ContainerConstants::PARAM_COROUTINES_COMPILE_PROCESSORS, $processors);
-        $container->setDefinition('kernel_proxy', (new Definition(FrameworkIsolationKernel::class))
+        $container->setDefinition('kernel_proxy', new Definition(FrameworkIsolationKernel::class)
             ->addTag(ContainerConstants::TAG_SAFE_STATEFUL_SERVICE));
         $container->setDefinition(ServicePoolContainer::class, new Definition(ServicePoolContainer::class));
         $ids = array_keys($resetMethods);

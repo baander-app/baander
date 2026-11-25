@@ -29,7 +29,7 @@ final class NativeExecutionDaemonTest extends TestCase
         if (!extension_loaded('posix')) {
             self::markTestSkipped('Requires the native CI image with ext-posix.');
         }
-        $this->directory = sys_get_temp_dir() . '/baander-native-' . bin2hex(random_bytes(8));
+        $this->directory = sys_get_temp_dir() . '/baander-native-' . (random_bytes(8) |> bin2hex(...));
         mkdir($this->directory, 0700);
         $environment = [...getenv(), 'BAANDER_NATIVE_SOCKET' => $this->directory . '/native.sock',
             'BAANDER_WORKER_NAMESPACE' => 'baander.app:workers', 'BAANDER_WORKER_BOOT_ID' => str_repeat('a', 32), 'BAANDER_WORKER_LEASE_EPOCH' => '1'];
@@ -158,7 +158,7 @@ final class NativeExecutionDaemonTest extends TestCase
             $deadline = microtime(true) + 3;
             do {
                 foreach (glob('/proc/[0-9]*/stat') ?: [] as $path) {
-                    $pid = (int) basename(dirname($path));
+                    $pid = (int) (dirname($path) |> basename(...));
                     $process = $this->processObservation($pid);
                     if ($process !== null && $process['parent'] === $daemonPid && $process['group'] === $pid
                         && !in_array($process['state'], ['Z', 'X'], true) && @readlink('/proc/' . $pid . '/exe') === '/usr/bin/ffmpeg'
@@ -219,7 +219,7 @@ final class NativeExecutionDaemonTest extends TestCase
             $deadline = microtime(true) + 3;
             do {
                 foreach (glob('/proc/[0-9]*/stat') ?: [] as $path) {
-                    $pid = (int) basename(dirname($path));
+                    $pid = (int) (dirname($path) |> basename(...));
                     $process = $this->processObservation($pid);
                     if ($process !== null && $process['parent'] === $daemonPid && $process['group'] === $pid
                         && @readlink('/proc/' . $pid . '/exe') === '/usr/bin/ffmpeg') {
@@ -273,7 +273,7 @@ final class NativeExecutionDaemonTest extends TestCase
     {
         $live = [];
         foreach (glob('/proc/[0-9]*/stat') ?: [] as $path) {
-            $pid = (int) basename(dirname($path));
+            $pid = (int) (dirname($path) |> basename(...));
             $process = $this->processObservation($pid);
             if ($process !== null && $process['group'] === $group && !in_array($process['state'], ['Z', 'X'], true)) {
                 $live[] = ['pid' => $pid, 'startTicks' => $process['startTicks']];
@@ -296,7 +296,7 @@ final class NativeExecutionDaemonTest extends TestCase
         self::assertIsResource($socket);
         $request = ['id' => str_repeat('c', 32), 'namespace' => 'baander.app:workers', 'bootId' => str_repeat('a', 32),
             'epoch' => 1, 'clientId' => 'media-video-0', 'generation' => 1, 'operation' => 'submit', 'attempt' => 1,
-            'deploymentProfile' => (new DeploymentProfile())->toJson(),
+            'deploymentProfile' => new DeploymentProfile()->toJson(),
             'limits' => NativeExecutionProtocol::limits(new DeploymentProfile()),
             'argv' => ['ffmpeg', '-version'], 'timeout' => 5];
         $frame = json_encode($request, JSON_THROW_ON_ERROR) . "\n";
@@ -430,7 +430,7 @@ final class NativeExecutionDaemonTest extends TestCase
 
     public function testOnlyTheProfilesDerivedClientsAreAdmitted(): void
     {
-        foreach (array_keys((new DeploymentProfile())->nativeClientCommandCaps()) as $id) {
+        foreach (array_keys(new DeploymentProfile()->nativeClientCommandCaps()) as $id) {
             self::assertTrue($this->clientNamed($id)->handshake()['ready'], $id);
         }
         foreach (['media-video-8', 'media-audio-12', 'media-copy-0', 'media'] as $id) {
@@ -451,7 +451,7 @@ final class NativeExecutionDaemonTest extends TestCase
         $fixture = new \App\Tests\Support\NativeExecutionFixture('baander.app:workers', str_repeat('d', 32), profile: $profile);
         try {
             foreach (array_keys($profile->nativeClientCommandCaps()) as $id) {
-                $reply = (new NativeExecutionClient($fixture->socketPath(), 'baander.app:workers', str_repeat('d', 32), 1, $id, 1, $profile))->handshake();
+                $reply = new NativeExecutionClient($fixture->socketPath(), 'baander.app:workers', str_repeat('d', 32), 1, $id, 1, $profile)->handshake();
                 self::assertTrue($reply['ready'], $id);
                 self::assertSame(['commands' => 29, 'results' => 60, 'clients' => 22], $reply['limits']);
             }
@@ -482,7 +482,7 @@ final class NativeExecutionDaemonTest extends TestCase
             self::assertSame('', (string) fread($waiting, 65_536), 'A client beyond the peer cap must not be served yet.');
             self::assertFalse(feof($waiting), 'A client beyond the peer cap must wait instead of being closed.');
 
-            fclose(array_shift($idle));
+            array_shift($idle) |> fclose(...);
             $received = '';
             $deadline = microtime(true) + 1;
             while (!str_contains($received, "\n") && !feof($waiting) && microtime(true) < $deadline) {
@@ -596,7 +596,7 @@ final class NativeExecutionDaemonTest extends TestCase
 
     public function testTerminalResultsRemainReadableUntilReleaseReopensCapacity(): void
     {
-        $limit = (new DeploymentProfile())->nativeResultLimit();
+        $limit = new DeploymentProfile()->nativeResultLimit();
         $handles = [];
         for ($sequence = 1; $sequence <= $limit; ++$sequence) {
             $handle = $this->client->submit(['ffmpeg', '-version'], 5, $sequence);
@@ -725,13 +725,13 @@ PHP;
      */
     private function filmWithLargeTag(string $section): string
     {
-        $name = $this->directory . '/' . bin2hex(random_bytes(4));
+        $name = $this->directory . '/' . (random_bytes(4) |> bin2hex(...));
         file_put_contents($name . '.txt', ";FFMETADATA1\n" . sprintf($section, str_repeat('c', 1_200_000)));
         $stream = str_starts_with($section, '[STREAM]');
-        (new Process(['/usr/bin/ffmpeg', '-nostdin', '-hide_banner', '-loglevel', 'error', '-y',
+        new Process(['/usr/bin/ffmpeg', '-nostdin', '-hide_banner', '-loglevel', 'error', '-y',
             '-f', 'lavfi', '-i', 'testsrc2=size=64x64:rate=10:duration=2', '-i', $name . '.txt', '-map', '0',
             ...($stream ? ['-map_metadata:s:v:0', '1:s:0'] : ['-map_metadata', '1']),
-            '-c:v', 'libx264', '-pix_fmt', 'yuv420p', $name . '.mkv']))->mustRun();
+            '-c:v', 'libx264', '-pix_fmt', 'yuv420p', $name . '.mkv'])->mustRun();
 
         return $name . '.mkv';
     }

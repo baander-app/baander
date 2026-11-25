@@ -44,16 +44,16 @@ final class SchedulerWorkerRunnerTest extends TestCase
         if (!$url || !$redis) {
             self::markTestSkipped('Use the disposable PostgreSQL/Redis functional runner.');
         }
-        $this->database = DriverManager::getConnection((new DsnParser(['postgresql' => 'pdo_pgsql']))->parse($url));
-        $this->schema = 'scheduler_loop_' . bin2hex(random_bytes(8));
+        $this->database = DriverManager::getConnection(new DsnParser(['postgresql' => 'pdo_pgsql'])->parse($url));
+        $this->schema = 'scheduler_loop_' . (random_bytes(8) |> bin2hex(...));
         $this->database->executeStatement('CREATE SCHEMA ' . $this->schema);
         $this->database->executeStatement('SET search_path TO ' . $this->schema . ', public');
         \App\Tests\Support\FinalSchemaBootstrap::bootstrap($this->database);
         $this->database->executeStatement('DELETE FROM scheduled_jobs');
         DeploymentJournalFixture::ready($this->database, 'scheduler.baander.app', str_repeat('a', 32));
-        $lease = (new DoctrineDeploymentLease($this->database))->acquire('scheduler.baander.app', str_repeat('a', 32), 300);
+        $lease = new DoctrineDeploymentLease($this->database)->acquire('scheduler.baander.app', str_repeat('a', 32), 300);
         self::assertNotNull($lease);
-        $stream = 'scheduler_loop_' . bin2hex(random_bytes(8));
+        $stream = 'scheduler_loop_' . (random_bytes(8) |> bin2hex(...));
         $this->redis = RedisConnection::fromDsn($redis, ['stream' => $stream, 'group' => 'test', 'consumer' => 'test']);
         $this->transport = new RedisTransport($this->redis, new JsonTransportSerializer(MessageCodecFactory::create()));
         $this->transport->setup();
@@ -77,7 +77,7 @@ final class SchedulerWorkerRunnerTest extends TestCase
         self::assertNotFalse($this->database->fetchOne('SELECT 1 FROM scheduled_jobs WHERE id = :id AND recovery_after > clock_timestamp()', ['id' => $poison]));
         $deliveries = iterator_to_array($this->transport->get());
         self::assertCount(1, $deliveries);
-        $envelope = reset($deliveries);
+        $envelope = array_first($deliveries);
         self::assertInstanceOf(Envelope::class, $envelope);
         $message = $envelope->getMessage();
         self::assertInstanceOf(ExecuteScheduledOccurrenceCommand::class, $message);
@@ -102,7 +102,7 @@ final class SchedulerWorkerRunnerTest extends TestCase
     public function testAuthorityLossStopsBeforeRecoveringNewlyPendingJob(): void
     {
         $this->seed();
-        $this->barrierDirectory = sys_get_temp_dir() . '/baander-scheduler-barrier-' . bin2hex(random_bytes(8));
+        $this->barrierDirectory = sys_get_temp_dir() . '/baander-scheduler-barrier-' . (random_bytes(8) |> bin2hex(...));
         self::assertTrue(mkdir($this->barrierDirectory, 0700));
         $this->start(['BAANDER_TEST_SCHEDULER_BARRIER_DIRECTORY' => $this->barrierDirectory]);
         $this->await(fn (): bool => is_file($this->barrierDirectory . '/waiting'));

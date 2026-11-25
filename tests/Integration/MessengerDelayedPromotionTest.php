@@ -39,7 +39,7 @@ final class MessengerDelayedPromotionTest extends TestCase
             self::markTestSkipped('Set MESSENGER_TEST_REDIS_DSN to disposable Redis with ACL administration.');
         }
         $this->dsn = $dsn;
-        $this->stream = 'delayed_promotion_' . bin2hex(random_bytes(12));
+        $this->stream = 'delayed_promotion_' . (random_bytes(12) |> bin2hex(...));
         $this->queue = $this->stream . '__queue';
         $this->serializer = new JsonTransportSerializer(MessageCodecFactory::create());
         // The test's own connection creates restricted users: ACL is outside the application user's ACL.
@@ -89,7 +89,7 @@ final class MessengerDelayedPromotionTest extends TestCase
 
     public function testMissingEvalPermissionRetainsAcceptedRetry(): void
     {
-        $user = 'delayed_test_' . bin2hex(random_bytes(8));
+        $user = 'delayed_test_' . (random_bytes(8) |> bin2hex(...));
         $this->aclUsers[] = $user;
         $this->redis->rawCommand('ACL', 'SETUSER', $user, 'on', '>test-only', 'resetkeys', '~' . $this->stream . '*', '+@all', '-eval');
         $transport = $this->transport(['auth' => [$user, 'test-only']]);
@@ -112,7 +112,7 @@ final class MessengerDelayedPromotionTest extends TestCase
 
     public function testInterruptedRemovalRetainsRetryAndAllowsDuplicateSafeRecovery(): void
     {
-        $user = 'delayed_test_' . bin2hex(random_bytes(8));
+        $user = 'delayed_test_' . (random_bytes(8) |> bin2hex(...));
         $this->aclUsers[] = $user;
         $this->redis->rawCommand('ACL', 'SETUSER', $user, 'on', '>test-only', 'resetkeys', '~' . $this->stream . '*', '+@all', '-zrem');
         $transport = $this->transport(['auth' => [$user, 'test-only']]);

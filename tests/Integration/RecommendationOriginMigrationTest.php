@@ -34,8 +34,8 @@ final class RecommendationOriginMigrationTest extends TestCase
         if (!is_string($url) || $url === '') {
             self::markTestSkipped('Set OUTBOX_TEST_DATABASE_URL to a disposable PostgreSQL database.');
         }
-        $this->schema = 'recommendation_origin_' . bin2hex(random_bytes(8));
-        $this->connection = DriverManager::getConnection((new DsnParser(['postgresql' => 'pdo_pgsql']))->parse($url));
+        $this->schema = 'recommendation_origin_' . (random_bytes(8) |> bin2hex(...));
+        $this->connection = DriverManager::getConnection(new DsnParser(['postgresql' => 'pdo_pgsql'])->parse($url));
         $this->connection->executeStatement('CREATE SCHEMA ' . $this->schema);
         $this->connection->executeStatement('SET search_path TO ' . $this->schema . ', public');
         FinalSchemaBootstrap::bootstrap($this->connection);

@@ -34,7 +34,7 @@ final class StreamServiceTest extends TestCase
 
     protected function setUp(): void
     {
-        $this->directory = sys_get_temp_dir() . '/baander-stream-source-' . bin2hex(random_bytes(8));
+        $this->directory = sys_get_temp_dir() . '/baander-stream-source-' . (random_bytes(8) |> bin2hex(...));
         $this->root = $this->directory . '/library';
         self::assertTrue(mkdir($this->root . '/album', 0700, true));
         self::assertTrue(mkdir($this->directory . '/library-other', 0700));
@@ -70,7 +70,7 @@ final class StreamServiceTest extends TestCase
 
     public function testResolvesTheAbsoluteSourceProducedByDirectoryDiscovery(): void
     {
-        $files = (new DirectoryScanner(new NullLogger()))->scan(new LibraryPath($this->root));
+        $files = new DirectoryScanner(new NullLogger())->scan(new LibraryPath($this->root));
         self::assertCount(1, $files);
         self::assertSame($this->source, $files[0]->getAbsolutePath());
         self::assertSame('album/track.flac', $files[0]->getRelativePath());

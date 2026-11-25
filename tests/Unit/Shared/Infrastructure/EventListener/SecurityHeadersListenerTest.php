@@ -158,7 +158,7 @@ final class SecurityHeadersListenerTest extends TestCase
     {
         self::assertNotNull($policy);
         $directives = [];
-        foreach (array_filter(array_map(trim(...), explode(';', $policy))) as $directive) {
+        foreach (array_map(trim(...), explode(';', $policy)) |> array_filter(...) as $directive) {
             $parts = explode(' ', $directive);
             $directives[array_shift($parts)] = $parts;
         }

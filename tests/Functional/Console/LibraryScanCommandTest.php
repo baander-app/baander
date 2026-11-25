@@ -37,14 +37,14 @@ final class LibraryScanCommandTest extends KernelTestCase
 
     protected function setUp(): void
     {
-        $this->libraryDirectory = sys_get_temp_dir() . '/baander-cli-scan-' . bin2hex(random_bytes(4));
+        $this->libraryDirectory = sys_get_temp_dir() . '/baander-cli-scan-' . (random_bytes(4) |> bin2hex(...));
         mkdir($this->libraryDirectory . '/Album', 0o777, true);
         file_put_contents($this->libraryDirectory . '/Album/track.flac', 'not really audio');
     }
 
     protected function tearDown(): void
     {
-        (new Filesystem())->remove($this->libraryDirectory);
+        new Filesystem()->remove($this->libraryDirectory);
         if ($this->schema !== null) {
             $connection = static::getContainer()->get(Connection::class);
             $connection->executeStatement('SET search_path TO ' . $this->searchPath);
@@ -60,7 +60,7 @@ final class LibraryScanCommandTest extends KernelTestCase
         $container = static::getContainer();
         $this->isolateSchema();
         $libraries = $container->get(LibraryPortInterface::class);
-        $slug = 'cli-scan-' . bin2hex(random_bytes(4));
+        $slug = 'cli-scan-' . (random_bytes(4) |> bin2hex(...));
         $libraries->save(Library::create(
             'CLI scan',
             new LibrarySlug($slug),
@@ -69,7 +69,7 @@ final class LibraryScanCommandTest extends KernelTestCase
             FilesystemType::Local,
         ));
 
-        $tester = new CommandTester((new Application($kernel))->find('app:library:scan'));
+        $tester = new CommandTester(new Application($kernel)->find('app:library:scan'));
         $exitCode = $tester->execute(['library' => $slug]);
 
         self::assertSame(Command::SUCCESS, $exitCode, $tester->getDisplay());
@@ -96,10 +96,10 @@ final class LibraryScanCommandTest extends KernelTestCase
         $container->get(RelayOutboxHandler::class)(new RelayOutboxCommand());
         $async = $container->get('messenger.transport.async');
         self::assertInstanceOf(InMemoryTransport::class, $async);
-        $discovered = array_values(array_filter(
+        $discovered = array_filter(
             $async->getSent(),
             static fn (Envelope $envelope): bool => $envelope->getMessage() instanceof FilesDiscovered,
-        ));
+        ) |> array_values(...);
         self::assertCount(1, $discovered);
     }
 
@@ -109,7 +109,7 @@ final class LibraryScanCommandTest extends KernelTestCase
         $container = static::getContainer();
         $this->isolateSchema();
         $libraries = $container->get(LibraryPortInterface::class);
-        $slug = 'cli-cancel-' . bin2hex(random_bytes(4));
+        $slug = 'cli-cancel-' . (random_bytes(4) |> bin2hex(...));
         $libraries->save(Library::create(
             'CLI cancel',
             new LibrarySlug($slug),
@@ -136,7 +136,7 @@ final class LibraryScanCommandTest extends KernelTestCase
             {
                 ($this->beforeScan)();
 
-                return (new DirectoryScanner(new NullLogger()))->scan($path);
+                return new DirectoryScanner(new NullLogger())->scan($path);
             }
         });
 
@@ -167,17 +167,17 @@ final class LibraryScanCommandTest extends KernelTestCase
         $container->get(RelayOutboxHandler::class)(new RelayOutboxCommand());
         $async = $container->get('messenger.transport.async');
         self::assertInstanceOf(InMemoryTransport::class, $async);
-        self::assertSame([], array_values(array_filter(
+        self::assertSame([], array_filter(
             $async->getSent(),
             static fn (Envelope $envelope): bool => $envelope->getMessage() instanceof FilesDiscovered,
-        )), 'The scan stopped before its first directory.');
+        ) |> array_values(...), 'The scan stopped before its first directory.');
     }
 
     private function isolateSchema(): void
     {
         $connection = static::getContainer()->get(Connection::class);
         $this->searchPath = (string) $connection->fetchOne('SHOW search_path');
-        $this->schema = 'scan_test_' . bin2hex(random_bytes(8));
+        $this->schema = 'scan_test_' . (random_bytes(8) |> bin2hex(...));
         $schema = $connection->quoteIdentifier($this->schema);
         $connection->executeStatement('CREATE SCHEMA ' . $schema);
         $connection->executeStatement('SET search_path TO ' . $schema . ', public');

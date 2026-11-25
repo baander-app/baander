@@ -33,7 +33,7 @@ final class InMemoryRateLimiterStore extends RedisRateLimiterStore
         if (($this->records[$snapshot->name][$snapshot->subject]['revision'] ?? null) !== $snapshot->revision) {
             return false;
         }
-        $this->records[$snapshot->name][$snapshot->subject] = ['revision' => bin2hex(random_bytes(16)), 'payload' => $payload];
+        $this->records[$snapshot->name][$snapshot->subject] = ['revision' => random_bytes(16) |> bin2hex(...), 'payload' => $payload];
 
         return true;
     }
@@ -51,6 +51,6 @@ final class InMemoryRateLimiterStore extends RedisRateLimiterStore
     /** @return array{revision: string, payload: string} */
     private static function emptyRecord(): array
     {
-        return ['revision' => bin2hex(random_bytes(16)), 'payload' => ''];
+        return ['revision' => random_bytes(16) |> bin2hex(...), 'payload' => ''];
     }
 }

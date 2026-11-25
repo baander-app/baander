@@ -42,7 +42,7 @@ final class TranscodeProcessPoolTest extends TestCase
         self::assertSame(['status' => 'ok', 'data' => 'metadata'], $pool->readResult($first));
         self::assertSame([1], $released);
         self::assertCount(2, $submitted);
-        self::assertSame('/media/second.mkv', $submitted[1][array_key_last($submitted[1])]);
+        self::assertSame('/media/second.mkv', array_last($submitted[1]));
         self::assertSame(['status' => 'ok', 'data' => 'metadata'], $pool->readResult($second));
         self::assertSame([1, 2], $released);
     }

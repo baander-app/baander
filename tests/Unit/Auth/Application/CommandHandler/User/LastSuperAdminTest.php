@@ -254,10 +254,10 @@ final class LastSuperAdminTest extends TestCase
             }
         });
         $users->method('soleEnabledSuperAdmin')->willReturnCallback(function (): ?Uuid {
-            $enabled = array_keys(array_filter(
+            $enabled = array_filter(
                 $this->stored,
                 static fn (array $state): bool => in_array('ROLE_SUPER_ADMIN', $state['roles'], true) && !$state['disabled'],
-            ));
+            ) |> array_keys(...);
 
             return count($enabled) === 1 ? Uuid::fromString((string) $enabled[0]) : null;
         });

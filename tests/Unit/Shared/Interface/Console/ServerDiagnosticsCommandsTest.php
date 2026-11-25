@@ -62,7 +62,7 @@ final class ServerDiagnosticsCommandsTest extends TestCase
 
         $tester->execute(['--json' => true]);
 
-        $endpoint = json_decode((string) (new ServerStatsControllerWithCoroutines($diagnostics))->stats()->getContent(), true);
+        $endpoint = json_decode((string) new ServerStatsControllerWithCoroutines($diagnostics)->stats()->getContent(), true);
         self::assertSame($endpoint['data'], json_decode($tester->getDisplay(), true));
         self::assertSame([0, 1], array_column($endpoint['data']['workers'], 'worker_id'));
         self::assertSame(['workers', 'missing_workers', 'worker_errors', 'redis'], array_keys($endpoint['data']));

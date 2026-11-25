@@ -29,7 +29,7 @@ require dirname(__DIR__, 3) . '/vendor/autoload.php';
 // The test process gets its environment from tests/bootstrap.php; a child process
 // has only the real environment, so load the same .env files here.
 $_SERVER['APP_ENV'] = $_ENV['APP_ENV'] = 'test';
-(new Dotenv())->bootEnv(dirname(__DIR__, 3) . '/.env');
+new Dotenv()->bootEnv(dirname(__DIR__, 3) . '/.env');
 
 $arguments = $_SERVER['argv'] ?? [];
 if (count($arguments) !== 6) {

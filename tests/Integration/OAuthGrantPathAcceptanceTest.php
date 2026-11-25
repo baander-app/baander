@@ -54,7 +54,7 @@ final class OAuthGrantPathAcceptanceTest extends TestCase
     public static function tearDownAfterClass(): void
     {
         if (isset(self::$sharedDirectory)) {
-            (new Filesystem())->remove(self::$sharedDirectory);
+            new Filesystem()->remove(self::$sharedDirectory);
         }
         parent::tearDownAfterClass();
     }
@@ -66,7 +66,7 @@ final class OAuthGrantPathAcceptanceTest extends TestCase
             self::markTestSkipped('Disposable PostgreSQL and Redis services are required.');
         }
         if (!isset(self::$sharedDirectory)) {
-            self::$sharedDirectory = sys_get_temp_dir() . '/baander-oauth-grant-paths-' . bin2hex(random_bytes(8));
+            self::$sharedDirectory = sys_get_temp_dir() . '/baander-oauth-grant-paths-' . (random_bytes(8) |> bin2hex(...));
             self::assertTrue(mkdir(self::$sharedDirectory, 0700));
             $key = openssl_pkey_new(['private_key_type' => OPENSSL_KEYTYPE_RSA, 'private_key_bits' => 2048]);
             self::assertNotFalse($key);
@@ -92,7 +92,7 @@ final class OAuthGrantPathAcceptanceTest extends TestCase
         $users = $container->get('oauth.acceptance.users');
         self::assertInstanceOf(UserRepositoryInterface::class, $users);
         $this->user = User::register(
-            new Email('grant-path-' . bin2hex(random_bytes(8)) . '@baander.app'),
+            new Email('grant-path-' . (random_bytes(8) |> bin2hex(...)) . '@baander.app'),
             password_hash(self::PASSWORD, PASSWORD_BCRYPT),
             'Grant path user',
         );
@@ -160,7 +160,7 @@ final class OAuthGrantPathAcceptanceTest extends TestCase
 
         try {
             $event = new PasswordChanged($other->getId(), new Email($other->getEmail()));
-            (new OutboxRepository($this->connection))->append($event::class, $event->eventName(), $event->toPayload());
+            new OutboxRepository($this->connection)->append($event::class, $event->eventName(), $event->toPayload());
             $otherEvent = $this->connection->fetchOne(
                 "SELECT id FROM domain_event_outbox WHERE payload->>'user_id' = :userId",
                 ['userId' => $other->getId()->toString()],
@@ -214,8 +214,8 @@ final class OAuthGrantPathAcceptanceTest extends TestCase
         );
         $this->manager->clear();
         $epoch = $this->connection->fetchOne('SELECT credential_epoch FROM users WHERE id = ?', [$this->user->getId()->toString()]);
-        $resetToken = bin2hex(random_bytes(32));
-        (new PasswordResetTokenRepository($this->connection))->issue(
+        $resetToken = random_bytes(32) |> bin2hex(...);
+        new PasswordResetTokenRepository($this->connection)->issue(
             $this->user->getId(),
             $resetToken,
             new DateTimeImmutable('+1 hour'),
@@ -272,7 +272,7 @@ final class OAuthGrantPathAcceptanceTest extends TestCase
         $oldHash = $this->storedPassword();
         $key = new SignedDpopProof();
         $nonce = $this->nonce();
-        $faultDirectory = self::$sharedDirectory . '/rehash-signing-fault-' . bin2hex(random_bytes(8));
+        $faultDirectory = self::$sharedDirectory . '/rehash-signing-fault-' . (random_bytes(8) |> bin2hex(...));
         self::assertTrue(mkdir($faultDirectory, 0700));
         self::assertTrue(touch(IssuanceFaults::path($faultDirectory, IssuanceFaults::SIGN_FAIL_ONCE)));
         $previousFaultDirectory = getenv(IssuanceFaults::ENVIRONMENT_VARIABLE);
@@ -297,7 +297,7 @@ final class OAuthGrantPathAcceptanceTest extends TestCase
             putenv($previousFaultDirectory === false
                 ? IssuanceFaults::ENVIRONMENT_VARIABLE
                 : IssuanceFaults::ENVIRONMENT_VARIABLE . '=' . $previousFaultDirectory);
-            (new Filesystem())->remove($faultDirectory);
+            new Filesystem()->remove($faultDirectory);
         }
     }
 
@@ -516,7 +516,7 @@ final class OAuthGrantPathAcceptanceTest extends TestCase
         $proof = match ($kind) {
             'missing' => null,
             'nonce-less' => $key->create('POST', $uri, 'no-access-token'),
-            'unissued-nonce' => $key->createWithNonce('POST', $uri, bin2hex(random_bytes(32))),
+            'unissued-nonce' => $key->createWithNonce('POST', $uri, random_bytes(32) |> bin2hex(...)),
             default => $key->createWithNonce('POST', self::ORIGIN . '/api/auth/login', $this->nonce()),
         };
 
@@ -649,14 +649,14 @@ final class OAuthGrantPathAcceptanceTest extends TestCase
         self::assertStringContainsString('no-store', (string) $missing->headers->get('Cache-Control'));
 
         $wrongEndpoint = $this->send('POST', '/api/oauth/token', form: ['grant_type' => 'refresh_token', 'client_id' => $device, 'refresh_token' => str_repeat('r', 80)], headers: [
-            'DPoP' => (new SignedDpopProof())->createWithNonce('POST', self::ORIGIN . '/api/auth/refresh', $this->nonce()),
+            'DPoP' => new SignedDpopProof()->createWithNonce('POST', self::ORIGIN . '/api/auth/refresh', $this->nonce()),
         ]);
         self::assertSame(400, $wrongEndpoint->getStatusCode());
         self::assertSame('invalid_dpop_proof', json_decode((string) $wrongEndpoint->getContent(), true, flags: JSON_THROW_ON_ERROR)['error']);
         self::assertIsString($wrongEndpoint->headers->get('DPoP-Nonce'));
 
         $noNonce = $this->send('POST', '/api/oauth/token', form: ['grant_type' => 'refresh_token', 'client_id' => $device, 'refresh_token' => str_repeat('r', 80)], headers: [
-            'DPoP' => (new SignedDpopProof())->create('POST', self::ORIGIN . '/api/oauth/token', 'none'),
+            'DPoP' => new SignedDpopProof()->create('POST', self::ORIGIN . '/api/oauth/token', 'none'),
         ]);
         self::assertSame(400, $noNonce->getStatusCode());
         self::assertSame('use_dpop_nonce', json_decode((string) $noNonce->getContent(), true, flags: JSON_THROW_ON_ERROR)['error']);
@@ -693,7 +693,7 @@ final class OAuthGrantPathAcceptanceTest extends TestCase
         // The signed-in user looks the code up as typed and approves it.
         $web = new SignedDpopProof();
         $login = $this->login($web);
-        $typed = strtolower(str_replace('-', ' ', $codes['user_code']));
+        $typed = str_replace('-', ' ', $codes['user_code']) |> strtolower(...);
         $lookup = $this->asUser($login['accessToken'], $web, 'GET', '/api/oauth/device/verify', query: ['user_code' => $typed]);
         self::assertSame(200, $lookup->getStatusCode(), (string) $lookup->getContent());
         $request = json_decode((string) $lookup->getContent(), true, flags: JSON_THROW_ON_ERROR)['data'];
@@ -923,7 +923,7 @@ final class OAuthGrantPathAcceptanceTest extends TestCase
 
         $response = $this->send('POST', '/api/oauth/par', form: [
             ...$this->pushParameters($this->spaClientId(), self::pkcePair()[1], 'pusher-state'),
-            'dpop_jkt' => (new SignedDpopProof())->thumbprint(),
+            'dpop_jkt' => new SignedDpopProof()->thumbprint(),
         ]);
 
         self::assertSame(400, $response->getStatusCode(), (string) $response->getContent());
@@ -1080,7 +1080,7 @@ final class OAuthGrantPathAcceptanceTest extends TestCase
         $clientId = $this->publicClient();
         $web = new SignedDpopProof();
         $login = $this->login($web);
-        $requestUri = $this->push($clientId, self::pkcePair()[1], dpopJkt: (new SignedDpopProof())->thumbprint(), state: 'denied-state');
+        $requestUri = $this->push($clientId, self::pkcePair()[1], dpopJkt: new SignedDpopProof()->thumbprint(), state: 'denied-state');
 
         $redirect = $this->decide($login['accessToken'], $web, ['client_id' => $clientId, 'request_uri' => $requestUri, 'decision' => 'deny', 'state' => 'browser-state']);
 
@@ -1097,7 +1097,7 @@ final class OAuthGrantPathAcceptanceTest extends TestCase
         $response = $this->send('POST', '/api/oauth/par', form: [
             ...$this->pushParameters($this->publicClient(), str_repeat('p', 43), 'plain-state'),
             'code_challenge_method' => 'plain',
-            'dpop_jkt' => (new SignedDpopProof())->thumbprint(),
+            'dpop_jkt' => new SignedDpopProof()->thumbprint(),
         ]);
 
         self::assertSame(400, $response->getStatusCode(), (string) $response->getContent());
@@ -1112,7 +1112,7 @@ final class OAuthGrantPathAcceptanceTest extends TestCase
         $web = new SignedDpopProof();
         $login = $this->login($web);
         $clientId = $this->publicClient();
-        $requestUri = $this->push($clientId, self::pkcePair()[1], dpopJkt: (new SignedDpopProof())->thumbprint());
+        $requestUri = $this->push($clientId, self::pkcePair()[1], dpopJkt: new SignedDpopProof()->thumbprint());
         $unknown = 'urn:ietf:params:oauth:request_uri:' . str_repeat('u', 80);
 
         foreach ([['unknown_client_000001', $requestUri], [$clientId, $unknown]] as [$client, $uri]) {
@@ -1167,9 +1167,9 @@ final class OAuthGrantPathAcceptanceTest extends TestCase
     /** @return array{string, string} a PKCE code verifier and its S256 challenge */
     private static function pkcePair(): array
     {
-        $verifier = rtrim(strtr(base64_encode(random_bytes(48)), '+/', '-_'), '=');
+        $verifier = rtrim(strtr(random_bytes(48) |> base64_encode(...), '+/', '-_'), '=');
 
-        return [$verifier, rtrim(strtr(base64_encode(hash('sha256', $verifier, true)), '+/', '-_'), '=')];
+        return [$verifier, rtrim(strtr(hash('sha256', $verifier, true) |> base64_encode(...), '+/', '-_'), '=')];
     }
 
     /** @return array<string, string> */
@@ -1379,7 +1379,7 @@ final class OAuthGrantPathAcceptanceTest extends TestCase
     private function nonce(): string
     {
         $probe = new SignedDpopProof();
-        $response = $this->send('POST', '/api/auth/refresh', json: ['refreshToken' => 'nonce-probe-' . bin2hex(random_bytes(8))], headers: [
+        $response = $this->send('POST', '/api/auth/refresh', json: ['refreshToken' => 'nonce-probe-' . (random_bytes(8) |> bin2hex(...))], headers: [
             'DPoP' => $probe->create('POST', self::ORIGIN . '/api/auth/refresh', 'no-access-token'),
         ]);
         self::assertSame(400, $response->getStatusCode(), (string) $response->getContent());

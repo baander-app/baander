@@ -79,7 +79,7 @@ final class CompletedVideoArtifactAdapterTest extends TestCase
 
     public function testOnlyCompleteCurrentSourceGenerationsCanBeReused(): void
     {
-        $root = sys_get_temp_dir() . '/baander-copy-artifact-' . bin2hex(random_bytes(8));
+        $root = sys_get_temp_dir() . '/baander-copy-artifact-' . (random_bytes(8) |> bin2hex(...));
         mkdir($root);
         try {
             file_put_contents($root . '/source.mkv', 'source');

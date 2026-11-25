@@ -17,7 +17,7 @@ final class VideoTimelinePreviewTest extends TestCase
     private string $directory;
     protected function setUp(): void
     {
-        $this->directory = sys_get_temp_dir() . '/baander-preview-' . bin2hex(random_bytes(6));
+        $this->directory = sys_get_temp_dir() . '/baander-preview-' . (random_bytes(6) |> bin2hex(...));
         mkdir($this->directory);
         file_put_contents($this->directory . '/source', 'source');
     }

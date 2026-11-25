@@ -166,7 +166,7 @@ final class NotificationPreferenceControllerTest extends TestCase
 
     private function createPreferenceUser(): User
     {
-        return $this->createTestUser('notification-preferences-' . bin2hex(random_bytes(8)) . '@baander.app');
+        return $this->createTestUser('notification-preferences-' . (random_bytes(8) |> bin2hex(...)) . '@baander.app');
     }
 
     /** @param list<array{category: string, channel: string, enabled: bool}> $preferences */

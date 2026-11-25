@@ -21,7 +21,7 @@ final class OAuthProductionConfigurationTest extends TestCase
 
     protected function setUp(): void
     {
-        $this->directory = sys_get_temp_dir() . '/baander-oauth-prod-' . bin2hex(random_bytes(8));
+        $this->directory = sys_get_temp_dir() . '/baander-oauth-prod-' . (random_bytes(8) |> bin2hex(...));
         self::assertTrue(mkdir($this->directory, 0700));
         $rsa = openssl_pkey_new(['private_key_bits' => 2048, 'private_key_type' => OPENSSL_KEYTYPE_RSA]);
         self::assertNotFalse($rsa);
@@ -58,7 +58,7 @@ final class OAuthProductionConfigurationTest extends TestCase
             }
             putenv($previous['process'] === false ? $name : $name . '=' . $previous['process']);
         }
-        (new Filesystem())->remove($this->directory);
+        new Filesystem()->remove($this->directory);
     }
 
     public function testIndependentProductionContainersResolveExternalKeyPaths(): void

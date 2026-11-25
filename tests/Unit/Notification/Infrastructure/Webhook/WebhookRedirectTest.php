@@ -25,7 +25,7 @@ final class WebhookRedirectTest extends TestCase
 {
     public function testDeliveryPinsTheAllowedLanAddressAndNeverFollowsRedirects(): void
     {
-        $webhook = new WebhookEntity(Uuid::generate(), (new WebhookSecretCodec('test-app-secret'))->encrypt('original-secret'));
+        $webhook = new WebhookEntity(Uuid::generate(), new WebhookSecretCodec('test-app-secret')->encrypt('original-secret'));
         $webhook->setUrl('http://lan.baander.app/hook');
         $repository = $this->createStub(EntityRepository::class);
         $repository->method('findAll')->willReturn([$webhook]);
@@ -55,7 +55,7 @@ final class WebhookRedirectTest extends TestCase
 
     public function testDeliveryOptionsBypassAProxyConfiguredOnTheCurlClient(): void
     {
-        $webhook = new WebhookEntity(Uuid::generate(), (new WebhookSecretCodec('test-app-secret'))->encrypt('original-secret'));
+        $webhook = new WebhookEntity(Uuid::generate(), new WebhookSecretCodec('test-app-secret')->encrypt('original-secret'));
         $webhook->setUrl('http://lan.baander.app/hook');
         $repository = $this->createStub(EntityRepository::class);
         $repository->method('findAll')->willReturn([$webhook]);

@@ -174,6 +174,6 @@ final class SignInStorageBoundsTest extends RateLimitTestCase
 
     private function email(): string
     {
-        return 'bounds-' . bin2hex(random_bytes(4)) . '@baander.app';
+        return 'bounds-' . (random_bytes(4) |> bin2hex(...)) . '@baander.app';
     }
 }

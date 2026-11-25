@@ -29,7 +29,7 @@ spl_autoload_register(static function (string $class) use ($project): void {
         }
     }
 });
-(new Symfony\Component\Dotenv\Dotenv())->bootEnv($project . '/.env');
+new Symfony\Component\Dotenv\Dotenv()->bootEnv($project . '/.env');
 const BASE = LocalOrigin::BASE;
 const ROOT = '/var/www/html/storage/two-command';
 const STATE = ROOT . '/state.json';
@@ -178,7 +178,7 @@ function decodeVideo(StreamClient $client, array $state, float $readinessSeconds
         $value = playback($client, $state);
         return ($value['ready'] ?? false) ? $value : false;
     }, 'worker publishes current generation', $readinessSeconds);
-    $master = (new HttpExchange(url($playback['manifestUrl']), []))->complete();
+    $master = new HttpExchange(url($playback['manifestUrl']), [])->complete();
     ensure($master->status() === 200, 'Master playlist is unavailable: ' . $master->body);
     preg_match('~^([^#\r\n][^\r\n]*)~m', $master->body, $mediaMatch);
     ensure(isset($mediaMatch[1]), 'Master playlist has no rendition.');
@@ -207,7 +207,7 @@ function decodeVideo(StreamClient $client, array $state, float $readinessSeconds
     unset($track);
     $decoded = decodeMedia(url($playback['manifestUrl']), 'decoded-hls-generation-' . $playback['generation'], 1.0);
     $subtitles = verifySubtitles($master->body, $playback);
-    return $playback + $decoded + ['deliveryReadyAt' => $delivery['availableAt'], 'tracks' => $tracks, 'decodedBytes' => array_sum(array_column($tracks, 'bytes')), 'subtitles' => $subtitles];
+    return $playback + $decoded + ['deliveryReadyAt' => $delivery['availableAt'], 'tracks' => $tracks, 'decodedBytes' => array_column($tracks, 'bytes') |> array_sum(...), 'subtitles' => $subtitles];
 }
 
 /** @return array<string,mixed> */
@@ -231,14 +231,14 @@ function verifySubtitles(string $master, array $playback): array
         preg_match('~/subtitles/(s[0-9]+)/~', $uri[1], $track);
         ensure(isset($track[1]) && !isset($evidence[$track[1]]), 'Subtitle track identity is absent or duplicated.');
         $key = $track[1];
-        $playlist = (new HttpExchange(url($uri[1]), []))->complete();
+        $playlist = new HttpExchange(url($uri[1]), [])->complete();
         ensure($playlist->status() === 200, 'Ready subtitle playlist is unavailable.');
         preg_match('/#EXTINF:([0-9.]+)/', $playlist->body, $duration);
         $remaining = (float) $playback['duration'] - (float) $playback['startTime'];
         ensure(isset($duration[1]) && abs((float) $duration[1] - $remaining) < .05, 'Full subtitle resource advertises the wrong timeline duration.');
         preg_match('~^([^#\r\n][^\r\n]*)~m', $playlist->body, $resource);
         ensure(isset($resource[1]), 'Subtitle playlist omitted its resource.');
-        $vtt = (new HttpExchange(url($resource[1]), []))->complete();
+        $vtt = new HttpExchange(url($resource[1]), [])->complete();
         ensure($vtt->status() === 200 && str_starts_with($vtt->body, 'WEBVTT'), 'Published subtitle is not a complete WebVTT resource.');
         $expected = ['s2' => 'Dialogue', 's3' => 'Forced', 's4' => 'Unlabelled'][$key] ?? null;
         ensure($expected !== null && str_contains($vtt->body, $expected . ' late'), 'Duplicate or unlabelled subtitle stream was lost or misselected.');
@@ -253,7 +253,7 @@ function verifySubtitles(string $master, array $playback): array
             'Subtitle cue timestamps do not follow the generation-local video timeline.');
         ensure(str_contains($line, 'DEFAULT=' . ($key === 's2' ? 'YES' : 'NO')), 'Subtitle default disposition was lost.');
         ensure(str_contains($line, 'FORCED=' . ($key === 's3' ? 'YES' : 'NO')), 'Subtitle forced disposition was lost.');
-        $tampered = (new HttpExchange(url($resource[1]) . '&generation=999999', []))->complete(5);
+        $tampered = new HttpExchange(url($resource[1]) . '&generation=999999', [])->complete(5);
         ensure(in_array($tampered->status(), [400, 403, 404], true), 'Altered subtitle signature was accepted.');
         $evidence[$key] = ['url' => url($resource[1]), 'bytes' => strlen($vtt->body), 'duration' => (float) $duration[1],
             'lateCueStart' => $seconds($cue[1]), 'lateCueEnd' => $seconds($cue[2]), 'tamperedStatus' => $tampered->status()];
@@ -274,7 +274,7 @@ function verifyDash(StreamClient $client, array $state): array
     ensure($signed->status() === 200, 'DASH signing failed: ' . $signed->body);
     $snapshot = jsonBody($signed);
     ensure(($snapshot['ready'] ?? false) && is_string($snapshot['url'] ?? null), 'DASH snapshot is not ready.');
-    $manifest = (new HttpExchange(url($snapshot['url']), []))->complete();
+    $manifest = new HttpExchange(url($snapshot['url']), [])->complete();
     ensure($manifest->status() === 200, 'Signed DASH manifest is unavailable.');
     $xml = new DOMDocument();
     ensure($xml->loadXML($manifest->body, LIBXML_NONET), 'DASH manifest is invalid XML.');
@@ -282,7 +282,7 @@ function verifyDash(StreamClient $client, array $state): array
     $xpath = new DOMXPath($xml); $xpath->registerNamespace('mpd', 'urn:mpeg:dash:schema:mpd:2011');
     $runtime = row($db, $state);
     ensure((int) $runtime['generation'] === (int) $snapshot['generation'], 'DASH output changed generation during inspection.');
-    $presentation = (new App\Transcode\Infrastructure\Packaging\PublishedPresentationReader())->read($runtime['output_directory']);
+    $presentation = new App\Transcode\Infrastructure\Packaging\PublishedPresentationReader()->read($runtime['output_directory']);
     ensure($presentation !== null, 'DASH native presentation is unavailable.');
     $resources = [];
     foreach (['video', 'audio'] as $kind) {
@@ -334,7 +334,7 @@ function traverseSignedDelivery(string $manifestUrl, int $expires): array
         parse_str((string) parse_url($resource, PHP_URL_QUERY), $query);
         ensure(($query['exp'] ?? null) === (string) $expires, 'A signed descendant changed its parent expiry: ' . $resource);
         ensure(time() <= $expires, 'Signed delivery traversal missed its expiry deadline.');
-        $response = (new HttpExchange($resource, []))->complete(5);
+        $response = new HttpExchange($resource, [])->complete(5);
         ensure($response->status() === 200, 'Signed resource unavailable before expiry: ' . $resource . ' HTTP ' . $response->status());
         $visited[$resource] = true;
         $path = (string) parse_url($resource, PHP_URL_PATH);
@@ -355,7 +355,7 @@ function traverseSignedDelivery(string $manifestUrl, int $expires): array
             foreach ($matches as $match) { $children[] = $match[1] ?? $match[2]; }
             ensure($children !== [], 'HLS playlist omitted signed children.');
             // A second read must retain the same deadline.
-            $repeated = (new HttpExchange($resource, []))->complete(5);
+            $repeated = new HttpExchange($resource, [])->complete(5);
             ensure($repeated->status() === 200, 'Repeated signed playlist read failed before expiry.');
             preg_match_all('/URI="([^"]+)"|^([^#\r\n][^\r\n]*)/m', $repeated->body, $repeatedMatches, PREG_SET_ORDER | PREG_UNMATCHED_AS_NULL);
             foreach ($repeatedMatches as $match) { $children[] = $match[1] ?? $match[2]; }
@@ -406,21 +406,21 @@ function verifySignedDeliveryExpiry(StreamClient $client, array $state): array
         foreach ($traversal['urls'] as $resource) {
             $tampered = preg_replace('/([?&]exp=)[0-9]+(?=&|$)/', '${1}' . ($expires + 3600), $resource);
             ensure(is_string($tampered) && $tampered !== $resource, 'Cannot alter signed resource expiry.');
-            ensure((new HttpExchange($tampered, []))->complete(5)->status() === 403, 'Altering signed expiry was accepted.');
+            ensure(new HttpExchange($tampered, [])->complete(5)->status() === 403, 'Altering signed expiry was accepted.');
             ++$tamperedCount;
         }
         ensure(time() <= $expires, 'Expiry tampering checks missed the short-lived deadline.');
         $evidence[$protocol] = ['expires' => $expires, 'windowSeconds' => $window,
             'resourceCount' => count($traversal['urls']), 'tamperedRefusals' => $tamperedCount] + $traversal;
     }
-    $refusalAt = max(array_column($evidence, 'expires')) + 1;
+    $refusalAt = (array_column($evidence, 'expires') |> max(...)) + 1;
     ensure($refusalAt - time() <= $window + 1, 'Expiry refusal wait exceeds its bound.');
     await(static fn (): bool => time() >= $refusalAt, 'first integer second after signed expiry', $window + 2);
     foreach ($evidence as &$proof) {
         $proof['refusalStartedAt'] = microtime(true);
         $refused = 0;
         foreach ($proof['urls'] as $resource) {
-            ensure((new HttpExchange($resource, []))->complete(5)->status() === 403, 'Expired signed resource remained accessible: ' . $resource);
+            ensure(new HttpExchange($resource, [])->complete(5)->status() === 403, 'Expired signed resource remained accessible: ' . $resource);
             ++$refused;
         }
         $proof['expiredRefusals'] = $refused;
@@ -466,7 +466,7 @@ function retainVideoOutput(Doctrine\DBAL\Connection $db, array $state, array $de
     $files = [];
     $paths = [];
     $urls = [];
-    $presentation = (new App\Transcode\Infrastructure\Packaging\PublishedPresentationReader())->read($runtime['output_directory']);
+    $presentation = new App\Transcode\Infrastructure\Packaging\PublishedPresentationReader()->read($runtime['output_directory']);
     ensure($presentation !== null, 'Cannot read retained native presentation.');
     foreach (App\Transcode\Application\DTO\MediaTrack::cases() as $kind) {
         $track = $presentation->track($kind);
@@ -507,7 +507,7 @@ function rejectRetiredVideoOutput(array $retained): array
         ensure(is_dir($directory) || mkdir($directory, 0750, true), 'Cannot restore retired output directory.');
         ensure(copy($file['copy'], $file['path']) && filesize($file['path']) > 0, 'Retired output bytes are absent.');
         // Each request starts after retirement; already-open responses have their own boundary.
-        $response = (new HttpExchange($file['url'], []))->complete(5);
+        $response = new HttpExchange($file['url'], [])->complete(5);
         ensure(in_array($response->status(), [403, 404, 410], true), 'Retired generation ' . $kind . ' remained deliverable: HTTP ' . $response->status());
         $statuses[$kind] = $response->status();
     }
@@ -527,7 +527,7 @@ function profileSlots(): array
 function drillOwner(Doctrine\ORM\EntityManagerInterface $manager, string $project, string $name): StreamClient
 {
     $email = $name . '@baander.app';
-    $owner = new App\Auth\Infrastructure\Doctrine\Entity\UserEntity(new PublicId(), ucfirst(str_replace('-', ' ', $name)), $email, 'unused-password', roles: ['ROLE_ADMIN']);
+    $owner = new App\Auth\Infrastructure\Doctrine\Entity\UserEntity(new PublicId(), str_replace('-', ' ', $name) |> ucfirst(...), $email, 'unused-password', roles: ['ROLE_ADMIN']);
     $owner->markEmailAsVerified();
     $manager->persist($owner);
     $manager->flush();
@@ -699,7 +699,7 @@ if ($mode === 'prepare') {
         $input = '/media/load-input';
         command(['ffmpeg', '-nostdin', '-v', 'error', '-y', '-ss', '60', '-t', (string) LOAD_VIDEO_SECONDS, '-i', $input,
             '-map', '0:v:0', '-map', '0:a:0', '-c:v', 'copy', '-c:a', 'aac', '-b:a', '160k', '-ac', '2', LOAD_VIDEO], 120);
-        $probe = json_decode((new Process(\App\Transcode\Infrastructure\FFmpeg\FFprobeArguments::video(LOAD_VIDEO, 'ffprobe'), timeout: 30))->mustRun()->getOutput(), true, flags: JSON_THROW_ON_ERROR);
+        $probe = json_decode(new Process(\App\Transcode\Infrastructure\FFmpeg\FFprobeArguments::video(LOAD_VIDEO, 'ffprobe'), timeout: 30)->mustRun()->getOutput(), true, flags: JSON_THROW_ON_ERROR);
         $loadProbe = \App\Transcode\Domain\ValueObject\VideoProbeResult::fromProbeOutput($probe);
         ensure($loadProbe->width === 1920 && $loadProbe->height === 1080, 'The load proof source must be 1080p.');
         $loadVideo = new VideoEntity(new PublicId(), LOAD_VIDEO, hash_file('xxh3', LOAD_VIDEO));
@@ -748,7 +748,7 @@ if ($mode === 'prepare') {
     curl_close($handle);
     $direct = $auth->open('id=' . $state['track'] . '', ['Range: bytes=0-127'])->complete();
     ensure(in_array($direct->status(), [200, 206], true) && strlen($direct->body) > 0, 'Direct delivery failed without a worker.');
-    ensure((new HttpExchange(BASE . '/live', []))->complete()->status() === 200, 'Web liveness failed without a worker.');
+    ensure(new HttpExchange(BASE . '/live', [])->complete()->status() === 200, 'Web liveness failed without a worker.');
     $result = ['videoStatus' => $video->status(), 'audioStatus' => $status, 'directStatus' => $direct->status()];
 } elseif ($mode === 'media-control') {
     require __DIR__ . '/media-control.php';
@@ -767,7 +767,7 @@ if ($mode === 'prepare') {
         ensure($response->status() === 201, 'Capacity video admission failed: ' . $response->body);
         $sessions[] = jsonBody($response);
     }
-    ensure(count(array_unique(array_column($sessions, 'jobId'))) === $slots['video'], 'Capacity needs a distinct video job per slot.');
+    ensure(array_column($sessions, 'jobId') |> array_unique(...) |> count(...) === $slots['video'], 'Capacity needs a distinct video job per slot.');
     $audioStreams = occupyAudio($auth, $state['track'], $slots['audio']);
     $audio = $audioStreams[0];
     await(static fn (): bool => (int) $db->fetchOne("SELECT count(*) FROM transcode_runtime_state WHERE claim_token IS NOT NULL") >= $slots['video'],
@@ -850,7 +850,7 @@ if ($mode === 'prepare') {
         ensure($request->done && $request->status() === 201, 'Concurrent attachment failed: ' . $request->body);
         $body = jsonBody($request); $sessions[] = $body['publicId']; $state['job'] = $body['jobId'];
     }
-    ensure(count(array_unique($sessions)) === 1, 'Concurrent web attachments did not converge.');
+    ensure(array_unique($sessions) |> count(...) === 1, 'Concurrent web attachments did not converge.');
     $state['session'] = $sessions[0]; save($state);
     ensure((int) $db->fetchOne('SELECT count(*) FROM transcode_runtime_state r JOIN transcode_jobs j ON j.id=r.job_id WHERE j.public_id=?', [$state['job']]) === 1, 'Duplicate durable video owner.');
     $decoded = decodeVideo($auth, $state);
@@ -881,7 +881,7 @@ if ($mode === 'prepare') {
     ensure($recommendation->status() === 202 && (jsonBody($recommendation)['data']['execution'] ?? null) === 'async', 'Recommendation admission lost its typed asynchronous response.');
     $recommendationId = jsonBody($recommendation)['data']['public_id'];
     await(static function () use ($db, $recommendationId): bool { return $db->fetchOne('SELECT status FROM recommendation_jobs WHERE public_id=?', [$recommendationId]) === 'completed'; }, 'worker recommendation completion', 45);
-    $result = ['attachments' => count($requests), 'uniqueSessions' => count(array_unique($sessions)), 'video' => videoEvidence($decoded), 'dash' => $dash, 'signedDeliveryExpiry' => $expiry, 'audioBytes' => strlen($audio->body), 'audioSeconds' => $audioSeconds, 'audioWorkerBoot' => $audioRow['worker_boot_id'], 'imageStatus' => $converted->status(), 'recommendationStatus' => $recommendation->status()];
+    $result = ['attachments' => count($requests), 'uniqueSessions' => array_unique($sessions) |> count(...), 'video' => videoEvidence($decoded), 'dash' => $dash, 'signedDeliveryExpiry' => $expiry, 'audioBytes' => strlen($audio->body), 'audioSeconds' => $audioSeconds, 'audioWorkerBoot' => $audioRow['worker_boot_id'], 'imageStatus' => $converted->status(), 'recommendationStatus' => $recommendation->status()];
 } elseif ($mode === 'dash') {
     $result = verifyDash($client(), state());
 } elseif (in_array($mode, ['seek-paused', 'resume', 'pause-absent', 'cancel'], true)) {
@@ -938,7 +938,7 @@ if ($mode === 'prepare') {
 } elseif ($mode === 'dependency') {
     $response = twoCommandExchange($client(), '/api/admin/recommendations/generate', 'POST', ['mode' => 'full'])->complete(15);
     ensure($response->status() >= 500, 'Unavailable queue did not refuse admission.');
-    ensure((new HttpExchange(BASE . '/live', []))->complete()->status() === 200, 'Queue outage broke web liveness.');
+    ensure(new HttpExchange(BASE . '/live', [])->complete()->status() === 200, 'Queue outage broke web liveness.');
     $result = ['queueAdmissionStatus' => $response->status()];
 } else {
     throw new RuntimeException('Unknown drill phase.');

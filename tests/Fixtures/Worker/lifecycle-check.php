@@ -112,7 +112,7 @@ try {
             throw new RuntimeException('Stale renewal requires exact predecessor and successor identities.');
         }
         $before = $receipt['lease'];
-        $renewed = (new DoctrineDeploymentLease($db))->renew($predecessor, 30);
+        $renewed = new DoctrineDeploymentLease($db)->renew($predecessor, 30);
         $after = lifecycleLease($db, $successor);
         if ($renewed || new DateTimeImmutable($after['expires_at']) < new DateTimeImmutable($before['expires_at'])) {
             throw new RuntimeException('Stale predecessor renewal changed successor authority.');
@@ -123,7 +123,7 @@ try {
     } elseif ($action === 'seed') {
         $userId = Uuid::v7();
         $publicId = new PublicId();
-        $email = 'worker-lifecycle-' . bin2hex(random_bytes(12)) . '@baander.app';
+        $email = 'worker-lifecycle-' . (random_bytes(12) |> bin2hex(...)) . '@baander.app';
         $jobId = Uuid::v7();
         $occurrenceId = Uuid::v7();
         $db->transactional(function (Connection $db) use ($userId, $publicId, $email): void {
@@ -151,9 +151,9 @@ try {
         $db->executeStatement(<<<'SQL'
             INSERT INTO scheduled_jobs (id, public_id, revision, name, expression, job_type, command, status, parameters, created_at, updated_at, run_count)
             VALUES (:id, :publicId, :revision, :name, '* * * * *', 'console', 'app:transcode:cache-sweep', 'paused', '{"dry-run":true}', clock_timestamp(), clock_timestamp(), 0)
-            SQL, ['id' => $jobId->toString(), 'publicId' => (new PublicId())->toString(),
+            SQL, ['id' => $jobId->toString(), 'publicId' => new PublicId()->toString(),
                 'revision' => Uuid::v7()->toString(), 'name' => 'Worker lifecycle ' . $email]);
-        if ((new DoctrineSchedulerManualOccurrenceRecorder($db))->record($jobId, $occurrenceId) === null) {
+        if (new DoctrineSchedulerManualOccurrenceRecorder($db)->record($jobId, $occurrenceId) === null) {
             throw new RuntimeException('Real manual occurrence recorder did not retain the requested work.');
         }
         $receipt['work'] = ['email' => $email, 'userId' => $userId->toString(), 'outboxId' => (string) $events[0],

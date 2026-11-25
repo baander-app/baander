@@ -51,7 +51,7 @@ final class CacheAdapterProcessorTest extends TestCase
         $container = new ContainerBuilder();
         $definition = $container->register('cache.chain', ChainAdapter::class);
         $this->process($container);
-        $directory = sys_get_temp_dir() . '/baander-cache-' . bin2hex(random_bytes(6));
+        $directory = sys_get_temp_dir() . '/baander-cache-' . (random_bytes(6) |> bin2hex(...));
         $shared = new FilesystemAdapter('baander', 0, $directory);
         try {
             $chain = new ChainAdapter([$shared]);

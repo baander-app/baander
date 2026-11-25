@@ -65,7 +65,7 @@ final class CoverExtractionPersistenceTest extends TestCase
         if (!$url) {
             self::markTestSkipped('Set OUTBOX_TEST_DATABASE_URL to the fully migrated disposable PostgreSQL database selected by DATABASE_URL.');
         }
-        $params = (new DsnParser(['postgresql' => 'pdo_pgsql']))->parse($url);
+        $params = new DsnParser(['postgresql' => 'pdo_pgsql'])->parse($url);
         $params['serverVersion'] = '18';
         $observer = DriverManager::getConnection($params);
         $this->expectOutputString('');
@@ -77,7 +77,7 @@ final class CoverExtractionPersistenceTest extends TestCase
         self::assertInstanceOf(ContextualProxy::class, $em, 'Exercise the actual Swoole service proxy, not a standalone EntityManager.');
         self::assertSame(0, $em->getConnection()->getTransactionNestingLevel(), 'DAMA must not wrap this commit-visibility test.');
         self::assertSame($observer->fetchOne('SELECT current_database()'), $em->getConnection()->fetchOne('SELECT current_database()'));
-        $library = new LibraryEntity('Cover recovery', 'cover-recovery-' . bin2hex(random_bytes(6)), '/tmp/cover-recovery', 'music', 'local');
+        $library = new LibraryEntity('Cover recovery', 'cover-recovery-' . (random_bytes(6) |> bin2hex(...)), '/tmp/cover-recovery', 'music', 'local');
         $em->persist($library);
         $em->flush();
         $album = Album::create($library->getId(), 'Recovery album', 'album');
@@ -86,7 +86,7 @@ final class CoverExtractionPersistenceTest extends TestCase
         $albums->save($album);
         $albumId = $album->getId()->toString();
         self::assertSame(1, (int) $observer->fetchOne('SELECT COUNT(*) FROM albums WHERE id = ?', [$albumId]));
-        $constraint = 'cover_retry_failure_' . bin2hex(random_bytes(8));
+        $constraint = 'cover_retry_failure_' . (random_bytes(8) |> bin2hex(...));
         $observer->executeStatement('ALTER TABLE images ADD CONSTRAINT ' . $constraint . " CHECK (album_id IS DISTINCT FROM '" . $albumId . "'::uuid)");
         try {
             $async = $this->transport();
@@ -171,7 +171,7 @@ final class CoverExtractionPersistenceTest extends TestCase
                     $event->getWorker()->stop();
                 }
             });
-            (new Worker(['async' => $async], $bus, $events))->run(['sleep' => 1000, 'time_limit' => 3]);
+            new Worker(['async' => $async], $bus, $events)->run(['sleep' => 1000, 'time_limit' => 3]);
 
             self::assertSame(2, $attempts);
             self::assertSame([$command->getAlbumId()->toString(), $command->getAlbumId()->toString()], $identities);
@@ -205,7 +205,7 @@ final class CoverExtractionPersistenceTest extends TestCase
             self::markTestSkipped('Set MESSENGER_TEST_REDIS_DSN to an isolated Redis instance.');
         }
         $connection = Connection::fromDsn($dsn, [
-            'stream' => 'cover_extraction_retry_' . bin2hex(random_bytes(12)),
+            'stream' => 'cover_extraction_retry_' . (random_bytes(12) |> bin2hex(...)),
             'group' => 'test',
             'consumer' => 'test',
         ]);

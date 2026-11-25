@@ -141,7 +141,7 @@ final class EnableTotpHandlerTest extends TestCase
 
     private static function pendingCipher(): SodiumTotpSecretCipher
     {
-        return new SodiumTotpSecretCipher(base64_encode(random_bytes(SODIUM_CRYPTO_SECRETBOX_KEYBYTES)));
+        return new SodiumTotpSecretCipher(random_bytes(SODIUM_CRYPTO_SECRETBOX_KEYBYTES) |> base64_encode(...));
     }
 
     private function handler(): EnableTotpHandler

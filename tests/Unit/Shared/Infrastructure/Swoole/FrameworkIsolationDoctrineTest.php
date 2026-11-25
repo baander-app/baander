@@ -49,7 +49,7 @@ final class FrameworkIsolationDoctrineTest extends TestCase
         $container->setParameter(ContainerConstants::PARAM_COROUTINES_STATEFUL_SERVICES, []);
         $container->setParameter(ContainerConstants::PARAM_COROUTINES_COMPILE_PROCESSORS, []);
         $container->setParameter(ContainerConstants::PARAM_COROUTINES_DOCTRINE_COMPILE_PROCESSOR_CONFIG, ['global_limit' => 2]);
-        $container->setDefinition('kernel_proxy', (new Definition(FrameworkIsolationDoctrineKernel::class))->addTag(ContainerConstants::TAG_SAFE_STATEFUL_SERVICE));
+        $container->setDefinition('kernel_proxy', new Definition(FrameworkIsolationDoctrineKernel::class)->addTag(ContainerConstants::TAG_SAFE_STATEFUL_SERVICE));
         $container->setDefinition('doctrine', new Definition(\stdClass::class));
         $container->setDefinition('doctrine.dbal.default_connection', new Definition(Connection::class));
         $container->setDefinition('doctrine.dbal.default_connection.event_manager', new Definition(ContainerAwareEventManager::class));
@@ -65,7 +65,7 @@ final class FrameworkIsolationDoctrineTest extends TestCase
         ]));
         $container->setDefinition(ServicePoolContainer::class, new Definition(ServicePoolContainer::class));
 
-        (new StatefulServicesPass())->process($container);
+        new StatefulServicesPass()->process($container);
 
         $eventPool = $container->getDefinition('doctrine.dbal.default_connection.event_manager.swoole_coop.service_pool');
         self::assertSame(2, $eventPool->getArgument(4));
@@ -79,7 +79,7 @@ final class FrameworkIsolationDoctrineTest extends TestCase
         $queryHistory = new BacktraceDebugDataHolder(['default']);
         $queryHistory->addQuery('default', new Query('SELECT 1'));
         self::assertNotEmpty($queryHistory->getData());
-        (new SimpleResetter($resetter->getArgument(0)))->reset($queryHistory);
+        new SimpleResetter($resetter->getArgument(0))->reset($queryHistory);
         self::assertSame([], $queryHistory->getData());
     }
 }

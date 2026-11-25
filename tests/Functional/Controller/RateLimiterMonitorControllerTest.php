@@ -41,7 +41,7 @@ final class RateLimiterMonitorControllerTest extends TestCase
 
     public function testClearResetsOnlyTheNamedLimiter(): void
     {
-        $key = 'u27-' . bin2hex(random_bytes(4));
+        $key = 'u27-' . (random_bytes(4) |> bin2hex(...));
         $this->exhaust('batch_cover_extract', $key);
         $this->exhaust('config_check', $key);
 
@@ -60,7 +60,7 @@ final class RateLimiterMonitorControllerTest extends TestCase
 
     public function testClearAllResetsEveryLimiter(): void
     {
-        $key = 'u27-' . bin2hex(random_bytes(4));
+        $key = 'u27-' . (random_bytes(4) |> bin2hex(...));
         $this->exhaust('config_check', $key);
         $this->exhaust('discovery_endpoint_ip', $key);
 
@@ -88,7 +88,7 @@ final class RateLimiterMonitorControllerTest extends TestCase
     #[DataProvider('rolesThatMayNotClear')]
     public function testOnlyASuperAdminClearsLimiters(string $role, int $status): void
     {
-        $key = 'clear-role-' . bin2hex(random_bytes(4));
+        $key = 'clear-role-' . (random_bytes(4) |> bin2hex(...));
         $this->exhaust('config_check', $key);
         $logs = $this->captureLogs();
 

@@ -88,17 +88,17 @@ final class LibraryDirectoryPublicationTest extends TestCase
         $this->manager = $container->get('doctrine')->getManager();
         $this->writer = $this->manager->getConnection();
         self::assertSame(0, $this->writer->getTransactionNestingLevel(), 'Commit visibility requires no enclosing test transaction.');
-        $this->observer = DriverManager::getConnection((new DsnParser(['postgresql' => 'pdo_pgsql']))->parse($url));
+        $this->observer = DriverManager::getConnection(new DsnParser(['postgresql' => 'pdo_pgsql'])->parse($url));
         self::assertSame($this->writer->fetchOne('SELECT current_database()'), $this->observer->fetchOne('SELECT current_database()'));
         self::assertNotSame($this->writer->fetchOne('SELECT pg_backend_pid()'), $this->observer->fetchOne('SELECT pg_backend_pid()'));
-        $this->schema = 'directory_publication_' . bin2hex(random_bytes(8));
+        $this->schema = 'directory_publication_' . (random_bytes(8) |> bin2hex(...));
         $this->writer->executeStatement('CREATE SCHEMA ' . $this->schema);
         foreach ([$this->writer, $this->observer] as $connection) {
             $connection->executeStatement('SET search_path TO ' . $this->schema . ', public');
             $connection->executeStatement("SET TIME ZONE 'UTC'");
         }
         FinalSchemaBootstrap::bootstrap($this->writer);
-        $this->root = sys_get_temp_dir() . '/baander-directory-publication-' . bin2hex(random_bytes(8));
+        $this->root = sys_get_temp_dir() . '/baander-directory-publication-' . (random_bytes(8) |> bin2hex(...));
         self::assertTrue(mkdir($this->root, 0777, true));
         $this->index = new LibraryFileIndexRepository($this->manager);
         $this->events = new EventDispatcher();
@@ -142,7 +142,7 @@ final class LibraryDirectoryPublicationTest extends TestCase
             $this->observer->close();
         }
         if (isset($this->root)) {
-            (new Filesystem())->remove($this->root);
+            new Filesystem()->remove($this->root);
         }
         if (isset($this->kernel)) {
             $this->kernel->shutdown();
@@ -535,7 +535,7 @@ final class LibraryDirectoryPublicationTest extends TestCase
     {
         $library = $this->library(LibraryType::Music);
         $path = $this->root . '/Album/source.' . $extension;
-        (new Filesystem())->mkdir(dirname($path));
+        new Filesystem()->mkdir(dirname($path));
         $arguments = ['/usr/bin/ffmpeg', '-y', '-nostdin', '-hide_banner', '-loglevel', 'error',
             '-f', 'lavfi', '-i', 'sine=frequency=440:sample_rate=48000:duration=0.3'];
         if ($expectedStream === 1) {
@@ -606,14 +606,14 @@ final class LibraryDirectoryPublicationTest extends TestCase
     private function library(LibraryType $type): Library
     {
         $library = Library::create('Directory publication', new LibrarySlug('directory-publication'), new LibraryPath($this->root), $type, FilesystemType::Local);
-        (new LibraryRepository($this->manager, new NativeClock()))->save($library);
+        new LibraryRepository($this->manager, new NativeClock())->save($library);
         return $library;
     }
 
     private function file(LibraryType $type, ?string $relative = null): string
     {
         $path = $this->root . '/' . ($relative ?? 'Album/01.' . ($type === LibraryType::Music ? 'flac' : 'mkv'));
-        (new Filesystem())->mkdir(dirname($path));
+        new Filesystem()->mkdir(dirname($path));
         self::assertNotFalse(file_put_contents($path, 'directory publication fixture ' . basename($path)));
         return $path;
     }
@@ -621,7 +621,7 @@ final class LibraryDirectoryPublicationTest extends TestCase
     private function audioFile(string $title = 'Directory publication', int $frequency = 440): string
     {
         $path = $this->root . '/Album/01.flac';
-        (new Filesystem())->mkdir(dirname($path));
+        new Filesystem()->mkdir(dirname($path));
         $fixture = new Process(['/usr/bin/ffmpeg', '-y', '-nostdin', '-hide_banner', '-loglevel', 'error', '-f', 'lavfi', '-i', sprintf('sine=frequency=%d:duration=0.1', $frequency), '-c:a', 'flac', '-metadata', 'title=' . $title, $path]);
         $fixture->mustRun();
         return $path;

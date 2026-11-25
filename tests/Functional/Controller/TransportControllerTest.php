@@ -127,7 +127,7 @@ final class TransportControllerTest extends TestCase
         // The async retry strategy allows three retries; this is the last attempt.
         $async->send(new Envelope(new FailureTransportProbe('exhausted', true), [new RedeliveryStamp(3)]));
 
-        $consume = new CommandTester((new Application(static::$kernel))->find('messenger:consume'));
+        $consume = new CommandTester(new Application(static::$kernel)->find('messenger:consume'));
         $consume->execute(['receivers' => ['async'], '--limit' => 1, '--time-limit' => 10], ['interactive' => false]);
         self::assertSame(0, $consume->getStatusCode(), $consume->getDisplay());
 
@@ -158,7 +158,7 @@ final class TransportControllerTest extends TestCase
     public function testRetryHandlesTheMessageInTheConsoleCommand(): void
     {
         $observer = $this->observer();
-        $label = 'retry-success-' . bin2hex(random_bytes(4));
+        $label = 'retry-success-' . (random_bytes(4) |> bin2hex(...));
         $jobId = new PublicId();
         try {
             $id = $this->sendCommittedFailed($observer, $label, $jobId, fail: false);
@@ -177,7 +177,7 @@ final class TransportControllerTest extends TestCase
     public function testRetryThatFailsAgainReturnsTheMessageUnderANewId(): void
     {
         $observer = $this->observer();
-        $label = 'retry-failure-' . bin2hex(random_bytes(4));
+        $label = 'retry-failure-' . (random_bytes(4) |> bin2hex(...));
         $jobId = new PublicId();
         try {
             $id = $this->sendCommittedFailed($observer, $label, $jobId, fail: true);
@@ -253,7 +253,7 @@ final class TransportControllerTest extends TestCase
         if (!$url) {
             self::markTestSkipped('Set OUTBOX_TEST_DATABASE_URL to the fully migrated disposable PostgreSQL database selected by DATABASE_URL.');
         }
-        $params = (new DsnParser(['postgresql' => 'pdo_pgsql']))->parse($url);
+        $params = new DsnParser(['postgresql' => 'pdo_pgsql'])->parse($url);
         $params['serverVersion'] = '18';
         $observer = DriverManager::getConnection($params);
         self::assertSame($observer->fetchOne('SELECT current_database()'), $this->connection()->fetchOne('SELECT current_database()'));

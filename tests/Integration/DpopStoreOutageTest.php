@@ -70,7 +70,7 @@ final class DpopStoreOutageTest extends TestCase
     public static function tearDownAfterClass(): void
     {
         if (isset(self::$sharedDirectory)) {
-            (new Filesystem())->remove(self::$sharedDirectory);
+            new Filesystem()->remove(self::$sharedDirectory);
         }
         parent::tearDownAfterClass();
     }
@@ -84,7 +84,7 @@ final class DpopStoreOutageTest extends TestCase
         }
         $this->databaseUrl = $url;
         if (!isset(self::$sharedDirectory)) {
-            self::$sharedDirectory = sys_get_temp_dir() . '/baander-dpop-store-outage-' . bin2hex(random_bytes(8));
+            self::$sharedDirectory = sys_get_temp_dir() . '/baander-dpop-store-outage-' . (random_bytes(8) |> bin2hex(...));
             $key = openssl_pkey_new(['private_key_type' => OPENSSL_KEYTYPE_RSA, 'private_key_bits' => 2048]);
             self::assertNotFalse($key);
             self::assertTrue(openssl_pkey_export($key, $privateKey));
@@ -115,7 +115,7 @@ final class DpopStoreOutageTest extends TestCase
         $users = $container->get('oauth.acceptance.users');
         self::assertInstanceOf(UserRepositoryInterface::class, $users);
         $this->user = User::register(
-            new Email('store-outage-' . bin2hex(random_bytes(8)) . '@baander.app'),
+            new Email('store-outage-' . (random_bytes(8) |> bin2hex(...)) . '@baander.app'),
             password_hash(self::PASSWORD, PASSWORD_BCRYPT),
             'Store outage user',
         );
@@ -608,7 +608,7 @@ final class DpopStoreOutageTest extends TestCase
             $users = $this->kernel->getContainer()->get('oauth.acceptance.users');
             self::assertInstanceOf(UserRepositoryInterface::class, $users);
             $this->otherUser = User::register(
-                new Email('store-outage-other-' . bin2hex(random_bytes(8)) . '@baander.app'),
+                new Email('store-outage-other-' . (random_bytes(8) |> bin2hex(...)) . '@baander.app'),
                 password_hash(self::PASSWORD, PASSWORD_BCRYPT),
                 'Store outage other user',
             );
@@ -816,7 +816,7 @@ final class DpopStoreOutageTest extends TestCase
     private function nonce(): string
     {
         $probe = new SignedDpopProof();
-        $response = $this->send('POST', '/api/auth/refresh', json: ['refreshToken' => 'nonce-probe-' . bin2hex(random_bytes(8))], headers: [
+        $response = $this->send('POST', '/api/auth/refresh', json: ['refreshToken' => 'nonce-probe-' . (random_bytes(8) |> bin2hex(...))], headers: [
             'DPoP' => $probe->create('POST', self::ORIGIN . '/api/auth/refresh', 'no-access-token'),
         ]);
         self::assertSame(400, $response->getStatusCode(), (string) $response->getContent());

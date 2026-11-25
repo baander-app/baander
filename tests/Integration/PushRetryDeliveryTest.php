@@ -106,10 +106,10 @@ final class PushRetryDeliveryTest extends TestCase
 
             public function findByUser(Uuid $userId): array
             {
-                return array_values(array_filter(
+                return array_filter(
                     $this->subscriptions,
                     static fn (PushSubscriptionEntity $subscription): bool => $subscription->getUserId()->equals($userId),
-                ));
+                ) |> array_values(...);
             }
         };
         $attempts = [];
@@ -134,7 +134,7 @@ final class PushRetryDeliveryTest extends TestCase
             },
         );
         $bus = $this->bus($async, $subscriptions, $webPush);
-        $command = new SendPushCommand($owner, NotificationCategory::Security, 'Title', 'Body', (new PublicId())->toString());
+        $command = new SendPushCommand($owner, NotificationCategory::Security, 'Title', 'Body', new PublicId()->toString());
 
         $bus->dispatch($command);
         self::assertSame([], $attempts, 'Sending must enqueue before any push is sent.');
@@ -201,7 +201,7 @@ final class PushRetryDeliveryTest extends TestCase
                 $event->getWorker()->stop();
             }
         });
-        (new Worker(['async' => $async], $bus, $events))->run(['sleep' => 1000, 'time_limit' => 5]);
+        new Worker(['async' => $async], $bus, $events)->run(['sleep' => 1000, 'time_limit' => 5]);
     }
 
     /**
@@ -222,7 +222,7 @@ final class PushRetryDeliveryTest extends TestCase
             self::markTestSkipped('Set MESSENGER_TEST_REDIS_DSN to an isolated Redis instance.');
         }
         $connection = Connection::fromDsn($dsn, [
-            'stream' => 'push_retry_' . bin2hex(random_bytes(12)),
+            'stream' => 'push_retry_' . (random_bytes(12) |> bin2hex(...)),
             'group' => 'test',
             'consumer' => 'test',
         ]);

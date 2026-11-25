@@ -24,7 +24,7 @@ final class StreamedResponseProcessorTest extends TestCase
 
     protected function setUp(): void
     {
-        $this->directory = sys_get_temp_dir() . '/baander-streamed-response-' . bin2hex(random_bytes(8));
+        $this->directory = sys_get_temp_dir() . '/baander-streamed-response-' . (random_bytes(8) |> bin2hex(...));
         self::assertTrue(mkdir($this->directory, 0700));
         $range = fopen($this->directory . '/range.bin', 'wb');
         self::assertNotFalse($range);

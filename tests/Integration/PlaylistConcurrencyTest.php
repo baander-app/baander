@@ -55,7 +55,7 @@ final class PlaylistConcurrencyTest extends TestCase
         if (!getenv('OUTBOX_TEST_DATABASE_URL')) {
             self::markTestSkipped('Set OUTBOX_TEST_DATABASE_URL to a disposable PostgreSQL database.');
         }
-        $this->schema = 'playlist_concurrency_' . bin2hex(random_bytes(8));
+        $this->schema = 'playlist_concurrency_' . (random_bytes(8) |> bin2hex(...));
         $this->observer = $this->connect('public');
         $this->observer->executeStatement('CREATE SCHEMA ' . $this->schema);
         $this->observer->executeStatement('SET search_path TO ' . $this->schema . ', public');
@@ -332,7 +332,7 @@ final class PlaylistConcurrencyTest extends TestCase
         self::assertSame($before, $this->storedState());
         $fresh = $this->load($this->repository($this->manager()));
         self::assertSame($playlist->getRevision(), $fresh->getRevision());
-        self::assertSame(array_reverse(array_map(static fn(Uuid $id): string => $id->toString(), $this->songIds)), array_map(static fn($song): string => $song->getSongId()->toString(), $fresh->getSongs()));
+        self::assertSame(array_map(static fn(Uuid $id): string => $id->toString(), $this->songIds) |> array_reverse(...), array_map(static fn($song): string => $song->getSongId()->toString(), $fresh->getSongs()));
     }
 
     /** @return iterable<string, array{bool}> */
@@ -409,7 +409,7 @@ final class PlaylistConcurrencyTest extends TestCase
         $fresh = $this->load($freshRepository);
         self::assertSame($winnerRevision, $fresh->getRevision());
         self::assertNotSame($expectedRevision, $winnerRevision);
-        self::assertSame(array_reverse(array_map(static fn(Uuid $id): string => $id->toString(), $this->songIds)), array_map(static fn($song): string => $song->getSongId()->toString(), $fresh->getSongs()));
+        self::assertSame(array_map(static fn(Uuid $id): string => $id->toString(), $this->songIds) |> array_reverse(...), array_map(static fn($song): string => $song->getSongId()->toString(), $fresh->getSongs()));
         try {
             (new ReorderSongsHandler($freshRepository))(new ReorderSongsCommand($this->playlistId, $this->ownerId, $this->songIds, $expectedRevision));
             self::fail('A reorder starting after the winner commits must also reject its old client revision.');
@@ -668,7 +668,7 @@ final class PlaylistConcurrencyTest extends TestCase
     /** @return array{process: resource, input: resource, output: resource, application: string, errors: resource} */
     private function startChild(string $action, Uuid|string|null $target = null): array
     {
-        $application = 'playlist_write_' . bin2hex(random_bytes(8));
+        $application = 'playlist_write_' . (random_bytes(8) |> bin2hex(...));
         $output = tmpfile();
         self::assertIsResource($output);
         $process = proc_open(
@@ -754,7 +754,7 @@ final class PlaylistConcurrencyTest extends TestCase
         $manager = $this->manager();
         $album = $manager->getRepository(AlbumEntity::class)->findOneBy([]);
         self::assertInstanceOf(AlbumEntity::class, $album);
-        $song = new SongEntity(new PublicId(), $album, 'Additional', '/race/' . (new Uuid())->toString() . '.flac', 3, 'audio/flac');
+        $song = new SongEntity(new PublicId(), $album, 'Additional', '/race/' . new Uuid()->toString() . '.flac', 3, 'audio/flac');
         $manager->persist($song);
         $manager->flush();
 

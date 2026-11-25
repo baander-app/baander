@@ -71,7 +71,7 @@ final class PasswordChangeSessionRevocationTest extends TestCase
     public static function tearDownAfterClass(): void
     {
         if (isset(self::$sharedDirectory)) {
-            (new Filesystem())->remove(self::$sharedDirectory);
+            new Filesystem()->remove(self::$sharedDirectory);
         }
         parent::tearDownAfterClass();
     }
@@ -83,7 +83,7 @@ final class PasswordChangeSessionRevocationTest extends TestCase
             self::markTestSkipped('Disposable PostgreSQL and Redis services are required.');
         }
         if (!isset(self::$sharedDirectory)) {
-            self::$sharedDirectory = sys_get_temp_dir() . '/baander-password-sessions-' . bin2hex(random_bytes(8));
+            self::$sharedDirectory = sys_get_temp_dir() . '/baander-password-sessions-' . (random_bytes(8) |> bin2hex(...));
             self::assertTrue(mkdir(self::$sharedDirectory, 0700));
             $key = openssl_pkey_new(['private_key_type' => OPENSSL_KEYTYPE_RSA, 'private_key_bits' => 2048]);
             self::assertNotFalse($key);
@@ -216,11 +216,11 @@ final class PasswordChangeSessionRevocationTest extends TestCase
         self::assertSame(200, $response->getStatusCode(), (string) $response->getContent());
         $this->assertSignedOut($other, $otherKey);
         $this->signIn($this->user, 'changed-by-owner-8');
-        $errors = array_values(array_filter(
+        $errors = array_filter(
             $this->prodLogRecords(),
             fn (array $record): bool => ($record['context']['user'] ?? null) === $this->user->getId()->toString()
                 && str_contains((string) $record['message'], 'did not close'),
-        ));
+        ) |> array_values(...);
         self::assertCount(1, $errors, 'One error records the close the web server did not finish.');
         self::assertSame('ERROR', $errors[0]['level_name']);
         self::assertSame(1, $errors[0]['context']['connections'] ?? null);
@@ -365,7 +365,7 @@ final class PasswordChangeSessionRevocationTest extends TestCase
     {
         [$current, $currentKey] = $this->signIn($this->user);
         [$other, $otherKey] = $this->signIn($this->user);
-        $passkey = Passkey::create(Uuid::v7(), 'Laptop', 'credential-' . bin2hex(random_bytes(8)), [], 0);
+        $passkey = Passkey::create(Uuid::v7(), 'Laptop', 'credential-' . (random_bytes(8) |> bin2hex(...)), [], 0);
         $this->passkeys()->save($passkey, $this->user->getId());
 
         $response = $this->send('DELETE', '/api/auth/passkey/' . $passkey->getPublicId()->toString(), $current['accessToken'], $currentKey, [
@@ -497,7 +497,7 @@ final class PasswordChangeSessionRevocationTest extends TestCase
         [$current, $currentKey] = $this->signIn($this->user);
         [$other, $otherKey] = $this->signIn($this->user);
         $pairedDevice = $this->issueDelegatedToken();
-        $address = 'password-session-new-' . bin2hex(random_bytes(8)) . '@baander.app';
+        $address = 'password-session-new-' . (random_bytes(8) |> bin2hex(...)) . '@baander.app';
         $this->requestEmailChange($address, 'session-email-change-token');
         $offset = RecordingLiveConnections::size(self::$sharedDirectory);
 
@@ -540,7 +540,7 @@ final class PasswordChangeSessionRevocationTest extends TestCase
         [$session, $key] = $this->signIn($this->user);
         $this->issueResetToken();
 
-        $command = (new Application($this->kernel))->find('app:user:reset-password');
+        $command = new Application($this->kernel)->find('app:user:reset-password');
         $tester = new CommandTester($command);
         $tester->setInputs(['changed-by-cli-4']);
         $tester->execute(['identifier' => $this->user->getEmail()]);
@@ -862,7 +862,7 @@ final class PasswordChangeSessionRevocationTest extends TestCase
      */
     private function startChild(string $script, array $arguments): array
     {
-        $application = 'password_race_' . bin2hex(random_bytes(6));
+        $application = 'password_race_' . (random_bytes(6) |> bin2hex(...));
         $output = tmpfile();
         self::assertIsResource($output);
         $process = proc_open(
@@ -935,7 +935,7 @@ final class PasswordChangeSessionRevocationTest extends TestCase
         if (!isset($this->observer)) {
             $url = getenv('OUTBOX_TEST_DATABASE_URL');
             self::assertIsString($url);
-            $this->observer = DriverManager::getConnection((new DsnParser(['postgresql' => 'pdo_pgsql']))->parse($url));
+            $this->observer = DriverManager::getConnection(new DsnParser(['postgresql' => 'pdo_pgsql'])->parse($url));
         }
 
         return $this->observer;
@@ -988,7 +988,7 @@ final class PasswordChangeSessionRevocationTest extends TestCase
         $this->createdClients[] = $client->getId()->toString();
         $user = $manager->find(UserEntity::class, $this->user->getId());
         self::assertInstanceOf(UserEntity::class, $user);
-        $tokenId = bin2hex(random_bytes(20));
+        $tokenId = random_bytes(20) |> bin2hex(...);
         $manager->persist(new AccessTokenEntity(
             $tokenId,
             $client,
@@ -1044,7 +1044,7 @@ final class PasswordChangeSessionRevocationTest extends TestCase
         $generated = openssl_pkey_new(['private_key_type' => OPENSSL_KEYTYPE_EC, 'curve_name' => 'prime256v1']);
         self::assertNotFalse($generated);
         self::assertTrue(openssl_pkey_export($generated, $pem));
-        $path = self::$sharedDirectory . '/dpop-' . bin2hex(random_bytes(6)) . '.pem';
+        $path = self::$sharedDirectory . '/dpop-' . (random_bytes(6) |> bin2hex(...)) . '.pem';
         self::assertSame(strlen($pem), file_put_contents($path, $pem));
         self::assertTrue(chmod($path, 0600));
         $key = new SignedDpopProof($pem);
@@ -1057,7 +1057,7 @@ final class PasswordChangeSessionRevocationTest extends TestCase
     private function createUser(array $roles): User
     {
         $user = User::createByOperator(
-            new Email('password-session-' . bin2hex(random_bytes(8)) . '@baander.app'),
+            new Email('password-session-' . (random_bytes(8) |> bin2hex(...)) . '@baander.app'),
             password_hash(self::PASSWORD, PASSWORD_BCRYPT),
             'Password session user',
             $roles,
@@ -1146,7 +1146,7 @@ final class PasswordChangeSessionRevocationTest extends TestCase
     private function nonce(): string
     {
         $probe = new SignedDpopProof();
-        $response = $this->send('POST', '/api/auth/refresh', json: ['refreshToken' => 'nonce-probe-' . bin2hex(random_bytes(8))], headers: [
+        $response = $this->send('POST', '/api/auth/refresh', json: ['refreshToken' => 'nonce-probe-' . (random_bytes(8) |> bin2hex(...))], headers: [
             'DPoP' => $probe->create('POST', self::ORIGIN . '/api/auth/refresh', 'no-access-token'),
         ]);
         self::assertSame(400, $response->getStatusCode(), (string) $response->getContent());

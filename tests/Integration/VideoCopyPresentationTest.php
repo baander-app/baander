@@ -64,7 +64,7 @@ final class VideoCopyPresentationTest extends TestCase
     #[DataProvider('audioSelections')]
     public function testOwnedCopyPreservesPacketsAndSeeksFromAnIrregularKeyframe(bool $hasAudio): void
     {
-        $root = sys_get_temp_dir() . '/baander-video-copy-' . bin2hex(random_bytes(8));
+        $root = sys_get_temp_dir() . '/baander-video-copy-' . (random_bytes(8) |> bin2hex(...));
         mkdir($root, 0700);
         $source = $root . '/source.mkv';
         $native = null;
@@ -117,7 +117,7 @@ final class VideoCopyPresentationTest extends TestCase
             self::assertContains('ready', $outcomes);
             self::assertSame('complete', array_last($outcomes));
             $directory = $job->getOutputDirectory();
-            $presentation = (new PublishedPresentationReader())->read($directory);
+            $presentation = new PublishedPresentationReader()->read($directory);
             self::assertNotNull($presentation);
             self::assertTrue($presentation->complete);
             self::assertSame($hasAudio, $presentation->track(MediaTrack::Audio) !== null);
@@ -154,7 +154,7 @@ final class VideoCopyPresentationTest extends TestCase
             self::assertSame('complete', array_last($outcomes), json_encode($outcomes));
             $metadata = json_decode(file_get_contents($job->getOutputDirectory() . '/generation.json'), true, flags: JSON_THROW_ON_ERROR);
             self::assertEqualsWithDelta(0.0, $metadata['startTime'], .001);
-            $seek = (new PublishedPresentationReader())->read($job->getOutputDirectory());
+            $seek = new PublishedPresentationReader()->read($job->getOutputDirectory());
             self::assertNotNull($seek);
             self::assertTrue($seek->covers(7.0 - $metadata['startTime'], $hasAudio));
 
@@ -169,7 +169,7 @@ final class VideoCopyPresentationTest extends TestCase
                 self::assertContains('ready', $outcomes, json_encode($outcomes));
                 $metadata = json_decode(file_get_contents($job->getOutputDirectory() . '/generation.json'), true, flags: JSON_THROW_ON_ERROR);
                 self::assertEqualsWithDelta(2.92, $metadata['startTime'], .001);
-                $seek = (new PublishedPresentationReader())->read($job->getOutputDirectory());
+                $seek = new PublishedPresentationReader()->read($job->getOutputDirectory());
                 self::assertNotNull($seek);
                 foreach ([MediaTrack::Video, ...($hasAudio ? [MediaTrack::Audio] : [])] as $kind) {
                     $track = $seek->track($kind);

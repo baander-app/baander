@@ -29,7 +29,7 @@ final class StreamControllerRangeTest extends TestCase
 
     protected function setUp(): void
     {
-        $this->directory = sys_get_temp_dir() . '/baander-stream-range-' . bin2hex(random_bytes(8));
+        $this->directory = sys_get_temp_dir() . '/baander-stream-range-' . (random_bytes(8) |> bin2hex(...));
         self::assertTrue(mkdir($this->directory, 0700));
         $this->file = $this->directory . '/track.bin';
         self::assertSame(10, file_put_contents($this->file, '0123456789'));

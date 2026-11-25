@@ -66,7 +66,7 @@ final class RedisTransportStatusTest extends TestCase
         $this->expectException(AsyncTransportUnavailableException::class);
         $this->expectExceptionMessage('Redis unavailable: connection refused');
 
-        (new RedisTransportStatus($factory, 'worker-baander-app', $this->failedMessages(0)))->status();
+        new RedisTransportStatus($factory, 'worker-baander-app', $this->failedMessages(0))->status();
     }
 
     public function testAnUnavailableFailureTransportIsPassedOn(): void

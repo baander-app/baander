@@ -22,7 +22,7 @@ final class AdvancedStaticFilesServerTest extends TestCase
 
     protected function setUp(): void
     {
-        $this->directory = sys_get_temp_dir() . '/baander.app-static-' . bin2hex(random_bytes(8));
+        $this->directory = sys_get_temp_dir() . '/baander.app-static-' . (random_bytes(8) |> bin2hex(...));
         $this->public = $this->directory . '/public';
         $filesystem = new Filesystem();
         $filesystem->dumpFile($this->public . self::FONT, 'font');

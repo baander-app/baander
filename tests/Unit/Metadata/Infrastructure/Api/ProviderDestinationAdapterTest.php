@@ -226,12 +226,12 @@ final class ProviderDestinationAdapterTest extends TestCase
                 new RateLimiterFactory(['id' => 'musicbrainz', 'policy' => 'no_limit'], new InMemoryStorage()),
                 new CoverArtArchiveAdapter($logger, $encoder, $client),
             )->searchArtist('Artist')->artists[0]->name ?? null,
-            'discogs' => (new DiscogsAdapter(self::SECRET, $logger, $encoder, $client))->searchArtist('Artist')->artists[0]->name ?? null,
-            'lastfm' => (new LastFmAdapter(self::SECRET, $logger, $encoder, $client))->getArtistInfo('Artist')['name'] ?? null,
-            'spotify' => (new SpotifyAdapter('client', self::SECRET, $logger, $encoder, $client))->searchArtist('Artist')[0]['name'] ?? null,
-            'tastedive' => (new TasteDiveAdapter(self::SECRET, $logger, $encoder, $client))->getSimilar('Artist')[0]['name'] ?? null,
-            'tmdb' => (new TmdbAdapter(self::SECRET, $logger, $encoder, $client))->searchMovie('Artist')->first()?->title,
-            'coverartarchive' => (new CoverArtArchiveAdapter($logger, $encoder, $client))->getReleaseCover('release')[0]['image'] ?? null,
+            'discogs' => new DiscogsAdapter(self::SECRET, $logger, $encoder, $client)->searchArtist('Artist')->artists[0]->name ?? null,
+            'lastfm' => new LastFmAdapter(self::SECRET, $logger, $encoder, $client)->getArtistInfo('Artist')['name'] ?? null,
+            'spotify' => new SpotifyAdapter('client', self::SECRET, $logger, $encoder, $client)->searchArtist('Artist')[0]['name'] ?? null,
+            'tastedive' => new TasteDiveAdapter(self::SECRET, $logger, $encoder, $client)->getSimilar('Artist')[0]['name'] ?? null,
+            'tmdb' => new TmdbAdapter(self::SECRET, $logger, $encoder, $client)->searchMovie('Artist')->first()?->title,
+            'coverartarchive' => new CoverArtArchiveAdapter($logger, $encoder, $client)->getReleaseCover('release')[0]['image'] ?? null,
             default => throw new \LogicException('Unknown fixture provider.'),
         };
     }

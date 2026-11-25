@@ -7,7 +7,7 @@ use App\Tests\Fixtures\Messaging\MessageCodecFactory;
 require dirname(__DIR__, 2) . '/vendor/autoload.php';
 require_once dirname(__DIR__) . '/Support/FinalSchemaBootstrap.php';
 require_once __DIR__ . '/Messaging/MessageCodecFactory.php';
-(new Symfony\Component\Dotenv\Dotenv())->bootEnv(dirname(__DIR__, 2) . '/.env');
+new Symfony\Component\Dotenv\Dotenv()->bootEnv(dirname(__DIR__, 2) . '/.env');
 
 $mode = $argv[1] ?? '';
 if (in_array($mode, ['ready', 'busy', 'unhealthy', 'stopped'], true)) {
@@ -33,7 +33,7 @@ if ($mode === 'consumer-pid') {
     foreach (glob('/proc/[0-9]*/cmdline') ?: [] as $file) {
         $arguments = explode("\0", (string) @file_get_contents($file));
         if (in_array('messenger:consume', $arguments, true)) {
-            $pids[] = (int) basename(dirname($file));
+            $pids[] = (int) (dirname($file) |> basename(...));
         }
     }
     if (count($pids) !== 1) {
