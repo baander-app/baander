@@ -47,6 +47,7 @@ final class OriginalMediaControllerTest extends TestCase
     private Uuid $owner;
     private PublicId $video;
     private HmacStreamAuthAdapter $signatures;
+    private ?string $directory = null;
 
     protected function setUp(): void
     {
@@ -60,6 +61,9 @@ final class OriginalMediaControllerTest extends TestCase
     protected function tearDown(): void
     {
         unlink($this->file);
+        if ($this->directory !== null) {
+            rmdir($this->directory);
+        }
     }
 
     public function testSignedVideoDeliversOnlyRequestedBytes(): void
@@ -76,6 +80,53 @@ final class OriginalMediaControllerTest extends TestCase
         self::assertSame('2345', $body);
         self::assertTrue($response->headers->hasCacheControlDirective('private'));
         self::assertTrue($response->headers->hasCacheControlDirective('no-store'));
+    }
+
+    /** @return iterable<string, array{string, string, array<string, string>, int}> */
+    public static function originalResponses(): iterable
+    {
+        foreach (['video', 'track'] as $resource) {
+            yield $resource . ' GET' => [$resource, 'GET', [], 200];
+            yield $resource . ' HEAD' => [$resource, 'HEAD', [], 200];
+            yield $resource . ' range' => [$resource, 'GET', ['Range' => 'bytes=2-5'], 206];
+        }
+    }
+
+    /** @param array<string, string> $headers */
+    #[DataProvider('originalResponses')]
+    public function testEveryOriginalIsASandboxedDownload(string $resource, string $method, array $headers, int $status): void
+    {
+        $request = Request::create($resource === 'video' ? $this->url() : $this->trackUrl(), $method);
+        $request->headers->add($headers);
+        $response = $this->controller()->{$resource}($request);
+        $response->prepare($request);
+
+        self::assertSame($status, $response->getStatusCode());
+        self::assertSame('attachment', $response->headers->get('Content-Disposition'));
+        self::assertSame("default-src 'none'; sandbox", $response->headers->get('Content-Security-Policy'));
+    }
+
+    /** @return iterable<string, array{string, string}> */
+    public static function libraryFileNames(): iterable
+    {
+        yield 'non-ASCII video' => ['video', 'Amélie (2001).mkv'];
+        yield 'percent track' => ['track', '100% Pure.mp3'];
+    }
+
+    #[DataProvider('libraryFileNames')]
+    public function testAnyLibraryFileNameIsServedAsADownload(string $resource, string $name): void
+    {
+        $this->directory = sys_get_temp_dir() . '/baander-original-' . bin2hex(random_bytes(8));
+        self::assertTrue(mkdir($this->directory, 0700));
+        self::assertTrue(rename($this->file, $this->directory . '/' . $name));
+        $this->file = $this->directory . '/' . $name;
+
+        $request = Request::create($resource === 'video' ? $this->url() : $this->trackUrl());
+        $response = $this->controller()->{$resource}($request);
+        $response->prepare($request);
+
+        self::assertSame(200, $response->getStatusCode());
+        self::assertSame('attachment', $response->headers->get('Content-Disposition'));
     }
 
     public function testSignedVideoRechecksRevokedMembership(): void
@@ -204,6 +255,11 @@ final class OriginalMediaControllerTest extends TestCase
         return $this->signatures->signUrl('/api/stream/original/track?' . http_build_query([
             'id' => $this->video->toString(), 'owner' => $this->owner->toString(), 'format' => 'aac', 'mode' => 'copy', 'container' => 'mp4', 'index' => $index,
         ]))['url'];
+    }
+
+    private function trackUrl(): string
+    {
+        return $this->signatures->signUrl('/api/stream/original/track?' . http_build_query(['id' => $this->video->toString(), 'owner' => $this->owner->toString()]))['url'];
     }
 
     private function url(): string

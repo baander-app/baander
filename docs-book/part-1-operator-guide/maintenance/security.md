@@ -100,6 +100,8 @@ The policy's `connect-src` allows a WebSocket only to the public origin the page
 
 Stored image files (`/api/images/{id}/file`) are served with the media type Baander recorded for them when it is JPEG, PNG, WebP or GIF, and converted derivatives as WebP. Any other recorded type is served as an `application/octet-stream` download. Each image file response also carries `Content-Security-Policy: default-src 'none'; sandbox`, so an uploaded file cannot run script at the installation's origin.
 
+Library media is protected the same way. An original video or track (`/api/stream/video`, `/api/stream/original/track` and `/api/stream/track`) is served with the media type of its probed container and file extension, never a type read from the file's bytes; a format that Baander does not list as a media container goes out as `application/octet-stream`. These responses also carry `Content-Disposition: attachment` and `Content-Security-Policy: default-src 'none'; sandbox`, so a signed media link opened in a browser tab downloads the file instead of playing it there. Playback inside Baander is unchanged. Any other response that is not the web app's HTML page carries `Content-Security-Policy: default-src 'none'; frame-ancestors 'none'; sandbox`, unless its route sets its own policy.
+
 A request that reaches Baander as HTTPS, directly or through a proxy listed in `TRUSTED_PROXIES` that sets `X-Forwarded-Proto: https`, also gets `Strict-Transport-Security: max-age=31536000`. With an untrusted proxy, Baander sees plain HTTP and sends no HSTS.
 
 ### File permissions

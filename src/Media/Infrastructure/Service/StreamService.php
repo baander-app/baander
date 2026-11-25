@@ -11,6 +11,8 @@ use App\Media\Domain\Model\TrackStreamMetadata;
 use App\Library\Application\Port\LibraryMediaFileResolverInterface;
 use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
+use App\Shared\Domain\ValueObject\MediaContainer;
+use App\Shared\Domain\ValueObject\MediaKind;
 
 final class StreamService implements StreamPortInterface
 {
@@ -34,12 +36,14 @@ final class StreamService implements StreamPortInterface
     public function getTrackMetadata(PublicId $trackId): TrackStreamMetadata
     {
         $song = $this->findSong($trackId);
+        $filename = basename($song->getPath());
 
         return new TrackStreamMetadata(
             publicId: $song->getPublicId()->toString(),
-            filename: basename($song->getPath()),
+            filename: $filename,
             filePath: $song->getPath(),
-            mimeType: $song->getMimeType(),
+            mimeType: MediaContainer::identify(MediaKind::Audio, $song->getContainerFormat(), pathinfo($filename, PATHINFO_EXTENSION))?->mediaType()
+                ?? 'application/octet-stream',
             size: $song->getSize(),
             codec: $song->getCodec(),
             bitrate: $song->getBitrate(),

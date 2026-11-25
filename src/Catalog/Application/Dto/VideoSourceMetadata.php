@@ -9,6 +9,9 @@ use App\Shared\Domain\Model\Uuid;
 final readonly class VideoSourceMetadata
 {
     /**
+     * @param string $filename the name the library lists, whose extension the import checked
+     * @param string $mimeType the container table's type for the probed format and that extension,
+     *                         `application/octet-stream` when neither names a video container
      * @param list<array<string, mixed>> $audioStreams
      * @param array<string, mixed>|null $colorSpace
      */

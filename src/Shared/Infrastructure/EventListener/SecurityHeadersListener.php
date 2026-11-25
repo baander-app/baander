@@ -13,10 +13,11 @@ use Symfony\Component\HttpKernel\Event\ResponseEvent;
 use Symfony\Component\HttpKernel\KernelEvents;
 
 /**
- * Browser protections for every application response. HTML responses also get a
+ * Browser protections for every application response. HTML responses get a
  * Content-Security-Policy whose script nonce is fresh per request: templates read it from
- * the request attribute named by NONCE_ATTRIBUTE. HTTPS requests, including HTTPS through a
- * trusted proxy, get HSTS.
+ * the request attribute named by NONCE_ATTRIBUTE. Every other response gets a policy that
+ * refuses to act as a document. HTTPS requests, including HTTPS through a trusted proxy, get
+ * HSTS.
  *
  * The policy follows what the web app loads: its own scripts, WebAssembly DSP modules and
  * audio worklets, the stream service worker and blob: media workers, a WebSocket to the public
@@ -37,6 +38,13 @@ final readonly class SecurityHeadersListener
     ];
 
     private const string HSTS = 'max-age=31536000';
+
+    /**
+     * For every response that is not the app page, unless its controller set its own policy: a
+     * JSON body, a manifest or a file opened as a page loads nothing, runs no script and cannot
+     * be framed.
+     */
+    private const string DOCUMENT_REFUSED = "default-src 'none'; frame-ancestors 'none'; sandbox";
 
     /**
      * @param list<string> $developmentOrigins Origins of a development asset server, empty in production
@@ -71,8 +79,16 @@ final readonly class SecurityHeadersListener
             $response->headers->set('Strict-Transport-Security', self::HSTS);
         }
 
+        if ($response->headers->has('Content-Security-Policy')) {
+            return;
+        }
+        if (!self::isHtml($response)) {
+            $response->headers->set('Content-Security-Policy', self::DOCUMENT_REFUSED);
+
+            return;
+        }
         $nonce = $request->attributes->get(self::NONCE_ATTRIBUTE);
-        if (is_string($nonce) && self::isHtml($response) && !$response->headers->has('Content-Security-Policy')) {
+        if (is_string($nonce)) {
             $response->headers->set('Content-Security-Policy', $this->policy($request, $nonce));
         }
     }

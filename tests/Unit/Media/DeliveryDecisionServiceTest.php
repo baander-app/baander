@@ -83,6 +83,52 @@ final class DeliveryDecisionServiceTest extends TestCase
         );
     }
 
+    /** @return iterable<string, array{string, string, string}> */
+    public static function originalContainers(): iterable
+    {
+        yield 'mp4' => ['movie.mp4', 'mov,mp4,m4a,3gp,3g2,mj2', 'mp4'];
+        yield 'mov' => ['movie.mov', 'mov,mp4,m4a,3gp,3g2,mj2', 'mov'];
+        yield 'matroska' => ['movie.mkv', 'matroska,webm', 'matroska'];
+        yield 'webm' => ['movie.webm', 'matroska,webm', 'webm'];
+    }
+
+    #[DataProvider('originalContainers')]
+    public function testTheContainerIsNamedFromTheProbeAndTheExtensionNotTheServedType(string $filename, string $format, string $container): void
+    {
+        $decision = $this->service(videos: $this->video($filename, $format))->video(
+            new Uuid(),
+            new PublicId(),
+            new DeliveryDestination([$container], ['h264'], ['aac']),
+        );
+
+        self::assertSame(DeliveryKind::Original, $decision->kind);
+    }
+
+    public function testAFormatNoVideoContainerIsReadByIsNeverOfferedAsTheOriginal(): void
+    {
+        $decision = $this->service(videos: $this->video('Holiday Clip (2021).mkv', 'mpegts'))->video(
+            new Uuid(),
+            new PublicId(),
+            new DeliveryDestination(['mpegts', 'matroska'], ['h264'], ['aac']),
+        );
+
+        self::assertNotSame(DeliveryKind::Original, $decision->kind);
+        self::assertSame('container_unsupported', $decision->reason);
+    }
+
+    public function testATrackWithoutAStoredContainerFormatIsNamedByItsExtension(): void
+    {
+        $metadata = new TrackStreamMetadata('track', 'song.mp3', '/library/song.mp3', 'application/octet-stream', 100, 'mp3', 128000, 48000, 2, 10.0);
+
+        $decision = $this->service(metadata: $metadata)->track(
+            new Uuid(),
+            new PublicId(),
+            new DeliveryDestination(['mp3'], audioCodecs: ['mp3']),
+        );
+
+        self::assertSame(DeliveryKind::Original, $decision->kind);
+    }
+
     public function testFailedNativeSourceCanOnlyFallBackToPermittedEncoding(): void
     {
         $metadata = new TrackStreamMetadata(
@@ -671,6 +717,33 @@ final class DeliveryDecisionServiceTest extends TestCase
         yield 'policy denied cached tier' => [0, false, false, false, 1920];
         yield 'completed source copy without a producer' => [0, false, true, true, 1920];
         yield 'source copy keeps source aspect dimensions' => [0, false, true, true, 2048];
+    }
+
+    /** A source whose served type is unknown, so only its probe and extension can name the container. */
+    private function video(string $filename, string $format): VideoPortInterface
+    {
+        $videos = $this->createStub(VideoPortInterface::class);
+        $videos->method('getSourceMetadata')->willReturn(new VideoSourceMetadata(
+            new Uuid(),
+            (new PublicId())->toString(),
+            '/library/' . $filename,
+            $filename,
+            100,
+            'application/octet-stream',
+            'hash',
+            $format,
+            'h264',
+            0,
+            [['codec' => 'aac', 'channels' => 2, 'streamIndex' => 1, 'isDefault' => true]],
+            1920,
+            1080,
+            24.0,
+            100.0,
+            pixFmt: 'yuv420p',
+            colorSpace: ['transfer' => 'bt709'],
+        ));
+
+        return $videos;
     }
 
     private function service(

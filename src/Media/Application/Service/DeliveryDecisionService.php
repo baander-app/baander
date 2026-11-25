@@ -19,6 +19,8 @@ use App\Shared\Application\Exception\ConflictException;
 use App\Shared\Application\Port\SystemSettingsPortInterface;
 use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
+use App\Shared\Domain\ValueObject\MediaContainer;
+use App\Shared\Domain\ValueObject\MediaKind;
 use App\Transcode\Application\DTO\MediaOperation;
 use App\Transcode\Application\DTO\RequestedQuality;
 use App\Transcode\Application\DTO\CompletedVideoArtifact;
@@ -71,7 +73,7 @@ final readonly class DeliveryDecisionService implements DeliveryDecisionPortInte
             return new DeliveryDecision(DeliveryKind::Incompatible, 'audio_stream_unavailable');
         }
         $media = new DeliverySource(
-            $this->container($source->containerFormat, $source->mimeType),
+            $this->container(MediaKind::Video, $source->containerFormat, $source->filename),
             $source->videoCodec,
             $source->videoStreamIndex,
             is_string($selected['codec'] ?? null) ? $selected['codec'] : null,
@@ -199,21 +201,22 @@ final readonly class DeliveryDecisionService implements DeliveryDecisionPortInte
             && $artifact->height === $quality->height;
     }
 
-    private function container(?string $format, string $mime): ?string
+    /**
+     * The name a destination lists for the source's container: the demuxer's name, except
+     * inside a family one demuxer reads, where the file extension picks the member. A probed
+     * format that no container of the kind is read by has no name, so it is never an original.
+     */
+    private function container(MediaKind $kind, ?string $format, string $filename): ?string
     {
-        $identified = match ($mime) {
-            'video/mp4', 'audio/mp4' => 'mp4', 'video/quicktime' => 'mov',
-            'video/webm', 'audio/webm' => 'webm', 'video/x-matroska', 'audio/x-matroska' => 'matroska',
-            'audio/mpeg' => 'mp3', 'audio/flac', 'audio/x-flac' => 'flac', 'audio/ogg' => 'ogg',
-            'audio/aac' => 'aac', default => null,
+        $container = MediaContainer::identify($kind, $format, pathinfo($filename, PATHINFO_EXTENSION));
+
+        return match ($container) {
+            null => null,
+            MediaContainer::Mpeg4, MediaContainer::Mpeg4Audio => 'mp4',
+            MediaContainer::QuickTime => 'mov',
+            MediaContainer::WebM => 'webm',
+            default => $container->demuxer(),
         };
-        if ($format === null) {
-            return $identified;
-        }
-        if (!str_contains($format, ',')) {
-            return $format;
-        }
-        return $identified !== null && in_array($identified, explode(',', $format), true) ? $identified : null;
     }
 
     private function bitDepth(?string $format): ?int
@@ -262,7 +265,7 @@ final readonly class DeliveryDecisionService implements DeliveryDecisionPortInte
         if ($destination->audioStreamIndex !== null && $source->streamIndex !== $destination->audioStreamIndex) {
             return new DeliveryDecision(DeliveryKind::Incompatible, 'audio_stream_unavailable');
         }
-        $container = $this->container($source->containerFormat, $source->mimeType);
+        $container = $this->container(MediaKind::Audio, $source->containerFormat, $source->filename);
         $decision = $this->compatibility->decide(new DeliverySource(
             $container,
             null,

@@ -172,6 +172,23 @@ final class StreamServiceTest extends TestCase
         $this->service->resolveTrackPath($this->trackId);
     }
 
+    /** @return iterable<string, array{string, ?string, string}> */
+    public static function servedTypes(): iterable
+    {
+        yield 'no stored container format' => ['/album/100% Pure.mp3', null, 'audio/mpeg'];
+        yield 'probed member of the mp4 family' => ['/album/track.m4a', 'mov,mp4,m4a,3gp,3g2,mj2', 'audio/mp4'];
+        yield 'format of no audio container' => ['/album/track.mp3', 'mpegts', 'application/octet-stream'];
+    }
+
+    #[DataProvider('servedTypes')]
+    public function testTheServedTypeComesFromTheContainerTableNotTheStoredType(string $path, ?string $containerFormat, string $type): void
+    {
+        $this->song = Song::create(new Uuid(), 'Playback track', $this->root . $path, 10, 'text/html', containerFormat: $containerFormat);
+        $this->trackId = $this->song->getPublicId();
+
+        self::assertSame($type, $this->service->getTrackMetadata($this->trackId)->mimeType);
+    }
+
     public function testRejectsMissingOwningLibraries(): void
     {
         $this->library = null;

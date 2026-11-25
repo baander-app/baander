@@ -22,6 +22,7 @@ use App\Transcode\Application\Settings\TranscodeSettingDefinitions;
 use OpenApi\Spec as OA;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
+use Symfony\Component\HttpFoundation\ResponseHeaderBag;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 use Symfony\Component\Routing\Attribute\Route;
 use SwooleBundle\SwooleBundle\Bridge\Symfony\HttpFoundation\SwooleBinaryFileResponse;
@@ -243,6 +244,10 @@ final class StreamController
         $response->headers->set('Content-Type', $mimeType);
         // Every request must recheck library access, including byte-range retries.
         $response->headers->set('Cache-Control', 'private, no-store');
+        // Both act only on navigation; media elements, MSE and fetch read the body as before. The
+        // disposition names no file because Symfony refuses a non-ASCII or `%` fallback name.
+        $response->headers->set('Content-Disposition', ResponseHeaderBag::DISPOSITION_ATTACHMENT);
+        $response->headers->set('Content-Security-Policy', "default-src 'none'; sandbox");
 
         return $response;
     }

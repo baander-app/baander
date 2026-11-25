@@ -12,6 +12,8 @@ use App\Library\Application\Port\LibraryMediaFileResolverInterface;
 use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
 use App\Shared\Domain\ValueObject\LibraryReadScope;
+use App\Shared\Domain\ValueObject\MediaContainer;
+use App\Shared\Domain\ValueObject\MediaKind;
 use InvalidArgumentException;
 
 final readonly class VideoService implements VideoPortInterface
@@ -40,16 +42,19 @@ final readonly class VideoService implements VideoPortInterface
             }
             $probe = $video->getProbe();
             $size = filesize($path);
+            $filename = basename($video->getPath());
+            $containerFormat = $probe['containerFormat'] ?? null;
 
             return new VideoSourceMetadata(
                 videoId: $video->getId(),
                 publicId: $video->getPublicId()->toString(),
                 filePath: $path,
-                filename: basename($path),
+                filename: $filename,
                 size: $size === false ? 0 : $size,
-                mimeType: (new \finfo(FILEINFO_MIME_TYPE))->file($path) ?: 'application/octet-stream',
+                mimeType: MediaContainer::identify(MediaKind::Video, $containerFormat, pathinfo($filename, PATHINFO_EXTENSION))?->mediaType()
+                    ?? 'application/octet-stream',
                 hash: $video->getHash(),
-                containerFormat: $probe['containerFormat'] ?? null,
+                containerFormat: $containerFormat,
                 videoCodec: $probe['videoCodec'] ?? null,
                 videoStreamIndex: $probe['videoStreamIndex'] ?? null,
                 audioStreams: $probe['audioStreams'] ?? [],

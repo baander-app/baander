@@ -56,6 +56,8 @@ All endpoints are prefixed with `/api`.
 | `POST` | `/api/admin/media/prune-missing` | `MediaAdminController` | Dispatch `PruneMissingImagesCommand` to remove image records with missing files (`ROLE_ADMIN`) |
 | `GET` | `/api/admin/media/missing-check` | `MediaAdminController` | Dry-run check listing image records whose backing files are missing (`ROLE_ADMIN`) |
 
+A library file is served with the media type that the container table (`MediaContainer` in the Shared kernel) gives for its probed format and file extension, never a type read from its bytes. Catalog's `VideoService` types a video and `StreamService` types a track. A row with no probed format is typed by its extension. A probed format that no container of the file's kind is read by, or an unlisted extension on an unprobed row, goes out as `application/octet-stream`. `DeliveryDecisionService` names the source's container through the same lookup, so a format the table does not list is never offered as an original. Every file response of `/api/stream/video`, `/api/stream/original/track` and `/api/stream/track`, completed renditions included, carries `Content-Disposition: attachment`, `Content-Security-Policy: default-src 'none'; sandbox` and `nosniff`. The disposition names no file, because Symfony refuses a non-ASCII or `%` fallback name and library files have such names. The disposition and the policy act only on navigation: a signed URL opened as a page downloads the file and runs nothing, while `<video>`, `<audio>`, Media Source Extensions and `fetch` read the body as before. The progressive response of a rendition still being encoded carries the default policy that `SecurityHeadersListener` gives every non-HTML response.
+
 ## Infrastructure
 
 | Component | Purpose |

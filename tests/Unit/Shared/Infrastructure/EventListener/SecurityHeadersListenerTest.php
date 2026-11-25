@@ -6,6 +6,7 @@ namespace App\Tests\Unit\Shared\Infrastructure\EventListener;
 
 use App\Shared\Application\Http\PublicOrigins;
 use App\Shared\Infrastructure\EventListener\SecurityHeadersListener;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
@@ -49,14 +50,33 @@ final class SecurityHeadersListenerTest extends TestCase
         self::assertStringContainsString("'nonce-" . $nonce . "'", (string) $response->headers->get('Content-Security-Policy'));
     }
 
-    public function testJsonResponsesCarryNoPolicyButKeepTheBaselineHeaders(): void
+    /** @return iterable<string, array{string, Response}> */
+    public static function nonDocumentResponses(): iterable
+    {
+        yield 'json' => ['/api/me', new JsonResponse([])];
+        yield 'dash manifest' => ['/api/transcode/x/manifest.mpd', new Response('<MPD/>', 200, ['Content-Type' => 'application/dash+xml'])];
+        yield 'xml' => ['/api/stream/video', new Response('<?xml version="1.0"?>', 200, ['Content-Type' => 'text/xml; charset=UTF-8'])];
+    }
+
+    #[DataProvider('nonDocumentResponses')]
+    public function testEveryResponseThatIsNotThePageRefusesToActAsADocument(string $path, Response $response): void
     {
         $listener = new SecurityHeadersListener(new PublicOrigins('https://baander.app'));
-        $response = $this->respond($listener, Request::create('https://baander.app/api/me'), new JsonResponse([]));
+        $response = $this->respond($listener, Request::create('https://baander.app' . $path), $response);
 
-        self::assertFalse($response->headers->has('Content-Security-Policy'));
+        self::assertSame("default-src 'none'; frame-ancestors 'none'; sandbox", $response->headers->get('Content-Security-Policy'));
         self::assertSame('nosniff', $response->headers->get('X-Content-Type-Options'));
         self::assertSame('DENY', $response->headers->get('X-Frame-Options'));
+    }
+
+    public function testAPolicyTheControllerSetIsLeftAlone(): void
+    {
+        $listener = new SecurityHeadersListener(new PublicOrigins('https://baander.app'));
+        $file = new Response('', 200, ['Content-Type' => 'video/mp4', 'Content-Security-Policy' => "default-src 'none'; sandbox"]);
+        $page = new Response('<html></html>', 200, ['Content-Security-Policy' => "default-src 'self'"]);
+
+        self::assertSame("default-src 'none'; sandbox", $this->respond($listener, Request::create('https://baander.app/api/stream/video'), $file)->headers->get('Content-Security-Policy'));
+        self::assertSame("default-src 'self'", $this->respond($listener, Request::create('https://baander.app/'), $page)->headers->get('Content-Security-Policy'));
     }
 
     public function testSignedMediaOnAnotherApplicationOriginAndTheDevelopmentServerAreAllowed(): void

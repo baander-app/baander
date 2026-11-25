@@ -68,6 +68,7 @@ final class StreamControllerRangeTest extends TestCase
             self::assertSame((string) strlen($body), $response->headers->get('Content-Length'));
         }
         $this->assertProtectedCache($response);
+        $this->assertSandboxedDownload($response);
     }
 
     /** @return iterable<string,array{string,int,string,?string}> */
@@ -127,6 +128,7 @@ final class StreamControllerRangeTest extends TestCase
         self::assertSame('10', $response->headers->get('Content-Length'));
         self::assertNull($response->headers->get('Content-Range'));
         $this->assertProtectedCache($response);
+        $this->assertSandboxedDownload($response);
     }
 
     /** @return iterable<string,array{?string}> */
@@ -162,5 +164,11 @@ final class StreamControllerRangeTest extends TestCase
         self::assertTrue($response->headers->hasCacheControlDirective('private'));
         self::assertTrue($response->headers->hasCacheControlDirective('no-store'));
         self::assertFalse($response->headers->hasCacheControlDirective('public'));
+    }
+
+    private function assertSandboxedDownload(Response $response): void
+    {
+        self::assertSame('attachment', $response->headers->get('Content-Disposition'));
+        self::assertSame("default-src 'none'; sandbox", $response->headers->get('Content-Security-Policy'));
     }
 }
