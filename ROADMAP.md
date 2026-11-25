@@ -96,7 +96,15 @@ named in their commit messages.
   without a playback report. The radio station list returns at most 500 rows per
   request, and the country catalogue is cached for six hours. Sign-in block records
   are kept 30 days with fields of at most 255 characters. The unused `unplugin-info`
-  plugin leaves the desktop build.
+  plugin leaves the desktop build. The operator guide documents one installation, the
+  preset. An unknown `APP_ENV` refuses to boot. Redis and PostgreSQL passwords need at
+  least 16 bytes, checked when the preset renders and when the application boots in
+  `prod`. The desktop preload loses the channel that reads a stored credential and
+  keeps the ones that store and clear it. Discovery accepts `http:` only for a private
+  or loopback address literal or a `.local` name. The preset's services log through
+  Docker's `local` driver, five files of 50 MB, and per-boot log directories older than
+  14 days are pruned. Fork pull requests on Forgejo run no job on the runner that holds
+  the Docker socket. Committed test secrets are refused by the preset, not yet at boot.
 
 ### Open
 
