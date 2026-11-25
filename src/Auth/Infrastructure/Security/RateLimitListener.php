@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Auth\Infrastructure\Security;
 
 use App\Auth\Infrastructure\Security\OAuth\TokenEndpointDpopListener;
+use App\Shared\Infrastructure\Http\RateLimitSubject;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\EventDispatcher\Attribute\AsEventListener;
 use Symfony\Component\HttpFoundation\Request;
@@ -22,7 +23,8 @@ use Symfony\Component\Serializer\Exception\NotEncodableValueException;
  * to sensitive auth endpoints, including passkey sign-in. For login, an
  * additional per-IP+email compound limit slows guessing against one account
  * from one address; failed logins are also limited per account across all
- * addresses, which the password authenticator charges.
+ * addresses, which the password authenticator charges. An IPv6 client is
+ * counted by its /64 ({@see RateLimitSubject}); warnings log the full address.
  *
  * Rules name the routes they charge. The router (priority 32) has matched the
  * request's decoded path by now, so no percent-encoding of a path avoids its
@@ -86,13 +88,13 @@ final class RateLimitListener
             [
                 'routes' => [self::LOGIN_ROUTE],
                 'limiter' => $authLoginIpLimiter,
-                'key_resolver' => fn (Request $r): string => $r->getClientIp() ?? 'unknown',
+                'key_resolver' => self::clientSubject(...),
             ],
             [
                 'routes' => [self::LOGIN_ROUTE],
                 'limiter' => $authLoginIpEmailLimiter,
                 'key_resolver' => function (Request $r): string {
-                    $ip = $r->getClientIp() ?? 'unknown';
+                    $client = self::clientSubject($r);
                     $email = strtolower(trim($this->jsonStringField($r, 'email')));
 
                     // When no email is provided, skip the compound check
@@ -101,7 +103,7 @@ final class RateLimitListener
                         return '';
                     }
 
-                    return $ip . '|' . $email;
+                    return $client . '|' . $email;
                 },
                 'skip_empty_key' => true,
             ],
@@ -109,13 +111,13 @@ final class RateLimitListener
             [
                 'routes' => [self::REGISTER_ROUTE],
                 'limiter' => $authRegisterIpLimiter,
-                'key_resolver' => fn (Request $r): string => $r->getClientIp() ?? 'unknown',
+                'key_resolver' => self::clientSubject(...),
             ],
             // Password reset request and redemption: per-IP, one shared bucket
             [
                 'routes' => [self::PASSWORD_RESET_REQUEST_ROUTE, self::PASSWORD_RESET_ROUTE],
                 'limiter' => $authPasswordResetIpLimiter,
-                'key_resolver' => fn (Request $r): string => $r->getClientIp() ?? 'unknown',
+                'key_resolver' => self::clientSubject(...),
             ],
             // Passkey sign-in: per-IP across the options, verification and login
             // endpoints. Options requests store a challenge, so they are limited too.
@@ -126,13 +128,13 @@ final class RateLimitListener
                     self::PASSKEY_LOGIN_ROUTE,
                 ],
                 'limiter' => $authPasskeyIpLimiter,
-                'key_resolver' => fn (Request $r): string => $r->getClientIp() ?? 'unknown',
+                'key_resolver' => self::clientSubject(...),
             ],
             // Email verification and verification resend requests: per-IP, one shared bucket
             [
                 'routes' => [self::EMAIL_VERIFY_ROUTE, self::EMAIL_VERIFICATION_RESEND_ROUTE],
                 'limiter' => $authEmailVerificationIpLimiter,
-                'key_resolver' => fn (Request $r): string => $r->getClientIp() ?? 'unknown',
+                'key_resolver' => self::clientSubject(...),
             ],
             // Token refresh: per presented refresh token, keyed by its SHA-256 so the
             // limiter store never holds a usable token. Without a token, per IP.
@@ -142,7 +144,7 @@ final class RateLimitListener
                 'key_resolver' => function (Request $r): string {
                     $token = $this->jsonStringField($r, 'refreshToken');
 
-                    return $token !== '' ? hash('sha256', $token) : ($r->getClientIp() ?? 'unknown');
+                    return $token !== '' ? hash('sha256', $token) : self::clientSubject($r);
                 },
             ],
             // OAuth token endpoint and pushed authorization requests: per IP here. The
@@ -151,32 +153,37 @@ final class RateLimitListener
             [
                 'routes' => [self::TOKEN_ROUTE],
                 'limiter' => $oauthTokenIpLimiter,
-                'key_resolver' => fn (Request $r): string => $r->getClientIp() ?? 'unknown',
+                'key_resolver' => self::clientSubject(...),
             ],
             [
                 'routes' => [self::PAR_ROUTE],
                 'limiter' => $oauthParIpLimiter,
-                'key_resolver' => fn (Request $r): string => $r->getClientIp() ?? 'unknown',
+                'key_resolver' => self::clientSubject(...),
             ],
             // Authorization endpoint: per IP, for the request lookup and the decision.
             [
                 'routes' => [self::AUTHORIZE_ROUTE, self::AUTHORIZE_DECISION_ROUTE],
                 'limiter' => $oauthAuthorizeIpLimiter,
-                'key_resolver' => fn (Request $r): string => $r->getClientIp() ?? 'unknown',
+                'key_resolver' => self::clientSubject(...),
             ],
             // Device authorization: per IP; each request stores a device code.
             [
                 'routes' => [self::DEVICE_AUTHORIZE_ROUTE],
                 'limiter' => $oauthDeviceAuthorizeIpLimiter,
-                'key_resolver' => fn (Request $r): string => $r->getClientIp() ?? 'unknown',
+                'key_resolver' => self::clientSubject(...),
             ],
             // User code lookup, approval and denial: per IP, bounding user code guessing.
             [
                 'routes' => [self::DEVICE_VERIFY_ROUTE, self::DEVICE_APPROVE_ROUTE],
                 'limiter' => $oauthDeviceVerifyIpLimiter,
-                'key_resolver' => fn (Request $r): string => $r->getClientIp() ?? 'unknown',
+                'key_resolver' => self::clientSubject(...),
             ],
         ];
+    }
+
+    private static function clientSubject(Request $request): string
+    {
+        return RateLimitSubject::ofAddress($request->getClientIp());
     }
 
     private function jsonStringField(Request $request, string $field): string

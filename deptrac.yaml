@@ -68,7 +68,7 @@ deptrac:
     - name: 'Rate Limiter Contracts'
       collectors:
         - type: classLike
-          value: '^Baander\\RedisRateLimiter\\(Administration\\(RateLimiterDefinition|RateLimiterAdministrationInterface)|Exception\\(RateLimiterUnavailableException|RateLimiterClearFailedException|UnknownRateLimiterException))$'
+          value: '^Baander\\RedisRateLimiter\\(Administration\\(RateLimiterDefinition|RateLimiterAdministrationInterface)|Exception\\(RateLimiterUnavailableException|RateLimiterClearFailedException|UnknownRateLimiterException)|Limiter\\(RefundableLimiterInterface|RefundableRateLimiterFactoryInterface))$'
     - name: 'Rate Limiter Implementation'
       collectors:
         - type: bool
@@ -77,7 +77,7 @@ deptrac:
               value: '^Baander\\RedisRateLimiter\\'
           must_not:
             - type: classLike
-              value: '^Baander\\RedisRateLimiter\\(Administration\\(RateLimiterDefinition|RateLimiterAdministrationInterface)|Exception\\(RateLimiterUnavailableException|RateLimiterClearFailedException|UnknownRateLimiterException))$'
+              value: '^Baander\\RedisRateLimiter\\(Administration\\(RateLimiterDefinition|RateLimiterAdministrationInterface)|Exception\\(RateLimiterUnavailableException|RateLimiterClearFailedException|UnknownRateLimiterException)|Limiter\\(RefundableLimiterInterface|RefundableRateLimiterFactoryInterface))$'
     - name: 'Image Processing'
       collectors:
         - type: classLike
@@ -824,7 +824,7 @@ deptrac:
     - name: 'Transcode Probe Contract'
       collectors:
         - type: classLike
-          value: '^App\\Transcode\\Application\\(Port\\(Audio|Video)ProbePortInterface|DTO\\AudioProbeResult)$'
+          value: '^App\\Transcode\\Application\\(Port\\(Audio|Video)ProbePortInterface|DTO\\AudioProbeResult|Exception\\UnsupportedMediaContainerException)$'
 
     - name: 'Transcode Timeline Preview Contract'
       collectors:
@@ -854,7 +854,7 @@ deptrac:
             - type: classLike
               value: '^App\\Transcode\\Application\\(Port\\(MediaExecutionPolicyInterface|CompletedVideoArtifactPort|CompletedVideoDeliveryPort|CopyPresentationPortInterface|StreamAuthPortInterface)|DTO\\(MediaOperation|MediaTrack|CompletedVideoArtifact|CopyPresentation|CopyPresentationInput)|Exception\\MediaEncodingProhibitedException)$'
             - type: classLike
-              value: '^App\\Transcode\\Application\\(Port\\(Audio|Video)ProbePortInterface|DTO\\AudioProbeResult)$'
+              value: '^App\\Transcode\\Application\\(Port\\(Audio|Video)ProbePortInterface|DTO\\AudioProbeResult|Exception\\UnsupportedMediaContainerException)$'
 
     - name: 'Transcode Infrastructure'
       collectors:
@@ -1268,6 +1268,7 @@ deptrac:
       - Core
     'Shared Application':
       - Core
+      - 'Rate Limiter Contracts'
       - 'Shared Domain'
     'Shared Infrastructure':
       - Core
@@ -1702,6 +1703,7 @@ deptrac:
       - 'Metadata Person Provider Contract'
       - 'Catalog Movie Contract'
       - 'Catalog Director Contract'
+      - 'Library Media Files Contract'
       - Core
       - 'Media Metadata Values'
       - 'Metadata Sync Contract'
@@ -1712,6 +1714,7 @@ deptrac:
     'Metadata Infrastructure':
       - 'Catalog Person Contract'
       - 'Metadata Person Provider Contract'
+      - 'Library Media Files Contract'
       - Core
       - 'Public HTTP Client'
       - 'Rate Limiter Contracts'

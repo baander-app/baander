@@ -191,6 +191,8 @@ parameters:
     auth.client_jwks.refetch_interval: 60
 
     # --- Rate Limiting (Brute-Force Protection) ---
+    # A per-IP limit counts an IPv4 address on its own and an IPv6 address by its /64
+    # network (App\Shared\Infrastructure\Http\RateLimitSubject).
 
     # Maximum login attempts per IP within the window. Default: 20 per 5 minutes.
     auth.rate_limit.login.max_attempts: 20
@@ -202,9 +204,11 @@ parameters:
     auth.rate_limit.login_per_email.max_attempts: 10
 
     # Maximum failed logins per account (normalized email) from all IPs together, in a
-    # sliding window. Only a wrong password, an unknown address or a rejected TOTP code is
-    # charged; once it is reached, every login for that address, the right password
-    # included, waits until older failures slide out of the window. Default: 10 per 5 minutes.
+    # sliding window. A login takes one failure before its password is checked, so
+    # concurrent logins cannot pass the limit together, and gives it back unless the
+    # password was wrong, the address unknown or the TOTP code rejected. Once the limit is
+    # reached, every login for that address, the right password included, waits until
+    # older failures slide out of the window. Default: 10 per 5 minutes.
     auth.rate_limit.login_failures_per_email.max_attempts: 10
     auth.rate_limit.login_failures_per_email.window: 300
 

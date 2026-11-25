@@ -6,6 +6,7 @@ namespace App\Auth\Infrastructure\Security;
 
 use App\Auth\Application\Port\AuthenticatedUserIdentityInterface;
 use App\Shared\Infrastructure\Http\ApiRequestPath;
+use App\Shared\Infrastructure\Http\RateLimitSubject;
 use Baander\RedisRateLimiter\Exception\RateLimiterUnavailableException;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\EventDispatcher\Attribute\AsEventListener;
@@ -26,8 +27,8 @@ use Symfony\Component\Security\Http\Event\LoginFailureEvent;
  *
  * A request with an authenticated user consumes `authenticated_api`, keyed by user
  * ID, so users behind one address do not share a bucket. Any other request consumes
- * `anonymous_api`, keyed by client IP. Each request is charged once, at the first
- * of these points it reaches:
+ * `anonymous_api`, keyed by client IP, an IPv6 client by its /64 ({@see RateLimitSubject}).
+ * Each request is charged once, at the first of these points it reaches:
  *
  * - the request check at priority 7, after the router (32) and the firewall (8),
  *   once the route and the user are known;
@@ -132,7 +133,7 @@ final class ApiRateLimitListener
             return;
         }
 
-        $this->consume($this->anonymousApiLimiter, 'anonymous_api', $request->getClientIp() ?? 'unknown', $request);
+        $this->consume($this->anonymousApiLimiter, 'anonymous_api', RateLimitSubject::ofAddress($request->getClientIp()), $request);
     }
 
     private function appliesTo(Request $request): bool

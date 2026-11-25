@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Tests\Functional\Console;
 
+use App\Shared\Application\Actor;
+use App\Tests\Fixtures\RateLimiter\ReadsLimiterClearLogs;
 use Baander\RedisRateLimiter\Storage\RedisRateLimiterStore;
 use Symfony\Bundle\FrameworkBundle\Console\Application;
 use Symfony\Bundle\FrameworkBundle\Test\KernelTestCase;
@@ -14,6 +16,8 @@ use Symfony\Component\Yaml\Yaml;
 
 final class RateLimiterCommandsTest extends KernelTestCase
 {
+    use ReadsLimiterClearLogs;
+
     protected function setUp(): void
     {
         self::bootKernel();
@@ -60,6 +64,22 @@ final class RateLimiterCommandsTest extends KernelTestCase
         self::assertSame(Command::SUCCESS, $tester->execute(['--all' => true]), $tester->getDisplay());
         self::assertTrue($this->limiter('batch_cover_extract')->create($key)->consume()->isAccepted());
         self::assertTrue($this->limiter('config_check')->create($key)->consume()->isAccepted());
+    }
+
+    public function testEveryClearIsLoggedWithTheCommandLineActor(): void
+    {
+        $logs = $this->captureLogs();
+
+        $named = $this->command('app:rate-limiter:clear');
+        $all = $this->command('app:rate-limiter:clear');
+        self::assertSame(Command::SUCCESS, $named->execute(['name' => 'batch_cover_extract']), $named->getDisplay());
+        self::assertSame(Command::SUCCESS, $all->execute(['--all' => true]), $all->getDisplay());
+
+        $records = $this->clearRecords($logs);
+        self::assertCount(2, $records);
+        self::assertSame(['actor' => Actor::CLI, 'limiters' => ['batch_cover_extract']], $records[0]);
+        self::assertSame(Actor::CLI, $records[1]['actor']);
+        self::assertEqualsCanonicalizing($this->configuredLimiterNames(), $records[1]['limiters']);
     }
 
     public function testClearUnknownLimiterFails(): void

@@ -44,6 +44,36 @@ final class AdminRateLimitListenerTest extends TestCase
         $listener->onKernelRequest($this->event($path, AdminRateLimitListener::COVER_EXTRACTION_ROUTE));
     }
 
+    /** @return iterable<string, array{string, string, bool}> */
+    public static function addressPairs(): iterable
+    {
+        yield 'one IPv6 /64' => ['2001:db8:20:1::1', '2001:db8:20:1:ffff:ffff:ffff:ffff', true];
+        yield 'neighbouring IPv6 /64 networks' => ['2001:db8:20:1::1', '2001:db8:20:2::1', false];
+        yield 'two IPv4 addresses in one /24' => ['198.18.20.7', '198.18.20.8', false];
+        yield 'IPv4 and its mapped form' => ['198.18.20.7', '::ffff:198.18.20.7', true];
+    }
+
+    #[DataProvider('addressPairs')]
+    public function testAnIpv6NetworkIsChargedAsOneAddress(string $first, string $second, bool $shared): void
+    {
+        $keys = [];
+        $factory = $this->createStub(RateLimiterFactoryInterface::class);
+        $factory->method('create')->willReturnCallback(function (string $key) use (&$keys): LimiterInterface {
+            $keys[] = $key;
+            $limit = $this->createStub(LimiterInterface::class);
+            $limit->method('consume')->willReturn(new RateLimit(9, new \DateTimeImmutable('+1 minute'), true, 10));
+
+            return $limit;
+        });
+        $listener = new AdminRateLimitListener($factory, new NullLogger(), 'prod');
+
+        $listener->onKernelRequest($this->event('/api/albums/covers/extract', AdminRateLimitListener::COVER_EXTRACTION_ROUTE, $first));
+        $listener->onKernelRequest($this->event('/api/albums/covers/extract', AdminRateLimitListener::COVER_EXTRACTION_ROUTE, $second));
+
+        self::assertCount(2, $keys);
+        self::assertSame($shared, $keys[0] === $keys[1]);
+    }
+
     public function testOtherRoutesAreNotCharged(): void
     {
         $factory = $this->createMock(RateLimiterFactoryInterface::class);
@@ -53,9 +83,9 @@ final class AdminRateLimitListenerTest extends TestCase
         $listener->onKernelRequest($this->event('/api/albums/merge', 'album_merge'));
     }
 
-    private function event(string $path, string $route): RequestEvent
+    private function event(string $path, string $route, string $address = '192.0.2.60'): RequestEvent
     {
-        $request = Request::create($path, 'POST', server: ['REMOTE_ADDR' => '192.0.2.60']);
+        $request = Request::create($path, 'POST', server: ['REMOTE_ADDR' => $address]);
         $request->attributes->set('_route', $route);
 
         return new RequestEvent($this->createStub(HttpKernelInterface::class), $request, HttpKernelInterface::MAIN_REQUEST);

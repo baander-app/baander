@@ -64,7 +64,8 @@ framework:
 
     # Rate limiting. Every limiter keeps its state in Redis through RedisRateLimiterStore,
     # under a key namespace of its own (RateLimiterCatalogPass wires them), so the admin panel
-    # and app:rate-limiter:clear can reset one limiter without the others.
+    # and app:rate-limiter:clear can reset one limiter without the others. A limiter keyed per
+    # IP counts an IPv6 client by its /64 network (App\Shared\Infrastructure\Http\RateLimitSubject).
     rate_limiter:
         # Generic /api limiters, enforced by App\Auth\Infrastructure\Security\ApiRateLimitListener.
         anonymous_api:

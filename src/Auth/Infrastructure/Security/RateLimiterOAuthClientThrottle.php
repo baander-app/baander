@@ -8,8 +8,8 @@ use App\Auth\Application\Exception\OAuthClientRateLimitedException;
 use App\Auth\Application\Port\OAuthClientThrottleInterface;
 use App\Auth\Domain\Model\OAuth\Client;
 use App\Auth\Domain\Model\OAuth\ClientAuthMethod;
+use App\Shared\Infrastructure\Http\RateLimitSubject;
 use Psr\Log\LoggerInterface;
-use Symfony\Component\HttpFoundation\IpUtils;
 use Symfony\Component\RateLimiter\RateLimiterFactoryInterface;
 
 /**
@@ -67,15 +67,7 @@ final readonly class RateLimiterOAuthClientThrottle implements OAuthClientThrott
         $clientId = $client->getPublicId()->toString();
 
         return $client->getAuthMethod() === ClientAuthMethod::None
-            ? $clientId . '|' . self::network($ipAddress)
+            ? $clientId . '|' . RateLimitSubject::ofNetwork($ipAddress)
             : $clientId;
-    }
-
-    /** The caller's /24 (IPv4) or /64 (IPv6) network. */
-    private static function network(?string $ipAddress): string
-    {
-        return $ipAddress !== null && filter_var($ipAddress, FILTER_VALIDATE_IP) !== false
-            ? IpUtils::anonymize($ipAddress, v4Bytes: 1, v6Bytes: 8)
-            : 'unknown';
     }
 }

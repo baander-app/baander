@@ -91,6 +91,38 @@ final class DiscoveryRateLimitListenerTest extends TestCase
         $listener->onKernelRequest($event);
     }
 
+    /** @return iterable<string, array{string, string, bool}> */
+    public static function addressPairs(): iterable
+    {
+        yield 'one IPv6 /64' => ['2001:db8:20:1::1', '2001:db8:20:1:ffff:ffff:ffff:ffff', true];
+        yield 'neighbouring IPv6 /64 networks' => ['2001:db8:20:1::1', '2001:db8:20:2::1', false];
+        yield 'two IPv4 addresses in one /24' => ['198.18.20.7', '198.18.20.8', false];
+        yield 'IPv4 and its mapped form' => ['198.18.20.7', '::ffff:198.18.20.7', true];
+    }
+
+    #[DataProvider('addressPairs')]
+    public function testAnIpv6NetworkIsChargedAsOneAddress(string $first, string $second, bool $shared): void
+    {
+        $keys = [];
+        $limiter = $this->createStub(RateLimiterFactoryInterface::class);
+        $limiter->method('create')->willReturnCallback(function (string $key) use (&$keys): LimiterInterface {
+            $keys[] = $key;
+            $limit = $this->createStub(LimiterInterface::class);
+            $limit->method('consume')->willReturn(new RateLimit(9, new \DateTimeImmutable('+1 minute'), true, 10));
+
+            return $limit;
+        });
+        $listener = new DiscoveryRateLimitListener($limiter, new NullLogger(), 'prod');
+
+        foreach ([$first, $second] as $address) {
+            $request = Request::create('/api/discovery/register', 'POST', server: ['REMOTE_ADDR' => $address]);
+            $listener->onKernelRequest($this->createRequestEvent($this->routed($request, DiscoveryRateLimitListener::REGISTER_ROUTE)));
+        }
+
+        self::assertCount(2, $keys);
+        self::assertSame($shared, $keys[0] === $keys[1]);
+    }
+
     public function testSkipsRateLimitingInDevEnvironment(): void
     {
         $limiter = $this->createMock(RateLimiterFactoryInterface::class);

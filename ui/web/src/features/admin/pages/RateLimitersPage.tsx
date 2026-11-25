@@ -1,3 +1,4 @@
+import { useAdminCheck } from '@/features/auth/hooks/use-admin-check'
 import { guardMutationCallbacks } from '@/shared/live/ownership'
 import { focusVisibleRing, textRole } from '@/shared/theme'
 import styled from 'styled-components'
@@ -20,6 +21,11 @@ const Container = styled.div`
 const HeaderRow = styled.div`
   display: flex;
   justify-content: flex-end;
+`
+
+const Note = styled.p`
+  ${textRole('body-sm')}
+  color: var(--color-muted-foreground);
 `
 
 const DangerButton = styled.button`
@@ -188,7 +194,12 @@ const RetryLink = styled.button`
   }
 `
 
+/**
+ * The configured rate limiters. Admins can see the list; only super admins clear limiter
+ * state, as the API enforces.
+ */
 export function RateLimitersPage() {
+  const { isSuperAdmin } = useAdminCheck()
   const { data, isPending: isLoading, error, refetch } = useRateLimiters()
   const clearMutation = useClearRateLimiters()
   const [showClearConfirm, setShowClearConfirm] = useState(false)
@@ -212,14 +223,18 @@ export function RateLimitersPage() {
 
   return (
     <Container>
-      <HeaderRow>
-        <DangerButton onClick={() => setShowClearConfirm(true)}>
-          Clear All
-        </DangerButton>
-      </HeaderRow>
+      {isSuperAdmin ? (
+        <HeaderRow>
+          <DangerButton onClick={() => setShowClearConfirm(true)}>
+            Clear All
+          </DangerButton>
+        </HeaderRow>
+      ) : (
+        <Note>Only super admins can clear rate limiters.</Note>
+      )}
 
       {/* Clear confirmation */}
-      {showClearConfirm && (
+      {isSuperAdmin && showClearConfirm && (
         <ConfirmBox>
           <ConfirmText>
             All rate limiter state will be cleared from Redis. This will reset limits for

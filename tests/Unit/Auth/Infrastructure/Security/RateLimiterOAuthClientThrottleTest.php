@@ -35,6 +35,7 @@ final class RateLimiterOAuthClientThrottleTest extends TestCase
     {
         yield 'IPv4 /24' => ['198.51.100.7', '198.51.100.250'];
         yield 'IPv6 /64' => ['2001:db8:1:2::1', '2001:db8:1:2:ffff:ffff:ffff:ffff'];
+        yield 'IPv4-mapped IPv6 and IPv4 /24' => ['::ffff:198.51.100.7', '198.51.100.250'];
     }
 
     #[DataProvider('sameNetwork')]
@@ -54,6 +55,7 @@ final class RateLimiterOAuthClientThrottleTest extends TestCase
     {
         yield 'IPv4 next /24' => ['198.51.100.7', '198.51.101.7'];
         yield 'IPv6 next /64' => ['2001:db8:1:2::1', '2001:db8:1:3::1'];
+        yield 'link-local next /64, zone ignored' => ['fe80::1%eth0', 'fe80:0:0:1::1%eth0'];
     }
 
     #[DataProvider('otherNetwork')]

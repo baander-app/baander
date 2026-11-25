@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Discovery\Infrastructure\EventListener;
 
+use App\Shared\Infrastructure\Http\RateLimitSubject;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\EventDispatcher\Attribute\AsEventListener;
 use Symfony\Component\HttpFoundation\Request;
@@ -17,7 +18,8 @@ use Symfony\Component\RateLimiter\RateLimiterFactoryInterface;
  * and pairing endpoints.
  *
  * These endpoints are publicly reachable (the discovery firewall allows
- * PUBLIC_ACCESS) so per-IP throttling is required to prevent abuse.
+ * PUBLIC_ACCESS) so per-IP throttling is required to prevent abuse. An IPv6
+ * client is counted by its /64 ({@see RateLimitSubject}).
  *
  * Requests are matched by the route the router resolved from the decoded path,
  * so no percent-encoding of a path avoids the limit.
@@ -62,7 +64,7 @@ final class DiscoveryRateLimitListener
             return;
         }
 
-        $key = $request->getClientIp() ?? 'unknown';
+        $key = RateLimitSubject::ofAddress($request->getClientIp());
         $limit = $this->discoveryLimiter->create($key);
         $result = $limit->consume(1);
 

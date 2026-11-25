@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Catalog\Infrastructure\EventListener;
 
+use App\Shared\Infrastructure\Http\RateLimitSubject;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\EventDispatcher\Attribute\AsEventListener;
 use Symfony\Component\HttpFoundation\Request;
@@ -16,7 +17,8 @@ use Symfony\Component\RateLimiter\RateLimiterFactoryInterface;
  * Kernel event listener that enforces rate limits on admin endpoints.
  *
  * Separate from the auth-focused RateLimitListener to keep concerns
- * isolated and avoid pre-auth token exhaustion.
+ * isolated and avoid pre-auth token exhaustion. An IPv6 client is counted
+ * by its /64 ({@see RateLimitSubject}).
  *
  * The cover-extraction request is matched by the route the router resolved from
  * the decoded path, so no percent-encoding of the path avoids the limit.
@@ -54,7 +56,7 @@ final class AdminRateLimitListener
             return;
         }
 
-        $key = $request->getClientIp() ?? 'unknown';
+        $key = RateLimitSubject::ofAddress($request->getClientIp());
         $limit = $this->batchCoverExtractLimiter->create($key);
         $result = $limit->consume(1);
 

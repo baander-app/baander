@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Shared\Interface\Controller;
 
+use App\Shared\Application\Service\RateLimiterClearer;
 use Baander\RedisRateLimiter\Exception\RateLimiterClearFailedException;
 use Baander\RedisRateLimiter\Exception\UnknownRateLimiterException;
 use Baander\RedisRateLimiter\Administration\RateLimiterAdministrationInterface;
@@ -13,6 +14,8 @@ use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Attribute\Route;
+use Symfony\Component\Security\Core\User\UserInterface;
+use Symfony\Component\Security\Http\Attribute\CurrentUser;
 use Symfony\Component\Security\Http\Attribute\IsGranted;
 
 #[IsGranted('ROLE_ADMIN')]
@@ -24,6 +27,7 @@ final class RateLimiterMonitorController
 
     public function __construct(
         private readonly RateLimiterAdministrationInterface $rateLimiters,
+        private readonly RateLimiterClearer $clearer,
     ) {
     }
 
@@ -100,11 +104,12 @@ final class RateLimiterMonitorController
      * Clear the state of every rate limiter.
      *
      * Use to unblock rate-limited clients after configuration changes or during incidents.
+     * Only a super admin may: the sign-in and OAuth limiters bound credential guessing.
      */
     #[OA\Operation\Delete(
         path: '/api/monitor/rate-limiters/clear',
         summary: 'Clear all rate limiter state',
-        description: 'Clears the stored state of every configured rate limiter. Requires ?confirm=true.',
+        description: 'Clears the stored state of every configured rate limiter. Requires a super admin and ?confirm=true. The clear is logged with the super admin who made it.',
         parameters: [
             new OA\Parameter(
                 name: 'confirm',
@@ -140,6 +145,13 @@ final class RateLimiterMonitorController
                 ),
             ),
             new OA\Response(
+                response: '403',
+                description: 'Only a super admin clears rate limiters',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
+            ),
+            new OA\Response(
                 response: '422',
                 description: 'Missing confirm parameter',
                 content: new OA\MediaType\Json(
@@ -156,15 +168,16 @@ final class RateLimiterMonitorController
         ],
     )]
     #[Route('/clear', name: 'clear_all', methods: ['DELETE'])]
+    #[IsGranted('ROLE_SUPER_ADMIN')]
     #[CliCounterpart('app:rate-limiter:clear')]
-    public function clearAll(Request $request): JsonResponse
+    public function clearAll(Request $request, #[CurrentUser] UserInterface $user): JsonResponse
     {
         if (!$this->isConfirmed($request)) {
             return $this->missingConfirmation();
         }
 
         try {
-            $cleared = $this->rateLimiters->clearAll();
+            $cleared = $this->clearer->clearAll($user->getUserIdentifier());
         } catch (RateLimiterClearFailedException $e) {
             return $this->clearFailed($e);
         }
@@ -176,12 +189,13 @@ final class RateLimiterMonitorController
     }
 
     /**
-     * Clear the state of one rate limiter, leaving every other limiter intact.
+     * Clear the state of one rate limiter, leaving every other limiter intact. Only a super
+     * admin may.
      */
     #[OA\Operation\Delete(
         path: '/api/monitor/rate-limiters/{name}/clear',
         summary: 'Clear one rate limiter\'s state',
-        description: 'Clears the stored state of the named rate limiter only. Other limiters keep their state. Requires ?confirm=true.',
+        description: 'Clears the stored state of the named rate limiter only. Other limiters keep their state. Requires a super admin and ?confirm=true. The clear is logged with the super admin who made it.',
         parameters: [
             new OA\Parameter(
                 name: 'name',
@@ -222,6 +236,13 @@ final class RateLimiterMonitorController
                 ),
             ),
             new OA\Response(
+                response: '403',
+                description: 'Only a super admin clears rate limiters',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                ),
+            ),
+            new OA\Response(
                 response: '404',
                 description: 'Unknown limiter name',
                 content: new OA\MediaType\Json(
@@ -245,15 +266,16 @@ final class RateLimiterMonitorController
         ],
     )]
     #[Route('/{name}/clear', name: 'clear', methods: ['DELETE'])]
+    #[IsGranted('ROLE_SUPER_ADMIN')]
     #[CliCounterpart('app:rate-limiter:clear')]
-    public function clear(Request $request, string $name): JsonResponse
+    public function clear(Request $request, string $name, #[CurrentUser] UserInterface $user): JsonResponse
     {
         if (!$this->isConfirmed($request)) {
             return $this->missingConfirmation();
         }
 
         try {
-            $this->rateLimiters->clear($name);
+            $this->clearer->clear($user->getUserIdentifier(), $name);
         } catch (UnknownRateLimiterException $e) {
             return $this->errorResponse($e->getMessage(), Response::HTTP_NOT_FOUND);
         } catch (RateLimiterClearFailedException $e) {

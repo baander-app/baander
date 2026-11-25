@@ -4,9 +4,10 @@ declare(strict_types=1);
 
 namespace App\Shared\Interface\Console;
 
+use App\Shared\Application\Actor;
+use App\Shared\Application\Service\RateLimiterClearer;
 use Baander\RedisRateLimiter\Exception\RateLimiterClearFailedException;
 use Baander\RedisRateLimiter\Exception\UnknownRateLimiterException;
-use Baander\RedisRateLimiter\Administration\RateLimiterAdministrationInterface;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputArgument;
@@ -22,7 +23,7 @@ use Symfony\Component\Console\Style\SymfonyStyle;
 final class RateLimiterClearCommand extends Command
 {
     public function __construct(
-        private readonly RateLimiterAdministrationInterface $rateLimiters,
+        private readonly RateLimiterClearer $clearer,
     ) {
         parent::__construct();
     }
@@ -49,7 +50,7 @@ final class RateLimiterClearCommand extends Command
 
         try {
             if ($all) {
-                $cleared = $this->rateLimiters->clearAll();
+                $cleared = $this->clearer->clearAll(Actor::CLI);
                 if (AdminCommandSupport::wantsJson($input)) {
                     return AdminCommandSupport::json($io, ['cleared' => true, 'limiters' => $cleared]);
                 }
@@ -59,7 +60,7 @@ final class RateLimiterClearCommand extends Command
                 return Command::SUCCESS;
             }
 
-            $this->rateLimiters->clear((string) $name);
+            $this->clearer->clear(Actor::CLI, (string) $name);
         } catch (UnknownRateLimiterException|RateLimiterClearFailedException $e) {
             $io->getErrorStyle()->error($e->getMessage());
 

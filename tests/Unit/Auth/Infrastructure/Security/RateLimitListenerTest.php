@@ -23,6 +23,21 @@ use Symfony\Component\Serializer\Encoder\JsonEncoder;
 #[AllowMockObjectsWithoutExpectations]
 final class RateLimitListenerTest extends TestCase
 {
+    private const array FACTORIES = [
+        'loginIpLimiter',
+        'loginIpEmailLimiter',
+        'registerIpLimiter',
+        'passwordResetIpLimiter',
+        'refreshClientLimiter',
+        'passkeyIpLimiter',
+        'emailVerificationIpLimiter',
+        'oauthTokenIpLimiter',
+        'oauthParIpLimiter',
+        'oauthAuthorizeIpLimiter',
+        'oauthDeviceAuthorizeIpLimiter',
+        'oauthDeviceVerifyIpLimiter',
+    ];
+
     private RateLimiterFactoryInterface&MockObject $loginIpLimiter;
     private RateLimiterFactoryInterface&MockObject $loginIpEmailLimiter;
     private RateLimiterFactoryInterface&MockObject $registerIpLimiter;
@@ -510,6 +525,122 @@ final class RateLimitListenerTest extends TestCase
 
         // IP2 should pass through
         $this->listener->onKernelRequest($eventIp2);
+    }
+
+    // --- Address folding ---
+
+    /**
+     * Every limiter this listener keys on the client address, with a body that makes the
+     * route charge it.
+     *
+     * @return iterable<string, array{string, string, array<string, string>}>
+     */
+    public static function addressKeyedLimiters(): iterable
+    {
+        yield 'login' => [RateLimitListener::LOGIN_ROUTE, 'loginIpLimiter', ['email' => 'user@baander.app']];
+        yield 'login and email' => [RateLimitListener::LOGIN_ROUTE, 'loginIpEmailLimiter', ['email' => 'user@baander.app']];
+        yield 'registration' => [RateLimitListener::REGISTER_ROUTE, 'registerIpLimiter', []];
+        yield 'password reset' => [RateLimitListener::PASSWORD_RESET_REQUEST_ROUTE, 'passwordResetIpLimiter', []];
+        yield 'passkey sign-in' => [RateLimitListener::PASSKEY_OPTIONS_ROUTE, 'passkeyIpLimiter', []];
+        yield 'email verification' => [RateLimitListener::EMAIL_VERIFY_ROUTE, 'emailVerificationIpLimiter', []];
+        yield 'refresh without a token' => [RateLimitListener::REFRESH_ROUTE, 'refreshClientLimiter', []];
+        yield 'token endpoint' => [RateLimitListener::TOKEN_ROUTE, 'oauthTokenIpLimiter', []];
+        yield 'pushed authorization request' => [RateLimitListener::PAR_ROUTE, 'oauthParIpLimiter', []];
+        yield 'authorization' => [RateLimitListener::AUTHORIZE_ROUTE, 'oauthAuthorizeIpLimiter', []];
+        yield 'device authorization' => [RateLimitListener::DEVICE_AUTHORIZE_ROUTE, 'oauthDeviceAuthorizeIpLimiter', []];
+        yield 'user code lookup' => [RateLimitListener::DEVICE_VERIFY_ROUTE, 'oauthDeviceVerifyIpLimiter', []];
+    }
+
+    /** @param array<string, string> $body */
+    #[DataProvider('addressKeyedLimiters')]
+    public function testAddressesInOneIpv6NetworkShareABucket(string $route, string $limiter, array $body): void
+    {
+        [$first, $sameNetwork, $otherNetwork] = $this->keysCharged($route, $limiter, $body, [
+            '2001:db8:20:1::1',
+            '2001:db8:20:1:ffff:ffff:ffff:ffff',
+            '2001:db8:20:2::1',
+        ]);
+
+        self::assertSame($first, $sameNetwork);
+        self::assertNotSame($first, $otherNetwork);
+    }
+
+    /** @param array<string, string> $body */
+    #[DataProvider('addressKeyedLimiters')]
+    public function testIpv4AddressesInOneNetworkKeepTheirOwnBuckets(string $route, string $limiter, array $body): void
+    {
+        [$first, $neighbour] = $this->keysCharged($route, $limiter, $body, ['198.18.20.7', '198.18.20.8']);
+
+        self::assertNotSame($first, $neighbour);
+    }
+
+    /** @param array<string, string> $body */
+    #[DataProvider('addressKeyedLimiters')]
+    public function testAMappedOrZonedAddressSharesTheBucketOfItsPlainForm(string $route, string $limiter, array $body): void
+    {
+        [$ipv4, $mapped, $linkLocal, $zoned] = $this->keysCharged($route, $limiter, $body, [
+            '198.18.20.7',
+            '::ffff:198.18.20.7',
+            'fe80::1',
+            'fe80::1%eth0',
+        ]);
+
+        self::assertSame($ipv4, $mapped);
+        self::assertSame($linkLocal, $zoned);
+    }
+
+    public function testTheLimitWarningLogsTheFullAddress(): void
+    {
+        $request = $this->createJsonRequest(RateLimitListener::REGISTER_ROUTE, '/api/auth/register', ip: '2001:db8:20:1::7');
+        $this->registerIpLimiter->expects($this->once())
+            ->method('create')
+            ->with('2001:db8:20:1::')
+            ->willReturn($this->createRejectedLimit(300));
+
+        $this->logger->expects($this->once())
+            ->method('warning')
+            ->with('Rate limit exceeded', $this->callback(
+                static fn (array $context): bool => $context['ip'] === '2001:db8:20:1::7',
+            ));
+
+        $this->expectException(TooManyRequestsHttpException::class);
+
+        $this->listener->onKernelRequest($this->createRequestEvent($request));
+    }
+
+    /**
+     * Sends one request per address and returns the keys the named limiter was charged under.
+     *
+     * @param array<string, string> $body
+     * @param list<string>          $addresses
+     *
+     * @return list<string>
+     */
+    private function keysCharged(string $route, string $limiter, array $body, array $addresses): array
+    {
+        $keys = [];
+        foreach (self::FACTORIES as $name) {
+            $factory = $this->{$name};
+            self::assertInstanceOf(MockObject::class, $factory);
+            $factory->method('create')->willReturnCallback(
+                function (string $key) use ($name, $limiter, &$keys): LimiterInterface {
+                    if ($name === $limiter) {
+                        $keys[] = $key;
+                    }
+
+                    return $this->createAcceptedLimit();
+                },
+            );
+        }
+
+        foreach ($addresses as $address) {
+            $request = $this->createJsonRequest($route, '/api/limited', body: $body, ip: $address);
+            $this->listener->onKernelRequest($this->createRequestEvent($request));
+        }
+
+        self::assertCount(count($addresses), $keys, sprintf('Every request must charge "%s".', $limiter));
+
+        return $keys;
     }
 
     // --- Route matching ---

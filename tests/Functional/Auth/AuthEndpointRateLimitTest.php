@@ -74,6 +74,29 @@ final class AuthEndpointRateLimitTest extends RateLimitTestCase
         self::assertSame(200, $other->getStatusCode(), (string) $other->getContent());
     }
 
+    public function testAnIpv6NetworkSharesOnePerAddressBudget(): void
+    {
+        $this->exhaust('auth_passkey_ip', '2001:db8:20:1::');
+        $this->trackLimiter('auth_passkey_ip', '2001:db8:20:2::');
+
+        $this->assertTooManyRequests($this->requestFrom('2001:db8:20:1::7', 'POST', '/api/auth/passkey/authenticate/options', content: []));
+        $this->assertTooManyRequests($this->requestFrom('2001:db8:20:1:ffff:ffff:ffff:ffff', 'POST', '/api/auth/passkey/authenticate/options', content: []));
+
+        $otherNetwork = $this->requestFrom('2001:db8:20:2::7', 'POST', '/api/auth/passkey/authenticate/options', content: []);
+        self::assertSame(200, $otherNetwork->getStatusCode(), (string) $otherNetwork->getContent());
+    }
+
+    public function testAMappedIpv4AddressSharesTheBudgetOfItsIpv4FormButNotOfItsNeighbours(): void
+    {
+        $this->exhaust('auth_passkey_ip', '198.18.20.7');
+        $this->trackLimiter('auth_passkey_ip', '198.18.20.8');
+
+        $this->assertTooManyRequests($this->requestFrom('::ffff:198.18.20.7', 'POST', '/api/auth/passkey/authenticate/options', content: []));
+
+        $neighbour = $this->requestFrom('198.18.20.8', 'POST', '/api/auth/passkey/authenticate/options', content: []);
+        self::assertSame(200, $neighbour->getStatusCode(), (string) $neighbour->getContent());
+    }
+
     public function testOAuthTokenEndpointIsLimitedPerIpBeforeTheClientAuthenticates(): void
     {
         $this->exhaust('oauth_token_ip', '198.51.100.60');

@@ -6,10 +6,12 @@ namespace App\Tests\Unit\Shared\Interface\Console;
 
 use Baander\RedisRateLimiter\Administration\RedisRateLimiterAdministration;
 use Baander\RedisRateLimiter\Storage\RedisRateLimiterStore;
+use App\Shared\Application\Service\RateLimiterClearer;
 use App\Shared\Infrastructure\Redis\RedisClientFactory;
 use App\Shared\Interface\Console\RateLimiterClearCommand;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
+use Psr\Log\NullLogger;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Tester\CommandTester;
 use Redis;
@@ -29,7 +31,7 @@ final class RateLimiterClearCommandTest extends TestCase
     {
         $redis = $this->createMock(Redis::class);
         $redis->expects(self::exactly($writes))->method('set')->willReturn(false);
-        $command = new CommandTester(new RateLimiterClearCommand($this->administration($redis)));
+        $command = new CommandTester(new RateLimiterClearCommand(new RateLimiterClearer($this->administration($redis), new NullLogger())));
         self::assertSame(Command::FAILURE, $command->execute($arguments, ['capture_stderr_separately' => true]));
         self::assertSame('', $command->getDisplay());
         self::assertStringContainsString('healthy', $command->getErrorOutput());

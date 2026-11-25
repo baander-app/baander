@@ -8,11 +8,14 @@ use Baander\RedisRateLimiter\Exception\RateLimiterClearFailedException;
 use Baander\RedisRateLimiter\Administration\RateLimiterAdministrationInterface;
 use PHPUnit\Framework\Attributes\DataProvider;
 use App\Tests\Functional\TestCase;
+use App\Tests\Fixtures\RateLimiter\ReadsLimiterClearLogs;
 use Symfony\Component\RateLimiter\RateLimiterFactoryInterface;
 use Symfony\Component\Yaml\Yaml;
 
 final class RateLimiterMonitorControllerTest extends TestCase
 {
+    use ReadsLimiterClearLogs;
+
     public function testListShowsEveryConfiguredLimiterWithItsEffectiveConfiguration(): void
     {
         $response = $this->authenticatedRequest('GET', '/api/monitor/rate-limiters', $this->createAdminUser());
@@ -45,7 +48,7 @@ final class RateLimiterMonitorControllerTest extends TestCase
         $response = $this->authenticatedRequest(
             'DELETE',
             '/api/monitor/rate-limiters/batch_cover_extract/clear?confirm=true',
-            $this->createAdminUser(),
+            $this->createSuperAdminUser(),
         );
 
         $data = $this->assertJsonResponse($response, 200)['data'];
@@ -64,7 +67,7 @@ final class RateLimiterMonitorControllerTest extends TestCase
         $response = $this->authenticatedRequest(
             'DELETE',
             '/api/monitor/rate-limiters/clear?confirm=true',
-            $this->createAdminUser(),
+            $this->createSuperAdminUser(),
         );
 
         $data = $this->assertJsonResponse($response, 200)['data'];
@@ -74,12 +77,66 @@ final class RateLimiterMonitorControllerTest extends TestCase
         self::assertTrue($this->limiter('discovery_endpoint_ip')->create($key)->consume()->isAccepted());
     }
 
+    /** @return iterable<string, array{string, int}> */
+    public static function rolesThatMayNotClear(): iterable
+    {
+        yield 'anonymous' => ['anonymous', 401];
+        yield 'ordinary user' => ['user', 403];
+        yield 'administrator' => ['admin', 403];
+    }
+
+    #[DataProvider('rolesThatMayNotClear')]
+    public function testOnlyASuperAdminClearsLimiters(string $role, int $status): void
+    {
+        $key = 'clear-role-' . bin2hex(random_bytes(4));
+        $this->exhaust('config_check', $key);
+        $logs = $this->captureLogs();
+
+        foreach (['/api/monitor/rate-limiters/clear', '/api/monitor/rate-limiters/config_check/clear'] as $route) {
+            $uri = $route . '?confirm=true';
+            $response = match ($role) {
+                'anonymous' => $this->anonymousRequest('DELETE', $uri),
+                'admin' => $this->authenticatedRequest('DELETE', $uri, $this->createAdminUser()),
+                default => $this->authenticatedRequest('DELETE', $uri, $this->createTestUser()),
+            };
+
+            $this->assertJsonResponse($response, $status);
+        }
+
+        self::assertFalse($this->limiter('config_check')->create($key)->consume()->isAccepted(), 'The limiter must keep its state.');
+        self::assertSame([], $this->clearRecords($logs));
+    }
+
+    public function testAnAdministratorStillListsLimiters(): void
+    {
+        $response = $this->authenticatedRequest('GET', '/api/monitor/rate-limiters', $this->createAdminUser());
+
+        $this->assertJsonResponse($response, 200);
+    }
+
+    public function testEveryClearIsLoggedWithTheSuperAdminAndTheLimiters(): void
+    {
+        $superAdmin = $this->createSuperAdminUser();
+        $logs = $this->captureLogs();
+
+        $named = $this->authenticatedRequest('DELETE', '/api/monitor/rate-limiters/batch_cover_extract/clear?confirm=true', $superAdmin);
+        $all = $this->authenticatedRequest('DELETE', '/api/monitor/rate-limiters/clear?confirm=true', $superAdmin);
+
+        $this->assertJsonResponse($named, 200);
+        $this->assertJsonResponse($all, 200);
+        $records = $this->clearRecords($logs);
+        self::assertCount(2, $records);
+        self::assertSame(['actor' => $superAdmin->getEmail(), 'limiters' => ['batch_cover_extract']], $records[0]);
+        self::assertSame($superAdmin->getEmail(), $records[1]['actor']);
+        self::assertEqualsCanonicalizing($this->configuredLimiterNames(), $records[1]['limiters']);
+    }
+
     public function testClearUnknownLimiterReturnsNotFound(): void
     {
         $response = $this->authenticatedRequest(
             'DELETE',
             '/api/monitor/rate-limiters/no_such_limiter/clear?confirm=true',
-            $this->createAdminUser(),
+            $this->createSuperAdminUser(),
         );
 
         $this->assertJsonResponse($response, 404);
@@ -93,7 +150,7 @@ final class RateLimiterMonitorControllerTest extends TestCase
             ->willThrowException(RateLimiterClearFailedException::forLimiters(['config_check']));
         static::getContainer()->set(RateLimiterAdministrationInterface::class, $administration);
 
-        $response = $this->authenticatedRequest('DELETE', $route . '?confirm=true', $this->createAdminUser());
+        $response = $this->authenticatedRequest('DELETE', $route . '?confirm=true', $this->createSuperAdminUser());
         $this->assertJsonResponse($response, 503);
         self::assertSame('1', $response->headers->get('Retry-After'));
         self::assertTrue($response->headers->hasCacheControlDirective('no-store'));
