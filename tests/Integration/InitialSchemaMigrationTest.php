@@ -111,7 +111,7 @@ final class InitialSchemaMigrationTest extends TestCase
         );
         $factory = $this->factory();
         $factory->getMetadataStorage()->ensureInitialized();
-        self::assertCount(43, $factory->getMigrationRepository()->getMigrations());
+        self::assertCount(47, $factory->getMigrationRepository()->getMigrations());
         self::assertSame(0, $this->migrate($factory));
         self::assertSame([
             'DoctrineMigrations\\Version20261017000000',

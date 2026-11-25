@@ -6,6 +6,7 @@ namespace App\Tests\Integration\LiveUpdates;
 
 use App\Catalog\Application\CommandHandler\FilesDiscoveredHandler;
 use App\Library\Application\Command\ScanLibraryCommand;
+use App\Library\Application\Port\LibraryMediaFilesInterface;
 use App\Library\Application\Message\DiscoveredFile;
 use App\Library\Application\Message\FilesDiscovered;
 use App\Library\Domain\Event\LibraryDirectoryIndexed;
@@ -19,6 +20,7 @@ use App\Notification\Domain\ValueObject\NotificationCategory;
 use App\Notification\Infrastructure\Messaging\NotificationMessagePayloadCodec;
 use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
+use App\Shared\Infrastructure\Filesystem\StoragePathBoundary;
 use App\Shared\Infrastructure\LiveUpdates\DoctrineLiveChangeProjector;
 use App\Shared\Infrastructure\Messaging\JsonMessageCodec;
 use App\Shared\Infrastructure\Messenger\JobIdStamp;
@@ -237,9 +239,18 @@ final class CapacityFixtureTest extends TestCase
         self::assertSame($prepared['hash'], hash_file('xxh3', $prepared['path']));
         self::assertNotSame($prepared['hash'], hash('xxh3', \ScanFixture::taggedWave($prepared['title'], 'Live album 00000', 'another-run')));
         $handler = new \ReflectionClass(FilesDiscoveredHandler::class)->newInstanceWithoutConstructor();
+        $libraryRoot = $owned['library']['path'];
+        $mediaFiles = $this->createStub(LibraryMediaFilesInterface::class);
+        // Reads a sidecar the way LibraryMediaFiles does: only when it resolves inside the library root.
+        $mediaFiles->method('readSidecar')->willReturnCallback(static function (Uuid $libraryId, string $path, int $maxBytes) use ($libraryRoot): ?string {
+            $resolved = StoragePathBoundary::resolve($libraryRoot, $path);
+
+            return is_file($resolved) ? (string) file_get_contents($resolved, length: $maxBytes) : null;
+        });
+        (fn (LibraryMediaFilesInterface $files) => $this->mediaFiles = $files)->call($handler, $mediaFiles);
         $lyricsReader = new \ReflectionMethod(FilesDiscoveredHandler::class, 'findLyricsFile');
         foreach ([$owned['song']['path'], $prepared['path']] as $audio) {
-            $lyrics = $lyricsReader->invoke($handler, $audio);
+            $lyrics = $lyricsReader->invoke($handler, Uuid::fromString($owned['library']['id']), $audio);
             self::assertIsString($lyrics);
             self::assertStringContainsString('[00:00.00]Live owned lyrics scan-owned', $lyrics);
         }

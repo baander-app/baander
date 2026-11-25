@@ -26,7 +26,7 @@ final class UnreadableMediaFileExceptionTest extends TestCase
     /** @return iterable<string, array{UnreadableMediaFileException, string}> */
     public static function danish(): iterable
     {
-        yield 'missing file' => [UnreadableMediaFileException::missing(), 'Gyldig "path" til en eksisterende fil er påkrævet.'];
+        yield 'missing file' => [UnreadableMediaFileException::missing(), 'Gyldig "path" til en eksisterende fil i et bibliotek er påkrævet.'];
         yield 'unsupported format' => [UnreadableMediaFileException::unsupportedFormat(), 'Lydformatet understøttes ikke.'];
     }
 
