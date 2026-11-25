@@ -168,7 +168,7 @@ final readonly class TranscodeSessionShare
     private function slotHolderToEnd(array $held, array $own, Uuid $videoId, string $requestId, DateTimeImmutable $now): ?HeldTranscodeSession
     {
         $freed = array_filter($own, static fn (HeldTranscodeSession $session): bool => $session->holdsSlot) |> count(...);
-        if ($this->store->occupiedVideoSlots() - $freed < $this->profile->videoEncoderSlots) {
+        if ($this->store->occupiedVideoSlots() - $freed < $this->videoSlots()) {
             return null;
         }
         $playback = array_filter($held, static fn (HeldTranscodeSession $session): bool => $session->belongsTo($videoId, $requestId));
@@ -192,6 +192,16 @@ final readonly class TranscodeSessionShare
             $this->ownership->control($session->jobId, $session->sessionId, new Uuid()->toString(), status: 'cancelled', seek: false);
         }
         $this->store->end($session);
+    }
+
+    /**
+     * The slots the media worker runs a video execution, encode or copy, in: the video slots, or under
+     * remux the shared copy slots. Audio copies share those under remux and are not counted: no
+     * session holds them, so none can be ended for their slot, and a start waits for one to finish.
+     */
+    private function videoSlots(): int
+    {
+        return count($this->profile->mediaClientIds('video'));
     }
 
     private function limit(): int

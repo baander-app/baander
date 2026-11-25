@@ -24,7 +24,7 @@ interface TranscodeSessionSharePort
      */
     public function heldBy(Uuid $userId): array;
 
-    /** Video executions that run in a video slot, or wait for one within their admission deadline. */
+    /** Video executions, encodes and copies, that run in a slot or wait for one within their admission deadline. */
     public function occupiedVideoSlots(): int;
 
     /**

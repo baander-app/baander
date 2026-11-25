@@ -45,7 +45,7 @@ A stored value can stop being allowed, for example when a setting's allowed valu
 | `transcode.enabled` | `false` | Allow on-the-fly audio transcoding when the startup profile permits encoding. It cannot enable encoding in a `remux` deployment. See [Audio transcoding](../media/audio-transcoding.md#audio-transcoding). |
 | `transcode.max_bitrate` | `320` | The highest bitrate of a transcoded audio stream, in kbps: `128`, `192`, `256` or `320`. It is also the bitrate used when a client asks for none. |
 | `transcode.aac_implementation` | `bac` | The codec implementation FFmpeg uses for AAC encodes and for decoding AAC sources in them: `bac`, `fdk_aac` or `ffmpeg`. See [AAC implementation](../media/audio-transcoding.md#aac-implementation). |
-| `transcode.sessions_per_user` | `6` | How many video transcode sessions one account holds at once, admins included; at least `1`. An automatic start takes up to three. See [Video sessions per user](../media/transcoding.md#video-sessions-per-user). |
+| `transcode.sessions_per_user` | `6` | How many video transcode sessions one account holds at once, admins included; at least `1`. An automatic start takes up to three, a stream copy one. See [Video sessions per user](../media/transcoding.md#video-sessions-per-user). |
 
 Every setting in the table is enforced. Four features arrived with server settings and start switched off: audio transcoding, automatic MusicBrainz matching, automatic lyrics fetch, and scheduled recommendations. Turn on the ones you want.
 

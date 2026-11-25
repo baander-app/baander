@@ -13,6 +13,7 @@ use App\Media\Interface\Resource\DeliveryResource;
 use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
 use App\Shared\Interface\Controller\ApiResponsesTrait;
+use App\Shared\Interface\DTO\ApiError;
 use App\Transcode\Application\Port\StreamAuthPortInterface;
 use App\Transcode\Application\Port\CompletedVideoDeliveryPort;
 use OpenApi\Spec as OA;
@@ -53,6 +54,26 @@ final readonly class DeliveryController
             ),
             new OA\Response(response: '400', description: 'Invalid capabilities or media identifier'),
             new OA\Response(response: '401', description: 'Authentication required'),
+            new OA\Response(
+                response: '409',
+                description: 'Playback cannot start: the video file no longer resolves inside one of its libraries, or the stream copy the destination needs would leave the account holding more transcode sessions than the server allows and too few have been silent for two minutes to give way (`error.details.reason` is `transcode_session_limit` and `error.details.limit` the limit)',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: ApiError::class),
+                ),
+            ),
+            new OA\Response(
+                response: '503',
+                description: 'The stream copy did not start in time (with `Retry-After`), or the completed media chosen for the destination is unavailable',
+                headers: [
+                    new OA\Header(
+                        header: 'Retry-After',
+                        schema: new OA\Schema(type: 'integer', example: 2),
+                    ),
+                ],
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: ApiError::class),
+                ),
+            ),
         ],
     )]
     #[Route('/api/stream/delivery', name: 'stream_delivery', methods: ['POST'])]

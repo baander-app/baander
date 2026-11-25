@@ -136,6 +136,25 @@ final class TranscodeSessionShareTest extends TestCase
         self::assertEquals([$this->at('-70 minutes')], $this->store->slotQueries);
     }
 
+    /** @return iterable<string, array{int, bool}> */
+    public static function remuxCopySlots(): iterable
+    {
+        yield 'a copy slot free' => [1, false];
+        yield 'every copy slot taken' => [2, true];
+    }
+
+    /** A remux deployment runs no video slots: its copies run in the shared copy slots. */
+    #[DataProvider('remuxCopySlots')]
+    public function testUnderRemuxTheVideoExecutionsAreComparedWithTheSharedCopySlots(int $occupied, bool $ended): void
+    {
+        $other = $this->hold(Uuid::generate(), '-3 hours');
+        $this->store->occupied = $occupied;
+
+        $this->share(profile: new DeploymentProfile('remux', 2, 4, 1, sharedCopySlots: 2))->makeRoom($this->user, $this->video, 'new-client');
+
+        self::assertSame($ended ? [$other->sessionId->toString()] : [], $this->store->ended);
+    }
+
     public function testASessionTheStartEndsForItsShareFreesItsSlot(): void
     {
         $own = $this->hold($this->user, '-10 minutes');
@@ -204,7 +223,7 @@ final class TranscodeSessionShareTest extends TestCase
         self::assertSame([$first->sessionId->toString()], $this->cancelled);
     }
 
-    private function share(int $limit = 6): TranscodeSessionShare
+    private function share(int $limit = 6, DeploymentProfile $profile = new DeploymentProfile()): TranscodeSessionShare
     {
         $ownership = $this->createStub(TranscodeExecutionOwnershipPort::class);
         $ownership->method('control')->willReturnCallback(function (Uuid $job, Uuid $session, string $request, ?string $status = null): TranscodeControlResult {
@@ -219,7 +238,7 @@ final class TranscodeSessionShareTest extends TestCase
         $settings = $this->createStub(SystemSettingsPortInterface::class);
         $settings->method('get')->willReturnCallback(static fn (string $key): int => $key === TranscodeSettingDefinitions::SESSIONS_PER_USER ? $limit : throw new \LogicException($key));
 
-        return new TranscodeSessionShare($this->store, $ownership, $transaction, $settings, new DeploymentProfile(), new MockClock(self::NOW, 'UTC'));
+        return new TranscodeSessionShare($this->store, $ownership, $transaction, $settings, $profile, new MockClock(self::NOW, 'UTC'));
     }
 
     private function hold(Uuid $user, string $lastSignOfLife, bool $complete = false, string $request = 'other-client', string $tier = '720p'): HeldTranscodeSession

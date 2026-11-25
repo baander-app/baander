@@ -21,8 +21,10 @@ use App\Transcode\Domain\Model\TranscodeSession;
 use App\Transcode\Domain\ValueObject\AudioProfile;
 use App\Transcode\Domain\ValueObject\PresentationSelection;
 use App\Transcode\Domain\ValueObject\SessionPriority;
+use App\Transcode\Domain\ValueObject\SessionState;
 use App\Transcode\Domain\ValueObject\TranscodeStatus;
 
+/** A copy holds a video slot, or under remux a shared copy slot, as an encode does, so its start counts toward the user's share. */
 final readonly class CopyPresentationService implements CopyPresentationPortInterface
 {
     public function __construct(
@@ -33,6 +35,7 @@ final readonly class CopyPresentationService implements CopyPresentationPortInte
         private TranscodeExecutionOwnershipPort $ownership,
         private TransactionPortInterface $transaction,
         private SleeperInterface $sleeper,
+        private TranscodeSessionShare $share,
     ) {
     }
 
@@ -48,6 +51,8 @@ final readonly class CopyPresentationService implements CopyPresentationPortInte
         $this->policy->assertAllowed(MediaOperation::VideoStreamCopy);
         $profile = AudioProfile::streamingStereo();
         $session = $this->transaction->run(function () use ($owner, $video, $selection, $width, $height, $requestId, $profile): TranscodeSession {
+            // The user's lock comes before any row lock, so one user's copy and encode starts count their sessions in turn.
+            $this->share->lock($owner);
             $this->ownership->lockAdmission($video);
             $job = $this->jobs->getOrCreateCopyJob($video, $this->storage->resolveJobDirectory($video, 'copy'), $owner, $selection, $width, $height, $requestId);
             $runtime = $this->ownership->find($job->getId());
@@ -57,10 +62,14 @@ final readonly class CopyPresentationService implements CopyPresentationPortInte
             }
             if ($runtime !== null && $runtime->requestId === $requestId && in_array($runtime->outcome, ['pending', 'accepted', 'ready', 'complete'], true)) {
                 $existing = $this->sessions->findByUuid($runtime->sessionId);
-                if ($existing !== null && $existing->getUserId()->equals($owner)) {
+                // An ended session is not handed back: the share ends a finished copy's session and
+                // leaves its execution complete, and its client holds nothing through it.
+                if ($existing !== null && $existing->getUserId()->equals($owner)
+                    && !in_array($existing->getSessionState(), [SessionState::Cancelled, SessionState::Failed], true)) {
                     return $existing;
                 }
             }
+            $this->share->makeRoom($owner, $video, $requestId);
             if (in_array($job->getStatus(), [TranscodeStatus::Failed, TranscodeStatus::Cancelled], true)) {
                 $job->retry();
             }

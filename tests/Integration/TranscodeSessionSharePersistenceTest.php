@@ -14,8 +14,11 @@ use App\Shared\Application\Port\SystemSettingsPortInterface;
 use App\Shared\Application\Port\TransactionPortInterface;
 use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
+use App\Tests\Fixtures\Transcode\CopyStartRace;
 use App\Transcode\Application\Command\CreateTranscodeSessionCommand;
 use App\Transcode\Application\CommandHandler\CreateTranscodeSessionHandler;
+use App\Transcode\Application\DTO\CopyPresentation;
+use App\Transcode\Application\DTO\CopyPresentationInput;
 use App\Transcode\Application\DTO\DesiredTranscodeState;
 use App\Transcode\Application\DTO\MediaWorkerIdentity;
 use App\Transcode\Application\DTO\PlaybackEndReason;
@@ -26,6 +29,7 @@ use App\Transcode\Application\Port\TranscodePublicViewInterface;
 use App\Transcode\Application\Port\TranscodeStoragePortInterface;
 use App\Shared\Infrastructure\Doctrine\Platform\BaanderDriverMiddleware;
 use App\Shared\Infrastructure\Doctrine\Type\CustomTypesRegistrar;
+use App\Transcode\Application\Service\CopyPresentationService;
 use App\Transcode\Application\Service\MediaExecutionPolicy;
 use App\Transcode\Application\Service\TranscodeSessionShare;
 use App\Transcode\Application\Settings\TranscodeSettingDefinitions;
@@ -55,9 +59,12 @@ use Symfony\Component\Messenger\Handler\HandlersLocator;
 use Symfony\Component\Messenger\MessageBus;
 use Symfony\Component\Messenger\Middleware\HandleMessageMiddleware;
 
+require_once dirname(__DIR__) . '/Fixtures/Transcode/copy-start-race.php';
+
 /**
  * A user's share of transcode sessions and the reclaim of silent sessions, through the real start
- * handler, signed start and session endpoint, on migrated PostgreSQL.
+ * handler, signed start, session endpoint and copy start of delivery negotiation, on migrated
+ * PostgreSQL.
  *
  * Each test copies the transcode tables into a schema of its own inside the rolled-back transaction,
  * so the count of occupied video slots sees only the test's rows.
@@ -319,6 +326,195 @@ final class TranscodeSessionSharePersistenceTest extends TestCase
         yield 'another user' => [false];
     }
 
+    public function testACopyStartPastTheShareEndsTheUsersLongestSilentSessionAndIsRefusedWhileEveryOtherPlays(): void
+    {
+        $connection = $this->isolate();
+        $user = Uuid::generate();
+        $stack = $this->stack($user, 8);
+        $silent = $this->seed($stack, $user, $this->video(), 'silent', '360p', '5 minutes');
+        foreach (range(1, 5) as $index) {
+            $this->seed($stack, $user, $this->video(), 'playing-' . $index, '360p', '10 seconds');
+        }
+
+        $this->copy($stack, $user, $this->video());
+
+        self::assertSame('cancelled', $this->sessionState($connection, $silent));
+        self::assertSame('cancelled', $this->outcome($connection, $silent), 'The worker reads the cancellation and gives up the slot.');
+        self::assertSame(6, $this->held($connection, $user));
+
+        $connection->executeStatement('UPDATE transcode_sessions SET updated_at = clock_timestamp() WHERE user_id = ?', [$user->toString()]);
+        $refusal = $this->refusal(fn () => $this->copy($stack, $user, $this->video()));
+
+        self::assertSame(['reason' => 'transcode_session_limit', 'limit' => 6], $refusal->details);
+        self::assertSame(6, $this->held($connection, $user));
+        self::assertSame(7, (int) $connection->fetchOne('SELECT count(*) FROM transcode_sessions'), 'The refused copy start created no session.');
+    }
+
+    public function testCopyAndEncodeSessionsCountTowardOneShare(): void
+    {
+        $connection = $this->isolate();
+        $user = Uuid::generate();
+        $stack = $this->stack($user, 8);
+        $copied = $this->sessionId($connection, $this->copy($stack, $user, $this->video())->sessionId);
+        foreach (range(1, 2) as $ignored) {
+            $this->copy($stack, $user, $this->video());
+        }
+        self::assertCount(1, $stack['playback']->start($this->video(), Uuid::generate()->toString(), qualityTier: '360p'));
+        $encoded = Uuid::fromString((string) $connection->fetchOne(
+            "SELECT s.id FROM transcode_sessions s JOIN transcode_jobs j ON j.id = s.job_id WHERE s.user_id = ? AND j.quality_tier_name = '360p'",
+            [$user->toString()],
+        ));
+        foreach (range(1, 2) as $ignored) {
+            self::assertCount(1, $stack['playback']->start($this->video(), Uuid::generate()->toString(), qualityTier: '360p'));
+        }
+        self::assertSame(6, $this->held($connection, $user));
+
+        $this->silence($connection, $copied, '5 minutes');
+        self::assertCount(1, $stack['playback']->start($this->video(), Uuid::generate()->toString(), qualityTier: '360p'));
+        self::assertSame('cancelled', $this->sessionState($connection, $copied), 'A silent copy session gives way to an encode start.');
+
+        $this->silence($connection, $encoded, '5 minutes');
+        $this->copy($stack, $user, $this->video());
+        self::assertSame('cancelled', $this->sessionState($connection, $encoded), 'A silent encode session gives way to a copy start.');
+        self::assertSame(6, $this->held($connection, $user));
+
+        self::assertSame('transcode_session_limit', $this->refusal(fn () => $this->copy($stack, $user, $this->video()))->details['reason']);
+        self::assertSame('transcode_session_limit', $this->refusal(fn () => $stack['playback']->start($this->video(), Uuid::generate()->toString(), qualityTier: '360p'))->details['reason']);
+        self::assertSame(6, $this->held($connection, $user));
+    }
+
+    /**
+     * A copy runs in a video slot under the transcode capability and in a shared copy slot under remux.
+     *
+     * @return iterable<string, array{bool}>
+     */
+    public static function copyDeployments(): iterable
+    {
+        yield 'transcode' => [false];
+        yield 'remux' => [true];
+    }
+
+    #[DataProvider('copyDeployments')]
+    public function testWhileASlotIsFreeACopyStartLeavesOtherUsersSilentSessionsAlone(bool $remux): void
+    {
+        $connection = $this->isolate();
+        $user = Uuid::generate();
+        $stack = $this->stack($user, 2, remux: $remux);
+        $other = $this->seed($stack, Uuid::generate(), $this->video(), 'other', 'copy', '3 hours');
+
+        $this->copy($stack, $user, $this->video());
+
+        self::assertSame('active', $this->sessionState($connection, $other));
+        self::assertSame('accepted', $this->outcome($connection, $other));
+    }
+
+    #[DataProvider('copyDeployments')]
+    public function testACopyStartThatFindsNoFreeSlotEndsTheSessionSilentForSeventyMinutesOnly(bool $remux): void
+    {
+        $connection = $this->isolate();
+        $first = Uuid::generate();
+        $stack = $this->stack($first, 2, remux: $remux);
+        $owner = Uuid::generate();
+        $abandoned = $this->seed($stack, $owner, $this->video(), 'abandoned', 'copy', '71 minutes');
+        // A paused player renews its sign of life once an hour when it signs its stream URL.
+        $paused = $this->seed($stack, $owner, $this->video(), 'paused', 'copy', '65 minutes');
+
+        $this->copy($stack, $first, $this->video());
+
+        self::assertSame('cancelled', $this->sessionState($connection, $abandoned));
+        self::assertSame('cancelled', $this->outcome($connection, $abandoned), 'The worker reads the cancellation and gives up the slot.');
+        self::assertSame('active', $this->sessionState($connection, $paused));
+
+        $second = Uuid::generate();
+        try {
+            $this->copy($this->stack($second, 2, remux: $remux), $second, $this->video());
+            self::fail('A copy start that finds every slot held by sessions that reported playback within 70 minutes waits and is refused.');
+        } catch (TranscodeStartupUnavailableException) {
+        }
+        self::assertSame('active', $this->sessionState($connection, $paused));
+        self::assertSame('accepted', $this->outcome($connection, $paused));
+        self::assertSame(1, $this->held($connection, $first));
+    }
+
+    /** The share ends a finished copy without cancelling its execution, which stays complete. */
+    public function testAFinishedCopyThatGaveWayStartsAgainForItsClientWithANewSession(): void
+    {
+        $connection = $this->isolate();
+        $user = Uuid::generate();
+        $stack = $this->stack($user, 8);
+        [$film, $client] = [$this->video(), Uuid::generate()->toString()];
+        $first = $this->copy($stack, $user, $film, $client);
+        $finished = $this->sessionId($connection, $first->sessionId);
+        $connection->executeStatement("UPDATE transcode_runtime_state SET outcome = 'complete' WHERE session_id = ?", [$finished->toString()]);
+        $this->silence($connection, $finished, '20 minutes');
+        $paused = $this->seed($stack, $user, $this->video(), 'paused', '360p', '5 minutes');
+        foreach (range(1, 4) as $index) {
+            $this->seed($stack, $user, $this->video(), 'playing-' . $index, '360p', '10 seconds');
+        }
+        self::assertCount(1, $stack['playback']->start($this->video(), Uuid::generate()->toString(), qualityTier: '360p'));
+        self::assertSame('cancelled', $this->sessionState($connection, $finished));
+        self::assertSame('complete', $this->outcome($connection, $finished));
+
+        $again = $this->copy($stack, $user, $film, $client);
+
+        self::assertFalse($again->sessionId->equals($first->sessionId), 'The ended session is not handed back.');
+        self::assertSame($first->jobId->toString(), $again->jobId->toString());
+        self::assertSame('cancelled', $this->sessionState($connection, $paused), 'The new session made room like any other start.');
+        self::assertSame(6, $this->held($connection, $user));
+    }
+
+    /**
+     * Two copy starts of one user at once, one below the share, each on a connection and ORM identity
+     * map of its own as two delivery negotiations run: the second waits for the first one's lock and
+     * then finds the share full.
+     */
+    public function testConcurrentCopyStartsOfOneUserLeaveExactlyTheShare(): void
+    {
+        $writer = CopyStartRace::connect();
+        $observer = CopyStartRace::connect();
+        $schema = 'transcode_copy_race_' . bin2hex(random_bytes(6));
+        $contender = null;
+        try {
+            $writer->executeStatement('CREATE SCHEMA ' . $schema);
+            foreach (self::TABLES as $table) {
+                $writer->executeStatement(sprintf('CREATE TABLE %1$s.%2$s (LIKE public.%2$s INCLUDING ALL)', $schema, $table));
+            }
+            foreach ([$writer, $observer] as $connection) {
+                $connection->executeStatement(sprintf('SET search_path TO %s, public', $schema));
+            }
+            $user = Uuid::generate();
+            $stack = ['connection' => $writer, 'runtime' => new TranscodeRuntimeState($writer, self::transaction($writer))];
+            foreach (range(1, 5) as $index) {
+                $this->seed($stack, $user, Uuid::generate(), 'playing-' . $index, '360p', '5 seconds');
+            }
+            $application = 'transcode_copy_race_' . bin2hex(random_bytes(6));
+            $contender = $this->contender($schema, $application, $user);
+            // The first start has created its session and not yet committed when the second one starts.
+            $first = CopyStartRace::service($writer, self::beforeCommit($writer, function () use ($contender, $observer, $application, $user): void {
+                self::assertSame(3, fwrite($contender['input'], "go\n"));
+                fflush($contender['input']);
+                $this->awaitAdvisoryWait($observer, $application, $contender['process']);
+                self::assertSame(5, $this->held($observer, $user));
+            }));
+
+            $first->start(CopyStartRace::input($user));
+
+            self::assertSame('refused', $this->outcomeOf($contender));
+            self::assertSame(6, $this->held($observer, $user));
+        } finally {
+            if ($contender !== null && is_resource($contender['process'])) {
+                proc_terminate($contender['process'], 9);
+                proc_close($contender['process']);
+            }
+            if ($writer->isTransactionActive()) {
+                $writer->rollBack();
+            }
+            $writer->executeStatement('DROP SCHEMA IF EXISTS ' . $schema . ' CASCADE');
+            $writer->close();
+            $observer->close();
+        }
+    }
+
     /** A start's room check from a separate PHP process on its own connection; prints whether it was admitted. */
     private const string CONTENDER = <<<'PHP'
 require $argv[1];
@@ -411,13 +607,14 @@ PHP;
     }
 
     /**
-     * The production start path for one admin user, with a worker that accepts a pending execution
-     * while fewer executions than the video slots run.
+     * The production start paths for one admin user, with a worker that accepts a pending execution
+     * while fewer executions than the slots of the video kind run: the video slots, or under remux the
+     * shared copy slots.
      *
      * @param (\Closure(): void)|null $whileWaiting runs each time a start waits for its worker
-     * @return array{connection: Connection, runtime: TranscodeRuntimeState, playback: AuthorizedPlayback, controller: TranscodeSessionController}
+     * @return array{connection: Connection, runtime: TranscodeRuntimeState, playback: AuthorizedPlayback, controller: TranscodeSessionController, copy: CopyPresentationService}
      */
-    private function stack(Uuid $user, int $slots, ?\Closure $whileWaiting = null): array
+    private function stack(Uuid $user, int $slots, ?\Closure $whileWaiting = null, bool $remux = false): array
     {
         $connection = $this->manager->getConnection();
         $transaction = self::transaction($connection);
@@ -442,7 +639,7 @@ PHP;
         });
         $presentations = $this->createStub(EncodePresentationPort::class);
         $presentations->method('select')->willReturn(new PresentationSelection('encode', 'source', 0, 1, 'mp4', 'configuration'));
-        $profile = new DeploymentProfile(videoEncoderSlots: $slots);
+        $profile = $remux ? new DeploymentProfile('remux', 2, 4, 1, sharedCopySlots: $slots) : new DeploymentProfile(videoEncoderSlots: $slots);
         $share = self::share($connection, $runtime, $profile);
         $handler = new CreateTranscodeSessionHandler(new MediaExecutionPolicy($profile), $jobs, $sessions, $storage, $runtime, $transaction, $sleeper, $presentations, self::settings(), $share);
         $bus = new MessageBus([new HandleMessageMiddleware(new HandlersLocator([CreateTranscodeSessionCommand::class => [$handler]]))]);
@@ -460,8 +657,106 @@ PHP;
         });
         $publicView->method('session')->willReturnCallback(static fn (TranscodeSession $session): TranscodeSessionDto => TranscodeSessionDto::fromModel($session, new PublicId(), new PublicId(), new PublicId()));
         $controller = new TranscodeSessionController($security, $bus, $sessions, $playback, $publicView);
+        $copy = new CopyPresentationService(new MediaExecutionPolicy($profile), $jobs, $sessions, $storage, $runtime, $transaction, $sleeper, $share);
 
-        return ['connection' => $connection, 'runtime' => $runtime, 'playback' => $playback, 'controller' => $controller];
+        return ['connection' => $connection, 'runtime' => $runtime, 'playback' => $playback, 'controller' => $controller, 'copy' => $copy];
+    }
+
+    /**
+     * A copy start as delivery negotiation makes it for a film the client can play once repackaged.
+     *
+     * @param array{copy: CopyPresentationService} $stack
+     */
+    private function copy(array $stack, Uuid $user, Uuid $video, ?string $client = null): CopyPresentation
+    {
+        return $stack['copy']->start(new CopyPresentationInput($user, $video, 'source-hash', 0, 1, 'mp4', 1280, 720, $client ?? Uuid::generate()->toString()));
+    }
+
+    /** The start's transaction, which runs the given step after the start's work and before its commit. */
+    private static function beforeCommit(Connection $connection, \Closure $step): TransactionPortInterface
+    {
+        return new class ($connection, $step) implements TransactionPortInterface {
+            public function __construct(private readonly Connection $connection, private ?\Closure $step)
+            {
+            }
+
+            public function run(callable $operation): mixed
+            {
+                return $this->connection->transactional(function () use ($operation): mixed {
+                    $result = $operation();
+                    [$step, $this->step] = [$this->step, null];
+                    $step?->__invoke();
+
+                    return $result;
+                });
+            }
+        };
+    }
+
+    /**
+     * A copy start of the user in a separate PHP process, loaded and waiting for "go" on its input.
+     *
+     * @return array{process: resource, input: resource, output: resource, errors: resource}
+     */
+    private function contender(string $schema, string $application, Uuid $user): array
+    {
+        $errors = tmpfile();
+        self::assertIsResource($errors);
+        $process = proc_open(
+            [PHP_BINARY, dirname(__DIR__) . '/Fixtures/Transcode/copy-start-race.php', $schema, $application, $user->toString()],
+            [0 => ['pipe', 'r'], 1 => ['pipe', 'w'], 2 => $errors],
+            $pipes,
+        );
+        self::assertIsResource($process);
+        $contender = ['process' => $process, 'input' => $pipes[0], 'output' => $pipes[1], 'errors' => $errors];
+        [$read, $write, $except] = [[$pipes[1]], [], []];
+        self::assertSame(1, stream_select($read, $write, $except, 30), 'The contender must finish loading before the first start.');
+        if (fgets($pipes[1]) !== "ready\n") {
+            rewind($errors);
+            self::fail('The contender did not load: ' . stream_get_contents($errors));
+        }
+
+        return $contender;
+    }
+
+    /** @param resource $process */
+    private function awaitAdvisoryWait(Connection $observer, string $application, $process): void
+    {
+        $deadline = microtime(true) + 8;
+        while (microtime(true) < $deadline && proc_get_status($process)['running']) {
+            $waiting = (int) $observer->fetchOne("SELECT count(*) FROM pg_stat_activity WHERE application_name = :name AND wait_event_type = 'Lock' AND wait_event = 'advisory'", ['name' => $application]);
+            if ($waiting === 1) {
+                return;
+            }
+            usleep(1000);
+        }
+        self::fail('The second copy start must wait for the user\'s lock.');
+    }
+
+    /** @param array{process: resource, input: resource, output: resource, errors: resource} $contender */
+    private function outcomeOf(array $contender): string
+    {
+        fclose($contender['input']);
+        [$read, $write, $except] = [[$contender['output']], [], []];
+        self::assertSame(1, stream_select($read, $write, $except, 15), 'The released contender must finish.');
+        $outcome = (string) stream_get_contents($contender['output']);
+        fclose($contender['output']);
+        rewind($contender['errors']);
+        $errors = (string) stream_get_contents($contender['errors']);
+        fclose($contender['errors']);
+        self::assertSame(0, proc_close($contender['process']), $errors . $outcome);
+
+        return $outcome;
+    }
+
+    private function sessionId(Connection $connection, PublicId $session): Uuid
+    {
+        return Uuid::fromString((string) $connection->fetchOne('SELECT id FROM transcode_sessions WHERE public_id = ?', [$session->toString()]));
+    }
+
+    private function silence(Connection $connection, Uuid $session, string $silentFor): void
+    {
+        $connection->executeStatement('UPDATE transcode_sessions SET updated_at = clock_timestamp() - CAST(? AS interval) WHERE id = ?', [$silentFor, $session->toString()]);
     }
 
     private static function transaction(Connection $connection): TransactionPortInterface
@@ -530,11 +825,13 @@ PHP;
         );
     }
 
+    /** @phpstan-impure */
     private function sessionState(Connection $connection, Uuid $session): string
     {
         return (string) $connection->fetchOne('SELECT state FROM transcode_sessions WHERE id = ?', [$session->toString()]);
     }
 
+    /** @phpstan-impure */
     private function outcome(Connection $connection, Uuid $session): string
     {
         return (string) $connection->fetchOne('SELECT r.outcome FROM transcode_runtime_state r JOIN transcode_sessions s ON s.job_id = r.job_id WHERE s.id = ?', [$session->toString()]);
