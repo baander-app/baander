@@ -14,16 +14,16 @@ use Symfony\Component\HttpKernel\KernelEvents;
 
 /**
  * Browser protections for every application response. HTML responses get a
- * Content-Security-Policy whose script nonce is fresh per request: templates read it from
- * the request attribute named by NONCE_ATTRIBUTE. Every other response gets a policy that
- * refuses to act as a document. HTTPS requests, including HTTPS through a trusted proxy, get
- * HSTS.
+ * Content-Security-Policy whose script nonce is fresh per request and issued only here:
+ * templates read it from the request attribute named by NONCE_ATTRIBUTE. Every other response
+ * gets a policy that refuses to act as a document. HTTPS requests, including HTTPS through a
+ * trusted proxy, get HSTS.
  *
  * The policy follows what the web app loads: its own scripts, WebAssembly DSP modules and
  * audio worklets, the stream service worker and blob: media workers, a WebSocket to the public
  * origin the page names as its API URL, signed media on the primary public origin, and radio
- * streams and station logos from any host. Styles allow inline because libraries and the
- * development server inject style tags.
+ * streams and station logos from any host. Forms post only to the page's own origin. Styles
+ * allow inline because libraries and the development server inject style tags.
  */
 final readonly class SecurityHeadersListener
 {
@@ -96,13 +96,16 @@ final readonly class SecurityHeadersListener
     private function policy(Request $request, string $nonce): string
     {
         $development = array_map(self::origin(...), $this->developmentOrigins) |> array_filter(...) |> array_values(...);
+        // A page served over HTTPS admits no plain-HTTP station stream or logo: that would be
+        // mixed content a network attacker could replace.
+        $stations = $request->isSecure() ? ['https:'] : ['https:', 'http:'];
 
         $directives = [
             'default-src' => ["'self'"],
             'script-src' => ["'self'", "'nonce-" . $nonce . "'", "'wasm-unsafe-eval'", ...$development],
             'style-src' => ["'self'", "'unsafe-inline'", ...$development],
-            'img-src' => ["'self'", 'data:', 'blob:', 'https:', 'http:'],
-            'media-src' => ["'self'", 'blob:', 'https:', 'http:'],
+            'img-src' => ["'self'", 'data:', 'blob:', ...$stations],
+            'media-src' => ["'self'", 'blob:', ...$stations],
             'font-src' => ["'self'", 'data:', ...$development],
             'connect-src' => [
                 "'self'",
@@ -115,6 +118,7 @@ final readonly class SecurityHeadersListener
             'manifest-src' => ["'self'"],
             'object-src' => ["'none'"],
             'base-uri' => ["'none'"],
+            'form-action' => ["'self'"],
             'frame-ancestors' => ["'none'"],
         ];
 

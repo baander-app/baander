@@ -39,6 +39,26 @@ final class SecurityHeadersListenerTest extends TestCase
         self::assertNotSame($first->headers->get('Content-Security-Policy'), $second->headers->get('Content-Security-Policy'));
     }
 
+    public function testFormsPostOnlyToThePagesOwnOrigin(): void
+    {
+        $listener = new SecurityHeadersListener(new PublicOrigins('https://baander.app'));
+        $response = $this->respond($listener, Request::create('https://baander.app/'), new Response('<html></html>'));
+
+        self::assertSame(["'self'"], $this->directives($response->headers->get('Content-Security-Policy'))['form-action']);
+    }
+
+    public function testPlainHttpStationsAreAdmittedOnlyByAPageServedOverHttp(): void
+    {
+        $listener = new SecurityHeadersListener(new PublicOrigins('https://baander.app', ['http://192.168.1.20:9501']));
+        $secure = $this->directives($this->respond($listener, Request::create('https://baander.app/'), new Response('<html></html>'))->headers->get('Content-Security-Policy'));
+        $plain = $this->directives($this->respond($listener, Request::create('http://192.168.1.20:9501/'), new Response('<html></html>'))->headers->get('Content-Security-Policy'));
+
+        self::assertSame(["'self'", 'data:', 'blob:', 'https:'], $secure['img-src']);
+        self::assertSame(["'self'", 'blob:', 'https:'], $secure['media-src']);
+        self::assertSame(["'self'", 'data:', 'blob:', 'https:', 'http:'], $plain['img-src']);
+        self::assertSame(["'self'", 'blob:', 'https:', 'http:'], $plain['media-src']);
+    }
+
     public function testTheNonceInThePolicyIsTheOneTheRequestCarriesForTemplates(): void
     {
         $listener = new SecurityHeadersListener(new PublicOrigins('https://baander.app'));

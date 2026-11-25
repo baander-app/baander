@@ -144,11 +144,14 @@ final class AdvancedStaticFilesServer implements RequestHandler, Bootable
     public function handle(Request $request, Response $response): void
     {
         if ($request->server['request_method'] === 'GET') {
-            $path = $this->publicDir . $request->server['request_uri'];
+            $uri = $request->server['request_uri'];
+            $path = $this->publicDir . $uri;
             $resolved = realpath($path);
             $root = rtrim($this->publicDir, DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR;
             if ($resolved !== false
                 && str_starts_with($resolved, $root)
+                && self::isAsset($uri)
+                && self::isAsset(substr($resolved, strlen($root)))
                 && (isset($this->cachedMimeTypes[$path]) || $this->checkPath($path))) {
                 $response->header('Content-Type', $this->cachedMimeTypes[$path]);
                 // Static files bypass the kernel's response listeners, so they set these here.
@@ -164,6 +167,20 @@ final class AdvancedStaticFilesServer implements RequestHandler, Bootable
         }
 
         $this->decorated->handle($request, $response);
+    }
+
+    /**
+     * A dot-prefixed segment is a dotfile, build metadata such as `.vite/manifest.json`, or a
+     * `..` step, and a PHP file is the front controller's source; none of them is an asset.
+     * `.well-known` is the one public dot directory (RFC 8615). Checked on the requested path
+     * and on the resolved one, so neither a `..` step nor a link reaches a refused file.
+     */
+    private static function isAsset(string $path): bool
+    {
+        $segments = explode('/', $path);
+
+        return !array_any($segments, static fn(string $segment): bool => str_starts_with($segment, '.') && $segment !== '.well-known')
+            && strtolower(pathinfo($path, PATHINFO_EXTENSION)) !== 'php';
     }
 
     private function checkPath(string $path): bool

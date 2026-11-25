@@ -7132,10 +7132,10 @@
             "recommended_disposition": "adopt",
             "rationale": "Port containment check; characterize traversal/symlink swap and cached-path escape behavior against static server contract.",
             "qualification": "Source-only recommendation; not a runtime proof or permission to change behavior.",
-            "current_local_sha256": "94e640c566a9407f5e27781ceb16fe8a2be6123ee1ad2210078977f10f809103",
+            "current_local_sha256": "efc4f74292bec4f5f71cf2dde71fec9c25b8f095fd4f625547968b2f4baba493",
             "current_source_presence": "present",
             "final_disposition": "adopted-adapted",
-            "final_reason": "Enforces resolved-path containment beneath publicDir, including cached MIME paths. Locally adds Cache-Control: public, max-age=31536000, immutable to files resolved beneath publicDir/assets, which holds only content-hashed build output. Locally sends X-Content-Type-Options: nosniff and X-Frame-Options: DENY with every static file it serves, because these responses bypass the kernel's response listeners.",
+            "final_reason": "Enforces resolved-path containment beneath publicDir, including cached MIME paths. Locally adds Cache-Control: public, max-age=31536000, immutable to files resolved beneath publicDir/assets, which holds only content-hashed build output. Locally sends X-Content-Type-Options: nosniff and X-Frame-Options: DENY with every static file it serves, because these responses bypass the kernel's response listeners. Locally passes to the decorated handler, on both the requested and the resolved path, any path with a dot-prefixed segment other than .well-known and any .php file, so the front controller's source, build metadata such as .vite/manifest.json and dotfiles are never served as static files.",
             "source_review_status": "recorded",
             "runtime_qualification": {
                 "status": "pending-authoritative-gates",
