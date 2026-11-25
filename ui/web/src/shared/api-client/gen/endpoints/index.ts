@@ -62,11 +62,13 @@ export interface PlayActivityRequest {
   movieId?: string | null;
   /**
      * Playback platform (e.g. web, mobile, desktop)
+     * @maxLength 64
      * @nullable
      */
   platform?: string | null;
   /**
      * Player application name
+     * @maxLength 64
      * @nullable
      */
   player?: string | null;
@@ -866,11 +868,18 @@ export interface DeliveryRequest {
   /**
      * @minItems 1
      * @maxItems 32
+     * @items.maxLength 32
      */
   containers: string[];
-  /** @maxItems 32 */
+  /**
+     * @maxItems 32
+     * @items.maxLength 32
+     */
   videoCodecs?: string[];
-  /** @maxItems 32 */
+  /**
+     * @maxItems 32
+     * @items.maxLength 32
+     */
   audioCodecs?: string[];
   /**
      * @exclusiveMinimum 0
@@ -893,6 +902,10 @@ export interface DeliveryRequest {
      */
   audioStreamIndex?: number | null;
   subtitleBurnIn?: boolean;
+  /**
+     * @maxItems 32
+     * @items.maxLength 32
+     */
   transports?: string[];
   /**
      * @minimum 8
@@ -900,7 +913,10 @@ export interface DeliveryRequest {
      */
   maxBitDepth?: number;
   supportsHdr?: boolean;
-  /** @maxItems 32 */
+  /**
+     * @maxItems 32
+     * @items.maxLength 32
+     */
   pixelFormats?: string[];
   /** @nullable */
   requestId?: string | null;
@@ -933,20 +949,50 @@ export interface SearchMetadataRequest {
 }
 
 export interface ExtractMetadataRequest {
-  /** Filesystem path to the media file to analyze */
+  /** Absolute path of the media file to analyze, as the server sees it. The file must lie inside a library; a symlink counts where its target lies */
   path: string;
 }
 
 export type MatchMetadataRequestCandidatesItem = { [key: string]: unknown };
 
 export interface MatchMetadataRequest {
-  /** Filesystem path to the media file */
+  /** Absolute path of the media file, as the server sees it. The file must lie inside a library; a symlink counts where its target lies */
   path: string;
   /**
      * Array of metadata match candidates
      * @minItems 1
      */
   candidates: MatchMetadataRequestCandidatesItem[];
+}
+
+export type UpdatePreferenceRequestPreferencesItemCategory = typeof UpdatePreferenceRequestPreferencesItemCategory[keyof typeof UpdatePreferenceRequestPreferencesItemCategory];
+
+
+export const UpdatePreferenceRequestPreferencesItemCategory = {
+  security: 'security',
+  background_jobs: 'background_jobs',
+  media_changes: 'media_changes',
+} as const;
+
+export type UpdatePreferenceRequestPreferencesItemChannel = typeof UpdatePreferenceRequestPreferencesItemChannel[keyof typeof UpdatePreferenceRequestPreferencesItemChannel];
+
+
+export const UpdatePreferenceRequestPreferencesItemChannel = {
+  in_app: 'in_app',
+  email: 'email',
+  push: 'push',
+  webhook: 'webhook',
+} as const;
+
+export type UpdatePreferenceRequestPreferencesItem = {
+  category: UpdatePreferenceRequestPreferencesItemCategory;
+  channel: UpdatePreferenceRequestPreferencesItemChannel;
+  enabled: boolean;
+};
+
+export interface UpdatePreferenceRequest {
+  /** @maxItems 64 */
+  preferences: UpdatePreferenceRequestPreferencesItem[];
 }
 
 export interface UpdatePartyMemberRequest {
@@ -996,29 +1042,72 @@ export interface SyncPlaybackRequest {
   clientLatency: number;
 }
 
-export type CreatePlaylistRequestSmartRulesItem = { [key: string]: unknown };
+export type CreatePlaylistRequestSmartRulesItemField = typeof CreatePlaylistRequestSmartRulesItemField[keyof typeof CreatePlaylistRequestSmartRulesItemField];
+
+
+export const CreatePlaylistRequestSmartRulesItemField = {
+  genre: 'genre',
+  year: 'year',
+  artist: 'artist',
+  album: 'album',
+  play_count: 'play_count',
+  date_added: 'date_added',
+  duration: 'duration',
+} as const;
+
+export type CreatePlaylistRequestSmartRulesItemOperator = typeof CreatePlaylistRequestSmartRulesItemOperator[keyof typeof CreatePlaylistRequestSmartRulesItemOperator];
+
+
+export const CreatePlaylistRequestSmartRulesItemOperator = {
+  equals: 'equals',
+  not_equals: 'not_equals',
+  contains: 'contains',
+  greater_than: 'greater_than',
+  less_than: 'less_than',
+  is_empty: 'is_empty',
+  is_not_empty: 'is_not_empty',
+} as const;
+
+export type CreatePlaylistRequestSmartRulesItem = {
+  field: CreatePlaylistRequestSmartRulesItemField;
+  operator: CreatePlaylistRequestSmartRulesItemOperator;
+  /** @maxLength 255 */
+  value?: string;
+};
 
 export interface CreatePlaylistRequest {
   /** @maxLength 255 */
   name: string;
-  /** @nullable */
+  /**
+     * @maxLength 2000
+     * @nullable
+     */
   description?: string | null;
   isPublic?: boolean;
   isCollaborative?: boolean;
   isSmart?: boolean;
-  /** Rules for smart playlist auto-population */
+  /**
+     * Rules for smart playlist auto-population
+     * @maxItems 50
+     */
   smartRules?: CreatePlaylistRequestSmartRulesItem[];
 }
 
 export interface UpdatePlaylistRequest {
-  /** @nullable */
+  /**
+     * @maxLength 255
+     * @nullable
+     */
   name?: string | null;
-  /** @nullable */
+  /**
+     * @maxLength 2000
+     * @nullable
+     */
   description?: string | null;
   /** @nullable */
   isPublic?: boolean | null;
   /**
-     * The owner's switch for collaborator editing
+     * The owner's switch for collaborator editing; collaborators keep viewing while it is off
      * @nullable
      */
   isCollaborative?: boolean | null;
@@ -1045,6 +1134,7 @@ export interface ReorderSongsRequest {
   /**
      * Ordered array of song public IDs
      * @minItems 1
+     * @maxItems 10000
      * @items.minLength 21
      * @items.maxLength 21
      * @items.pattern ^[0-9a-zA-Z_-]{21}$
@@ -1072,6 +1162,7 @@ export interface StartRadioRequest {
      * @maxLength 21
      */
   stationId: string;
+  /** @maxLength 2048 */
   streamUrl: string;
 }
 
@@ -1318,7 +1409,13 @@ export interface ControlPlaybackRequest {
   position?: number | null;
   /** @nullable */
   media?: ControlPlaybackRequestMedia;
-  /** @nullable */
+  /**
+     * @maxItems 10000
+     * @nullable
+     * @items.minLength 21
+     * @items.maxLength 21
+     * @items.pattern ^[0-9a-zA-Z_-]{21}$
+     */
   queue?: string[] | null;
   /**
      * @minimum 0
@@ -1494,6 +1591,113 @@ export const UpdateTranscodeSessionRequestAudioProfile = {
 export interface UpdateTranscodeSessionRequest {
   /** @nullable */
   audioProfile?: UpdateTranscodeSessionRequestAudioProfile;
+}
+
+export type CreateEqDeviceProfileRequestIcon = typeof CreateEqDeviceProfileRequestIcon[keyof typeof CreateEqDeviceProfileRequestIcon];
+
+
+export const CreateEqDeviceProfileRequestIcon = {
+  headphones: 'headphones',
+  speakers: 'speakers',
+  'hifi-speaker': 'hifi-speaker',
+  'wireless-speaker': 'wireless-speaker',
+  car: 'car',
+  tv: 'tv',
+  monitor: 'monitor',
+  custom: 'custom',
+} as const;
+
+export interface CreateEqDeviceProfileRequest {
+  /** @maxLength 255 */
+  name: string;
+  icon: CreateEqDeviceProfileRequestIcon;
+  /**
+     * Client audio-output token, independent of database identity
+     * @maxLength 255
+     * @nullable
+     */
+  deviceId?: string | null;
+}
+
+/**
+ * @nullable
+ */
+export type UpdateEqDeviceProfileRequestIcon = typeof UpdateEqDeviceProfileRequestIcon[keyof typeof UpdateEqDeviceProfileRequestIcon] | null;
+
+
+export const UpdateEqDeviceProfileRequestIcon = {
+  headphones: 'headphones',
+  speakers: 'speakers',
+  'hifi-speaker': 'hifi-speaker',
+  'wireless-speaker': 'wireless-speaker',
+  car: 'car',
+  tv: 'tv',
+  monitor: 'monitor',
+  custom: 'custom',
+} as const;
+
+/**
+ * Client EQ settings; at most 16384 bytes as compact JSON
+ * @nullable
+ */
+export type UpdateEqDeviceProfileRequestPayload = { [key: string]: unknown } | null;
+
+export interface UpdateEqDeviceProfileRequest {
+  /**
+     * @maxLength 255
+     * @nullable
+     */
+  name?: string | null;
+  /** @nullable */
+  icon?: UpdateEqDeviceProfileRequestIcon;
+  /**
+     * Client audio-output token, independent of database identity
+     * @maxLength 255
+     * @nullable
+     */
+  deviceId?: string | null;
+  /**
+     * Client EQ settings; at most 16384 bytes as compact JSON
+     * @nullable
+     */
+  payload?: UpdateEqDeviceProfileRequestPayload;
+  /** @nullable */
+  sortOrder?: number | null;
+}
+
+export type UpdateSidebarSectionsRequestSectionsItemItemsItemType = typeof UpdateSidebarSectionsRequestSectionsItemItemsItemType[keyof typeof UpdateSidebarSectionsRequestSectionsItemItemsItemType];
+
+
+export const UpdateSidebarSectionsRequestSectionsItemItemsItemType = {
+  page_link: 'page_link',
+  smart_filter: 'smart_filter',
+  panel_action: 'panel_action',
+} as const;
+
+export type UpdateSidebarSectionsRequestSectionsItemItemsItemConfig = { [key: string]: unknown };
+
+export type UpdateSidebarSectionsRequestSectionsItemItemsItem = {
+  id: string;
+  type: UpdateSidebarSectionsRequestSectionsItemItemsItemType;
+  label: string;
+  icon: string;
+  config?: UpdateSidebarSectionsRequestSectionsItemItemsItemConfig;
+};
+
+export type UpdateSidebarSectionsRequestSectionsItem = {
+  id?: string;
+  label?: string;
+  type?: string;
+  /** @maxItems 100 */
+  items?: UpdateSidebarSectionsRequestSectionsItemItemsItem[];
+};
+
+export interface UpdateSidebarSectionsRequest {
+  /**
+     * At most 16384 bytes as compact JSON
+     * @maxItems 100
+     */
+  sections: UpdateSidebarSectionsRequestSectionsItem[];
 }
 
 export interface SetUserSettingRequest {
@@ -5299,11 +5503,13 @@ export type PostActivityPlayBody = {
   movieId?: string | null;
   /**
      * Playback platform (e.g. web, mobile, desktop)
+     * @maxLength 64
      * @nullable
      */
   platform?: string | null;
   /**
      * Player application name
+     * @maxLength 64
      * @nullable
      */
   player?: string | null;
@@ -7586,41 +7792,14 @@ export type GetNotificationPreferenceIndex200 = {
   data?: GetNotificationPreferenceIndex200DataItem[];
 };
 
-export type PutNotificationPreferenceUpdateBodyPreferencesItemCategory = typeof PutNotificationPreferenceUpdateBodyPreferencesItemCategory[keyof typeof PutNotificationPreferenceUpdateBodyPreferencesItemCategory];
-
-
-export const PutNotificationPreferenceUpdateBodyPreferencesItemCategory = {
-  security: 'security',
-  background_jobs: 'background_jobs',
-  media_changes: 'media_changes',
-} as const;
-
-export type PutNotificationPreferenceUpdateBodyPreferencesItemChannel = typeof PutNotificationPreferenceUpdateBodyPreferencesItemChannel[keyof typeof PutNotificationPreferenceUpdateBodyPreferencesItemChannel];
-
-
-export const PutNotificationPreferenceUpdateBodyPreferencesItemChannel = {
-  in_app: 'in_app',
-  email: 'email',
-  push: 'push',
-  webhook: 'webhook',
-} as const;
-
-export type PutNotificationPreferenceUpdateBodyPreferencesItem = {
-  category: PutNotificationPreferenceUpdateBodyPreferencesItemCategory;
-  channel: PutNotificationPreferenceUpdateBodyPreferencesItemChannel;
-  enabled: boolean;
-};
-
-export type PutNotificationPreferenceUpdateBody = {
-  preferences: PutNotificationPreferenceUpdateBodyPreferencesItem[];
-};
-
 export type PutNotificationPreferenceUpdate200 = {
   updated?: boolean;
 };
 
 export type PostPushSubscribeBodyKeys = {
+  /** @maxLength 128 */
   p256dh?: string;
+  /** @maxLength 64 */
   auth?: string;
 };
 
@@ -7633,6 +7812,7 @@ export const PostPushSubscribeBodyContentEncoding = {
 } as const;
 
 export type PostPushSubscribeBody = {
+  /** @maxLength 2048 */
   endpoint: string;
   keys: PostPushSubscribeBodyKeys;
   contentEncoding: PostPushSubscribeBodyContentEncoding;
@@ -7881,16 +8061,6 @@ export type GetPlaylistIndex200 = {
   data?: PlaylistResource[];
 };
 
-export type PostPlaylistStoreBody = {
-  name: string;
-  /** @nullable */
-  description?: string | null;
-  isPublic?: boolean;
-  isCollaborative?: boolean;
-  isSmart?: boolean;
-  smartRules?: unknown[];
-};
-
 export type GetPlaylistShow200DataSongsItem = {
   /**
      * @minLength 21
@@ -7980,20 +8150,6 @@ export type GetPlaylistShow200Data = {
 
 export type GetPlaylistShow200 = {
   data?: GetPlaylistShow200Data;
-};
-
-export type PatchPlaylistUpdateBody = {
-  /** @nullable */
-  name?: string | null;
-  /** @nullable */
-  description?: string | null;
-  /** @nullable */
-  isPublic?: boolean | null;
-  /**
-     * The owner's switch for collaborator editing; collaborators keep viewing while it is off
-     * @nullable
-     */
-  isCollaborative?: boolean | null;
 };
 
 export type PatchPlaylistUpdate200 = {
@@ -9587,26 +9743,8 @@ export type GetEqProfilesIndex200 = {
   profiles?: GetEqProfilesIndex200ProfilesItem[];
 };
 
-export type PostEqProfilesCreateBody = {
-  name: string;
-  icon: string;
-  /** @nullable */
-  deviceId?: string | null;
-};
-
 export type GetEqProfilesShow200 = {
   data?: EqDeviceProfileResource;
-};
-
-export type PutEqProfilesUpdateBodyPayload = { [key: string]: unknown };
-
-export type PutEqProfilesUpdateBody = {
-  name?: string;
-  icon?: string;
-  /** @nullable */
-  deviceId?: string | null;
-  payload?: PutEqProfilesUpdateBodyPayload;
-  sortOrder?: number;
 };
 
 export type PutEqProfilesUpdate200 = {
@@ -9757,27 +9895,6 @@ export type GetSidebarConfigGet200Data = {
 
 export type GetSidebarConfigGet200 = {
   data?: GetSidebarConfigGet200Data;
-};
-
-export type PutSidebarConfigUpdateBodySectionsItemItemsItemConfig = { [key: string]: unknown };
-
-export type PutSidebarConfigUpdateBodySectionsItemItemsItem = {
-  id?: string;
-  type?: string;
-  label?: string;
-  icon?: string;
-  config?: PutSidebarConfigUpdateBodySectionsItemItemsItemConfig;
-};
-
-export type PutSidebarConfigUpdateBodySectionsItem = {
-  id?: string;
-  label?: string;
-  type?: string;
-  items?: PutSidebarConfigUpdateBodySectionsItemItemsItem[];
-};
-
-export type PutSidebarConfigUpdateBody = {
-  sections: PutSidebarConfigUpdateBodySectionsItem[];
 };
 
 export type PutSidebarConfigUpdate200DataSectionsItemItemsItemConfig = { [key: string]: unknown };
@@ -26815,7 +26932,7 @@ export const getPostMetadataExtractUrl = () => {
 }
 
 /**
- * @summary Extract embedded metadata from a local media file
+ * @summary Extract embedded metadata from a media file inside a library
  */
 export const postMetadataExtract = async (postMetadataExtractBody: PostMetadataExtractBody, options?: Parameters<typeof customInstance>[1]): Promise<PostMetadataExtract200> => {
 
@@ -26866,7 +26983,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type PostMetadataExtractMutationError = ErrorType<void | ValidationError>
     export type PostMetadataExtractMutationVariables = {data: BodyType<PostMetadataExtractBody>}
 
-    /** @summary Extract embedded metadata from a local media file */
+    /** @summary Extract embedded metadata from a media file inside a library */
 export const usePostMetadataExtract = <TError = ErrorType<void | ValidationError>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postMetadataExtract>>, TError,PostMetadataExtractMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient): UseMutationResult<
@@ -27500,14 +27617,14 @@ export const getPutNotificationPreferenceUpdateUrl = () => {
 /**
  * @summary Update notification preferences
  */
-export const putNotificationPreferenceUpdate = async (putNotificationPreferenceUpdateBody: PutNotificationPreferenceUpdateBody, options?: Parameters<typeof customInstance>[1]): Promise<PutNotificationPreferenceUpdate200> => {
+export const putNotificationPreferenceUpdate = async (updatePreferenceRequest: UpdatePreferenceRequest, options?: Parameters<typeof customInstance>[1]): Promise<PutNotificationPreferenceUpdate200> => {
 
   return customInstance<PutNotificationPreferenceUpdate200>(getPutNotificationPreferenceUpdateUrl(),
   {
     ...options,
     method: 'PUT',
     headers: getHeaders({ 'Content-Type': 'application/json' }, options?.headers),
-    body: JSON.stringify(putNotificationPreferenceUpdateBody)
+    body: JSON.stringify(updatePreferenceRequest)
   }
 );}
 
@@ -27517,7 +27634,7 @@ export const putNotificationPreferenceUpdate = async (putNotificationPreferenceU
 
 export const getPutNotificationPreferenceUpdateMutationKey = () => ['putNotificationPreferenceUpdate'] as const;
 
-export const getPutNotificationPreferenceUpdateMutationOptions = <TError = ErrorType<ValidationError>,
+export const getPutNotificationPreferenceUpdateMutationOptions = <TError = ErrorType<ApiError | ValidationError>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof putNotificationPreferenceUpdate>>, TError,PutNotificationPreferenceUpdateMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
 ): UseMutationOptions<Awaited<ReturnType<typeof putNotificationPreferenceUpdate>>, TError,PutNotificationPreferenceUpdateMutationVariables, TContext> => {
 
@@ -27545,12 +27662,12 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
   return  { mutationFn, ...mutationOptions }}
 
     export type PutNotificationPreferenceUpdateMutationResult = NonNullable<Awaited<ReturnType<typeof putNotificationPreferenceUpdate>>>
-    export type PutNotificationPreferenceUpdateMutationBody = BodyType<PutNotificationPreferenceUpdateBody>
-    export type PutNotificationPreferenceUpdateMutationError = ErrorType<ValidationError>
-    export type PutNotificationPreferenceUpdateMutationVariables = {data: BodyType<PutNotificationPreferenceUpdateBody>}
+    export type PutNotificationPreferenceUpdateMutationBody = BodyType<UpdatePreferenceRequest>
+    export type PutNotificationPreferenceUpdateMutationError = ErrorType<ApiError | ValidationError>
+    export type PutNotificationPreferenceUpdateMutationVariables = {data: BodyType<UpdatePreferenceRequest>}
 
     /** @summary Update notification preferences */
-export const usePutNotificationPreferenceUpdate = <TError = ErrorType<ValidationError>,
+export const usePutNotificationPreferenceUpdate = <TError = ErrorType<ApiError | ValidationError>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof putNotificationPreferenceUpdate>>, TError,PutNotificationPreferenceUpdateMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient): UseMutationResult<
         Awaited<ReturnType<typeof putNotificationPreferenceUpdate>>,
@@ -27570,6 +27687,7 @@ export const getPostPushSubscribeUrl = () => {
 }
 
 /**
+ * A user keeps at most 20 subscriptions; registering another evicts the longest-registered ones.
  * @summary Subscribe to push notifications
  */
 export const postPushSubscribe = async (postPushSubscribeBody: PostPushSubscribeBody, options?: Parameters<typeof customInstance>[1]): Promise<PostPushSubscribe200 | PostPushSubscribe201> => {
@@ -27589,7 +27707,7 @@ export const postPushSubscribe = async (postPushSubscribeBody: PostPushSubscribe
 
 export const getPostPushSubscribeMutationKey = () => ['postPushSubscribe'] as const;
 
-export const getPostPushSubscribeMutationOptions = <TError = ErrorType<void | ApiError | ValidationError>,
+export const getPostPushSubscribeMutationOptions = <TError = ErrorType<ApiError | void | ValidationError>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postPushSubscribe>>, TError,PostPushSubscribeMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
 ): UseMutationOptions<Awaited<ReturnType<typeof postPushSubscribe>>, TError,PostPushSubscribeMutationVariables, TContext> => {
 
@@ -27618,11 +27736,14 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
     export type PostPushSubscribeMutationResult = NonNullable<Awaited<ReturnType<typeof postPushSubscribe>>>
     export type PostPushSubscribeMutationBody = BodyType<PostPushSubscribeBody>
-    export type PostPushSubscribeMutationError = ErrorType<void | ApiError | ValidationError>
+    export type PostPushSubscribeMutationError = ErrorType<ApiError | void | ValidationError>
     export type PostPushSubscribeMutationVariables = {data: BodyType<PostPushSubscribeBody>}
 
-    /** @summary Subscribe to push notifications */
-export const usePostPushSubscribe = <TError = ErrorType<void | ApiError | ValidationError>,
+    /**
+ * A user keeps at most 20 subscriptions; registering another evicts the longest-registered ones.
+ * @summary Subscribe to push notifications
+ */
+export const usePostPushSubscribe = <TError = ErrorType<ApiError | void | ValidationError>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postPushSubscribe>>, TError,PostPushSubscribeMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient): UseMutationResult<
         Awaited<ReturnType<typeof postPushSubscribe>>,
@@ -27661,7 +27782,7 @@ export const deletePushUnsubscribe = async (deletePushUnsubscribeBody: DeletePus
 
 export const getDeletePushUnsubscribeMutationKey = () => ['deletePushUnsubscribe'] as const;
 
-export const getDeletePushUnsubscribeMutationOptions = <TError = ErrorType<void>,
+export const getDeletePushUnsubscribeMutationOptions = <TError = ErrorType<ApiError | void>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deletePushUnsubscribe>>, TError,DeletePushUnsubscribeMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
 ): UseMutationOptions<Awaited<ReturnType<typeof deletePushUnsubscribe>>, TError,DeletePushUnsubscribeMutationVariables, TContext> => {
 
@@ -27690,11 +27811,11 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
     export type DeletePushUnsubscribeMutationResult = NonNullable<Awaited<ReturnType<typeof deletePushUnsubscribe>>>
     export type DeletePushUnsubscribeMutationBody = BodyType<DeletePushUnsubscribeBody>
-    export type DeletePushUnsubscribeMutationError = ErrorType<void>
+    export type DeletePushUnsubscribeMutationError = ErrorType<ApiError | void>
     export type DeletePushUnsubscribeMutationVariables = {data: BodyType<DeletePushUnsubscribeBody>}
 
     /** @summary Unsubscribe from push notifications */
-export const useDeletePushUnsubscribe = <TError = ErrorType<void>,
+export const useDeletePushUnsubscribe = <TError = ErrorType<ApiError | void>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deletePushUnsubscribe>>, TError,DeletePushUnsubscribeMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient): UseMutationResult<
         Awaited<ReturnType<typeof deletePushUnsubscribe>>,
@@ -29402,14 +29523,14 @@ export const getPostPlaylistStoreUrl = () => {
 /**
  * @summary Create a new playlist
  */
-export const postPlaylistStore = async (postPlaylistStoreBody: PostPlaylistStoreBody, options?: Parameters<typeof customInstance>[1]): Promise<PlaylistResource> => {
+export const postPlaylistStore = async (createPlaylistRequest: CreatePlaylistRequest, options?: Parameters<typeof customInstance>[1]): Promise<PlaylistResource> => {
 
   return customInstance<PlaylistResource>(getPostPlaylistStoreUrl(),
   {
     ...options,
     method: 'POST',
     headers: getHeaders({ 'Content-Type': 'application/json' }, options?.headers),
-    body: JSON.stringify(postPlaylistStoreBody)
+    body: JSON.stringify(createPlaylistRequest)
   }
 );}
 
@@ -29447,9 +29568,9 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
   return  { mutationFn, ...mutationOptions }}
 
     export type PostPlaylistStoreMutationResult = NonNullable<Awaited<ReturnType<typeof postPlaylistStore>>>
-    export type PostPlaylistStoreMutationBody = BodyType<PostPlaylistStoreBody>
+    export type PostPlaylistStoreMutationBody = BodyType<CreatePlaylistRequest>
     export type PostPlaylistStoreMutationError = ErrorType<ApiError | ValidationError>
-    export type PostPlaylistStoreMutationVariables = {data: BodyType<PostPlaylistStoreBody>}
+    export type PostPlaylistStoreMutationVariables = {data: BodyType<CreatePlaylistRequest>}
 
     /** @summary Create a new playlist */
 export const usePostPlaylistStore = <TError = ErrorType<ApiError | ValidationError>,
@@ -29576,14 +29697,14 @@ export const getPatchPlaylistUpdateUrl = (publicId: string,) => {
  * @summary Update playlist metadata
  */
 export const patchPlaylistUpdate = async (publicId: string,
-    patchPlaylistUpdateBody: PatchPlaylistUpdateBody, options?: Parameters<typeof customInstance>[1]): Promise<PatchPlaylistUpdate200> => {
+    updatePlaylistRequest: UpdatePlaylistRequest, options?: Parameters<typeof customInstance>[1]): Promise<PatchPlaylistUpdate200> => {
 
   return customInstance<PatchPlaylistUpdate200>(getPatchPlaylistUpdateUrl(publicId),
   {
     ...options,
     method: 'PATCH',
     headers: getHeaders({ 'Content-Type': 'application/json' }, options?.headers),
-    body: JSON.stringify(patchPlaylistUpdateBody)
+    body: JSON.stringify(updatePlaylistRequest)
   }
 );}
 
@@ -29621,9 +29742,9 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
   return  { mutationFn, ...mutationOptions }}
 
     export type PatchPlaylistUpdateMutationResult = NonNullable<Awaited<ReturnType<typeof patchPlaylistUpdate>>>
-    export type PatchPlaylistUpdateMutationBody = BodyType<PatchPlaylistUpdateBody>
+    export type PatchPlaylistUpdateMutationBody = BodyType<UpdatePlaylistRequest>
     export type PatchPlaylistUpdateMutationError = ErrorType<ApiError | ValidationError>
-    export type PatchPlaylistUpdateMutationVariables = {publicId: string;data: BodyType<PatchPlaylistUpdateBody>}
+    export type PatchPlaylistUpdateMutationVariables = {publicId: string;data: BodyType<UpdatePlaylistRequest>}
 
     /** @summary Update playlist metadata */
 export const usePatchPlaylistUpdate = <TError = ErrorType<ApiError | ValidationError>,
@@ -36751,7 +36872,7 @@ export const getDeleteMonitorRatelimitersClearAllUrl = (params: DeleteMonitorRat
 }
 
 /**
- * Clears the stored state of every configured rate limiter. Requires ?confirm=true.
+ * Clears the stored state of every configured rate limiter. Requires a super admin and ?confirm=true. The clear is logged with the super admin who made it.
  * @summary Clear all rate limiter state
  */
 export const deleteMonitorRatelimitersClearAll = async (params: DeleteMonitorRatelimitersClearAllParams, options?: Parameters<typeof customInstance>[1]): Promise<DeleteMonitorRatelimitersClearAll200> => {
@@ -36771,7 +36892,7 @@ export const deleteMonitorRatelimitersClearAll = async (params: DeleteMonitorRat
 
 export const getDeleteMonitorRatelimitersClearAllMutationKey = () => ['deleteMonitorRatelimitersClearAll'] as const;
 
-export const getDeleteMonitorRatelimitersClearAllMutationOptions = <TError = ErrorType<ValidationError | ApiError>,
+export const getDeleteMonitorRatelimitersClearAllMutationOptions = <TError = ErrorType<ApiError | ValidationError>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteMonitorRatelimitersClearAll>>, TError,DeleteMonitorRatelimitersClearAllMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
 ): UseMutationOptions<Awaited<ReturnType<typeof deleteMonitorRatelimitersClearAll>>, TError,DeleteMonitorRatelimitersClearAllMutationVariables, TContext> => {
 
@@ -36800,14 +36921,14 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
     export type DeleteMonitorRatelimitersClearAllMutationResult = NonNullable<Awaited<ReturnType<typeof deleteMonitorRatelimitersClearAll>>>
 
-    export type DeleteMonitorRatelimitersClearAllMutationError = ErrorType<ValidationError | ApiError>
+    export type DeleteMonitorRatelimitersClearAllMutationError = ErrorType<ApiError | ValidationError>
     export type DeleteMonitorRatelimitersClearAllMutationVariables = {params: DeleteMonitorRatelimitersClearAllParams}
 
     /**
- * Clears the stored state of every configured rate limiter. Requires ?confirm=true.
+ * Clears the stored state of every configured rate limiter. Requires a super admin and ?confirm=true. The clear is logged with the super admin who made it.
  * @summary Clear all rate limiter state
  */
-export const useDeleteMonitorRatelimitersClearAll = <TError = ErrorType<ValidationError | ApiError>,
+export const useDeleteMonitorRatelimitersClearAll = <TError = ErrorType<ApiError | ValidationError>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteMonitorRatelimitersClearAll>>, TError,DeleteMonitorRatelimitersClearAllMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient): UseMutationResult<
         Awaited<ReturnType<typeof deleteMonitorRatelimitersClearAll>>,
@@ -36835,7 +36956,7 @@ export const getDeleteMonitorRatelimitersClearUrl = (name: string,
 }
 
 /**
- * Clears the stored state of the named rate limiter only. Other limiters keep their state. Requires ?confirm=true.
+ * Clears the stored state of the named rate limiter only. Other limiters keep their state. Requires a super admin and ?confirm=true. The clear is logged with the super admin who made it.
  * @summary Clear one rate limiter's state
  */
 export const deleteMonitorRatelimitersClear = async (name: string,
@@ -36889,7 +37010,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type DeleteMonitorRatelimitersClearMutationVariables = {name: string;params: DeleteMonitorRatelimitersClearParams}
 
     /**
- * Clears the stored state of the named rate limiter only. Other limiters keep their state. Requires ?confirm=true.
+ * Clears the stored state of the named rate limiter only. Other limiters keep their state. Requires a super admin and ?confirm=true. The clear is logged with the super admin who made it.
  * @summary Clear one rate limiter's state
  */
 export const useDeleteMonitorRatelimitersClear = <TError = ErrorType<ApiError | ValidationError>,
@@ -39702,7 +39823,7 @@ export const postStreamSigningSign = async (postStreamSigningSignBody: PostStrea
 
 export const getPostStreamSigningSignMutationKey = () => ['postStreamSigningSign'] as const;
 
-export const getPostStreamSigningSignMutationOptions = <TError = ErrorType<void | PostStreamSigningSign410 | ApiError>,
+export const getPostStreamSigningSignMutationOptions = <TError = ErrorType<void | ApiError | PostStreamSigningSign410>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postStreamSigningSign>>, TError,PostStreamSigningSignMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
 ): UseMutationOptions<Awaited<ReturnType<typeof postStreamSigningSign>>, TError,PostStreamSigningSignMutationVariables, TContext> => {
 
@@ -39731,11 +39852,11 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
     export type PostStreamSigningSignMutationResult = NonNullable<Awaited<ReturnType<typeof postStreamSigningSign>>>
     export type PostStreamSigningSignMutationBody = BodyType<PostStreamSigningSignBody>
-    export type PostStreamSigningSignMutationError = ErrorType<void | PostStreamSigningSign410 | ApiError>
+    export type PostStreamSigningSignMutationError = ErrorType<void | ApiError | PostStreamSigningSign410>
     export type PostStreamSigningSignMutationVariables = {data: BodyType<PostStreamSigningSignBody>}
 
     /** @summary Generate a signed URL for a stream resource */
-export const usePostStreamSigningSign = <TError = ErrorType<void | PostStreamSigningSign410 | ApiError>,
+export const usePostStreamSigningSign = <TError = ErrorType<void | ApiError | PostStreamSigningSign410>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postStreamSigningSign>>, TError,PostStreamSigningSignMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient): UseMutationResult<
         Awaited<ReturnType<typeof postStreamSigningSign>>,
@@ -40416,14 +40537,14 @@ export const getPostEqProfilesCreateUrl = () => {
 /**
  * @summary Create a new EQ device profile
  */
-export const postEqProfilesCreate = async (postEqProfilesCreateBody: PostEqProfilesCreateBody, options?: Parameters<typeof customInstance>[1]): Promise<void> => {
+export const postEqProfilesCreate = async (createEqDeviceProfileRequest: CreateEqDeviceProfileRequest, options?: Parameters<typeof customInstance>[1]): Promise<void> => {
 
   return customInstance<void>(getPostEqProfilesCreateUrl(),
   {
     ...options,
     method: 'POST',
     headers: getHeaders({ 'Content-Type': 'application/json' }, options?.headers),
-    body: JSON.stringify(postEqProfilesCreateBody)
+    body: JSON.stringify(createEqDeviceProfileRequest)
   }
 );}
 
@@ -40461,9 +40582,9 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
   return  { mutationFn, ...mutationOptions }}
 
     export type PostEqProfilesCreateMutationResult = NonNullable<Awaited<ReturnType<typeof postEqProfilesCreate>>>
-    export type PostEqProfilesCreateMutationBody = BodyType<PostEqProfilesCreateBody>
+    export type PostEqProfilesCreateMutationBody = BodyType<CreateEqDeviceProfileRequest>
     export type PostEqProfilesCreateMutationError = ErrorType<ApiError | ValidationError>
-    export type PostEqProfilesCreateMutationVariables = {data: BodyType<PostEqProfilesCreateBody>}
+    export type PostEqProfilesCreateMutationVariables = {data: BodyType<CreateEqDeviceProfileRequest>}
 
     /** @summary Create a new EQ device profile */
 export const usePostEqProfilesCreate = <TError = ErrorType<ApiError | ValidationError>,
@@ -40590,14 +40711,14 @@ export const getPutEqProfilesUpdateUrl = (id: string,) => {
  * @summary Update an EQ device profile
  */
 export const putEqProfilesUpdate = async (id: string,
-    putEqProfilesUpdateBody: PutEqProfilesUpdateBody, options?: Parameters<typeof customInstance>[1]): Promise<PutEqProfilesUpdate200> => {
+    updateEqDeviceProfileRequest: UpdateEqDeviceProfileRequest, options?: Parameters<typeof customInstance>[1]): Promise<PutEqProfilesUpdate200> => {
 
   return customInstance<PutEqProfilesUpdate200>(getPutEqProfilesUpdateUrl(id),
   {
     ...options,
     method: 'PUT',
     headers: getHeaders({ 'Content-Type': 'application/json' }, options?.headers),
-    body: JSON.stringify(putEqProfilesUpdateBody)
+    body: JSON.stringify(updateEqDeviceProfileRequest)
   }
 );}
 
@@ -40635,9 +40756,9 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
   return  { mutationFn, ...mutationOptions }}
 
     export type PutEqProfilesUpdateMutationResult = NonNullable<Awaited<ReturnType<typeof putEqProfilesUpdate>>>
-    export type PutEqProfilesUpdateMutationBody = BodyType<PutEqProfilesUpdateBody>
+    export type PutEqProfilesUpdateMutationBody = BodyType<UpdateEqDeviceProfileRequest>
     export type PutEqProfilesUpdateMutationError = ErrorType<ApiError | ValidationError>
-    export type PutEqProfilesUpdateMutationVariables = {id: string;data: BodyType<PutEqProfilesUpdateBody>}
+    export type PutEqProfilesUpdateMutationVariables = {id: string;data: BodyType<UpdateEqDeviceProfileRequest>}
 
     /** @summary Update an EQ device profile */
 export const usePutEqProfilesUpdate = <TError = ErrorType<ApiError | ValidationError>,
@@ -41665,14 +41786,14 @@ export const getPutSidebarConfigUpdateUrl = (mediaType: string,) => {
  * @summary Update sidebar configuration for a media type
  */
 export const putSidebarConfigUpdate = async (mediaType: string,
-    putSidebarConfigUpdateBody: PutSidebarConfigUpdateBody, options?: Parameters<typeof customInstance>[1]): Promise<PutSidebarConfigUpdate200> => {
+    updateSidebarSectionsRequest: UpdateSidebarSectionsRequest, options?: Parameters<typeof customInstance>[1]): Promise<PutSidebarConfigUpdate200> => {
 
   return customInstance<PutSidebarConfigUpdate200>(getPutSidebarConfigUpdateUrl(mediaType),
   {
     ...options,
     method: 'PUT',
     headers: getHeaders({ 'Content-Type': 'application/json' }, options?.headers),
-    body: JSON.stringify(putSidebarConfigUpdateBody)
+    body: JSON.stringify(updateSidebarSectionsRequest)
   }
 );}
 
@@ -41710,9 +41831,9 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
   return  { mutationFn, ...mutationOptions }}
 
     export type PutSidebarConfigUpdateMutationResult = NonNullable<Awaited<ReturnType<typeof putSidebarConfigUpdate>>>
-    export type PutSidebarConfigUpdateMutationBody = BodyType<PutSidebarConfigUpdateBody>
+    export type PutSidebarConfigUpdateMutationBody = BodyType<UpdateSidebarSectionsRequest>
     export type PutSidebarConfigUpdateMutationError = ErrorType<ApiError | ValidationError>
-    export type PutSidebarConfigUpdateMutationVariables = {mediaType: string;data: BodyType<PutSidebarConfigUpdateBody>}
+    export type PutSidebarConfigUpdateMutationVariables = {mediaType: string;data: BodyType<UpdateSidebarSectionsRequest>}
 
     /** @summary Update sidebar configuration for a media type */
 export const usePutSidebarConfigUpdate = <TError = ErrorType<ApiError | ValidationError>,

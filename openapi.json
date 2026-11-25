@@ -488,6 +488,16 @@
                             }
                         }
                     },
+                    "409": {
+                        "description": "Playback media is unavailable: the video file no longer resolves inside one of its libraries",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    },
                     "422": {
                         "description": "Validation error",
                         "content": {
@@ -1439,12 +1449,14 @@
                                     "platform": {
                                         "type": "string",
                                         "description": "Playback platform (e.g. web, mobile, desktop)",
-                                        "nullable": true
+                                        "nullable": true,
+                                        "maxLength": 64
                                     },
                                     "player": {
                                         "type": "string",
                                         "description": "Player application name",
-                                        "nullable": true
+                                        "nullable": true,
+                                        "maxLength": 64
                                     }
                                 }
                             }
@@ -13853,7 +13865,7 @@
                 "tags": [
                     "Metadata"
                 ],
-                "summary": "Extract embedded metadata from a local media file",
+                "summary": "Extract embedded metadata from a media file inside a library",
                 "operationId": "post_metadata_extract",
                 "requestBody": {
                     "content": {
@@ -13976,7 +13988,7 @@
                         "description": "Administrator role required"
                     },
                     "422": {
-                        "description": "Invalid request, or no file exists at the path, or the file is in a format the tag readers do not support",
+                        "description": "Invalid request, or no library holds a file at the path, or the file is in a format the tag readers do not support",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -14088,7 +14100,7 @@
                         "description": "Administrator role required"
                     },
                     "422": {
-                        "description": "Invalid request, or no file exists at the path, or the file is in a format the tag readers do not support",
+                        "description": "Invalid request, or no library holds a file at the path, or the file is in a format the tag readers do not support",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -14427,45 +14439,7 @@
                     "content": {
                         "application/json": {
                             "schema": {
-                                "type": "object",
-                                "properties": {
-                                    "preferences": {
-                                        "type": "array",
-                                        "items": {
-                                            "type": "object",
-                                            "properties": {
-                                                "category": {
-                                                    "type": "string",
-                                                    "enum": [
-                                                        "security",
-                                                        "background_jobs",
-                                                        "media_changes"
-                                                    ]
-                                                },
-                                                "channel": {
-                                                    "type": "string",
-                                                    "enum": [
-                                                        "in_app",
-                                                        "email",
-                                                        "push",
-                                                        "webhook"
-                                                    ]
-                                                },
-                                                "enabled": {
-                                                    "type": "boolean"
-                                                }
-                                            },
-                                            "required": [
-                                                "category",
-                                                "channel",
-                                                "enabled"
-                                            ]
-                                        }
-                                    }
-                                },
-                                "required": [
-                                    "preferences"
-                                ]
+                                "$ref": "#/components/schemas/UpdatePreferenceRequest"
                             }
                         }
                     },
@@ -14483,6 +14457,16 @@
                                             "type": "boolean"
                                         }
                                     }
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "The body is not a JSON object",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
                                 }
                             }
                         }
@@ -14506,6 +14490,7 @@
                     "Push"
                 ],
                 "summary": "Subscribe to push notifications",
+                "description": "A user keeps at most 20 subscriptions; registering another evicts the longest-registered ones.",
                 "operationId": "post_push_subscribe",
                 "requestBody": {
                     "content": {
@@ -14514,16 +14499,19 @@
                                 "type": "object",
                                 "properties": {
                                     "endpoint": {
-                                        "type": "string"
+                                        "type": "string",
+                                        "maxLength": 2048
                                     },
                                     "keys": {
                                         "type": "object",
                                         "properties": {
                                             "p256dh": {
-                                                "type": "string"
+                                                "type": "string",
+                                                "maxLength": 128
                                             },
                                             "auth": {
-                                                "type": "string"
+                                                "type": "string",
+                                                "maxLength": 64
                                             }
                                         }
                                     },
@@ -14588,6 +14576,16 @@
                             }
                         }
                     },
+                    "400": {
+                        "description": "The body is not a JSON object",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    },
                     "401": {
                         "description": "Authentication required"
                     },
@@ -14640,6 +14638,16 @@
                 "responses": {
                     "204": {
                         "description": "Unsubscribed"
+                    },
+                    "400": {
+                        "description": "The body is not a JSON object",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
                     },
                     "401": {
                         "description": "Authentication required"
@@ -16045,32 +16053,7 @@
                     "content": {
                         "application/json": {
                             "schema": {
-                                "type": "object",
-                                "properties": {
-                                    "name": {
-                                        "type": "string"
-                                    },
-                                    "description": {
-                                        "type": "string",
-                                        "nullable": true
-                                    },
-                                    "isPublic": {
-                                        "type": "boolean"
-                                    },
-                                    "isCollaborative": {
-                                        "type": "boolean"
-                                    },
-                                    "isSmart": {
-                                        "type": "boolean"
-                                    },
-                                    "smartRules": {
-                                        "type": "array",
-                                        "items": {}
-                                    }
-                                },
-                                "required": [
-                                    "name"
-                                ]
+                                "$ref": "#/components/schemas/CreatePlaylistRequest"
                             }
                         }
                     },
@@ -16089,6 +16072,16 @@
                     },
                     "401": {
                         "description": "Not authenticated",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "The caller already owns the most playlists an owner may keep (reason playlist_limit)",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -16349,26 +16342,7 @@
                     "content": {
                         "application/json": {
                             "schema": {
-                                "type": "object",
-                                "properties": {
-                                    "name": {
-                                        "type": "string",
-                                        "nullable": true
-                                    },
-                                    "description": {
-                                        "type": "string",
-                                        "nullable": true
-                                    },
-                                    "isPublic": {
-                                        "type": "boolean",
-                                        "nullable": true
-                                    },
-                                    "isCollaborative": {
-                                        "type": "boolean",
-                                        "description": "The owner's switch for collaborator editing; collaborators keep viewing while it is off",
-                                        "nullable": true
-                                    }
-                                }
+                                "$ref": "#/components/schemas/UpdatePlaylistRequest"
                             }
                         }
                     },
@@ -16585,6 +16559,16 @@
                             }
                         }
                     },
+                    "409": {
+                        "description": "The playlist changed meanwhile, or it already holds the most songs a playlist may hold (reason song_limit)",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    },
                     "422": {
                         "description": "Validation error",
                         "content": {
@@ -16737,7 +16721,7 @@
                         }
                     },
                     "409": {
-                        "description": "The playlist kept changing during the addition",
+                        "description": "The playlist kept changing during the addition, or it already has the most collaborators a playlist may have (reason collaborator_limit)",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -22002,7 +21986,7 @@
                     "System"
                 ],
                 "summary": "Clear all rate limiter state",
-                "description": "Clears the stored state of every configured rate limiter. Requires ?confirm=true.",
+                "description": "Clears the stored state of every configured rate limiter. Requires a super admin and ?confirm=true. The clear is logged with the super admin who made it.",
                 "operationId": "delete_monitor_ratelimiters_clear_all",
                 "parameters": [
                     {
@@ -22045,6 +22029,16 @@
                             }
                         }
                     },
+                    "403": {
+                        "description": "Only a super admin clears rate limiters",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    },
                     "422": {
                         "description": "Missing confirm parameter",
                         "content": {
@@ -22074,7 +22068,7 @@
                     "System"
                 ],
                 "summary": "Clear one rate limiter's state",
-                "description": "Clears the stored state of the named rate limiter only. Other limiters keep their state. Requires ?confirm=true.",
+                "description": "Clears the stored state of the named rate limiter only. Other limiters keep their state. Requires a super admin and ?confirm=true. The clear is logged with the super admin who made it.",
                 "operationId": "delete_monitor_ratelimiters_clear",
                 "parameters": [
                     {
@@ -22120,6 +22114,16 @@
                                             }
                                         }
                                     }
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Only a super admin clears rate limiters",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
                                 }
                             }
                         }
@@ -23986,6 +23990,16 @@
                     "400": {
                         "description": "Invalid request"
                     },
+                    "409": {
+                        "description": "Playback media is unavailable: the video file no longer resolves inside one of its libraries",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    },
                     "410": {
                         "description": "A refresh named only sessions that have ended. Sessions that expired may be started again; failed or cancelled ones may not",
                         "content": {
@@ -24467,23 +24481,7 @@
                     "content": {
                         "application/json": {
                             "schema": {
-                                "type": "object",
-                                "properties": {
-                                    "name": {
-                                        "type": "string"
-                                    },
-                                    "icon": {
-                                        "type": "string"
-                                    },
-                                    "deviceId": {
-                                        "type": "string",
-                                        "nullable": true
-                                    }
-                                },
-                                "required": [
-                                    "name",
-                                    "icon"
-                                ]
+                                "$ref": "#/components/schemas/CreateEqDeviceProfileRequest"
                             }
                         }
                     },
@@ -24493,8 +24491,28 @@
                     "201": {
                         "description": "Profile created"
                     },
+                    "400": {
+                        "description": "The body is not a JSON object",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    },
                     "401": {
                         "description": "Not authenticated",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "The user already keeps the most profiles a user may keep (reason eq_profile_limit)",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -24591,25 +24609,7 @@
                     "content": {
                         "application/json": {
                             "schema": {
-                                "type": "object",
-                                "properties": {
-                                    "name": {
-                                        "type": "string"
-                                    },
-                                    "icon": {
-                                        "type": "string"
-                                    },
-                                    "deviceId": {
-                                        "type": "string",
-                                        "nullable": true
-                                    },
-                                    "payload": {
-                                        "type": "object"
-                                    },
-                                    "sortOrder": {
-                                        "type": "integer"
-                                    }
-                                }
+                                "$ref": "#/components/schemas/UpdateEqDeviceProfileRequest"
                             }
                         }
                     },
@@ -24627,6 +24627,16 @@
                                             "$ref": "#/components/schemas/EqDeviceProfileResource"
                                         }
                                     }
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "The body is not a JSON object",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
                                 }
                             }
                         }
@@ -25551,52 +25561,7 @@
                     "content": {
                         "application/json": {
                             "schema": {
-                                "type": "object",
-                                "properties": {
-                                    "sections": {
-                                        "type": "array",
-                                        "items": {
-                                            "type": "object",
-                                            "properties": {
-                                                "id": {
-                                                    "type": "string"
-                                                },
-                                                "label": {
-                                                    "type": "string"
-                                                },
-                                                "type": {
-                                                    "type": "string"
-                                                },
-                                                "items": {
-                                                    "type": "array",
-                                                    "items": {
-                                                        "type": "object",
-                                                        "properties": {
-                                                            "id": {
-                                                                "type": "string"
-                                                            },
-                                                            "type": {
-                                                                "type": "string"
-                                                            },
-                                                            "label": {
-                                                                "type": "string"
-                                                            },
-                                                            "icon": {
-                                                                "type": "string"
-                                                            },
-                                                            "config": {
-                                                                "type": "object"
-                                                            }
-                                                        }
-                                                    }
-                                                }
-                                            }
-                                        }
-                                    }
-                                },
-                                "required": [
-                                    "sections"
-                                ]
+                                "$ref": "#/components/schemas/UpdateSidebarSectionsRequest"
                             }
                         }
                     },
@@ -25663,6 +25628,16 @@
                                             }
                                         }
                                     }
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "The body is not a JSON object",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
                                 }
                             }
                         }
@@ -26074,12 +26049,14 @@
                         "type": "string",
                         "description": "Playback platform (e.g. web, mobile, desktop)",
                         "nullable": true,
+                        "maxLength": 64,
                         "default": null
                     },
                     "player": {
                         "type": "string",
                         "description": "Player application name",
                         "nullable": true,
+                        "maxLength": 64,
                         "default": null
                     }
                 }
@@ -27438,7 +27415,8 @@
                     "containers": {
                         "type": "array",
                         "items": {
-                            "type": "string"
+                            "type": "string",
+                            "maxLength": 32
                         },
                         "minItems": 1,
                         "maxItems": 32
@@ -27446,7 +27424,8 @@
                     "videoCodecs": {
                         "type": "array",
                         "items": {
-                            "type": "string"
+                            "type": "string",
+                            "maxLength": 32
                         },
                         "maxItems": 32,
                         "default": []
@@ -27454,7 +27433,8 @@
                     "audioCodecs": {
                         "type": "array",
                         "items": {
-                            "type": "string"
+                            "type": "string",
+                            "maxLength": 32
                         },
                         "maxItems": 32,
                         "default": []
@@ -27493,8 +27473,10 @@
                     "transports": {
                         "type": "array",
                         "items": {
-                            "type": "string"
+                            "type": "string",
+                            "maxLength": 32
                         },
+                        "maxItems": 32,
                         "default": [
                             "file"
                         ]
@@ -27512,7 +27494,8 @@
                     "pixelFormats": {
                         "type": "array",
                         "items": {
-                            "type": "string"
+                            "type": "string",
+                            "maxLength": 32
                         },
                         "maxItems": 32,
                         "default": [
@@ -27592,7 +27575,7 @@
                 "properties": {
                     "path": {
                         "type": "string",
-                        "description": "Filesystem path to the media file to analyze",
+                        "description": "Absolute path of the media file to analyze, as the server sees it. The file must lie inside a library; a symlink counts where its target lies",
                         "default": "",
                         "example": "/mnt/media/music/album/song.flac"
                     }
@@ -27606,7 +27589,7 @@
                 "properties": {
                     "path": {
                         "type": "string",
-                        "description": "Filesystem path to the media file",
+                        "description": "Absolute path of the media file, as the server sees it. The file must lie inside a library; a symlink counts where its target lies",
                         "default": "",
                         "example": "/mnt/media/music/album/song.flac"
                     },
@@ -27623,6 +27606,48 @@
                 "required": [
                     "path",
                     "candidates"
+                ]
+            },
+            "UpdatePreferenceRequest": {
+                "type": "object",
+                "properties": {
+                    "preferences": {
+                        "type": "array",
+                        "items": {
+                            "properties": {
+                                "category": {
+                                    "type": "string",
+                                    "enum": [
+                                        "security",
+                                        "background_jobs",
+                                        "media_changes"
+                                    ]
+                                },
+                                "channel": {
+                                    "type": "string",
+                                    "enum": [
+                                        "in_app",
+                                        "email",
+                                        "push",
+                                        "webhook"
+                                    ]
+                                },
+                                "enabled": {
+                                    "type": "boolean"
+                                }
+                            },
+                            "required": [
+                                "category",
+                                "channel",
+                                "enabled"
+                            ]
+                        },
+                        "maxItems": 64,
+                        "default": []
+                    }
+                },
+                "required": [
+                    "preferences"
                 ]
             },
             "UpdatePartyMemberRequest": {
@@ -27721,6 +27746,7 @@
                     "description": {
                         "type": "string",
                         "nullable": true,
+                        "maxLength": 2000,
                         "default": null,
                         "example": "A great playlist"
                     },
@@ -27743,8 +27769,44 @@
                         "type": "array",
                         "description": "Rules for smart playlist auto-population",
                         "items": {
-                            "type": "object"
+                            "type": "object",
+                            "properties": {
+                                "field": {
+                                    "type": "string",
+                                    "enum": [
+                                        "genre",
+                                        "year",
+                                        "artist",
+                                        "album",
+                                        "play_count",
+                                        "date_added",
+                                        "duration"
+                                    ]
+                                },
+                                "operator": {
+                                    "type": "string",
+                                    "enum": [
+                                        "equals",
+                                        "not_equals",
+                                        "contains",
+                                        "greater_than",
+                                        "less_than",
+                                        "is_empty",
+                                        "is_not_empty"
+                                    ]
+                                },
+                                "value": {
+                                    "type": "string",
+                                    "maxLength": 255
+                                }
+                            },
+                            "required": [
+                                "field",
+                                "operator"
+                            ],
+                            "additionalProperties": false
                         },
+                        "maxItems": 50,
                         "default": []
                     }
                 },
@@ -27758,12 +27820,14 @@
                     "name": {
                         "type": "string",
                         "nullable": true,
+                        "maxLength": 255,
                         "default": null,
                         "example": "Updated Playlist Name"
                     },
                     "description": {
                         "type": "string",
                         "nullable": true,
+                        "maxLength": 2000,
                         "default": null,
                         "example": "Updated description"
                     },
@@ -27775,7 +27839,7 @@
                     },
                     "isCollaborative": {
                         "type": "boolean",
-                        "description": "The owner's switch for collaborator editing",
+                        "description": "The owner's switch for collaborator editing; collaborators keep viewing while it is off",
                         "nullable": true,
                         "default": null,
                         "example": false
@@ -27820,6 +27884,7 @@
                             "pattern": "^[0-9a-zA-Z_-]{21}$"
                         },
                         "minItems": 1,
+                        "maxItems": 10000,
                         "default": [],
                         "example": [
                             "aB3dE5fG7hJ9kL1mN3pQr",
@@ -27859,7 +27924,8 @@
                         "maxLength": 21
                     },
                     "streamUrl": {
-                        "type": "string"
+                        "type": "string",
+                        "maxLength": 2048
                     }
                 },
                 "required": [
@@ -28276,8 +28342,12 @@
                         "type": "array",
                         "nullable": true,
                         "items": {
-                            "type": "string"
+                            "type": "string",
+                            "minLength": 21,
+                            "maxLength": 21,
+                            "pattern": "^[0-9a-zA-Z_-]{21}$"
                         },
+                        "maxItems": 10000,
                         "default": null
                     },
                     "currentTrackIndex": {
@@ -28663,6 +28733,159 @@
                         "example": "streaming_stereo"
                     }
                 }
+            },
+            "CreateEqDeviceProfileRequest": {
+                "type": "object",
+                "properties": {
+                    "name": {
+                        "type": "string",
+                        "maxLength": 255,
+                        "default": "",
+                        "example": "Headphones"
+                    },
+                    "icon": {
+                        "type": "string",
+                        "enum": [
+                            "headphones",
+                            "speakers",
+                            "hifi-speaker",
+                            "wireless-speaker",
+                            "car",
+                            "tv",
+                            "monitor",
+                            "custom"
+                        ],
+                        "default": "custom",
+                        "example": "headphones"
+                    },
+                    "deviceId": {
+                        "type": "string",
+                        "description": "Client audio-output token, independent of database identity",
+                        "nullable": true,
+                        "maxLength": 255,
+                        "default": null,
+                        "example": "audio-output-group-abc"
+                    }
+                },
+                "required": [
+                    "name",
+                    "icon"
+                ]
+            },
+            "UpdateEqDeviceProfileRequest": {
+                "type": "object",
+                "properties": {
+                    "name": {
+                        "type": "string",
+                        "nullable": true,
+                        "maxLength": 255,
+                        "default": null,
+                        "example": "Living Room"
+                    },
+                    "icon": {
+                        "type": "string",
+                        "nullable": true,
+                        "enum": [
+                            "headphones",
+                            "speakers",
+                            "hifi-speaker",
+                            "wireless-speaker",
+                            "car",
+                            "tv",
+                            "monitor",
+                            "custom"
+                        ],
+                        "default": null,
+                        "example": "speakers"
+                    },
+                    "deviceId": {
+                        "type": "string",
+                        "description": "Client audio-output token, independent of database identity",
+                        "nullable": true,
+                        "maxLength": 255,
+                        "default": null
+                    },
+                    "payload": {
+                        "type": "object",
+                        "description": "Client EQ settings; at most 16384 bytes as compact JSON",
+                        "nullable": true,
+                        "default": null
+                    },
+                    "sortOrder": {
+                        "type": "integer",
+                        "nullable": true,
+                        "default": null,
+                        "example": 0
+                    }
+                }
+            },
+            "UpdateSidebarSectionsRequest": {
+                "type": "object",
+                "properties": {
+                    "sections": {
+                        "type": "array",
+                        "description": "At most 16384 bytes as compact JSON",
+                        "items": {
+                            "properties": {
+                                "id": {
+                                    "type": "string",
+                                    "example": "music-quick-jump"
+                                },
+                                "label": {
+                                    "type": "string",
+                                    "example": "Quick Jump"
+                                },
+                                "type": {
+                                    "type": "string",
+                                    "example": "navigation"
+                                },
+                                "items": {
+                                    "type": "array",
+                                    "items": {
+                                        "properties": {
+                                            "id": {
+                                                "type": "string",
+                                                "example": "music-home"
+                                            },
+                                            "type": {
+                                                "type": "string",
+                                                "enum": [
+                                                    "page_link",
+                                                    "smart_filter",
+                                                    "panel_action"
+                                                ],
+                                                "example": "page_link"
+                                            },
+                                            "label": {
+                                                "type": "string",
+                                                "example": "Home"
+                                            },
+                                            "icon": {
+                                                "type": "string",
+                                                "example": "home"
+                                            },
+                                            "config": {
+                                                "type": "object"
+                                            }
+                                        },
+                                        "required": [
+                                            "id",
+                                            "type",
+                                            "label",
+                                            "icon"
+                                        ]
+                                    },
+                                    "maxItems": 100
+                                }
+                            }
+                        },
+                        "maxItems": 100,
+                        "default": []
+                    }
+                },
+                "required": [
+                    "sections"
+                ]
             },
             "SetUserSettingRequest": {
                 "type": "object",
