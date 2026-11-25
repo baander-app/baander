@@ -4,14 +4,15 @@ declare(strict_types=1);
 
 namespace App\Activity\Interface\Controller;
 
-use App\Auth\Application\Port\AuthenticatedUserIdentityInterface;
 use App\Activity\Application\Port\ActivityPortInterface;
 use App\Activity\Domain\Model\MediaActivity;
 use App\Activity\Infrastructure\ActivityEnrichmentService;
 use App\Activity\Interface\Resource\RecentItemResource;
+use App\Auth\Application\Port\AuthenticatedUserIdentityInterface;
 use App\Shared\Application\Http\PublicOrigins;
 use App\Shared\Domain\Model\Uuid;
 use App\Shared\Interface\Controller\ApiResponsesTrait;
+use App\Shared\Interface\DTO\ApiError;
 use OpenApi\Spec as OA;
 use Symfony\Bundle\SecurityBundle\Security;
 use Symfony\Component\HttpFoundation\JsonResponse;
@@ -82,7 +83,7 @@ final class UserRecentController
                 response: '401',
                 description: 'Not authenticated',
                 content: new OA\MediaType\Json(
-                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                    schema: new OA\Schema(ref: ApiError::class),
                 ),
             ),
         ],

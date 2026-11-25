@@ -14,8 +14,9 @@ use App\Library\Infrastructure\Doctrine\Repository\LibraryRepository;
 use App\Shared\Domain\Model\Uuid;
 use App\Shared\Domain\ValueObject\FilesystemType;
 use Doctrine\DBAL\Exception\ForeignKeyConstraintViolationException;
-use Doctrine\ORM\Tools\SchemaTool;
 use Doctrine\DBAL\Schema\Schema;
+use Doctrine\ORM\Tools\SchemaTool;
+use DoctrineMigrations\Version20261021120000;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
 use Symfony\Component\Clock\NativeClock;
@@ -265,7 +266,7 @@ final class LibraryFileIndexPersistenceTest extends TestCase
         $before = $read();
         self::assertIsArray($before);
         require_once dirname(__DIR__, 2) . '/migrations/Version20261021120000.php';
-        $migration = new \DoctrineMigrations\Version20261021120000($connection, new NullLogger());
+        $migration = new Version20261021120000($connection, new NullLogger());
         $migration->up(new Schema());
         foreach ($migration->getSql() as $query) {
             $connection->executeStatement($query->getStatement(), $query->getParameters(), $query->getTypes());

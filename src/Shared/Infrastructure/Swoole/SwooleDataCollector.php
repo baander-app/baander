@@ -4,10 +4,11 @@ declare(strict_types=1);
 
 namespace App\Shared\Infrastructure\Swoole;
 
+use Swoole\Coroutine;
 use SwooleBundle\SwooleBundle\Server\HttpServerConfiguration;
-use Symfony\Component\HttpKernel\DataCollector\DataCollector;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
+use Symfony\Component\HttpKernel\DataCollector\DataCollector;
 
 final class SwooleDataCollector extends DataCollector
 {
@@ -43,7 +44,7 @@ final class SwooleDataCollector extends DataCollector
 
     public function getCoroutineId(): int
     {
-        return extension_loaded('swoole') ? \Swoole\Coroutine::getCid() : -1;
+        return extension_loaded('swoole') ? Coroutine::getCid() : -1;
     }
 
     public function getWorkerId(): int

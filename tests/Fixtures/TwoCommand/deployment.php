@@ -2,19 +2,37 @@
 
 declare(strict_types=1);
 
+use App\Auth\Domain\Event\UserRegistered;
 use App\Auth\Domain\Model\OAuth\SignInGrant;
+use App\Auth\Infrastructure\Doctrine\Entity\UserEntity;
 use App\Catalog\Infrastructure\Doctrine\Entity\AlbumEntity;
 use App\Catalog\Infrastructure\Doctrine\Entity\MovieEntity;
 use App\Catalog\Infrastructure\Doctrine\Entity\MovieVideoEntity;
 use App\Catalog\Infrastructure\Doctrine\Entity\SongEntity;
 use App\Catalog\Infrastructure\Doctrine\Entity\VideoEntity;
+use App\Kernel;
 use App\Library\Infrastructure\Doctrine\Entity\LibraryEntity;
 use App\Media\Infrastructure\Doctrine\Entity\ImageEntity;
+use App\Scheduler\Infrastructure\Doctrine\DoctrineSchedulerManualOccurrenceRecorder;
+use App\Shared\Application\DTO\DeploymentProfile;
+use App\Shared\Domain\Event\Outbox\RelayOutboxCommand;
+use App\Shared\Domain\Model\Email;
 use App\Shared\Domain\Model\PublicId;
-use App\Tests\Fixtures\TwoCommand\TrackDelivery;
+use App\Shared\Domain\Model\Uuid;
+use App\Tests\Fixtures\Messaging\MessageCodecFactory;
 use App\Tests\Fixtures\TwoCommand\LocalOrigin;
+use App\Tests\Fixtures\TwoCommand\TrackDelivery;
 use App\Tests\Fixtures\WebRuntime\HttpExchange;
 use App\Tests\Fixtures\WebRuntime\StreamClient;
+use App\Transcode\Application\DTO\MediaTrack;
+use App\Transcode\Domain\ValueObject\VideoProbeResult;
+use App\Transcode\Infrastructure\FFmpeg\FFprobeArguments;
+use App\Transcode\Infrastructure\Packaging\PublishedPresentationReader;
+use Doctrine\DBAL\Connection;
+use Doctrine\ORM\EntityManagerInterface;
+use Symfony\Component\Dotenv\Dotenv;
+use Symfony\Component\Messenger\Bridge\Redis\Transport\RedisTransport;
+use Symfony\Component\Messenger\Envelope;
 use Symfony\Component\Process\Process;
 
 $project = dirname(__DIR__, 3);
@@ -29,7 +47,7 @@ spl_autoload_register(static function (string $class) use ($project): void {
         }
     }
 });
-new Symfony\Component\Dotenv\Dotenv()->bootEnv($project . '/.env');
+new Dotenv()->bootEnv($project . '/.env');
 const BASE = LocalOrigin::BASE;
 const ROOT = '/var/www/html/storage/two-command';
 const STATE = ROOT . '/state.json';
@@ -99,7 +117,7 @@ function await(callable $probe, string $description, float $seconds = 30): mixed
  * @param array<string, mixed> $state
  * @return array<string, mixed>
  */
-function row(Doctrine\DBAL\Connection $db, array $state): array
+function row(Connection $db, array $state): array
 {
     $row = $db->fetchAssociative('SELECT r.*, clock_timestamp() AS sampled_at, j.status AS job_status, s.public_id AS session_public_id FROM transcode_runtime_state r JOIN transcode_sessions s ON s.id=r.session_id JOIN transcode_jobs j ON j.id=r.job_id WHERE j.public_id = ?', [$state['job']]);
     ensure($row !== false, 'Durable runtime disappeared.');
@@ -110,7 +128,7 @@ function row(Doctrine\DBAL\Connection $db, array $state): array
  * @param array<string, mixed> $state
  * @return array<string, mixed>
  */
-function acknowledged(Doctrine\DBAL\Connection $db, array $state, string $status, ?float $position = null): array
+function acknowledged(Connection $db, array $state, string $status, ?float $position = null): array
 {
     $last = [];
     try {
@@ -282,7 +300,7 @@ function verifyDash(StreamClient $client, array $state): array
     $xpath = new DOMXPath($xml); $xpath->registerNamespace('mpd', 'urn:mpeg:dash:schema:mpd:2011');
     $runtime = row($db, $state);
     ensure((int) $runtime['generation'] === (int) $snapshot['generation'], 'DASH output changed generation during inspection.');
-    $presentation = new App\Transcode\Infrastructure\Packaging\PublishedPresentationReader()->read($runtime['output_directory']);
+    $presentation = new PublishedPresentationReader()->read($runtime['output_directory']);
     ensure($presentation !== null, 'DASH native presentation is unavailable.');
     $resources = [];
     foreach (['video', 'audio'] as $kind) {
@@ -308,7 +326,7 @@ function verifyDash(StreamClient $client, array $state): array
         $resources[$kind]['startTicks'] = (int) $timing->getAttribute('t');
         $resources[$kind]['durationTicks'] = (int) $timing->getAttribute('d');
         ensure($resources[$kind]['timescale'] > 0 && $resources[$kind]['durationTicks'] > 0, 'DASH track timing must be positive.');
-        $native = $presentation->track(App\Transcode\Application\DTO\MediaTrack::from($kind));
+        $native = $presentation->track(MediaTrack::from($kind));
         ensure($native !== null && $resources[$kind]['timescale'] === $native->timescale
             && $resources[$kind]['startTicks'] === $native->segments[0]->start
             && $resources[$kind]['durationTicks'] === $native->segments[0]->duration
@@ -459,16 +477,16 @@ function videoEvidence(array $decoded): array
  * @param array<string,mixed> $decoded
  * @return array<string,mixed>
  */
-function retainVideoOutput(Doctrine\DBAL\Connection $db, array $state, array $decoded, string $name): array
+function retainVideoOutput(Connection $db, array $state, array $decoded, string $name): array
 {
     $runtime = row($db, $state);
     ensure((int) $runtime['generation'] === (int) $decoded['generation'], 'Output changed generation during retention.');
     $files = [];
     $paths = [];
     $urls = [];
-    $presentation = new App\Transcode\Infrastructure\Packaging\PublishedPresentationReader()->read($runtime['output_directory']);
+    $presentation = new PublishedPresentationReader()->read($runtime['output_directory']);
     ensure($presentation !== null, 'Cannot read retained native presentation.');
-    foreach (App\Transcode\Application\DTO\MediaTrack::cases() as $kind) {
+    foreach (MediaTrack::cases() as $kind) {
         $track = $presentation->track($kind);
         ensure($track !== null, 'Retained presentation omitted ' . $kind->value . '.');
         $delivery = $decoded['tracks'][$kind->value];
@@ -520,14 +538,14 @@ function rejectRetiredVideoOutput(array $retained): array
  */
 function profileSlots(): array
 {
-    $profile = App\Shared\Application\DTO\DeploymentProfile::fromEnvironment();
+    $profile = DeploymentProfile::fromEnvironment();
     return ['video' => $profile->videoEncoderSlots, 'audio' => $profile->audioEncoderSlots];
 }
 /** One more signed-in administrator, whose video sessions get jobs of their own. */
-function drillOwner(Doctrine\ORM\EntityManagerInterface $manager, string $project, string $name): StreamClient
+function drillOwner(EntityManagerInterface $manager, string $project, string $name): StreamClient
 {
     $email = $name . '@baander.app';
-    $owner = new App\Auth\Infrastructure\Doctrine\Entity\UserEntity(new PublicId(), str_replace('-', ' ', $name) |> ucfirst(...), $email, 'unused-password', roles: ['ROLE_ADMIN']);
+    $owner = new UserEntity(new PublicId(), str_replace('-', ' ', $name) |> ucfirst(...), $email, 'unused-password', roles: ['ROLE_ADMIN']);
     $owner->markEmailAsVerified();
     $manager->persist($owner);
     $manager->flush();
@@ -583,7 +601,7 @@ set_exception_handler(static function (Throwable $error) use ($mode, $hostAtStar
     fwrite(STDERR, 'two-command ' . $mode . ' host load: ' . json_encode(['start' => $hostAtStart, 'end' => hostLoad()]) . "\n");
     exit(1);
 });
-$kernel = new App\Kernel('prod', false);
+$kernel = new Kernel('prod', false);
 $kernel->boot();
 $manager = $kernel->getContainer()->get('doctrine')->getManager();
 $db = $manager->getConnection();
@@ -642,9 +660,9 @@ if ($mode === 'prepare') {
     $album = new AlbumEntity(new PublicId(), $library, 'Two command album', 'two-command-album');
     $song = new SongEntity(new PublicId(), $album, 'Worker audio', AUDIO, (int) filesize(AUDIO), 'audio/flac');
     $video = new VideoEntity(new PublicId(), VIDEO, hash_file('xxh3', VIDEO));
-    $catalogProbe = new Process(\App\Transcode\Infrastructure\FFmpeg\FFprobeArguments::video(VIDEO, 'ffprobe'), timeout: 30);
+    $catalogProbe = new Process(FFprobeArguments::video(VIDEO, 'ffprobe'), timeout: 30);
     $catalogProbe->mustRun();
-    $video->setProbe(\App\Transcode\Domain\ValueObject\VideoProbeResult::fromProbeOutput(
+    $video->setProbe(VideoProbeResult::fromProbeOutput(
         json_decode($catalogProbe->getOutput(), true, flags: JSON_THROW_ON_ERROR),
     )->jsonSerialize());
     $video->setDuration((int) round($catalogDuration)); $video->setWidth(1280); $video->setHeight(720); $video->setFramerate($movieEndpoint ? 25 : 30);
@@ -669,9 +687,9 @@ if ($mode === 'prepare') {
             '-pix_fmt', 'yuv420p', '-c:a', 'aac', '-b:a', '160k', '-ac', '2', COST_VIDEO], 300);
         // Copy execution verifies the catalog's scanner hash before repackaging.
         $costVideo = new VideoEntity(new PublicId(), COST_VIDEO, hash_file('xxh3', COST_VIDEO));
-        $costProbe = new Process(\App\Transcode\Infrastructure\FFmpeg\FFprobeArguments::video(COST_VIDEO, 'ffprobe'), timeout: 30);
+        $costProbe = new Process(FFprobeArguments::video(COST_VIDEO, 'ffprobe'), timeout: 30);
         $costProbe->mustRun();
-        $costVideo->setProbe(\App\Transcode\Domain\ValueObject\VideoProbeResult::fromProbeOutput(
+        $costVideo->setProbe(VideoProbeResult::fromProbeOutput(
             json_decode($costProbe->getOutput(), true, flags: JSON_THROW_ON_ERROR),
         )->jsonSerialize());
         $costVideo->setDuration(COST_VIDEO_SECONDS); $costVideo->setWidth(1920); $costVideo->setHeight(1080); $costVideo->setFramerate(30);
@@ -699,8 +717,8 @@ if ($mode === 'prepare') {
         $input = '/media/load-input';
         command(['ffmpeg', '-nostdin', '-v', 'error', '-y', '-ss', '60', '-t', (string) LOAD_VIDEO_SECONDS, '-i', $input,
             '-map', '0:v:0', '-map', '0:a:0', '-c:v', 'copy', '-c:a', 'aac', '-b:a', '160k', '-ac', '2', LOAD_VIDEO], 120);
-        $probe = json_decode(new Process(\App\Transcode\Infrastructure\FFmpeg\FFprobeArguments::video(LOAD_VIDEO, 'ffprobe'), timeout: 30)->mustRun()->getOutput(), true, flags: JSON_THROW_ON_ERROR);
-        $loadProbe = \App\Transcode\Domain\ValueObject\VideoProbeResult::fromProbeOutput($probe);
+        $probe = json_decode(new Process(FFprobeArguments::video(LOAD_VIDEO, 'ffprobe'), timeout: 30)->mustRun()->getOutput(), true, flags: JSON_THROW_ON_ERROR);
+        $loadProbe = VideoProbeResult::fromProbeOutput($probe);
         ensure($loadProbe->width === 1920 && $loadProbe->height === 1080, 'The load proof source must be 1080p.');
         $loadVideo = new VideoEntity(new PublicId(), LOAD_VIDEO, hash_file('xxh3', LOAD_VIDEO));
         $loadVideo->setProbe($loadProbe->jsonSerialize());
@@ -721,7 +739,7 @@ if ($mode === 'prepare') {
             'sourceVideoCodec' => $loadProbe->videoCodec, 'tracks' => $loadTracks, 'trackSeconds' => LOAD_TRACK_SECONDS];
     }
     $manager->flush();
-    $prepared = ['requestId' => \App\Shared\Domain\Model\Uuid::generate()->toString(), 'video' => (string) $video->getPublicId(), 'movie' => (string) $movie->getPublicId(), 'track' => (string) $song->getPublicId(), 'image' => (string) $image->getPublicId()];
+    $prepared = ['requestId' => Uuid::generate()->toString(), 'video' => (string) $video->getPublicId(), 'movie' => (string) $movie->getPublicId(), 'track' => (string) $song->getPublicId(), 'image' => (string) $image->getPublicId()];
     if ($cost !== null) {
         $prepared['cost'] = $cost;
     }
@@ -780,23 +798,23 @@ if ($mode === 'prepare') {
         acknowledged($db, ['job' => $session['jobId']], $status);
     }
     require_once $project . '/tests/Fixtures/Messaging/MessageCodecFactory.php';
-    $transport = new Symfony\Component\Messenger\Bridge\Redis\Transport\RedisTransport(
+    $transport = new RedisTransport(
         Symfony\Component\Messenger\Bridge\Redis\Transport\Connection::fromDsn('redis://default:test-only-redis-password@redis:6379/messages/baander'),
-        App\Tests\Fixtures\Messaging\MessageCodecFactory::signingSerializer(),
+        MessageCodecFactory::signingSerializer(),
     );
     $redis = new Redis(); $redis->connect('redis', 6379, 1); $redis->auth(['default', 'test-only-redis-password']);
     $sent = 0;
     $feed = static function () use ($transport, $redis, &$sent): void {
         $needed = max(0, 2000 - $redis->xLen('messages'));
         for ($index = 0; $index < $needed; ++$index) {
-            $transport->send(new Symfony\Component\Messenger\Envelope(new App\Shared\Domain\Event\Outbox\RelayOutboxCommand()));
+            $transport->send(new Envelope(new RelayOutboxCommand()));
             ++$sent;
         }
     };
     $feed();
     $schedulerJob = $db->fetchOne("SELECT id FROM scheduled_jobs WHERE command='app:transcode:cache-sweep'");
     ensure(is_string($schedulerJob), 'Capacity scheduler fixture missing.');
-    $recorder = App\Scheduler\Infrastructure\Doctrine\DoctrineSchedulerManualOccurrenceRecorder::fromDsn((string) getenv('DATABASE_URL'));
+    $recorder = DoctrineSchedulerManualOccurrenceRecorder::fromDsn((string) getenv('DATABASE_URL'));
     $occurrences = []; $nextOccurrence = 0.0; $backlog = [];
     file_put_contents(ROOT . '/capacity-ready', 'ready');
     await(static fn (): bool => is_file(ROOT . '/capacity-pressure-start'), 'capacity pressure barrier', 60);
@@ -807,8 +825,8 @@ if ($mode === 'prepare') {
         $backlog[] = ['monotonic' => hrtime(true) / 1e9, 'receiverDepth' => $depth, 'sent' => $sent, 'acknowledged' => $sent - $depth,
             'relayedEvents' => (int) $db->fetchOne('SELECT count(*) FROM domain_event_outbox WHERE relayed_at IS NOT NULL')];
         if (hrtime(true) / 1e9 >= $nextOccurrence && hrtime(true) < $deadline - 10_000_000_000) {
-            $request = App\Shared\Domain\Model\Uuid::v7();
-            ensure($recorder->record(App\Shared\Domain\Model\Uuid::fromString($schedulerJob), $request) !== null, 'Due occurrence was not recorded.');
+            $request = Uuid::v7();
+            ensure($recorder->record(Uuid::fromString($schedulerJob), $request) !== null, 'Due occurrence was not recorded.');
             $occurrences[] = ['id' => $request->toString(), 'recordedAt' => hrtime(true) / 1e9];
             $nextOccurrence = hrtime(true) / 1e9 + 10;
         }
@@ -820,9 +838,9 @@ if ($mode === 'prepare') {
         $observed = acknowledged($db, ['job' => $session['jobId']], $paused ? 'paused' : 'running');
         $samples[] = ['seconds' => (hrtime(true) - $startedAt) / 1e9, 'desiredRevision' => $observed['desired_revision'], 'observedRevision' => $observed['observed_revision']];
         // Feed real ordinary outbox work, with disabled outbound preferences.
-        $user = $manager->getRepository(App\Auth\Infrastructure\Doctrine\Entity\UserEntity::class)->findOneBy(['email' => 'worker-command@baander.app']);
+        $user = $manager->getRepository(UserEntity::class)->findOneBy(['email' => 'worker-command@baander.app']);
         ensure($user !== null, 'Capacity backlog fixture user missing.');
-        $kernel->getContainer()->get('event_dispatcher')->dispatch(new App\Auth\Domain\Event\UserRegistered($user->getId(), $user->getPublicId(), App\Shared\Domain\Model\Email::fromString($user->getEmail()), $user->getName()));
+        $kernel->getContainer()->get('event_dispatcher')->dispatch(new UserRegistered($user->getId(), $user->getPublicId(), Email::fromString($user->getEmail()), $user->getName()));
         $audio->until(static fn (HttpExchange $value): bool => $value->done, .01);
         usleep(100000);
     }

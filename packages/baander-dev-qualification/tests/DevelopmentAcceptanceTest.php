@@ -7,18 +7,21 @@ namespace Baander\DevQualification\Tests;
 use Baander\DevQualification\Acceptance\MediaClient;
 use Baander\DevQualification\Acceptance\MediaProbe;
 use Baander\DevQualification\Acceptance\Support;
+use Baander\Process\Execution\CompletionPolicy;
+use Baander\Process\Execution\EngineExecutor;
+use Baander\Process\Execution\ExecutionContext;
 use Baander\Process\Execution\ProcessRunner;
 use Baander\Process\Execution\ProcessSpec;
 use PHPUnit\Framework\TestCase;
 
 final class DevelopmentAcceptanceTest extends TestCase
 {
-    private \Baander\Process\Execution\EngineExecutor $executor;
+    private EngineExecutor $executor;
     private string $root;
 
     protected function setUp(): void
     {
-        $this->executor = new \Baander\Process\Execution\EngineExecutor(new \Baander\Process\Execution\ExecutionContext(getenv()));
+        $this->executor = new EngineExecutor(new ExecutionContext(getenv()));
         $this->root = Support::temporary('baander-acceptance-test-');
     }
     protected function tearDown(): void
@@ -133,7 +136,7 @@ final class DevelopmentAcceptanceTest extends TestCase
     public function testAudioOracleRequiresTheCompleteNonSilentEightSecondTone(): void
     {
         $fixture = $this->root . '/tone.flac';
-        $this->executor->run(new \Baander\Process\Execution\ProcessSpec([
+        $this->executor->run(new ProcessSpec([
             'ffmpeg',
             '-v',
             'error',
@@ -144,13 +147,13 @@ final class DevelopmentAcceptanceTest extends TestCase
             '-c:a',
             'flac',
             $fixture,
-        ], processGroup: true), new \Baander\Process\Execution\CompletionPolicy([0]));
+        ], processGroup: true), new CompletionPolicy([0]));
         $result = new MediaProbe($this->executor, $this->executor->context)->decodedAudio($fixture);
         self::assertSame('flac', $result['codec']);
         self::assertSame(64000, $result['decodedSamples']);
         self::assertTrue($result['nonSilent']);
         $short = $this->root . '/short.flac';
-        $this->executor->run(new \Baander\Process\Execution\ProcessSpec([
+        $this->executor->run(new ProcessSpec([
             'ffmpeg',
             '-v',
             'error',
@@ -161,7 +164,7 @@ final class DevelopmentAcceptanceTest extends TestCase
             '-c:a',
             'flac',
             $short,
-        ], processGroup: true), new \Baander\Process\Execution\CompletionPolicy([0]));
+        ], processGroup: true), new CompletionPolicy([0]));
         $this->expectExceptionMessage('Audio did not decode the complete eight second tone:');
         new MediaProbe($this->executor, $this->executor->context)->decodedAudio($short);
     }
@@ -184,14 +187,14 @@ final class DevelopmentAcceptanceTest extends TestCase
     public function testExistingWorkspaceIsRejectedBeforeDockerOrStateMutation(): void
     {
         $state = $this->root . '/state';
-        $result = $this->executor->run(new \Baander\Process\Execution\ProcessSpec([
+        $result = $this->executor->run(new ProcessSpec([
             PHP_BINARY,
             dirname(__DIR__, 3) . '/scripts/dev_environment_acceptance.php',
             '--workspace',
             $this->root,
             '--state-root',
             $state,
-        ], processGroup: true), new \Baander\Process\Execution\CompletionPolicy(null));
+        ], processGroup: true), new CompletionPolicy(null));
         self::assertSame(1, $result->exitCode);
         self::assertStringContainsString('Select a new workspace', $result->stderr);
         self::assertDirectoryDoesNotExist($state);

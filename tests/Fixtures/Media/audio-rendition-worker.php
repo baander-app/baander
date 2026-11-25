@@ -2,13 +2,18 @@
 
 declare(strict_types=1);
 
-use App\Transcode\Application\DTO\MediaWorkerIdentity;
-use App\Transcode\Infrastructure\Doctrine\AudioRenditionRuntime;
-use App\Transcode\Infrastructure\Transcode\AudioRenditionExecutor;
-use App\Transcode\Infrastructure\FFmpeg\ProcessExecutor;
-use App\Shared\Infrastructure\Worker\NativeExecutionClientInterface;
+use App\Shared\Application\DTO\DeploymentProfile;
+use App\Shared\Application\Port\SystemSettingsPortInterface;
 use App\Shared\Infrastructure\Worker\NativeExecutionClient;
+use App\Shared\Infrastructure\Worker\NativeExecutionClientInterface;
 use App\Shared\Infrastructure\Worker\NativeExecutionHandle;
+use App\Transcode\Application\DTO\MediaWorkerIdentity;
+use App\Transcode\Application\Service\MediaExecutionPolicy;
+use App\Transcode\Domain\ValueObject\AacImplementation;
+use App\Transcode\Infrastructure\Doctrine\AudioRenditionRuntime;
+use App\Transcode\Infrastructure\FFmpeg\AacImplementationProbe;
+use App\Transcode\Infrastructure\FFmpeg\ProcessExecutor;
+use App\Transcode\Infrastructure\Transcode\AudioRenditionExecutor;
 use Doctrine\DBAL\DriverManager;
 use Doctrine\DBAL\Tools\DsnParser;
 use Psr\Log\NullLogger;
@@ -24,7 +29,7 @@ $connection = DriverManager::getConnection((new DsnParser(['postgresql' => 'pdo_
 $connection->executeStatement('SET search_path TO ' . $schema . ', public');
 $runtime = new AudioRenditionRuntime($connection);
 // Pace real input and flush packets so the reader can observe an unfinished encode.
-$profile = \App\Shared\Application\DTO\DeploymentProfile::fromEnvironment();
+$profile = DeploymentProfile::fromEnvironment();
 $client = new class(NativeExecutionClient::fromEnvironment($profile->capability === 'remux' ? 'media-copy-0' : 'media-audio-0'), 3 / (float) $delay) implements NativeExecutionClientInterface {
     public function __construct(private NativeExecutionClientInterface $inner, private float $readRate) {}
     public function handshake(): array { return $this->inner->handshake(); }
@@ -43,10 +48,10 @@ $client = new class(NativeExecutionClient::fromEnvironment($profile->capability 
 };
 ProcessExecutor::configureNativeExecution($client);
 // The disposable schema has no settings table; the fixture runs the setting's default.
-$settings = new class implements \App\Shared\Application\Port\SystemSettingsPortInterface {
+$settings = new class implements SystemSettingsPortInterface {
     public function get(string $key): string
     {
-        return \App\Transcode\Domain\ValueObject\AacImplementation::Bac->value;
+        return AacImplementation::Bac->value;
     }
 };
 try {
@@ -55,7 +60,7 @@ try {
         foreach ($runtime->pending() as $pending) {
             $claim = $runtime->claim($pending->key, new MediaWorkerIdentity('baander.app:test', str_repeat('b', 32), 'media', 1));
             if ($claim !== null) {
-                (new AudioRenditionExecutor(new \App\Transcode\Application\Service\MediaExecutionPolicy(\App\Shared\Application\DTO\DeploymentProfile::fromEnvironment()), $runtime, new NullLogger(), $settings, new \App\Transcode\Infrastructure\FFmpeg\AacImplementationProbe('/usr/bin/ffmpeg'), '/usr/bin/ffmpeg'))->run($claim, static fn (): bool => false);
+                (new AudioRenditionExecutor(new MediaExecutionPolicy(DeploymentProfile::fromEnvironment()), $runtime, new NullLogger(), $settings, new AacImplementationProbe('/usr/bin/ffmpeg'), '/usr/bin/ffmpeg'))->run($claim, static fn (): bool => false);
                 return;
             }
         }

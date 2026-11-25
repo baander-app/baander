@@ -4,12 +4,14 @@ declare(strict_types=1);
 
 namespace App\Recommendation\Application\Command;
 
+use App\Shared\Domain\Model\Uuid;
+
 final readonly class DeleteRecommendationsBySourceCommand
 {
     public function __construct(
         private readonly string $sourceType,
         private readonly string $sourceId,
-        public ?\App\Shared\Domain\Model\Uuid $actorId = null,
+        public ?Uuid $actorId = null,
     ) {
     }
 

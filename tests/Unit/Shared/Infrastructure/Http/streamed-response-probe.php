@@ -24,6 +24,7 @@ require dirname(__DIR__, 5) . '/vendor/autoload.php';
 use App\Shared\Infrastructure\Swoole\Async;
 use App\Shared\Infrastructure\Swoole\CoroutineCanceledException;
 use App\Shared\Infrastructure\Swoole\Drain\InFlightStreamAborter;
+use Swoole\Coroutine;
 use Swoole\Http\Request as SwooleRequest;
 use Swoole\Http\Response as SwooleResponse;
 use Swoole\Http\Server;
@@ -64,7 +65,7 @@ $bufferedProduced = 0;
 $bufferedFinished = false;
 $bufferedCid = null;
 $bufferedChunks = static function () use (&$bufferedProduced, &$bufferedFinished, &$bufferedCid, $record): Generator {
-    $bufferedCid = \Swoole\Coroutine::getCid();
+    $bufferedCid = Coroutine::getCid();
     $chunk = str_pad('buffered-body-', 65_536, '.');
     try {
         for ($index = 0; $index < 1024; ++$index) {
@@ -130,7 +131,7 @@ $server->on('request', static function (SwooleRequest $request, SwooleResponse $
     $response->end(match ($request->server['request_uri']) {
         '/buffered-state' => (static function () use (&$bufferedCid, &$bufferedProduced): string {
             $blocked = false;
-            $frames = $bufferedCid === null ? [] : (\Swoole\Coroutine::getBackTrace($bufferedCid, DEBUG_BACKTRACE_IGNORE_ARGS, 12) ?: []);
+            $frames = $bufferedCid === null ? [] : (Coroutine::getBackTrace($bufferedCid, DEBUG_BACKTRACE_IGNORE_ARGS, 12) ?: []);
             foreach ($frames as $frame) {
                 if (($frame['class'] ?? '') === SwooleResponse::class && ($frame['function'] ?? '') === 'write') {
                     $blocked = true;

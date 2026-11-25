@@ -6,6 +6,7 @@ namespace App\Shared\Infrastructure\Swoole;
 
 use App\Shared\Infrastructure\Redis\RedisClientFactory;
 use Psr\Log\LoggerInterface;
+use Swoole\Process;
 use SwooleBundle\SwooleBundle\Bridge\Symfony\Event\ServerStartedEvent;
 use SwooleBundle\SwooleBundle\Bridge\Symfony\Event\WorkerErrorEvent;
 use SwooleBundle\SwooleBundle\Bridge\Symfony\Event\WorkerStartedEvent;
@@ -40,7 +41,7 @@ final class SwooleWorkerEventSubscriber implements EventSubscriberInterface
     {
         $server = $event->getServer();
 
-        \Swoole\Process::signal(SIGINT, static function () use ($server): void {
+        Process::signal(SIGINT, static function () use ($server): void {
             $server->shutdown();
         });
     }

@@ -14,6 +14,7 @@ use App\Tests\Fixtures\Messaging\CancelAtCheckpoint;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
+use Psr\Log\NullLogger;
 use RuntimeException;
 use Symfony\Component\Messenger\Envelope;
 use Symfony\Component\Messenger\MessageBusInterface;
@@ -144,7 +145,7 @@ final class BatchExtractCoversHandlerTest extends TestCase
                 return new Envelope($message);
             },
         );
-        $count = (new BatchExtractCoversHandler($repository, $bus, new \Psr\Log\NullLogger(), new CancelAtCheckpoint()))(new BatchExtractCoversCommand());
+        $count = (new BatchExtractCoversHandler($repository, $bus, new NullLogger(), new CancelAtCheckpoint()))(new BatchExtractCoversCommand());
         self::assertSame(501, $count);
         self::assertSame(array_map(static fn (Uuid $id): string => $id->toString(), $ids), $accepted);
         self::assertSame([null, $ids[499], $ids[500]], $cursors);

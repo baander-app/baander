@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Auth\Application\Port;
 
+use App\Auth\Application\Exception\OAuthTokenCacheInvalidationFailed;
+
 interface OAuthTokenInvalidatorInterface
 {
     /**
@@ -13,7 +15,7 @@ interface OAuthTokenInvalidatorInterface
      * repeating after workers resume can delete newly issued grants.
      *
      * @return int Committed deleted rows, including grant metadata.
-     * @throws \App\Auth\Application\Exception\OAuthTokenCacheInvalidationFailed Database deletion committed; cache invalidation needs retry.
+     * @throws OAuthTokenCacheInvalidationFailed Database deletion committed; cache invalidation needs retry.
      * @throws \RuntimeException Database outcome is unconfirmed.
      */
     public function invalidate(): int;

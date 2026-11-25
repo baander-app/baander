@@ -19,10 +19,11 @@ use App\Notification\Application\Handler\UpdateWebhookHandler;
 use App\Notification\Application\Service\WebhookInput;
 use App\Notification\Infrastructure\Webhook\WebhookDestinationPolicy;
 use App\Notification\Infrastructure\Webhook\WebhookSecretCodec;
+use App\Notification\Interface\Resource\WebhookResource;
 use App\Shared\Application\Exception\InvalidInputException;
 use App\Shared\Application\Exception\NotFoundException;
-use App\Shared\Domain\Model\Uuid;
 use App\Shared\Domain\Model\PublicId;
+use App\Shared\Domain\Model\Uuid;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
@@ -182,7 +183,7 @@ final class WebhookHandlersTest extends TestCase
         }
         self::assertSame(0, $this->webhooks->writes);
         self::assertSame($webhook, $this->webhooks->find($webhook->id));
-        $output = \App\Notification\Interface\Resource\WebhookResource::from($webhook);
+        $output = WebhookResource::from($webhook);
         self::assertSame($webhook->publicId->toString(), $output['publicId']);
         self::assertArrayNotHasKey('id', $output);
         self::assertStringNotContainsString($id, json_encode($output, JSON_THROW_ON_ERROR));

@@ -5,21 +5,23 @@ declare(strict_types=1);
 namespace App\Tests\Integration;
 
 use App\Kernel;
-use App\Scheduler\Domain\Exception\ScheduledJobConflict;
 use App\Scheduler\Application\CommandHandler\ExecuteScheduledJobHandler;
 use App\Scheduler\Application\DTO\SchedulerOccurrence;
 use App\Scheduler\Application\Port\ScheduledConsoleExecutorInterface;
 use App\Scheduler\Application\Port\ScheduledJobPortInterface;
+use App\Scheduler\Domain\Exception\ScheduledJobConflict;
 use App\Scheduler\Domain\Model\SchedulableConsoleCommandInterface;
 use App\Scheduler\Domain\Model\ScheduledJob;
 use App\Scheduler\Domain\Model\ScheduledJobState;
 use App\Scheduler\Domain\Repository\ScheduledJobRepositoryInterface;
+use App\Scheduler\Domain\Service\SchedulerRegistry;
 use App\Scheduler\Domain\ValueObject\JobType;
 use App\Scheduler\Domain\ValueObject\ScheduleStatus;
-use App\Scheduler\Domain\Service\SchedulerRegistry;
 use App\Scheduler\Infrastructure\Doctrine\Repository\ScheduledJobRepository;
+use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
 use DAMA\DoctrineTestBundle\PHPUnit\SkipDatabaseRollback;
+use Doctrine\Common\EventManager;
 use Doctrine\DBAL\Connection;
 use Doctrine\DBAL\DriverManager;
 use Doctrine\DBAL\Tools\DsnParser;
@@ -64,7 +66,7 @@ final class ScheduledJobConcurrencyTest extends TestCase
         self::assertSame($this->observer->fetchOne('SELECT current_database()'), $manager->getConnection()->fetchOne('SELECT current_database()'));
         $this->jobs = $container->get(ScheduledJobRepositoryInterface::class);
         $eventManager = $manager->getEventManager();
-        self::assertInstanceOf(\Doctrine\Common\EventManager::class, $eventManager);
+        self::assertInstanceOf(EventManager::class, $eventManager);
         $this->otherManager = new EntityManager($this->otherConnection, $manager->getConfiguration(), $eventManager);
         $this->otherJobs = new ScheduledJobRepository($this->otherManager);
     }
@@ -100,7 +102,7 @@ final class ScheduledJobConcurrencyTest extends TestCase
     public function testActualHandlerResultCannotOverwritePauseAndEditDuringConsoleExecution(): void
     {
         $job = $this->createJob();
-        $snapshot = new SchedulerOccurrence(Uuid::generate(), $job->getId(), new \DateTimeImmutable('2026-10-02T10:00:00Z'), $job->getJobType(), $job->getCommand(), $job->getParameters(), jobPublicId: new \App\Shared\Domain\Model\PublicId());
+        $snapshot = new SchedulerOccurrence(Uuid::generate(), $job->getId(), new \DateTimeImmutable('2026-10-02T10:00:00Z'), $job->getJobType(), $job->getCommand(), $job->getParameters(), jobPublicId: new PublicId());
         $registeredCommand = new class extends Command implements SchedulableConsoleCommandInterface {
             public function __construct()
             {

@@ -6,6 +6,7 @@ namespace App\Tests\Unit\Catalog\Domain\Model;
 
 use App\Catalog\Domain\Model\Genre;
 use App\Catalog\Domain\Model\GenreState;
+use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
 use InvalidArgumentException;
 use PHPUnit\Framework\TestCase;
@@ -136,7 +137,7 @@ final class GenreTest extends TestCase
     {
         $now = new \DateTimeImmutable();
         $mbid = 'b1b2b3b4-b5b6-7890-abcd-ef1234567890';
-        $publicId = new \App\Shared\Domain\Model\PublicId();
+        $publicId = new PublicId();
         $genre = Genre::reconstitute(new GenreState(
             id: Uuid::v4(),
             publicId: $publicId,
@@ -157,7 +158,7 @@ final class GenreTest extends TestCase
     public function testReconstituteWithNullParent(): void
     {
         $now = new \DateTimeImmutable();
-        $publicId = new \App\Shared\Domain\Model\PublicId();
+        $publicId = new PublicId();
         $genre = Genre::reconstitute(new GenreState(
             id: Uuid::v4(),
             publicId: $publicId,

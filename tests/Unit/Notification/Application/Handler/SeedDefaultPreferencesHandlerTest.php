@@ -6,6 +6,7 @@ namespace App\Tests\Unit\Notification\Application\Handler;
 
 use App\Notification\Application\DTO\SeedDefaultPreferencesCommand;
 use App\Notification\Application\Handler\SeedDefaultPreferencesHandler;
+use App\Notification\Domain\Model\NotificationPreference;
 use App\Notification\Domain\Repository\NotificationPreferenceRepositoryInterface;
 use App\Shared\Domain\Model\Uuid;
 use PHPUnit\Framework\TestCase;
@@ -29,7 +30,7 @@ final class SeedDefaultPreferencesHandlerTest extends TestCase
         $savedPreferences = [];
         $preferenceRepository = $this->createStub(NotificationPreferenceRepositoryInterface::class);
         $preferenceRepository->method('save')
-            ->willReturnCallback(function (\App\Notification\Domain\Model\NotificationPreference $pref) use (&$savedPreferences): void {
+            ->willReturnCallback(function (NotificationPreference $pref) use (&$savedPreferences): void {
                 $savedPreferences[] = [
                     'category' => $pref->getCategory()->value,
                     'channel' => $pref->getChannel()->value,

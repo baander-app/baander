@@ -9,6 +9,7 @@ use App\Auth\Application\DTO\TokenResponseDTO;
 use App\Auth\Application\Port\ClientAssertionVerifierInterface;
 use App\Auth\Domain\Model\OAuth\Client;
 use App\Auth\Domain\Model\OAuth\SignInGrant;
+use App\Auth\Domain\Model\User;
 use App\Auth\Domain\Repository\OAuth\ClientRepositoryInterface;
 use App\Shared\Domain\Model\PublicId;
 use App\Tests\Fixtures\Auth\SignedClientAssertion;
@@ -335,7 +336,7 @@ final class AdminOAuthClientTest extends TestCase
      * @param array<string, mixed> $body
      * @return array<string, mixed>
      */
-    private function registerClient(\App\Auth\Domain\Model\User $superAdmin, array $body): array
+    private function registerClient(User $superAdmin, array $body): array
     {
         $response = $this->authenticatedRequest('POST', self::PATH, $superAdmin, $body);
         $data = $this->assertJsonResponse($response, 201, 'data')['data'];
@@ -345,7 +346,7 @@ final class AdminOAuthClientTest extends TestCase
     }
 
     /** @return array<string, mixed> */
-    private function listed(\App\Auth\Domain\Model\User $admin, string $clientId): array
+    private function listed(User $admin, string $clientId): array
     {
         $clients = $this->assertJsonResponse($this->authenticatedRequest('GET', self::PATH, $admin), 200, 'data')['data'];
         foreach ($clients as $client) {
@@ -371,7 +372,7 @@ final class AdminOAuthClientTest extends TestCase
         return $client;
     }
 
-    private function issueTokens(string $clientId, \App\Auth\Domain\Model\User $user): TokenResponseDTO
+    private function issueTokens(string $clientId, User $user): TokenResponseDTO
     {
         $client = $this->clients()->findClientByPublicId(PublicId::fromString($clientId));
         self::assertNotNull($client);

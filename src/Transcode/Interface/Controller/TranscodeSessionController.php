@@ -8,15 +8,17 @@ use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
 use App\Shared\Interface\Attribute\CliCounterpart;
 use App\Shared\Interface\Controller\ApiResponsesTrait;
+use App\Shared\Interface\DTO\ApiError;
+use App\Shared\Interface\DTO\ValidationError;
 use App\Transcode\Application\Command\CancelTranscodeSessionCommand;
 use App\Transcode\Application\Command\CreateTranscodeSessionCommand;
 use App\Transcode\Application\Command\PauseTranscodeSessionCommand;
 use App\Transcode\Application\Command\ResumeTranscodeSessionCommand;
 use App\Transcode\Application\Command\UpdateTranscodePositionCommand;
 use App\Transcode\Application\Command\UpdateTranscodeSessionCommand;
-use App\Transcode\Application\Port\TranscodeSessionPortInterface;
-use App\Transcode\Application\Port\TranscodePublicViewInterface;
 use App\Transcode\Application\Port\PlaybackPortInterface;
+use App\Transcode\Application\Port\TranscodePublicViewInterface;
+use App\Transcode\Application\Port\TranscodeSessionPortInterface;
 use App\Transcode\Application\Query\TranscodeSessionQueryPort;
 use App\Transcode\Domain\ValueObject\AudioProfile;
 use App\Transcode\Domain\ValueObject\QualityTier;
@@ -26,15 +28,16 @@ use App\Transcode\Interface\Request\UpdateTranscodeSessionRequest;
 use App\Transcode\Interface\Resource\TranscodeSessionResource;
 use OpenApi\Spec as OA;
 use Symfony\Bundle\SecurityBundle\Security;
+use Symfony\Component\HttpFoundation\Exception\JsonException;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpKernel\Attribute\MapRequestPayload;
 use Symfony\Component\HttpKernel\Exception\HttpException;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
-use Symfony\Component\Security\Core\Exception\AccessDeniedException;
 use Symfony\Component\Messenger\MessageBusInterface;
 use Symfony\Component\Messenger\Stamp\HandledStamp;
 use Symfony\Component\Routing\Attribute\Route;
+use Symfony\Component\Security\Core\Exception\AccessDeniedException;
 
 #[OA\Tag(name: 'Transcode', description: 'Video transcoding management endpoints')]
 #[Route('/api/transcode/sessions', name: 'transcode_session_')]
@@ -110,21 +113,21 @@ final class TranscodeSessionController
                 response: '401',
                 description: 'Not authenticated',
                 content: new OA\MediaType\Json(
-                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                    schema: new OA\Schema(ref: ApiError::class),
                 ),
             ),
             new OA\Response(
                 response: '409',
                 description: 'Playback cannot start: the video file no longer resolves inside one of its libraries, or the account already holds as many transcode sessions as the server allows and too few have been silent for two minutes to give way (`error.details.reason` is `transcode_session_limit` and `error.details.limit` the limit)',
                 content: new OA\MediaType\Json(
-                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                    schema: new OA\Schema(ref: ApiError::class),
                 ),
             ),
             new OA\Response(
                 response: '422',
                 description: 'Validation error',
                 content: new OA\MediaType\Json(
-                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ValidationError::class),
+                    schema: new OA\Schema(ref: ValidationError::class),
                 ),
             ),
             new OA\Response(
@@ -137,7 +140,7 @@ final class TranscodeSessionController
                     ),
                 ],
                 content: new OA\MediaType\Json(
-                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                    schema: new OA\Schema(ref: ApiError::class),
                 ),
             ),
         ],
@@ -200,7 +203,7 @@ final class TranscodeSessionController
                 response: '401',
                 description: 'Not authenticated',
                 content: new OA\MediaType\Json(
-                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                    schema: new OA\Schema(ref: ApiError::class),
                 ),
             ),
         ],
@@ -263,7 +266,7 @@ final class TranscodeSessionController
                 response: '404',
                 description: 'Not found',
                 content: new OA\MediaType\Json(
-                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                    schema: new OA\Schema(ref: ApiError::class),
                 ),
             ),
         ],
@@ -311,7 +314,7 @@ final class TranscodeSessionController
                 response: '404',
                 description: 'Not found',
                 content: new OA\MediaType\Json(
-                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                    schema: new OA\Schema(ref: ApiError::class),
                 ),
             ),
         ],
@@ -361,7 +364,7 @@ final class TranscodeSessionController
                 response: '404',
                 description: 'Not found',
                 content: new OA\MediaType\Json(
-                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                    schema: new OA\Schema(ref: ApiError::class),
                 ),
             ),
         ],
@@ -411,7 +414,7 @@ final class TranscodeSessionController
                 response: '404',
                 description: 'Not found',
                 content: new OA\MediaType\Json(
-                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                    schema: new OA\Schema(ref: ApiError::class),
                 ),
             ),
         ],
@@ -485,7 +488,7 @@ final class TranscodeSessionController
                 response: '404',
                 description: 'Not found',
                 content: new OA\MediaType\Json(
-                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                    schema: new OA\Schema(ref: ApiError::class),
                 ),
             ),
         ],
@@ -516,7 +519,7 @@ final class TranscodeSessionController
                 response: '401',
                 description: 'Not authenticated',
                 content: new OA\MediaType\Json(
-                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                    schema: new OA\Schema(ref: ApiError::class),
                 ),
             ),
         ],
@@ -617,7 +620,7 @@ final class TranscodeSessionController
         $sessionId = $this->requireOwnedSession($publicId);
         try {
             $payload = $request->toArray();
-        } catch (\Symfony\Component\HttpFoundation\Exception\JsonException) {
+        } catch (JsonException) {
             return $this->errorResponse('Expected a JSON object.', 400);
         }
         $position = $payload['position'] ?? null;

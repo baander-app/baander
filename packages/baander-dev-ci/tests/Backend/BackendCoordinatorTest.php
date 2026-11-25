@@ -4,10 +4,12 @@ declare(strict_types=1);
 
 namespace Baander\DevCi\Tests\Backend;
 
+use Baander\Configuration\ToolingConfiguration;
 use Baander\DevCi\Backend\Coordinator;
 use Baander\DevCi\Backend\Runtime;
 use Baander\DevEnvironment\Host\ProcessEnvironment;
 use Baander\Images\Inventory\Collector;
+use Baander\Process\Execution\CommandFailure;
 use Baander\Process\Execution\CompletionPolicy;
 use Baander\Process\Execution\EngineExecutor;
 use Baander\Process\Execution\ExecutionContext;
@@ -190,7 +192,7 @@ final class BackendCoordinatorTest extends TestCase
             try {
                 $runtime->startLane('later', ['files' => ['tests/Unit/LaterTest.php'], 'processes' => 1, 'batch' => 1, 'services' => true, 'privileged' => true], $this->directory, false);
                 self::fail('Started a later lane');
-            } catch (\Baander\Process\Execution\CommandFailure $error) {
+            } catch (CommandFailure $error) {
                 self::assertSame(143, $error->getCode());
                 self::assertSame([], $runtime->projects);
                 self::assertSame([], $runtime->containers);
@@ -214,7 +216,7 @@ final class BackendCoordinatorTest extends TestCase
             try {
                 $runtime->run(['/bin/sh', '-c', 'trap "exit 0" TERM; while :; do sleep 1; done'], timeout: 0.1, check: false);
                 self::fail('Accepted a timed out command');
-            } catch (\Baander\Process\Execution\CommandFailure $error) {
+            } catch (CommandFailure $error) {
                 self::assertSame(124, $error->getCode());
                 self::assertTrue($error->result->timedOut);
                 self::assertSame(0, $error->result->exitCode);
@@ -393,7 +395,7 @@ final class BackendCoordinatorTest extends TestCase
     public function testComposeAndStandaloneCleanupShareOneBudget(): void
     {
         $environment = array_replace($this->fakeEnvironment(services: true), ['BACKEND_CLEANUP_DELAY_MICROSECONDS' => '3000000']);
-        $configuration = \Baander\Configuration\ToolingConfiguration::resolve(['budgets' => ['cleanup' => 2]], $environment);
+        $configuration = ToolingConfiguration::resolve(['budgets' => ['cleanup' => 2]], $environment);
         $runtime = new Runtime($this->directory, 60, dirname(__DIR__, 4), $environment, $configuration);
         try {
             $runtime->connect();

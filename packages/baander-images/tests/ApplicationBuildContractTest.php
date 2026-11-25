@@ -4,17 +4,18 @@ declare(strict_types=1);
 
 namespace Baander\Images\Tests;
 
-use Baander\Images\Tests\Support\ApplicationImageExecutor;
-use Baander\Images\Build\ApplicationImage;
-use Baander\Images\Build\BuildOptions;
+use Baander\Configuration\ToolingConfiguration;
 use Baander\Containers\Docker\Client;
 use Baander\Containers\Docker\Target;
-use Baander\Configuration\ToolingConfiguration;
+use Baander\Images\Build\ApplicationImage;
+use Baander\Images\Build\BuildOptions;
+use Baander\Images\Tests\Support\ApplicationImageExecutor;
 use Baander\Process\Execution\CommandExecutor;
 use Baander\Process\Execution\CompletionPolicy;
 use Baander\Process\Execution\EngineExecutor;
 use Baander\Process\Execution\ExecutionContext;
 use Baander\Process\Execution\ProcessResult;
+use Baander\Process\Execution\ProcessRunner;
 use Baander\Process\Execution\ProcessSpec;
 use Baander\Process\Execution\RunningProcess;
 use PHPUnit\Framework\TestCase;
@@ -194,7 +195,7 @@ PHP);
                 'operator' => ['/srv/baander/bin/worker-deployment.php', '--qualification'],
             ] as $role => $expected) {
                 $script = dirname(__DIR__, 3) . '/docker/general/start-' . $role . '.sh';
-                $result = new \Baander\Process\Execution\ProcessRunner()->run(new ProcessSpec(
+                $result = new ProcessRunner()->run(new ProcessSpec(
                     ['/bin/sh', '-c', 'echo $$; exec /bin/sh "$1" --qualification', 'entrypoint', $script],
                     environment: ['PATH' => $this->source . ':/usr/bin:/bin', 'APP_HOME' => '/srv/baander', 'APP_ENV' => 'prod'],
                 ));
@@ -227,7 +228,7 @@ if (in_array('info', $argv, true)) {
 PHP);
         chmod($docker, 0700);
         $environmentFile = $this->source . '/compose.fixture';
-        $result = new \Baander\Process\Execution\ProcessRunner()->run(new ProcessSpec(
+        $result = new ProcessRunner()->run(new ProcessSpec(
             [PHP_BINARY, dirname(__DIR__, 3) . '/scripts/build-application.php', '--source', $this->source,
                 '--target', 'dev', '--tag', 'baander:qualification', '--compose-env', $environmentFile],
             environment: ['BAANDER_DOCKER_EXECUTABLE' => $docker, 'DOCKER_HOST' => 'unix:///run/baander-build-fixture.sock'],
@@ -259,7 +260,7 @@ if (in_array('info', $argv, true)) {
 }
 PHP);
         chmod($docker, 0700);
-        $result = new \Baander\Process\Execution\ProcessRunner()->run(new ProcessSpec(
+        $result = new ProcessRunner()->run(new ProcessSpec(
             [PHP_BINARY, dirname(__DIR__, 3) . '/scripts/build-application.php', '--source', $this->source, '--target', 'dev', '--tag', 'baander:qualification'],
             environment: ['BAANDER_DOCKER_EXECUTABLE' => $docker, 'DOCKER_HOST' => 'unix:///run/baander-build-fixture.sock'],
         ));

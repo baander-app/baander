@@ -5,34 +5,35 @@ declare(strict_types=1);
 namespace App\Tests\Integration;
 
 use App\Catalog\Domain\ValueObject\DirectorCredit;
+use App\Catalog\Infrastructure\DirectorService;
 use App\Catalog\Infrastructure\Doctrine\Entity\MovieEntity;
-use App\Catalog\Infrastructure\Doctrine\Entity\PersonEntity;
-use App\Catalog\Infrastructure\Doctrine\Entity\PersonExternalIdEntity;
 use App\Catalog\Infrastructure\Doctrine\Entity\MoviePersonCreditEntity;
 use App\Catalog\Infrastructure\Doctrine\Entity\MovieVideoEntity;
+use App\Catalog\Infrastructure\Doctrine\Entity\PersonEntity;
+use App\Catalog\Infrastructure\Doctrine\Entity\PersonExternalIdEntity;
 use App\Catalog\Infrastructure\Doctrine\Entity\VideoEntity;
-use App\Catalog\Infrastructure\Doctrine\Repository\MovieRepository;
-use App\Catalog\Infrastructure\DirectorService;
-use App\Shared\Domain\Model\SearchOptions;
-use App\Shared\Domain\ValueObject\LibraryReadScope;
-use App\Shared\Infrastructure\Doctrine\Platform\BaanderDriverMiddleware;
-use Doctrine\DBAL\Configuration;
-use Doctrine\DBAL\DriverManager;
-use Doctrine\DBAL\Logging\Middleware;
-use Psr\Log\AbstractLogger;
 use App\Catalog\Infrastructure\Doctrine\Repository\DirectorRepository;
+use App\Catalog\Infrastructure\Doctrine\Repository\MovieRepository;
 use App\Library\Infrastructure\Doctrine\Entity\LibraryEntity;
 use App\Shared\Domain\Model\PublicId;
+use App\Shared\Domain\Model\SearchOptions;
 use App\Shared\Domain\Model\Uuid;
+use App\Shared\Domain\ValueObject\LibraryReadScope;
+use App\Shared\Infrastructure\Doctrine\Platform\BaanderDriverMiddleware;
 use App\Tests\Fixtures\Catalog\ArtistImportIdentityRace;
 use App\Tests\Fixtures\Catalog\GenreImportRace;
+use Doctrine\DBAL\Configuration;
 use Doctrine\DBAL\Connection;
+use Doctrine\DBAL\DriverManager;
+use Doctrine\DBAL\Logging\Middleware;
 use Doctrine\DBAL\Schema\Schema;
+use Doctrine\Migrations\AbstractMigration;
 use Doctrine\ORM\EntityManager;
 use DoctrineMigrations\Version20261121143000;
 use DoctrineMigrations\Version20261121194500;
 use DoctrineMigrations\Version20261121194800;
 use PHPUnit\Framework\TestCase;
+use Psr\Log\AbstractLogger;
 use Psr\Log\NullLogger;
 
 require_once dirname(__DIR__, 2) . '/migrations/Version20261121143000.php';
@@ -335,7 +336,7 @@ final class DirectorCreditPersistenceTest extends TestCase
         self::assertFalse($this->writer->transactional(fn (): bool => $repository->syncMovieDirectors($this->first, [new DirectorCredit(2_000_000_093, 'Several Credits')])));
     }
 
-    private function migrate(\Doctrine\Migrations\AbstractMigration $migration): void
+    private function migrate(AbstractMigration $migration): void
     {
         $migration->up(new Schema());
         $this->writer->transactional(static function (Connection $connection) use ($migration): void {

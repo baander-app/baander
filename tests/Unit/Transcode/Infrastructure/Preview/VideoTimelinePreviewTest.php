@@ -7,6 +7,8 @@ namespace App\Tests\Unit\Transcode\Infrastructure\Preview;
 use App\Catalog\Application\Dto\VideoSourceMetadata;
 use App\Shared\Domain\Model\Uuid;
 use App\Transcode\Application\Command\PrepareTimelinePreview;
+use App\Transcode\Infrastructure\FFmpeg\ProcessExecutor;
+use App\Transcode\Infrastructure\Messaging\TimelinePreviewMessagePayloadCodec;
 use App\Transcode\Infrastructure\Preview\VideoTimelinePreview;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Messenger\Envelope;
@@ -115,7 +117,7 @@ final class VideoTimelinePreviewTest extends TestCase
             self::markTestSkipped('FFmpeg is required for actual frame generation.');
         }
         $path = $this->directory . '/movie.mp4';
-        $result = \App\Transcode\Infrastructure\FFmpeg\ProcessExecutor::exec([
+        $result = ProcessExecutor::exec([
             '/usr/bin/ffmpeg', '-v', 'error', '-y', '-f', 'lavfi', '-i', 'color=c=red:s=320x180:r=2:d=2',
             '-c:v', 'mpeg4', $path,
         ], 10);
@@ -160,7 +162,7 @@ final class VideoTimelinePreviewTest extends TestCase
         self::assertSame(1600, $dimensions[0]);
         self::assertSame(90, $dimensions[1]);
         self::assertLessThan(4_000_000, filesize($image));
-        $codec = new \App\Transcode\Infrastructure\Messaging\TimelinePreviewMessagePayloadCodec();
+        $codec = new TimelinePreviewMessagePayloadCodec();
         $fields = $codec->fields('transcode.prepare_timeline_preview');
         $restored = $codec->decode(
             'transcode.prepare_timeline_preview',
@@ -187,7 +189,7 @@ final class VideoTimelinePreviewTest extends TestCase
     public function testAManifestNamedLikeAFilmGetsNoContactSheetOfTheFilmItNames(): void
     {
         $film = $this->directory . '/elsewhere.mp4';
-        $result = \App\Transcode\Infrastructure\FFmpeg\ProcessExecutor::exec([
+        $result = ProcessExecutor::exec([
             '/usr/bin/ffmpeg', '-v', 'error', '-y', '-f', 'lavfi', '-i', 'color=c=red:s=320x180:r=2:d=2',
             '-c:v', 'libx264', '-pix_fmt', 'yuv420p', $film,
         ], 10);

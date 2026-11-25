@@ -7,6 +7,7 @@ declare(strict_types=1);
 // served before, and answer each signed-in user with that user's own profile.
 use App\Auth\Domain\Model\OAuth\SignInGrant;
 use App\Auth\Infrastructure\Doctrine\Entity\UserEntity;
+use App\Kernel;
 use App\Shared\Domain\Model\PublicId;
 use App\Shared\Infrastructure\Swoole\Control\SocketServerControlClient;
 use App\Tests\Fixtures\Auth\FirstPartyOAuthClient;
@@ -14,9 +15,10 @@ use App\Tests\Fixtures\WebRuntime\HeldConnection;
 use App\Tests\Fixtures\WebRuntime\StreamClient;
 use App\Tests\Fixtures\WebRuntime\WorkerRequestCounts;
 use Doctrine\ORM\EntityManagerInterface;
+use Symfony\Component\Dotenv\Dotenv;
 
 require dirname(__DIR__, 2) . '/vendor/autoload.php';
-new Symfony\Component\Dotenv\Dotenv()->bootEnv(dirname(__DIR__, 2) . '/.env');
+new Dotenv()->bootEnv(dirname(__DIR__, 2) . '/.env');
 
 const IDENTITY_SERVER = 'http://127.0.0.1:9501';
 const IDENTITY_USERS = '/api/admin/users';
@@ -68,7 +70,7 @@ function identityProfile(array $answer): ?string
     return is_string($publicId) ? $publicId : null;
 }
 
-$kernel = new App\Kernel('prod', false);
+$kernel = new Kernel('prod', false);
 $kernel->boot();
 $container = $kernel->getContainer();
 $manager = $container->get('doctrine')->getManager();

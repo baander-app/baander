@@ -4,8 +4,9 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Shared\Infrastructure\Worker;
 
-use App\Shared\Infrastructure\Worker\WorkerPeerHandshake;
+use App\Shared\Application\DTO\DeploymentProfile;
 use App\Shared\Infrastructure\Worker\WorkerChildProcess;
+use App\Shared\Infrastructure\Worker\WorkerPeerHandshake;
 use PHPUnit\Framework\TestCase;
 
 final class WorkerPeerHandshakeTest extends TestCase
@@ -108,7 +109,7 @@ PHP;
     {
         $clock = 10.0;
         $control = new WorkerPeerHandshake($this->directory, 'worker.baander.app', str_repeat('a', 32), 'control', 10,
-            new \App\Shared\Application\DTO\DeploymentProfile(), static function () use (&$clock): float {
+            new DeploymentProfile(), static function () use (&$clock): float {
                 return $clock;
             });
         $execution = $this->peer('execution');
@@ -134,7 +135,7 @@ PHP;
     {
         $control = $this->peer('control');
         $execution = new WorkerPeerHandshake($this->directory, 'worker.baander.app', str_repeat('a', 32), 'execution', 10,
-            new \App\Shared\Application\DTO\DeploymentProfile('remux', 2, 4, 1, sharedCopySlots: 2));
+            new DeploymentProfile('remux', 2, 4, 1, sharedCopySlots: 2));
         $execution->publish(4, true, false, 10);
         $this->expectException(\RuntimeException::class);
         $control->ready(4, 10);
@@ -178,6 +179,6 @@ PHP;
 
     private function peer(string $unit): WorkerPeerHandshake
     {
-        return new WorkerPeerHandshake($this->directory, 'worker.baander.app', str_repeat('a', 32), $unit, 10, new \App\Shared\Application\DTO\DeploymentProfile());
+        return new WorkerPeerHandshake($this->directory, 'worker.baander.app', str_repeat('a', 32), $unit, 10, new DeploymentProfile());
     }
 }

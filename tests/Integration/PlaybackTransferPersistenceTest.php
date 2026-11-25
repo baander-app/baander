@@ -4,6 +4,14 @@ declare(strict_types=1);
 
 namespace App\Tests\Integration;
 
+use App\Auth\Infrastructure\Doctrine\Entity\UserEntity;
+use App\Catalog\Infrastructure\Doctrine\Entity\AlbumEntity;
+use App\Catalog\Infrastructure\Doctrine\Entity\MovieEntity;
+use App\Catalog\Infrastructure\Doctrine\Entity\MovieVideoEntity;
+use App\Catalog\Infrastructure\Doctrine\Entity\SongEntity;
+use App\Catalog\Infrastructure\Doctrine\Entity\VideoEntity;
+use App\Library\Infrastructure\Doctrine\Entity\LibraryEntity;
+use App\Library\Infrastructure\Doctrine\Entity\UserLibraryAccessEntity;
 use App\Media\Application\Port\PlaybackMediaAccessInterface;
 use App\Session\Application\Port\PlaybackOperation;
 use App\Session\Application\Service\PlaybackCoordinator;
@@ -12,16 +20,19 @@ use App\Session\Domain\Model\Playback\PlaybackMedia;
 use App\Session\Domain\Model\Playback\PlaybackState;
 use App\Session\Infrastructure\Doctrine\PlaybackStore;
 use App\Session\Infrastructure\Doctrine\Repository\DeviceDoctrineRepository;
-use App\Tests\Fixtures\Session\PlaybackPersistenceFixture;
-use App\Tests\Support\FinalSchemaBootstrap;
-use App\Auth\Infrastructure\Doctrine\Entity\UserEntity;
-use Doctrine\ORM\EntityManager;
-use Doctrine\DBAL\Connection;
+use App\Shared\Application\Exception\ConflictException;
+use App\Shared\Application\Exception\InvalidInputException;
+use App\Shared\Application\Port\TransactionPortInterface;
 use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
-use App\Shared\Application\Port\TransactionPortInterface;
+use App\Tests\Fixtures\Session\PlaybackPersistenceFixture;
+use App\Tests\Support\FinalSchemaBootstrap;
+use Doctrine\DBAL\Connection;
+use Doctrine\DBAL\Exception;
+use Doctrine\DBAL\Exception\DriverException;
 use Doctrine\DBAL\Schema\Schema;
-use App\Shared\Application\Exception\ConflictException;
+use Doctrine\ORM\EntityManager;
+use DoctrineMigrations\Version20261101190000;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
 
@@ -397,7 +408,7 @@ final class PlaybackTransferPersistenceTest extends TestCase
         try {
             $this->ack($service, $owner, $source, $command, 'applied', volume: 1.1);
             self::fail('Observed volume must remain bounded.');
-        } catch (\App\Shared\Application\Exception\InvalidInputException $error) {
+        } catch (InvalidInputException $error) {
             self::assertStringContainsString('Volume', $error->getMessage());
         }
         self::assertCount(1, $this->pending($service, $owner, $source)['commands']);
@@ -560,7 +571,7 @@ final class PlaybackTransferPersistenceTest extends TestCase
         try {
             $service->execute($owner, PlaybackOperation::Transfer, $request);
             self::fail('The injected insert failure must escape.');
-        } catch (\Doctrine\DBAL\Exception $error) {
+        } catch (Exception $error) {
             self::assertStringContainsString('command insertion refused', $error->getMessage());
         }
         $connection->executeStatement('DROP TRIGGER reject_playback_command ON playback_commands');
@@ -586,7 +597,7 @@ final class PlaybackTransferPersistenceTest extends TestCase
             try {
                 $service->execute($owner, PlaybackOperation::Endpoint, $registration);
                 self::fail("The refused insert into {$table} must escape.");
-            } catch (\Doctrine\DBAL\Exception $error) {
+            } catch (Exception $error) {
                 self::assertStringContainsString('registration insert refused', $error->getMessage(), $table);
             }
             $connection->executeStatement("DROP TRIGGER reject_playback_registration ON {$table}");
@@ -624,10 +635,10 @@ final class PlaybackTransferPersistenceTest extends TestCase
     public function testQueueBeforeFirstPlaybackIsRetainedWithoutInventingAnActiveRunner(): void
     {
         $owner = $this->createUser();
-        $library = new \App\Library\Infrastructure\Doctrine\Entity\LibraryEntity('Music', 'music', '/playback/music', 'music', 'local');
-        $album = new \App\Catalog\Infrastructure\Doctrine\Entity\AlbumEntity(new PublicId(), $library, 'Album', 'album');
-        $song = new \App\Catalog\Infrastructure\Doctrine\Entity\SongEntity(new PublicId(), $album, 'Song', '/playback/music/song.flac', 1, 'audio/flac');
-        foreach ([$library, $album, $song, new \App\Library\Infrastructure\Doctrine\Entity\UserLibraryAccessEntity($owner, $library, new \DateTimeImmutable())] as $entity) {
+        $library = new LibraryEntity('Music', 'music', '/playback/music', 'music', 'local');
+        $album = new AlbumEntity(new PublicId(), $library, 'Album', 'album');
+        $song = new SongEntity(new PublicId(), $album, 'Song', '/playback/music/song.flac', 1, 'audio/flac');
+        foreach ([$library, $album, $song, new UserLibraryAccessEntity($owner, $library, new \DateTimeImmutable())] as $entity) {
             $this->manager->persist($entity);
         }
         $this->manager->flush();
@@ -647,13 +658,13 @@ final class PlaybackTransferPersistenceTest extends TestCase
     public function testTypedVideoUsesLibraryPermissionAndPreservesTheExistingMusicQueue(): void
     {
         $owner = $this->createUser();
-        $music = new \App\Library\Infrastructure\Doctrine\Entity\LibraryEntity('Music', 'music', '/playback/music', 'music', 'local');
-        $videos = new \App\Library\Infrastructure\Doctrine\Entity\LibraryEntity('Movies', 'movies', '/playback/video', 'video', 'local');
-        $album = new \App\Catalog\Infrastructure\Doctrine\Entity\AlbumEntity(new PublicId(), $music, 'Album', 'album');
-        $song = new \App\Catalog\Infrastructure\Doctrine\Entity\SongEntity(new PublicId(), $album, 'Song', '/playback/music/song.flac', 1, 'audio/flac');
-        $movie = new \App\Catalog\Infrastructure\Doctrine\Entity\MovieEntity(new PublicId(), $videos, 'Movie');
-        $video = new \App\Catalog\Infrastructure\Doctrine\Entity\VideoEntity(new PublicId(), '/playback/video/movie.mkv', 'fixture-hash');
-        foreach ([$music, $videos, $album, $song, $movie, $video, new \App\Catalog\Infrastructure\Doctrine\Entity\MovieVideoEntity($movie, $video), new \App\Library\Infrastructure\Doctrine\Entity\UserLibraryAccessEntity($owner, $music, new \DateTimeImmutable())] as $entity) {
+        $music = new LibraryEntity('Music', 'music', '/playback/music', 'music', 'local');
+        $videos = new LibraryEntity('Movies', 'movies', '/playback/video', 'video', 'local');
+        $album = new AlbumEntity(new PublicId(), $music, 'Album', 'album');
+        $song = new SongEntity(new PublicId(), $album, 'Song', '/playback/music/song.flac', 1, 'audio/flac');
+        $movie = new MovieEntity(new PublicId(), $videos, 'Movie');
+        $video = new VideoEntity(new PublicId(), '/playback/video/movie.mkv', 'fixture-hash');
+        foreach ([$music, $videos, $album, $song, $movie, $video, new MovieVideoEntity($movie, $video), new UserLibraryAccessEntity($owner, $music, new \DateTimeImmutable())] as $entity) {
             $this->manager->persist($entity);
         }
         $this->manager->flush();
@@ -669,9 +680,9 @@ final class PlaybackTransferPersistenceTest extends TestCase
             self::assertSame('Playback media is unavailable.', $error->getMessage());
         }
         self::assertSame($snapshot['revision'], $service->execute($owner, PlaybackOperation::Snapshot, [])['revision']);
-        $grantedLibrary = $this->manager->find(\App\Library\Infrastructure\Doctrine\Entity\LibraryEntity::class, $videos->getId());
-        self::assertInstanceOf(\App\Library\Infrastructure\Doctrine\Entity\LibraryEntity::class, $grantedLibrary);
-        $this->manager->persist(new \App\Library\Infrastructure\Doctrine\Entity\UserLibraryAccessEntity($owner, $grantedLibrary, new \DateTimeImmutable()));
+        $grantedLibrary = $this->manager->find(LibraryEntity::class, $videos->getId());
+        self::assertInstanceOf(LibraryEntity::class, $grantedLibrary);
+        $this->manager->persist(new UserLibraryAccessEntity($owner, $grantedLibrary, new \DateTimeImmutable()));
         $this->manager->flush();
         $snapshot = $service->execute($owner, PlaybackOperation::Control, $videoRequest);
         self::assertSame($queue, $snapshot['queue']);
@@ -2014,7 +2025,7 @@ final class PlaybackTransferPersistenceTest extends TestCase
         try {
             $service->execute($owner, PlaybackOperation::Endpoint, ['pageId' => 'the first page'] + $registration);
             self::fail('A page identity that is no UUID was accepted.');
-        } catch (\App\Shared\Application\Exception\InvalidInputException $error) {
+        } catch (InvalidInputException $error) {
             self::assertSame('pageId must be a UUID.', $error->getMessage());
         }
 
@@ -2759,7 +2770,7 @@ final class PlaybackTransferPersistenceTest extends TestCase
         $service->execute($owner, PlaybackOperation::Transfer, ['requestId' => new Uuid()->toString(), 'expectedRevision' => 0,
             'targetIncarnationId' => $target['incarnationId']]);
         $command = $this->pending($service, $owner, $target)['commands'][0];
-        $this->expectException(\Doctrine\DBAL\Exception\DriverException::class);
+        $this->expectException(DriverException::class);
         $this->observer->executeStatement("UPDATE playback_commands SET rejection_reason='unknown' WHERE id=?", [$command['id']]);
     }
 
@@ -2782,7 +2793,7 @@ final class PlaybackTransferPersistenceTest extends TestCase
         $connection->executeStatement("INSERT INTO devices VALUES(:id,:publicId,:owner,:device,'Preserved browser',CURRENT_TIMESTAMP)", ['id' => new Uuid()->toString(), 'publicId' => new PublicId()->toString(), 'owner' => $owner, 'device' => $device]);
         $connection->executeStatement("INSERT INTO listening_sessions VALUES(:id,:publicId,:owner,:device,CAST(:queue AS jsonb),1,83.125,'paused',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,NULL)", ['id' => $session, 'publicId' => $publicId, 'owner' => $owner, 'device' => $device, 'queue' => json_encode($queue, JSON_THROW_ON_ERROR)]);
         require_once dirname(__DIR__, 2) . '/migrations/Version20261101190000.php';
-        $migration = new \DoctrineMigrations\Version20261101190000($connection, new NullLogger());
+        $migration = new Version20261101190000($connection, new NullLogger());
         $migration->up(new Schema());
         foreach ($migration->getSql() as $query) {
             $connection->executeStatement($query->getStatement(), $query->getParameters(), $query->getTypes());

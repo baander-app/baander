@@ -5,15 +5,15 @@ declare(strict_types=1);
 namespace App\Shared\Infrastructure\Messenger;
 
 use App\Shared\Application\PublicDiagnosticText;
-
 use App\Shared\Domain\Model\Cursor;
 use App\Shared\Domain\Model\JobStatus;
 use App\Shared\Domain\Model\Uuid;
 use App\Shared\Infrastructure\Doctrine\Entity\JobMonitorEntity;
 use App\Shared\Infrastructure\Pagination\CursorPaginator;
 use App\Shared\Infrastructure\Pagination\CursorResult;
-use Doctrine\ORM\EntityManagerInterface;
 use Doctrine\DBAL\ParameterType;
+use Doctrine\ORM\EntityManagerInterface;
+use Doctrine\ORM\QueryBuilder;
 use RuntimeException;
 use Symfony\Component\Serializer\Encoder\JsonEncoder;
 
@@ -646,7 +646,7 @@ final class JobMonitorService
             ->getSingleScalarResult();
     }
 
-    private function prunable(\Doctrine\ORM\QueryBuilder $qb, \DateTimeImmutable $olderThan): \Doctrine\ORM\QueryBuilder
+    private function prunable(QueryBuilder $qb, \DateTimeImmutable $olderThan): QueryBuilder
     {
         return $qb
             ->where('j.status IN (:statuses)')

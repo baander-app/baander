@@ -4,13 +4,14 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Library\Domain\Model;
 
-use App\Shared\Domain\ValueObject\FilesystemType;
 use App\Library\Domain\Model\Library;
 use App\Library\Domain\Model\LibraryState;
 use App\Library\Domain\ValueObject\LibraryPath;
 use App\Library\Domain\ValueObject\LibrarySlug;
 use App\Library\Domain\ValueObject\LibraryType;
+use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
+use App\Shared\Domain\ValueObject\FilesystemType;
 use InvalidArgumentException;
 use PHPUnit\Framework\TestCase;
 
@@ -101,7 +102,7 @@ final class LibraryTest extends TestCase
 
         $library = Library::reconstitute(new LibraryState(
             id: $id,
-            publicId: new \App\Shared\Domain\Model\PublicId(),
+            publicId: new PublicId(),
             name: 'Audiobooks',
             slug: $slug,
             path: $path,
@@ -127,7 +128,7 @@ final class LibraryTest extends TestCase
 
     public function testReconstituteWithNullLastScan(): void
     {
-        $publicId = new \App\Shared\Domain\Model\PublicId();
+        $publicId = new PublicId();
         $library = Library::reconstitute(new LibraryState(
             id: Uuid::v4(),
             publicId: $publicId,
@@ -150,7 +151,7 @@ final class LibraryTest extends TestCase
     public function testReconstituteRestoresDiscoveryStatus(): void
     {
         $now = new \DateTimeImmutable();
-        $publicId = new \App\Shared\Domain\Model\PublicId();
+        $publicId = new PublicId();
 
         $library = Library::reconstitute(new LibraryState(
             id: Uuid::v4(),

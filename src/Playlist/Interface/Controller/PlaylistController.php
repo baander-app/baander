@@ -4,8 +4,11 @@ declare(strict_types=1);
 
 namespace App\Playlist\Interface\Controller;
 
-use App\Catalog\Application\Port\SongAvailabilityPortInterface;
 use App\Auth\Application\Port\AuthenticatedUserIdentityInterface;
+use App\Catalog\Application\Port\SongAvailabilityPortInterface;
+use App\Catalog\Application\Port\SongPortInterface;
+use App\Catalog\Domain\Model\Song;
+use App\Catalog\Interface\Resource\SongResource;
 use App\Library\Application\Port\LibraryReadScopeProviderInterface;
 use App\Playlist\Application\Command\AddCollaboratorCommand;
 use App\Playlist\Application\Command\AddSongCommand;
@@ -16,27 +19,28 @@ use App\Playlist\Application\Command\ReorderSongsCommand;
 use App\Playlist\Application\Command\UpdatePlaylistCommand;
 use App\Playlist\Application\Port\PlaylistCollaboratorResolverInterface;
 use App\Playlist\Application\Port\PlaylistPortInterface;
+use App\Playlist\Application\Port\PlaylistSongVisibilityInterface;
 use App\Playlist\Domain\Model\Playlist;
+use App\Playlist\Domain\Model\PlaylistSong;
 use App\Playlist\Interface\Request\AddSongRequest;
 use App\Playlist\Interface\Request\CreatePlaylistRequest;
 use App\Playlist\Interface\Request\ReorderSongsRequest;
 use App\Playlist\Interface\Request\UpdatePlaylistRequest;
 use App\Playlist\Interface\Resource\PlaylistResource;
-use App\Catalog\Application\Port\SongPortInterface;
-use App\Playlist\Application\Port\PlaylistSongVisibilityInterface;
-use App\Catalog\Interface\Resource\SongResource;
 use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
 use App\Shared\Interface\Controller\ApiResponsesTrait;
+use App\Shared\Interface\DTO\ApiError;
+use App\Shared\Interface\DTO\ValidationError;
 use App\Shared\Interface\Request\QueryParameters;
 use OpenApi\Spec as OA;
 use Symfony\Bundle\SecurityBundle\Security;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpKernel\Attribute\MapRequestPayload;
+use Symfony\Component\Messenger\Envelope;
 use Symfony\Component\Messenger\MessageBusInterface;
 use Symfony\Component\Messenger\Stamp\HandledStamp;
-use Symfony\Component\Messenger\Envelope;
 use Symfony\Component\Routing\Attribute\Route;
 use Symfony\Component\Security\Core\Exception\AccessDeniedException;
 
@@ -133,14 +137,14 @@ final class PlaylistController
                 response: '400',
                 description: 'Invalid limit or offset',
                 content: new OA\MediaType\Json(
-                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                    schema: new OA\Schema(ref: ApiError::class),
                 ),
             ),
             new OA\Response(
                 response: '401',
                 description: 'Not authenticated',
                 content: new OA\MediaType\Json(
-                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                    schema: new OA\Schema(ref: ApiError::class),
                 ),
             ),
         ],
@@ -197,21 +201,21 @@ final class PlaylistController
                 response: '401',
                 description: 'Not authenticated',
                 content: new OA\MediaType\Json(
-                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                    schema: new OA\Schema(ref: ApiError::class),
                 ),
             ),
             new OA\Response(
                 response: '409',
                 description: 'The caller already owns the most playlists an owner may keep (reason playlist_limit)',
                 content: new OA\MediaType\Json(
-                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                    schema: new OA\Schema(ref: ApiError::class),
                 ),
             ),
             new OA\Response(
                 response: '422',
                 description: 'Validation error',
                 content: new OA\MediaType\Json(
-                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ValidationError::class),
+                    schema: new OA\Schema(ref: ValidationError::class),
                 ),
             ),
         ],
@@ -380,21 +384,21 @@ final class PlaylistController
                 response: '401',
                 description: 'Not authenticated',
                 content: new OA\MediaType\Json(
-                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                    schema: new OA\Schema(ref: ApiError::class),
                 ),
             ),
             new OA\Response(
                 response: '403',
                 description: 'The actor is neither the owner, a collaborator nor an administrator; the public flag grants no read access',
                 content: new OA\MediaType\Json(
-                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                    schema: new OA\Schema(ref: ApiError::class),
                 ),
             ),
             new OA\Response(
                 response: '404',
                 description: 'Not found',
                 content: new OA\MediaType\Json(
-                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                    schema: new OA\Schema(ref: ApiError::class),
                 ),
             ),
         ],
@@ -418,17 +422,17 @@ final class PlaylistController
 
         $scope = $this->libraryScopes->current();
         $songIds = array_map(
-            static fn(\App\Playlist\Domain\Model\PlaylistSong $song) => $song->getSongId(),
+            static fn(PlaylistSong $song) => $song->getSongId(),
             $playlist->getSongs(),
         );
         $songMap = $this->songService->findVisibleByUuids($songIds, $scope);
         $visibleSongIds = array_map(
-            static fn(\App\Catalog\Domain\Model\Song $song) => $song->getId(),
+            static fn(Song $song) => $song->getId(),
             array_values($songMap),
         );
         $artistNames = $this->songService->getVisibleArtistNamesForSongs($visibleSongIds, $scope);
         $albumIds = array_map(
-            static fn(\App\Catalog\Domain\Model\Song $song) => $song->getAlbumId(),
+            static fn(Song $song) => $song->getAlbumId(),
             array_values($songMap),
         );
         [$albumTitles, $albumLanguages] = SongResource::albumMaps($this->songService->getVisibleAlbumTitlesAndLanguagesByIds($albumIds, $scope));
@@ -496,28 +500,28 @@ final class PlaylistController
                 response: '401',
                 description: 'Not authenticated',
                 content: new OA\MediaType\Json(
-                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                    schema: new OA\Schema(ref: ApiError::class),
                 ),
             ),
             new OA\Response(
                 response: '403',
                 description: 'Only the owner may update the playlist',
                 content: new OA\MediaType\Json(
-                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                    schema: new OA\Schema(ref: ApiError::class),
                 ),
             ),
             new OA\Response(
                 response: '404',
                 description: 'Not found',
                 content: new OA\MediaType\Json(
-                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                    schema: new OA\Schema(ref: ApiError::class),
                 ),
             ),
             new OA\Response(
                 response: '422',
                 description: 'Validation error',
                 content: new OA\MediaType\Json(
-                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ValidationError::class),
+                    schema: new OA\Schema(ref: ValidationError::class),
                 ),
             ),
         ],
@@ -580,21 +584,21 @@ final class PlaylistController
                 response: '401',
                 description: 'Not authenticated',
                 content: new OA\MediaType\Json(
-                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                    schema: new OA\Schema(ref: ApiError::class),
                 ),
             ),
             new OA\Response(
                 response: '403',
                 description: 'Only the owner may delete the playlist',
                 content: new OA\MediaType\Json(
-                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                    schema: new OA\Schema(ref: ApiError::class),
                 ),
             ),
             new OA\Response(
                 response: '404',
                 description: 'Not found',
                 content: new OA\MediaType\Json(
-                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                    schema: new OA\Schema(ref: ApiError::class),
                 ),
             ),
         ],
@@ -676,35 +680,35 @@ final class PlaylistController
                 response: '401',
                 description: 'Not authenticated',
                 content: new OA\MediaType\Json(
-                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                    schema: new OA\Schema(ref: ApiError::class),
                 ),
             ),
             new OA\Response(
                 response: '403',
                 description: 'Only the owner, or a collaborator while the playlist is collaborative, may change its songs',
                 content: new OA\MediaType\Json(
-                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                    schema: new OA\Schema(ref: ApiError::class),
                 ),
             ),
             new OA\Response(
                 response: '404',
                 description: 'Playlist not found, or the song does not exist or is not visible to the caller',
                 content: new OA\MediaType\Json(
-                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                    schema: new OA\Schema(ref: ApiError::class),
                 ),
             ),
             new OA\Response(
                 response: '409',
                 description: 'The playlist changed meanwhile, or it already holds the most songs a playlist may hold (reason song_limit)',
                 content: new OA\MediaType\Json(
-                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                    schema: new OA\Schema(ref: ApiError::class),
                 ),
             ),
             new OA\Response(
                 response: '422',
                 description: 'Validation error',
                 content: new OA\MediaType\Json(
-                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ValidationError::class),
+                    schema: new OA\Schema(ref: ValidationError::class),
                 ),
             ),
         ],
@@ -794,21 +798,21 @@ final class PlaylistController
                 response: '401',
                 description: 'Not authenticated',
                 content: new OA\MediaType\Json(
-                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                    schema: new OA\Schema(ref: ApiError::class),
                 ),
             ),
             new OA\Response(
                 response: '403',
                 description: 'Only the owner, or a collaborator while the playlist is collaborative, may change its songs',
                 content: new OA\MediaType\Json(
-                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                    schema: new OA\Schema(ref: ApiError::class),
                 ),
             ),
             new OA\Response(
                 response: '404',
                 description: 'Not found',
                 content: new OA\MediaType\Json(
-                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                    schema: new OA\Schema(ref: ApiError::class),
                 ),
             ),
         ],
@@ -881,35 +885,35 @@ final class PlaylistController
                 response: '401',
                 description: 'Not authenticated',
                 content: new OA\MediaType\Json(
-                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                    schema: new OA\Schema(ref: ApiError::class),
                 ),
             ),
             new OA\Response(
                 response: '403',
                 description: 'Only the owner may manage the collaborators',
                 content: new OA\MediaType\Json(
-                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                    schema: new OA\Schema(ref: ApiError::class),
                 ),
             ),
             new OA\Response(
                 response: '404',
                 description: 'Playlist not found, the value is not a public id, or no user has it',
                 content: new OA\MediaType\Json(
-                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                    schema: new OA\Schema(ref: ApiError::class),
                 ),
             ),
             new OA\Response(
                 response: '409',
                 description: 'The playlist kept changing during the addition, or it already has the most collaborators a playlist may have (reason collaborator_limit)',
                 content: new OA\MediaType\Json(
-                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                    schema: new OA\Schema(ref: ApiError::class),
                 ),
             ),
             new OA\Response(
                 response: '422',
                 description: 'The owner named themself',
                 content: new OA\MediaType\Json(
-                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                    schema: new OA\Schema(ref: ApiError::class),
                 ),
             ),
         ],
@@ -979,21 +983,21 @@ final class PlaylistController
                 response: '401',
                 description: 'Not authenticated',
                 content: new OA\MediaType\Json(
-                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                    schema: new OA\Schema(ref: ApiError::class),
                 ),
             ),
             new OA\Response(
                 response: '403',
                 description: 'Only the owner may remove another user; only a collaborator may leave',
                 content: new OA\MediaType\Json(
-                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                    schema: new OA\Schema(ref: ApiError::class),
                 ),
             ),
             new OA\Response(
                 response: '404',
                 description: 'Playlist not found, the value is not a public id, or no user has it',
                 content: new OA\MediaType\Json(
-                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                    schema: new OA\Schema(ref: ApiError::class),
                 ),
             ),
         ],
@@ -1102,35 +1106,35 @@ final class PlaylistController
                 response: '401',
                 description: 'Not authenticated',
                 content: new OA\MediaType\Json(
-                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                    schema: new OA\Schema(ref: ApiError::class),
                 ),
             ),
             new OA\Response(
                 response: '403',
                 description: 'Only the owner, or a collaborator while the playlist is collaborative, may change its songs',
                 content: new OA\MediaType\Json(
-                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                    schema: new OA\Schema(ref: ApiError::class),
                 ),
             ),
             new OA\Response(
                 response: '404',
                 description: 'Not found',
                 content: new OA\MediaType\Json(
-                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                    schema: new OA\Schema(ref: ApiError::class),
                 ),
             ),
             new OA\Response(
                 response: '409',
                 description: 'The playlist changed; refresh it before reordering',
                 content: new OA\MediaType\Json(
-                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                    schema: new OA\Schema(ref: ApiError::class),
                 ),
             ),
             new OA\Response(
                 response: '422',
                 description: 'Validation error',
                 content: new OA\MediaType\Json(
-                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ValidationError::class),
+                    schema: new OA\Schema(ref: ValidationError::class),
                 ),
             ),
         ],

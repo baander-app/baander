@@ -4,11 +4,13 @@ declare(strict_types=1);
 
 namespace Baander\DevEnvironment\Host;
 
+use Baander\Filesystem\Paths;
+
 final class ProcessEnvironment
 {
     public static function previewId(string $worktree, string $repository): string
     {
-        return 'preview-' . substr(hash('sha256', $repository . "\0" . \Baander\Filesystem\Paths::resolvedPath($worktree)), 0, 16);
+        return 'preview-' . substr(hash('sha256', $repository . "\0" . Paths::resolvedPath($worktree)), 0, 16);
     }
 
     /** @param array<string,string>|null $source
@@ -44,7 +46,7 @@ final class ProcessEnvironment
         foreach (explode(PATH_SEPARATOR, getenv('PATH') ?: '/usr/bin:/bin') as $directory) {
             $candidate = $directory . '/' . $name;
             if (is_file($candidate) && is_executable($candidate)) {
-                return \Baander\Filesystem\Paths::absolutePath($candidate);
+                return Paths::absolutePath($candidate);
             }
         }
         return null;

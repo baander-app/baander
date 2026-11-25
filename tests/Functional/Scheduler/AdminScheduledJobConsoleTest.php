@@ -9,6 +9,7 @@ use App\Auth\Domain\Model\User;
 use App\Scheduler\Application\Port\ScheduledJobPortInterface;
 use App\Scheduler\Domain\Model\ScheduledJob;
 use App\Scheduler\Domain\ValueObject\ScheduleStatus;
+use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
 use App\Tests\Functional\TestCase;
 use Symfony\Bundle\FrameworkBundle\Console\Application;
@@ -199,7 +200,7 @@ final class AdminScheduledJobConsoleTest extends TestCase
 
     private function job(string $id): ?ScheduledJob
     {
-        return $this->port()->getByPublicId(\App\Shared\Domain\Model\PublicId::fromString($id));
+        return $this->port()->getByPublicId(PublicId::fromString($id));
     }
 
     /** @return list<string> */

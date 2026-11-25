@@ -4,26 +4,28 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Shared\LiveUpdates;
 
+use App\Shared\Application\LiveUpdates\LiveChangeProjector;
 use App\Shared\Application\LiveUpdates\LiveFamily;
 use App\Shared\Application\LiveUpdates\LiveMessage;
 use App\Shared\Application\LiveUpdates\LivePipelineHealth;
 use App\Shared\Application\LiveUpdates\LiveSnapshot;
+use App\Shared\Application\LiveUpdates\LiveSnapshotReader;
+use App\Shared\Application\Port\ServerDrainStateInterface;
 use App\Shared\Domain\Model\Uuid;
 use App\Shared\Infrastructure\LiveUpdates\LiveConnectionState;
-use PHPUnit\Framework\TestCase;
-use SwooleBundle\SwooleBundle\Bridge\Symfony\Container\ServicePool\ServicePoolContainer;
-use SwooleBundle\SwooleBundle\Bridge\Symfony\Container\ServicePool\ServicePool;
-use SwooleBundle\SwooleBundle\Bridge\Symfony\Container\CoWrapper;
-use SwooleBundle\SwooleBundle\Bridge\Swoole\Swoole as SwooleBridge;
-use App\Shared\Application\LiveUpdates\LiveSnapshotReader;
-use App\Shared\Application\LiveUpdates\LiveChangeProjector;
-use App\Shared\Infrastructure\Swoole\WebSocketConnectionRegistry;
-use App\Shared\Application\Port\ServerDrainStateInterface;
-use App\Shared\Infrastructure\LiveUpdates\LiveUpdateRuntime;
 use App\Shared\Infrastructure\LiveUpdates\LiveFrameSender;
+use App\Shared\Infrastructure\LiveUpdates\LiveUpdateRuntime;
+use App\Shared\Infrastructure\Swoole\WebSocketConnectionRegistry;
+use PHPUnit\Framework\TestCase;
+use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
 use Swoole\Coroutine;
+use Swoole\Coroutine\Channel;
 use Swoole\WebSocket\Server;
+use SwooleBundle\SwooleBundle\Bridge\Swoole\Swoole as SwooleBridge;
+use SwooleBundle\SwooleBundle\Bridge\Symfony\Container\CoWrapper;
+use SwooleBundle\SwooleBundle\Bridge\Symfony\Container\ServicePool\ServicePool;
+use SwooleBundle\SwooleBundle\Bridge\Symfony\Container\ServicePool\ServicePoolContainer;
 
 final class LiveRuntimeTest extends TestCase
 {
@@ -217,7 +219,7 @@ final class LiveRuntimeTest extends TestCase
 
     private function assertOverloadReleasesLoggerPool(bool $blockedPush): void
     {
-        $released = new \Swoole\Coroutine\Channel(1);
+        $released = new Channel(1);
         $pool = new class ($released) implements ServicePool {
             /** @var array<int, true> */
             private array $assigned = [];
@@ -226,7 +228,7 @@ final class LiveRuntimeTest extends TestCase
             /** @var list<int> */
             public array $releasedIds = [];
 
-            public function __construct(private readonly \Swoole\Coroutine\Channel $released) {}
+            public function __construct(private readonly Channel $released) {}
 
             public function get(): object
             {
@@ -261,7 +263,7 @@ final class LiveRuntimeTest extends TestCase
             }
         };
         $wrapper = new CoWrapper(new ServicePoolContainer([[$pool]]), new SwooleBridge());
-        $logger = $this->createMock(\Psr\Log\LoggerInterface::class);
+        $logger = $this->createMock(LoggerInterface::class);
         $logger->expects(self::exactly(3))->method('warning')->willReturnCallback(static function () use ($pool): void {
             $pool->get();
         });

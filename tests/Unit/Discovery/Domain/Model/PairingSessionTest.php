@@ -7,6 +7,7 @@ namespace App\Tests\Unit\Discovery\Domain\Model;
 use App\Discovery\Domain\Model\PairingSession;
 use App\Discovery\Domain\Model\PairingSessionState;
 use App\Discovery\Domain\ValueObject\AuthenticationMethod;
+use App\Discovery\Domain\ValueObject\PairingCode;
 use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
 use DateInterval;
@@ -164,7 +165,7 @@ final class PairingSessionTest extends TestCase
             serverPublicId: $this->serverPublicId,
             serverUrl: 'https://music.baander.app',
             serverName: 'Home Server',
-            pairingCode: \App\Discovery\Domain\ValueObject\PairingCode::fromString('BCDF-GHJK'),
+            pairingCode: PairingCode::fromString('BCDF-GHJK'),
             method: AuthenticationMethod::EmailUrl,
             expiresAt: new DateTimeImmutable('+2 minutes'),
             createdAt: new DateTimeImmutable('-5 minutes'),
@@ -197,7 +198,7 @@ final class PairingSessionTest extends TestCase
             serverPublicId: $this->serverPublicId,
             serverUrl: 'https://music.baander.app',
             serverName: 'Home Server',
-            pairingCode: \App\Discovery\Domain\ValueObject\PairingCode::fromString('BCDF-GHJK'),
+            pairingCode: PairingCode::fromString('BCDF-GHJK'),
             method: AuthenticationMethod::QrCode,
             expiresAt: new DateTimeImmutable('-1 minute'),
             createdAt: new DateTimeImmutable('-10 minutes'),

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 require dirname(__DIR__, 5) . '/vendor/autoload.php';
 
+use Swoole\Coroutine;
 use Swoole\Coroutine\Http\Client;
 use Swoole\Coroutine\Http\Server;
 use Swoole\Http\Request as SwooleRequest;
@@ -28,7 +29,7 @@ try {
             $response->headers->set('Content-Type', 'audio/mpeg');
             (new ResponseHeadersAndStatusProcessor(new EndResponseProcessor()))->process($response, $transport);
         });
-        Swoole\Coroutine::create(static function () use ($server): void { $server->start(); });
+        Coroutine::create(static function () use ($server): void { $server->start(); });
         try {
             foreach ([
                 ['GET', 'bytes=2-4', 206, '234', '3'],

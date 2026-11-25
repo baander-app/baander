@@ -5,9 +5,10 @@ declare(strict_types=1);
 namespace App\Recommendation\Interface\Controller;
 
 use App\Auth\Application\Port\AuthenticatedUserIdentityInterface;
+use App\Recommendation\Application\Command\CreateRecommendationCommand;
 use App\Recommendation\Application\Command\DeleteRecommendationCommand;
 use App\Recommendation\Application\Command\DeleteRecommendationsBySourceCommand;
-use App\Recommendation\Application\Command\CreateRecommendationCommand;
+use App\Recommendation\Application\Port\RecommendationPublicIdentityInterface;
 use App\Recommendation\Application\Query\GetPersonalizedRecommendationsQuery;
 use App\Recommendation\Application\Query\GetRecommendationsBySourceQuery;
 use App\Recommendation\Application\Query\GetRecommendationsForUserQuery;
@@ -17,6 +18,8 @@ use App\Recommendation\Interface\Request\CreateRecommendationRequest;
 use App\Recommendation\Interface\Resource\RecommendationResource;
 use App\Shared\Domain\Model\Uuid;
 use App\Shared\Interface\Controller\ApiResponsesTrait;
+use App\Shared\Interface\DTO\ApiError;
+use App\Shared\Interface\DTO\ValidationError;
 use OpenApi\Spec as OA;
 use Symfony\Bundle\SecurityBundle\Security;
 use Symfony\Component\HttpFoundation\JsonResponse;
@@ -25,6 +28,7 @@ use Symfony\Component\HttpKernel\Attribute\MapRequestPayload;
 use Symfony\Component\Messenger\MessageBusInterface;
 use Symfony\Component\Messenger\Stamp\HandledStamp;
 use Symfony\Component\Routing\Attribute\Route;
+use Symfony\Component\Security\Core\Exception\AccessDeniedException;
 
 #[OA\Tag(name: 'Recommendation', description: 'Recommendation endpoints')]
 #[Route('/api/recommendations', name: 'recommendation_')]
@@ -35,7 +39,7 @@ final class RecommendationController
     public function __construct(
         private readonly Security $security,
         private readonly MessageBusInterface $bus,
-        private readonly \App\Recommendation\Application\Port\RecommendationPublicIdentityInterface $identities,
+        private readonly RecommendationPublicIdentityInterface $identities,
     ) {
     }
 
@@ -73,7 +77,7 @@ final class RecommendationController
                 response: '401',
                 description: 'Not authenticated',
                 content: new OA\MediaType\Json(
-                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                    schema: new OA\Schema(ref: ApiError::class),
                 ),
             ),
         ],
@@ -155,7 +159,7 @@ final class RecommendationController
                 response: '401',
                 description: 'Not authenticated',
                 content: new OA\MediaType\Json(
-                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                    schema: new OA\Schema(ref: ApiError::class),
                 ),
             ),
         ],
@@ -350,28 +354,28 @@ final class RecommendationController
                 response: '401',
                 description: 'Not authenticated',
                 content: new OA\MediaType\Json(
-                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                    schema: new OA\Schema(ref: ApiError::class),
                 ),
             ),
             new OA\Response(
                 response: '404',
                 description: 'The source or target entity is not visible to the user',
                 content: new OA\MediaType\Json(
-                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                    schema: new OA\Schema(ref: ApiError::class),
                 ),
             ),
             new OA\Response(
                 response: '409',
                 description: 'The user already keeps ' . RecommendationLimits::MEMBER_ROWS_PER_USER . ' rows written through this route (reason recommendation_limit, with limit), or a row with this source, target and name (reason recommendation_exists)',
                 content: new OA\MediaType\Json(
-                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                    schema: new OA\Schema(ref: ApiError::class),
                 ),
             ),
             new OA\Response(
                 response: '422',
                 description: 'Validation error',
                 content: new OA\MediaType\Json(
-                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ValidationError::class),
+                    schema: new OA\Schema(ref: ValidationError::class),
                 ),
             ),
         ],
@@ -421,14 +425,14 @@ final class RecommendationController
                 response: '401',
                 description: 'Not authenticated',
                 content: new OA\MediaType\Json(
-                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                    schema: new OA\Schema(ref: ApiError::class),
                 ),
             ),
             new OA\Response(
                 response: '404',
                 description: 'Not found',
                 content: new OA\MediaType\Json(
-                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                    schema: new OA\Schema(ref: ApiError::class),
                 ),
             ),
         ],
@@ -483,7 +487,7 @@ final class RecommendationController
                 response: '401',
                 description: 'Not authenticated',
                 content: new OA\MediaType\Json(
-                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                    schema: new OA\Schema(ref: ApiError::class),
                 ),
             ),
         ],
@@ -507,7 +511,7 @@ final class RecommendationController
     private function actorId(): Uuid
     {
         $user = $this->security->getUser();
-        if (!$user instanceof AuthenticatedUserIdentityInterface) { throw new \Symfony\Component\Security\Core\Exception\AccessDeniedException(); }
+        if (!$user instanceof AuthenticatedUserIdentityInterface) { throw new AccessDeniedException(); }
         return Uuid::fromString($user->getId());
     }
 

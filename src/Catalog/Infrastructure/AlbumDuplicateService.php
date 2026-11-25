@@ -6,13 +6,15 @@ namespace App\Catalog\Infrastructure;
 
 use App\Catalog\Application\Port\AlbumDuplicatePortInterface;
 use App\Catalog\Application\Port\AlbumPortInterface;
-use App\Media\Application\Port\ImagePortInterface;
 use App\Catalog\Domain\Service\AlbumDuplicateDetector;
 use App\Catalog\Domain\ValueObject\DuplicateGroup;
-use App\Shared\Domain\Model\Uuid;
-use App\Shared\Application\Exception\ConflictException;
-use App\Shared\Domain\ValueObject\LibraryReadScope;
 use App\Catalog\Interface\Resource\AlbumResource;
+use App\Media\Application\Port\ImagePortInterface;
+use App\Shared\Application\Exception\ConflictException;
+use App\Shared\Domain\Model\PublicId;
+use App\Shared\Domain\Model\Uuid;
+use App\Shared\Domain\ValueObject\LibraryReadScope;
+use Doctrine\DBAL\Connection;
 
 final class AlbumDuplicateService implements AlbumDuplicatePortInterface
 {
@@ -20,11 +22,11 @@ final class AlbumDuplicateService implements AlbumDuplicatePortInterface
         private readonly AlbumDuplicateDetector $detector,
         private readonly AlbumPortInterface $albumService,
         private readonly ImagePortInterface $imagePort,
-        private readonly \Doctrine\DBAL\Connection $connection,
+        private readonly Connection $connection,
     ) {
     }
 
-    public function findDuplicatesByLibraryPublicId(\App\Shared\Domain\Model\PublicId $libraryId): ?array
+    public function findDuplicatesByLibraryPublicId(PublicId $libraryId): ?array
     {
         $id = $this->connection->fetchOne('SELECT id FROM libraries WHERE public_id = :public_id', ['public_id' => $libraryId->toString()]);
         return $id === false ? null : $this->findDuplicates(Uuid::fromString((string) $id));

@@ -17,11 +17,13 @@ use App\Catalog\Application\CommandHandler\Song\UpdateSongHandler;
 use App\Catalog\Application\Port\AlbumPortInterface;
 use App\Catalog\Application\Port\ArtistPortInterface;
 use App\Catalog\Application\Port\MoviePortInterface;
+use App\Catalog\Application\Port\SongAvailabilityPortInterface;
 use App\Catalog\Application\Port\SongPortInterface;
 use App\Catalog\Domain\Model\Album;
 use App\Catalog\Domain\Model\Artist;
 use App\Catalog\Domain\Model\Movie;
 use App\Catalog\Domain\Model\Song;
+use App\Catalog\Domain\Model\SongState;
 use App\Catalog\Interface\Console\AlbumUpdateCommand;
 use App\Catalog\Interface\Console\ArtistCreateCommand;
 use App\Catalog\Interface\Console\ArtistUpdateCommand;
@@ -123,7 +125,7 @@ final class CatalogMetadataCommandsTest extends TestCase
     public function testSongUpdatePrintsTheResourceWithArtistAndAlbumNamesAndAlbumLanguage(): void
     {
         $song = Song::create(new Uuid(), 'Come Together', '/music/come-together.flac', 1024, 'audio/flac');
-        $song = Song::reconstitute(new \App\Catalog\Domain\Model\SongState(...array_replace(get_object_vars($song->getState()), ['albumPublicId' => new PublicId()])));
+        $song = Song::reconstitute(new SongState(...array_replace(get_object_vars($song->getState()), ['albumPublicId' => new PublicId()])));
         $songs = $this->createMock(SongPortInterface::class);
         $songs->method('findByPublicId')->willReturn($song);
         $songs->method('findFreshByUuid')->willReturn($song);
@@ -131,7 +133,7 @@ final class CatalogMetadataCommandsTest extends TestCase
         $songs->method('getArtistNamesForSongs')->willReturn([$song->getId()->toString() => 'The Beatles']);
         $songs->method('getAlbumTitlesAndLanguagesByIds')->willReturn([$song->getAlbumId()->toString() => ['title' => 'Abbey Road', 'language' => 'eng']]);
 
-        $availability = $this->createMock(\App\Catalog\Application\Port\SongAvailabilityPortInterface::class);
+        $availability = $this->createMock(SongAvailabilityPortInterface::class);
         $availability->expects(self::exactly(2))->method('forSongs')->with([$song])->willReturn([$song->getId()->toString() => true]);
         $tester = new CommandTester(new SongUpdateCommand($this->support(songs: $songs), $songs, $availability));
 

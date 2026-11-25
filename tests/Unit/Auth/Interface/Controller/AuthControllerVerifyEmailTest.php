@@ -21,11 +21,11 @@ use App\Shared\Application\Http\AcceptLanguageMatcher;
 use App\Shared\Application\Http\PublicOrigins;
 use App\Shared\Domain\Model\Email;
 use App\Shared\Infrastructure\Redis\RedisClientFactory;
+use App\Tests\Fixtures\Auth\InMemoryPasskeyChallengeStore;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\MockObject\Stub;
 use PHPUnit\Framework\TestCase;
-use App\Tests\Fixtures\Auth\InMemoryPasskeyChallengeStore;
 use Psr\EventDispatcher\EventDispatcherInterface;
 use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
@@ -121,7 +121,7 @@ final class AuthControllerVerifyEmailTest extends TestCase
     {
         $this->security->method('getUser')->willReturn($this->createStub(UserInterface::class));
         $this->commandBus->expects($this->never())->method('dispatch');
-        $this->assertSame(Response::HTTP_NOT_FOUND, $this->controller->me(\Symfony\Component\HttpFoundation\Request::create('/api/auth/me'))->getStatusCode());
+        $this->assertSame(Response::HTTP_NOT_FOUND, $this->controller->me(Request::create('/api/auth/me'))->getStatusCode());
     }
 
     public function testVerifyEmailDispatchesCommandAndMarksVerified(): void

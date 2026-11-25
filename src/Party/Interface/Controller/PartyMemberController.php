@@ -7,14 +7,15 @@ namespace App\Party\Interface\Controller;
 use App\Auth\Application\Port\AuthenticatedUserIdentityInterface;
 use App\Party\Application\Command\TransferHostCommand;
 use App\Party\Application\Port\PartyMemberPortInterface;
-use App\Party\Application\Port\PartySessionPortInterface;
 use App\Party\Application\Port\PartyPublicIdentityPortInterface;
+use App\Party\Application\Port\PartySessionPortInterface;
 use App\Party\Interface\Request\TransferHostRequest;
 use App\Party\Interface\Request\UpdatePartyMemberRequest;
 use App\Party\Interface\Resource\PartyMemberResource;
-use App\Shared\Domain\Model\Uuid;
 use App\Shared\Domain\Model\PublicId;
+use App\Shared\Domain\Model\Uuid;
 use App\Shared\Interface\Controller\ApiResponsesTrait;
+use App\Shared\Interface\DTO\ApiError;
 use OpenApi\Spec as OA;
 use Symfony\Bundle\SecurityBundle\Security;
 use Symfony\Component\HttpFoundation\JsonResponse;
@@ -84,14 +85,14 @@ final class PartyMemberController
                 response: '401',
                 description: 'Not authenticated',
                 content: new OA\MediaType\Json(
-                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                    schema: new OA\Schema(ref: ApiError::class),
                 ),
             ),
             new OA\Response(
                 response: '404',
                 description: 'The session does not exist, or the caller is neither its host nor a member',
                 content: new OA\MediaType\Json(
-                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                    schema: new OA\Schema(ref: ApiError::class),
                 ),
             ),
         ],
@@ -170,14 +171,14 @@ final class PartyMemberController
                 response: '401',
                 description: 'Not authenticated',
                 content: new OA\MediaType\Json(
-                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                    schema: new OA\Schema(ref: ApiError::class),
                 ),
             ),
             new OA\Response(
                 response: '404',
                 description: 'Not found',
                 content: new OA\MediaType\Json(
-                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                    schema: new OA\Schema(ref: ApiError::class),
                 ),
             ),
         ],
@@ -267,28 +268,28 @@ final class PartyMemberController
                 response: '401',
                 description: 'Not authenticated',
                 content: new OA\MediaType\Json(
-                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                    schema: new OA\Schema(ref: ApiError::class),
                 ),
             ),
             new OA\Response(
                 response: '403',
                 description: 'The caller is a member of the session but not its host',
                 content: new OA\MediaType\Json(
-                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                    schema: new OA\Schema(ref: ApiError::class),
                 ),
             ),
             new OA\Response(
                 response: '404',
                 description: 'The session does not exist, or the caller is neither its host nor a member; for the host, no user has the public ID',
                 content: new OA\MediaType\Json(
-                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                    schema: new OA\Schema(ref: ApiError::class),
                 ),
             ),
             new OA\Response(
                 response: '422',
                 description: 'The request body is invalid, or the host named themself or a user who is not a member of the session',
                 content: new OA\MediaType\Json(
-                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                    schema: new OA\Schema(ref: ApiError::class),
                 ),
             ),
         ],

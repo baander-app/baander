@@ -13,13 +13,14 @@ use App\Shared\Domain\Model\Uuid;
 use App\Shared\Domain\ValueObject\LibraryReadScope;
 use App\Shared\Domain\ValueObject\MediaReadScope;
 use App\Tests\Fixtures\Catalog\ArtistImportIdentityRace;
-use Doctrine\DBAL\Connection;
 use Doctrine\DBAL\Configuration;
+use Doctrine\DBAL\Connection;
 use Doctrine\DBAL\DriverManager;
 use Doctrine\DBAL\Logging\Middleware;
+use Doctrine\DBAL\ParameterType;
+use PHPUnit\Framework\TestCase;
 use Psr\Log\AbstractLogger;
 use Stringable;
-use PHPUnit\Framework\TestCase;
 
 final class PeopleReadRepositoryTest extends TestCase
 {
@@ -60,7 +61,7 @@ final class PeopleReadRepositoryTest extends TestCase
             'name' => 'Shared Person', 'aliases' => '["Stage Name"]', 'profile_overrides' => '{}',
             'birth_date' => '1980-05-15', 'birth_precision' => 3,
             'death_date' => '2020-05-14', 'death_precision' => 3, 'is_deceased' => true,
-        ], ['is_deceased' => \Doctrine\DBAL\ParameterType::BOOLEAN]);
+        ], ['is_deceased' => ParameterType::BOOLEAN]);
     }
 
     protected function tearDown(): void

@@ -1,6 +1,7 @@
 <?php
 
 declare(strict_types=1);
+use Baander\DevEnvironment\Tests\Support\GatewayDockerState;
 
 $arguments = array_slice($_SERVER['argv'], 4);
 if (($arguments[0] ?? '') === 'network' && ($arguments[1] ?? '') === 'inspect') {
@@ -15,4 +16,4 @@ if (is_file($_SERVER['argv'][1] . '/reload-fails') && in_array('reload', $argume
     exit(17);
 }
 require dirname(__DIR__, 4) . '/vendor/autoload.php';
-Baander\DevEnvironment\Tests\Support\GatewayDockerState::run($_SERVER['argv']);
+GatewayDockerState::run($_SERVER['argv']);

@@ -4,17 +4,18 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Shared\Infrastructure\Event;
 
-use App\Tests\Fixtures\Messaging\MessageCodecFactory;
 use App\Notification\Application\DTO\SendEmailCommand;
 use App\Notification\Application\DTO\SendPushCommand;
 use App\Notification\Application\DTO\SendWebhookCommand;
 use App\Notification\Domain\ValueObject\NotificationCategory;
 use App\Notification\Infrastructure\Messaging\NotificationDeliveryIntentResolver;
 use App\Shared\Domain\Event\Outbox\OutboxRelayException;
+use App\Shared\Domain\Event\Outbox\RelayOutboxCommand;
 use App\Shared\Domain\Model\Uuid;
 use App\Shared\Infrastructure\Event\NotificationDeliveryBus;
 use App\Shared\Infrastructure\Event\NotificationDeliveryRepository;
 use App\Shared\Infrastructure\Event\RelayNotificationDeliveriesHandler;
+use App\Tests\Fixtures\Messaging\MessageCodecFactory;
 use Doctrine\DBAL\Connection;
 use Doctrine\DBAL\Result;
 use PHPUnit\Framework\Attributes\DataProvider;
@@ -120,7 +121,7 @@ final class NotificationDeliveryTest extends TestCase
             'wrong channel' => $codec->encode(self::message('email')),
             'wrong ID' => $codec->encode(new SendPushCommand(Uuid::v4(), NotificationCategory::Security, 'title', 'body', 'notification-2')),
             'missing ID' => $codec->encode(new SendEmailCommand(Uuid::v4(), 'user@baander.app', NotificationCategory::Security, 'title', [], 'body', [], new \DateTimeImmutable())),
-            'unsupported' => $codec->encode(new \App\Shared\Domain\Event\Outbox\RelayOutboxCommand()),
+            'unsupported' => $codec->encode(new RelayOutboxCommand()),
             default => $codec->encode($message),
         };
         $rows = [

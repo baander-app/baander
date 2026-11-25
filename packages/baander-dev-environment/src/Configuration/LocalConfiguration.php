@@ -4,17 +4,19 @@ declare(strict_types=1);
 
 namespace Baander\DevEnvironment\Configuration;
 
-use Baander\Process\Execution\CommandExecutor;
-use Baander\Process\Execution\ProcessSpec;
-use Baander\Process\Execution\CompletionPolicy;
 use Baander\Configuration\Sources\LocalSettingsFile;
+use Baander\Configuration\Sources\RepositorySettings;
 use Baander\DevEnvironment\WorkflowError;
+use Baander\Filesystem\Paths;
+use Baander\Process\Execution\CommandExecutor;
+use Baander\Process\Execution\CompletionPolicy;
+use Baander\Process\Execution\ProcessSpec;
 
 final class LocalConfiguration
 {
     public static function discover(CommandExecutor $runner, string $root): ?string
     {
-        return \Baander\Configuration\Sources\RepositorySettings::discover($runner, $root);
+        return RepositorySettings::discover($runner, $root);
     }
 
     /** @param array<string,string>|null $environment
@@ -23,7 +25,7 @@ final class LocalConfiguration
     public static function load(CommandExecutor $runner, string $root, ?array $environment = null): array
     {
         try {
-            return \Baander\Configuration\Sources\RepositorySettings::local($runner, $root, $environment ?? getenv());
+            return RepositorySettings::local($runner, $root, $environment ?? getenv());
         } catch (\InvalidArgumentException $error) {
             throw new WorkflowError($error->getMessage(), previous: $error);
         }
@@ -69,7 +71,7 @@ final class LocalConfiguration
                 'slug' => $slug,
                 'name' => $entry->name,
                 'type' => $entry->type,
-                'source' => \Baander\Filesystem\Paths::resolvedPath($entry->path),
+                'source' => Paths::resolvedPath($entry->path),
                 'target' => '/media/' . $slug,
             ];
         }

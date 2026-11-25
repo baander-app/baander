@@ -11,6 +11,7 @@ use App\Media\Infrastructure\Messaging\MediaMessagePayloadCodec;
 use App\Metadata\Infrastructure\Messaging\MetadataMessagePayloadCodec;
 use App\Notification\Infrastructure\Messaging\NotificationMessagePayloadCodec;
 use App\Radio\Infrastructure\Messaging\RadioMessagePayloadCodec;
+use App\Recommendation\Infrastructure\Messaging\RecommendationMessagePayloadCodec;
 use App\Scheduler\Infrastructure\Messaging\SchedulerMessagePayloadCodec;
 use App\Shared\Application\Messaging\MessagePayloadCodecInterface;
 use App\Shared\Infrastructure\Messaging\JsonMessageCodec;
@@ -54,7 +55,7 @@ final class MessageCodecFactory
             new MetadataMessagePayloadCodec(),
             new NotificationMessagePayloadCodec(),
             new RadioMessagePayloadCodec(),
-            new \App\Recommendation\Infrastructure\Messaging\RecommendationMessagePayloadCodec(),
+            new RecommendationMessagePayloadCodec(),
             new SchedulerMessagePayloadCodec(),
             new OutboxMessagePayloadCodec(),
             new TranscodeMessagePayloadCodec(),

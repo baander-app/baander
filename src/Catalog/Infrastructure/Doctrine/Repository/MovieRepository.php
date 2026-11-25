@@ -20,8 +20,9 @@ use App\Shared\Domain\Model\SearchResult;
 use App\Shared\Domain\Model\Uuid;
 use App\Shared\Domain\ValueObject\LibraryReadScope;
 use App\Shared\Infrastructure\Doctrine\Repository\PgroongaSearchTrait;
-use Doctrine\ORM\EntityManagerInterface;
 use Doctrine\DBAL\ArrayParameterType;
+use Doctrine\ORM\EntityManagerInterface;
+use Doctrine\ORM\QueryBuilder;
 
 /**
  * Pure domain repository for movies.
@@ -131,7 +132,7 @@ final class MovieRepository implements MovieRepositoryInterface
             : Uuid::fromString($row['movieId']), $rows);
     }
 
-    private function visibleQuery(LibraryReadScope $scope): \Doctrine\ORM\QueryBuilder
+    private function visibleQuery(LibraryReadScope $scope): QueryBuilder
     {
         $qb = $this->entityManager
             ->getRepository(MovieEntity::class)
@@ -192,7 +193,7 @@ final class MovieRepository implements MovieRepositoryInterface
     }
 
     /**
-     * @return \App\Catalog\Domain\Model\Movie[]
+     * @return Movie[]
      */
     public function findByLibrary(Uuid $libraryId): array
     {

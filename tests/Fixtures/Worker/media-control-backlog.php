@@ -1,13 +1,18 @@
 <?php
 
 declare(strict_types=1);
+use App\Shared\Domain\Event\Outbox\RelayOutboxCommand;
+use App\Tests\Fixtures\Messaging\MessageCodecFactory;
+use Symfony\Component\Messenger\Bridge\Redis\Transport\Connection;
+use Symfony\Component\Messenger\Bridge\Redis\Transport\RedisTransport;
+use Symfony\Component\Messenger\Envelope;
 
 $project = dirname(__DIR__, 3);
 require $project . '/vendor/autoload.php';
 require $project . '/tests/Fixtures/Messaging/MessageCodecFactory.php';
-$transport = new Symfony\Component\Messenger\Bridge\Redis\Transport\RedisTransport(
-    Symfony\Component\Messenger\Bridge\Redis\Transport\Connection::fromDsn('redis://default:test-only-redis-password@redis:6379/messages/baander'),
-    App\Tests\Fixtures\Messaging\MessageCodecFactory::signingSerializer(),
+$transport = new RedisTransport(
+    Connection::fromDsn('redis://default:test-only-redis-password@redis:6379/messages/baander'),
+    MessageCodecFactory::signingSerializer(),
 );
 $redis = new Redis();
 $redis->connect('redis', 6379, 1);
@@ -17,7 +22,7 @@ $sent = 0;
 while (hrtime(true) < $deadline) {
     $needed = max(0, 2000 - $redis->xLen('messages'));
     for ($index = 0; $index < $needed; ++$index) {
-        $transport->send(new Symfony\Component\Messenger\Envelope(new App\Shared\Domain\Event\Outbox\RelayOutboxCommand()));
+        $transport->send(new Envelope(new RelayOutboxCommand()));
         ++$sent;
     }
     $depth = $redis->xLen('messages');

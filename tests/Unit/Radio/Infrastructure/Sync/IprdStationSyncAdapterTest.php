@@ -91,10 +91,10 @@ final class IprdStationSyncAdapterTest extends TestCase
     public function testCatalogRedirectCannotReachItsUnapprovedTarget(): void
     {
         $requests = 0;
-        $raw = new \Symfony\Component\HttpClient\MockHttpClient(static function () use (&$requests): \Symfony\Component\HttpClient\Response\MockResponse {
+        $raw = new MockHttpClient(static function () use (&$requests): MockResponse {
             ++$requests;
 
-            return new \Symfony\Component\HttpClient\Response\MockResponse('', [
+            return new MockResponse('', [
                 'http_code' => 302, 'response_headers' => ['Location: http://127.0.0.1/private'],
             ]);
         });

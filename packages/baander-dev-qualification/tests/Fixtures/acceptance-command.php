@@ -3,6 +3,12 @@
 declare(strict_types=1);
 
 use Baander\DevQualification\Acceptance\Commands;
+use Baander\Process\Execution\CommandFailure;
+use Baander\Process\Execution\EngineExecutor;
+use Baander\Process\Execution\ExecutionContext;
+use Baander\Process\Execution\ProcessSpec;
+use Swoole\Process;
+use Swoole\Timer;
 
 require dirname(__DIR__, 4) . '/scripts/bootstrap.php';
 
@@ -37,7 +43,7 @@ switch ($argv[1]) {
         sleep(30);
         break;
     case 'pause-ownership-driver':
-        $executor = new \Baander\Process\Execution\EngineExecutor(new \Baander\Process\Execution\ExecutionContext(getenv()));
+        $executor = new EngineExecutor(new ExecutionContext(getenv()));
         $commands = new Commands($argv[2], $argv[2] . '/logs', $executor, getenv());
         $commands->pause(10000);
         $commands->pause(10000);
@@ -47,25 +53,25 @@ switch ($argv[1]) {
     case 'polling-signal-driver':
         $root = $argv[2];
         $signal = constant($argv[3]);
-        $executor = new \Baander\Process\Execution\EngineExecutor(new \Baander\Process\Execution\ExecutionContext(getenv()));
+        $executor = new EngineExecutor(new ExecutionContext(getenv()));
         $commands = new Commands($root, $root . '/logs', $executor, getenv());
-        Swoole\Timer::after(25, static function () use ($signal): void {
-            Swoole\Process::kill(getmypid(), $signal);
+        Timer::after(25, static function () use ($signal): void {
+            Process::kill(getmypid(), $signal);
         });
         try {
             $commands->pause(500000);
         } catch (Throwable $error) {
             file_put_contents($root . '/failure-preserved', $error->getMessage());
-            $timers = Swoole\Timer::stats()['num'];
+            $timers = Timer::stats()['num'];
             $repeatedStatus = null;
             try {
                 $commands->pause(10000);
-            } catch (\Baander\Process\Execution\CommandFailure $repeated) {
+            } catch (CommandFailure $repeated) {
                 $repeatedStatus = $repeated->getCode();
             }
-            $cleanupExecutor = new \Baander\Process\Execution\EngineExecutor(\Baander\Process\Execution\ExecutionContext::bounded(2, getenv(), ignoreCancellation: true));
+            $cleanupExecutor = new EngineExecutor(ExecutionContext::bounded(2, getenv(), ignoreCancellation: true));
             try {
-                $cleanup = $cleanupExecutor->run(new \Baander\Process\Execution\ProcessSpec([
+                $cleanup = $cleanupExecutor->run(new ProcessSpec([
                     PHP_BINARY, '-r', 'file_put_contents($argv[1], "complete"); echo "cleaned";', $root . '/cleanup-finished',
                 ]))->stdout;
             } finally {
@@ -77,7 +83,7 @@ switch ($argv[1]) {
         }
         exit(2);
     case 'pause-driver':
-        $commands = new Commands($argv[2], $argv[2] . '/logs', new \Baander\Process\Execution\EngineExecutor(new \Baander\Process\Execution\ExecutionContext(getenv())), getenv());
+        $commands = new Commands($argv[2], $argv[2] . '/logs', new EngineExecutor(new ExecutionContext(getenv())), getenv());
         $started = hrtime(true);
         $commands->pause(10000);
         $idleSeconds = (hrtime(true) - $started) / 1000000000;
@@ -90,13 +96,13 @@ switch ($argv[1]) {
         echo json_encode(['idleSeconds' => $idleSeconds, 'status' => $result->exitCode], JSON_THROW_ON_ERROR);
         break;
     case 'signal-driver':
-        $commands = new Commands($argv[2], $argv[2] . '/logs', new \Baander\Process\Execution\EngineExecutor(new \Baander\Process\Execution\ExecutionContext(getenv())), getenv());
-        $timer = Swoole\Timer::tick(
+        $commands = new Commands($argv[2], $argv[2] . '/logs', new EngineExecutor(new ExecutionContext(getenv())), getenv());
+        $timer = Timer::tick(
             10,
             static function () use ($argv, &$timer): void {
                 if (is_file($argv[2] . '/child-pid')) {
-                    Swoole\Timer::clear($timer);
-                    Swoole\Process::kill(getmypid(), SIGTERM);
+                    Timer::clear($timer);
+                    Process::kill(getmypid(), SIGTERM);
                 }
             },
         );
@@ -106,8 +112,8 @@ switch ($argv[1]) {
         } catch (RuntimeException) {
             $cancelled = true;
         } finally {
-            if (Swoole\Timer::exists($timer)) {
-                Swoole\Timer::clear($timer);
+            if (Timer::exists($timer)) {
+                Timer::clear($timer);
             }
         }
         echo json_encode(['cancelled' => $cancelled], JSON_THROW_ON_ERROR);

@@ -9,6 +9,8 @@ use App\Catalog\Application\MessageHandler\DrainAlbumMatchesHandler;
 use App\Catalog\Application\MessageHandler\QueueArtistSyncsHandler;
 use App\Catalog\Application\MessageHandler\RequestAlbumMatchHandler;
 use App\Catalog\Application\MessageHandler\SyncArtistHandler;
+use App\Media\Application\Command\GenerateImageDerivativeCommand;
+use App\Media\Application\CommandHandler\GenerateImageDerivativeHandler;
 use App\Metadata\Application\Message\SyncAlbumMessage;
 use App\Metadata\Application\Message\SyncArtistMessage;
 use App\Metadata\Application\Message\SyncArtistsMessage;
@@ -18,8 +20,17 @@ use App\Metadata\Application\Message\SyncSongMessage;
 use App\Metadata\Application\MessageHandler\SyncLibraryHandler;
 use App\Metadata\Application\MessageHandler\SyncMovieHandler;
 use App\Metadata\Application\MessageHandler\SyncSongHandler;
+use App\Notification\Application\DTO\SendEmailCommand;
+use App\Notification\Application\DTO\SendPushCommand;
+use App\Notification\Application\DTO\SendPushToSubscriptionCommand;
+use App\Notification\Application\Handler\SendEmailHandler;
+use App\Notification\Application\Handler\SendPushHandler;
+use App\Notification\Application\Handler\SendPushToSubscriptionHandler;
+use App\Notification\Domain\ValueObject\NotificationCategory;
 use App\Radio\Application\Command\SyncCountryStationsCommand;
 use App\Radio\Application\CommandHandler\SyncCountryStationsHandler;
+use App\Recommendation\Application\Command\ExecuteRecommendationJobCommand;
+use App\Recommendation\Application\CommandHandler\ExecuteRecommendationJobHandler;
 use App\Shared\Domain\Model\Uuid;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
@@ -54,11 +65,11 @@ final class SwooleFallbackHandlerRegistrationTest extends TestCase
     public static function handlerTransports(): iterable
     {
         $messages = [
-            \App\Recommendation\Application\CommandHandler\ExecuteRecommendationJobHandler::class => new \App\Recommendation\Application\Command\ExecuteRecommendationJobCommand(Uuid::v7()),
-            \App\Media\Application\CommandHandler\GenerateImageDerivativeHandler::class => new \App\Media\Application\Command\GenerateImageDerivativeCommand('source.png'),
-            \App\Notification\Application\Handler\SendPushHandler::class => new \App\Notification\Application\DTO\SendPushCommand(Uuid::v7(), \App\Notification\Domain\ValueObject\NotificationCategory::Security, 'title', 'body', 'notification'),
-            \App\Notification\Application\Handler\SendPushToSubscriptionHandler::class => new \App\Notification\Application\DTO\SendPushToSubscriptionCommand(Uuid::v7(), Uuid::v7(), 'title', 'body', 'notification'),
-            \App\Notification\Application\Handler\SendEmailHandler::class => new \App\Notification\Application\DTO\SendEmailCommand(Uuid::v7(), 'worker@baander.app', \App\Notification\Domain\ValueObject\NotificationCategory::Security, 'title', [], 'body', [], new \DateTimeImmutable()),
+            ExecuteRecommendationJobHandler::class => new ExecuteRecommendationJobCommand(Uuid::v7()),
+            GenerateImageDerivativeHandler::class => new GenerateImageDerivativeCommand('source.png'),
+            SendPushHandler::class => new SendPushCommand(Uuid::v7(), NotificationCategory::Security, 'title', 'body', 'notification'),
+            SendPushToSubscriptionHandler::class => new SendPushToSubscriptionCommand(Uuid::v7(), Uuid::v7(), 'title', 'body', 'notification'),
+            SendEmailHandler::class => new SendEmailCommand(Uuid::v7(), 'worker@baander.app', NotificationCategory::Security, 'title', [], 'body', [], new \DateTimeImmutable()),
             SyncSongHandler::class => new SyncSongMessage(Uuid::v7()),
             SyncMovieHandler::class => new SyncMovieMessage(Uuid::v7()),
             RequestAlbumMatchHandler::class => new SyncAlbumMessage(Uuid::v7()),

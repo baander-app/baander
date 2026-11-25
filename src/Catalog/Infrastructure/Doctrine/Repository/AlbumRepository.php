@@ -15,18 +15,21 @@ use App\Catalog\Infrastructure\Doctrine\Entity\ArtistAlbumEntity;
 use App\Catalog\Infrastructure\Doctrine\Entity\ArtistEntity;
 use App\Catalog\Infrastructure\Doctrine\Entity\GenreAlbumEntity;
 use App\Catalog\Infrastructure\Doctrine\Entity\GenreEntity;
+use App\Catalog\Infrastructure\Doctrine\Entity\SongEntity;
 use App\Catalog\Infrastructure\Doctrine\ManagedHolders;
 use App\Catalog\Infrastructure\Doctrine\Query\CatalogReadScopeQuery;
 use App\Library\Infrastructure\Doctrine\Entity\LibraryEntity;
+use App\Media\Infrastructure\Doctrine\Entity\ImageEntity;
 use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\SearchOptions;
 use App\Shared\Domain\Model\SearchResult;
 use App\Shared\Domain\Model\Uuid;
-use App\Shared\Infrastructure\Doctrine\Repository\RefreshedEntityTrait;
 use App\Shared\Domain\ValueObject\LibraryReadScope;
 use App\Shared\Infrastructure\Doctrine\Repository\PgroongaSearchTrait;
+use App\Shared\Infrastructure\Doctrine\Repository\RefreshedEntityTrait;
 use Doctrine\DBAL\ArrayParameterType;
 use Doctrine\ORM\EntityManagerInterface;
+use Doctrine\ORM\QueryBuilder;
 
 /**
  * Pure domain repository for albums.
@@ -74,7 +77,7 @@ final class AlbumRepository implements AlbumRepositoryInterface
             ->getSingleScalarResult();
     }
 
-    private function visibleQuery(LibraryReadScope $scope): \Doctrine\ORM\QueryBuilder
+    private function visibleQuery(LibraryReadScope $scope): QueryBuilder
     {
         $qb = $this->entityManager
             ->getRepository(AlbumEntity::class)
@@ -258,11 +261,11 @@ final class AlbumRepository implements AlbumRepositoryInterface
         $album = $this->toDomain($entity);
 
         $songEntities = $this->entityManager
-            ->getRepository(\App\Catalog\Infrastructure\Doctrine\Entity\SongEntity::class)
+            ->getRepository(SongEntity::class)
             ->findBy(['album' => $entity]);
 
         $songs = array_map(
-            fn(\App\Catalog\Infrastructure\Doctrine\Entity\SongEntity $songEntity) => SongRepository::entityToDomain($songEntity),
+            fn(SongEntity $songEntity) => SongRepository::entityToDomain($songEntity),
             $songEntities,
         );
 
@@ -627,7 +630,7 @@ final class AlbumRepository implements AlbumRepositoryInterface
     /**
      * @param list<array{field: string, operator: string, value: mixed}> $filters
      */
-    private function applyAlbumFilters(\Doctrine\ORM\QueryBuilder $qb, array $filters): void
+    private function applyAlbumFilters(QueryBuilder $qb, array $filters): void
     {
         foreach ($filters as $filter) {
             match ($filter['field']) {
@@ -638,7 +641,7 @@ final class AlbumRepository implements AlbumRepositoryInterface
         }
     }
 
-    private function applyArtistFilter(\Doctrine\ORM\QueryBuilder $qb, string $artistPublicId): void
+    private function applyArtistFilter(QueryBuilder $qb, string $artistPublicId): void
     {
         $artistEntity = $this->entityManager
             ->getRepository(ArtistEntity::class)
@@ -660,7 +663,7 @@ final class AlbumRepository implements AlbumRepositoryInterface
             ->setParameter('artist_filter_id', $artistEntity->getId());
     }
 
-    private function applyGenreFilter(\Doctrine\ORM\QueryBuilder $qb, string $genreSlug): void
+    private function applyGenreFilter(QueryBuilder $qb, string $genreSlug): void
     {
         $qb->andWhere($qb->expr()->in(
             'a.id',
@@ -670,7 +673,7 @@ final class AlbumRepository implements AlbumRepositoryInterface
         ))->setParameter('genre_slug', $genreSlug);
     }
 
-    private function applyAlbumSort(\Doctrine\ORM\QueryBuilder $qb, SearchOptions $options): void
+    private function applyAlbumSort(QueryBuilder $qb, SearchOptions $options): void
     {
         if (!$options->hasSort()) {
             $qb->orderBy('a.title', 'ASC');
@@ -767,7 +770,7 @@ final class AlbumRepository implements AlbumRepositoryInterface
         // Sync cover image relationship
         if ($album->getCoverImageId() !== null) {
             $imageEntity = $this->entityManager
-                ->getRepository(\App\Media\Infrastructure\Doctrine\Entity\ImageEntity::class)
+                ->getRepository(ImageEntity::class)
                 ->find($album->getCoverImageId());
             $entity->setCoverImage($imageEntity);
         } else {

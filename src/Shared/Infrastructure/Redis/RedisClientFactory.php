@@ -7,6 +7,7 @@ namespace App\Shared\Infrastructure\Redis;
 use InvalidArgumentException;
 use Redis;
 use SensitiveParameter;
+use Swoole\Coroutine;
 use Throwable;
 
 /**
@@ -89,11 +90,11 @@ class RedisClientFactory
         $this->maxSize = $maxSize;
         $this->idleTimeoutSeconds = $idleTimeoutSeconds;
         $this->connectionFactory = $connectionFactory ?? fn(): Redis => $this->connect(new Redis());
-        $this->getCidFn = $getCidFn ?? static fn(): int => \extension_loaded('swoole') && \Swoole\Coroutine::getCid() > 0
-            ? \Swoole\Coroutine::getCid()
+        $this->getCidFn = $getCidFn ?? static fn(): int => \extension_loaded('swoole') && Coroutine::getCid() > 0
+            ? Coroutine::getCid()
             : -1;
         $this->cidExistsFn = $cidExistsFn ?? static fn(int $cid): bool => \extension_loaded('swoole')
-            ? \Swoole\Coroutine::exists($cid)
+            ? Coroutine::exists($cid)
             : true;
     }
 

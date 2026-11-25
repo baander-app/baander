@@ -4,13 +4,18 @@ declare(strict_types=1);
 
 namespace Baander\Images\Tests;
 
+use Baander\Configuration\ToolingConfiguration;
 use Baander\Images\Inventory\ApplicationInventory as Inventory;
 use Baander\Images\Inventory\Collector;
 use Baander\Images\Inventory\InventoryError;
 use Baander\Images\Inventory\Json;
 use Baander\Images\Inventory\SafeTar;
+use Baander\Process\Execution\EngineExecutor;
+use Baander\Process\Execution\ExecutionContext;
+use Baander\Process\Execution\ProcessSpec;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
+use Swoole\Process;
 
 final class ApplicationInventoryTest extends TestCase
 {
@@ -593,13 +598,13 @@ final class ApplicationInventoryTest extends TestCase
         unlink($this->temporary . '/fail-remove');
         $environment = array_replace(getenv(), ['INVENTORY_DOCKER_STATE' => $this->temporary, 'TMPDIR' => $this->temporary, 'BAANDER_BROWSER_IMAGE' => "invalid\nreference"]);
         try {
-            \Baander\Configuration\ToolingConfiguration::resolve(environment: $environment);
+            ToolingConfiguration::resolve(environment: $environment);
             self::fail('Expected current image configuration to be invalid.');
         } catch (\InvalidArgumentException) {
         }
-        $runner = new \Baander\Process\Execution\EngineExecutor(\Baander\Process\Execution\ExecutionContext::bounded(20, $environment));
+        $runner = new EngineExecutor(ExecutionContext::bounded(20, $environment));
         try {
-            $retry = $runner->run(new \Baander\Process\Execution\ProcessSpec([PHP_BINARY, dirname(__DIR__, 3) . '/scripts/packaged_inventory.php', 'cleanup-collection', '--session', $sessions[0]], environment: $environment));
+            $retry = $runner->run(new ProcessSpec([PHP_BINARY, dirname(__DIR__, 3) . '/scripts/packaged_inventory.php', 'cleanup-collection', '--session', $sessions[0]], environment: $environment));
             self::assertSame(0, $retry->exitCode);
         } finally {
             $runner->close();
@@ -788,7 +793,7 @@ final class ApplicationInventoryTest extends TestCase
                 usleep(10000);
             }
             self::assertFileExists($this->temporary . '/create-block-ready');
-            \Swoole\Process::kill(proc_get_status($child)['pid'], $signal);
+            Process::kill(proc_get_status($child)['pid'], $signal);
         } elseif ($signal !== 0) {
             $deadline = microtime(true) + 5;
             while (!is_file($this->temporary . '/export-ready') && microtime(true) < $deadline) {
@@ -798,7 +803,7 @@ final class ApplicationInventoryTest extends TestCase
                 proc_terminate($child, 9);
                 self::fail('Export child did not become ready');
             }
-            \Swoole\Process::kill(proc_get_status($child)['pid'], $signal);
+            Process::kill(proc_get_status($child)['pid'], $signal);
         }
         $stdout = stream_get_contents($pipes[1]);
         $stderr = stream_get_contents($pipes[2]);

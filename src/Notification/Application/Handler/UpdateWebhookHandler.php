@@ -8,6 +8,7 @@ use App\Notification\Application\DTO\UpdateWebhookCommand;
 use App\Notification\Application\DTO\WebhookView;
 use App\Notification\Application\Port\WebhookRepositoryInterface;
 use App\Notification\Application\Service\WebhookInput;
+use App\Shared\Application\Exception\InvalidInputException;
 use App\Shared\Application\Exception\NotFoundException;
 use Symfony\Component\Messenger\Attribute\AsMessageHandler;
 
@@ -20,7 +21,7 @@ final readonly class UpdateWebhookHandler
     }
 
     /**
-     * @throws \App\Shared\Application\Exception\InvalidInputException when the ID, the URL or the category filter is rejected; nothing changes
+     * @throws InvalidInputException when the ID, the URL or the category filter is rejected; nothing changes
      * @throws NotFoundException                                         when no webhook has the ID
      */
     #[AsMessageHandler]

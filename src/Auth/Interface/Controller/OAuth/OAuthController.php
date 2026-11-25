@@ -29,8 +29,8 @@ use App\Auth\Application\Http\AccessTokenAttributes;
 use App\Auth\Application\Port\AuthenticatedUserIdentityInterface;
 use App\Auth\Application\Query\OAuth\GetAuthorizationRequestQuery;
 use App\Auth\Application\Query\OAuth\GetDeviceAuthorizationQuery;
-use App\Auth\Interface\Request\OAuth\DeviceApproveRequest;
 use App\Auth\Interface\Request\OAuth\AuthorizationDecisionRequest;
+use App\Auth\Interface\Request\OAuth\DeviceApproveRequest;
 use App\Auth\Interface\Request\OAuth\RevokeTokenRequest;
 use App\Auth\Interface\Resource\OAuth\AuthorizationErrorResource;
 use App\Auth\Interface\Resource\OAuth\AuthorizationRedirectResource;
@@ -45,6 +45,7 @@ use App\Shared\Domain\Model\Uuid;
 use App\Shared\Interface\Controller\ApiResponsesTrait;
 use App\Shared\Interface\DTO\ApiError;
 use App\Shared\Interface\DTO\OAuthError;
+use App\Shared\Interface\DTO\ValidationError;
 use OpenApi\Spec as OA;
 use Symfony\Bundle\SecurityBundle\Security;
 use Symfony\Component\HttpFoundation\Exception\JsonException;
@@ -493,7 +494,7 @@ final class OAuthController
                 response: '422',
                 description: 'Validation error',
                 content: new OA\MediaType\Json(
-                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ValidationError::class),
+                    schema: new OA\Schema(ref: ValidationError::class),
                 ),
             ),
             new OA\Response(
@@ -507,7 +508,7 @@ final class OAuthController
                     ),
                 ],
                 content: new OA\MediaType\Json(
-                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                    schema: new OA\Schema(ref: ApiError::class),
                 ),
             ),
         ],
@@ -752,7 +753,7 @@ final class OAuthController
                 response: '422',
                 description: 'Validation error',
                 content: new OA\MediaType\Json(
-                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ValidationError::class),
+                    schema: new OA\Schema(ref: ValidationError::class),
                 ),
             ),
         ],

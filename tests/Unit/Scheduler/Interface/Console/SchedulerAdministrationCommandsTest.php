@@ -23,6 +23,7 @@ use App\Scheduler\Interface\Console\SchedulerResumeCommand;
 use App\Scheduler\Interface\Console\SchedulerShowCommand;
 use App\Scheduler\Interface\Console\SchedulerUpdateCommand;
 use App\Scheduler\Interface\Resource\ScheduledJobResource;
+use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
@@ -279,7 +280,7 @@ final class SchedulerAdministrationCommandsTest extends TestCase
     {
         $tester = $this->tester($command($this));
 
-        $missing = $tester->execute(['id' => (new \App\Shared\Domain\Model\PublicId())->toString()] + $options, ['capture_stderr_separately' => true]);
+        $missing = $tester->execute(['id' => (new PublicId())->toString()] + $options, ['capture_stderr_separately' => true]);
         self::assertSame(Command::FAILURE, $missing);
         self::assertStringContainsString('Scheduled job not found.', $tester->getErrorOutput());
 
@@ -440,7 +441,7 @@ final class SchedulerAdministrationCommandsTest extends TestCase
                 $this->test->write($job);
             }
 
-            public function findByPublicId(\App\Shared\Domain\Model\PublicId $id): ?ScheduledJob
+            public function findByPublicId(PublicId $id): ?ScheduledJob
             {
                 foreach ($this->test->readAll() as $job) {
                     if ($job->getPublicId()->equals($id)) { return $job; }

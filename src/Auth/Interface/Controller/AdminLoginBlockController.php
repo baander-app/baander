@@ -11,6 +11,7 @@ use App\Auth\Application\Query\LoginBlock\ListLoginBlocksQuery;
 use App\Auth\Interface\Resource\LoginBlockResource;
 use App\Shared\Interface\Attribute\CliCounterpart;
 use App\Shared\Interface\Controller\ApiResponsesTrait;
+use App\Shared\Interface\DTO\ApiError;
 use App\Shared\Interface\Request\QueryParameters;
 use OpenApi\Spec as OA;
 use Symfony\Component\HttpFoundation\JsonResponse;
@@ -90,7 +91,7 @@ final class AdminLoginBlockController
                 response: '400',
                 description: 'Invalid pagination',
                 content: new OA\MediaType\Json(
-                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                    schema: new OA\Schema(ref: ApiError::class),
                 ),
             ),
         ],
@@ -123,7 +124,7 @@ final class AdminLoginBlockController
                 response: '404',
                 description: 'Block not found',
                 content: new OA\MediaType\Json(
-                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                    schema: new OA\Schema(ref: ApiError::class),
                 ),
             ),
         ],

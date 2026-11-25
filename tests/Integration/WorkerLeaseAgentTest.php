@@ -5,8 +5,9 @@ declare(strict_types=1);
 namespace App\Tests\Integration;
 
 use App\Shared\Infrastructure\Worker\DoctrineDeploymentLease;
-use App\Tests\Support\DeploymentJournalFixture;
 use App\Shared\Infrastructure\Worker\LeaseAgentProcess;
+use App\Tests\Support\DeploymentJournalFixture;
+use App\Tests\Support\FinalSchemaBootstrap;
 use Doctrine\DBAL\Connection;
 use Doctrine\DBAL\DriverManager;
 use Doctrine\DBAL\Tools\DsnParser;
@@ -34,7 +35,7 @@ final class WorkerLeaseAgentTest extends TestCase
         $this->schema = 'lease_agent_test_' . bin2hex(random_bytes(8));
         $this->connection->executeStatement('CREATE SCHEMA ' . $this->schema);
         $this->connection->executeStatement('SET search_path TO ' . $this->schema . ', public');
-        \App\Tests\Support\FinalSchemaBootstrap::bootstrap($this->connection);
+        FinalSchemaBootstrap::bootstrap($this->connection);
         DeploymentJournalFixture::ready($this->connection, 'baander.app:workers', str_repeat('a', 32));
         $this->environment = [...getenv(), 'DATABASE_URL' => $url, 'DATABASE_CONTROL_URL' => $url, 'PGOPTIONS' => '-c search_path=' . $this->schema . ',public'];
     }

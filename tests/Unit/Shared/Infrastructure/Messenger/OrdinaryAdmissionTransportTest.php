@@ -4,12 +4,14 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Shared\Infrastructure\Messenger;
 
+use App\Shared\Application\DTO\DeploymentProfile;
 use App\Shared\Application\DTO\WorkerAutoscalingProfile;
 use App\Shared\Infrastructure\Messenger\OrdinaryAdmissionTransport;
 use App\Shared\Infrastructure\Worker\Autoscaling\AdmissionLedger;
 use App\Shared\Infrastructure\Worker\Autoscaling\WorkerAdmissionContext;
 use App\Shared\Infrastructure\Worker\DeploymentLease;
 use App\Shared\Infrastructure\Worker\WorkerLaunchIdentity;
+use App\Shared\Infrastructure\Worker\WorkerPeerHandshake;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Messenger\Envelope;
 use Symfony\Component\Messenger\Transport\CloseableTransportInterface;
@@ -30,11 +32,11 @@ final class OrdinaryAdmissionTransportTest extends TestCase
         $this->boot = str_repeat('a', 32);
         mkdir($this->directory, 0700);
         mkdir($this->directory . '/' . $this->boot, 0700);
-        $this->ledger = new AdmissionLedger($this->directory, new DeploymentLease('worker.baander.app', $this->boot, 1), new WorkerAutoscalingProfile(maximumConcurrency: 4), new \App\Shared\Application\DTO\DeploymentProfile());
+        $this->ledger = new AdmissionLedger($this->directory, new DeploymentLease('worker.baander.app', $this->boot, 1), new WorkerAutoscalingProfile(maximumConcurrency: 4), new DeploymentProfile());
         $now = hrtime(true) / 1e9;
         $this->ledger->initialize($now);
         foreach (['control', 'execution'] as $unit) {
-            (new \App\Shared\Infrastructure\Worker\WorkerPeerHandshake($this->directory, 'worker.baander.app', $this->boot, $unit, $now, new \App\Shared\Application\DTO\DeploymentProfile()))->publish(1, true, false, $now);
+            (new WorkerPeerHandshake($this->directory, 'worker.baander.app', $this->boot, $unit, $now, new DeploymentProfile()))->publish(1, true, false, $now);
         }
         $this->ledger->publishDecision(4, 'test-demand', [], $now);
     }

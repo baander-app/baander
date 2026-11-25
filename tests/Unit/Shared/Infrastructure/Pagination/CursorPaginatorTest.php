@@ -9,6 +9,7 @@ use App\Shared\Domain\Model\Cursor;
 use App\Shared\Domain\Model\CursorDirection;
 use App\Shared\Infrastructure\Pagination\CursorPaginator;
 use App\Shared\Infrastructure\Pagination\CursorResult;
+use Doctrine\ORM\QueryBuilder;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
@@ -139,7 +140,7 @@ final class CursorPaginatorTest extends TestCase
      */
     public function testPaginateThrowsInvalidArgumentExceptionForLimitZero(): void
     {
-        $qb = $this->createStub(\Doctrine\ORM\QueryBuilder::class);
+        $qb = $this->createStub(QueryBuilder::class);
 
         $this->expectException(\InvalidArgumentException::class);
         $this->expectExceptionMessage('Limit must be at least 1');
@@ -156,7 +157,7 @@ final class CursorPaginatorTest extends TestCase
 
     public function testPaginateThrowsInvalidArgumentExceptionForNegativeLimit(): void
     {
-        $qb = $this->createStub(\Doctrine\ORM\QueryBuilder::class);
+        $qb = $this->createStub(QueryBuilder::class);
 
         $this->expectException(\InvalidArgumentException::class);
         $this->expectExceptionMessage('Limit must be at least 1');
@@ -183,7 +184,7 @@ final class CursorPaginatorTest extends TestCase
     #[DataProvider('cursorsFromOtherOrderings')]
     public function testPaginateRejectsCursorFromAnotherOrderingBeforeQuerying(array $values): void
     {
-        $qb = $this->createMock(\Doctrine\ORM\QueryBuilder::class);
+        $qb = $this->createMock(QueryBuilder::class);
         $qb->expects($this->never())->method('getQuery');
 
         $this->expectException(CursorMismatchException::class);

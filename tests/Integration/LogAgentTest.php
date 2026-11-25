@@ -10,8 +10,13 @@ use App\Shared\Infrastructure\LogViewer\Agent\AgentProtocol;
 use App\Shared\Infrastructure\LogViewer\Agent\Collector;
 use App\Shared\Infrastructure\LogViewer\Agent\DockerClient;
 use App\Shared\Infrastructure\LogViewer\Agent\DockerLogSession;
+use App\Shared\Infrastructure\LogViewer\ArchiveReader;
 use App\Shared\Infrastructure\LogViewer\LogIndex;
+use App\Shared\Infrastructure\LogViewer\LogNormalizer;
+use App\Shared\Infrastructure\LogViewer\LogStorageLimitException;
+use Baander\Containers\Docker\Target;
 use Baander\Core\EnvironmentVariable;
+use Baander\Deployment\Observability\LogCollection;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Process\Process;
 
@@ -167,7 +172,7 @@ final class LogAgentTest extends TestCase
             $received = [];
             $consume = static function (array $record) use ($index, $sourceId, &$collected, &$received): void {
                 $received[] = strstr($record['raw'], ' ', true);
-                $index->append($sourceId, 'backlog', ++$collected, new \App\Shared\Infrastructure\LogViewer\LogNormalizer()->normalize('backlog-'.$collected), ['sequence' => $collected]);
+                $index->append($sourceId, 'backlog', ++$collected, new LogNormalizer()->normalize('backlog-'.$collected), ['sequence' => $collected]);
             };
             self::assertFalse($session->collect($consume, seconds: 10));
             self::assertGreaterThan(0, $index->checkpoint($sourceId)['sequence']);
@@ -192,7 +197,7 @@ final class LogAgentTest extends TestCase
             try {
                 $interleaved->collect(static function (array $record) use ($index, $containerSource, $secondTime): void {
                     self::assertSame('committed stdout', $record['raw']);
-                    $index->append($containerSource, 'boot', 147, new \App\Shared\Infrastructure\LogViewer\LogNormalizer()->normalize($record['raw']), ['timestamp' => $record['checkpointTimestamp'], 'resumeThrough' => $secondTime, 'sequence' => 147, 'boundary' => []]);
+                    $index->append($containerSource, 'boot', 147, new LogNormalizer()->normalize($record['raw']), ['timestamp' => $record['checkpointTimestamp'], 'resumeThrough' => $secondTime, 'sequence' => 147, 'boundary' => []]);
                     throw new \RuntimeException('Simulated collector interruption.');
                 });
                 self::fail('Interruption must stop the session.');
@@ -248,7 +253,7 @@ final class LogAgentTest extends TestCase
             try {
                 new Collector($config, $limitedIndex)->tick();
                 self::fail('The impossible index budget must suspend collection.');
-            } catch (\App\Shared\Infrastructure\LogViewer\LogStorageLimitException) {
+            } catch (LogStorageLimitException) {
             }
             $limitedSources = array_column($limitedIndex->sources()['items'], null, 'id');
             self::assertTrue($limitedSources[$containerSource]['available']);
@@ -270,8 +275,8 @@ final class LogAgentTest extends TestCase
         $port = (int) substr(strrchr(stream_socket_get_name($reservation, false), ':'), 1);
         fclose($reservation);
         $configuration = array_replace($this->config()->values, ['listenHost' => '127.0.0.1', 'listenPort' => $port]);
-        $target = new \Baander\Containers\Docker\Target('/usr/bin/docker', 'unix:///var/run/docker.sock', 'fixture-daemon', null, null);
-        $service = \Baander\Deployment\Observability\LogCollection::service('baander:fixture', dirname(__DIR__, 2), $target, $this->directory, $configuration);
+        $target = new Target('/usr/bin/docker', 'unix:///var/run/docker.sock', 'fixture-daemon', null, null);
+        $service = LogCollection::service('baander:fixture', dirname(__DIR__, 2), $target, $this->directory, $configuration);
         $process = proc_open([PHP_BINARY, dirname(__DIR__, 2).'/bin/log-agent.php'], [0 => ['file', '/dev/null', 'r'], 1 => ['file', $this->directory.'/stdout', 'w'], 2 => ['file', $this->directory.'/stderr', 'w']], $pipes, null, array_replace(getenv(), $service['environment']));
         self::assertIsResource($process);
         try {
@@ -410,7 +415,7 @@ final class LogAgentTest extends TestCase
         $source = LogIndex::sourceId('channel-fixture');
         $index->upsertSource(['id' => $source, 'status' => 'following']);
         foreach (['app', 'security', 'messenger'] as $sequence => $channel) {
-            $record = new \App\Shared\Infrastructure\LogViewer\LogNormalizer()->normalize(json_encode(['message' => 'channel fixture', 'channel' => $channel]));
+            $record = new LogNormalizer()->normalize(json_encode(['message' => 'channel fixture', 'channel' => $channel]));
             $index->append($source, 'boot', $sequence, $record);
         }
         $protocol = new AgentProtocol($this->config(), $index);
@@ -507,7 +512,7 @@ final class LogAgentTest extends TestCase
         $archive = $this->directory.'/logs/ready.log.gz';
         file_put_contents($file, "readable file\n");
         file_put_contents($archive, gzencode("readable archive\n"));
-        $member = new \App\Shared\Infrastructure\LogViewer\ArchiveReader()->members($archive)[0];
+        $member = new ArchiveReader()->members($archive)[0];
         $fileId = LogIndex::sourceId('local:file:'.$file);
         $archiveId = LogIndex::sourceId('local:file:'.$archive.':member:'.$member);
         $index = new LogIndex($this->directory.'/logs.sqlite');
@@ -559,7 +564,7 @@ final class LogAgentTest extends TestCase
         try {
             $collector->tick();
             self::fail('The intentionally impossible index budget must suspend collection.');
-        } catch (\App\Shared\Infrastructure\LogViewer\LogStorageLimitException) {
+        } catch (LogStorageLimitException) {
         }
         self::assertSame([], $index->query(new LogQuery())['items']);
         foreach ($index->sources()['items'] as $source) {
@@ -570,7 +575,7 @@ final class LogAgentTest extends TestCase
         try {
             $collector->tick();
             self::fail('The intentionally impossible index budget must suspend collection.');
-        } catch (\App\Shared\Infrastructure\LogViewer\LogStorageLimitException) {
+        } catch (LogStorageLimitException) {
         }
         self::assertSame([], $index->query(new LogQuery())['items']);
         foreach ($index->sources()['items'] as $source) {
@@ -608,7 +613,7 @@ final class LogAgentTest extends TestCase
             exit(0);
         }
         fclose($listener);
-        file_put_contents($this->directory.'/nginx.conf', \Baander\Deployment\Observability\LogCollection::proxyConfiguration($daemon, $proxy));
+        file_put_contents($this->directory.'/nginx.conf', LogCollection::proxyConfiguration($daemon, $proxy));
         $nginx = new Process(['nginx', '-c', $this->directory.'/nginx.conf', '-p', $this->directory]);
         $nginx->start();
         try {

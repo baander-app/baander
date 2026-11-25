@@ -6,11 +6,15 @@ namespace App\Tests\Integration;
 
 use App\Catalog\Application\Command\Person\ManagePersonCommand;
 use App\Catalog\Application\Port\PersonCreditInput;
+use App\Catalog\Infrastructure\Doctrine\Entity\MovieEntity;
 use App\Catalog\Infrastructure\Doctrine\ImportIdentity\PersonWriteLock;
 use App\Catalog\Infrastructure\Doctrine\Repository\PersonAdministrationRepository;
 use App\Catalog\Infrastructure\Doctrine\Repository\PersonArtistLinkRepository;
 use App\Catalog\Infrastructure\Doctrine\Repository\PersonCreditRepository;
 use App\Catalog\Infrastructure\Doctrine\Repository\PersonIdentityRepository;
+use App\Library\Infrastructure\Doctrine\Entity\LibraryEntity;
+use App\Shared\Application\Exception\ConflictException;
+use App\Shared\Application\Exception\InvalidInputException;
 use App\Shared\Application\Port\TransactionPortInterface;
 use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
@@ -164,14 +168,14 @@ final class PersonIdentityPersistenceTest extends TestCase
             try {
                 $this->administration->execute(new ManagePersonCommand('merge', $source, $target, null, []));
                 self::fail('The conflicting living status must be resolved.');
-            } catch (\App\Shared\Application\Exception\ConflictException $error) {
+            } catch (ConflictException $error) {
                 self::assertStringContainsString('death date', $error->getMessage());
             }
         }
         try {
             $this->administration->execute(new ManagePersonCommand('edit', $deceased, null, null, ['is_deceased' => false]));
             self::fail('An edit cannot leave a death date on a living profile.');
-        } catch (\App\Shared\Application\Exception\InvalidInputException $error) {
+        } catch (InvalidInputException $error) {
             self::assertStringContainsString('death date', $error->getMessage());
         }
         $livingId = $this->connection->fetchOne('SELECT id FROM people WHERE public_id = ?', [$living]);
@@ -258,8 +262,8 @@ final class PersonIdentityPersistenceTest extends TestCase
     private function movie(): Uuid
     {
         $manager = ArtistImportIdentityRace::entityManager($this->connection);
-        $library = new \App\Library\Infrastructure\Doctrine\Entity\LibraryEntity('Movies', 'people-test', '/media/people-test', 'movie', 'local');
-        $movie = new \App\Catalog\Infrastructure\Doctrine\Entity\MovieEntity(new PublicId(), $library, 'Credited work');
+        $library = new LibraryEntity('Movies', 'people-test', '/media/people-test', 'movie', 'local');
+        $movie = new MovieEntity(new PublicId(), $library, 'Credited work');
         $manager->persist($library);
         $manager->persist($movie);
         $manager->flush();

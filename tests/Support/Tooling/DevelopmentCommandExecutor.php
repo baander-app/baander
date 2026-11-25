@@ -4,10 +4,12 @@ declare(strict_types=1);
 
 namespace Baander\Tests\Tooling\Support;
 
+use Baander\Configuration\ToolingConfiguration;
 use Baander\Containers\Docker\Target;
+use Baander\DevEnvironment\Host\ProcessEnvironment;
+use Baander\DevEnvironment\State\ReleaseContract;
 use Baander\Process\Execution\CommandExecutor;
 use Baander\Process\Execution\CompletionPolicy;
-use Baander\DevEnvironment\Host\ProcessEnvironment;
 use Baander\Process\Execution\ProcessResult;
 use Baander\Process\Execution\ProcessRunner;
 use Baander\Process\Execution\ProcessSpec;
@@ -111,7 +113,7 @@ class DevelopmentCommandExecutor implements CommandExecutor
             'effective' => [
                 'media' => $instance['media'] ?? [],
                 'libraries' => $instance['libraries'] ?? [],
-                'budgets' => \Baander\Configuration\ToolingConfiguration::resolve()->budgets->toArray(),
+                'budgets' => ToolingConfiguration::resolve()->budgets->toArray(),
                 'provenance' => [],
                 'state_mounts' => $instance['state_mounts'] ?? [],
                 'volumes' => $instance['volumes'] ?? [],
@@ -123,12 +125,12 @@ class DevelopmentCommandExecutor implements CommandExecutor
         $release['source'] = $source;
         $release['environmentFile'] = $environment;
         $release['inputs'][$environment] = hash_file('sha256', $environment);
-        $identity = \Baander\DevEnvironment\State\ReleaseContract::sourceIdentity($source);
+        $identity = ReleaseContract::sourceIdentity($source);
         $release['sourceIdentity'] = $identity;
         $release['sourceDigest'] = hash('sha256', json_encode($identity, JSON_THROW_ON_ERROR));
         $existingImages = $release['images'] ?? [];
         $release['images'] = [];
-        foreach (\Baander\DevEnvironment\State\ReleaseContract::IMAGE_KEYS as $key) {
+        foreach (ReleaseContract::IMAGE_KEYS as $key) {
             $identity = $release[$key] ?? $existingImages[$key]['resolvedId'] ?? 'fixture-' . $key;
             $release['images'][$key] = [
                 'reference' => array_key_exists($key, $release) ? $identity : ($existingImages[$key]['reference'] ?? $identity),
@@ -138,6 +140,6 @@ class DevelopmentCommandExecutor implements CommandExecutor
             ];
             unset($release[$key]);
         }
-        return \Baander\DevEnvironment\State\ReleaseContract::fromArray($release)->toArray();
+        return ReleaseContract::fromArray($release)->toArray();
     }
 }

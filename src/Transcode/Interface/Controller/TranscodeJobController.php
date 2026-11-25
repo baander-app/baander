@@ -9,10 +9,11 @@ use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
 use App\Shared\Interface\Attribute\CliCounterpart;
 use App\Shared\Interface\Controller\ApiResponsesTrait;
+use App\Shared\Interface\DTO\ApiError;
 use App\Transcode\Application\Command\CleanupOrphanedJobsCommand;
 use App\Transcode\Application\DTO\TranscodeCleanupResult;
-use App\Transcode\Application\Port\TranscodeJobPortInterface;
 use App\Transcode\Application\Port\PlaybackAccessInterface;
+use App\Transcode\Application\Port\TranscodeJobPortInterface;
 use App\Transcode\Application\Port\TranscodePublicViewInterface;
 use App\Transcode\Application\Query\TranscodeJobQueryPort;
 use App\Transcode\Interface\Resource\TranscodeJobResource;
@@ -23,9 +24,9 @@ use Symfony\Component\Messenger\MessageBusInterface;
 use Symfony\Component\Messenger\Stamp\HandledStamp;
 use Symfony\Component\Routing\Attribute\Route;
 use Symfony\Component\Security\Core\Authorization\AuthorizationCheckerInterface;
+use Symfony\Component\Security\Core\Exception\AccessDeniedException;
 use Symfony\Component\Security\Http\Attribute\CurrentUser;
 use Symfony\Component\Security\Http\Attribute\IsGranted;
-use Symfony\Component\Security\Core\Exception\AccessDeniedException;
 
 #[OA\Tag(name: 'Transcode', description: 'Video transcoding management endpoints')]
 #[Route('/api/transcode/jobs', name: 'transcode_job_')]
@@ -121,7 +122,7 @@ final class TranscodeJobController
                 response: '404',
                 description: 'No such job, or another user\'s job for a caller who is not an administrator',
                 content: new OA\MediaType\Json(
-                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                    schema: new OA\Schema(ref: ApiError::class),
                 ),
             ),
         ],
@@ -165,7 +166,7 @@ final class TranscodeJobController
                 response: '503',
                 description: 'The run removed every job it could and left at least one behind; `details` holds the `expired`, `cleaned` and `failed` counts, and the server log names each job that failed',
                 content: new OA\MediaType\Json(
-                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                    schema: new OA\Schema(ref: ApiError::class),
                 ),
             ),
         ],
@@ -209,7 +210,7 @@ final class TranscodeJobController
                 response: '404',
                 description: 'No such job, or another user\'s job for a caller who is not an administrator',
                 content: new OA\MediaType\Json(
-                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                    schema: new OA\Schema(ref: ApiError::class),
                 ),
             ),
         ],
@@ -234,7 +235,7 @@ final class TranscodeJobController
                 response: '401',
                 description: 'Not authenticated',
                 content: new OA\MediaType\Json(
-                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                    schema: new OA\Schema(ref: ApiError::class),
                 ),
             ),
         ],

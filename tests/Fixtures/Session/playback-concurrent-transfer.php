@@ -4,13 +4,27 @@ declare(strict_types=1);
 
 namespace App\Tests\Fixtures\Session;
 
+use App\Auth\Infrastructure\LiveUpdates\DoctrineCurrentUserAuthorityReader;
+use App\Catalog\Infrastructure\Doctrine\Repository\SongRepository;
+use App\Catalog\Infrastructure\Doctrine\Repository\VideoRepository;
+use App\Catalog\Infrastructure\VideoService;
+use App\Library\Application\Port\LibraryMediaFileResolverInterface;
+use App\Library\Infrastructure\Doctrine\Repository\LibraryAccessRepository;
+use App\Library\Infrastructure\LibraryReadScopeProvider;
+use App\Media\Application\Port\PlaybackMediaAccessInterface;
+use App\Media\Application\Service\PlaybackMediaAccess;
+use App\Media\Infrastructure\MediaReadScopeProvider;
+use App\Media\Infrastructure\Service\StreamService;
 use App\Session\Application\Port\PlaybackOperation;
 use App\Session\Application\Service\PlaybackCoordinator;
 use App\Session\Infrastructure\Doctrine\PlaybackStore;
+use App\Shared\Application\Exception\ConflictException;
 use App\Shared\Domain\Model\Uuid;
 use App\Shared\Infrastructure\Doctrine\DedicatedConnectionFactory;
 use App\Shared\Infrastructure\Doctrine\DoctrineTransaction;
 use App\Shared\Infrastructure\Doctrine\Type\CustomTypesRegistrar;
+use App\Shared\Infrastructure\Pagination\CursorCodec;
+use App\Shared\Infrastructure\Pagination\CursorPaginator;
 use Doctrine\DBAL\Connection;
 use Doctrine\ORM\Decorator\EntityManagerDecorator;
 use Doctrine\ORM\EntityManager;
@@ -20,6 +34,9 @@ use Doctrine\ORM\ORMSetup;
 use Doctrine\Persistence\AbstractManagerRegistry;
 use Doctrine\Persistence\ObjectManager;
 use SwooleBundle\SwooleBundle\Bridge\Swoole\Swoole;
+use Symfony\Bundle\SecurityBundle\Security;
+use Symfony\Component\DependencyInjection\Container;
+use Symfony\Component\Serializer\Encoder\JsonEncoder;
 
 require_once dirname(__DIR__, 3) . '/vendor/autoload.php';
 
@@ -90,15 +107,15 @@ final class PlaybackPersistenceFixture
         };
         return new PlaybackCoordinator(new PlaybackStore($current), new DoctrineTransaction($registry, new Swoole()), self::mediaAccess($manager));
     }
-    private static function mediaAccess(EntityManager $manager): \App\Media\Application\Port\PlaybackMediaAccessInterface
+    private static function mediaAccess(EntityManager $manager): PlaybackMediaAccessInterface
     {
-        $security = new \Symfony\Bundle\SecurityBundle\Security(new \Symfony\Component\DependencyInjection\Container());
-        $libraries = new \App\Library\Infrastructure\LibraryReadScopeProvider(
+        $security = new Security(new Container());
+        $libraries = new LibraryReadScopeProvider(
             $security,
-            new \App\Library\Infrastructure\Doctrine\Repository\LibraryAccessRepository($manager),
-            new \App\Auth\Infrastructure\LiveUpdates\DoctrineCurrentUserAuthorityReader($manager->getConnection()),
+            new LibraryAccessRepository($manager),
+            new DoctrineCurrentUserAuthorityReader($manager->getConnection()),
         );
-        $files = new class implements \App\Library\Application\Port\LibraryMediaFileResolverInterface {
+        $files = new class implements LibraryMediaFileResolverInterface {
             public function resolve(Uuid $libraryId, string $absolutePath): string
             {
                 throw new \LogicException('Playback authorization must not probe media files.');
@@ -109,15 +126,15 @@ final class PlaybackPersistenceFixture
                 throw new \LogicException('Playback authorization must not probe media files.');
             }
         };
-        $songs = new \App\Catalog\Infrastructure\Doctrine\Repository\SongRepository(
+        $songs = new SongRepository(
             $manager,
-            new \App\Shared\Infrastructure\Pagination\CursorPaginator(),
-            new \App\Shared\Infrastructure\Pagination\CursorCodec(new \Symfony\Component\Serializer\Encoder\JsonEncoder()),
+            new CursorPaginator(),
+            new CursorCodec(new JsonEncoder()),
         );
-        return new \App\Media\Application\Service\PlaybackMediaAccess(
-            new \App\Media\Infrastructure\MediaReadScopeProvider($security, $libraries),
-            new \App\Media\Infrastructure\Service\StreamService($songs, $files),
-            new \App\Catalog\Infrastructure\VideoService(new \App\Catalog\Infrastructure\Doctrine\Repository\VideoRepository($manager), $files),
+        return new PlaybackMediaAccess(
+            new MediaReadScopeProvider($security, $libraries),
+            new StreamService($songs, $files),
+            new VideoService(new VideoRepository($manager), $files),
         );
     }
 
@@ -138,7 +155,7 @@ if (realpath($_SERVER['SCRIPT_FILENAME'] ?? '') === __FILE__) {
         try {
             $result = $coordinator->execute(Uuid::fromString($owner), PlaybackOperation::from($operation), json_decode($input, true, flags: JSON_THROW_ON_ERROR));
             $answer = 'committed ' . json_encode($result, JSON_THROW_ON_ERROR);
-        } catch (\App\Shared\Application\Exception\ConflictException) {
+        } catch (ConflictException) {
             $answer = 'conflict';
         }
         // A refused insert closes the entity manager it was flushed through, also when the caller

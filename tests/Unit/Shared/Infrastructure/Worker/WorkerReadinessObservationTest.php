@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Shared\Infrastructure\Worker;
 
+use App\Shared\Application\DTO\DeploymentProfile;
 use App\Shared\Application\DTO\WorkerAutoscalingProfile;
 use App\Shared\Infrastructure\Worker\DeploymentLease;
 use App\Shared\Infrastructure\Worker\WorkerReadinessObservation;
@@ -19,20 +20,20 @@ final class WorkerReadinessObservationTest extends TestCase
             $process['command'] = array_map(static fn (string $argument): string => str_replace('/var/www/html', '/opt/baander', $argument), $process['command']);
         }
         unset($process);
-        self::assertCount(4, WorkerReadinessObservation::verifyProcesses($processes, self::lease(), 'control', new WorkerAutoscalingProfile(), '/opt/baander', new \App\Shared\Application\DTO\DeploymentProfile()));
+        self::assertCount(4, WorkerReadinessObservation::verifyProcesses($processes, self::lease(), 'control', new WorkerAutoscalingProfile(), '/opt/baander', new DeploymentProfile()));
     }
 
     public function testChildrenFromAnotherApplicationHomeDoNotConfirmReadiness(): void
     {
         $this->expectException(RuntimeException::class);
         $this->expectExceptionMessage('incomplete');
-        WorkerReadinessObservation::verifyProcesses(self::processes('control'), self::lease(), 'control', new WorkerAutoscalingProfile(), '/opt/baander', new \App\Shared\Application\DTO\DeploymentProfile());
+        WorkerReadinessObservation::verifyProcesses(self::processes('control'), self::lease(), 'control', new WorkerAutoscalingProfile(), '/opt/baander', new DeploymentProfile());
     }
 
     public function testCurrentGenerationsAreAcceptedForCompletePair(): void
     {
         foreach (['control', 'execution'] as $unit) {
-            $roles = WorkerReadinessObservation::verifyProcesses(self::processes($unit), self::lease(), $unit, new WorkerAutoscalingProfile(), '/var/www/html', new \App\Shared\Application\DTO\DeploymentProfile());
+            $roles = WorkerReadinessObservation::verifyProcesses(self::processes($unit), self::lease(), $unit, new WorkerAutoscalingProfile(), '/var/www/html', new DeploymentProfile());
             self::assertContains(2, $roles);
             self::assertCount($unit === 'control' ? 4 : 3, $roles);
         }
@@ -46,7 +47,7 @@ final class WorkerReadinessObservationTest extends TestCase
                 $process['status'] = "PPid:\t1\nState:\tR (running)\n";
             }
             unset($process);
-            $roles = WorkerReadinessObservation::verifyProcesses($processes, self::lease(), $unit, new WorkerAutoscalingProfile(), '/var/www/html', new \App\Shared\Application\DTO\DeploymentProfile());
+            $roles = WorkerReadinessObservation::verifyProcesses($processes, self::lease(), $unit, new WorkerAutoscalingProfile(), '/var/www/html', new DeploymentProfile());
             self::assertCount($unit === 'control' ? 4 : 3, $roles);
         }
     }
@@ -64,8 +65,8 @@ final class WorkerReadinessObservationTest extends TestCase
                 'profile' => $processes[0]['environment'] = str_replace('AUTOSCALING_PROFILE=', 'UNRECOGNIZED_PROFILE=', $processes[0]['environment']),
                 'deployment-profile' => $processes[0]['environment'] = str_replace('BAANDER_DEPLOYMENT_PROFILE=', 'MISSING_DEPLOYMENT_PROFILE=', $processes[0]['environment']),
                 'deployment-settings' => $processes[0]['environment'] = str_replace(
-                    'BAANDER_DEPLOYMENT_PROFILE=' . (new \App\Shared\Application\DTO\DeploymentProfile())->toJson(),
-                    'BAANDER_DEPLOYMENT_PROFILE=' . (new \App\Shared\Application\DTO\DeploymentProfile(webWorkers: 8))->toJson(),
+                    'BAANDER_DEPLOYMENT_PROFILE=' . (new DeploymentProfile())->toJson(),
+                    'BAANDER_DEPLOYMENT_PROFILE=' . (new DeploymentProfile(webWorkers: 8))->toJson(),
                     $processes[0]['environment'],
                 ),
                 'transport' => $processes[0]['command'][] = 'scheduler',
@@ -79,7 +80,7 @@ final class WorkerReadinessObservationTest extends TestCase
             };
             $rejected = false;
             try {
-                WorkerReadinessObservation::verifyProcesses($processes, self::lease(), 'execution', new WorkerAutoscalingProfile(), '/var/www/html', new \App\Shared\Application\DTO\DeploymentProfile());
+                WorkerReadinessObservation::verifyProcesses($processes, self::lease(), 'execution', new WorkerAutoscalingProfile(), '/var/www/html', new DeploymentProfile());
             } catch (RuntimeException) {
                 $rejected = true;
             }
@@ -98,7 +99,7 @@ final class WorkerReadinessObservationTest extends TestCase
             $lease = self::lease();
             $environment = ['BAANDER_WORKER_NAMESPACE=' . $lease->namespace, 'BAANDER_WORKER_BOOT_ID=' . $lease->bootId,
                 'BAANDER_WORKER_LEASE_EPOCH=3', 'BAANDER_WORKER_UNIT=' . $unit, 'BAANDER_WORKER_ID=' . $role,
-                'BAANDER_DEPLOYMENT_PROFILE=' . (new \App\Shared\Application\DTO\DeploymentProfile())->toJson(),
+                'BAANDER_DEPLOYMENT_PROFILE=' . (new DeploymentProfile())->toJson(),
                 'BAANDER_WORKER_GENERATION=2', 'BAANDER_WORKER_AUTOSCALING_PROFILE=' . (new WorkerAutoscalingProfile())->toJson()];
             if ($role !== 'native') {
                 $environment[] = 'MESSENGER_CONSUMER_NAME=worker-' . substr(hash('sha256', $lease->namespace), 0, 16) . '-' . $lease->bootId . '-' . $role . '-2';

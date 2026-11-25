@@ -7,8 +7,9 @@ namespace App\Transcode\Application\DTO;
 use App\Transcode\Domain\ValueObject\AacImplementation;
 use App\Transcode\Domain\ValueObject\AudioProfile;
 use App\Transcode\Domain\ValueObject\PresentationSelection;
+use Symfony\Component\DependencyInjection\Attribute\Exclude;
 
-#[\Symfony\Component\DependencyInjection\Attribute\Exclude]
+#[Exclude]
 final readonly class DesiredTranscodeState
 {
     /** @param list<string> $audioLanguages */

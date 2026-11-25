@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Tests\Functional\Controller;
 
+use App\Auth\Domain\Model\User;
+use App\Library\Application\Port\LibraryAccessPortInterface;
 use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
 use App\Tests\Functional\TestCase;
@@ -13,7 +15,7 @@ final class ActivityControllerTest extends TestCase
     public function testPlayRequiresAuth(): void
     {
         $response = $this->anonymousRequest('POST', '/api/activity/play', [
-            'songId' => new \App\Shared\Domain\Model\PublicId()->toString(),
+            'songId' => new PublicId()->toString(),
         ]);
 
         $this->assertJsonResponse($response, 401);
@@ -115,7 +117,7 @@ final class ActivityControllerTest extends TestCase
      * Create a library -> album -> song chain and return the song's public ID,
      * which the /play endpoint resolves within the user's library scope.
      */
-    private function createSongFixture(\App\Auth\Domain\Model\User $user): string
+    private function createSongFixture(User $user): string
     {
         $libraryId = Uuid::v7();
         $albumId = Uuid::v7();
@@ -137,7 +139,7 @@ final class ActivityControllerTest extends TestCase
             [$songId->toString(), $songPublicId->toString(), $albumId->toString(), 'track.mp3', 'hash1', 'Track', 1000, 'audio/mpeg', 180.0, 1, 1, $now->format('Y-m-d H:i:s.uP'), $now->format('Y-m-d H:i:s.uP')],
         );
 
-        static::getContainer()->get(\App\Library\Application\Port\LibraryAccessPortInterface::class)->grant($user->getId(), $libraryId);
+        static::getContainer()->get(LibraryAccessPortInterface::class)->grant($user->getId(), $libraryId);
 
         return $songPublicId->toString();
     }

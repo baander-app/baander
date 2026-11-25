@@ -3,6 +3,8 @@
 
 declare(strict_types=1);
 
+use Baander\Images\Inventory\Commands;
+
 $arguments = $_SERVER['argv'];
 array_shift($arguments);
 if (array_shift($arguments) !== '--composer-loader' || ($loader = array_shift($arguments)) === null || !is_file($loader)) {
@@ -10,4 +12,4 @@ if (array_shift($arguments) !== '--composer-loader' || ($loader = array_shift($a
     exit(2);
 }
 require $loader;
-exit(\Baander\Images\Inventory\Commands::main([__FILE__, ...$arguments], $loader));
+exit(Commands::main([__FILE__, ...$arguments], $loader));

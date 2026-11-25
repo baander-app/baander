@@ -31,19 +31,21 @@ declare(strict_types=1);
  */
 
 use App\Auth\Domain\Model\OAuth\SignInGrant;
+use App\Kernel;
 use App\Tests\Fixtures\Auth\FirstPartyOAuthClient;
 use App\Tests\Fixtures\WebRuntime\HeldRendition;
 use App\Tests\Fixtures\WebRuntime\StreamClient;
 use Doctrine\ORM\EntityManagerInterface;
+use Swoole\Coroutine;
 use Swoole\Coroutine\Http\Client;
 use Swoole\WebSocket\CloseFrame;
 use Swoole\WebSocket\Frame;
-
+use Symfony\Component\Dotenv\Dotenv;
 use function Swoole\Coroutine\run;
 
 $projectDir = dirname(__DIR__, 3);
 require $projectDir . '/vendor/autoload.php';
-(new Symfony\Component\Dotenv\Dotenv())->bootEnv($projectDir . '/.env');
+(new Dotenv())->bootEnv($projectDir . '/.env');
 
 function record(string $event, string $detail = ''): void
 {
@@ -92,7 +94,7 @@ set_exception_handler(static function (Throwable $error) use ($mode): never {
     fwrite(STDERR, sprintf("drain-client %s failed: %s\n  at %s:%d\n", $mode, $error->getMessage(), $error->getFile(), $error->getLine()));
     exit(1);
 });
-$kernel = new App\Kernel('prod', false);
+$kernel = new Kernel('prod', false);
 $kernel->boot();
 $manager = $kernel->getContainer()->get('doctrine')->getManager();
 if (!$manager instanceof EntityManagerInterface) {
@@ -141,7 +143,7 @@ if ($mode === 'ws') {
             } elseif ($frame instanceof Frame) {
                 record('ws_frame', 'opcode=' . $frame->opcode);
             }
-            Swoole\Coroutine::sleep(0.2);
+            Coroutine::sleep(0.2);
         }
     });
 } elseif ($mode === 'stalled-stream') {

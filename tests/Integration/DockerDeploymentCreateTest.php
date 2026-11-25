@@ -4,14 +4,16 @@ declare(strict_types=1);
 
 namespace App\Tests\Integration;
 
+use App\Shared\Application\DTO\DeploymentProfile;
 use App\Shared\Application\DTO\DeploymentUnit;
-
+use App\Shared\Application\DTO\HardwareEncoder;
 use App\Shared\Infrastructure\Worker\DeploymentContainer;
 use App\Shared\Infrastructure\Worker\DeploymentContainerRecipe;
 use App\Shared\Infrastructure\Worker\DeploymentRuntimeEnvironment;
 use App\Shared\Infrastructure\Worker\DockerDeploymentCreate;
 use App\Shared\Infrastructure\Worker\DoctrineDeploymentInventory;
 use App\Shared\Infrastructure\Worker\RegisteredDeploymentStart;
+use App\Tests\Support\FinalSchemaBootstrap;
 use Doctrine\DBAL\Connection;
 use Doctrine\DBAL\DriverManager;
 use Doctrine\DBAL\Tools\DsnParser;
@@ -45,7 +47,7 @@ final class DockerDeploymentCreateTest extends TestCase
         foreach ([$this->first, $this->second] as $connection) {
             $connection->executeStatement('SET search_path TO ' . $this->schema . ', public');
         }
-        \App\Tests\Support\FinalSchemaBootstrap::bootstrap($this->first);
+        FinalSchemaBootstrap::bootstrap($this->first);
     }
 
     public function testCreateCommitsIntentBeforeDockerAndBindingBeforeReturning(): void
@@ -214,7 +216,7 @@ final class DockerDeploymentCreateTest extends TestCase
 
     public function testHardwareExecutionRegistersOnlyWithItsAdmittedDeviceAndGroup(): void
     {
-        $profile = new \App\Shared\Application\DTO\DeploymentProfile(videoEncoderSlots: 8, audioEncoderSlots: 12, hardware: new \App\Shared\Application\DTO\HardwareEncoder('vaapi', '/dev/dri/renderD128'));
+        $profile = new DeploymentProfile(videoEncoderSlots: 8, audioEncoderSlots: 12, hardware: new HardwareEncoder('vaapi', '/dev/dri/renderD128'));
         $recipe = static fn (DeploymentUnit $unit): DeploymentContainerRecipe => new DeploymentContainerRecipe('baander.app:create', str_repeat('a', 32), 'baander.app-daemon', 'sha256:' . str_repeat('f', 64),
             ['/usr/local/bin/php', '/app/bin/worker.php'], 'none', $unit, 'worker-ipc', '/app', $profile, deviceGroup: 485);
         $execution = $recipe(DeploymentUnit::Execution);
@@ -382,7 +384,7 @@ final class DockerDeploymentCreateTest extends TestCase
     /** @param array<string, string> $environment */
     private function recipe(array $environment = [], DeploymentUnit $unit = DeploymentUnit::Control): DeploymentContainerRecipe
     {
-        return new DeploymentContainerRecipe('baander.app:create', str_repeat('a', 32), 'baander.app-daemon', 'sha256:' . str_repeat('f', 64), ['/usr/local/bin/php', '/app/bin/worker.php'], 'none', $unit, 'worker-ipc', '/app', new \App\Shared\Application\DTO\DeploymentProfile(), new DeploymentRuntimeEnvironment($environment));
+        return new DeploymentContainerRecipe('baander.app:create', str_repeat('a', 32), 'baander.app-daemon', 'sha256:' . str_repeat('f', 64), ['/usr/local/bin/php', '/app/bin/worker.php'], 'none', $unit, 'worker-ipc', '/app', new DeploymentProfile(), new DeploymentRuntimeEnvironment($environment));
     }
 
     private function reserve(DeploymentContainerRecipe $recipe): void

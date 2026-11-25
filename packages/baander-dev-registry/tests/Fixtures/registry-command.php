@@ -3,6 +3,8 @@
 
 declare(strict_types=1);
 
+use Swoole\Process;
+
 $arguments = $_SERVER['argv'];
 $name = basename($arguments[0]);
 if ($name === 'registry-command.php') {
@@ -170,7 +172,7 @@ if ($name === 'docker') {
         }
         if (in_array(getenv('STUB_FAIL'), ['terminate', 'stubborn'], true) && $name === 'run_cluster_contract.php') {
             if (getenv('STUB_FAIL') === 'stubborn') {
-                Swoole\Process::signal(15, static function (): void {});
+                Process::signal(15, static function (): void {});
             }
             $storage = sys_get_temp_dir() . '/qualification-child-' . (random_bytes(4) |> bin2hex(...));
             mkdir($storage);

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Tests\Functional\Catalog\Infrastructure\Doctrine\Repository;
 
 use App\Catalog\Domain\Repository\ArtistRepositoryInterface;
+use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
 use App\Tests\Functional\TestCase;
 
@@ -31,7 +32,7 @@ final class ArtistRepositoryTest extends TestCase
             'INSERT INTO artists (id, public_id, name, country, gender, type, life_span_begin, life_span_end, disambiguation, sort_name, biography, mbid, discogs_id, spotify_id, locked_fields, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
             [
                 $artistId1->toString(),
-                (new \App\Shared\Domain\Model\PublicId())->toString(),
+                (new PublicId())->toString(),
                 'Artist One',
                 'US',
                 null,
@@ -53,7 +54,7 @@ final class ArtistRepositoryTest extends TestCase
             'INSERT INTO artists (id, public_id, name, country, gender, type, life_span_begin, life_span_end, disambiguation, sort_name, biography, mbid, discogs_id, spotify_id, locked_fields, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
             [
                 $artistId2->toString(),
-                (new \App\Shared\Domain\Model\PublicId())->toString(),
+                (new PublicId())->toString(),
                 'Artist Two',
                 'UK',
                 null,
@@ -99,7 +100,7 @@ final class ArtistRepositoryTest extends TestCase
             'INSERT INTO artists (id, public_id, name, country, gender, type, life_span_begin, life_span_end, disambiguation, sort_name, biography, mbid, discogs_id, spotify_id, locked_fields, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
             [
                 $artistId->toString(),
-                (new \App\Shared\Domain\Model\PublicId())->toString(),
+                (new PublicId())->toString(),
                 'Existing Artist',
                 'US',
                 null,
@@ -135,7 +136,7 @@ final class ArtistRepositoryTest extends TestCase
             'INSERT INTO artists (id, public_id, name, country, gender, type, life_span_begin, life_span_end, disambiguation, sort_name, biography, mbid, discogs_id, spotify_id, locked_fields, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
             [
                 $artistId->toString(),
-                (new \App\Shared\Domain\Model\PublicId())->toString(),
+                (new PublicId())->toString(),
                 'Single Artist',
                 'US',
                 null,
@@ -171,7 +172,7 @@ final class ArtistRepositoryTest extends TestCase
             'INSERT INTO artists (id, public_id, name, country, gender, type, life_span_begin, life_span_end, disambiguation, sort_name, biography, mbid, discogs_id, spotify_id, locked_fields, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
             [
                 $artistId->toString(),
-                (new \App\Shared\Domain\Model\PublicId())->toString(),
+                (new PublicId())->toString(),
                 'Duplicate Test',
                 'US',
                 null,

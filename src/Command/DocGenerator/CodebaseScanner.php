@@ -12,6 +12,7 @@ use phpDocumentor\Reflection\DocBlockFactory;
 use phpDocumentor\Reflection\DocBlockFactoryInterface;
 use ReflectionClass;
 use ReflectionMethod;
+use Symfony\Component\Messenger\Attribute\AsMessageHandler;
 use Symfony\Component\Routing\Attribute\Route;
 
 final class CodebaseScanner
@@ -303,7 +304,7 @@ final class CodebaseScanner
 
         $invokeMethod = $reflection->getMethod('__invoke');
         $attributes = $invokeMethod->getAttributes(
-            \Symfony\Component\Messenger\Attribute\AsMessageHandler::class,
+            AsMessageHandler::class,
         );
 
         if (empty($attributes)) {

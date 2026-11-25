@@ -21,9 +21,12 @@ use App\Auth\Infrastructure\Repository\OAuth\AuthCodeRepository;
 use App\Auth\Infrastructure\Repository\OAuth\ClientRepository;
 use App\Auth\Infrastructure\Repository\OAuth\DeviceCodeRepository;
 use App\Auth\Infrastructure\Repository\OAuth\RefreshTokenRepository;
+use App\Auth\Interface\Console\SetupClientsCommand;
 use App\Shared\Domain\Model\Email;
+use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
 use App\Shared\Infrastructure\Doctrine\Type\CustomTypesRegistrar;
+use App\Tests\Support\FinalSchemaBootstrap;
 use DateInterval;
 use Doctrine\DBAL\Connection;
 use Doctrine\DBAL\DriverManager;
@@ -32,6 +35,7 @@ use Doctrine\ORM\EntityManager;
 use Doctrine\ORM\Mapping\UnderscoreNamingStrategy;
 use Doctrine\ORM\ORMSetup;
 use PHPUnit\Framework\TestCase;
+use Symfony\Component\Console\Tester\CommandTester;
 use Symfony\Component\Serializer\Encoder\JsonEncoder;
 
 /** OAuth client persistence against the migration's oauth tables in an isolated schema. */
@@ -56,7 +60,7 @@ final class OAuthClientPersistenceTest extends TestCase
         foreach ([$this->writer, $this->observer] as $connection) {
             $connection->executeStatement('SET search_path TO ' . $this->schema . ', public');
         }
-        \App\Tests\Support\FinalSchemaBootstrap::bootstrap($this->writer);
+        FinalSchemaBootstrap::bootstrap($this->writer);
         CustomTypesRegistrar::register();
         $configuration = ORMSetup::createAttributeMetadataConfig([
             dirname(__DIR__, 2) . '/src/Auth/Infrastructure/Doctrine/Entity',
@@ -83,9 +87,9 @@ final class OAuthClientPersistenceTest extends TestCase
     public function testFreshClientUsesInstanceOriginAndResumePreservesItsIdentity(): void
     {
         $repository = new ClientRepository($this->manager, new JsonEncoder());
-        $tester = new \Symfony\Component\Console\Tester\CommandTester(new \App\Auth\Interface\Console\SetupClientsCommand($repository));
+        $tester = new CommandTester(new SetupClientsCommand($repository));
         self::assertSame(0, $tester->execute(['--origin' => 'https://dev.baander.app']));
-        $client = $repository->findClientByPublicId(\App\Shared\Domain\Model\PublicId::fromString(\App\Auth\Interface\Console\SetupClientsCommand::SPA_PUBLIC_ID));
+        $client = $repository->findClientByPublicId(PublicId::fromString(SetupClientsCommand::SPA_PUBLIC_ID));
         self::assertNotNull($client);
         $id = $client->getId()->toString();
         self::assertSame(['https://dev.baander.app'], $client->getRedirectUris());
@@ -221,7 +225,7 @@ final class OAuthClientPersistenceTest extends TestCase
             'access token' => str_repeat('a', 40),
             'refresh token' => str_repeat('r', 40),
         ];
-        $this->writer->insert('users', ['id' => $user, 'public_id' => (new \App\Shared\Domain\Model\PublicId())->toString(),
+        $this->writer->insert('users', ['id' => $user, 'public_id' => (new PublicId())->toString(),
             'name' => 'Key client user', 'email' => 'key-client@baander.app', 'password' => 'test-only', ...$times]);
         $this->writer->insert('oauth_auth_codes', ['id' => Uuid::generate()->toString(), 'code_id' => hash('sha256', $tokens['auth code']),
             'client_id' => $client->toString(), 'user_id' => $user, 'redirect_uri' => 'https://server.baander.app/callback',

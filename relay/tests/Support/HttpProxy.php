@@ -5,6 +5,8 @@ declare(strict_types=1);
 
 namespace Baander\RegistryTests;
 
+use Swoole\Http\Server;
+
 final class HttpProxy
 {
     /**
@@ -36,7 +38,7 @@ final class HttpProxy
     {
         $config = json_decode(file_get_contents($path), true, 32, JSON_THROW_ON_ERROR);
         \Swoole\Runtime::enableCoroutine(SWOOLE_HOOK_ALL);
-        $server = new \Swoole\Http\Server('127.0.0.1', $config['port'], SWOOLE_BASE, SWOOLE_SOCK_TCP | SWOOLE_SSL);
+        $server = new Server('127.0.0.1', $config['port'], SWOOLE_BASE, SWOOLE_SOCK_TCP | SWOOLE_SSL);
         $server->set([
             'worker_num' => 1,
             'enable_coroutine' => true,

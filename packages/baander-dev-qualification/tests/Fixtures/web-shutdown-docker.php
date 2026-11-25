@@ -3,6 +3,8 @@
 
 declare(strict_types=1);
 
+use Baander\DevQualification\Tests\Support\WebDockerState;
+
 $args = array_slice($_SERVER['argv'] ?? [], 1);
 file_put_contents(getenv('WEB_WORKFLOW_TRACE'), json_encode($args, JSON_THROW_ON_ERROR) . "\n", FILE_APPEND | LOCK_EX);
 while (in_array($args[0] ?? '', ['--context', '--host'], true)) {
@@ -13,7 +15,7 @@ if ($args === ['context', 'show']) {
     exit(0);
 }
 require dirname(__DIR__, 4) . '/vendor/autoload.php';
-\Baander\DevQualification\Tests\Support\WebDockerState::handle($args, getenv('WEB_WORKFLOW_TRACE'));
+WebDockerState::handle($args, getenv('WEB_WORKFLOW_TRACE'));
 if (($args[0] ?? null) === 'start' && str_ends_with(end($args), '-client')) {
     if (getenv('WEB_WORKFLOW_STAGE') === '1') {
         exit(0);

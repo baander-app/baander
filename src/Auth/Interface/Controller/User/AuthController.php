@@ -13,7 +13,6 @@ use App\Auth\Application\Command\User\RequestPasswordResetCommand;
 use App\Auth\Application\Command\User\ResendEmailVerificationCommand;
 use App\Auth\Application\Command\User\ResetPasswordCommand;
 use App\Auth\Application\Command\User\VerifyEmailCommand;
-use App\Auth\Application\Http\AccessTokenAttributes;
 use App\Auth\Application\Exception\CredentialsChangedException;
 use App\Auth\Application\Exception\DpopStoreUnavailableException;
 use App\Auth\Application\Exception\EmailVerificationException;
@@ -25,6 +24,7 @@ use App\Auth\Application\Exception\RegistrationClosedException;
 use App\Auth\Application\Exception\StepUpFailedException;
 use App\Auth\Application\Exception\StepUpRateLimitedException;
 use App\Auth\Application\Exception\VerificationLinkOtherAccountException;
+use App\Auth\Application\Http\AccessTokenAttributes;
 use App\Auth\Application\Port\AuthenticatedUserIdentityInterface;
 use App\Auth\Application\Port\SelfRegistrationInterface;
 use App\Auth\Application\Port\UserPortInterface;
@@ -43,12 +43,14 @@ use App\Auth\Interface\Request\User\VerifyEmailRequest;
 use App\Auth\Interface\Resource\TokenResource;
 use App\Auth\Interface\Resource\UserResource;
 use App\Shared\Application\Exception\HandlerFailure;
-use Baander\RedisRateLimiter\Exception\RateLimiterUnavailableException;
 use App\Shared\Application\Http\AcceptLanguageMatcher;
 use App\Shared\Domain\Model\Email;
 use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
 use App\Shared\Interface\Controller\ApiResponsesTrait;
+use App\Shared\Interface\DTO\ApiError;
+use App\Shared\Interface\DTO\ValidationError;
+use Baander\RedisRateLimiter\Exception\RateLimiterUnavailableException;
 use OpenApi\Spec as OA;
 use Psr\Log\LoggerInterface;
 use Symfony\Bundle\SecurityBundle\Security;
@@ -129,21 +131,21 @@ final class AuthController
                 response: '422',
                 description: 'Validation error',
                 content: new OA\MediaType\Json(
-                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ValidationError::class),
+                    schema: new OA\Schema(ref: ValidationError::class),
                 ),
             ),
             new OA\Response(
                 response: '400',
                 description: 'Bad request',
                 content: new OA\MediaType\Json(
-                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                    schema: new OA\Schema(ref: ApiError::class),
                 ),
             ),
             new OA\Response(
                 response: '403',
                 description: 'Self-registration is closed; `details.reason` is `registration_closed`. Nothing was stored or sent.',
                 content: new OA\MediaType\Json(
-                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                    schema: new OA\Schema(ref: ApiError::class),
                 ),
             ),
         ],
@@ -232,7 +234,7 @@ final class AuthController
                 response: '401',
                 description: 'Not authenticated',
                 content: new OA\MediaType\Json(
-                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                    schema: new OA\Schema(ref: ApiError::class),
                 ),
             ),
             new OA\Response(
@@ -246,7 +248,7 @@ final class AuthController
                     ),
                 ],
                 content: new OA\MediaType\Json(
-                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                    schema: new OA\Schema(ref: ApiError::class),
                 ),
             ),
         ],
@@ -323,14 +325,14 @@ final class AuthController
                 response: '401',
                 description: 'The refresh token is unknown, malformed, revoked, expired or replayed, is bound to another proof key, or belongs to a disabled account or a revoked client; sign in again',
                 content: new OA\MediaType\Json(
-                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                    schema: new OA\Schema(ref: ApiError::class),
                 ),
             ),
             new OA\Response(
                 response: '422',
                 description: 'Validation error',
                 content: new OA\MediaType\Json(
-                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ValidationError::class),
+                    schema: new OA\Schema(ref: ValidationError::class),
                 ),
             ),
             new OA\Response(
@@ -344,7 +346,7 @@ final class AuthController
                     ),
                 ],
                 content: new OA\MediaType\Json(
-                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                    schema: new OA\Schema(ref: ApiError::class),
                 ),
             ),
         ],
@@ -448,14 +450,14 @@ final class AuthController
                 response: '422',
                 description: 'Validation error',
                 content: new OA\MediaType\Json(
-                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ValidationError::class),
+                    schema: new OA\Schema(ref: ValidationError::class),
                 ),
             ),
             new OA\Response(
                 response: '429',
                 description: 'Too many password reset requests from this IP',
                 content: new OA\MediaType\Json(
-                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                    schema: new OA\Schema(ref: ApiError::class),
                 ),
             ),
         ],
@@ -522,21 +524,21 @@ final class AuthController
                 response: '400',
                 description: 'The token is unknown, expired or already used',
                 content: new OA\MediaType\Json(
-                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                    schema: new OA\Schema(ref: ApiError::class),
                 ),
             ),
             new OA\Response(
                 response: '422',
                 description: 'Validation error',
                 content: new OA\MediaType\Json(
-                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ValidationError::class),
+                    schema: new OA\Schema(ref: ValidationError::class),
                 ),
             ),
             new OA\Response(
                 response: '429',
                 description: 'Too many password reset attempts from this IP',
                 content: new OA\MediaType\Json(
-                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                    schema: new OA\Schema(ref: ApiError::class),
                 ),
             ),
         ],
@@ -612,7 +614,7 @@ final class AuthController
                 response: '401',
                 description: 'Not authenticated',
                 content: new OA\MediaType\Json(
-                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                    schema: new OA\Schema(ref: ApiError::class),
                 ),
             ),
         ],
@@ -682,21 +684,21 @@ final class AuthController
                 response: '401',
                 description: 'Not authenticated',
                 content: new OA\MediaType\Json(
-                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                    schema: new OA\Schema(ref: ApiError::class),
                 ),
             ),
             new OA\Response(
                 response: '404',
                 description: 'User not found',
                 content: new OA\MediaType\Json(
-                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                    schema: new OA\Schema(ref: ApiError::class),
                 ),
             ),
             new OA\Response(
                 response: '422',
                 description: 'Validation error',
                 content: new OA\MediaType\Json(
-                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ValidationError::class),
+                    schema: new OA\Schema(ref: ValidationError::class),
                 ),
             ),
         ],
@@ -779,35 +781,35 @@ final class AuthController
                 response: '400',
                 description: 'The token is unknown, expired, already used or for an address the account no longer has',
                 content: new OA\MediaType\Json(
-                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                    schema: new OA\Schema(ref: ApiError::class),
                 ),
             ),
             new OA\Response(
                 response: '401',
                 description: 'Not authenticated, or another change ended this session first (reason credentials_changed); the token stays usable',
                 content: new OA\MediaType\Json(
-                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                    schema: new OA\Schema(ref: ApiError::class),
                 ),
             ),
             new OA\Response(
                 response: '403',
                 description: 'The token is valid but was sent for another account (`details.reason` `verification_link_other_account`), or the request used a delegated access token; the token stays usable',
                 content: new OA\MediaType\Json(
-                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                    schema: new OA\Schema(ref: ApiError::class),
                 ),
             ),
             new OA\Response(
                 response: '422',
                 description: 'Validation error',
                 content: new OA\MediaType\Json(
-                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ValidationError::class),
+                    schema: new OA\Schema(ref: ValidationError::class),
                 ),
             ),
             new OA\Response(
                 response: '429',
                 description: 'Too many verification attempts from this IP',
                 content: new OA\MediaType\Json(
-                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                    schema: new OA\Schema(ref: ApiError::class),
                 ),
             ),
         ],
@@ -872,14 +874,14 @@ final class AuthController
                 response: '401',
                 description: 'Not authenticated',
                 content: new OA\MediaType\Json(
-                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                    schema: new OA\Schema(ref: ApiError::class),
                 ),
             ),
             new OA\Response(
                 response: '429',
                 description: 'Too many verification requests from this IP',
                 content: new OA\MediaType\Json(
-                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                    schema: new OA\Schema(ref: ApiError::class),
                 ),
             ),
         ],
@@ -942,21 +944,21 @@ final class AuthController
                 response: '401',
                 description: 'Not authenticated',
                 content: new OA\MediaType\Json(
-                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                    schema: new OA\Schema(ref: ApiError::class),
                 ),
             ),
             new OA\Response(
                 response: '422',
                 description: 'Validation error, or the password or code is wrong',
                 content: new OA\MediaType\Json(
-                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ValidationError::class),
+                    schema: new OA\Schema(ref: ValidationError::class),
                 ),
             ),
             new OA\Response(
                 response: '429',
                 description: 'Too many step-up attempts for this account',
                 content: new OA\MediaType\Json(
-                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                    schema: new OA\Schema(ref: ApiError::class),
                 ),
             ),
         ],
@@ -1021,21 +1023,21 @@ final class AuthController
                 response: '401',
                 description: 'Not authenticated, or another change ended this session first (reason credentials_changed); nothing was changed',
                 content: new OA\MediaType\Json(
-                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                    schema: new OA\Schema(ref: ApiError::class),
                 ),
             ),
             new OA\Response(
                 response: '422',
                 description: 'Validation error, or the password or code is wrong',
                 content: new OA\MediaType\Json(
-                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ValidationError::class),
+                    schema: new OA\Schema(ref: ValidationError::class),
                 ),
             ),
             new OA\Response(
                 response: '429',
                 description: 'Too many step-up attempts for this account',
                 content: new OA\MediaType\Json(
-                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                    schema: new OA\Schema(ref: ApiError::class),
                 ),
             ),
         ],

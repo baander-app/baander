@@ -7,6 +7,7 @@ namespace App\Radio\Interface\Console;
 use App\Radio\Application\Port\CountrySubscriptionPortInterface;
 use App\Radio\Application\Port\RadioSourcePortInterface;
 use App\Radio\Application\Port\RadioStationPortInterface;
+use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;
@@ -92,7 +93,7 @@ final class SyncSubscribedCountriesCommand extends Command
             }
         }
 
-        $source = $this->sourcePort->findByPublicId(\App\Shared\Domain\Model\PublicId::fromString($activeSource['publicId']))
+        $source = $this->sourcePort->findByPublicId(PublicId::fromString($activeSource['publicId']))
             ?? throw new \RuntimeException('Radio source not found.');
         $sourceId = $source->getId();
 

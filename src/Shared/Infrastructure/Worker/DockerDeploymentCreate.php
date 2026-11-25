@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Shared\Infrastructure\Worker;
 
+use App\Shared\Application\DTO\DeploymentUnit;
 use Baander\Core\EnvironmentVariable;
 use Closure;
 use Symfony\Component\DependencyInjection\Attribute\Exclude;
@@ -25,7 +26,7 @@ FORMAT;
     public function create(DeploymentContainerRecipe $recipe): DeploymentContainer
     {
         $boot = $this->inventory->findBoot($recipe->namespace, $recipe->bootId);
-        $state = $recipe->unit === \App\Shared\Application\DTO\DeploymentUnit::Control ? $boot?->control : $boot?->execution;
+        $state = $recipe->unit === DeploymentUnit::Control ? $boot?->control : $boot?->execution;
         if ($boot === null || $boot->daemonId !== $recipe->daemonId || $state?->recipeHash !== $recipe->fingerprint()) {
             throw new \RuntimeException('Creation requires the exact reserved unit recipe.');
         }

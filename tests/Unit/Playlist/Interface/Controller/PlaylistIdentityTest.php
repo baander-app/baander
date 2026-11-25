@@ -4,11 +4,12 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Playlist\Interface\Controller;
 
+use App\Catalog\Application\Port\SongAvailabilityPortInterface;
 use App\Catalog\Application\Port\SongPortInterface;
-use App\Playlist\Application\Port\PlaylistSongVisibilityInterface;
 use App\Library\Application\Port\LibraryReadScopeProviderInterface;
 use App\Playlist\Application\Port\PlaylistCollaboratorResolverInterface;
 use App\Playlist\Application\Port\PlaylistPortInterface;
+use App\Playlist\Application\Port\PlaylistSongVisibilityInterface;
 use App\Playlist\Domain\Model\Playlist;
 use App\Playlist\Interface\Controller\PlaylistController;
 use App\Playlist\Interface\Request\CreatePlaylistRequest;
@@ -39,7 +40,7 @@ final class PlaylistIdentityTest extends TestCase
             $this->createStub(LibraryReadScopeProviderInterface::class),
             $this->createStub(PlaylistCollaboratorResolverInterface::class),
             $this->createStub(PlaylistSongVisibilityInterface::class),
-            $this->createStub(\App\Catalog\Application\Port\SongAvailabilityPortInterface::class),
+            $this->createStub(SongAvailabilityPortInterface::class),
         );
         $controller->setTranslator(new Translator('en'));
 
@@ -68,7 +69,7 @@ final class PlaylistIdentityTest extends TestCase
             $scopes,
             $this->createStub(PlaylistCollaboratorResolverInterface::class),
             $this->createStub(PlaylistSongVisibilityInterface::class),
-            $this->createStub(\App\Catalog\Application\Port\SongAvailabilityPortInterface::class),
+            $this->createStub(SongAvailabilityPortInterface::class),
         );
 
         $this->expectException(AccessDeniedException::class);

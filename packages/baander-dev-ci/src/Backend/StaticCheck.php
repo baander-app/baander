@@ -4,17 +4,17 @@ declare(strict_types=1);
 
 namespace Baander\DevCi\Backend;
 
-use Baander\Images\Build\ApplicationImage;
 use Baander\Configuration\ApplicationLayout;
 use Baander\Configuration\ToolingConfiguration;
 use Baander\Containers\Docker\Client;
 use Baander\Containers\Docker\TargetResolver;
-use Baander\Process\Execution\EngineExecutor;
-use Baander\Process\Execution\ExecutionContext;
 use Baander\Containers\Resources\ResourceKind;
 use Baander\Containers\Resources\ResourceLedger;
+use Baander\Images\Build\ApplicationImage;
 use Baander\Images\Build\Source;
 use Baander\Process\Execution\CommandExecutor;
+use Baander\Process\Execution\EngineExecutor;
+use Baander\Process\Execution\ExecutionContext;
 use Baander\Process\Execution\ProcessSpec;
 use RuntimeException;
 
@@ -104,7 +104,7 @@ final class StaticCheck
         $inspection = json_decode($docker->run(['image', 'inspect', '--', $image])->stdout, true, flags: JSON_THROW_ON_ERROR);
         if (!is_array($inspection) || !array_is_list($inspection) || count($inspection) !== 1 || !is_array($inspection[0])
             || ApplicationLayout::fromImage($inspection[0])->toArray() !== $layout->toArray()) {
-            throw new \RuntimeException('Static-check image layout differs from the selected source layout.');
+            throw new RuntimeException('Static-check image layout differs from the selected source layout.');
         }
         $name = 'baander-check-' . bin2hex(random_bytes(6));
         return $ledger->scoped(static function () use ($docker, $image, $archive, $command, $layout, $ledger, $name): int {

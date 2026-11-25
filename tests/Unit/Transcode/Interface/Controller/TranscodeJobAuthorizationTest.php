@@ -4,29 +4,41 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Transcode\Interface\Controller;
 
+use App\Auth\Infrastructure\Security\SecurityUser;
+use App\Shared\Domain\Model\PublicId;
+use App\Shared\Domain\Model\Uuid;
+use App\Shared\Infrastructure\EventListener\ExceptionSubscriber;
+use App\Tests\Unit\Transcode\PublicViewStub;
 use App\Transcode\Application\Command\CleanupOrphanedJobsCommand;
-use App\Transcode\Application\Exception\TranscodeCleanupIncompleteException;
-use App\Transcode\Application\Port\TranscodeJobPortInterface;
-use App\Transcode\Application\Port\PlaybackAccessInterface;
-use App\Transcode\Application\Port\TranscodePublicViewInterface;
+use App\Transcode\Application\DTO\TranscodeCleanupResult;
 use App\Transcode\Application\DTO\TranscodeJobDto;
+use App\Transcode\Application\Exception\TranscodeCleanupIncompleteException;
+use App\Transcode\Application\Port\PlaybackAccessInterface;
+use App\Transcode\Application\Port\TranscodeJobPortInterface;
+use App\Transcode\Application\Port\TranscodePublicViewInterface;
 use App\Transcode\Application\Query\TranscodeJobQueryPort;
 use App\Transcode\Domain\Model\TranscodeJob;
 use App\Transcode\Domain\ValueObject\QualityTier;
-use App\Shared\Domain\Model\PublicId;
-use App\Shared\Domain\Model\Uuid;
-use App\Auth\Infrastructure\Security\SecurityUser;
 use App\Transcode\Interface\Controller\TranscodeJobController;
-use PHPUnit\Framework\TestCase;
 use PHPUnit\Framework\Attributes\DataProvider;
+use PHPUnit\Framework\TestCase;
+use Psr\Log\NullLogger;
+use Symfony\Component\EventDispatcher\EventDispatcher;
+use Symfony\Component\HttpFoundation\Request;
+use Symfony\Component\HttpFoundation\RequestStack;
+use Symfony\Component\HttpKernel\Controller\ArgumentResolverInterface;
+use Symfony\Component\HttpKernel\Controller\ControllerResolverInterface;
+use Symfony\Component\HttpKernel\HttpKernel;
+use Symfony\Component\HttpKernel\KernelEvents;
 use Symfony\Component\Messenger\Envelope;
 use Symfony\Component\Messenger\Exception\HandlerFailedException;
 use Symfony\Component\Messenger\MessageBusInterface;
 use Symfony\Component\Messenger\Stamp\HandledStamp;
-use Symfony\Component\Security\Http\Attribute\IsGranted;
 use Symfony\Component\Security\Core\Authorization\AuthorizationCheckerInterface;
 use Symfony\Component\Security\Core\Exception\AccessDeniedException;
+use Symfony\Component\Security\Http\Attribute\IsGranted;
 use Symfony\Component\Translation\Translator;
+use Symfony\Contracts\Translation\TranslatorInterface;
 
 final class TranscodeJobAuthorizationTest extends TestCase
 {
@@ -83,7 +95,7 @@ final class TranscodeJobAuthorizationTest extends TestCase
         $jobs->method('findByPublicId')->willReturnCallback(
             static fn (PublicId $id): ?TranscodeJob => $id->equals($job->getPublicId()) ? $job : null,
         );
-        $controller = $this->controller($jobs, new \App\Tests\Unit\Transcode\PublicViewStub(), $this->createStub(PlaybackAccessInterface::class));
+        $controller = $this->controller($jobs, new PublicViewStub(), $this->createStub(PlaybackAccessInterface::class));
         $member = self::user(Uuid::generate());
 
         $foreign = $controller->$method($job->getPublicId()->toString(), $member);
@@ -99,7 +111,7 @@ final class TranscodeJobAuthorizationTest extends TestCase
         $job = TranscodeJob::create(new Uuid(), QualityTier::p720(), '/tmp/transcode', Uuid::generate());
         $jobs = $this->createStub(TranscodeJobPortInterface::class);
         $jobs->method('findByPublicId')->willReturn($job);
-        $controller = $this->controller($jobs, new \App\Tests\Unit\Transcode\PublicViewStub(), $this->createStub(PlaybackAccessInterface::class), admin: true);
+        $controller = $this->controller($jobs, new PublicViewStub(), $this->createStub(PlaybackAccessInterface::class), admin: true);
 
         $response = $controller->$method($job->getPublicId()->toString(), self::user(Uuid::generate()));
 
@@ -128,7 +140,7 @@ final class TranscodeJobAuthorizationTest extends TestCase
         ];
         $port = $this->createStub(TranscodeJobPortInterface::class);
         $port->method('findOrphanedJobs')->willReturn(array_values($jobs));
-        $controller = $this->controller($port, new \App\Tests\Unit\Transcode\PublicViewStub(), $this->createStub(PlaybackAccessInterface::class), $admin);
+        $controller = $this->controller($port, new PublicViewStub(), $this->createStub(PlaybackAccessInterface::class), $admin);
 
         $result = json_decode($controller->index(self::user($caller))->getContent(), true, flags: JSON_THROW_ON_ERROR);
 
@@ -172,7 +184,7 @@ final class TranscodeJobAuthorizationTest extends TestCase
     public function testUserJobHistoryRechecksCurrentLibraryAccess(): void
     {
         $owner = new Uuid();
-        $job = TranscodeJob::create(new Uuid(), QualityTier::p720(), '/tmp/revoked', \App\Shared\Domain\Model\Uuid::generate());
+        $job = TranscodeJob::create(new Uuid(), QualityTier::p720(), '/tmp/revoked', Uuid::generate());
         $videoPublicId = new PublicId();
         $query = $this->createMock(TranscodeJobQueryPort::class);
         $query->expects(self::once())->method('findByUser')->with($owner)->willReturn([TranscodeJobDto::fromModel($job, $videoPublicId)]);
@@ -205,7 +217,7 @@ final class TranscodeJobAuthorizationTest extends TestCase
     {
         $bus = $this->createMock(MessageBusInterface::class);
         $bus->expects($this->once())->method('dispatch')->with($this->isInstanceOf(CleanupOrphanedJobsCommand::class))
-            ->willReturn(new Envelope(new CleanupOrphanedJobsCommand(), [new HandledStamp(new \App\Transcode\Application\DTO\TranscodeCleanupResult(expired: 2, cleaned: 3), 'cleanup')]));
+            ->willReturn(new Envelope(new CleanupOrphanedJobsCommand(), [new HandledStamp(new TranscodeCleanupResult(expired: 2, cleaned: 3), 'cleanup')]));
         $controller = $this->cleanupController($bus);
 
         self::assertSame(['data' => ['expired' => 2, 'cleaned' => 3]], json_decode($controller->cleanup()->getContent(), true, flags: JSON_THROW_ON_ERROR));
@@ -232,18 +244,18 @@ final class TranscodeJobAuthorizationTest extends TestCase
 
         // The controller holds no answer of its own for this outcome: the exception subscriber every
         // endpoint shares unwraps the handler's failure and answers it.
-        $events = new \Symfony\Component\EventDispatcher\EventDispatcher();
-        $events->addListener(\Symfony\Component\HttpKernel\KernelEvents::EXCEPTION, new \App\Shared\Infrastructure\EventListener\ExceptionSubscriber(
-            new \Psr\Log\NullLogger(),
-            $this->createStub(\Symfony\Contracts\Translation\TranslatorInterface::class),
+        $events = new EventDispatcher();
+        $events->addListener(KernelEvents::EXCEPTION, new ExceptionSubscriber(
+            new NullLogger(),
+            $this->createStub(TranslatorInterface::class),
         ));
-        $controllers = $this->createStub(\Symfony\Component\HttpKernel\Controller\ControllerResolverInterface::class);
+        $controllers = $this->createStub(ControllerResolverInterface::class);
         $controllers->method('getController')->willReturn($controller->cleanup(...));
-        $arguments = $this->createStub(\Symfony\Component\HttpKernel\Controller\ArgumentResolverInterface::class);
+        $arguments = $this->createStub(ArgumentResolverInterface::class);
         $arguments->method('getArguments')->willReturn([]);
 
-        $response = (new \Symfony\Component\HttpKernel\HttpKernel($events, $controllers, new \Symfony\Component\HttpFoundation\RequestStack(), $arguments))
-            ->handle(\Symfony\Component\HttpFoundation\Request::create('/api/transcode/jobs/cleanup', 'POST'));
+        $response = (new HttpKernel($events, $controllers, new RequestStack(), $arguments))
+            ->handle(Request::create('/api/transcode/jobs/cleanup', 'POST'));
 
         self::assertSame(503, $response->getStatusCode());
         self::assertSame(['error' => [
@@ -291,7 +303,7 @@ final class TranscodeJobAuthorizationTest extends TestCase
     {
         return $this->controller(
             $this->createStub(TranscodeJobPortInterface::class),
-            new \App\Tests\Unit\Transcode\PublicViewStub(),
+            new PublicViewStub(),
             $this->createStub(PlaybackAccessInterface::class),
             admin: true,
             bus: $bus,

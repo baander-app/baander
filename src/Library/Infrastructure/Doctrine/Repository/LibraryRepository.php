@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace App\Library\Infrastructure\Doctrine\Repository;
 
-use App\Shared\Domain\ValueObject\FilesystemType;
 use App\Library\Domain\Model\Library;
+use App\Library\Domain\Model\LibraryState;
 use App\Library\Domain\Repository\LibraryRepositoryInterface;
 use App\Library\Domain\ValueObject\LibraryClaimAttempt;
 use App\Library\Domain\ValueObject\LibraryClaimKind;
@@ -14,12 +14,13 @@ use App\Library\Domain\ValueObject\LibraryPath;
 use App\Library\Domain\ValueObject\LibrarySlug;
 use App\Library\Domain\ValueObject\LibraryType;
 use App\Library\Infrastructure\Doctrine\Entity\LibraryEntity;
-use App\Library\Domain\Model\LibraryState;
-use App\Shared\Domain\Model\Uuid;
 use App\Shared\Domain\Model\PublicId;
+use App\Shared\Domain\Model\Uuid;
+use App\Shared\Domain\ValueObject\FilesystemType;
 use App\Shared\Domain\ValueObject\LibraryReadScope;
 use Doctrine\DBAL\ParameterType;
 use Doctrine\ORM\EntityManagerInterface;
+use Doctrine\ORM\QueryBuilder;
 use LogicException;
 use Psr\Clock\ClockInterface;
 
@@ -85,7 +86,7 @@ final class LibraryRepository implements LibraryRepositoryInterface
         return $entity === null ? null : $this->toDomain($entity);
     }
 
-    private function visibleQuery(LibraryReadScope $scope): \Doctrine\ORM\QueryBuilder
+    private function visibleQuery(LibraryReadScope $scope): QueryBuilder
     {
         $qb = $this->entityManager
             ->getRepository(LibraryEntity::class)

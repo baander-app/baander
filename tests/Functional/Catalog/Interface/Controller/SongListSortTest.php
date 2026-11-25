@@ -11,9 +11,11 @@ use App\Library\Infrastructure\Doctrine\Entity\LibraryEntity;
 use App\Shared\Domain\Model\Cursor;
 use App\Shared\Domain\Model\CursorDirection;
 use App\Shared\Domain\Model\PublicId;
+use App\Shared\Domain\Model\Uuid;
 use App\Shared\Infrastructure\Pagination\CursorCodec;
 use App\Tests\Functional\TestCase;
 use PHPUnit\Framework\Attributes\DataProvider;
+use Symfony\Component\HttpFoundation\Response;
 
 /**
  * The song list accepts only the sort fields and orders it implements, and a
@@ -177,7 +179,7 @@ final class SongListSortTest extends TestCase
     {
         $codec = static::getContainer()->get(CursorCodec::class);
         $cursor = $codec->encode(Cursor::create(CursorDirection::Next, [
-            'sort' => 'Track A', 'id' => (new \App\Shared\Domain\Model\Uuid())->toString(), 'binding' => 'title:asc',
+            'sort' => 'Track A', 'id' => (new Uuid())->toString(), 'binding' => 'title:asc',
         ]));
         $this->assertJsonResponse($this->list('limit=1&cursor=' . $cursor), 400, 'error');
     }
@@ -190,7 +192,7 @@ final class SongListSortTest extends TestCase
         $this->assertJsonResponse($this->list('limit=1&cursor=' . $cursor), 400, 'error');
     }
 
-    private function list(string $query): \Symfony\Component\HttpFoundation\Response
+    private function list(string $query): Response
     {
         return $this->authenticatedRequest('GET', '/api/songs/?' . $query, $this->admin);
     }

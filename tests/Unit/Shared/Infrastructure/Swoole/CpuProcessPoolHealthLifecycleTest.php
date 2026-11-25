@@ -6,6 +6,7 @@ namespace App\Tests\Unit\Shared\Infrastructure\Swoole;
 
 use App\Tests\Fixtures\Swoole\CoroutineProbe;
 use PHPUnit\Framework\TestCase;
+use Swoole\Process;
 
 final class CpuProcessPoolHealthLifecycleTest extends TestCase
 {
@@ -102,7 +103,7 @@ PHP;
                 }
                 $fields = explode(' ', substr($stat, strrpos($stat, ')') + 2));
                 if ($fields[19] === $start) {
-                    \Swoole\Process::kill((int) $pid, SIGKILL);
+                    Process::kill((int) $pid, SIGKILL);
                 }
             }
             foreach (glob($directory . '/*') ?: [] as $file) {

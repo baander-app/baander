@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Shared\Infrastructure\LogViewer\Agent;
 
+use App\Shared\Application\Exception\InvalidInputException;
 use App\Shared\Application\LogViewer\LogQuery;
 use App\Shared\Infrastructure\LogViewer\LogIndex;
 
@@ -32,7 +33,7 @@ final readonly class AgentProtocol
                 1 === preg_match('~^/entry/([A-Za-z0-9_.:-]+)$~D', $path, $matches) => [200, $this->index->detail($matches[1])],
                 default => [404, ['error' => 'Unknown agent operation.']],
             };
-        } catch (\InvalidArgumentException|\App\Shared\Application\Exception\InvalidInputException $error) {
+        } catch (\InvalidArgumentException|InvalidInputException $error) {
             return [422, ['error' => $error->getMessage()]];
         } catch (\Throwable) {
             return [503, ['error' => 'Agent index unavailable or snapshot expired.']];

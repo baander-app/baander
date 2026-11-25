@@ -224,7 +224,7 @@ final class NotificationOwnershipPersistenceTest extends TestCase
         self::assertSame(['a2', 'a3'], $titles($repository->findByUserId($first, limit: 2, cursor: $publicIds['a1']->toString(), direction: 'asc')));
         self::assertSame(['a3', 'a2'], $titles($repository->findByUserId($first, unreadOnly: true)));
         self::assertSame([], $repository->findByUserId($first, cursor: $publicIds['b1']->toString()));
-        self::assertSame([], $repository->findByUserId($first, cursor: (new \App\Shared\Domain\Model\PublicId())->toString()));
+        self::assertSame([], $repository->findByUserId($first, cursor: (new PublicId())->toString()));
         self::assertSame(
             ['a3', 'a2'],
             $titles($repository->findByUserId($first, since: new \DateTimeImmutable('2026-10-06T14:00:15+02:00'))),

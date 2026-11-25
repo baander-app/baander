@@ -16,6 +16,7 @@ use App\Shared\Domain\Model\SearchOptions;
 use App\Shared\Domain\ValueObject\LibraryReadScope;
 use App\Shared\Infrastructure\Pagination\CursorCodec;
 use App\Tests\Functional\TestCase;
+use Doctrine\DBAL\ArrayParameterType;
 use PHPUnit\Framework\Attributes\DataProvider;
 
 /**
@@ -123,7 +124,7 @@ final class SongCursorPaginationTest extends TestCase
         // collation for their tie order, rather than PHP's byte comparison.
         $orderedIds = $connection->fetchFirstColumn(
             'SELECT public_id FROM songs WHERE id IN (:ids) ORDER BY public_id ASC',
-            ['ids' => array_keys($added)], ['ids' => \Doctrine\DBAL\ArrayParameterType::STRING],
+            ['ids' => array_keys($added)], ['ids' => ArrayParameterType::STRING],
         );
         foreach ($orderedIds as $rank => $publicId) {
             self::assertIsString($publicId);

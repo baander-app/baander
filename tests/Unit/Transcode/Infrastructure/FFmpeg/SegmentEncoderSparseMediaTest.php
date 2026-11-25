@@ -4,9 +4,11 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Transcode\Infrastructure\FFmpeg;
 
+use App\Shared\Application\DTO\DeploymentProfile;
 use App\Transcode\Application\DTO\MediaTrack;
 use App\Transcode\Application\Port\FFmpegPortInterface;
 use App\Transcode\Application\Port\TranscodeStoragePortInterface;
+use App\Transcode\Application\Service\MediaExecutionPolicy;
 use App\Transcode\Domain\ValueObject\AudioProfile;
 use App\Transcode\Domain\ValueObject\EncoderProfile;
 use App\Transcode\Domain\ValueObject\QualityTier;
@@ -46,7 +48,7 @@ final class SegmentEncoderSparseMediaTest extends TestCase
         $source = $this->createSource(0.1, 30.0, true, 0.0);
         $probe = VideoProbeResult::fromProbeOutput($this->probe($source));
         self::assertEqualsWithDelta(0.1, $probe->framerate, 0.0001);
-        $encoder = new SegmentEncoder(new \App\Transcode\Application\Service\MediaExecutionPolicy(new \App\Shared\Application\DTO\DeploymentProfile()), $this->createStub(FFmpegPortInterface::class), $this->createStub(TranscodeStoragePortInterface::class), EncoderProfile::software($encoderName));
+        $encoder = new SegmentEncoder(new MediaExecutionPolicy(new DeploymentProfile()), $this->createStub(FFmpegPortInterface::class), $this->createStub(TranscodeStoragePortInterface::class), EncoderProfile::software($encoderName));
         $tier = new QualityTier('fixture', 64, 64, 100_000, 200_000, 200_000,
             $encoderName === 'libx264' ? 'avc1' : 'hvc1', $encoderName === 'libx264' ? 'avc1.64001f' : 'hvc1.1.6.L93.B0');
         $profile = AudioProfile::streamingStereo();
@@ -179,7 +181,7 @@ final class SegmentEncoderSparseMediaTest extends TestCase
             self::assertEqualsWithDelta($index / $rate, (float) $packet['pts_time'], 0.002);
         }
 
-        $encoder = new SegmentEncoder(new \App\Transcode\Application\Service\MediaExecutionPolicy(new \App\Shared\Application\DTO\DeploymentProfile()), $this->createStub(FFmpegPortInterface::class), $this->createStub(TranscodeStoragePortInterface::class), EncoderProfile::software($encoderName));
+        $encoder = new SegmentEncoder(new MediaExecutionPolicy(new DeploymentProfile()), $this->createStub(FFmpegPortInterface::class), $this->createStub(TranscodeStoragePortInterface::class), EncoderProfile::software($encoderName));
         $tier = new QualityTier('fixture', 64, 64, 100_000, 200_000, 200_000,
             $encoderName === 'libx264' ? 'avc1' : 'hvc1', $encoderName === 'libx264' ? 'avc1.64001f' : 'hvc1.1.6.L93.B0');
         $profile = AudioProfile::streamingStereo();

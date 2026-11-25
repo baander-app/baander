@@ -6,15 +6,15 @@ namespace Tsduck\Tests;
 
 use PHPUnit\Framework\TestCase;
 use Tsduck\Exception\SwitchStartException;
-use Tsduck\Exception\TSPStartException;
 use Tsduck\Exception\TsduckException;
+use Tsduck\Exception\TSPStartException;
 use Tsduck\FFI\LibTSDuck;
 use Tsduck\InputSwitcher;
 use Tsduck\PluginEventHandlerRegistry;
 use Tsduck\Report\NullReport;
 use Tsduck\TSProcessor;
-use Tsduck\Util\StructMapper;
 use Tsduck\Util\InBuffer;
+use Tsduck\Util\StructMapper;
 
 /**
  * Tests for TSProcessor, InputSwitcher, PluginEventHandlerRegistry, and StructMapper.
@@ -780,7 +780,7 @@ class TSProcessorTest extends TestCase
     {
         $exception = new TSPStartException('test');
 
-        $this->assertInstanceOf(\Tsduck\Exception\TsduckException::class, $exception);
+        $this->assertInstanceOf(TsduckException::class, $exception);
         $this->assertInstanceOf(\RuntimeException::class, $exception);
     }
 
@@ -788,7 +788,7 @@ class TSProcessorTest extends TestCase
     {
         $exception = new SwitchStartException('test');
 
-        $this->assertInstanceOf(\Tsduck\Exception\TsduckException::class, $exception);
+        $this->assertInstanceOf(TsduckException::class, $exception);
         $this->assertInstanceOf(\RuntimeException::class, $exception);
     }
 }

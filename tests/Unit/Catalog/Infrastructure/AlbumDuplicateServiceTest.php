@@ -10,9 +10,12 @@ use App\Catalog\Domain\Repository\AlbumRepositoryInterface;
 use App\Catalog\Domain\Service\AlbumDuplicateDetector;
 use App\Catalog\Domain\Service\TitleNormalizer;
 use App\Catalog\Infrastructure\AlbumDuplicateService;
+use App\Catalog\Interface\Resource\DuplicateGroupResource;
 use App\Media\Application\Port\ImagePortInterface;
+use App\Shared\Application\Exception\ConflictException;
 use App\Shared\Domain\Model\Uuid;
 use App\Shared\Domain\ValueObject\LibraryReadScope;
+use Doctrine\DBAL\Connection;
 use PHPUnit\Framework\TestCase;
 
 final class AlbumDuplicateServiceTest extends TestCase
@@ -36,10 +39,10 @@ final class AlbumDuplicateServiceTest extends TestCase
         $port->method('getArtistNamesForAlbums')->willReturn($artists);
         $service = new AlbumDuplicateService(
             new AlbumDuplicateDetector($repository, new TitleNormalizer()), $port,
-            $this->createStub(ImagePortInterface::class), $this->createStub(\Doctrine\DBAL\Connection::class),
+            $this->createStub(ImagePortInterface::class), $this->createStub(Connection::class),
         );
 
-        $this->expectException(\App\Shared\Application\Exception\ConflictException::class);
+        $this->expectException(ConflictException::class);
         $this->expectExceptionMessage('Album duplicate results changed. Refresh and try again.');
         $service->findDuplicates($library);
     }
@@ -81,14 +84,14 @@ final class AlbumDuplicateServiceTest extends TestCase
             new AlbumDuplicateDetector($repository, new TitleNormalizer()),
             $port,
             $this->createStub(ImagePortInterface::class),
-            $this->createStub(\Doctrine\DBAL\Connection::class),
+            $this->createStub(Connection::class),
         );
 
         $groups = $service->findVisibleDuplicatesForAlbum($viewed->getId(), LibraryReadScope::unrestricted());
 
         self::assertTrue(array_is_list($groups));
         self::assertCount(1, $groups);
-        $resource = \App\Catalog\Interface\Resource\DuplicateGroupResource::from($groups[0]);
+        $resource = DuplicateGroupResource::from($groups[0]);
         self::assertSame(count($resource['albumIds']), $resource['albumCount']);
         self::assertSame(count($resource['albums']), $resource['albumCount']);
         self::assertSame(

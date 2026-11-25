@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Catalog\Domain\Service;
 
+use App\Catalog\Domain\Model\Album;
 use App\Catalog\Domain\Repository\AlbumRepositoryInterface;
 use App\Catalog\Domain\ValueObject\DuplicateGroup;
 use App\Shared\Domain\Model\Uuid;
@@ -99,8 +100,8 @@ final class AlbumDuplicateDetector
      * 2. Title similarity ≥ 85%
      * 3. Artist overlap ≥ 50%
      * 4. Year match (both null OR equal)
-     * @param array{album: \App\Catalog\Domain\Model\Album, normalizedTitle: string, artists: array<array-key, string>, year: int|null} $a
-     * @param array{album: \App\Catalog\Domain\Model\Album, normalizedTitle: string, artists: array<array-key, string>, year: int|null} $b
+     * @param array{album: Album, normalizedTitle: string, artists: array<array-key, string>, year: int|null} $a
+     * @param array{album: Album, normalizedTitle: string, artists: array<array-key, string>, year: int|null} $b
      */
     private function isDuplicate(array $a, array $b): bool
     {
@@ -174,9 +175,9 @@ final class AlbumDuplicateDetector
      * Calculates confidence score for a duplicate group.
      *
      * Confidence is based on the average similarity scores within the group.
-     * @param array{album: \App\Catalog\Domain\Model\Album, normalizedTitle: string, artists: array<array-key, string>, year: int|null} $anchor
+     * @param array{album: Album, normalizedTitle: string, artists: array<array-key, string>, year: int|null} $anchor
      * @param string[] $groupIds
-     * @param array<string, array{album: \App\Catalog\Domain\Model\Album, normalizedTitle: string, artists: array<array-key, string>, year: int|null}> $albumData
+     * @param array<string, array{album: Album, normalizedTitle: string, artists: array<array-key, string>, year: int|null}> $albumData
      */
     private function calculateConfidence(array $anchor, array $groupIds, array $albumData): float
     {

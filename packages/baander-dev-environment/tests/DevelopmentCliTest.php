@@ -4,14 +4,17 @@ declare(strict_types=1);
 
 namespace Baander\DevEnvironment\Tests;
 
+use Baander\Configuration\ToolingConfiguration;
+use Baander\Containers\Docker\Target;
 use Baander\DevEnvironment\Cli;
 use Baander\DevEnvironment\Host\ProcessEnvironment;
-use Baander\Tests\Tooling\Support\DevelopmentCommandExecutor;
 use Baander\DevEnvironment\State\InstanceStateStore;
 use Baander\DevEnvironment\WorkflowError;
+use Baander\Filesystem\AtomicFile;
 use Baander\Process\Execution\ProcessResult;
 use Baander\Process\Execution\ProcessRunner;
 use Baander\Process\Execution\ProcessSpec;
+use Baander\Tests\Tooling\Support\DevelopmentCommandExecutor;
 use PHPUnit\Framework\TestCase;
 
 final class DevelopmentCliTest extends TestCase
@@ -71,12 +74,12 @@ final class DevelopmentCliTest extends TestCase
         try {
             putenv('BAANDER_TOOLING_TARGET_FILE=' . $path);
             foreach (['tcp://daemon.baander.app:2375', 'unix:///tmp/daemon,socket'] as $endpoint) {
-                \Baander\Filesystem\AtomicFile::writeJson(
+                AtomicFile::writeJson(
                     $path,
-                    new \Baander\Containers\Docker\Target('/fake/docker', $endpoint, 'daemon', null, null)->toArray(),
+                    new Target('/fake/docker', $endpoint, 'daemon', null, null)->toArray(),
                 );
                 try {
-                    Cli::dockerTarget($runner, \Baander\Configuration\ToolingConfiguration::resolve(), $this->directory . '/unused-snapshot', getenv());
+                    Cli::dockerTarget($runner, ToolingConfiguration::resolve(), $this->directory . '/unused-snapshot', getenv());
                     self::fail('Unsupported development transport was admitted.');
                 } catch (\RuntimeException $error) {
                     self::assertNotSame('Unexpected Docker command.', $error->getMessage());
@@ -128,7 +131,7 @@ final class DevelopmentCliTest extends TestCase
             ],
             'libraries' => [['slug' => 'movies', 'name' => 'Movies', 'type' => 'movie', 'source' => $this->directory . '/movies', 'target' => '/media/movies']],
         ];
-        $configuration = \Baander\Configuration\ToolingConfiguration::resolve(environment: getenv());
+        $configuration = ToolingConfiguration::resolve(environment: getenv());
         $instance['tooling'] = $configuration->toArray();
         $store->save('persistent', $instance);
         file_put_contents($store->directory('persistent') . '/env.json', '{}');

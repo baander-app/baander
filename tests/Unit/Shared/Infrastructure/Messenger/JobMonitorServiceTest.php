@@ -11,6 +11,7 @@ use App\Shared\Infrastructure\Messenger\JobMonitorService;
 use App\Shared\Infrastructure\Pagination\CursorPaginator;
 use Doctrine\DBAL\Connection;
 use Doctrine\ORM\EntityManagerInterface;
+use Doctrine\ORM\EntityRepository;
 use PHPUnit\Framework\Attributes\AllowMockObjectsWithoutExpectations;
 use PHPUnit\Framework\Attributes\IgnoreDeprecations;
 use PHPUnit\Framework\MockObject\MockObject;
@@ -98,7 +99,7 @@ final class JobMonitorServiceTest extends TestCase
 
     public function testFindByJobIdOrFailThrowsWhenNotFound(): void
     {
-        $repository = $this->createMock(\Doctrine\ORM\EntityRepository::class);
+        $repository = $this->createMock(EntityRepository::class);
         $repository->expects($this->once())->method('findOneBy')
             ->with(['jobId' => 'non-existent'])
             ->willReturn(null);
@@ -116,7 +117,7 @@ final class JobMonitorServiceTest extends TestCase
     public function testFindByJobIdOrFailReturnsEntityWhenFound(): void
     {
         $entity = new JobMonitorEntity(jobId: 'job-123', name: 'TestJob');
-        $repository = $this->createMock(\Doctrine\ORM\EntityRepository::class);
+        $repository = $this->createMock(EntityRepository::class);
         $repository->expects($this->once())->method('findOneBy')
             ->with(['jobId' => 'job-123'])
             ->willReturn($entity);
@@ -255,7 +256,7 @@ final class JobMonitorServiceTest extends TestCase
         $entity = new JobMonitorEntity(jobId: 'job-audit');
         $this->assertNull($entity->getAuditLog());
 
-        $repository = $this->createMock(\Doctrine\ORM\EntityRepository::class);
+        $repository = $this->createMock(EntityRepository::class);
         $repository->expects($this->once())->method('findOneBy')
             ->with(['jobId' => 'job-audit'])
             ->willReturn($entity);
@@ -282,7 +283,7 @@ final class JobMonitorServiceTest extends TestCase
         $existingEntry = ['action' => 'first', 'at' => '2026-04-19T10:00:00+00:00'];
         $entity->setAuditLog(json_encode([$existingEntry]));
 
-        $repository = $this->createMock(\Doctrine\ORM\EntityRepository::class);
+        $repository = $this->createMock(EntityRepository::class);
         $repository->expects($this->once())->method('findOneBy')
             ->with(['jobId' => 'job-audit-2'])
             ->willReturn($entity);
@@ -305,7 +306,7 @@ final class JobMonitorServiceTest extends TestCase
 
     public function testAppendAuditLogThrowsWhenNotFound(): void
     {
-        $repository = $this->createMock(\Doctrine\ORM\EntityRepository::class);
+        $repository = $this->createMock(EntityRepository::class);
         $repository->expects($this->once())->method('findOneBy')
             ->willReturn(null);
 
@@ -324,7 +325,7 @@ final class JobMonitorServiceTest extends TestCase
     {
         $entity = new JobMonitorEntity(jobId: 'job-retry');
 
-        $repository = $this->createMock(\Doctrine\ORM\EntityRepository::class);
+        $repository = $this->createMock(EntityRepository::class);
         $repository->expects($this->exactly(2))->method('findOneBy')
             ->with(['jobId' => 'job-retry'])
             ->willReturn($entity);
@@ -356,7 +357,7 @@ final class JobMonitorServiceTest extends TestCase
         $entity = new JobMonitorEntity(jobId: 'job-retry-2');
         $entity->setAuditLog(json_encode([['action' => 'previous']]));
 
-        $repository = $this->createMock(\Doctrine\ORM\EntityRepository::class);
+        $repository = $this->createMock(EntityRepository::class);
         $repository->expects($this->exactly(2))->method('findOneBy')
             ->with(['jobId' => 'job-retry-2'])
             ->willReturn($entity);
@@ -380,7 +381,7 @@ final class JobMonitorServiceTest extends TestCase
 
     public function testMarkRetriedWithAuditThrowsWhenNotFound(): void
     {
-        $repository = $this->createMock(\Doctrine\ORM\EntityRepository::class);
+        $repository = $this->createMock(EntityRepository::class);
         $repository->expects($this->once())->method('findOneBy')
             ->willReturn(null);
 

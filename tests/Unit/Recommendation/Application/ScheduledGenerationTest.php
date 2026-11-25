@@ -6,6 +6,7 @@ namespace App\Tests\Unit\Recommendation\Application;
 
 use App\Activity\Application\Port\ActivityPortInterface;
 use App\Catalog\Domain\Repository\SongRepositoryInterface;
+use App\Recommendation\Application\Command\ExecuteRecommendationJobCommand;
 use App\Recommendation\Application\Command\GenerateRecommendationsCommand;
 use App\Recommendation\Application\CommandHandler\GenerateRecommendationsHandler;
 use App\Recommendation\Application\DTO\RecommendationGenerationResult;
@@ -21,7 +22,10 @@ use App\Tests\Unit\Recommendation\InMemoryRecommendationJobs;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\AbstractLogger;
 use Psr\Log\NullLogger;
+use Symfony\Component\Messenger\Handler\HandlersLocator;
+use Symfony\Component\Messenger\MessageBus;
 use Symfony\Component\Messenger\MessageBusInterface;
+use Symfony\Component\Messenger\Middleware\HandleMessageMiddleware;
 
 /**
  * The daily scheduler job builds the command with automatic: true; only that run reads
@@ -116,10 +120,10 @@ final class ScheduledGenerationTest extends TestCase
         $songs->expects(self::never())->method('findAllForRecommendations');
         $jobs = new InMemoryRecommendationJobs();
         $queued = [];
-        $bus = new \Symfony\Component\Messenger\MessageBus([
-            new \Symfony\Component\Messenger\Middleware\HandleMessageMiddleware(
-                new \Symfony\Component\Messenger\Handler\HandlersLocator([
-                    \App\Recommendation\Application\Command\ExecuteRecommendationJobCommand::class => [
+        $bus = new MessageBus([
+            new HandleMessageMiddleware(
+                new HandlersLocator([
+                    ExecuteRecommendationJobCommand::class => [
                         static function ($command) use (&$queued): void { $queued[] = $command; },
                     ],
                 ]),
@@ -172,7 +176,7 @@ final class ScheduledGenerationTest extends TestCase
         $activity->method('getAllListeningHistories')->willReturn([]);
 
         return new GenerateRecommendationsHandler(
-            $bus ?? new \Symfony\Component\Messenger\MessageBus(),
+            $bus ?? new MessageBus(),
             $songs,
             $activity,
             new CollaborativeFilteringCalculator(),

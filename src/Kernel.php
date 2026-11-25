@@ -7,14 +7,15 @@ use App\Shared\Infrastructure\Doctrine\Type\CustomTypesRegistrar;
 use App\Shared\Infrastructure\Logging\BoundedContextLoggerPass;
 use App\Shared\Infrastructure\Logging\MonologHandlerResetterPass;
 use App\Shared\Infrastructure\Logging\TerminalLogGuardPass;
+use App\Shared\Infrastructure\Messaging\AsyncWorkloadCompilerPass;
 use App\Shared\Infrastructure\Security\ProductionSecrets;
 use App\Shared\Infrastructure\Swoole\DBAL\DBALAliveKeeperCompilerPass;
 use App\Shared\Infrastructure\Swoole\ServeCommandPass;
 use Baander\Core\EnvironmentVariable;
 use SwooleBundle\SwooleBundle\Bridge\Symfony\Kernel\CoroutinesSupportingKernel;
 use Symfony\Bundle\FrameworkBundle\Kernel\MicroKernelTrait;
-use Symfony\Component\DependencyInjection\ContainerBuilder;
 use Symfony\Component\DependencyInjection\Compiler\PassConfig;
+use Symfony\Component\DependencyInjection\ContainerBuilder;
 use Symfony\Component\HttpKernel\Kernel as BaseKernel;
 
 class Kernel extends BaseKernel
@@ -84,7 +85,7 @@ class Kernel extends BaseKernel
         $container->addCompilerPass(new MonologHandlerResetterPass());
         $container->addCompilerPass(new TerminalLogGuardPass());
         $container->addCompilerPass(new OutboxSubscriberPass());
-        $container->addCompilerPass(new \App\Shared\Infrastructure\Messaging\AsyncWorkloadCompilerPass(), PassConfig::TYPE_BEFORE_REMOVING, 10);
+        $container->addCompilerPass(new AsyncWorkloadCompilerPass(), PassConfig::TYPE_BEFORE_REMOVING, 10);
         $container->addCompilerPass(new ServeCommandPass(), PassConfig::TYPE_BEFORE_REMOVING, 10);
     }
 

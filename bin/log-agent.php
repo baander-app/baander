@@ -9,6 +9,11 @@ use App\Shared\Infrastructure\LogViewer\Agent\CheckpointExchange;
 use App\Shared\Infrastructure\LogViewer\Agent\Collector;
 use App\Shared\Infrastructure\LogViewer\LogIndex;
 use Baander\Core\EnvironmentVariable;
+use Swoole\Coroutine;
+use Swoole\Http\Request;
+use Swoole\Http\Response;
+use Swoole\Http\Server;
+use Swoole\Process;
 
 require dirname(__DIR__).'/vendor/autoload.php';
 
@@ -43,14 +48,14 @@ try {
     $config->token(true);
     $index = new LogIndex($config->get('databasePath'), false, $config->get('maxStorageBytes', 1073741824));
     unset($index);
-    $server = new Swoole\Http\Server($config->get('listenHost', '0.0.0.0'), $config->get('listenPort', 9509));
+    $server = new Server($config->get('listenHost', '0.0.0.0'), $config->get('listenPort', 9509));
     $server->set(['worker_num' => 1, 'enable_coroutine' => true, 'http_parse_post' => false, 'package_max_length' => 32768, 'log_file' => '/dev/stderr']);
-    $process = new Swoole\Process(static function () use ($config): void {
+    $process = new Process(static function () use ($config): void {
         $running = true;
-        Swoole\Process::signal(SIGTERM, static function () use (&$running): void {
+        Process::signal(SIGTERM, static function () use (&$running): void {
             $running = false;
         });
-        Swoole\Process::signal(SIGINT, static function () use (&$running): void {
+        Process::signal(SIGINT, static function () use (&$running): void {
             $running = false;
         });
         $collector = new Collector($config, new LogIndex($config->get('databasePath'), false, $config->get('maxStorageBytes', 1073741824)));
@@ -66,7 +71,7 @@ try {
         }
     }, false, 0, false);
     $server->addProcess($process);
-    $server->on('request', static function (Swoole\Http\Request $request, Swoole\Http\Response $response) use ($config): void {
+    $server->on('request', static function (Request $request, Response $response) use ($config): void {
         $response->header('Content-Type', 'application/json');
         $response->header('Cache-Control', 'no-store');
         $path = $request->server['request_uri'] ?? '';
@@ -91,7 +96,7 @@ try {
                 $deadline = microtime(true) + $timeout;
                 $result = null;
                 while (microtime(true) < $deadline && null === ($result = $exchange->result($id))) {
-                    Swoole\Coroutine::sleep(0.05);
+                    Coroutine::sleep(0.05);
                 }
                 $result ??= ['complete' => false, 'error' => 'Final collection deadline expired; history may contain a gap.'];
                 $response->status($result['complete'] ? 200 : 503);

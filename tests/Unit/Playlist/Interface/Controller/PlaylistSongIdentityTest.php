@@ -4,18 +4,21 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Playlist\Interface\Controller;
 
-use App\Playlist\Application\Port\PlaylistSongVisibilityInterface;
+use App\Auth\Application\Port\AuthenticatedUserIdentityInterface;
+use App\Catalog\Application\Port\SongAvailabilityPortInterface;
 use App\Catalog\Application\Port\SongPortInterface;
+use App\Catalog\Domain\Model\Song;
+use App\Catalog\Domain\Model\SongState;
 use App\Library\Application\Port\LibraryReadScopeProviderInterface;
 use App\Playlist\Application\Command\AddSongCommand;
-use App\Playlist\Application\CommandHandler\AddSongHandler;
 use App\Playlist\Application\Command\RemoveSongCommand;
 use App\Playlist\Application\Command\ReorderSongsCommand;
-use App\Auth\Application\Port\AuthenticatedUserIdentityInterface;
-use Symfony\Component\Messenger\Stamp\HandledStamp;
+use App\Playlist\Application\CommandHandler\AddSongHandler;
 use App\Playlist\Application\Port\PlaylistCollaboratorResolverInterface;
 use App\Playlist\Application\Port\PlaylistPortInterface;
+use App\Playlist\Application\Port\PlaylistSongVisibilityInterface;
 use App\Playlist\Domain\Model\Playlist;
+use App\Playlist\Domain\ReadModel\PlaylistReadView;
 use App\Playlist\Domain\Repository\PlaylistRepositoryInterface;
 use App\Playlist\Interface\Controller\PlaylistController;
 use App\Playlist\Interface\Request\AddSongRequest;
@@ -29,6 +32,8 @@ use Symfony\Bundle\SecurityBundle\Security;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\Messenger\Envelope;
 use Symfony\Component\Messenger\MessageBusInterface;
+use Symfony\Component\Messenger\Stamp\HandledStamp;
+use Symfony\Component\Security\Core\User\UserInterface;
 use Symfony\Contracts\Translation\TranslatorInterface;
 
 final class PlaylistSongIdentityTest extends TestCase
@@ -211,7 +216,7 @@ final class PlaylistSongIdentityTest extends TestCase
         $playlist->addSong(new Uuid(), 0);
         $playlist->markPersisted(7);
         $revision = $playlist->getRevision();
-        $view = new \App\Playlist\Domain\ReadModel\PlaylistReadView(
+        $view = new PlaylistReadView(
             $playlist->getId(), $playlist->getPublicId(), new PublicId(), [], 'Later read', null,
             false, false, false, [], $playlist->getCreatedAt(), $playlist->getUpdatedAt(), 99,
         );
@@ -226,7 +231,7 @@ final class PlaylistSongIdentityTest extends TestCase
         $songs->method('getVisibleAlbumTitlesAndLanguagesByIds')->willReturn([]);
         $scopes = $this->createStub(LibraryReadScopeProviderInterface::class);
         $scopes->method('current')->willReturn(LibraryReadScope::none());
-        $controller = new PlaylistController($security, $playlists, $songs, $this->createStub(MessageBusInterface::class), $scopes, $this->createStub(PlaylistCollaboratorResolverInterface::class), $this->createStub(PlaylistSongVisibilityInterface::class), $this->createStub(\App\Catalog\Application\Port\SongAvailabilityPortInterface::class));
+        $controller = new PlaylistController($security, $playlists, $songs, $this->createStub(MessageBusInterface::class), $scopes, $this->createStub(PlaylistCollaboratorResolverInterface::class), $this->createStub(PlaylistSongVisibilityInterface::class), $this->createStub(SongAvailabilityPortInterface::class));
 
         $response = $controller->show($playlist->getPublicId()->toString());
         $data = json_decode($response->getContent(), true, 512, JSON_THROW_ON_ERROR)['data'];
@@ -242,8 +247,8 @@ final class PlaylistSongIdentityTest extends TestCase
         $albumPublicId = new PublicId();
         $visible = [];
         foreach (['Available', 'Unavailable'] as $title) {
-            $song = \App\Catalog\Domain\Model\Song::create($albumId, $title, '/music/' . $title . '.flac', 1, 'audio/flac');
-            $visible[] = \App\Catalog\Domain\Model\Song::reconstitute(new \App\Catalog\Domain\Model\SongState(...array_replace(
+            $song = Song::create($albumId, $title, '/music/' . $title . '.flac', 1, 'audio/flac');
+            $visible[] = Song::reconstitute(new SongState(...array_replace(
                 get_object_vars($song->getState()), ['albumPublicId' => $albumPublicId],
             )));
         }
@@ -251,7 +256,7 @@ final class PlaylistSongIdentityTest extends TestCase
         $playlist->addSong($visible[0]->getId(), 0);
         $playlist->addSong(new Uuid(), 1);
         $playlist->addSong($visible[1]->getId(), 2);
-        $view = new \App\Playlist\Domain\ReadModel\PlaylistReadView(
+        $view = new PlaylistReadView(
             $playlist->getId(), $playlist->getPublicId(), new PublicId(), [], 'Mixed availability', null,
             false, false, false, [], $playlist->getCreatedAt(), $playlist->getUpdatedAt(), 3,
         );
@@ -265,7 +270,7 @@ final class PlaylistSongIdentityTest extends TestCase
             $visible[0]->getId()->toString() => $visible[0],
             $visible[1]->getId()->toString() => $visible[1],
         ]);
-        $availability = $this->createMock(\App\Catalog\Application\Port\SongAvailabilityPortInterface::class);
+        $availability = $this->createMock(SongAvailabilityPortInterface::class);
         $availability->expects(self::once())->method('forSongs')->with($visible)->willReturn([
             $visible[0]->getId()->toString() => true,
             $visible[1]->getId()->toString() => false,
@@ -290,7 +295,7 @@ final class PlaylistSongIdentityTest extends TestCase
     {
         $security = $this->createStub(Security::class);
         $security->method('isGranted')->willReturn(true);
-        $identity = $this->createStubForIntersectionOfInterfaces([AuthenticatedUserIdentityInterface::class, \Symfony\Component\Security\Core\User\UserInterface::class]);
+        $identity = $this->createStubForIntersectionOfInterfaces([AuthenticatedUserIdentityInterface::class, UserInterface::class]);
         $identity->method('getId')->willReturn($playlist->getUserId()->toString());
         $security->method('getUser')->willReturn($identity);
         $playlists = $this->createMock(PlaylistPortInterface::class);
@@ -298,7 +303,7 @@ final class PlaylistSongIdentityTest extends TestCase
         $playlists->expects(self::never())->method('save');
         $scopes = $this->createStub(LibraryReadScopeProviderInterface::class);
         $scopes->method('current')->willReturn(LibraryReadScope::none());
-        $controller = new PlaylistController($security, $playlists, $this->createStub(SongPortInterface::class), $bus, $scopes, $this->createStub(PlaylistCollaboratorResolverInterface::class), $lookup, $this->createStub(\App\Catalog\Application\Port\SongAvailabilityPortInterface::class));
+        $controller = new PlaylistController($security, $playlists, $this->createStub(SongPortInterface::class), $bus, $scopes, $this->createStub(PlaylistCollaboratorResolverInterface::class), $lookup, $this->createStub(SongAvailabilityPortInterface::class));
         $translator = $this->createStub(TranslatorInterface::class);
         $translator->method('trans')->willReturnArgument(0);
         $controller->setTranslator($translator);

@@ -13,6 +13,7 @@ use App\Playlist\Infrastructure\Doctrine\Entity\PlaylistCollaboratorEntity;
 use App\Playlist\Infrastructure\Doctrine\Entity\PlaylistEntity;
 use App\Playlist\Infrastructure\Doctrine\Entity\PlaylistSongEntity;
 use App\Shared\Domain\Model\PublicId;
+use App\Shared\Domain\Model\Uuid;
 use App\Shared\Domain\ValueObject\LibraryReadScope;
 use App\Tests\Functional\TestCase;
 
@@ -88,6 +89,6 @@ final class PlaylistCollaboratorListRepositoryTest extends TestCase
         $this->assertNotNull($view);
         $this->assertSame(1, $view->getSongCount());
         $this->assertSame($this->owner->getPublicId()->toString(), $view->getOwnerPublicId()->toString());
-        $this->assertNull($repository->findRead(new \App\Shared\Domain\Model\Uuid(), LibraryReadScope::unrestricted()));
+        $this->assertNull($repository->findRead(new Uuid(), LibraryReadScope::unrestricted()));
     }
 }

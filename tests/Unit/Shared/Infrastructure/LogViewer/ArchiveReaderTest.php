@@ -6,6 +6,7 @@ namespace App\Tests\Unit\Shared\Infrastructure\LogViewer;
 
 use App\Shared\Infrastructure\LogViewer\ArchiveReader;
 use App\Shared\Infrastructure\LogViewer\FileRecordReader;
+use App\Shared\Infrastructure\LogViewer\LogNormalizer;
 use PHPUnit\Framework\TestCase;
 
 final class ArchiveReaderTest extends TestCase
@@ -133,7 +134,7 @@ final class ArchiveReaderTest extends TestCase
         $records = iterator_to_array((new ArchiveReader())->records($path));
         self::assertCount(2, $records);
         self::assertSame(262145, strlen($records[0]));
-        self::assertTrue((new \App\Shared\Infrastructure\LogViewer\LogNormalizer())->normalize($records[0])['truncated']);
+        self::assertTrue((new LogNormalizer())->normalize($records[0])['truncated']);
     }
 
     public function testConcatenatedGzipDoesNotSilentlyDropTheSecondStream(): void

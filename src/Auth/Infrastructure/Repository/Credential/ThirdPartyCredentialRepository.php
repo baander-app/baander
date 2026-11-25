@@ -8,6 +8,8 @@ use App\Auth\Domain\Model\Credential\ThirdPartyCredential;
 use App\Auth\Domain\Model\Credential\ThirdPartyCredentialState;
 use App\Auth\Domain\Repository\Credential\ThirdPartyCredentialRepositoryInterface;
 use App\Auth\Infrastructure\Doctrine\Entity\ThirdPartyCredentialEntity;
+use App\Auth\Infrastructure\Doctrine\Entity\UserEntity;
+use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
 use Doctrine\ORM\EntityManagerInterface;
 
@@ -99,8 +101,8 @@ final class ThirdPartyCredentialRepository implements ThirdPartyCredentialReposi
         }
 
         return new ThirdPartyCredentialEntity(
-            new \App\Shared\Domain\Model\PublicId(),
-            $this->entityManager->getReference(\App\Auth\Infrastructure\Doctrine\Entity\UserEntity::class, $credential->getUserId()->toString()),
+            new PublicId(),
+            $this->entityManager->getReference(UserEntity::class, $credential->getUserId()->toString()),
             $credential->getProvider(),
             $credential->getAccessToken(),
             $credential->getRefreshToken(),

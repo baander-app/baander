@@ -10,6 +10,7 @@ use App\Catalog\Domain\ValueObject\MatchedSongField;
 use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
 use InvalidArgumentException;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
 final class SongTest extends TestCase
@@ -551,7 +552,7 @@ final class SongTest extends TestCase
     }
 
     /** @param array<string, string|int|bool> $change */
-    #[\PHPUnit\Framework\Attributes\DataProvider('everyLockableField')]
+    #[DataProvider('everyLockableField')]
     public function testUpdateMetadataRejectsAChangeToAnyLockedField(string $field, array $change): void
     {
         $song = Song::create($this->albumId, 'Title', '/path.mp3', 1024, 'audio/mpeg');
@@ -597,7 +598,7 @@ final class SongTest extends TestCase
     }
 
     /** @param \Closure(Song): mixed $read */
-    #[\PHPUnit\Framework\Attributes\DataProvider('lockedTagFields')]
+    #[DataProvider('lockedTagFields')]
     public function testUpdateFromTagsKeepsALockedFieldAndTakesTheOthers(string $field, \Closure $read, mixed $kept): void
     {
         $song = Song::create($this->albumId, 'Old Title', '/path.flac', 1024, 'audio/flac', track: 1, disc: 1, year: 2000, comment: 'old');

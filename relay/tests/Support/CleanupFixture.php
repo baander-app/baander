@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Baander\RegistryTests;
 
+use Swoole\Process;
+
 final class CleanupFixture
 {
     public static function run(string $mode, string $path): void
@@ -26,7 +28,7 @@ final class CleanupFixture
             }
         }
         if ($mode === 'ignore') {
-            \Swoole\Process::signal(15, static function (): void {});
+            Process::signal(15, static function (): void {});
         }
         file_put_contents($path, (string) getmypid());
         for (;;) {

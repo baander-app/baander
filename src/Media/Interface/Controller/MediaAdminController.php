@@ -8,6 +8,7 @@ use App\Media\Application\Port\MediaAdminPortInterface;
 use App\Shared\Domain\Model\PublicId;
 use App\Shared\Interface\Attribute\CliCounterpart;
 use App\Shared\Interface\Controller\ApiResponsesTrait;
+use App\Shared\Interface\DTO\ApiError;
 use OpenApi\Spec as OA;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\Routing\Attribute\Route;
@@ -62,7 +63,7 @@ final class MediaAdminController
                 response: '403',
                 description: 'Forbidden',
                 content: new OA\MediaType\Json(
-                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                    schema: new OA\Schema(ref: ApiError::class),
                 ),
             ),
         ],
@@ -99,7 +100,7 @@ final class MediaAdminController
                 response: '403',
                 description: 'Forbidden',
                 content: new OA\MediaType\Json(
-                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                    schema: new OA\Schema(ref: ApiError::class),
                 ),
             ),
         ],
@@ -153,7 +154,7 @@ final class MediaAdminController
                 response: '403',
                 description: 'Forbidden',
                 content: new OA\MediaType\Json(
-                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                    schema: new OA\Schema(ref: ApiError::class),
                 ),
             ),
         ],

@@ -8,6 +8,7 @@ use App\Auth\Application\Exception\UserNotFoundException;
 use App\Auth\Application\Port\UserIdentifierResolverInterface;
 use App\Auth\Domain\Model\User;
 use App\Auth\Domain\Repository\UserRepositoryInterface;
+use App\Shared\Application\Exception\NotFoundException;
 use App\Shared\Domain\Model\Email;
 use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
@@ -58,6 +59,6 @@ final readonly class UserLookup implements UserIdentifierResolverInterface
     public function publicIdByUserId(Uuid $userId): PublicId
     {
         return ($this->userRepository->findByUuid($userId)
-            ?? throw new \App\Shared\Application\Exception\NotFoundException('User not found.'))->getPublicId();
+            ?? throw new NotFoundException('User not found.'))->getPublicId();
     }
 }

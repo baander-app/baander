@@ -23,6 +23,7 @@ use Doctrine\DBAL\Connection;
 use Doctrine\DBAL\Tools\DsnParser;
 use Doctrine\DBAL\Types\Type;
 use Doctrine\DBAL\Types\Types;
+use Pdo\Pgsql;
 use Symfony\Component\Dotenv\Dotenv;
 
 $root = dirname(__DIR__, 3);
@@ -79,7 +80,7 @@ $zones[DedicatedConnectionFactory::class] = $dedicated->fetchOne('SHOW TimeZone'
 $statements[DedicatedConnectionFactory::class] = $named($dedicated);
 $dedicated->close();
 // A caller cannot turn named statements back on for a dedicated connection.
-$requested = DedicatedConnectionFactory::fromParams($params + ['driverOptions' => [Pdo\Pgsql::ATTR_DISABLE_PREPARES => false]]);
+$requested = DedicatedConnectionFactory::fromParams($params + ['driverOptions' => [Pgsql::ATTR_DISABLE_PREPARES => false]]);
 $statements['requested named statements'] = $named($requested);
 $requested->close();
 

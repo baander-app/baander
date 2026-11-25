@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Shared\Infrastructure\Swoole;
 
 use Psr\Log\LoggerInterface;
+use Swoole\Server;
 use Swoole\WebSocket\CloseFrame;
 use Symfony\Component\Serializer\Encoder\JsonEncoder;
 
@@ -18,7 +19,7 @@ final class WebSocketPusher
         private readonly ?LoggerInterface $logger = null,
     ) {}
 
-    public function setServer(\Swoole\Server $server): void
+    public function setServer(Server $server): void
     {
         if (!$server instanceof \Swoole\WebSocket\Server) {
             throw new \InvalidArgumentException('WebSocket push requires a WebSocket server.');

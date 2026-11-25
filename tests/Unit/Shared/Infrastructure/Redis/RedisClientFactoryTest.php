@@ -7,6 +7,7 @@ namespace App\Tests\Unit\Shared\Infrastructure\Redis;
 use App\Shared\Infrastructure\Redis\ManagedRedisConnection;
 use App\Shared\Infrastructure\Redis\RedisClientFactory;
 use App\Shared\Infrastructure\Redis\RedisPoolExhaustedException;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\MockObject\Stub;
 use PHPUnit\Framework\TestCase;
@@ -34,7 +35,7 @@ final class RedisClientFactoryTest extends TestCase
             dsn: 'redis://localhost:6379',
             maxSize: $maxSize,
             idleTimeoutSeconds: $idleTimeoutSeconds,
-            connectionFactory: function () use (&$mocks, &$totalCreated): \Redis {
+            connectionFactory: function () use (&$mocks, &$totalCreated): Redis {
                 $totalCreated++;
                 if (count($mocks) === 0) {
                     throw new \LogicException('No mock connections available');
@@ -88,7 +89,7 @@ final class RedisClientFactoryTest extends TestCase
         $factory = $this->createFactory();
         $this->addMockConnection($this->createMockRedis());
 
-        $result = $factory->borrow(fn(\Redis $r) => 'hello');
+        $result = $factory->borrow(fn(Redis $r) => 'hello');
 
         $this->assertSame('hello', $result);
     }
@@ -100,11 +101,11 @@ final class RedisClientFactoryTest extends TestCase
         $this->addMockConnection($redis1);
 
         // First borrow
-        $factory->borrow(fn(\Redis $r) => null);
+        $factory->borrow(fn(Redis $r) => null);
 
         // Second borrow should reuse — no new mock added
         $captured = null;
-        $factory->borrow(function (\Redis $r) use (&$captured): void {
+        $factory->borrow(function (Redis $r) use (&$captured): void {
             $captured = $r;
         });
 
@@ -118,7 +119,7 @@ final class RedisClientFactoryTest extends TestCase
         $this->addMockConnection($this->createMockRedis());
 
         try {
-            $factory->borrow(fn(\Redis $r) => throw new \RuntimeException('boom'));
+            $factory->borrow(fn(Redis $r) => throw new \RuntimeException('boom'));
         } catch (\RuntimeException) {
             // expected
         }
@@ -129,7 +130,7 @@ final class RedisClientFactoryTest extends TestCase
         $this->assertSame(1, $metrics['idle']);
 
         // Should reuse without creating new — no mock added
-        $factory->borrow(fn(\Redis $r) => null);
+        $factory->borrow(fn(Redis $r) => null);
         $this->assertSame(1, $this->totalCreated);
     }
 
@@ -161,7 +162,7 @@ final class RedisClientFactoryTest extends TestCase
         $this->assertSame(1, $metrics['idle']);
 
         // Next borrow should reuse — no mock added
-        $factory->borrow(fn(\Redis $r) => null);
+        $factory->borrow(fn(Redis $r) => null);
         $this->assertSame(1, $this->totalCreated);
     }
 
@@ -179,7 +180,7 @@ final class RedisClientFactoryTest extends TestCase
         $this->nextCid = 99;
 
         $this->expectException(RedisPoolExhaustedException::class);
-        $factory->borrow(fn(\Redis $r) => null);
+        $factory->borrow(fn(Redis $r) => null);
     }
 
     public function test_orphan_reclamation(): void
@@ -212,12 +213,12 @@ final class RedisClientFactoryTest extends TestCase
         // First: borrow and return to get a connection into idle
         $healthyFirst = $this->createMockRedis();
         $this->addMockConnection($healthyFirst);
-        $factory->borrow(fn(\Redis $r) => null);
+        $factory->borrow(fn(Redis $r) => null);
         $this->assertSame(1, $this->totalCreated);
 
         // Now manually poison the idle connection — replace it with a dead one
         $idleProp = new \ReflectionProperty($factory, 'idle');
-        $deadRedis = $this->createMock(\Redis::class);
+        $deadRedis = $this->createMock(Redis::class);
         $deadRedis->method('ping')->willThrowException(new \RuntimeException('Connection lost'));
         $deadRedis->expects($this->once())->method('close');
         $idleProp->setValue($factory, [['redis' => $deadRedis, 'idleSince' => microtime(true)]]);
@@ -226,7 +227,7 @@ final class RedisClientFactoryTest extends TestCase
         $this->addMockConnection($this->createMockRedis());
 
         // Second borrow: pops dead from idle, ping fails, discards, creates healthy
-        $result = $factory->borrow(fn(\Redis $r) => 'ok');
+        $result = $factory->borrow(fn(Redis $r) => 'ok');
         $this->assertSame('ok', $result);
 
         // Should have created healthyFirst + healthy replacement = 2 total
@@ -273,7 +274,7 @@ final class RedisClientFactoryTest extends TestCase
         $this->addMockConnection($staleRedis);
 
         // Borrow and return — connection goes to idle
-        $factory->borrow(fn(\Redis $r) => null);
+        $factory->borrow(fn(Redis $r) => null);
         $this->assertSame(1, $this->totalCreated);
 
         // Manually age the idle entry so it exceeds the 1-second timeout
@@ -286,7 +287,7 @@ final class RedisClientFactoryTest extends TestCase
         $this->addMockConnection($this->createMockRedis());
 
         // Next borrow should evict the stale connection and create a new one
-        $factory->borrow(fn(\Redis $r) => 'ok');
+        $factory->borrow(fn(Redis $r) => 'ok');
         $this->assertSame(2, $this->totalCreated);
     }
 
@@ -341,7 +342,7 @@ final class RedisClientFactoryTest extends TestCase
     }
 
     /** @param string|list<string>|null $auth */
-    #[\PHPUnit\Framework\Attributes\DataProvider('credentialDsns')]
+    #[DataProvider('credentialDsns')]
     public function test_connect_authenticates_as_the_dsn_user_with_the_decoded_password(string $dsn, string|array|null $auth): void
     {
         $redis = $this->createMock(Redis::class);
@@ -392,7 +393,7 @@ final class RedisClientFactoryTest extends TestCase
         $redis = $this->createMockRedis();
         $this->addMockConnection($redis);
 
-        $factory->borrow(function (\Redis $r) use ($redis): void {
+        $factory->borrow(function (Redis $r) use ($redis): void {
             $this->assertSame($redis, $r);
         });
     }

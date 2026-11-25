@@ -4,12 +4,13 @@ declare(strict_types=1);
 
 namespace Baander\DevEnvironment\Host;
 
-use Baander\Process\Execution\CommandExecutor;
-use Baander\Process\Execution\ProcessSpec;
-use Baander\Filesystem\AtomicFile;
-use Baander\Filesystem\PrivateDirectory;
 use Baander\DevEnvironment\State\InstanceStateStore;
 use Baander\DevEnvironment\WorkflowError;
+use Baander\Filesystem\AtomicFile;
+use Baander\Filesystem\Paths;
+use Baander\Filesystem\PrivateDirectory;
+use Baander\Process\Execution\CommandExecutor;
+use Baander\Process\Execution\ProcessSpec;
 
 final class HostSetup
 {
@@ -49,10 +50,10 @@ final class HostSetup
     /** @param list<string> $paths */
     public function sharePaths(array $paths): void
     {
-        $ca = \Baander\Filesystem\Paths::resolvedPath($this->store->root . '/host-setup/ca');
+        $ca = Paths::resolvedPath($this->store->root . '/host-setup/ca');
         $sources = [];
         foreach ($paths as $path) {
-            $source = realpath(\Baander\Filesystem\Paths::absolutePath($path));
+            $source = realpath(Paths::absolutePath($path));
             if ($source === false || !is_dir($source)) {
                 throw new WorkflowError('Select existing directories for container access.');
             }

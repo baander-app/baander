@@ -15,6 +15,8 @@ use App\Shared\Application\Exception\HandlerFailure;
 use App\Shared\Application\Http\BaanderHeader;
 use App\Shared\Domain\Model\PublicId;
 use App\Shared\Interface\Controller\ApiResponsesTrait;
+use App\Shared\Interface\DTO\ApiError;
+use App\Shared\Interface\DTO\OAuthError;
 use OpenApi\Spec as OA;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
@@ -67,14 +69,14 @@ final class PasskeyLoginController
                 response: '400',
                 description: 'DPoP nonce challenge (use_dpop_nonce) with a DPoP-Nonce header, or an invalid proof. A missing proof returns an ApiError.',
                 content: new OA\MediaType\Json(
-                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\OAuthError::class),
+                    schema: new OA\Schema(ref: OAuthError::class),
                 ),
             ),
             new OA\Response(
                 response: '401',
                 description: 'Invalid passkey or verification failed',
                 content: new OA\MediaType\Json(
-                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                    schema: new OA\Schema(ref: ApiError::class),
                 ),
             ),
             new OA\Response(
@@ -88,7 +90,7 @@ final class PasskeyLoginController
                     ),
                 ],
                 content: new OA\MediaType\Json(
-                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                    schema: new OA\Schema(ref: ApiError::class),
                 ),
             ),
         ],

@@ -13,6 +13,7 @@ use App\Notification\Application\DTO\SeedDefaultPreferencesCommand;
 use App\Shared\Application\Port\TransactionPortInterface;
 use App\Shared\Domain\Model\Email;
 use InvalidArgumentException;
+use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\MockObject\Stub;
 use PHPUnit\Framework\TestCase;
 use RuntimeException;
@@ -40,7 +41,7 @@ final class CreateUserHandlerTest extends TestCase
         $this->handler = $this->createCreateUserHandlerFixture();
     }
 
-    /** @return ($expectCalls is true ? MessageBusInterface&\PHPUnit\Framework\MockObject\MockObject : MessageBusInterface&Stub) */
+    /** @return ($expectCalls is true ? MessageBusInterface&MockObject : MessageBusInterface&Stub) */
     private function createMessageBus(bool $expectCalls = false): MessageBusInterface&Stub
     {
         $double = $expectCalls ? $this->createMock(MessageBusInterface::class) : $this->createStub(MessageBusInterface::class);
@@ -204,14 +205,14 @@ final class CreateUserHandlerTest extends TestCase
                 return $this->active;
             }
         };
-        $failure = new \RuntimeException('Outbox insertion failed.');
+        $failure = new RuntimeException('Outbox insertion failed.');
         $this->transaction = $this->createMock(TransactionPortInterface::class);
         $this->transaction->expects($this->once())->method('run')->willReturnCallback(
             function (callable $operation) use ($active, $failure): mixed {
                 $active->active = true;
                 try {
                     return $operation();
-                } catch (\RuntimeException $exception) {
+                } catch (RuntimeException $exception) {
                     $this->assertSame($failure, $exception);
                     throw $exception;
                 } finally {

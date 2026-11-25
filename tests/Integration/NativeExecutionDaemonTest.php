@@ -12,6 +12,7 @@ use App\Shared\Infrastructure\Worker\NativeExecutionHandle;
 use App\Shared\Infrastructure\Worker\NativeExecutionProtocol;
 use App\Shared\Infrastructure\Worker\OutOfMemoryKillOrder;
 use App\Shared\Infrastructure\Worker\OutputTail;
+use App\Tests\Support\NativeExecutionFixture;
 use App\Transcode\Domain\ValueObject\VideoProbeResult;
 use App\Transcode\Infrastructure\FFmpeg\FFprobeArguments;
 use PHPUnit\Framework\TestCase;
@@ -448,7 +449,7 @@ final class NativeExecutionDaemonTest extends TestCase
     public function testEveryConfiguredSlotOfALargeProfileConnects(): void
     {
         $profile = new DeploymentProfile(videoEncoderSlots: 8, audioEncoderSlots: 12);
-        $fixture = new \App\Tests\Support\NativeExecutionFixture('baander.app:workers', str_repeat('d', 32), profile: $profile);
+        $fixture = new NativeExecutionFixture('baander.app:workers', str_repeat('d', 32), profile: $profile);
         try {
             foreach (array_keys($profile->nativeClientCommandCaps()) as $id) {
                 $reply = new NativeExecutionClient($fixture->socketPath(), 'baander.app:workers', str_repeat('d', 32), 1, $id, 1, $profile)->handshake();
@@ -688,7 +689,7 @@ PHP;
     public function testRemuxPreservesAuxiliaryCapacityForBothCopySlotsAndControl(): void
     {
         $profile = new DeploymentProfile('remux', 2, 4, 1, sharedCopySlots: 2);
-        $fixture = new \App\Tests\Support\NativeExecutionFixture('baander.app:remux', str_repeat('c', 32), profile: $profile);
+        $fixture = new NativeExecutionFixture('baander.app:remux', str_repeat('c', 32), profile: $profile);
         $clients = [];
         $handles = [];
         try {

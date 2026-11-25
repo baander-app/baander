@@ -9,8 +9,8 @@ use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\SearchOptions;
 use App\Shared\Domain\Model\SearchResult;
 use App\Shared\Domain\Model\Uuid;
-use App\Shared\Domain\ValueObject\LibraryReadScope;
 use App\Shared\Domain\Repository\Searchable;
+use App\Shared\Domain\ValueObject\LibraryReadScope;
 
 interface MovieRepositoryInterface extends Searchable
 {
@@ -46,7 +46,7 @@ interface MovieRepositoryInterface extends Searchable
     public function findByPublicId(PublicId $publicId): ?Movie;
 
     /**
-     * @return \App\Catalog\Domain\Model\Movie[]
+     * @return Movie[]
      */
     public function findByLibrary(Uuid $libraryId): array;
 

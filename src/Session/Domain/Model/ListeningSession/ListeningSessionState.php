@@ -4,8 +4,11 @@ declare(strict_types=1);
 
 namespace App\Session\Domain\Model\ListeningSession;
 
-use App\Shared\Domain\Model\Uuid;
+use App\Session\Domain\Model\Playback\ObservedPlaybackState;
+use App\Session\Domain\Model\Playback\PlaybackMedia;
+use App\Session\Domain\Model\Playback\PlaybackState;
 use App\Shared\Domain\Model\PublicId;
+use App\Shared\Domain\Model\Uuid;
 use DateTimeImmutable;
 
 /**
@@ -32,9 +35,9 @@ final class ListeningSessionState
         public DateTimeImmutable $updatedAt,
         public ?DateTimeImmutable $lastUsedAt = null,
         public int $revision = 0,
-        public ?\App\Session\Domain\Model\Playback\PlaybackMedia $media = null,
-        public \App\Session\Domain\Model\Playback\PlaybackState $desiredState = \App\Session\Domain\Model\Playback\PlaybackState::Stopped,
-        public \App\Session\Domain\Model\Playback\ObservedPlaybackState $observedState = \App\Session\Domain\Model\Playback\ObservedPlaybackState::Unknown,
+        public ?PlaybackMedia $media = null,
+        public PlaybackState $desiredState = PlaybackState::Stopped,
+        public ObservedPlaybackState $observedState = ObservedPlaybackState::Unknown,
         public ?Uuid $selectedDestinationId = null,
         public ?Uuid $activeIncarnationId = null,
     ) {}

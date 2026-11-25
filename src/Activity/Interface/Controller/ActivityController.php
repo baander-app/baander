@@ -6,12 +6,13 @@ namespace App\Activity\Interface\Controller;
 
 use App\Activity\Application\Command\RecordPlayCommand;
 use App\Activity\Application\Command\ToggleLoveCommand;
-use App\Auth\Application\Port\AuthenticatedUserIdentityInterface;
+use App\Activity\Application\Port\ActivityIdentityProjectionPortInterface;
 use App\Activity\Application\Port\ActivityPortInterface;
 use App\Activity\Domain\Model\MediaActivity;
 use App\Activity\Infrastructure\ActivityEnrichmentService;
 use App\Activity\Interface\Request\PlayActivityRequest;
 use App\Activity\Interface\Resource\ActivityResource;
+use App\Auth\Application\Port\AuthenticatedUserIdentityInterface;
 use App\Catalog\Application\Port\AlbumPortInterface;
 use App\Catalog\Application\Port\ArtistPortInterface;
 use App\Catalog\Application\Port\MoviePortInterface;
@@ -20,6 +21,8 @@ use App\Shared\Application\Http\PublicOrigins;
 use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
 use App\Shared\Interface\Controller\ApiResponsesTrait;
+use App\Shared\Interface\DTO\ApiError;
+use App\Shared\Interface\DTO\ValidationError;
 use App\Shared\Interface\Request\QueryParameters;
 use OpenApi\Spec as OA;
 use Symfony\Bundle\SecurityBundle\Security;
@@ -46,7 +49,7 @@ final class ActivityController
         private readonly AlbumPortInterface $albumPort,
         private readonly ArtistPortInterface $artistPort,
         private readonly MoviePortInterface $moviePort,
-        private readonly \App\Activity\Application\Port\ActivityIdentityProjectionPortInterface $identities,
+        private readonly ActivityIdentityProjectionPortInterface $identities,
         private readonly PublicOrigins $publicOrigins,
     ) {
     }
@@ -102,14 +105,14 @@ final class ActivityController
                 response: '400',
                 description: 'Invalid query parameter',
                 content: new OA\MediaType\Json(
-                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                    schema: new OA\Schema(ref: ApiError::class),
                 ),
             ),
             new OA\Response(
                 response: '401',
                 description: 'Not authenticated',
                 content: new OA\MediaType\Json(
-                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                    schema: new OA\Schema(ref: ApiError::class),
                 ),
             ),
         ],
@@ -225,14 +228,14 @@ final class ActivityController
                 response: '401',
                 description: 'Not authenticated',
                 content: new OA\MediaType\Json(
-                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                    schema: new OA\Schema(ref: ApiError::class),
                 ),
             ),
             new OA\Response(
                 response: '422',
                 description: 'Validation error',
                 content: new OA\MediaType\Json(
-                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ValidationError::class),
+                    schema: new OA\Schema(ref: ValidationError::class),
                 ),
             ),
         ],
@@ -364,14 +367,14 @@ final class ActivityController
                 response: '401',
                 description: 'Not authenticated',
                 content: new OA\MediaType\Json(
-                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                    schema: new OA\Schema(ref: ApiError::class),
                 ),
             ),
             new OA\Response(
                 response: '404',
                 description: 'Not found',
                 content: new OA\MediaType\Json(
-                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                    schema: new OA\Schema(ref: ApiError::class),
                 ),
             ),
         ],
@@ -437,7 +440,7 @@ final class ActivityController
                 response: '401',
                 description: 'Not authenticated',
                 content: new OA\MediaType\Json(
-                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                    schema: new OA\Schema(ref: ApiError::class),
                 ),
             ),
         ],

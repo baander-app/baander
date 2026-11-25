@@ -10,6 +10,7 @@ use App\Scheduler\Domain\Service\SchedulerRegistry;
 use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
 use DateTimeImmutable;
+use Doctrine\DBAL\ArrayParameterType;
 use Doctrine\DBAL\Exception\DriverException;
 use DoctrineMigrations\Version20261017000000;
 use PHPUnit\Framework\TestCase;
@@ -144,7 +145,7 @@ final class OAuthSecretHashAndCodePurgeTest extends TestCase
         $present = $this->manager->getConnection()->fetchFirstColumn(
             'SELECT id::text FROM ' . $table . ' WHERE id IN (?)',
             [array_map(static fn (Uuid $id): string => $id->toString(), array_values($rows))],
-            [\Doctrine\DBAL\ArrayParameterType::STRING],
+            [ArrayParameterType::STRING],
         );
 
         return array_keys(array_filter($rows, static fn (Uuid $id): bool => in_array($id->toString(), $present, true)));

@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Radio\Domain\Model\RadioSession;
 
+use App\Radio\Domain\Event\RadioSessionStarted;
+use App\Radio\Domain\Event\RadioSessionStopped;
 use App\Radio\Domain\Model\RadioSession\RadioSession;
 use App\Radio\Domain\Model\RadioSession\RadioSessionState;
 use App\Shared\Domain\Model\Uuid;
@@ -71,7 +73,7 @@ final class RadioSessionTest extends TestCase
 
         $events = $session->drainPendingEvents();
         $this->assertCount(1, $events);
-        $this->assertInstanceOf(\App\Radio\Domain\Event\RadioSessionStarted::class, $events[0]);
+        $this->assertInstanceOf(RadioSessionStarted::class, $events[0]);
     }
 
     public function testStopFiresRadioSessionStoppedEvent(): void
@@ -84,7 +86,7 @@ final class RadioSessionTest extends TestCase
 
         $events = $session->drainPendingEvents();
         $this->assertCount(1, $events);
-        $this->assertInstanceOf(\App\Radio\Domain\Event\RadioSessionStopped::class, $events[0]);
+        $this->assertInstanceOf(RadioSessionStopped::class, $events[0]);
     }
 
     public function testStopWhenAlreadyStoppedThrows(): void

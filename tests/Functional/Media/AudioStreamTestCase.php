@@ -8,20 +8,25 @@ use App\Auth\Domain\Model\User;
 use App\Library\Infrastructure\Doctrine\Entity\LibraryEntity;
 use App\Media\Application\Port\StreamPortInterface;
 use App\Media\Domain\Model\TrackStreamMetadata;
+use App\Shared\Application\DTO\DeploymentProfile;
 use App\Shared\Application\Http\BaanderHeader;
+use App\Shared\Application\Port\SystemSettingsPortInterface;
 use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
 use App\Tests\Functional\TestCase;
-use App\Transcode\Infrastructure\Storage\SegmentFileResolver;
+use App\Tests\Support\NativeExecutionFixture;
 use App\Transcode\Application\DTO\AudioRenditionClaim;
 use App\Transcode\Application\DTO\AudioRenditionInput;
 use App\Transcode\Application\DTO\AudioRenditionRuntimeSnapshot;
 use App\Transcode\Application\DTO\MediaWorkerIdentity;
 use App\Transcode\Application\Port\AudioRenditionRuntimePort;
-use App\Transcode\Infrastructure\Transcode\AudioRenditionExecutor;
+use App\Transcode\Application\Service\MediaExecutionPolicy;
+use App\Transcode\Infrastructure\FFmpeg\AacImplementationProbe;
 use App\Transcode\Infrastructure\FFmpeg\ProcessExecutor;
-use App\Tests\Support\NativeExecutionFixture;
+use App\Transcode\Infrastructure\Storage\SegmentFileResolver;
+use App\Transcode\Infrastructure\Transcode\AudioRenditionExecutor;
 use Psr\Log\NullLogger;
+use Symfony\Component\BrowserKit\Response;
 
 /**
  * HTTP format, cache and access coverage with an explicitly invoked worker executor.
@@ -109,7 +114,7 @@ abstract class AudioStreamTestCase extends TestCase
             $operation();
             return true;
         });
-        $executor = new AudioRenditionExecutor(new \App\Transcode\Application\Service\MediaExecutionPolicy(new \App\Shared\Application\DTO\DeploymentProfile()), $runtime, new NullLogger(), self::getContainer()->get(\App\Shared\Application\Port\SystemSettingsPortInterface::class), self::getContainer()->get(\App\Transcode\Infrastructure\FFmpeg\AacImplementationProbe::class), getenv('FFMPEG_PATH') ?: 'ffmpeg');
+        $executor = new AudioRenditionExecutor(new MediaExecutionPolicy(new DeploymentProfile()), $runtime, new NullLogger(), self::getContainer()->get(SystemSettingsPortInterface::class), self::getContainer()->get(AacImplementationProbe::class), getenv('FFMPEG_PATH') ?: 'ffmpeg');
         $runtime->method('admit')->willReturnCallback(static function (AudioRenditionInput $input) use (&$rows, $executor): AudioRenditionRuntimeSnapshot {
             if (!isset($rows[$input->key()])) {
                 $row = new AudioRenditionRuntimeSnapshot($input->key(), $input, 'pending', 1, null, null, null, true);
@@ -134,7 +139,7 @@ abstract class AudioStreamTestCase extends TestCase
     /**
      * @param array<string, string> $server
      */
-    protected function request(User $user, string $query, array $server = []): \Symfony\Component\BrowserKit\Response
+    protected function request(User $user, string $query, array $server = []): Response
     {
         $this->client->request('GET', $this->uri($query), [], [], [
             BaanderHeader::TestUserId->serverKey() => $user->getId()->toString(),

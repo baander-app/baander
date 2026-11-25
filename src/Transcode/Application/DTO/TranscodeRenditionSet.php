@@ -5,8 +5,9 @@ declare(strict_types=1);
 namespace App\Transcode\Application\DTO;
 
 use App\Shared\Domain\Model\PublicId;
+use Symfony\Component\DependencyInjection\Attribute\Exclude;
 
-#[\Symfony\Component\DependencyInjection\Attribute\Exclude]
+#[Exclude]
 final class TranscodeRenditionSet
 {
     /** @param list<array{jobId: string, generation: int}> $pairs */

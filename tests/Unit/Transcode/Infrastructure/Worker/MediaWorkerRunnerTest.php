@@ -4,22 +4,26 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Transcode\Infrastructure\Worker;
 
+use App\Shared\Application\DTO\DeploymentProfile;
 use App\Shared\Domain\Model\Uuid;
 use App\Transcode\Application\DTO\AudioRenditionInput;
 use App\Transcode\Application\DTO\AudioRenditionRuntimeSnapshot;
 use App\Transcode\Application\DTO\DesiredTranscodeState;
 use App\Transcode\Application\DTO\TranscodeRuntimeSnapshot;
+use App\Transcode\Application\Port\AudioRenditionFormat;
 use App\Transcode\Application\Port\AudioRenditionRuntimePort;
 use App\Transcode\Application\Port\TranscodeExecutionOwnershipPort;
+use App\Transcode\Domain\ValueObject\AudioProfile;
 use App\Transcode\Infrastructure\Worker\MediaWorkerAuthorityInterface;
 use App\Transcode\Infrastructure\Worker\MediaWorkerRunner;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
 final class MediaWorkerRunnerTest extends TestCase
 {
     /** @param list<string> $expectedIds */
-    #[\PHPUnit\Framework\Attributes\DataProvider('deploymentCapacities')]
-    public function testFreshChildrenRespectCapacityAndAreReapedOnDrain(\App\Shared\Application\DTO\DeploymentProfile $profile, int $count, array $expectedIds, int $videoCount): void
+    #[DataProvider('deploymentCapacities')]
+    public function testFreshChildrenRespectCapacityAndAreReapedOnDrain(DeploymentProfile $profile, int $count, array $expectedIds, int $videoCount): void
     {
         $directory = sys_get_temp_dir() . '/baander-media-test-' . bin2hex(random_bytes(8));
         mkdir($directory);
@@ -30,14 +34,14 @@ final class MediaWorkerRunnerTest extends TestCase
         $video->expects(self::never())->method('claim');
         $jobs = [];
         for ($index = 0; $index < 4; ++$index) {
-            $jobs[] = new TranscodeRuntimeSnapshot(Uuid::generate(), Uuid::generate(), 'request', new DesiredTranscodeState(\App\Transcode\Domain\ValueObject\AudioProfile::streamingStereo()), 1, 0, 0, 'pending', null, null);
+            $jobs[] = new TranscodeRuntimeSnapshot(Uuid::generate(), Uuid::generate(), 'request', new DesiredTranscodeState(AudioProfile::streamingStereo()), 1, 0, 0, 'pending', null, null);
         }
         $video->expects(self::exactly(2))->method('pending')->willReturn($jobs);
         $audio = $this->createMock(AudioRenditionRuntimePort::class);
         $audio->expects(self::never())->method('claim');
         $audioJobs = [];
         foreach (['one', 'two'] as $track) {
-            $input = new AudioRenditionInput($track, 'source.flac', '/media/source.flac', \App\Transcode\Application\Port\AudioRenditionFormat::Opus, 128000, '/media/derived');
+            $input = new AudioRenditionInput($track, 'source.flac', '/media/source.flac', AudioRenditionFormat::Opus, 128000, '/media/derived');
             $audioJobs[] = new AudioRenditionRuntimeSnapshot($input->key(), $input, 'pending', 0, null, null, null);
         }
         $audio->expects(self::exactly(2))->method('pending')->willReturn($audioJobs);
@@ -78,11 +82,11 @@ final class MediaWorkerRunnerTest extends TestCase
         }
     }
 
-    /** @return iterable<string, array{\App\Shared\Application\DTO\DeploymentProfile,int,list<string>,int}> */
+    /** @return iterable<string, array{DeploymentProfile,int,list<string>,int}> */
     public static function deploymentCapacities(): iterable
     {
-        yield 'transcode' => [new \App\Shared\Application\DTO\DeploymentProfile(videoEncoderSlots: 3, audioEncoderSlots: 1), 4, ['media-audio-0', 'media-video-0', 'media-video-1', 'media-video-2'], 3];
-        yield 'remux' => [new \App\Shared\Application\DTO\DeploymentProfile('remux', 2, 4, 1, sharedCopySlots: 2), 2, ['media-copy-0', 'media-copy-1'], 1];
+        yield 'transcode' => [new DeploymentProfile(videoEncoderSlots: 3, audioEncoderSlots: 1), 4, ['media-audio-0', 'media-video-0', 'media-video-1', 'media-video-2'], 3];
+        yield 'remux' => [new DeploymentProfile('remux', 2, 4, 1, sharedCopySlots: 2), 2, ['media-copy-0', 'media-copy-1'], 1];
     }
 
     public function testEveryConfiguredVideoSlotLaunchesAndNoneBeyondIt(): void
@@ -94,7 +98,7 @@ final class MediaWorkerRunnerTest extends TestCase
         file_put_contents($script, '<?php file_put_contents(__DIR__."/launches", json_encode([$argv[1], getenv("BAANDER_NATIVE_CLIENT_ID")])."\n", FILE_APPEND | LOCK_EX); sleep(10);');
         $jobs = [];
         for ($index = 0; $index < 9; ++$index) {
-            $jobs[] = new TranscodeRuntimeSnapshot(Uuid::generate(), Uuid::generate(), 'request', new DesiredTranscodeState(\App\Transcode\Domain\ValueObject\AudioProfile::streamingStereo()), 1, 0, 0, 'pending', null, null);
+            $jobs[] = new TranscodeRuntimeSnapshot(Uuid::generate(), Uuid::generate(), 'request', new DesiredTranscodeState(AudioProfile::streamingStereo()), 1, 0, 0, 'pending', null, null);
         }
         $video = $this->createStub(TranscodeExecutionOwnershipPort::class);
         $video->method('pending')->willReturn($jobs);
@@ -104,7 +108,7 @@ final class MediaWorkerRunnerTest extends TestCase
         $deadline = microtime(true) + 5;
         $fullAt = null;
         try {
-            (new MediaWorkerRunner($video, $audio, $authority, new \App\Shared\Application\DTO\DeploymentProfile(videoEncoderSlots: 8, audioEncoderSlots: 0), $script))->run(
+            (new MediaWorkerRunner($video, $audio, $authority, new DeploymentProfile(videoEncoderSlots: 8, audioEncoderSlots: 0), $script))->run(
                 static function () use ($log, $deadline, &$fullAt): bool {
                     if (is_file($log) && count(file($log)) >= 8) {
                         $fullAt ??= microtime(true);
@@ -146,7 +150,7 @@ PHP);
                 Uuid::generate(),
                 Uuid::generate(),
                 'request',
-                new DesiredTranscodeState(\App\Transcode\Domain\ValueObject\AudioProfile::streamingStereo()),
+                new DesiredTranscodeState(AudioProfile::streamingStereo()),
                 1,
                 0,
                 0,
@@ -169,7 +173,7 @@ PHP);
                 $video,
                 $audio,
                 $authority,
-                new \App\Shared\Application\DTO\DeploymentProfile(videoEncoderSlots: 1, audioEncoderSlots: 0),
+                new DeploymentProfile(videoEncoderSlots: 1, audioEncoderSlots: 0),
                 $script,
             );
             $runner->run(static function () use ($log, $release, $deadline, &$startedAt): bool {
@@ -209,10 +213,10 @@ PHP);
         $script = $directory . '/child.php';
         $log = $directory . '/launches';
         file_put_contents($script, '<?php file_put_contents(__DIR__."/launches", json_encode([$argv[1], getenv("BAANDER_NATIVE_CLIENT_ID"), getenv("BAANDER_NATIVE_CLIENT_GENERATION"), getmypid()])."\n", FILE_APPEND | LOCK_EX);');
-        $runtime = new TranscodeRuntimeSnapshot(Uuid::generate(), Uuid::generate(), 'request', new DesiredTranscodeState(\App\Transcode\Domain\ValueObject\AudioProfile::streamingStereo()), 1, 0, 0, 'pending', null, null);
+        $runtime = new TranscodeRuntimeSnapshot(Uuid::generate(), Uuid::generate(), 'request', new DesiredTranscodeState(AudioProfile::streamingStereo()), 1, 0, 0, 'pending', null, null);
         $video = $this->createStub(TranscodeExecutionOwnershipPort::class);
         $video->method('pending')->willReturnCallback(static fn(): array => is_file($log) ? [] : [$runtime]);
-        $input = new AudioRenditionInput('track', 'source.flac', '/media/source.flac', \App\Transcode\Application\Port\AudioRenditionFormat::Opus, 128000, '/media/derived');
+        $input = new AudioRenditionInput('track', 'source.flac', '/media/source.flac', AudioRenditionFormat::Opus, 128000, '/media/derived');
         $audioRuntime = new AudioRenditionRuntimeSnapshot($input->key(), $input, 'pending', 0, null, null, null);
         $audio = $this->createStub(AudioRenditionRuntimePort::class);
         $audio->method('pending')->willReturnCallback(static function () use ($log, $audioRuntime): array {
@@ -225,7 +229,7 @@ PHP);
         $authority = $this->createStub(MediaWorkerAuthorityInterface::class);
         $deadline = hrtime(true) + 3_000_000_000;
         try {
-            (new MediaWorkerRunner($video, $audio, $authority, new \App\Shared\Application\DTO\DeploymentProfile('remux', 2, 4, 1, sharedCopySlots: 2), $script))->run(
+            (new MediaWorkerRunner($video, $audio, $authority, new DeploymentProfile('remux', 2, 4, 1, sharedCopySlots: 2), $script))->run(
                 static fn(): bool => (is_file($log) && count(file($log)) >= 2) || hrtime(true) >= $deadline,
             );
             $launches = array_map(static fn(string $line): array => json_decode($line, true, flags: JSON_THROW_ON_ERROR), file($log));
@@ -247,12 +251,12 @@ PHP);
         $video = $this->createStub(TranscodeExecutionOwnershipPort::class);
         $video->method('pending')->willReturn([]);
         $audio = $this->createStub(AudioRenditionRuntimePort::class);
-        $input = new AudioRenditionInput('track', 'source.flac', '/media/source.flac', \App\Transcode\Application\Port\AudioRenditionFormat::Opus, 128000, '/media/derived');
+        $input = new AudioRenditionInput('track', 'source.flac', '/media/source.flac', AudioRenditionFormat::Opus, 128000, '/media/derived');
         $audio->method('pending')->willReturn([new AudioRenditionRuntimeSnapshot($input->key(), $input, 'pending', 0, null, null, null)]);
         $authority = $this->createStub(MediaWorkerAuthorityInterface::class);
         $deadline = hrtime(true) + 10_000_000_000;
         try {
-            (new MediaWorkerRunner($video, $audio, $authority, new \App\Shared\Application\DTO\DeploymentProfile(), $script))->run(static function () use ($log, $deadline): bool {
+            (new MediaWorkerRunner($video, $audio, $authority, new DeploymentProfile(), $script))->run(static function () use ($log, $deadline): bool {
                 return (is_file($log) && count(file($log)) >= 65) || hrtime(true) >= $deadline;
             });
             $launches = array_map(static fn(string $line): array => json_decode($line, true, flags: JSON_THROW_ON_ERROR), file($log));
@@ -266,7 +270,7 @@ PHP);
         }
     }
 
-    #[\PHPUnit\Framework\Attributes\DataProvider('fatalConditions')]
+    #[DataProvider('fatalConditions')]
     public function testAuthorityLossAndFatalChildCloseAdmissionAndReap(bool $loseAuthority): void
     {
         $directory = sys_get_temp_dir() . '/baander-media-failure-' . bin2hex(random_bytes(8));
@@ -275,7 +279,7 @@ PHP);
         $pidFile = $directory . '/pid';
         file_put_contents($script, '<?php file_put_contents(__DIR__."/pid", (string) getmypid()); ' . ($loseAuthority ? 'sleep(10);' : 'exit(23);'));
         $video = $this->createStub(TranscodeExecutionOwnershipPort::class);
-        $video->method('pending')->willReturn([new TranscodeRuntimeSnapshot(Uuid::generate(), Uuid::generate(), 'request', new DesiredTranscodeState(\App\Transcode\Domain\ValueObject\AudioProfile::streamingStereo()), 1, 0, 0, 'pending', null, null)]);
+        $video->method('pending')->willReturn([new TranscodeRuntimeSnapshot(Uuid::generate(), Uuid::generate(), 'request', new DesiredTranscodeState(AudioProfile::streamingStereo()), 1, 0, 0, 'pending', null, null)]);
         $audio = $this->createStub(AudioRenditionRuntimePort::class);
         $audio->method('pending')->willReturn([]);
         $authority = $this->createStub(MediaWorkerAuthorityInterface::class);
@@ -288,7 +292,7 @@ PHP);
         $deadline = microtime(true) + 3;
         try {
             try {
-                (new MediaWorkerRunner($video, $audio, $authority, new \App\Shared\Application\DTO\DeploymentProfile(), $script))->run(static fn(): bool => microtime(true) >= $deadline);
+                (new MediaWorkerRunner($video, $audio, $authority, new DeploymentProfile(), $script))->run(static fn(): bool => microtime(true) >= $deadline);
                 self::fail('Role continued after execution authority became uncertain.');
             } catch (\RuntimeException $error) {
                 self::assertStringContainsString($loseAuthority ? 'authority lost' : 'exited unexpectedly', $error->getMessage());
@@ -318,7 +322,7 @@ PHP);
         $audio->expects(self::never())->method('pending');
         $authority->expects(self::once())->method('assertActive')->willThrowException(new \RuntimeException('authority lost'));
         $this->expectExceptionMessage('authority lost');
-        (new MediaWorkerRunner($video, $audio, $authority, new \App\Shared\Application\DTO\DeploymentProfile()))->run(static fn(): bool => false, static function (): void {
+        (new MediaWorkerRunner($video, $audio, $authority, new DeploymentProfile()))->run(static fn(): bool => false, static function (): void {
             self::fail('Uninitialized role reported readiness.');
         });
     }

@@ -10,6 +10,7 @@ use App\Scheduler\Application\Exception\SchedulerOccurrenceConflict;
 use App\Scheduler\Application\Port\SchedulerManualOccurrenceRecorderInterface;
 use App\Scheduler\Domain\ValueObject\JobType;
 use App\Scheduler\Interface\Console\SchedulerRunCommand;
+use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
@@ -20,7 +21,7 @@ final class SchedulerRunCommandTest extends TestCase
 {
     public function testProvidedRequestIdIsPreservedAndAcceptedWithoutDispatch(): void
     {
-        $jobId = new \App\Shared\Domain\Model\PublicId();
+        $jobId = new PublicId();
         $requestId = Uuid::generate();
         $recorder = $this->createMock(SchedulerManualOccurrenceRecorderInterface::class);
         $recorder->expects(self::once())->method('recordByPublicId')->with($jobId, $requestId)->willReturn(
@@ -35,7 +36,7 @@ final class SchedulerRunCommandTest extends TestCase
 
     public function testJsonPrintsTheApiPayloadAndTheRequestUuidOnStderr(): void
     {
-        $jobId = new \App\Shared\Domain\Model\PublicId();
+        $jobId = new PublicId();
         $requestId = Uuid::generate();
         $recorder = $this->createStub(SchedulerManualOccurrenceRecorderInterface::class);
         $recorder->method('recordByPublicId')->willReturn(
@@ -62,19 +63,19 @@ final class SchedulerRunCommandTest extends TestCase
         $recorder->method('recordByPublicId')->willReturn(null);
         $tester = new CommandTester(new SchedulerRunCommand($recorder));
 
-        self::assertSame(Command::FAILURE, $tester->execute(['id' => (new \App\Shared\Domain\Model\PublicId())->toString(), '--json' => true], ['capture_stderr_separately' => true]));
+        self::assertSame(Command::FAILURE, $tester->execute(['id' => (new PublicId())->toString(), '--json' => true], ['capture_stderr_separately' => true]));
         self::assertSame('', $tester->getDisplay());
         self::assertStringContainsString('not found', $tester->getErrorOutput());
     }
 
     public function testGeneratedIdentityIsPrintedBeforeAnUncertainCommit(): void
     {
-        $jobId = new \App\Shared\Domain\Model\PublicId();
+        $jobId = new PublicId();
         $requestId = null;
         $error = new \RuntimeException('Commit acknowledgement lost');
         $recorder = $this->createMock(SchedulerManualOccurrenceRecorderInterface::class);
         $tester = new CommandTester(new SchedulerRunCommand($recorder));
-        $recorder->expects(self::once())->method('recordByPublicId')->willReturnCallback(function (\App\Shared\Domain\Model\PublicId $id, Uuid $generated) use (&$requestId, $tester, $error): never {
+        $recorder->expects(self::once())->method('recordByPublicId')->willReturnCallback(function (PublicId $id, Uuid $generated) use (&$requestId, $tester, $error): never {
             $requestId = $generated;
             self::assertSame('7', $generated->toString()[14]);
             self::assertStringContainsString('Request UUID: ' . $generated->toString(), $tester->getDisplay());
@@ -95,7 +96,7 @@ final class SchedulerRunCommandTest extends TestCase
         $recorder = $this->createMock(SchedulerManualOccurrenceRecorderInterface::class);
         $recorder->expects(self::never())->method('recordByPublicId');
         $tester = new CommandTester(new SchedulerRunCommand($recorder));
-        self::assertSame(Command::INVALID, $tester->execute(['id' => (new \App\Shared\Domain\Model\PublicId())->toString(), '--request-id' => 'invalid']));
+        self::assertSame(Command::INVALID, $tester->execute(['id' => (new PublicId())->toString(), '--request-id' => 'invalid']));
     }
 
     public function testRequestIdentityCollisionReportsFailureWithoutAcceptance(): void
@@ -103,7 +104,7 @@ final class SchedulerRunCommandTest extends TestCase
         $recorder = $this->createMock(SchedulerManualOccurrenceRecorderInterface::class);
         $recorder->expects(self::once())->method('recordByPublicId')->willThrowException(new SchedulerOccurrenceConflict('Different job'));
         $tester = new CommandTester(new SchedulerRunCommand($recorder));
-        self::assertSame(Command::FAILURE, $tester->execute(['id' => (new \App\Shared\Domain\Model\PublicId())->toString(), '--request-id' => Uuid::generate()->toString()]));
+        self::assertSame(Command::FAILURE, $tester->execute(['id' => (new PublicId())->toString(), '--request-id' => Uuid::generate()->toString()]));
         self::assertStringContainsString('Request UUID already belongs to another job or origin.', $tester->getDisplay());
         self::assertStringNotContainsString('Accepted occurrence', $tester->getDisplay());
     }
@@ -116,7 +117,7 @@ final class SchedulerRunCommandTest extends TestCase
         $requestId = Uuid::generate();
         $tester = new CommandTester(new SchedulerRunCommand($recorder));
         try {
-            $tester->execute(['id' => (new \App\Shared\Domain\Model\PublicId())->toString(), '--request-id' => $requestId->toString()]);
+            $tester->execute(['id' => (new PublicId())->toString(), '--request-id' => $requestId->toString()]);
             self::fail('A recorder failure must propagate.');
         } catch (\LogicException $actual) {
             self::assertSame($error, $actual);
@@ -138,7 +139,7 @@ final class SchedulerRunCommandTest extends TestCase
         $recorder = $this->createMock(SchedulerManualOccurrenceRecorderInterface::class);
         $recorder->expects(self::once())->method('recordByPublicId')->willReturn(null);
         $tester = new CommandTester(new SchedulerRunCommand($recorder));
-        self::assertSame(Command::FAILURE, $tester->execute(['id' => (new \App\Shared\Domain\Model\PublicId())->toString()]));
+        self::assertSame(Command::FAILURE, $tester->execute(['id' => (new PublicId())->toString()]));
         self::assertStringNotContainsString('Accepted occurrence', $tester->getDisplay());
     }
 }

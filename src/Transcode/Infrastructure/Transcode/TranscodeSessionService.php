@@ -4,13 +4,14 @@ declare(strict_types=1);
 
 namespace App\Transcode\Infrastructure\Transcode;
 
+use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
 use App\Transcode\Application\Port\TranscodeSessionPortInterface;
+use App\Transcode\Domain\Exception\SessionNotFoundException;
 use App\Transcode\Domain\Model\TranscodeSession;
 use App\Transcode\Domain\Repository\TranscodeSessionRepositoryInterface;
 use App\Transcode\Domain\ValueObject\AudioProfile;
 use App\Transcode\Domain\ValueObject\SessionPriority;
-use App\Transcode\Domain\Exception\SessionNotFoundException;
 
 final class TranscodeSessionService implements TranscodeSessionPortInterface
 {
@@ -49,7 +50,7 @@ final class TranscodeSessionService implements TranscodeSessionPortInterface
         return $this->sessionRepository->findByUuid($uuid);
     }
 
-    public function findByPublicId(\App\Shared\Domain\Model\PublicId $publicId): ?TranscodeSession
+    public function findByPublicId(PublicId $publicId): ?TranscodeSession
     {
         return $this->sessionRepository->findByPublicId($publicId);
     }

@@ -6,19 +6,20 @@ namespace App\Tests\Integration;
 
 use App\Kernel;
 use App\Shared\Infrastructure\EventListener\MediaCorsVaryListener;
-use Symfony\Component\EventDispatcher\EventDispatcherInterface;
-use Symfony\Component\HttpKernel\KernelEvents;
 use Nelmio\CorsBundle\EventListener\CacheableResponseVaryListener;
 use Nelmio\CorsBundle\EventListener\CorsListener;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\DependencyInjection\ContainerBuilder;
+use Symfony\Component\EventDispatcher\EventDispatcherInterface;
 use Symfony\Component\Filesystem\Filesystem;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpKernel\Event\RequestEvent;
 use Symfony\Component\HttpKernel\Event\ResponseEvent;
 use Symfony\Component\HttpKernel\HttpKernelInterface;
+use Symfony\Component\HttpKernel\KernelEvents;
+use Symfony\Component\Routing\RouterInterface;
 
 /** Exercises configured listeners, without claiming endpoint authentication or database coverage. */
 final class CorsConfigurationTest extends TestCase
@@ -281,7 +282,7 @@ final class CorsConfigurationTest extends TestCase
     public function testRawPathStreamRouteIsRemoved(): void
     {
         $router = self::$kernel->getContainer()->get('cors.production.router');
-        self::assertInstanceOf(\Symfony\Component\Routing\RouterInterface::class, $router);
+        self::assertInstanceOf(RouterInterface::class, $router);
         $routes = $router->getRouteCollection();
         self::assertNull($routes->get('stream_media'));
         self::assertNotNull($routes->get('stream_track'));

@@ -5,14 +5,17 @@ declare(strict_types=1);
 namespace Baander\Containers\Tests;
 
 use Baander\Configuration\Execution\DockerSettings;
+use Baander\Configuration\Images\ImageSelection;
 use Baander\Containers\Docker\Client;
 use Baander\Containers\Docker\OperatorTransport;
 use Baander\Containers\Docker\Target;
 use Baander\Containers\Docker\TargetResolver;
+use Baander\Filesystem\AtomicFile;
+use Baander\Process\Execution\CommandFailure;
 use Baander\Process\Execution\EngineExecutor;
 use Baander\Process\Execution\ExecutionContext;
-use PHPUnit\Framework\TestCase;
 use PHPUnit\Framework\Attributes\DataProvider;
+use PHPUnit\Framework\TestCase;
 
 final class DockerClientTest extends TestCase
 {
@@ -97,7 +100,7 @@ CLI);
     {
         $target = $this->resolve();
         $file = $this->root . '/target.json';
-        \Baander\Filesystem\AtomicFile::writeJson($file, $target->toArray());
+        AtomicFile::writeJson($file, $target->toArray());
         file_put_contents($this->root . '/calls', '');
         file_put_contents($this->root . '/endpoint', 'unix:///other.sock');
         $environment = $this->environment + ['BAANDER_TOOLING_TARGET_FILE' => $file];
@@ -367,7 +370,7 @@ CLI);
     public function testSelectedImageHasImmutableIdentityAndSavedRoleMetadata(): void
     {
         $client = new Client($this->executor, $this->resolve(), $this->environment);
-        $selection = new \Baander\Configuration\Images\ImageSelection('registry.baander.app/browser:1', ['browser'], '1.55.0');
+        $selection = new ImageSelection('registry.baander.app/browser:1', ['browser'], '1.55.0');
         $image = $client->resolveImage($selection);
         self::assertSame('sha256:' . str_repeat('a', 64), $image->id);
         self::assertSame('selected-daemon', $image->daemonId);
@@ -402,7 +405,7 @@ CLI);
         try {
             $bounded->run(['stall']);
             self::fail('Docker command budget was ignored.');
-        } catch (\Baander\Process\Execution\CommandFailure $error) {
+        } catch (CommandFailure $error) {
             self::assertSame(124, $error->getCode());
         } finally {
             $boundedExecutor->close();
@@ -431,7 +434,7 @@ CLI);
         try {
             $client->compose('qualification', '/tmp/compose.json', ['stall'], timeout: 0.05, check: false);
             self::fail('Compose timeout was accepted.');
-        } catch (\Baander\Process\Execution\CommandFailure $error) {
+        } catch (CommandFailure $error) {
             self::assertSame(124, $error->getCode());
         }
     }

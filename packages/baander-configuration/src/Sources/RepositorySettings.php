@@ -4,9 +4,10 @@ declare(strict_types=1);
 
 namespace Baander\Configuration\Sources;
 
+use Baander\Filesystem\Paths;
 use Baander\Process\Execution\CommandExecutor;
-use Baander\Process\Execution\ProcessSpec;
 use Baander\Process\Execution\CompletionPolicy;
+use Baander\Process\Execution\ProcessSpec;
 
 final class RepositorySettings
 {
@@ -40,7 +41,7 @@ final class RepositorySettings
             $candidate = $runner->run(new ProcessSpec(['git', 'rev-parse', '--path-format=absolute', '--git-common-dir'], cwd: $checkout, processGroup: true), new CompletionPolicy(null));
             if (
                 $candidate->exitCode !== 0
-                || ($candidate->stdout |> trim(...) |> \Baander\Filesystem\Paths::resolvedPath(...)) !== \Baander\Filesystem\Paths::resolvedPath($directories[1])
+                || ($candidate->stdout |> trim(...) |> Paths::resolvedPath(...)) !== Paths::resolvedPath($directories[1])
             ) {
                 return null;
             }

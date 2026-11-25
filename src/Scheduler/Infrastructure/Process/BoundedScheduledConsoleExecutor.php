@@ -7,6 +7,7 @@ namespace App\Scheduler\Infrastructure\Process;
 use App\Scheduler\Application\Exception\ScheduledConsoleCompletionUnknown;
 use App\Scheduler\Application\Port\ScheduledConsoleExecutorInterface;
 use Baander\Core\EnvironmentVariable;
+use Swoole\Coroutine;
 use Symfony\Component\DependencyInjection\Attribute\Exclude;
 
 /** CLI-only direct child. Deadlines cannot prove descendant containment or interrupt kernel-stalled processes. */
@@ -56,7 +57,7 @@ final class BoundedScheduledConsoleExecutor implements ScheduledConsoleExecutorI
         if ($this->reservationBytes === 0) {
             throw new \RuntimeException('Scheduled console execution is disabled without a subprocess reservation.');
         }
-        if (PHP_SAPI !== 'cli' || (extension_loaded('swoole') && \Swoole\Coroutine::getCid() > 0)) {
+        if (PHP_SAPI !== 'cli' || (extension_loaded('swoole') && Coroutine::getCid() > 0)) {
             throw new \LogicException('Scheduled console executor requires CLI outside an active coroutine.');
         }
         $argv = $this->arguments($command, $parameters);

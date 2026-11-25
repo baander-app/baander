@@ -4,21 +4,24 @@ declare(strict_types=1);
 
 namespace App\Tests\Integration;
 
-use App\Shared\Infrastructure\Doctrine\Platform\BaanderDriverMiddleware;
 use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
-use Doctrine\DBAL\Exception\DriverException;
-use DoctrineMigrations\Version20990101000000;
+use App\Shared\Infrastructure\Doctrine\Platform\BaanderDriverMiddleware;
+use App\Shared\Infrastructure\Worker\DoctrineDeploymentInventory;
+use App\Shared\Infrastructure\Worker\DoctrineDeploymentLease;
 use App\Tests\Support\FinalSchemaBootstrap;
+use App\Transcode\Domain\ValueObject\AudioProfile;
 use Doctrine\DBAL\Configuration;
 use Doctrine\DBAL\Connection;
 use Doctrine\DBAL\DriverManager;
+use Doctrine\DBAL\Exception\DriverException;
 use Doctrine\DBAL\Tools\DsnParser;
 use Doctrine\Migrations\Configuration\Connection\ExistingConnection;
 use Doctrine\Migrations\Configuration\Migration\ConfigurationArray;
 use Doctrine\Migrations\DependencyFactory;
 use Doctrine\Migrations\Tools\Console\Command\ExecuteCommand;
 use Doctrine\Migrations\Tools\Console\Command\MigrateCommand;
+use DoctrineMigrations\Version20990101000000;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Console\Tester\CommandTester;
@@ -316,7 +319,7 @@ final class InitialSchemaMigrationTest extends TestCase
         }
         $this->connection->executeStatement("UPDATE transcode_jobs SET status = 'completed', reference_count = 2, total_segments = 2, completed_segments = 2 WHERE id = ?", [$jobs[0]]);
         $this->connection->executeStatement("UPDATE transcode_sessions SET state = 'active' WHERE id = ?", [$runtimeSession]);
-        $desired = json_encode(['status' => 'paused', 'position' => 10.0, 'segmentIndex' => 0, 'audioLanguages' => ['en'], 'audioProfile' => \App\Transcode\Domain\ValueObject\AudioProfile::streamingStereo()->jsonSerialize()], JSON_THROW_ON_ERROR);
+        $desired = json_encode(['status' => 'paused', 'position' => 10.0, 'segmentIndex' => 0, 'audioLanguages' => ['en'], 'audioProfile' => AudioProfile::streamingStereo()->jsonSerialize()], JSON_THROW_ON_ERROR);
         $this->connection->executeStatement(<<<'SQL'
 INSERT INTO transcode_runtime_state (job_id, session_id, request_id, last_control_request_id, desired, desired_revision, observed_revision, generation, outcome, output_directory, admission_deadline, worker_namespace, worker_boot_id, worker_id, worker_launch_generation, worker_lease_epoch, claim_token, lease_expires_at, updated_at)
 VALUES (?, ?, 'start-upgrade', 'seek-upgrade', CAST(? AS jsonb), 2, 2, 7, 'complete', '/old-output/generation-7', clock_timestamp() - interval '1 second', 'baander.app:workers', ?, 'media', 1, 1, 'old-claim', clock_timestamp() + interval '1 hour', clock_timestamp())
@@ -705,7 +708,7 @@ SQL, [$jobs[0], $runtimeSession, $desired, str_repeat('a', 32)]);
             }
         }
         self::assertSame($before['leases'], $this->connection->fetchAssociative('SELECT * FROM worker_deployment_leases'));
-        $inventory = new \App\Shared\Infrastructure\Worker\DoctrineDeploymentInventory($this->connection);
+        $inventory = new DoctrineDeploymentInventory($this->connection);
         $snapshot = $inventory->findBoot($namespace, $boot);
         self::assertNotNull($snapshot);
         self::assertTrue($snapshot->importedSingleton);
@@ -718,7 +721,7 @@ SQL, [$jobs[0], $runtimeSession, $desired, str_repeat('a', 32)]);
         self::assertFalse($snapshot->execution->createClaimed);
         self::assertNull($snapshot->execution->binding);
         self::assertNull($snapshot->execution->recipeHash);
-        self::assertNull(new \App\Shared\Infrastructure\Worker\DoctrineDeploymentLease($this->connection)->acquire($namespace, $boot, 60));
+        self::assertNull(new DoctrineDeploymentLease($this->connection)->acquire($namespace, $boot, 60));
         self::assertNotNull($snapshot->control->binding);
         self::assertFalse($inventory->claimStart($snapshot->control->binding));
         self::assertSame(0, $this->migrate($this->factory()));

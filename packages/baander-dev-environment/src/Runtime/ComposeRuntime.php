@@ -4,22 +4,23 @@ declare(strict_types=1);
 
 namespace Baander\DevEnvironment\Runtime;
 
-use Baander\Core\EnvironmentVariable;
-use Baander\Process\Execution\CommandExecutor;
-use Baander\Process\Execution\ProcessSpec;
-use Baander\Process\Execution\CompletionPolicy;
 use Baander\Configuration\ApplicationLayout;
+use Baander\Containers\Docker\Target;
+use Baander\Containers\Resources\DisposableContainer;
+use Baander\Core\EnvironmentVariable;
 use Baander\Deployment\Database\Pooler;
 use Baander\Deployment\Observability\LogCollection;
-use Baander\Containers\Docker\Target;
-use Baander\Filesystem\AtomicFile;
-use Baander\Filesystem\PrivateDirectory;
-use Baander\Containers\Resources\DisposableContainer;
 use Baander\DevEnvironment\Host\CapturedConnections;
-use Baander\DevEnvironment\State\InstanceStateStore;
-use Baander\DevEnvironment\Host\ProcessEnvironment;
-use Baander\DevEnvironment\WorkflowError;
 use Baander\DevEnvironment\Host\Gateway;
+use Baander\DevEnvironment\Host\ProcessEnvironment;
+use Baander\DevEnvironment\State\InstanceStateStore;
+use Baander\DevEnvironment\WorkflowError;
+use Baander\Filesystem\AtomicFile;
+use Baander\Filesystem\Paths;
+use Baander\Filesystem\PrivateDirectory;
+use Baander\Process\Execution\CommandExecutor;
+use Baander\Process\Execution\CompletionPolicy;
+use Baander\Process\Execution\ProcessSpec;
 
 class ComposeRuntime
 {
@@ -104,7 +105,7 @@ class ComposeRuntime
      */
     public function config(array $instance, array $release): array
     {
-        $home = \Baander\Configuration\ApplicationLayout::fromArray($release['layout'])->root;
+        $home = ApplicationLayout::fromArray($release['layout'])->root;
         $project = $instance['project'];
         if (!preg_match('/\A[a-z0-9][a-z0-9_-]*\z/', $project)) {
             throw new WorkflowError('Invalid Compose project name.');
@@ -249,7 +250,7 @@ class ComposeRuntime
                 [EnvironmentVariable::BAANDER_DEV_ORIGIN => $origin, EnvironmentVariable::APP_ENV => 'dev', EnvironmentVariable::APP_DEBUG => '1'],
             );
             $services['app']['environment'] = $environment;
-            $source = \Baander\Filesystem\Paths::resolvedPath($instance['worktree']);
+            $source = Paths::resolvedPath($instance['worktree']);
             array_unshift($mounts, self::bind($source, $home));
             $mounts[] = self::volume('vendor', $home . '/vendor');
             $services['app']['volumes'] = $mounts;
@@ -441,7 +442,7 @@ class ComposeRuntime
         $instance['gateway'] = $gateway;
         $this->store->save($instance['id'], $instance);
         if ($instance['kind'] === 'preview') {
-            $source = \Baander\Filesystem\Paths::resolvedPath($instance['worktree']);
+            $source = Paths::resolvedPath($instance['worktree']);
             $expected = [];
             foreach (['composer.lock', 'ui/web/package.json'] as $name) {
                 $hash = @hash_file('sha256', $source . '/' . $name);
@@ -609,7 +610,7 @@ class ComposeRuntime
      */
     public function prepare(array $instance, array $release): void
     {
-        $home = \Baander\Configuration\ApplicationLayout::fromArray($release['layout'])->root;
+        $home = ApplicationLayout::fromArray($release['layout'])->root;
         $docker = $this->connections->client($instance['docker']);
         $docker->validateIdentity();
         $model = $this->config($instance, $release);
@@ -693,7 +694,7 @@ class ComposeRuntime
             ], $this->connections->environment(), $release['effective']['budgets']['cleanup'] ?? 120);
         }
         if ($instance['kind'] === 'preview') {
-            $source = \Baander\Filesystem\Paths::resolvedPath($instance['worktree']);
+            $source = Paths::resolvedPath($instance['worktree']);
             $modules = $model['volumes']['node_modules']['name'];
             DisposableContainer::run($docker, $this->store->directory($instance['id']) . '/runtime-yarn.json', [
                 '--entrypoint',

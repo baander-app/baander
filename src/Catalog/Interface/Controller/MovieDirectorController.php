@@ -11,6 +11,7 @@ use App\Library\Application\Port\LibraryReadScopeProviderInterface;
 use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\SearchOptions;
 use App\Shared\Interface\Controller\ApiResponsesTrait;
+use App\Shared\Interface\DTO\ApiError;
 use App\Shared\Interface\DTO\PaginatedResponse;
 use App\Shared\Interface\Request\PageNumberPagination;
 use App\Shared\Interface\Request\QueryParameters;
@@ -44,15 +45,15 @@ final class MovieDirectorController
                 response: '200',
                 description: 'Paginated directors',
                 content: new OA\MediaType\Json(
-                    schema: new OA\Schema(
+                    schema: new ParameterSchema(
                         allOf: [
-                            new OA\Schema(ref: PaginatedResponse::class),
-                            new OA\Schema(
+                            new ParameterSchema(ref: PaginatedResponse::class),
+                            new ParameterSchema(
                                 type: 'object',
                                 properties: [
-                                    'data' => new OA\Schema(
+                                    'data' => new ParameterSchema(
                                         type: 'array',
-                                        items: new OA\Schema(ref: DirectorResource::class),
+                                        items: new ParameterSchema(ref: DirectorResource::class),
                                     ),
                                 ],
                                 required: ['data'],
@@ -65,7 +66,7 @@ final class MovieDirectorController
                 response: '400',
                 description: 'Invalid page or limit',
                 content: new OA\MediaType\Json(
-                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                    schema: new ParameterSchema(ref: ApiError::class),
                 ),
             ),
         ],
@@ -113,10 +114,10 @@ final class MovieDirectorController
                 response: '200',
                 description: 'Director',
                 content: new OA\MediaType\Json(
-                    schema: new OA\Schema(
+                    schema: new ParameterSchema(
                         type: 'object',
                         properties: [
-                            'data' => new OA\Schema(ref: DirectorResource::class),
+                            'data' => new ParameterSchema(ref: DirectorResource::class),
                         ],
                         required: ['data'],
                     ),
@@ -147,15 +148,15 @@ final class MovieDirectorController
                 response: '200',
                 description: 'Paginated movies',
                 content: new OA\MediaType\Json(
-                    schema: new OA\Schema(
+                    schema: new ParameterSchema(
                         allOf: [
-                            new OA\Schema(ref: PaginatedResponse::class),
-                            new OA\Schema(
+                            new ParameterSchema(ref: PaginatedResponse::class),
+                            new ParameterSchema(
                                 type: 'object',
                                 properties: [
-                                    'data' => new OA\Schema(
+                                    'data' => new ParameterSchema(
                                         type: 'array',
-                                        items: new OA\Schema(ref: MovieResource::class),
+                                        items: new ParameterSchema(ref: MovieResource::class),
                                     ),
                                 ],
                                 required: ['data'],
@@ -169,7 +170,7 @@ final class MovieDirectorController
                 response: '400',
                 description: 'Invalid page or limit',
                 content: new OA\MediaType\Json(
-                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                    schema: new ParameterSchema(ref: ApiError::class),
                 ),
             ),
         ],

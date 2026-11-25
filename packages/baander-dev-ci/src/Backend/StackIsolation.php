@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 namespace Baander\DevCi\Backend;
 
+use Baander\Configuration\ApplicationLayout;
+use Baander\Configuration\ToolingConfiguration;
+use Baander\Process\Execution\ProcessResult;
 use InvalidArgumentException;
 use RuntimeException;
 use Throwable;
@@ -37,7 +40,7 @@ PHP_CODE;
     public function __construct(private readonly Runtime $runtime) {}
 
     /** @param list<string> $arguments */
-    private function command(array $arguments, bool $check = true): \Baander\Process\Execution\ProcessResult
+    private function command(array $arguments, bool $check = true): ProcessResult
     {
         $log = $this->runtime->artifacts . '/command-' . sprintf('%03d', ++$this->sequence) . '.log';
         try {
@@ -212,9 +215,9 @@ PHP_CODE]);
             };
         }
         $environment = getenv();
-        $configuration = \Baander\Configuration\ToolingConfiguration::forRepository($root, $environment, $timeout === null ? [] : ['budgets' => ['backend' => $timeout]]);
+        $configuration = ToolingConfiguration::forRepository($root, $environment, $timeout === null ? [] : ['budgets' => ['backend' => $timeout]]);
         $timeout = $configuration->budgets->seconds('backend');
-        \Baander\Configuration\ApplicationLayout::load($root . '/packages/baander-configuration/resources/application-layout.json');
+        ApplicationLayout::load($root . '/packages/baander-configuration/resources/application-layout.json');
         $artifacts ??= sys_get_temp_dir() . '/baander-stack-isolation-' . (random_bytes(8) |> bin2hex(...));
         if (!is_dir($artifacts) && !mkdir($artifacts, 0700, true)) {
             throw new RuntimeException('Cannot create stack-isolation artifacts');

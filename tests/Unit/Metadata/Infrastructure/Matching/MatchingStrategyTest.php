@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Metadata\Infrastructure\Matching;
 
+use App\Metadata\Domain\Model\MetadataMatch;
 use App\Metadata\Infrastructure\Matching\MatchingStrategy;
 use App\Metadata\Infrastructure\Matching\Validator\AlbumValidator;
 use App\Metadata\Infrastructure\Matching\Validator\ArtistValidator;
@@ -230,7 +231,7 @@ final class MatchingStrategyTest extends TestCase
 
         $results = $this->strategy->match($extracted, $candidates);
 
-        $this->assertInstanceOf(\App\Metadata\Domain\Model\MetadataMatch::class, $results[0]);
+        $this->assertInstanceOf(MetadataMatch::class, $results[0]);
     }
 
     public function testMatchPreservesCandidateData(): void

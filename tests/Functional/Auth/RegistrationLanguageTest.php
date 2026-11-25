@@ -6,6 +6,7 @@ namespace App\Tests\Functional\Auth;
 
 use App\Auth\Application\Settings\UserManagementSettingDefinitions;
 use App\Shared\Application\Port\SystemSettingStoreInterface;
+use App\Shared\Domain\Model\Email;
 use App\Shared\Domain\Model\Uuid;
 use App\Tests\Functional\TestCase;
 use App\UserPreference\Application\Port\UserSettingStoreInterface;
@@ -51,7 +52,7 @@ final class RegistrationLanguageTest extends TestCase
         ], JSON_THROW_ON_ERROR));
         $this->assertJsonResponse($this->client->getResponse(), 202, 'data');
 
-        $userId = $this->userRepository->findByEmail(new \App\Shared\Domain\Model\Email($email))->getId();
+        $userId = $this->userRepository->findByEmail(new Email($email))->getId();
         $this->assertSame($stored, static::getContainer()->get(UserSettingStoreInterface::class)->find($userId, 'language'));
     }
 }

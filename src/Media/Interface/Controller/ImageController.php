@@ -11,15 +11,16 @@ use App\Media\Application\Port\StoragePortInterface;
 use App\Media\Interface\Resource\ImageResource;
 use App\Shared\Domain\Model\PublicId;
 use App\Shared\Interface\Controller\ApiResponsesTrait;
+use App\Shared\Interface\DTO\ApiError;
 use Baander\ImageProcessing\BlurHash\BlurHashGenerator;
 use OpenApi\Spec as OA;
 use Psr\Log\LoggerInterface;
-use Symfony\Component\Messenger\MessageBusInterface;
 use Symfony\Component\HttpFoundation\BinaryFileResponse;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpFoundation\ResponseHeaderBag;
+use Symfony\Component\Messenger\MessageBusInterface;
 use Symfony\Component\Routing\Attribute\Route;
 
 #[OA\Tag(name: 'Media', description: 'Media file and streaming endpoints')]
@@ -86,7 +87,7 @@ final class ImageController
                 response: '404',
                 description: 'Image not found',
                 content: new OA\MediaType\Json(
-                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                    schema: new OA\Schema(ref: ApiError::class),
                 ),
             ),
         ],
@@ -95,7 +96,7 @@ final class ImageController
     public function show(string $publicId): JsonResponse
     {
         try {
-            $pid = new \App\Shared\Domain\Model\PublicId($publicId);
+            $pid = new PublicId($publicId);
         } catch (\InvalidArgumentException) {
             return $this->notFound($this->trans('errors.image_not_found', domain: 'media'));
         }
@@ -166,7 +167,7 @@ final class ImageController
                 response: '404',
                 description: 'Image or image file not found',
                 content: new OA\MediaType\Json(
-                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                    schema: new OA\Schema(ref: ApiError::class),
                 ),
             ),
         ],
@@ -175,7 +176,7 @@ final class ImageController
     public function file(string $publicId, Request $request): Response
     {
         try {
-            $pid = new \App\Shared\Domain\Model\PublicId($publicId);
+            $pid = new PublicId($publicId);
         } catch (\InvalidArgumentException) {
             return $this->notFound($this->trans('errors.image_not_found', domain: 'media'));
         }
@@ -305,7 +306,7 @@ final class ImageController
                 response: '404',
                 description: 'Image not found',
                 content: new OA\MediaType\Json(
-                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                    schema: new OA\Schema(ref: ApiError::class),
                 ),
             ),
         ],
@@ -314,7 +315,7 @@ final class ImageController
     public function blurhash(string $publicId): JsonResponse
     {
         try {
-            $pid = new \App\Shared\Domain\Model\PublicId($publicId);
+            $pid = new PublicId($publicId);
         } catch (\InvalidArgumentException) {
             return $this->notFound($this->trans('errors.image_not_found', domain: 'media'));
         }

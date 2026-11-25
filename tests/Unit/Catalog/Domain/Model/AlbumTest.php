@@ -10,6 +10,7 @@ use App\Catalog\Domain\ValueObject\MusicbrainzId;
 use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
 use InvalidArgumentException;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
 final class AlbumTest extends TestCase
@@ -380,7 +381,7 @@ final class AlbumTest extends TestCase
     }
 
     /** @param array<string, string|int> $change */
-    #[\PHPUnit\Framework\Attributes\DataProvider('everyLockableField')]
+    #[DataProvider('everyLockableField')]
     public function testUpdateMetadataRejectsAChangeToAnyLockedField(string $field, array $change): void
     {
         $album = Album::create(Uuid::v4(), 'Test', 'Album');

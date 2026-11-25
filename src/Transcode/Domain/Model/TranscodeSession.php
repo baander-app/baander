@@ -6,12 +6,12 @@ namespace App\Transcode\Domain\Model;
 
 use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
+use App\Transcode\Domain\Exception\InvalidSegmentIndexException;
+use App\Transcode\Domain\Exception\InvalidSessionTransitionException;
 use App\Transcode\Domain\ValueObject\AudioProfile;
 use App\Transcode\Domain\ValueObject\SessionPriority;
 use App\Transcode\Domain\ValueObject\SessionState;
 use DateTimeImmutable;
-use App\Transcode\Domain\Exception\InvalidSegmentIndexException;
-use App\Transcode\Domain\Exception\InvalidSessionTransitionException;
 
 final class TranscodeSession
 {
@@ -131,13 +131,13 @@ final class TranscodeSession
     public function updateAudioProfile(AudioProfile $profile): void
     {
         $this->state->audioProfile = $profile;
-        $this->state->updatedAt = new \DateTimeImmutable();
+        $this->state->updatedAt = new DateTimeImmutable();
     }
 
     public function updateWallClockOffset(float $offset): void
     {
         $this->state->wallClockOffset = $offset;
-        $this->state->updatedAt = new \DateTimeImmutable();
+        $this->state->updatedAt = new DateTimeImmutable();
     }
 
     public function getState(): TranscodeSessionState

@@ -11,6 +11,7 @@ use App\Notification\Domain\ValueObject\NotificationChannel;
 use App\Notification\Infrastructure\Doctrine\Entity\NotificationPreferenceEntity;
 use App\Shared\Domain\Model\Uuid;
 use Doctrine\ORM\EntityManagerInterface;
+use Doctrine\ORM\EntityRepository;
 
 final class NotificationPreferenceRepository implements NotificationPreferenceRepositoryInterface
 {
@@ -19,8 +20,8 @@ final class NotificationPreferenceRepository implements NotificationPreferenceRe
     ) {
     }
 
-    /** @return \Doctrine\ORM\EntityRepository<NotificationPreferenceEntity> */
-    private function getEntityRepository(): \Doctrine\ORM\EntityRepository
+    /** @return EntityRepository<NotificationPreferenceEntity> */
+    private function getEntityRepository(): EntityRepository
     {
         return $this->entityManager->getRepository(NotificationPreferenceEntity::class);
     }

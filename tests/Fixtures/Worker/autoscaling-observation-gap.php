@@ -4,11 +4,19 @@ declare(strict_types=1);
 
 require dirname(__DIR__, 3) . '/vendor/autoload.php';
 
+use App\Shared\Application\DTO\DeploymentProfile;
 use App\Shared\Application\DTO\WorkerAutoscalingProfile;
 use App\Shared\Infrastructure\Worker\Autoscaling\AutoscalingStatus;
 use App\Shared\Infrastructure\Worker\DeploymentLease;
+use App\Tests\Fixtures\Messaging\MessageCodecFactory;
 use App\Tests\Fixtures\Worker\Autoscaling\Workload;
 use App\Tests\Fixtures\Worker\Autoscaling\WorkloadCodec;
+use Doctrine\DBAL\DriverManager;
+use Doctrine\DBAL\Tools\DsnParser;
+use Symfony\Component\Messenger\Bridge\Redis\Transport\Connection;
+use Symfony\Component\Messenger\Bridge\Redis\Transport\RedisTransport;
+use Symfony\Component\Messenger\Envelope;
+use Symfony\Component\Messenger\Stamp\TransportMessageIdStamp;
 
 $started = hrtime(true) / 1e9;
 $deadline = $started + 24;
@@ -27,8 +35,8 @@ $profileFields = json_decode((string) file_get_contents(__DIR__ . '/autoscaling-
 $profileFields['maximumConcurrency'] = count($ledger['slots']);
 $profile = WorkerAutoscalingProfile::fromJson(json_encode($profileFields, JSON_THROW_ON_ERROR));
 if ($profile->maxSampleAgeMs > 6000) { throw new RuntimeException('Observation gap exceeds qualification time budget.'); }
-$status = new AutoscalingStatus(dirname($directory), $lease, $profile, \App\Shared\Application\DTO\DeploymentProfile::fromEnvironment());
-$db = Doctrine\DBAL\DriverManager::getConnection(new Doctrine\DBAL\Tools\DsnParser(['postgresql' => 'pdo_pgsql'])->parse((string) getenv('DATABASE_URL')));
+$status = new AutoscalingStatus(dirname($directory), $lease, $profile, DeploymentProfile::fromEnvironment());
+$db = DriverManager::getConnection(new DsnParser(['postgresql' => 'pdo_pgsql'])->parse((string) getenv('DATABASE_URL')));
 $db->executeStatement("SET statement_timeout = '1000ms'");
 $startTicks = static function (int $pid): ?string {
     $raw = @file_get_contents('/proc/' . $pid . '/stat');
@@ -131,12 +139,12 @@ try {
     $stoppedAt = hrtime(true) / 1e9;
     $waitUntil = $stoppedAt + $profile->maxSampleAgeMs / 1000 + .2;
     while (hrtime(true) / 1e9 < $waitUntil) { usleep(20000); }
-    $transport = new Symfony\Component\Messenger\Bridge\Redis\Transport\RedisTransport(
-        Symfony\Component\Messenger\Bridge\Redis\Transport\Connection::fromDsn('redis://default:test-only-redis-password@redis:6379/messages/baander'),
-        App\Tests\Fixtures\Messaging\MessageCodecFactory::signingSerializer([new WorkloadCodec()]),
+    $transport = new RedisTransport(
+        Connection::fromDsn('redis://default:test-only-redis-password@redis:6379/messages/baander'),
+        MessageCodecFactory::signingSerializer([new WorkloadCodec()]),
     );
-    $sent = $transport->send(new Symfony\Component\Messenger\Envelope(new Workload('observation-gap', 0)));
-    $messageId = $sent->last(Symfony\Component\Messenger\Stamp\TransportMessageIdStamp::class)?->getId();
+    $sent = $transport->send(new Envelope(new Workload('observation-gap', 0)));
+    $messageId = $sent->last(TransportMessageIdStamp::class)?->getId();
     if (!is_string($messageId)) { throw new RuntimeException('Real transport did not identify gap message.'); }
     $publishedAt = hrtime(true) / 1e9;
     usleep(1_200_000);

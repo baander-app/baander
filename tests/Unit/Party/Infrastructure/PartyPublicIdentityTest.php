@@ -6,6 +6,8 @@ namespace App\Tests\Unit\Party\Infrastructure;
 
 use App\Auth\Domain\Model\User;
 use App\Catalog\Domain\Model\Video;
+use App\Party\Application\Exception\PartyMediaNotFoundException;
+use App\Party\Application\Port\PartyMediaAccessPortInterface;
 use App\Party\Domain\Model\PartyInvitation;
 use App\Party\Domain\Model\PartyMember;
 use App\Party\Domain\Model\SyncedPartySession;
@@ -18,6 +20,7 @@ use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
 use App\Transcode\Domain\Model\TranscodeJob;
 use App\Transcode\Domain\ValueObject\QualityTier;
+use Doctrine\DBAL\Connection;
 use PHPUnit\Framework\TestCase;
 
 final class PartyPublicIdentityTest extends TestCase
@@ -29,7 +32,7 @@ final class PartyPublicIdentityTest extends TestCase
         $job = TranscodeJob::create($video->getId(), QualityTier::p720(), '/tmp/baander-party-identity', $user->getId());
         $session = SyncedPartySession::create($user->getId(), $video->getId(), $job->getId());
         $member = PartyMember::create($user->getId(), $session->getId());
-        $connection = $this->createMock(\Doctrine\DBAL\Connection::class);
+        $connection = $this->createMock(Connection::class);
         $rows = [
             'users' => [$user->getId()->toString(), $user->getPublicId()->toString()],
             'videos' => [$video->getId()->toString(), $video->getPublicId()->toString()],
@@ -51,7 +54,7 @@ final class PartyPublicIdentityTest extends TestCase
             }
             throw new \LogicException('Unexpected identity query.');
         });
-        $identities = new PartyPublicIdentity($connection, $this->createStub(\App\Party\Application\Port\PartyMediaAccessPortInterface::class));
+        $identities = new PartyPublicIdentity($connection, $this->createStub(PartyMediaAccessPortInterface::class));
 
         self::assertEquals($video->getId(), $identities->videoId($video->getPublicId()));
         self::assertEquals($job->getId(), $identities->transcodeJobId($job->getPublicId()));
@@ -76,24 +79,24 @@ final class PartyPublicIdentityTest extends TestCase
     {
         $user = User::register(Email::fromString('host@baander.app'), 'hash', 'Host');
         $video = Video::create('/media/party.mp4', 'video-hash');
-        $session = SyncedPartySession::create($user->getId(), $video->getId(), new \App\Shared\Domain\Model\Uuid());
-        $connection = $this->createMock(\Doctrine\DBAL\Connection::class);
+        $session = SyncedPartySession::create($user->getId(), $video->getId(), new Uuid());
+        $connection = $this->createMock(Connection::class);
         $connection->expects($this->exactly(3))->method('fetchOne')->willReturnOnConsecutiveCalls($user->getPublicId()->toString(), $video->getPublicId()->toString(), false);
-        $identities = new PartyPublicIdentity($connection, $this->createStub(\App\Party\Application\Port\PartyMediaAccessPortInterface::class));
+        $identities = new PartyPublicIdentity($connection, $this->createStub(PartyMediaAccessPortInterface::class));
 
         self::assertNull(PartySessionResource::from($identities->session($session))['transcodeJobId']);
     }
     public function testPublicVideoResolutionChecksPlaybackScopeBeforeAnyJobLookup(): void
     {
         $video = Video::create('/media/party.mp4', 'video-hash');
-        $connection = $this->createMock(\Doctrine\DBAL\Connection::class);
+        $connection = $this->createMock(Connection::class);
         $connection->expects($this->once())->method('fetchOne')
             ->with('SELECT id FROM videos WHERE public_id = :publicId', ['publicId' => $video->getPublicId()->toString()])
             ->willReturn($video->getId()->toString());
-        $access = $this->createMock(\App\Party\Application\Port\PartyMediaAccessPortInterface::class);
+        $access = $this->createMock(PartyMediaAccessPortInterface::class);
         $access->expects($this->once())->method('assertCanPlay')->with($video->getId())
-            ->willThrowException(\App\Party\Application\Exception\PartyMediaNotFoundException::video());
-        $this->expectException(\App\Party\Application\Exception\PartyMediaNotFoundException::class);
+            ->willThrowException(PartyMediaNotFoundException::video());
+        $this->expectException(PartyMediaNotFoundException::class);
 
         (new PartyPublicIdentity($connection, $access))->videoId($video->getPublicId());
     }
@@ -108,7 +111,7 @@ final class PartyPublicIdentityTest extends TestCase
         ];
         $userIds = array_map(static fn (PartyInvitation $invitation): string => $invitation->getUserId()->toString(), $invitations);
         $publicIds = array_combine($userIds, [(new PublicId())->toString(), (new PublicId())->toString(), (new PublicId())->toString()]);
-        $connection = $this->createMock(\Doctrine\DBAL\Connection::class);
+        $connection = $this->createMock(Connection::class);
         $connection->expects($this->never())->method('fetchOne');
         $connection->expects($this->once())->method('fetchAllKeyValue')->willReturnCallback(
             static function (string $sql, array $parameters) use ($userIds, $publicIds): array {
@@ -119,7 +122,7 @@ final class PartyPublicIdentityTest extends TestCase
                 return array_reverse($publicIds, true);
             },
         );
-        $identities = new PartyPublicIdentity($connection, $this->createStub(\App\Party\Application\Port\PartyMediaAccessPortInterface::class));
+        $identities = new PartyPublicIdentity($connection, $this->createStub(PartyMediaAccessPortInterface::class));
 
         $output = PartyInvitationResource::collection($identities->invitations($invitations));
 
@@ -143,9 +146,9 @@ final class PartyPublicIdentityTest extends TestCase
 
     public function testNoInvitationsNeedNoLookup(): void
     {
-        $connection = $this->createMock(\Doctrine\DBAL\Connection::class);
+        $connection = $this->createMock(Connection::class);
         $connection->expects($this->never())->method($this->anything());
-        $identities = new PartyPublicIdentity($connection, $this->createStub(\App\Party\Application\Port\PartyMediaAccessPortInterface::class));
+        $identities = new PartyPublicIdentity($connection, $this->createStub(PartyMediaAccessPortInterface::class));
 
         self::assertSame([], $identities->invitations([]));
     }

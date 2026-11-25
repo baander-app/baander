@@ -5,8 +5,9 @@ declare(strict_types=1);
 namespace App\Transcode\Application\DTO;
 
 use App\Transcode\Domain\ValueObject\AacImplementation;
+use Symfony\Component\DependencyInjection\Attribute\Exclude;
 
-#[\Symfony\Component\DependencyInjection\Attribute\Exclude]
+#[Exclude]
 final readonly class AudioRenditionRuntimeSnapshot
 {
     public function __construct(

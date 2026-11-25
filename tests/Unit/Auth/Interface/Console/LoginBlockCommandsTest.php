@@ -15,6 +15,7 @@ use App\Auth\Domain\Repository\LoginBlockRepositoryInterface;
 use App\Auth\Interface\Console\LoginBlockDeleteCommand;
 use App\Auth\Interface\Console\LoginBlockListCommand;
 use App\Auth\Interface\Resource\LoginBlockResource;
+use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
 use App\Shared\Interface\Console\AdminCommandSupport;
 use PHPUnit\Framework\TestCase;
@@ -73,18 +74,18 @@ final class LoginBlockCommandsTest extends TestCase
 
     public function testDeleteRemovesOneBlockAndAnUnknownOrMalformedIdFails(): void
     {
-        $known = new \App\Shared\Domain\Model\PublicId();
+        $known = new PublicId();
         $blocks = $this->createMock(LoginBlockRepositoryInterface::class);
         $blocks->expects(self::exactly(2))
             ->method('deleteByPublicId')
-            ->willReturnCallback(static fn (\App\Shared\Domain\Model\PublicId $id): bool => $id->equals($known));
+            ->willReturnCallback(static fn (PublicId $id): bool => $id->equals($known));
         $blocks->expects(self::never())->method('deleteAll');
         $command = new LoginBlockDeleteCommand($this->support($blocks));
 
         self::assertSame(Command::SUCCESS, (new CommandTester($command))->execute(['id' => $known->toString()], ['interactive' => false]));
 
         $unknown = new CommandTester($command);
-        $unknownId = (new \App\Shared\Domain\Model\PublicId())->toString();
+        $unknownId = (new PublicId())->toString();
         self::assertSame(Command::FAILURE, $unknown->execute(['id' => $unknownId], ['interactive' => false]));
         self::assertStringContainsString(sprintf('Login block "%s" not found.', $unknownId), $unknown->getDisplay());
 
@@ -130,7 +131,7 @@ final class LoginBlockCommandsTest extends TestCase
 
     public function testDeleteWithJsonPrintsNothingAsTheApiAnswersWithNoContent(): void
     {
-        $known = new \App\Shared\Domain\Model\PublicId();
+        $known = new PublicId();
         $blocks = $this->createMock(LoginBlockRepositoryInterface::class);
         $blocks->expects(self::once())->method('deleteByPublicId')->willReturn(true);
         $blocks->expects(self::once())->method('deleteAll');
@@ -154,7 +155,7 @@ final class LoginBlockCommandsTest extends TestCase
 
         self::assertSame(Command::INVALID, (new CommandTester($command))->execute([], ['interactive' => false]));
         self::assertSame(Command::INVALID, (new CommandTester($command))->execute(
-            ['id' => (new \App\Shared\Domain\Model\PublicId())->toString(), '--all' => true, '--force' => true],
+            ['id' => (new PublicId())->toString(), '--all' => true, '--force' => true],
             ['interactive' => false],
         ));
     }

@@ -5,9 +5,10 @@ declare(strict_types=1);
 namespace Baander\DevEnvironment\Tests;
 
 use Baander\DevEnvironment\Runtime\Libraries;
-use Baander\Tests\Tooling\Support\DevelopmentCommandExecutor;
 use Baander\DevEnvironment\WorkflowError;
 use Baander\Process\Execution\ProcessResult;
+use Baander\Process\Execution\ProcessSpec;
+use Baander\Tests\Tooling\Support\DevelopmentCommandExecutor;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Console\Input\ArgvInput;
@@ -42,7 +43,7 @@ final class DevelopmentLibrariesTest extends TestCase
         $commands = [];
         $responses = ['[]', '{}', json_encode([self::existing()], JSON_THROW_ON_ERROR)];
         $runner = $this->createMock(DevelopmentCommandExecutor::class);
-        $runner->expects(self::exactly(3))->method('run')->willReturnCallback(static function (\Baander\Process\Execution\ProcessSpec $command) use (&$commands, &$responses): ProcessResult {
+        $runner->expects(self::exactly(3))->method('run')->willReturnCallback(static function (ProcessSpec $command) use (&$commands, &$responses): ProcessResult {
             $arguments = $command->argv;
             $commands[] = $arguments;
             return new ProcessResult(0, null, false, false, array_shift($responses), '', 0);
@@ -63,7 +64,7 @@ final class DevelopmentLibrariesTest extends TestCase
         $instance = self::instance();
         $instance['libraries'][0]['name'] = '--help';
         $runner = $this->createMock(DevelopmentCommandExecutor::class);
-        $runner->expects(self::exactly(2))->method('run')->willReturnCallback(static function (\Baander\Process\Execution\ProcessSpec $command): ProcessResult {
+        $runner->expects(self::exactly(2))->method('run')->willReturnCallback(static function (ProcessSpec $command): ProcessResult {
             $arguments = $command->argv;
             if (in_array('app:library:list', $arguments, true)) {
                 return new ProcessResult(0, null, false, false, '[]', '', 0);
@@ -171,7 +172,7 @@ final class DevelopmentLibrariesTest extends TestCase
     public function testCreateCommandFailureNamesTheLibrary(): void
     {
         $runner = $this->createMock(DevelopmentCommandExecutor::class);
-        $runner->expects(self::exactly(2))->method('run')->willReturnCallback(static function (\Baander\Process\Execution\ProcessSpec $command): ProcessResult {
+        $runner->expects(self::exactly(2))->method('run')->willReturnCallback(static function (ProcessSpec $command): ProcessResult {
             $arguments = $command->argv;
             if (in_array('app:library:create', $arguments, true)) {
                 throw new WorkflowError('fake exited with status 1.');

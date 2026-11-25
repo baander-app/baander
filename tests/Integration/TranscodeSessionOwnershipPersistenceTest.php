@@ -4,23 +4,69 @@ declare(strict_types=1);
 
 namespace App\Tests\Integration;
 
+use App\Auth\Infrastructure\Security\SecurityUser;
 use App\QoL\Application\Port\AllowedQualityTiersPortInterface;
+use App\Shared\Application\DTO\DeploymentProfile;
+use App\Shared\Application\Port\SleeperInterface;
+use App\Shared\Application\Port\SystemSettingsPortInterface;
+use App\Shared\Application\Port\TransactionPortInterface;
 use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
+use App\Shared\Infrastructure\Doctrine\DoctrineTransaction;
+use App\Shared\Interface\Console\AdminCommandSupport;
 use App\Tests\Unit\Transcode\FreeTranscodeSessionShare;
+use App\Transcode\Application\Command\CleanupOrphanedJobsCommand;
+use App\Transcode\Application\Command\CreateTranscodeSessionCommand;
+use App\Transcode\Application\CommandHandler\CleanupOrphanedJobsHandler;
+use App\Transcode\Application\CommandHandler\CreateTranscodeSessionHandler;
+use App\Transcode\Application\DTO\DesiredTranscodeState;
+use App\Transcode\Application\DTO\MediaWorkerIdentity;
+use App\Transcode\Application\DTO\PlaybackEndReason;
+use App\Transcode\Application\DTO\TranscodeExecutionClaim;
+use App\Transcode\Application\Port\EncodePresentationPort;
+use App\Transcode\Application\Port\TranscodeStoragePortInterface;
+use App\Transcode\Application\Service\MediaExecutionPolicy;
+use App\Transcode\Application\Service\StaleTranscodeSessionExpiry;
+use App\Transcode\Application\Service\TranscodePlaybackControl;
+use App\Transcode\Application\Service\TranscodeSessionShare;
+use App\Transcode\Application\Settings\TranscodeSettingDefinitions;
+use App\Transcode\Domain\Model\TranscodeJob;
 use App\Transcode\Domain\Model\TranscodeSession;
 use App\Transcode\Domain\Model\TranscodeSessionState;
 use App\Transcode\Domain\ValueObject\AudioProfile;
+use App\Transcode\Domain\ValueObject\PresentationSelection;
+use App\Transcode\Domain\ValueObject\QualityTier;
 use App\Transcode\Domain\ValueObject\SessionPriority;
 use App\Transcode\Domain\ValueObject\SessionState;
+use App\Transcode\Infrastructure\Auth\AuthorizedPlayback;
 use App\Transcode\Infrastructure\Doctrine\Entity\TranscodeJobEntity;
 use App\Transcode\Infrastructure\Doctrine\Entity\TranscodeSessionEntity;
+use App\Transcode\Infrastructure\Doctrine\Repository\TranscodeJobRepository;
 use App\Transcode\Infrastructure\Doctrine\Repository\TranscodeSessionRepository;
+use App\Transcode\Infrastructure\Doctrine\TranscodeRuntimeState;
+use App\Transcode\Infrastructure\Doctrine\TranscodeSessionShareStore;
+use App\Transcode\Infrastructure\Transcode\TranscodeJobService;
+use App\Transcode\Infrastructure\Transcode\TranscodeSessionService;
+use App\Transcode\Interface\Console\TranscodeJobCleanupCommand;
+use Doctrine\DBAL\Connection;
 use Doctrine\DBAL\Exception\ForeignKeyConstraintViolationException;
 use Doctrine\DBAL\Exception\NotNullConstraintViolationException;
 use Doctrine\ORM\Tools\SchemaTool;
-use PHPUnit\Framework\TestCase;
+use Doctrine\Persistence\ManagerRegistry;
 use PHPUnit\Framework\Attributes\DataProvider;
+use PHPUnit\Framework\TestCase;
+use Psr\Log\AbstractLogger;
+use Psr\Log\NullLogger;
+use SwooleBundle\SwooleBundle\Bridge\Swoole\Swoole;
+use Symfony\Bundle\SecurityBundle\Security;
+use Symfony\Component\Clock\NativeClock;
+use Symfony\Component\Console\Command\Command;
+use Symfony\Component\Console\Tester\CommandTester;
+use Symfony\Component\EventDispatcher\EventDispatcher;
+use Symfony\Component\Messenger\Handler\HandlersLocator;
+use Symfony\Component\Messenger\MessageBus;
+use Symfony\Component\Messenger\MessageBusInterface;
+use Symfony\Component\Messenger\Middleware\HandleMessageMiddleware;
 
 final class TranscodeSessionOwnershipPersistenceTest extends TestCase
 {
@@ -54,10 +100,10 @@ final class TranscodeSessionOwnershipPersistenceTest extends TestCase
         $alice = $this->createUser();
         $bob = $this->createUser();
         $video = $this->createVideo();
-        $tier = \App\Transcode\Domain\ValueObject\QualityTier::p720();
-        $first = \App\Transcode\Domain\Model\TranscodeJob::create($video, $tier, '/fixture/alice', $alice);
-        $second = \App\Transcode\Domain\Model\TranscodeJob::create($video, $tier, '/fixture/bob', $bob);
-        $repository = new \App\Transcode\Infrastructure\Doctrine\Repository\TranscodeJobRepository($this->manager);
+        $tier = QualityTier::p720();
+        $first = TranscodeJob::create($video, $tier, '/fixture/alice', $alice);
+        $second = TranscodeJob::create($video, $tier, '/fixture/bob', $bob);
+        $repository = new TranscodeJobRepository($this->manager);
         $repository->save($first);
         $repository->save($second);
         $unowned = new TranscodeJobEntity(new PublicId(), $video, $tier->name, ownerUserId: null);
@@ -66,7 +112,7 @@ final class TranscodeSessionOwnershipPersistenceTest extends TestCase
         $this->manager->clear();
         self::assertTrue($repository->findByOwnerVideoAndQuality($alice, $video, $tier->name, requestId: $first->getRequestId())?->getId()->equals($first->getId()));
         self::assertTrue($repository->findByOwnerVideoAndQuality($bob, $video, $tier->name, requestId: $second->getRequestId())?->getId()->equals($second->getId()));
-        self::assertSame([$first->getId()->toString()], array_map(static fn(\App\Transcode\Domain\Model\TranscodeJob $job): string => $job->getId()->toString(), $repository->findActiveByOwnerAndVideo($alice, $video)));
+        self::assertSame([$first->getId()->toString()], array_map(static fn(TranscodeJob $job): string => $job->getId()->toString(), $repository->findActiveByOwnerAndVideo($alice, $video)));
         self::assertNull($repository->findByUuid($unowned->getId())?->getOwnerUserId());
     }
 
@@ -74,11 +120,11 @@ final class TranscodeSessionOwnershipPersistenceTest extends TestCase
     {
         $owner = $this->createUser();
         $video = $this->createVideo();
-        $repository = new \App\Transcode\Infrastructure\Doctrine\Repository\TranscodeJobRepository($this->manager);
-        $firstSelection = new \App\Transcode\Domain\ValueObject\PresentationSelection('copy', 'source-hash', 2, 4, 'mp4');
-        $secondSelection = new \App\Transcode\Domain\ValueObject\PresentationSelection('copy', 'source-hash', 2, 5, 'mp4');
-        $first = \App\Transcode\Domain\Model\TranscodeJob::createCopy($video, '/fixture/copy-first', $owner, $firstSelection, 1920, 1080);
-        $second = \App\Transcode\Domain\Model\TranscodeJob::createCopy($video, '/fixture/copy-second', $owner, $secondSelection, 1920, 1080);
+        $repository = new TranscodeJobRepository($this->manager);
+        $firstSelection = new PresentationSelection('copy', 'source-hash', 2, 4, 'mp4');
+        $secondSelection = new PresentationSelection('copy', 'source-hash', 2, 5, 'mp4');
+        $first = TranscodeJob::createCopy($video, '/fixture/copy-first', $owner, $firstSelection, 1920, 1080);
+        $second = TranscodeJob::createCopy($video, '/fixture/copy-second', $owner, $secondSelection, 1920, 1080);
         $repository->save($first);
         $repository->save($second);
         $this->manager->clear();
@@ -93,31 +139,31 @@ final class TranscodeSessionOwnershipPersistenceTest extends TestCase
     {
         $owner = $this->createUser();
         $video = $this->createVideo();
-        $selection = new \App\Transcode\Domain\ValueObject\PresentationSelection('copy', 'source-hash', 2, 4, 'mp4');
-        $jobs = new \App\Transcode\Infrastructure\Doctrine\Repository\TranscodeJobRepository($this->manager);
+        $selection = new PresentationSelection('copy', 'source-hash', 2, 4, 'mp4');
+        $jobs = new TranscodeJobRepository($this->manager);
         $sessions = new TranscodeSessionRepository($this->manager);
         $connection = $this->manager->getConnection();
-        $transaction = new class($connection) implements \App\Shared\Application\Port\TransactionPortInterface {
-            public function __construct(private readonly \Doctrine\DBAL\Connection $connection) {}
+        $transaction = new class($connection) implements TransactionPortInterface {
+            public function __construct(private readonly Connection $connection) {}
             public function run(callable $operation): mixed { return $this->connection->transactional(static fn (): mixed => $operation()); }
         };
-        $runtime = new \App\Transcode\Infrastructure\Doctrine\TranscodeRuntimeState($connection, $transaction);
+        $runtime = new TranscodeRuntimeState($connection, $transaction);
         $expected = [];
         foreach (['first-client', 'second-client'] as $request) {
-            $job = \App\Transcode\Domain\Model\TranscodeJob::createCopy($video, '/fixture/' . $request, $owner, $selection, 1920, 1080, $request);
+            $job = TranscodeJob::createCopy($video, '/fixture/' . $request, $owner, $selection, 1920, 1080, $request);
             $jobs->save($job);
             $session = TranscodeSession::create($owner, $job->getId(), $video, AudioProfile::streamingStereo());
             $sessions->save($session);
-            $runtime->admit($job->getId(), $session->getId(), $request, new \App\Transcode\Application\DTO\DesiredTranscodeState(AudioProfile::streamingStereo(), presentationSelection: $selection));
+            $runtime->admit($job->getId(), $session->getId(), $request, new DesiredTranscodeState(AudioProfile::streamingStereo(), presentationSelection: $selection));
             $expected[$request] = [$job->getPublicId()->toString() => $session->getPublicId()->toString()];
         }
-        $security = $this->createStub(\Symfony\Bundle\SecurityBundle\Security::class);
-        $security->method('getUser')->willReturn(new \App\Auth\Infrastructure\Security\SecurityUser($owner->toString(), 'viewer@baander.app', ''));
-        $playback = new \App\Transcode\Infrastructure\Auth\AuthorizedPlayback(
+        $security = $this->createStub(Security::class);
+        $security->method('getUser')->willReturn(new SecurityUser($owner->toString(), 'viewer@baander.app', ''));
+        $playback = new AuthorizedPlayback(
             $security,
             $connection,
-            $this->createStub(\Symfony\Component\Messenger\MessageBusInterface::class),
-            new \Symfony\Component\Clock\NativeClock(),
+            $this->createStub(MessageBusInterface::class),
+            new NativeClock(),
             $this->createStub(AllowedQualityTiersPortInterface::class),
             $this->freeSessionShare(),
         );
@@ -132,31 +178,31 @@ final class TranscodeSessionOwnershipPersistenceTest extends TestCase
     {
         $owner = $this->createUser();
         $video = $this->createVideo();
-        $jobs = new \App\Transcode\Infrastructure\Doctrine\Repository\TranscodeJobRepository($this->manager);
+        $jobs = new TranscodeJobRepository($this->manager);
         $sessions = new TranscodeSessionRepository($this->manager);
         $connection = $this->manager->getConnection();
-        $transaction = new class($connection) implements \App\Shared\Application\Port\TransactionPortInterface {
-            public function __construct(private readonly \Doctrine\DBAL\Connection $connection) {}
+        $transaction = new class($connection) implements TransactionPortInterface {
+            public function __construct(private readonly Connection $connection) {}
             public function run(callable $operation): mixed { return $this->connection->transactional(static fn (): mixed => $operation()); }
         };
-        $runtime = new \App\Transcode\Infrastructure\Doctrine\TranscodeRuntimeState($connection, $transaction);
-        $control = new \App\Transcode\Application\Service\TranscodePlaybackControl(
-            new \App\Transcode\Infrastructure\Transcode\TranscodeSessionService($sessions),
+        $runtime = new TranscodeRuntimeState($connection, $transaction);
+        $control = new TranscodePlaybackControl(
+            new TranscodeSessionService($sessions),
             $runtime,
             $transaction,
-            new \App\Transcode\Infrastructure\Transcode\TranscodeJobService($jobs, $this->createStub(\App\Transcode\Application\Port\TranscodeStoragePortInterface::class), new \Symfony\Component\EventDispatcher\EventDispatcher(), $runtime, $transaction, new \Psr\Log\NullLogger()),
+            new TranscodeJobService($jobs, $this->createStub(TranscodeStoragePortInterface::class), new EventDispatcher(), $runtime, $transaction, new NullLogger()),
         );
         $controlled = [];
         $protected = [];
         $mismatchedSession = null;
         foreach ([
-            ['first-client', 'first-client', \App\Transcode\Domain\ValueObject\QualityTier::p360()],
-            ['first-client', 'first-client', \App\Transcode\Domain\ValueObject\QualityTier::p720()],
-            ['second-client', 'second-client', \App\Transcode\Domain\ValueObject\QualityTier::p360()],
-            ['second-client', 'second-client', \App\Transcode\Domain\ValueObject\QualityTier::p720()],
-            ['first-client', 'mismatched-client', \App\Transcode\Domain\ValueObject\QualityTier::p1080()],
+            ['first-client', 'first-client', QualityTier::p360()],
+            ['first-client', 'first-client', QualityTier::p720()],
+            ['second-client', 'second-client', QualityTier::p360()],
+            ['second-client', 'second-client', QualityTier::p720()],
+            ['first-client', 'mismatched-client', QualityTier::p1080()],
         ] as [$jobRequest, $runtimeRequest, $tier]) {
-            $job = \App\Transcode\Domain\Model\TranscodeJob::create($video, $tier, '/fixture/' . $jobRequest . '/' . $tier->name, $owner, requestId: $jobRequest);
+            $job = TranscodeJob::create($video, $tier, '/fixture/' . $jobRequest . '/' . $tier->name, $owner, requestId: $jobRequest);
             $job->attachSession();
             $job->markInProgress();
             $jobs->save($job);
@@ -164,7 +210,7 @@ final class TranscodeSessionOwnershipPersistenceTest extends TestCase
             $session->markPreparing();
             $session->markActive();
             $sessions->save($session);
-            $runtime->admit($job->getId(), $session->getId(), $runtimeRequest, new \App\Transcode\Application\DTO\DesiredTranscodeState(AudioProfile::streamingStereo()));
+            $runtime->admit($job->getId(), $session->getId(), $runtimeRequest, new DesiredTranscodeState(AudioProfile::streamingStereo()));
             if ($jobRequest === 'first-client' && $runtimeRequest === $jobRequest) {
                 $controlled[] = [$job->getId(), $session->getId()];
             } else {
@@ -224,23 +270,23 @@ final class TranscodeSessionOwnershipPersistenceTest extends TestCase
     {
         $owner = $this->createUser();
         $video = $this->createVideo();
-        $jobs = new \App\Transcode\Infrastructure\Doctrine\Repository\TranscodeJobRepository($this->manager);
+        $jobs = new TranscodeJobRepository($this->manager);
         $sessions = new TranscodeSessionRepository($this->manager);
         $connection = $this->manager->getConnection();
-        $transaction = new class($connection) implements \App\Shared\Application\Port\TransactionPortInterface {
-            public function __construct(private readonly \Doctrine\DBAL\Connection $connection) {}
+        $transaction = new class($connection) implements TransactionPortInterface {
+            public function __construct(private readonly Connection $connection) {}
             public function run(callable $operation): mixed { return $this->connection->transactional(static fn (): mixed => $operation()); }
         };
-        $runtime = new \App\Transcode\Infrastructure\Doctrine\TranscodeRuntimeState($connection, $transaction);
-        $storage = $this->createMock(\App\Transcode\Application\Port\TranscodeStoragePortInterface::class);
-        $jobService = new \App\Transcode\Infrastructure\Transcode\TranscodeJobService($jobs, $storage, new \Symfony\Component\EventDispatcher\EventDispatcher(), $runtime, $transaction, new \Psr\Log\NullLogger());
-        $expiry = new \App\Transcode\Application\Service\StaleTranscodeSessionExpiry(
-            new \App\Transcode\Infrastructure\Transcode\TranscodeSessionService($sessions), $runtime, $jobService, $transaction, new \Symfony\Component\Clock\NativeClock(), new \Psr\Log\NullLogger(),
+        $runtime = new TranscodeRuntimeState($connection, $transaction);
+        $storage = $this->createMock(TranscodeStoragePortInterface::class);
+        $jobService = new TranscodeJobService($jobs, $storage, new EventDispatcher(), $runtime, $transaction, new NullLogger());
+        $expiry = new StaleTranscodeSessionExpiry(
+            new TranscodeSessionService($sessions), $runtime, $jobService, $transaction, new NativeClock(), new NullLogger(),
         );
-        $handler = new \App\Transcode\Application\CommandHandler\CleanupOrphanedJobsHandler($jobService, $expiry, new \Psr\Log\NullLogger());
+        $handler = new CleanupOrphanedJobsHandler($jobService, $expiry, new NullLogger());
         $ids = [];
-        foreach (['abandoned' => \App\Transcode\Domain\ValueObject\QualityTier::p360(), 'fresh' => \App\Transcode\Domain\ValueObject\QualityTier::p720(), 'paused' => \App\Transcode\Domain\ValueObject\QualityTier::p1080()] as $name => $tier) {
-            $job = \App\Transcode\Domain\Model\TranscodeJob::create($video, $tier, '/fixture/' . $name, $owner, requestId: $name . '-client');
+        foreach (['abandoned' => QualityTier::p360(), 'fresh' => QualityTier::p720(), 'paused' => QualityTier::p1080()] as $name => $tier) {
+            $job = TranscodeJob::create($video, $tier, '/fixture/' . $name, $owner, requestId: $name . '-client');
             $job->attachSession();
             $job->markInProgress();
             $jobs->save($job);
@@ -248,7 +294,7 @@ final class TranscodeSessionOwnershipPersistenceTest extends TestCase
             $session->markPreparing();
             $session->markActive();
             $sessions->save($session);
-            $connection->transactional(static fn () => $runtime->admit($job->getId(), $session->getId(), $name . '-client', new \App\Transcode\Application\DTO\DesiredTranscodeState(AudioProfile::streamingStereo(), position: 118.86)));
+            $connection->transactional(static fn () => $runtime->admit($job->getId(), $session->getId(), $name . '-client', new DesiredTranscodeState(AudioProfile::streamingStereo(), position: 118.86)));
             $ids[$name] = [$job->getId(), $session->getId(), $session->getPublicId()];
         }
         // The abandoned client last reported or signed just over a day ago.
@@ -256,13 +302,13 @@ final class TranscodeSessionOwnershipPersistenceTest extends TestCase
         $connection->executeStatement("UPDATE transcode_sessions SET updated_at = clock_timestamp() - interval '23 hours' WHERE id = ?", [$ids['fresh'][1]->toString()]);
         // The paused client was last written just as long ago, but it still signs its stream URL.
         $connection->executeStatement("UPDATE transcode_sessions SET updated_at = clock_timestamp() - interval '24 hours 1 minute' WHERE id = ?", [$ids['paused'][1]->toString()]);
-        $security = $this->createStub(\Symfony\Bundle\SecurityBundle\Security::class);
-        $security->method('getUser')->willReturn(new \App\Auth\Infrastructure\Security\SecurityUser($owner->toString(), 'viewer@baander.app', ''));
-        $playback = new \App\Transcode\Infrastructure\Auth\AuthorizedPlayback(
+        $security = $this->createStub(Security::class);
+        $security->method('getUser')->willReturn(new SecurityUser($owner->toString(), 'viewer@baander.app', ''));
+        $playback = new AuthorizedPlayback(
             $security,
             $connection,
-            $this->createStub(\Symfony\Component\Messenger\MessageBusInterface::class),
-            new \Symfony\Component\Clock\NativeClock(),
+            $this->createStub(MessageBusInterface::class),
+            new NativeClock(),
             $this->createStub(AllowedQualityTiersPortInterface::class),
             $this->freeSessionShare(),
         );
@@ -275,7 +321,7 @@ final class TranscodeSessionOwnershipPersistenceTest extends TestCase
         $this->manager->clear();
         $storage->expects(self::once())->method('deleteIfUnretained')->with('/fixture/abandoned')->willReturn(true);
 
-        self::assertSame(['expired' => 1, 'cleaned' => 1], $handler(new \App\Transcode\Application\Command\CleanupOrphanedJobsCommand())->toArray());
+        self::assertSame(['expired' => 1, 'cleaned' => 1], $handler(new CleanupOrphanedJobsCommand())->toArray());
 
         $this->manager->clear();
         // The job went with its output; its session and execution rows cascade with it.
@@ -296,20 +342,20 @@ final class TranscodeSessionOwnershipPersistenceTest extends TestCase
     {
         $owner = $this->createUser();
         $video = $this->createVideo();
-        $jobs = new \App\Transcode\Infrastructure\Doctrine\Repository\TranscodeJobRepository($this->manager);
+        $jobs = new TranscodeJobRepository($this->manager);
         $sessions = new TranscodeSessionRepository($this->manager);
         $connection = $this->manager->getConnection();
-        $transaction = new class($connection) implements \App\Shared\Application\Port\TransactionPortInterface {
-            public function __construct(private readonly \Doctrine\DBAL\Connection $connection) {}
+        $transaction = new class($connection) implements TransactionPortInterface {
+            public function __construct(private readonly Connection $connection) {}
             public function run(callable $operation): mixed { return $this->connection->transactional(static fn (): mixed => $operation()); }
         };
-        $runtime = new \App\Transcode\Infrastructure\Doctrine\TranscodeRuntimeState($connection, $transaction);
-        $storage = $this->createMock(\App\Transcode\Application\Port\TranscodeStoragePortInterface::class);
-        $jobService = new \App\Transcode\Infrastructure\Transcode\TranscodeJobService($jobs, $storage, new \Symfony\Component\EventDispatcher\EventDispatcher(), $runtime, $transaction, new \Psr\Log\NullLogger());
-        $handler = new \App\Transcode\Application\CommandHandler\CleanupOrphanedJobsHandler($jobService, new \App\Transcode\Application\Service\StaleTranscodeSessionExpiry(
-            new \App\Transcode\Infrastructure\Transcode\TranscodeSessionService($sessions), $runtime, $jobService, $transaction, new \Symfony\Component\Clock\NativeClock(), new \Psr\Log\NullLogger(),
-        ), new \Psr\Log\NullLogger());
-        $job = \App\Transcode\Domain\Model\TranscodeJob::create($video, \App\Transcode\Domain\ValueObject\QualityTier::p1080(), '/fixture/held', $owner, requestId: 'held-client');
+        $runtime = new TranscodeRuntimeState($connection, $transaction);
+        $storage = $this->createMock(TranscodeStoragePortInterface::class);
+        $jobService = new TranscodeJobService($jobs, $storage, new EventDispatcher(), $runtime, $transaction, new NullLogger());
+        $handler = new CleanupOrphanedJobsHandler($jobService, new StaleTranscodeSessionExpiry(
+            new TranscodeSessionService($sessions), $runtime, $jobService, $transaction, new NativeClock(), new NullLogger(),
+        ), new NullLogger());
+        $job = TranscodeJob::create($video, QualityTier::p1080(), '/fixture/held', $owner, requestId: 'held-client');
         $job->attachSession();
         $job->markInProgress();
         $jobs->save($job);
@@ -317,15 +363,15 @@ final class TranscodeSessionOwnershipPersistenceTest extends TestCase
         $session->markPreparing();
         $session->markActive();
         $sessions->save($session);
-        $connection->transactional(static fn () => $runtime->admit($job->getId(), $session->getId(), 'held-client', new \App\Transcode\Application\DTO\DesiredTranscodeState(AudioProfile::streamingStereo())));
+        $connection->transactional(static fn () => $runtime->admit($job->getId(), $session->getId(), 'held-client', new DesiredTranscodeState(AudioProfile::streamingStereo())));
         // A worker holds the execution with a live lease, as it does at the lead throttle.
-        $claim = $runtime->claim($job->getId(), new \App\Transcode\Application\DTO\MediaWorkerIdentity('baander.app:workers', str_repeat('a', 32), 'media', 1));
+        $claim = $runtime->claim($job->getId(), new MediaWorkerIdentity('baander.app:workers', str_repeat('a', 32), 'media', 1));
         self::assertNotNull($claim);
         $connection->executeStatement("UPDATE transcode_sessions SET updated_at = clock_timestamp() - interval '2 days' WHERE id = ?", [$session->getId()->toString()]);
         $this->manager->clear();
         $storage->expects(self::once())->method('deleteIfUnretained')->with('/fixture/held')->willReturn(true);
 
-        self::assertSame(['expired' => 1, 'cleaned' => 0], $handler(new \App\Transcode\Application\Command\CleanupOrphanedJobsCommand())->toArray());
+        self::assertSame(['expired' => 1, 'cleaned' => 0], $handler(new CleanupOrphanedJobsCommand())->toArray());
 
         $this->manager->clear();
         $cancelled = $runtime->find($job->getId());
@@ -339,28 +385,28 @@ final class TranscodeSessionOwnershipPersistenceTest extends TestCase
         self::assertSame(0, $released->getReferenceCount());
         self::assertSame('in_progress', $released->getStatus()->value);
         // Until cleanup removes the job, its client is told that the session expired, not that it still holds it.
-        $security = $this->createStub(\Symfony\Bundle\SecurityBundle\Security::class);
-        $security->method('getUser')->willReturn(new \App\Auth\Infrastructure\Security\SecurityUser($owner->toString(), 'viewer@baander.app', ''));
-        $playback = new \App\Transcode\Infrastructure\Auth\AuthorizedPlayback(
+        $security = $this->createStub(Security::class);
+        $security->method('getUser')->willReturn(new SecurityUser($owner->toString(), 'viewer@baander.app', ''));
+        $playback = new AuthorizedPlayback(
             $security,
             $connection,
-            $this->createStub(\Symfony\Component\Messenger\MessageBusInterface::class),
-            new \Symfony\Component\Clock\NativeClock(),
+            $this->createStub(MessageBusInterface::class),
+            new NativeClock(),
             $this->createStub(AllowedQualityTiersPortInterface::class),
             $this->freeSessionShare(),
         );
         self::assertSame([], $playback->findSessions($video, 'held-client', [$job->getPublicId()]));
-        self::assertSame(\App\Transcode\Application\DTO\PlaybackEndReason::Expired, $playback->endReason($video, 'held-client', [$job->getPublicId()]));
+        self::assertSame(PlaybackEndReason::Expired, $playback->endReason($video, 'held-client', [$job->getPublicId()]));
 
         // The worker reads the cancellation and gives up the execution; the next run reclaims the job.
         $latest = $runtime->refresh($claim);
         self::assertNotNull($latest);
         self::assertTrue($runtime->release($latest));
         $this->manager->clear();
-        self::assertSame(['expired' => 0, 'cleaned' => 1], $handler(new \App\Transcode\Application\Command\CleanupOrphanedJobsCommand())->toArray());
+        self::assertSame(['expired' => 0, 'cleaned' => 1], $handler(new CleanupOrphanedJobsCommand())->toArray());
         $this->manager->clear();
         self::assertNull($jobs->findByUuid($job->getId()));
-        self::assertSame(\App\Transcode\Application\DTO\PlaybackEndReason::Expired, $playback->endReason($video, 'held-client', [$job->getPublicId()]));
+        self::assertSame(PlaybackEndReason::Expired, $playback->endReason($video, 'held-client', [$job->getPublicId()]));
     }
 
     #[DataProvider('endedPresentations')]
@@ -370,7 +416,7 @@ final class TranscodeSessionOwnershipPersistenceTest extends TestCase
     ): void {
         $owner = $this->createUser();
         $video = $this->createVideo();
-        $jobs = new \App\Transcode\Infrastructure\Doctrine\Repository\TranscodeJobRepository($this->manager);
+        $jobs = new TranscodeJobRepository($this->manager);
         $sessions = new TranscodeSessionRepository($this->manager);
         $connection = $this->manager->getConnection();
         if ($qualityTier !== null) {
@@ -379,45 +425,45 @@ final class TranscodeSessionOwnershipPersistenceTest extends TestCase
                 [$video->toString()],
             );
         }
-        $transaction = new class ($connection) implements \App\Shared\Application\Port\TransactionPortInterface {
-            public function __construct(private readonly \Doctrine\DBAL\Connection $connection) {}
+        $transaction = new class ($connection) implements TransactionPortInterface {
+            public function __construct(private readonly Connection $connection) {}
             public function run(callable $operation): mixed
             {
                 return $this->connection->transactional(static fn(): mixed => $operation());
             }
         };
-        $runtime = new \App\Transcode\Infrastructure\Doctrine\TranscodeRuntimeState($connection, $transaction);
-        $storage = $this->createStub(\App\Transcode\Application\Port\TranscodeStoragePortInterface::class);
+        $runtime = new TranscodeRuntimeState($connection, $transaction);
+        $storage = $this->createStub(TranscodeStoragePortInterface::class);
         $storage->method('forGeneration')->willReturnSelf();
         $storage->method('resolveJobDirectory')->willReturn('/fixture/restart/generation-1');
-        $jobService = new \App\Transcode\Infrastructure\Transcode\TranscodeJobService(
+        $jobService = new TranscodeJobService(
             $jobs,
             $storage,
-            new \Symfony\Component\EventDispatcher\EventDispatcher(),
+            new EventDispatcher(),
             $runtime,
             $transaction,
-            new \Psr\Log\NullLogger(),
+            new NullLogger(),
         );
-        $sessionService = new \App\Transcode\Infrastructure\Transcode\TranscodeSessionService($sessions);
-        $expiry = new \App\Transcode\Application\Service\StaleTranscodeSessionExpiry(
+        $sessionService = new TranscodeSessionService($sessions);
+        $expiry = new StaleTranscodeSessionExpiry(
             $sessionService,
             $runtime,
             $jobService,
             $transaction,
-            new \Symfony\Component\Clock\NativeClock(),
-            new \Psr\Log\NullLogger(),
+            new NativeClock(),
+            new NullLogger(),
         );
         $request = Uuid::generate()->toString();
-        $worker = new \App\Transcode\Application\DTO\MediaWorkerIdentity(
+        $worker = new MediaWorkerIdentity(
             'baander.app:workers',
             str_repeat('b', 32),
             'media',
             1,
         );
-        /** @var list<\App\Transcode\Application\DTO\TranscodeExecutionClaim> $claims Every execution the worker accepted, in order */
+        /** @var list<TranscodeExecutionClaim> $claims Every execution the worker accepted, in order */
         $claims = [];
         // The worker: while a start waits for its execution to be accepted, it claims and accepts it.
-        $sleeper = $this->createStub(\App\Shared\Application\Port\SleeperInterface::class);
+        $sleeper = $this->createStub(SleeperInterface::class);
         $sleeper->method('sleep')->willReturnCallback(function () use (
             $connection,
             $runtime,
@@ -435,8 +481,8 @@ final class TranscodeSessionOwnershipPersistenceTest extends TestCase
                 $claims[] = $claim;
             }
         });
-        $presentations = $this->createStub(\App\Transcode\Application\Port\EncodePresentationPort::class);
-        $presentations->method('select')->willReturn(new \App\Transcode\Domain\ValueObject\PresentationSelection(
+        $presentations = $this->createStub(EncodePresentationPort::class);
+        $presentations->method('select')->willReturn(new PresentationSelection(
             'encode',
             'source',
             0,
@@ -444,18 +490,18 @@ final class TranscodeSessionOwnershipPersistenceTest extends TestCase
             'mp4',
             'configuration',
         ));
-        $settings = $this->createStub(\App\Shared\Application\Port\SystemSettingsPortInterface::class);
-        $settings->method('get')->willReturnCallback(static fn (string $key): int|string => $key === \App\Transcode\Application\Settings\TranscodeSettingDefinitions::SESSIONS_PER_USER ? 6 : 'fdk_aac');
-        $share = new \App\Transcode\Application\Service\TranscodeSessionShare(
-            new \App\Transcode\Infrastructure\Doctrine\TranscodeSessionShareStore($connection),
+        $settings = $this->createStub(SystemSettingsPortInterface::class);
+        $settings->method('get')->willReturnCallback(static fn (string $key): int|string => $key === TranscodeSettingDefinitions::SESSIONS_PER_USER ? 6 : 'fdk_aac');
+        $share = new TranscodeSessionShare(
+            new TranscodeSessionShareStore($connection),
             $runtime,
             $transaction,
             $settings,
-            new \App\Shared\Application\DTO\DeploymentProfile(),
-            new \Symfony\Component\Clock\NativeClock(),
+            new DeploymentProfile(),
+            new NativeClock(),
         );
-        $handler = new \App\Transcode\Application\CommandHandler\CreateTranscodeSessionHandler(
-            new \App\Transcode\Application\Service\MediaExecutionPolicy(new \App\Shared\Application\DTO\DeploymentProfile()),
+        $handler = new CreateTranscodeSessionHandler(
+            new MediaExecutionPolicy(new DeploymentProfile()),
             $jobService,
             $sessionService,
             $storage,
@@ -466,32 +512,32 @@ final class TranscodeSessionOwnershipPersistenceTest extends TestCase
             $settings,
             $share,
         );
-        $security = $this->createStub(\Symfony\Bundle\SecurityBundle\Security::class);
-        $security->method('getUser')->willReturn(new \App\Auth\Infrastructure\Security\SecurityUser(
+        $security = $this->createStub(Security::class);
+        $security->method('getUser')->willReturn(new SecurityUser(
             $owner->toString(),
             'viewer@baander.app',
             '',
         ));
         $security->method('isGranted')->willReturn(true);
-        $handlers = new \Symfony\Component\Messenger\Handler\HandlersLocator([
-            \App\Transcode\Application\Command\CreateTranscodeSessionCommand::class => [$handler],
+        $handlers = new HandlersLocator([
+            CreateTranscodeSessionCommand::class => [$handler],
         ]);
-        $bus = new \Symfony\Component\Messenger\MessageBus([
-            new \Symfony\Component\Messenger\Middleware\HandleMessageMiddleware($handlers),
+        $bus = new MessageBus([
+            new HandleMessageMiddleware($handlers),
         ]);
         $qualityPolicy = $this->createStub(AllowedQualityTiersPortInterface::class);
         $qualityPolicy->method('qualifiedTierNames')->willReturn(['480p', '720p']);
-        $control = new \App\Transcode\Application\Service\TranscodePlaybackControl(
+        $control = new TranscodePlaybackControl(
             $sessionService,
             $runtime,
             $transaction,
             $jobService,
         );
-        $playback = new \App\Transcode\Infrastructure\Auth\AuthorizedPlayback(
+        $playback = new AuthorizedPlayback(
             $security,
             $connection,
             $bus,
-            new \Symfony\Component\Clock\NativeClock(),
+            new NativeClock(),
             $qualityPolicy,
             $share,
         );
@@ -633,17 +679,17 @@ final class TranscodeSessionOwnershipPersistenceTest extends TestCase
     {
         $owner = $this->createUser();
         $video = $this->createVideo();
-        $jobs = new \App\Transcode\Infrastructure\Doctrine\Repository\TranscodeJobRepository($this->manager);
+        $jobs = new TranscodeJobRepository($this->manager);
         $sessions = new TranscodeSessionRepository($this->manager);
         $connection = $this->manager->getConnection();
         // The transaction port the application runs: it flushes the entity manager inside each transaction.
-        $registry = $this->createStub(\Doctrine\Persistence\ManagerRegistry::class);
+        $registry = $this->createStub(ManagerRegistry::class);
         $registry->method('getManager')->willReturn($this->manager);
-        $transaction = new \App\Shared\Infrastructure\Doctrine\DoctrineTransaction($registry, new \SwooleBundle\SwooleBundle\Bridge\Swoole\Swoole());
-        $runtime = new \App\Transcode\Infrastructure\Doctrine\TranscodeRuntimeState($connection, $transaction);
-        $storage = $this->createStub(\App\Transcode\Application\Port\TranscodeStoragePortInterface::class);
+        $transaction = new DoctrineTransaction($registry, new Swoole());
+        $runtime = new TranscodeRuntimeState($connection, $transaction);
+        $storage = $this->createStub(TranscodeStoragePortInterface::class);
         $storage->method('deleteIfUnretained')->willReturn(true);
-        $logger = new class extends \Psr\Log\AbstractLogger {
+        $logger = new class extends AbstractLogger {
             /** @var list<string> */
             public array $records = [];
 
@@ -652,16 +698,16 @@ final class TranscodeSessionOwnershipPersistenceTest extends TestCase
                 $this->records[] = $level . ': ' . $message;
             }
         };
-        $jobService = new \App\Transcode\Infrastructure\Transcode\TranscodeJobService($jobs, $storage, new \Symfony\Component\EventDispatcher\EventDispatcher(), $runtime, $transaction, $logger);
-        $handler = new \App\Transcode\Application\CommandHandler\CleanupOrphanedJobsHandler($jobService, new \App\Transcode\Application\Service\StaleTranscodeSessionExpiry(
-            new \App\Transcode\Infrastructure\Transcode\TranscodeSessionService($sessions), $runtime, $jobService, $transaction, new \Symfony\Component\Clock\NativeClock(), $logger,
+        $jobService = new TranscodeJobService($jobs, $storage, new EventDispatcher(), $runtime, $transaction, $logger);
+        $handler = new CleanupOrphanedJobsHandler($jobService, new StaleTranscodeSessionExpiry(
+            new TranscodeSessionService($sessions), $runtime, $jobService, $transaction, new NativeClock(), $logger,
         ), $logger);
-        $command = new \App\Transcode\Interface\Console\TranscodeJobCleanupCommand(new \App\Shared\Interface\Console\AdminCommandSupport(
-            new \Symfony\Component\Messenger\MessageBus([new \Symfony\Component\Messenger\Middleware\HandleMessageMiddleware(new \Symfony\Component\Messenger\Handler\HandlersLocator([
-                \App\Transcode\Application\Command\CleanupOrphanedJobsCommand::class => [$handler],
+        $command = new TranscodeJobCleanupCommand(new AdminCommandSupport(
+            new MessageBus([new HandleMessageMiddleware(new HandlersLocator([
+                CleanupOrphanedJobsCommand::class => [$handler],
             ]))]),
         ));
-        $worker = new \App\Transcode\Application\DTO\MediaWorkerIdentity('baander.app:workers', str_repeat('c', 32), 'media', 1);
+        $worker = new MediaWorkerIdentity('baander.app:workers', str_repeat('c', 32), 'media', 1);
         // One user left one video open in three players two days ago. Each player holds the tiers of
         // its own play; some were paused. Two executions still have a worker renewing its lease, as
         // at the lead throttle; the workers of the others have let go.
@@ -674,7 +720,7 @@ final class TranscodeSessionOwnershipPersistenceTest extends TestCase
         $let = [];
         foreach ($plays as $player => $tiers) {
             foreach ($tiers as $tier => [$state, $lease]) {
-                $job = \App\Transcode\Domain\Model\TranscodeJob::create($video, \App\Transcode\Domain\ValueObject\QualityTier::fromString($tier), '/fixture/' . $player . '/' . $tier, $owner, requestId: $player);
+                $job = TranscodeJob::create($video, QualityTier::fromString($tier), '/fixture/' . $player . '/' . $tier, $owner, requestId: $player);
                 $job->attachSession();
                 $job->markInProgress();
                 $jobs->save($job);
@@ -685,7 +731,7 @@ final class TranscodeSessionOwnershipPersistenceTest extends TestCase
                     $session->markPaused();
                 }
                 $sessions->save($session);
-                $connection->transactional(static fn () => $runtime->admit($job->getId(), $session->getId(), $player, new \App\Transcode\Application\DTO\DesiredTranscodeState(AudioProfile::streamingStereo(), $state === 'paused' ? 'paused' : 'running', 118.86)));
+                $connection->transactional(static fn () => $runtime->admit($job->getId(), $session->getId(), $player, new DesiredTranscodeState(AudioProfile::streamingStereo(), $state === 'paused' ? 'paused' : 'running', 118.86)));
                 if ($lease !== 'never claimed') {
                     $claim = $runtime->claim($job->getId(), $worker);
                     self::assertNotNull($claim);
@@ -705,12 +751,12 @@ final class TranscodeSessionOwnershipPersistenceTest extends TestCase
         // The command runs in a process of its own: nothing is managed when it starts.
         $this->manager->clear();
 
-        $tester = new \Symfony\Component\Console\Tester\CommandTester($command);
+        $tester = new CommandTester($command);
         $exit = $tester->execute(['--json' => true], ['capture_stderr_separately' => true]);
 
         self::assertSame('', $tester->getErrorOutput());
         self::assertSame([], $logger->records);
-        self::assertSame(\Symfony\Component\Console\Command\Command::SUCCESS, $exit);
+        self::assertSame(Command::SUCCESS, $exit);
         self::assertSame(['expired' => 8, 'cleaned' => 6], json_decode($tester->getDisplay(), true, flags: JSON_THROW_ON_ERROR));
         self::assertTrue($this->manager->isOpen());
         $this->manager->clear();
@@ -730,7 +776,7 @@ final class TranscodeSessionOwnershipPersistenceTest extends TestCase
         self::assertSame(2, (int) $connection->fetchOne('SELECT count(*) FROM transcode_sessions WHERE user_id = ?', [$owner->toString()]));
 
         // The next run, in the same process as a scheduler runs it, finds nothing to expire and still nothing to remove.
-        self::assertSame(\Symfony\Component\Console\Command\Command::SUCCESS, $tester->execute(['--json' => true]));
+        self::assertSame(Command::SUCCESS, $tester->execute(['--json' => true]));
         self::assertSame(['expired' => 0, 'cleaned' => 0], json_decode($tester->getDisplay(), true, flags: JSON_THROW_ON_ERROR));
     }
 
@@ -738,18 +784,18 @@ final class TranscodeSessionOwnershipPersistenceTest extends TestCase
     {
         $owner = $this->createUser();
         $video = $this->createVideo();
-        $jobs = new \App\Transcode\Infrastructure\Doctrine\Repository\TranscodeJobRepository($this->manager);
+        $jobs = new TranscodeJobRepository($this->manager);
         $sessions = new TranscodeSessionRepository($this->manager);
         $connection = $this->manager->getConnection();
         // The registry and the pooled manager the application runs: a flush the database refuses
         // closes the manager, and the transaction port has to hand the next job a working one.
         $registry = $this->kernel->getContainer()->get('test.service_container')->get('doctrine');
-        self::assertInstanceOf(\Doctrine\Persistence\ManagerRegistry::class, $registry);
-        $transaction = new \App\Shared\Infrastructure\Doctrine\DoctrineTransaction($registry, new \SwooleBundle\SwooleBundle\Bridge\Swoole\Swoole());
-        $runtime = new \App\Transcode\Infrastructure\Doctrine\TranscodeRuntimeState($connection, $transaction);
-        $storage = $this->createStub(\App\Transcode\Application\Port\TranscodeStoragePortInterface::class);
+        self::assertInstanceOf(ManagerRegistry::class, $registry);
+        $transaction = new DoctrineTransaction($registry, new Swoole());
+        $runtime = new TranscodeRuntimeState($connection, $transaction);
+        $storage = $this->createStub(TranscodeStoragePortInterface::class);
         $storage->method('deleteIfUnretained')->willReturn(true);
-        $logger = new class extends \Psr\Log\AbstractLogger {
+        $logger = new class extends AbstractLogger {
             /** @var list<array{message: string, context: array<mixed>}> */
             public array $records = [];
 
@@ -758,19 +804,19 @@ final class TranscodeSessionOwnershipPersistenceTest extends TestCase
                 $this->records[] = ['message' => $level . ': ' . $message, 'context' => $context];
             }
         };
-        $jobService = new \App\Transcode\Infrastructure\Transcode\TranscodeJobService($jobs, $storage, new \Symfony\Component\EventDispatcher\EventDispatcher(), $runtime, $transaction, $logger);
-        $handler = new \App\Transcode\Application\CommandHandler\CleanupOrphanedJobsHandler($jobService, new \App\Transcode\Application\Service\StaleTranscodeSessionExpiry(
-            new \App\Transcode\Infrastructure\Transcode\TranscodeSessionService($sessions), $runtime, $jobService, $transaction, new \Symfony\Component\Clock\NativeClock(), $logger,
+        $jobService = new TranscodeJobService($jobs, $storage, new EventDispatcher(), $runtime, $transaction, $logger);
+        $handler = new CleanupOrphanedJobsHandler($jobService, new StaleTranscodeSessionExpiry(
+            new TranscodeSessionService($sessions), $runtime, $jobService, $transaction, new NativeClock(), $logger,
         ), $logger);
-        $command = new \App\Transcode\Interface\Console\TranscodeJobCleanupCommand(new \App\Shared\Interface\Console\AdminCommandSupport(
-            new \Symfony\Component\Messenger\MessageBus([new \Symfony\Component\Messenger\Middleware\HandleMessageMiddleware(new \Symfony\Component\Messenger\Handler\HandlersLocator([
-                \App\Transcode\Application\Command\CleanupOrphanedJobsCommand::class => [$handler],
+        $command = new TranscodeJobCleanupCommand(new AdminCommandSupport(
+            new MessageBus([new HandleMessageMiddleware(new HandlersLocator([
+                CleanupOrphanedJobsCommand::class => [$handler],
             ]))]),
         ));
         // Three tiers of one abandoned play; no worker ever claimed them.
         $ids = [];
         foreach (['360p', '720p', '1080p'] as $tier) {
-            $job = \App\Transcode\Domain\Model\TranscodeJob::create($video, \App\Transcode\Domain\ValueObject\QualityTier::fromString($tier), '/fixture/abandoned/' . $tier, $owner, requestId: 'abandoned-player');
+            $job = TranscodeJob::create($video, QualityTier::fromString($tier), '/fixture/abandoned/' . $tier, $owner, requestId: 'abandoned-player');
             $job->attachSession();
             $job->markInProgress();
             $jobs->save($job);
@@ -778,7 +824,7 @@ final class TranscodeSessionOwnershipPersistenceTest extends TestCase
             $session->markPreparing();
             $session->markActive();
             $sessions->save($session);
-            $connection->transactional(static fn () => $runtime->admit($job->getId(), $session->getId(), 'abandoned-player', new \App\Transcode\Application\DTO\DesiredTranscodeState(AudioProfile::streamingStereo(), 'running', 12.0)));
+            $connection->transactional(static fn () => $runtime->admit($job->getId(), $session->getId(), 'abandoned-player', new DesiredTranscodeState(AudioProfile::streamingStereo(), 'running', 12.0)));
             $ids[] = $job->getId();
         }
         [$first, $refused, $last] = $ids;
@@ -788,10 +834,10 @@ final class TranscodeSessionOwnershipPersistenceTest extends TestCase
         $connection->executeStatement(sprintf("CREATE TRIGGER refuse_transcode_job_removal BEFORE DELETE ON transcode_jobs FOR EACH ROW WHEN (OLD.id = '%s') EXECUTE FUNCTION refuse_transcode_job_removal()", $refused->toString()));
         $this->manager->clear();
 
-        $tester = new \Symfony\Component\Console\Tester\CommandTester($command);
+        $tester = new CommandTester($command);
         $exit = $tester->execute(['--json' => true], ['capture_stderr_separately' => true]);
 
-        self::assertSame(\Symfony\Component\Console\Command\Command::FAILURE, $exit);
+        self::assertSame(Command::FAILURE, $exit);
         self::assertSame('', $tester->getDisplay(), 'A run that left a job behind prints no result.');
         self::assertStringContainsString('removed 2 orphaned jobs and could not remove 1', (string) preg_replace('/\s+/', ' ', $tester->getErrorOutput()));
         // One record names the job, one closes the run with its counts.
@@ -814,7 +860,7 @@ final class TranscodeSessionOwnershipPersistenceTest extends TestCase
 
         // Once the database lets the row go, the next run in the same process removes it.
         $connection->executeStatement('DROP TRIGGER refuse_transcode_job_removal ON transcode_jobs');
-        self::assertSame(\Symfony\Component\Console\Command\Command::SUCCESS, $tester->execute(['--json' => true]));
+        self::assertSame(Command::SUCCESS, $tester->execute(['--json' => true]));
         self::assertSame(['expired' => 0, 'cleaned' => 1], json_decode($tester->getDisplay(), true, flags: JSON_THROW_ON_ERROR));
         self::assertNull($jobs->findByUuid($refused));
     }

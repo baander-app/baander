@@ -8,6 +8,7 @@ use App\Auth\Application\Exception\OAuthTokenCacheInvalidationFailed;
 use App\Auth\Infrastructure\Security\OAuth\DoctrineOAuthTokenInvalidator;
 use App\Shared\Domain\Model\Uuid;
 use App\Shared\Infrastructure\Cache\CacheTags;
+use App\Tests\Support\FinalSchemaBootstrap;
 use Doctrine\DBAL\Connection;
 use Doctrine\DBAL\DriverManager;
 use Doctrine\DBAL\Tools\DsnParser;
@@ -42,7 +43,7 @@ final class OAuthTokenInvalidationTest extends TestCase
         foreach ([$this->writer, $this->observer] as $connection) {
             $connection->executeStatement('SET search_path TO ' . $this->schema . ', public');
         }
-        \App\Tests\Support\FinalSchemaBootstrap::bootstrap($this->writer);
+        FinalSchemaBootstrap::bootstrap($this->writer);
         $this->seed();
     }
 

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Baander\DevQualification\Tests;
 
 use Baander\DevQualification\Fixtures\Runtime;
+use Baander\Process\Execution\CommandFailure;
 use PHPUnit\Framework\TestCase;
 
 final class FixtureExecutionTest extends TestCase
@@ -15,7 +16,7 @@ final class FixtureExecutionTest extends TestCase
         try {
             $runtime->run(['bash', '-c', 'trap "printf cleaned; exit 0" TERM; while true; do sleep 0.02; done'], timeout: 0.15, check: false);
             self::fail('Fixture timeout passed.');
-        } catch (\Baander\Process\Execution\CommandFailure $error) {
+        } catch (CommandFailure $error) {
             self::assertSame(124, $error->getCode());
             self::assertSame(0, $error->result?->exitCode);
         } finally {

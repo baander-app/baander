@@ -9,6 +9,7 @@ use App\Catalog\Application\Port\VideoPortInterface;
 use App\Catalog\Domain\Model\Video;
 use App\Shared\Application\DTO\DeploymentProfile;
 use App\Shared\Application\Exception\ConflictException;
+use App\Shared\Application\Exception\InvalidInputException;
 use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
 use App\Shared\Domain\ValueObject\LibraryReadScope;
@@ -73,7 +74,7 @@ final class EncodePresentationAdapterTest extends TestCase
             AudioProfile::streamingStereo(),
             audioStreamIndex: 0,
         );
-        $this->expectException(\App\Shared\Application\Exception\InvalidInputException::class);
+        $this->expectException(InvalidInputException::class);
         $this->adapter($video, $snapshots)->select($command);
     }
 

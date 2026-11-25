@@ -6,6 +6,7 @@ namespace App\Tests\Unit\Auth\Infrastructure\Security;
 
 use App\Auth\Application\Exception\TotpSecretUnavailableException;
 use App\Auth\Infrastructure\Security\Totp\SodiumTotpSecretCipher;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\RequiresPhpExtension;
 use PHPUnit\Framework\TestCase;
 
@@ -34,7 +35,7 @@ final class SodiumTotpSecretCipherTest extends TestCase
         yield 'empty' => [''];
     }
 
-    #[\PHPUnit\Framework\Attributes\DataProvider('unreadable')]
+    #[DataProvider('unreadable')]
     public function testACiphertextThatDoesNotOpenIsUnavailable(string $ciphertext): void
     {
         $cipher = new SodiumTotpSecretCipher(base64_encode(str_repeat("\x01", 32)));
@@ -51,7 +52,7 @@ final class SodiumTotpSecretCipherTest extends TestCase
         yield 'too short' => [base64_encode(str_repeat("\x01", 16))];
     }
 
-    #[\PHPUnit\Framework\Attributes\DataProvider('malformedKeys')]
+    #[DataProvider('malformedKeys')]
     public function testAKeyThatIsNot32BytesIsRejected(string $key): void
     {
         $this->expectException(\InvalidArgumentException::class);

@@ -8,12 +8,14 @@ use App\Media\Application\Port\MediaReadScopeProviderInterface;
 use App\Media\Application\Port\StreamPortInterface;
 use App\Media\Domain\Model\TrackStreamMetadata;
 use App\Media\Interface\Controller\StreamController;
+use App\Shared\Application\DTO\DeploymentProfile;
+use App\Shared\Application\Port\SystemSettingsPortInterface;
 use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
 use App\Shared\Domain\ValueObject\LibraryReadScope;
 use App\Shared\Domain\ValueObject\MediaReadScope;
-use App\Shared\Application\Port\SystemSettingsPortInterface;
 use App\Transcode\Application\Port\AudioRenditionPortInterface;
+use App\Transcode\Application\Service\MediaExecutionPolicy;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\MockObject\Stub;
 use PHPUnit\Framework\TestCase;
@@ -231,7 +233,7 @@ final class StreamControllerSecurityTest extends TestCase
     private function createController(MediaReadScopeProviderInterface $scopes): StreamController
     {
         $controller = new StreamController(
-            executionPolicy: new \App\Transcode\Application\Service\MediaExecutionPolicy(new \App\Shared\Application\DTO\DeploymentProfile()),
+            executionPolicy: new MediaExecutionPolicy(new DeploymentProfile()),
             streamService: $this->streamService,
             scopes: $scopes,
             renditions: $this->createStub(AudioRenditionPortInterface::class),

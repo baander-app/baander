@@ -4,7 +4,13 @@ declare(strict_types=1);
 
 namespace Baander\DevRegistry\Tests;
 
+use Baander\Containers\Docker\Client;
+use Baander\Containers\Docker\Target;
+use Baander\Containers\Resources\ImageLedger;
+use Baander\Filesystem\AtomicFile;
 use Baander\Images\Inventory\Collector;
+use Baander\Process\Execution\EngineExecutor;
+use Baander\Process\Execution\ExecutionContext;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
@@ -155,7 +161,7 @@ PHP;
     {
         $image = 'baander-registry-foreign:test';
         $id = 'sha256:' . str_repeat('a', 64);
-        $target = new \Baander\Containers\Docker\Target(
+        $target = new Target(
             realpath(dirname(__DIR__, 3) . '/packages/baander-dev-registry/tests/Fixtures/registry-command.php') ?: throw new \LogicException('Missing Docker fixture.'),
             'unix:///var/run/docker.sock',
             'registry-fixture-daemon',
@@ -163,7 +169,7 @@ PHP;
             null,
         );
         $receipt = $this->root . '/images.json';
-        \Baander\Filesystem\AtomicFile::writeJson($receipt, [
+        AtomicFile::writeJson($receipt, [
             'version' => 1, 'target' => $target->toArray(), 'token' => str_repeat('a', 32), 'images' => [$image => $idRecorded ? $id : null],
         ]);
         $images = [
@@ -175,10 +181,10 @@ PHP;
         }
         file_put_contents($this->root . '/docker-state.json', json_encode(['containers' => [], 'images' => $images], JSON_THROW_ON_ERROR));
         $environment = array_replace(getenv(), ['REGISTRY_TEST_STATE' => $this->root]);
-        $executor = new \Baander\Process\Execution\EngineExecutor(\Baander\Process\Execution\ExecutionContext::bounded(10, $environment));
+        $executor = new EngineExecutor(ExecutionContext::bounded(10, $environment));
         try {
-            $docker = new \Baander\Containers\Docker\Client($executor, $target, $environment);
-            $ledger = new \Baander\Containers\Resources\ImageLedger($receipt, $docker);
+            $docker = new Client($executor, $target, $environment);
+            $ledger = new ImageLedger($receipt, $docker);
             $report = $ledger->cleanup($docker);
             if ($tagRemoved) {
                 self::assertTrue($report->successful(), $report->message());
@@ -204,12 +210,12 @@ PHP;
         self::assertCount(1, $receipts);
         $saved = json_decode((string) file_get_contents($receipts[0]), true, flags: JSON_THROW_ON_ERROR);
         $environment = array_replace(getenv(), ['REGISTRY_TEST_STATE' => $this->root, 'STUB_FAIL' => '']);
-        $executor = new \Baander\Process\Execution\EngineExecutor(
-            \Baander\Process\Execution\ExecutionContext::bounded(30, $environment, ignoreCancellation: true),
+        $executor = new EngineExecutor(
+            ExecutionContext::bounded(30, $environment, ignoreCancellation: true),
         );
         try {
-            $docker = new \Baander\Containers\Docker\Client($executor, \Baander\Containers\Docker\Target::fromArray($saved['target']), $environment);
-            $ledger = new \Baander\Containers\Resources\ImageLedger($receipts[0], $docker);
+            $docker = new Client($executor, Target::fromArray($saved['target']), $environment);
+            $ledger = new ImageLedger($receipts[0], $docker);
             $report = $ledger->cleanup($docker);
             self::assertTrue($report->successful(), $report->message());
             self::assertFileDoesNotExist($receipts[0]);

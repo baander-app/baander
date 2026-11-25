@@ -1,6 +1,7 @@
 <?php
 
 declare(strict_types=1);
+use Doctrine\ORM\EntityManagerInterface;
 
 const LOAD_WEB_CLIENTS = 8;
 const LOAD_WEB_PATH = '/api/albums/?limit=20';
@@ -11,7 +12,7 @@ const LOAD_WEB_PATH = '/api/albums/?limit=20';
  * finishes. Every request's status and curl-measured latency is recorded.
  *
  * @var string $project
- * @var Doctrine\ORM\EntityManagerInterface $manager
+ * @var EntityManagerInterface $manager
  */
 $owner = drillOwner($manager, $project, 'media-load-web');
 await(static fn (): bool => is_file(ROOT . '/load-go'), 'load barrier', 1200);

@@ -4,14 +4,15 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Shared\Infrastructure\Worker;
 
+use App\Shared\Application\DTO\DeploymentProfile;
 use App\Shared\Application\DTO\DeploymentUnit;
-
 use App\Shared\Infrastructure\Worker\DeploymentContainerRecipe;
+use App\Shared\Infrastructure\Worker\DeploymentLease;
 use App\Shared\Infrastructure\Worker\DockerWorkerContainment;
 use InvalidArgumentException;
-use RuntimeException;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
+use RuntimeException;
 
 final class DeploymentMediaMountsTest extends TestCase
 {
@@ -30,7 +31,7 @@ final class DeploymentMediaMountsTest extends TestCase
             $inspection['mounts'][0] = ['Type' => 'bind', 'Source' => $source, 'Destination' => '/media/library', 'RW' => false, 'Propagation' => 'rprivate'];
             return json_encode($arguments[0] === 'container' ? $inspection : self::volume($arguments[4]), JSON_THROW_ON_ERROR);
         }, $recipe);
-        $containment->retire(str_repeat('c', 64), new \App\Shared\Infrastructure\Worker\DeploymentLease('worker.baander.app', str_repeat('a', 32), 1), DeploymentUnit::Control);
+        $containment->retire(str_repeat('c', 64), new DeploymentLease('worker.baander.app', str_repeat('a', 32), 1), DeploymentUnit::Control);
         $this->expectException(InvalidArgumentException::class);
         $containment->verifyAdmission(str_repeat('c', 64), 'worker.baander.app', str_repeat('a', 32), DeploymentUnit::Control);
     }
@@ -239,6 +240,6 @@ final class DeploymentMediaMountsTest extends TestCase
     /** @param list<array<string,mixed>> $mounts */
     public static function recipe(array $mounts, string $sourceMountPolicy = 'production'): DeploymentContainerRecipe
     {
-        return new DeploymentContainerRecipe('worker.baander.app', str_repeat('a', 32), 'daemon', 'sha256:' . str_repeat('b', 64), ['/usr/local/bin/php', '/var/www/html/bin/console', 'app:worker'], 'none', DeploymentUnit::Control, 'worker-ipc', '/var/www/html', new \App\Shared\Application\DTO\DeploymentProfile(), mediaMounts: $mounts, sourceMountPolicy: $sourceMountPolicy);
+        return new DeploymentContainerRecipe('worker.baander.app', str_repeat('a', 32), 'daemon', 'sha256:' . str_repeat('b', 64), ['/usr/local/bin/php', '/var/www/html/bin/console', 'app:worker'], 'none', DeploymentUnit::Control, 'worker-ipc', '/var/www/html', new DeploymentProfile(), mediaMounts: $mounts, sourceMountPolicy: $sourceMountPolicy);
     }
 }

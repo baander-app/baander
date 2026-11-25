@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\QoL\Infrastructure;
 
 use App\QoL\Application\Port\QoLAdminPortInterface;
+use App\QoL\Application\Port\QoLJobIdentityInterface;
 use App\QoL\Domain\ValueObject\AlgorithmProfile;
 use App\QoL\Infrastructure\Swoole\Control\QoLLearningResetOperation;
 use App\QoL\Infrastructure\Swoole\Control\QoLProfileSetOperation;
@@ -13,6 +14,7 @@ use App\QoL\Infrastructure\Swoole\Control\QoLStreamsOperation;
 use App\Shared\Application\Exception\InvalidInputException;
 use App\Shared\Application\Port\ServerControlPortInterface;
 use App\Shared\Application\Port\ServerControlResult;
+use App\Shared\Application\PublicDiagnosticText;
 
 /**
  * Runs QoL administration through the server control channel, so the admin API
@@ -29,7 +31,7 @@ final readonly class QoLAdminService implements QoLAdminPortInterface
 {
     public function __construct(
         private ServerControlPortInterface $serverControl,
-        private \App\QoL\Application\Port\QoLJobIdentityInterface $jobIdentities,
+        private QoLJobIdentityInterface $jobIdentities,
     ) {
     }
 
@@ -120,7 +122,7 @@ final readonly class QoLAdminService implements QoLAdminPortInterface
     {
         $errors = [];
         foreach ($result->errors as $workerId => $error) {
-            $errors[] = ['worker_id' => $workerId, 'error' => \App\Shared\Application\PublicDiagnosticText::redact($error)];
+            $errors[] = ['worker_id' => $workerId, 'error' => PublicDiagnosticText::redact($error)];
         }
 
         return $errors;

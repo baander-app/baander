@@ -4,16 +4,21 @@ declare(strict_types=1);
 
 namespace App\Tests\Integration;
 
+use App\Shared\Application\DTO\DeploymentProfile;
 use App\Shared\Application\DTO\DeploymentUnit;
 use App\Shared\Infrastructure\Worker\DeploymentContainer;
+use App\Shared\Infrastructure\Worker\DeploymentContainerRecipe;
 use App\Shared\Infrastructure\Worker\DeploymentLease;
 use App\Shared\Infrastructure\Worker\DoctrineDeploymentInventory;
 use App\Shared\Infrastructure\Worker\DoctrineDeploymentLease;
 use App\Shared\Infrastructure\Worker\DoctrineDeploymentRetirement;
 use App\Shared\Infrastructure\Worker\RegisteredDeploymentRecovery;
+use App\Tests\Support\DeploymentJournalFixture;
+use App\Tests\Support\FinalSchemaBootstrap;
 use Doctrine\DBAL\Connection;
 use Doctrine\DBAL\DriverManager;
 use Doctrine\DBAL\Tools\DsnParser;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
 /** Committed PostgreSQL registration and lease state; Docker frames are controlled fixtures. */
@@ -37,7 +42,7 @@ final class RegisteredDeploymentRecoveryTest extends TestCase
         foreach ([$this->first, $this->second] as $connection) {
             $connection->executeStatement('SET search_path TO ' . $this->schema . ', public');
         }
-        \App\Tests\Support\FinalSchemaBootstrap::bootstrap($this->first);
+        FinalSchemaBootstrap::bootstrap($this->first);
     }
 
     public function testMissingBindingNeverCallsDocker(): void
@@ -107,7 +112,7 @@ final class RegisteredDeploymentRecoveryTest extends TestCase
     {
         $this->reserveAndBind();
         self::assertTrue($this->recovery(new DoctrineDeploymentInventory($this->first), $this->executor())->recover(self::NAMESPACE, self::BOOT));
-        \App\Tests\Support\DeploymentJournalFixture::ready($this->second, self::NAMESPACE, str_repeat('b', 32));
+        DeploymentJournalFixture::ready($this->second, self::NAMESPACE, str_repeat('b', 32));
         $leases = new DoctrineDeploymentLease($this->second);
         $foreign = $leases->acquire(self::NAMESPACE, str_repeat('b', 32), 60);
         self::assertNotNull($foreign);
@@ -158,7 +163,7 @@ final class RegisteredDeploymentRecoveryTest extends TestCase
         self::assertSame([$this->id(DeploymentUnit::Execution), $this->id(DeploymentUnit::Control)], $removed);
         $leases = new DoctrineDeploymentLease($this->second);
         self::assertNull($leases->findForContainment(self::NAMESPACE));
-        \App\Tests\Support\DeploymentJournalFixture::ready($this->second, self::NAMESPACE, str_repeat('b', 32));
+        DeploymentJournalFixture::ready($this->second, self::NAMESPACE, str_repeat('b', 32));
         $next = $leases->acquire(self::NAMESPACE, str_repeat('b', 32), 60);
         self::assertNotNull($next);
         self::assertSame(2, $next->epoch);
@@ -262,7 +267,7 @@ final class RegisteredDeploymentRecoveryTest extends TestCase
         self::assertNull((new DoctrineDeploymentRetirement($this->second))->findUnit(self::NAMESPACE, self::BOOT, DeploymentUnit::Execution));
     }
 
-    #[\PHPUnit\Framework\Attributes\DataProvider('units')]
+    #[DataProvider('units')]
     public function testOneCompletedUnitCannotReleaseOwnershipAndRecoveryResumesOtherUnit(DeploymentUnit $completed): void
     {
         $old = $this->registeredOwner();
@@ -328,12 +333,12 @@ final class RegisteredDeploymentRecoveryTest extends TestCase
     private const string BOOT = 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
     private const string DAEMON = 'baander.app-daemon';
 
-    private function recipe(DeploymentUnit $unit, string $ipcVolume = 'worker-ipc'): \App\Shared\Infrastructure\Worker\DeploymentContainerRecipe
+    private function recipe(DeploymentUnit $unit, string $ipcVolume = 'worker-ipc'): DeploymentContainerRecipe
     {
-        return new \App\Shared\Infrastructure\Worker\DeploymentContainerRecipe(self::NAMESPACE, self::BOOT, self::DAEMON, 'sha256:' . str_repeat('f', 64), ['/usr/local/bin/php', '/app/bin/worker.php'], 'none', $unit, $ipcVolume, '/app', new \App\Shared\Application\DTO\DeploymentProfile());
+        return new DeploymentContainerRecipe(self::NAMESPACE, self::BOOT, self::DAEMON, 'sha256:' . str_repeat('f', 64), ['/usr/local/bin/php', '/app/bin/worker.php'], 'none', $unit, $ipcVolume, '/app', new DeploymentProfile());
     }
 
-    /** @return array{control:\App\Shared\Infrastructure\Worker\DeploymentContainerRecipe,execution:\App\Shared\Infrastructure\Worker\DeploymentContainerRecipe} */
+    /** @return array{control:DeploymentContainerRecipe,execution:DeploymentContainerRecipe} */
     private function recipes(): array
     {
         return ['control' => $this->recipe(DeploymentUnit::Control), 'execution' => $this->recipe(DeploymentUnit::Execution)];

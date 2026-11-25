@@ -9,6 +9,7 @@ use App\Auth\Application\Command\OAuth\RefreshTokenCommand;
 use App\Auth\Application\DTO\TokenResponseDTO;
 use App\Auth\Domain\Model\OAuth\SignInGrant;
 use App\Auth\Domain\Model\User;
+use App\Auth\Domain\Repository\OAuth\ClientRepositoryInterface;
 use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
 use App\Tests\Functional\TestCase;
@@ -179,8 +180,8 @@ final class PersonalAccessClientTest extends TestCase
 
     private function clientId(string $publicId): Uuid
     {
-        $client = static::getContainer()->get(\App\Auth\Domain\Repository\OAuth\ClientRepositoryInterface::class)
-            ->findClientByPublicId(\App\Shared\Domain\Model\PublicId::fromString($publicId));
+        $client = static::getContainer()->get(ClientRepositoryInterface::class)
+            ->findClientByPublicId(PublicId::fromString($publicId));
         self::assertNotNull($client);
 
         return $client->getId();

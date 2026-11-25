@@ -6,11 +6,11 @@ namespace App\Tests\Unit\Auth\Application\CommandHandler;
 
 use App\Auth\Application\Command\OAuth\RefreshTokenCommand;
 use App\Auth\Application\CommandHandler\OAuth\RefreshTokenHandler;
-use App\Auth\Application\Service\ChainConnectionCloser;
-use App\Auth\Application\Service\TokenChainRevoker;
 use App\Auth\Application\Exception\OAuthProtocolException;
 use App\Auth\Application\Exception\RefreshTokenRejectedException;
 use App\Auth\Application\Port\JwtGeneratorInterface;
+use App\Auth\Application\Service\ChainConnectionCloser;
+use App\Auth\Application\Service\TokenChainRevoker;
 use App\Auth\Domain\Model\OAuth\AccessToken;
 use App\Auth\Domain\Model\OAuth\Client;
 use App\Auth\Domain\Model\OAuth\RefreshToken;
@@ -18,26 +18,27 @@ use App\Auth\Domain\Model\OAuth\RefreshTokenState;
 use App\Auth\Domain\Model\OAuth\SignInGrant;
 use App\Auth\Domain\Model\OAuth\TokenId;
 use App\Auth\Domain\Model\OAuth\TokenMetadata;
-use App\Auth\Domain\Model\User;
-use App\Auth\Domain\Model\UserState;
 use App\Auth\Domain\Model\OAuth\ValueObject\ChainId;
 use App\Auth\Domain\Model\OAuth\ValueObject\ClientSecret;
 use App\Auth\Domain\Model\OAuth\ValueObject\Scope;
+use App\Auth\Domain\Model\User;
+use App\Auth\Domain\Model\UserState;
 use App\Auth\Domain\Repository\OAuth\AccessTokenRepositoryInterface;
 use App\Auth\Domain\Repository\OAuth\ClientRepositoryInterface;
 use App\Auth\Domain\Repository\OAuth\RefreshTokenRepositoryInterface;
 use App\Auth\Domain\Repository\OAuth\TokenMetadataRepositoryInterface;
 use App\Auth\Domain\Repository\UserRepositoryInterface;
 use App\Auth\Domain\Service\TokenChainValidator;
-use App\Shared\Domain\Model\Email;
-use App\Shared\Domain\Model\PublicId;
 use App\Shared\Application\Port\LiveConnectionsPortInterface;
 use App\Shared\Application\Port\ServerControlException;
 use App\Shared\Application\Port\TransactionPortInterface;
+use App\Shared\Domain\Model\Email;
+use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
 use Doctrine\DBAL\Driver\AbstractException;
 use Doctrine\DBAL\Exception\ConnectionException;
 use Doctrine\ORM\EntityManagerInterface;
+use Doctrine\ORM\EntityRepository;
 use InvalidArgumentException;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\MockObject\Stub;
@@ -1000,7 +1001,7 @@ final class RefreshTokenHandlerTest extends TestCase
         ));
 
         // Mock repository to return null (entity not found) -- handler silently skips
-        $tokenRepo = $this->createStub(\Doctrine\ORM\EntityRepository::class);
+        $tokenRepo = $this->createStub(EntityRepository::class);
         $tokenRepo->method('findOneBy')->willReturn(null);
         $this->entityManager->method('getRepository')->willReturn($tokenRepo);
 

@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Shared\Infrastructure\Worker;
 
+use App\Shared\Application\DTO\DeploymentProfile;
 use App\Shared\Application\DTO\DeploymentUnit;
-
 use App\Shared\Infrastructure\Worker\DeploymentOperatorManifest;
 use App\Shared\Infrastructure\Worker\DeploymentRuntimeEnvironment;
 use InvalidArgumentException;
@@ -16,7 +16,7 @@ final class DeploymentOperatorManifestTest extends TestCase
 {
     public function testRemuxManifestKeepsItsProfile(): void
     {
-        $remux = new \App\Shared\Application\DTO\DeploymentProfile('remux', 2, 4, 1, sharedCopySlots: 2);
+        $remux = new DeploymentProfile('remux', 2, 4, 1, sharedCopySlots: 2);
         $manifest = DeploymentOperatorManifest::fromJson($this->json([
             'deploymentProfile' => json_decode($remux->toJson(), true, flags: JSON_THROW_ON_ERROR),
         ]), '/var/www/html');

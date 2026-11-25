@@ -6,24 +6,25 @@ namespace Baander\DevQualification\Tests;
 
 use Baander\Configuration\ApplicationLayout;
 use Baander\Configuration\ToolingConfiguration;
+use Baander\Containers\Docker\Client;
+use Baander\Containers\Docker\Target;
 use Baander\Deployment\Presets\Configuration;
 use Baander\Deployment\Presets\RedisCredentials;
 use Baander\Deployment\Presets\StateStore;
-use Baander\Containers\Docker\Client;
-use Baander\Containers\Docker\Target;
-use Baander\Filesystem\AtomicFile;
+use Baander\DevQualification\Fixtures\Qualification\Observer;
+use Baander\DevQualification\Fixtures\Qualification\Qualification;
 use Baander\DevQualification\Fixtures\Runtime;
-use Baander\Images\Inventory\Collector;
+use Baander\Filesystem\AtomicFile;
 use Baander\Filesystem\PrivateDirectory;
+use Baander\Images\Inventory\Collector;
+use Baander\Process\Execution\CommandExecutor;
+use Baander\Process\Execution\CompletionPolicy;
 use Baander\Process\Execution\EngineExecutor;
 use Baander\Process\Execution\ExecutionContext;
 use Baander\Process\Execution\ProcessResult;
 use Baander\Process\Execution\ProcessSpec;
-use Baander\Process\Execution\CommandExecutor;
-use Baander\Process\Execution\CompletionPolicy;
-use Baander\DevQualification\Fixtures\Qualification\Observer;
-use Baander\DevQualification\Fixtures\Qualification\Qualification;
 use PHPUnit\Framework\Attributes\DataProvider;
+use PHPUnit\Framework\MockObject\Stub;
 use PHPUnit\Framework\TestCase;
 
 final class QualificationTest extends TestCase
@@ -126,7 +127,7 @@ final class QualificationTest extends TestCase
             }
             self::assertSame('running', AtomicFile::readJson($directory . '/qualification.json')['phase']);
             self::assertDirectoryDoesNotExist($directory . '/runs');
-        }, function (CommandExecutor&\PHPUnit\Framework\MockObject\Stub $executor) use (&$calls): void {
+        }, function (CommandExecutor&Stub $executor) use (&$calls): void {
             $executor->method('run')->willReturnCallback(self::hostMemoryDocker(1024 ** 3, $calls));
         });
         $created = array_filter($calls, static fn(ProcessSpec $call): bool => ($call->argv[3] ?? null) === 'create') |> array_values(...);
@@ -580,8 +581,8 @@ final class QualificationTest extends TestCase
             }
             self::assertContains('--cgroupns', $created->argv);
             self::assertContains('memory_limit=64M', $created->argv);
-        }, function (CommandExecutor&\PHPUnit\Framework\MockObject\Stub $executor) use (&$created): void {
-            $executor->method('run')->willReturnCallback(static function (ProcessSpec $command) use (&$created): \Baander\Process\Execution\ProcessResult {
+        }, function (CommandExecutor&Stub $executor) use (&$created): void {
+            $executor->method('run')->willReturnCallback(static function (ProcessSpec $command) use (&$created): ProcessResult {
                 $output = '';
                 if (in_array('info', $command->argv, true)) {
                     $output = '{"ID":"fixture-daemon"}';
@@ -591,7 +592,7 @@ final class QualificationTest extends TestCase
                     $created = $command;
                     throw new \RuntimeException('Captured rename container before launch.');
                 }
-                return new \Baander\Process\Execution\ProcessResult(0, null, false, false, $output, '', 0);
+                return new ProcessResult(0, null, false, false, $output, '', 0);
             });
         });
     }
@@ -792,7 +793,7 @@ final class QualificationTest extends TestCase
             self::assertSame([], new \ReflectionProperty(Qualification::class, 'unexpectedExits')->getValue($qualification));
             self::assertInstanceOf(ProcessSpec::class, $sampled);
             self::assertFalse(array_any($sampled->argv, static fn(string $argument): bool => str_contains($argument, 'private-redis')));
-        }, function (CommandExecutor&\PHPUnit\Framework\MockObject\Stub $executor) use (&$sampled): void {
+        }, function (CommandExecutor&Stub $executor) use (&$sampled): void {
             $executor->method('run')->willReturnCallback(static function (ProcessSpec $command) use (&$sampled): ProcessResult {
                 $output = match (true) {
                     in_array('app:server:stats', $command->argv, true) => '{"missing_workers":[],"worker_errors":[]}',

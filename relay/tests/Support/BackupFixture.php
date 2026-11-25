@@ -5,6 +5,8 @@ declare(strict_types=1);
 
 namespace Baander\RegistryTests;
 
+use Swoole\Process;
+
 final class BackupFixture
 {
     public readonly string $root;
@@ -100,14 +102,14 @@ final class BackupFixture
     {
         foreach ($this->calls() as [, $pid]) {
             if (self::isOwnedChild($pid, $this->root)) {
-                @\Swoole\Process::kill($pid, 9);
+                @Process::kill($pid, 9);
             }
         }
     }
 
     private static function isOwnedChild(int $pid, string $root): bool
     {
-        if (!@\Swoole\Process::kill($pid, 0)) {
+        if (!@Process::kill($pid, 0)) {
             return false;
         }
         // Long-running cadence checks must not signal an unrelated process

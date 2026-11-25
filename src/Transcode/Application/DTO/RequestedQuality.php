@@ -5,8 +5,9 @@ declare(strict_types=1);
 namespace App\Transcode\Application\DTO;
 
 use App\Transcode\Domain\ValueObject\QualityTier;
+use Symfony\Component\DependencyInjection\Attribute\Exclude;
 
-#[\Symfony\Component\DependencyInjection\Attribute\Exclude]
+#[Exclude]
 final readonly class RequestedQuality
 {
     private function __construct(

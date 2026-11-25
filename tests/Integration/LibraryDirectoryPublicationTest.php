@@ -6,12 +6,12 @@ namespace App\Tests\Integration;
 
 use App\Catalog\Application\CommandHandler\FilesDiscoveredHandler;
 use App\Kernel;
+use App\Library\Application\Exception\LibraryScanClaimLostException;
 use App\Library\Application\Message\DiscoveredFile;
 use App\Library\Application\Message\FilesDiscovered;
 use App\Library\Application\MovieScanner;
-use App\Library\Application\Exception\LibraryScanClaimLostException;
-use App\Library\Application\Service\LibraryScanLease;
 use App\Library\Application\MusicScanner;
+use App\Library\Application\Service\LibraryScanLease;
 use App\Library\Domain\Event\LibraryDirectoryIndexed;
 use App\Library\Domain\Model\Library;
 use App\Library\Domain\ValueObject\LibraryPath;
@@ -21,6 +21,7 @@ use App\Library\Infrastructure\Doctrine\Repository\LibraryFileIndexRepository;
 use App\Library\Infrastructure\Doctrine\Repository\LibraryRepository;
 use App\Library\Infrastructure\Messaging\LibraryDirectoryOutboxEventDispatcher;
 use App\Library\Infrastructure\Scanner\DirectoryScanner;
+use App\Media\Application\Port\StreamPortInterface;
 use App\Shared\Application\Port\JobCancellationCheckpointInterface;
 use App\Shared\Application\Port\TransactionPortInterface;
 use App\Shared\Domain\Event\Outbox\OutboxEventDispatcherInterface;
@@ -29,23 +30,24 @@ use App\Shared\Domain\Event\Outbox\OutboxRepository;
 use App\Shared\Domain\Event\Outbox\OutboxSubscriber;
 use App\Shared\Domain\Event\Outbox\RelayOutboxCommand;
 use App\Shared\Domain\Event\Outbox\RelayOutboxHandler;
-use App\Shared\Domain\ValueObject\FilesystemType;
-use App\Shared\Domain\Model\Uuid;
 use App\Shared\Domain\Model\PublicId;
-use App\Media\Application\Port\StreamPortInterface;
+use App\Shared\Domain\Model\Uuid;
+use App\Shared\Domain\ValueObject\FilesystemType;
 use App\Tests\Fixtures\Library\LibraryScanClaimRace;
 use App\Tests\Support\FinalSchemaBootstrap;
+use App\Tests\Support\ScannedAudioCopyProof;
 use Closure;
 use DAMA\DoctrineTestBundle\PHPUnit\SkipDatabaseRollback;
 use Doctrine\DBAL\Connection;
 use Doctrine\DBAL\DriverManager;
+use Doctrine\DBAL\Exception;
 use Doctrine\DBAL\Tools\DsnParser;
 use Doctrine\ORM\EntityManagerInterface;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
-use Symfony\Component\Clock\NativeClock;
 use Symfony\Component\Clock\MockClock;
+use Symfony\Component\Clock\NativeClock;
 use Symfony\Component\DependencyInjection\ServiceLocator;
 use Symfony\Component\EventDispatcher\EventDispatcher;
 use Symfony\Component\Filesystem\Filesystem;
@@ -61,7 +63,7 @@ use Symfony\Component\Process\Process;
 #[SkipDatabaseRollback]
 final class LibraryDirectoryPublicationTest extends TestCase
 {
-    use \App\Tests\Support\ScannedAudioCopyProof;
+    use ScannedAudioCopyProof;
 
     private Kernel $kernel;
     private EntityManagerInterface $manager;
@@ -204,7 +206,7 @@ final class LibraryDirectoryPublicationTest extends TestCase
         try {
             $this->scanner(LibraryType::Music)->scan($library, publishDirectory: $this->capture($library));
             self::fail('A failed write must abort the directory transaction.');
-        } catch (\Doctrine\DBAL\Exception $error) {
+        } catch (Exception $error) {
             self::assertStringContainsString('directory write rejected', $error->getMessage());
         }
         self::assertSame(0, $this->rowCount($this->observer, 'library_file_index'));

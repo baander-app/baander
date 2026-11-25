@@ -1,10 +1,13 @@
 <?php
 declare(strict_types=1);
 require dirname(__DIR__, 5) . '/vendor/autoload.php';
-use SwooleBundle\SwooleBundle\Bridge\Symfony\Container\ServicePool\UnmanagedFactoryServicePool;
-use SwooleBundle\SwooleBundle\Bridge\Symfony\Container\ServicePool\ServicePoolContainer;
+use Swoole\Coroutine;
+use Swoole\Coroutine\Channel;
 use SwooleBundle\SwooleBundle\Bridge\Swoole\Swoole as Adapter;
+use SwooleBundle\SwooleBundle\Bridge\Symfony\Container\ServicePool\ServicePoolContainer;
+use SwooleBundle\SwooleBundle\Bridge\Symfony\Container\ServicePool\UnmanagedFactoryServicePool;
 use SwooleBundle\SwooleBundle\Component\Locking\Mutex;
+
 $adapter = new Adapter();
 $mutex = new class implements Mutex {
     public function acquire(): void {}
@@ -26,11 +29,11 @@ $sample = static function (string $phase) use ($pool, &$results): void {
 };
 $sample('boot');
 Swoole\Coroutine\run(static function () use ($pool, $container, $adapter, $sample): void {
-    $ready = new Swoole\Coroutine\Channel(32);
-    $release = new Swoole\Coroutine\Channel(32);
-    $done = new Swoole\Coroutine\Channel(32);
+    $ready = new Channel(32);
+    $release = new Channel(32);
+    $done = new Channel(32);
     for ($i = 0; $i < 32; $i++) {
-        Swoole\Coroutine::create(static function () use ($pool, $adapter, $ready, $release, $done): void {
+        Coroutine::create(static function () use ($pool, $adapter, $ready, $release, $done): void {
             $pool->get();
             $ready->push(true);
             $release->pop();

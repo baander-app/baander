@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Recommendation\Interface\Resource;
 
 use App\Recommendation\Domain\Model\RecommendationJob;
+use App\Shared\Application\PublicDiagnosticText;
 use App\Shared\Interface\Resource\AbstractResource;
 use OpenApi\Spec as OA;
 
@@ -78,8 +79,8 @@ final class RecommendationJobResource extends AbstractResource
             'created_at' => $source->getCreatedAt()->format(\DateTimeInterface::ATOM),
             'started_at' => $source->getStartedAt()?->format(\DateTimeInterface::ATOM),
             'completed_at' => $source->getCompletedAt()?->format(\DateTimeInterface::ATOM),
-            'fail_reason' => $source->getFailReason() === null ? null : \App\Shared\Application\PublicDiagnosticText::redact($source->getFailReason()),
-            'metadata' => \App\Shared\Application\PublicDiagnosticText::details($source->getMetadata()),
+            'fail_reason' => $source->getFailReason() === null ? null : PublicDiagnosticText::redact($source->getFailReason()),
+            'metadata' => PublicDiagnosticText::details($source->getMetadata()),
             'original_job_id' => $source->getOriginalJobPublicId()?->toString(),
         ];
     }

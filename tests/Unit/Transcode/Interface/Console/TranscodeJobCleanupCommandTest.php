@@ -4,11 +4,12 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Transcode\Interface\Console;
 
+use App\Shared\Application\Port\TransactionPortInterface;
+use App\Shared\Domain\Model\Uuid;
 use App\Shared\Interface\Console\AdminCommandSupport;
 use App\Transcode\Application\Command\CleanupOrphanedJobsCommand;
 use App\Transcode\Application\CommandHandler\CleanupOrphanedJobsHandler;
-use App\Shared\Application\Port\TransactionPortInterface;
-use App\Shared\Domain\Model\Uuid;
+use App\Transcode\Application\Exception\TranscodeCleanupIncompleteException;
 use App\Transcode\Application\Port\TranscodeExecutionOwnershipPort;
 use App\Transcode\Application\Port\TranscodeJobPortInterface;
 use App\Transcode\Application\Port\TranscodeSessionPortInterface;
@@ -17,6 +18,9 @@ use App\Transcode\Domain\Model\TranscodeSession;
 use App\Transcode\Domain\ValueObject\AudioProfile;
 use App\Transcode\Interface\Console\TranscodeJobCleanupCommand;
 use PHPUnit\Framework\TestCase;
+use Psr\Log\AbstractLogger;
+use Psr\Log\LogLevel;
+use Psr\Log\NullLogger;
 use Symfony\Component\Clock\MockClock;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Tester\CommandTester;
@@ -31,7 +35,7 @@ final class TranscodeJobCleanupCommandTest extends TestCase
         $jobs = $this->createStub(TranscodeJobPortInterface::class);
         $jobs->method('cleanupOrphanedJobs')->willReturn(3);
         $support = new AdminCommandSupport(new MessageBus([new HandleMessageMiddleware(new HandlersLocator([
-            CleanupOrphanedJobsCommand::class => [new CleanupOrphanedJobsHandler($jobs, $this->staleSessions(2), new \Psr\Log\NullLogger())],
+            CleanupOrphanedJobsCommand::class => [new CleanupOrphanedJobsHandler($jobs, $this->staleSessions(2), new NullLogger())],
         ]))]));
 
         $tester = new CommandTester(new TranscodeJobCleanupCommand($support));
@@ -45,7 +49,7 @@ final class TranscodeJobCleanupCommandTest extends TestCase
         $jobs = $this->createStub(TranscodeJobPortInterface::class);
         $jobs->method('cleanupOrphanedJobs')->willReturn(0);
         $support = new AdminCommandSupport(new MessageBus([new HandleMessageMiddleware(new HandlersLocator([
-            CleanupOrphanedJobsCommand::class => [new CleanupOrphanedJobsHandler($jobs, $this->staleSessions(8), new \Psr\Log\NullLogger())],
+            CleanupOrphanedJobsCommand::class => [new CleanupOrphanedJobsHandler($jobs, $this->staleSessions(8), new NullLogger())],
         ]))]));
 
         $tester = new CommandTester(new TranscodeJobCleanupCommand($support));
@@ -59,7 +63,7 @@ final class TranscodeJobCleanupCommandTest extends TestCase
         $failure = new \RuntimeException('The job could not be removed.');
         $jobs = $this->createStub(TranscodeJobPortInterface::class);
         $jobs->method('cleanupOrphanedJobs')->willThrowException($failure);
-        $logger = new class extends \Psr\Log\AbstractLogger {
+        $logger = new class extends AbstractLogger {
             /** @var list<array{level: mixed, message: string, context: array<mixed>}> */
             public array $records = [];
 
@@ -79,7 +83,7 @@ final class TranscodeJobCleanupCommandTest extends TestCase
         self::assertStringContainsString('The job could not be removed.', $tester->getErrorOutput());
         // The sessions expired before the failure stay expired; the log says how many and why the run failed.
         self::assertCount(1, $logger->records);
-        self::assertSame(\Psr\Log\LogLevel::ERROR, $logger->records[0]['level']);
+        self::assertSame(LogLevel::ERROR, $logger->records[0]['level']);
         self::assertSame(3, $logger->records[0]['context']['expired']);
         self::assertSame($failure, $logger->records[0]['context']['exception']);
     }
@@ -87,8 +91,8 @@ final class TranscodeJobCleanupCommandTest extends TestCase
     public function testACleanupThatLeftJobsBehindFailsWithItsCountsOnTheConsoleAndInTheLog(): void
     {
         $jobs = $this->createStub(TranscodeJobPortInterface::class);
-        $jobs->method('cleanupOrphanedJobs')->willThrowException(new \App\Transcode\Application\Exception\TranscodeCleanupIncompleteException(6, 2));
-        $logger = new class extends \Psr\Log\AbstractLogger {
+        $jobs->method('cleanupOrphanedJobs')->willThrowException(new TranscodeCleanupIncompleteException(6, 2));
+        $logger = new class extends AbstractLogger {
             /** @var list<array<mixed>> */
             public array $contexts = [];
 
@@ -110,7 +114,7 @@ final class TranscodeJobCleanupCommandTest extends TestCase
         self::assertCount(1, $logger->contexts);
         self::assertSame(['expired' => 4, 'cleaned' => 6, 'failed' => 2], array_diff_key($logger->contexts[0], ['exception' => true]));
         // The failure the run ends with carries the expiry's count too, for an entry point that reports all three.
-        self::assertInstanceOf(\App\Transcode\Application\Exception\TranscodeCleanupIncompleteException::class, $logger->contexts[0]['exception']);
+        self::assertInstanceOf(TranscodeCleanupIncompleteException::class, $logger->contexts[0]['exception']);
         self::assertSame([4, 6, 2], [$logger->contexts[0]['exception']->expired, $logger->contexts[0]['exception']->removed, $logger->contexts[0]['exception']->failed]);
     }
 
@@ -131,6 +135,6 @@ final class TranscodeJobCleanupCommandTest extends TestCase
         $transaction->method('run')->willReturnCallback(static fn (callable $operation): mixed => $operation());
 
         return new StaleTranscodeSessionExpiry($sessions, $this->createStub(TranscodeExecutionOwnershipPort::class),
-            $this->createStub(TranscodeJobPortInterface::class), $transaction, new MockClock($now), new \Psr\Log\NullLogger());
+            $this->createStub(TranscodeJobPortInterface::class), $transaction, new MockClock($now), new NullLogger());
     }
 }

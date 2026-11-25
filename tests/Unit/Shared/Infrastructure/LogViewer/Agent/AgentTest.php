@@ -5,9 +5,10 @@ declare(strict_types=1);
 namespace App\Tests\Unit\Shared\Infrastructure\LogViewer\Agent;
 
 use App\Shared\Infrastructure\LogViewer\Agent\AgentConfiguration;
-use App\Shared\Infrastructure\LogViewer\Agent\DockerFrameDecoder;
 use App\Shared\Infrastructure\LogViewer\Agent\DockerClient;
+use App\Shared\Infrastructure\LogViewer\Agent\DockerFrameDecoder;
 use App\Shared\Infrastructure\LogViewer\Agent\DockerRecords;
+use App\Shared\Infrastructure\LogViewer\LogNormalizer;
 use PHPUnit\Framework\TestCase;
 
 final class AgentTest extends TestCase
@@ -42,7 +43,7 @@ final class AgentTest extends TestCase
         array_push($decoded, ...$records->finish());
         self::assertCount(2, $decoded);
         self::assertLessThanOrEqual(262145, strlen($decoded[0]['raw']));
-        self::assertTrue((new \App\Shared\Infrastructure\LogViewer\LogNormalizer())->normalize($decoded[0]['raw'])['truncated']);
+        self::assertTrue((new LogNormalizer())->normalize($decoded[0]['raw'])['truncated']);
         self::assertSame('next record', $decoded[1]['raw']);
     }
 

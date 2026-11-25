@@ -9,6 +9,7 @@ use Doctrine\DBAL\DriverManager;
 use Doctrine\DBAL\Exception\DriverException;
 use Doctrine\DBAL\Schema\Schema;
 use Doctrine\DBAL\Tools\DsnParser;
+use DoctrineMigrations\Version20261102190000;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
 
@@ -42,7 +43,7 @@ SQL);
         $this->connection->executeStatement("INSERT INTO transcode_jobs VALUES ('job', 'owner', 'video', '720p')");
         $this->connection->executeStatement("INSERT INTO audio_rendition_runtime VALUES ('audio', 'track', 'signature', 'aac', 128000, 'complete', 1)");
         require_once dirname(__DIR__, 2) . '/migrations/Version20261102190000.php';
-        $migration = new \DoctrineMigrations\Version20261102190000($this->connection, new NullLogger());
+        $migration = new Version20261102190000($this->connection, new NullLogger());
         $migration->up(new Schema());
         $this->connection->transactional(static function (Connection $connection) use ($migration): void {
             foreach ($migration->getSql() as $query) {

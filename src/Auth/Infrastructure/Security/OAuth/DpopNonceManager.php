@@ -8,6 +8,7 @@ use App\Auth\Application\Exception\DpopStoreUnavailableException;
 use App\Shared\Infrastructure\Redis\RedisClientFactory;
 use App\Shared\Infrastructure\Redis\RedisPoolExhaustedException;
 use Psr\Log\LoggerInterface;
+use Psr\Log\NullLogger;
 use RedisException;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Response;
@@ -25,7 +26,7 @@ final class DpopNonceManager
     public function __construct(
         private readonly RedisClientFactory $redisClientFactory,
         private readonly int $nonceTtlSeconds = 300,
-        private readonly LoggerInterface $logger = new \Psr\Log\NullLogger(),
+        private readonly LoggerInterface $logger = new NullLogger(),
     ) {
     }
 

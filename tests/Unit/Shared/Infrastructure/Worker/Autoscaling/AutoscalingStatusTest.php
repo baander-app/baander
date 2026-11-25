@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Shared\Infrastructure\Worker\Autoscaling;
 
+use App\Shared\Application\DTO\DeploymentProfile;
 use App\Shared\Application\DTO\WorkerAutoscalingProfile;
 use App\Shared\Infrastructure\Worker\Autoscaling\AdmissionLedger;
 use App\Shared\Infrastructure\Worker\Autoscaling\AutoscalingStatus;
@@ -24,10 +25,10 @@ final class AutoscalingStatusTest extends TestCase
         $this->directory = sys_get_temp_dir() . '/baander-status-' . bin2hex(random_bytes(8));
         $this->boot = str_repeat('a', 32);
         foreach (['control', 'execution'] as $unit) {
-            (new WorkerPeerHandshake($this->directory, 'worker.baander.app', $this->boot, $unit, 10, new \App\Shared\Application\DTO\DeploymentProfile()))->publish(4, true, false, 10);
+            (new WorkerPeerHandshake($this->directory, 'worker.baander.app', $this->boot, $unit, 10, new DeploymentProfile()))->publish(4, true, false, 10);
         }
         $this->profile = new WorkerAutoscalingProfile(maximumConcurrency: 2);
-        $this->ledger = new AdmissionLedger($this->directory, $this->lease(), $this->profile, new \App\Shared\Application\DTO\DeploymentProfile());
+        $this->ledger = new AdmissionLedger($this->directory, $this->lease(), $this->profile, new DeploymentProfile());
         $this->ledger->initialize(10);
     }
 
@@ -110,21 +111,21 @@ final class AutoscalingStatusTest extends TestCase
 
     public function testForeignLeaseEpochCannotReadCurrentSnapshot(): void
     {
-        $status = new AutoscalingStatus($this->directory, new DeploymentLease('worker.baander.app', $this->boot, 5), $this->profile, new \App\Shared\Application\DTO\DeploymentProfile());
+        $status = new AutoscalingStatus($this->directory, new DeploymentLease('worker.baander.app', $this->boot, 5), $this->profile, new DeploymentProfile());
         $this->expectException(\RuntimeException::class);
         $status->snapshot(10);
     }
 
     public function testForeignProfileCannotReadCurrentSnapshot(): void
     {
-        $status = new AutoscalingStatus($this->directory, $this->lease(), new WorkerAutoscalingProfile(), new \App\Shared\Application\DTO\DeploymentProfile());
+        $status = new AutoscalingStatus($this->directory, $this->lease(), new WorkerAutoscalingProfile(), new DeploymentProfile());
         $this->expectException(\RuntimeException::class);
         $status->snapshot(10);
     }
 
     private function probe(): AutoscalingStatus
     {
-        return new AutoscalingStatus($this->directory, $this->lease(), $this->profile, new \App\Shared\Application\DTO\DeploymentProfile());
+        return new AutoscalingStatus($this->directory, $this->lease(), $this->profile, new DeploymentProfile());
     }
     private function lease(): DeploymentLease
     {

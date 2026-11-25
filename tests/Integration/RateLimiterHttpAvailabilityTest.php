@@ -4,12 +4,13 @@ declare(strict_types=1);
 
 namespace App\Tests\Integration;
 
-use Baander\RedisRateLimiter\Exception\RateLimiterUnavailableException;
 use App\Tests\Functional\TestCase;
+use Baander\RedisRateLimiter\Exception\RateLimiterUnavailableException;
 use PHPUnit\Framework\Attributes\DataProvider;
+use Symfony\Component\HttpFoundation\Response;
+use Symfony\Component\Messenger\Transport\InMemory\InMemoryTransport;
 use Symfony\Component\RateLimiter\LimiterInterface;
 use Symfony\Component\RateLimiter\RateLimiterFactoryInterface;
-use Symfony\Component\Messenger\Transport\InMemory\InMemoryTransport;
 
 final class RateLimiterHttpAvailabilityTest extends TestCase
 {
@@ -82,7 +83,7 @@ final class RateLimiterHttpAvailabilityTest extends TestCase
         static::getContainer()->set('limiter.' . $name, $factory);
     }
 
-    private function assertUnavailable(\Symfony\Component\HttpFoundation\Response $response): void
+    private function assertUnavailable(Response $response): void
     {
         self::assertSame(503, $response->getStatusCode(), (string) $response->getContent());
         self::assertSame('1', $response->headers->get('Retry-After'));

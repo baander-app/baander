@@ -13,6 +13,7 @@ use App\Scheduler\Interface\Controller\AdminScheduledJobController;
 use App\Scheduler\Interface\Request\CreateScheduledJobRequest;
 use App\Scheduler\Interface\Request\UpdateScheduledJobRequest;
 use App\Scheduler\Interface\Resource\ScheduledJobResource;
+use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
@@ -97,7 +98,7 @@ final class AdminScheduledJobAdministrationTest extends TestCase
 
     public function testMissingJobsPreserve404AndDeletePreserves204(): void
     {
-        $id = new \App\Shared\Domain\Model\PublicId();
+        $id = new PublicId();
         $admin = $this->createStub(ScheduledJobAdministrationInterface::class);
         $present = ScheduledJob::create('Present', '* * * * *', JobType::Console, 'app:test');
         $calls = 0;

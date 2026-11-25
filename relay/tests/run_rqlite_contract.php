@@ -3,5 +3,9 @@
 
 // SPDX-License-Identifier: Apache-2.0
 declare(strict_types=1);
+
+use Baander\RegistryTests\RqliteContract;
+use Baander\RegistryTests\Runtime;
+
 require __DIR__ . '/bootstrap.php';
-Baander\RegistryTests\Runtime::main(static fn() => Baander\RegistryTests\RqliteContract::main());
+Runtime::main(static fn() => RqliteContract::main());

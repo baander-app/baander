@@ -4,13 +4,22 @@ declare(strict_types=1);
 
 namespace App\Tests\Integration\LiveUpdates;
 
+use App\Auth\Domain\Event\UserRegistered;
+use App\Shared\Domain\Model\Email;
+use App\Shared\Domain\Model\PublicId;
+use App\Shared\Infrastructure\Event\OutboxEventDispatcher;
 use Doctrine\DBAL\Connection;
 use Doctrine\DBAL\DriverManager;
-use Doctrine\DBAL\Tools\DsnParser;
+use Doctrine\DBAL\Exception\DriverException;
 use Doctrine\DBAL\Schema\Schema;
-use Psr\Log\NullLogger;
+use Doctrine\DBAL\Tools\DsnParser;
+use Doctrine\ORM\EntityManagerInterface;
+use Doctrine\Persistence\ManagerRegistry;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
+use Psr\Log\NullLogger;
+use Symfony\Component\EventDispatcher\EventDispatcher;
+use Symfony\Component\Uid\Uuid;
 
 final class CommittedCaptureTest extends TestCase
 {
@@ -336,22 +345,22 @@ final class CommittedCaptureTest extends TestCase
         $this->clearInbox();
         $outboxId = (int) $this->writer->fetchOne("INSERT INTO domain_event_outbox (event_class, event_name, payload, created_at) VALUES ('Event', 'test', '{}'::jsonb, now()) RETURNING id");
         self::assertSame(0, $this->pendingCount());
-        $listeners = new \Symfony\Component\EventDispatcher\EventDispatcher();
-        $listeners->addListener(\App\Auth\Domain\Event\UserRegistered::class, function () use ($user): void {
+        $listeners = new EventDispatcher();
+        $listeners->addListener(UserRegistered::class, function () use ($user): void {
             $this->notification($user);
             self::assertTrue($this->writer->isTransactionActive());
             self::assertSame(0, $this->pendingCount());
         });
-        $manager = $this->createStub(\Doctrine\ORM\EntityManagerInterface::class);
+        $manager = $this->createStub(EntityManagerInterface::class);
         $manager->method('getConnection')->willReturn($this->writer);
         $manager->method('isOpen')->willReturn(true);
-        $registry = $this->createStub(\Doctrine\Persistence\ManagerRegistry::class);
+        $registry = $this->createStub(ManagerRegistry::class);
         $registry->method('getManager')->willReturn($manager);
-        $replayer = new \App\Shared\Infrastructure\Event\OutboxEventDispatcher($registry, $listeners);
-        $event = new \App\Auth\Domain\Event\UserRegistered(
+        $replayer = new OutboxEventDispatcher($registry, $listeners);
+        $event = new UserRegistered(
             \App\Shared\Domain\Model\Uuid::fromString($user),
-            \App\Shared\Domain\Model\PublicId::fromString('bbbbbbbbbbbbbbbbbbbbb'),
-            \App\Shared\Domain\Model\Email::fromString('notification@baander.app'),
+            PublicId::fromString('bbbbbbbbbbbbbbbbbbbbb'),
+            Email::fromString('notification@baander.app'),
             'Notification recipient',
         );
         $replayer->dispatch($event, $outboxId);
@@ -499,7 +508,7 @@ final class CommittedCaptureTest extends TestCase
         try {
             $this->notification($user);
             self::fail('Capture errors must fail the mutation.');
-        } catch (\Doctrine\DBAL\Exception\DriverException $error) {
+        } catch (DriverException $error) {
             self::assertSame('23514', $error->getSQLState());
             self::assertSame(0, (int) $this->observer->fetchOne('SELECT count(*) FROM notifications'));
             self::assertSame(0, $this->pendingCount());
@@ -508,7 +517,7 @@ final class CommittedCaptureTest extends TestCase
 
     private function id(): string
     {
-        return \Symfony\Component\Uid\Uuid::v7()->toRfc4122();
+        return Uuid::v7()->toRfc4122();
     }
 
     private function user(): string

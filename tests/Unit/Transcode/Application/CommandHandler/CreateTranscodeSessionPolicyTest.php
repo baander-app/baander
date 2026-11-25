@@ -6,6 +6,7 @@ namespace App\Tests\Unit\Transcode\Application\CommandHandler;
 
 use App\Shared\Application\DTO\DeploymentProfile;
 use App\Shared\Application\Port\SleeperInterface;
+use App\Shared\Application\Port\SystemSettingsPortInterface;
 use App\Shared\Application\Port\TransactionPortInterface;
 use App\Shared\Domain\Model\Uuid;
 use App\Tests\Unit\Transcode\FreeTranscodeSessionShare;
@@ -45,9 +46,9 @@ final class CreateTranscodeSessionPolicyTest extends TestCase
         $handler(new CreateTranscodeSessionCommand(Uuid::generate(), Uuid::generate(), QualityTier::p720(), AudioProfile::streamingStereo()));
     }
 
-    private function settings(): \App\Shared\Application\Port\SystemSettingsPortInterface
+    private function settings(): SystemSettingsPortInterface
     {
-        $settings = $this->createStub(\App\Shared\Application\Port\SystemSettingsPortInterface::class);
+        $settings = $this->createStub(SystemSettingsPortInterface::class);
         $settings->method('get')->willReturn('bac');
         return $settings;
     }

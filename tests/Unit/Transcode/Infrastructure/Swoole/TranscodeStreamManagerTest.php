@@ -5,20 +5,23 @@ declare(strict_types=1);
 namespace Tests\Unit\Transcode\Infrastructure\Swoole;
 
 use App\QoL\Domain\ValueObject\EncoderWork;
+use App\Shared\Application\DTO\DeploymentProfile;
 use App\Shared\Domain\Model\Uuid;
 use App\Tests\Support\PublishedPresentationFixture;
 use App\Transcode\Application\Port\FFmpegPortInterface;
 use App\Transcode\Application\Port\SegmentAvailabilityInterface;
 use App\Transcode\Application\Port\TranscodeStoragePortInterface;
+use App\Transcode\Application\Service\MediaExecutionPolicy;
 use App\Transcode\Domain\Exception\FFmpegProcessFailedException;
 use App\Transcode\Domain\Model\TranscodeJob;
+use App\Transcode\Domain\ValueObject\AacImplementation;
 use App\Transcode\Domain\ValueObject\EncoderProfile;
 use App\Transcode\Domain\ValueObject\QualityTier;
 use App\Transcode\Infrastructure\FFmpeg\SegmentEncoder;
 use App\Transcode\Infrastructure\Swoole\ProcessSpawnerInterface;
 use App\Transcode\Infrastructure\Swoole\TranscodeStreamManager;
-use PHPUnit\Framework\TestCase;
 use PHPUnit\Framework\Attributes\DataProvider;
+use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
 
 /**
@@ -43,7 +46,7 @@ final class TranscodeStreamManagerTest extends TestCase
         // SegmentEncoder is final — create a real instance with stub deps
         $ffmpeg = $this->createStub(FFmpegPortInterface::class);
         $encoderStorage = $this->createStub(TranscodeStoragePortInterface::class);
-        $this->segmentEncoder = new SegmentEncoder(new \App\Transcode\Application\Service\MediaExecutionPolicy(new \App\Shared\Application\DTO\DeploymentProfile()), ffmpeg: $ffmpeg, storage: $encoderStorage, encoderProfile: EncoderProfile::software('libx265'));
+        $this->segmentEncoder = new SegmentEncoder(new MediaExecutionPolicy(new DeploymentProfile()), ffmpeg: $ffmpeg, storage: $encoderStorage, encoderProfile: EncoderProfile::software('libx265'));
 
         // Storage returns a temp dir for resolveJobDirectory
         $this->storage->method('resolveJobDirectory')->willReturnCallback(
@@ -94,7 +97,7 @@ final class TranscodeStreamManagerTest extends TestCase
     public function testTheSessionsAacImplementationReachesTheSpawnedCommand(): void
     {
         $this->manager->startStream($this->makeJob(), '/src.mkv', QualityTier::p720(), '', audioStreamOrdinal: 1,
-            aacImplementation: \App\Transcode\Domain\ValueObject\AacImplementation::FdkAac, sourceAudioCodec: 'aac');
+            aacImplementation: AacImplementation::FdkAac, sourceAudioCodec: 'aac');
         $command = $this->spawner->lastCommand;
         self::assertSame('libfdk_aac', $command[array_search('-c:a:1', $command, true) + 1]);
         self::assertSame('libfdk_aac', $command[array_search('-c:a', $command, true) + 1]);
@@ -524,7 +527,7 @@ final class TranscodeStreamManagerTest extends TestCase
 
     private function makeJob(): TranscodeJob
     {
-        return TranscodeJob::create(videoId: Uuid::v4(), qualityTier: QualityTier::p720(), outputDirectory: '/tmp/test-job', ownerUserId: \App\Shared\Domain\Model\Uuid::generate());
+        return TranscodeJob::create(videoId: Uuid::v4(), qualityTier: QualityTier::p720(), outputDirectory: '/tmp/test-job', ownerUserId: Uuid::generate());
     }
 }
 

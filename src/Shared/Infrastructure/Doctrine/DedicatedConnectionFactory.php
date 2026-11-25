@@ -9,6 +9,7 @@ use Doctrine\DBAL\Configuration;
 use Doctrine\DBAL\Connection;
 use Doctrine\DBAL\DriverManager;
 use Doctrine\DBAL\Tools\DsnParser;
+use Pdo\Pgsql;
 use Symfony\Component\DependencyInjection\Attribute\Exclude;
 
 /**
@@ -34,7 +35,7 @@ final class DedicatedConnectionFactory
     public static function fromParams(#[\SensitiveParameter] array $params): Connection
     {
         $configuration = (new Configuration())->setMiddlewares([new BaanderDriverMiddleware()]);
-        $params['driverOptions'] = [\Pdo\Pgsql::ATTR_DISABLE_PREPARES => true] + ($params['driverOptions'] ?? []);
+        $params['driverOptions'] = [Pgsql::ATTR_DISABLE_PREPARES => true] + ($params['driverOptions'] ?? []);
 
         return DriverManager::getConnection($params, $configuration);
     }

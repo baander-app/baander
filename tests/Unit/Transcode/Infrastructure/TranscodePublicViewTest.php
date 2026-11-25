@@ -6,18 +6,18 @@ namespace App\Tests\Unit\Transcode\Infrastructure;
 
 use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
+use App\Transcode\Application\DTO\DesiredTranscodeState;
+use App\Transcode\Application\DTO\TranscodeRuntimeSnapshot;
+use App\Transcode\Application\Port\TranscodeExecutionOwnershipPort;
+use App\Transcode\Application\Port\TranscodeStreamingPortInterface;
 use App\Transcode\Domain\Model\TranscodeJob;
 use App\Transcode\Domain\Model\TranscodeSession;
 use App\Transcode\Domain\ValueObject\AudioProfile;
 use App\Transcode\Domain\ValueObject\QualityTier;
-use App\Transcode\Infrastructure\TranscodePublicView;
-use App\Transcode\Application\Port\TranscodeStreamingPortInterface;
-use App\Transcode\Application\Port\TranscodeExecutionOwnershipPort;
-use App\Transcode\Application\DTO\TranscodeRuntimeSnapshot;
-use App\Transcode\Application\DTO\DesiredTranscodeState;
-use PHPUnit\Framework\Attributes\DataProvider;
 use App\Transcode\Infrastructure\Auth\HmacStreamAuthAdapter;
+use App\Transcode\Infrastructure\TranscodePublicView;
 use Doctrine\DBAL\Connection;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
 final class TranscodePublicViewTest extends TestCase
@@ -88,7 +88,7 @@ final class TranscodePublicViewTest extends TestCase
 
     public function testJobProjectionDoesNotExposeInternalFilesystemCoordinates(): void
     {
-        $job = TranscodeJob::create(new Uuid(), QualityTier::p720(), '/tmp/private-transcode', \App\Shared\Domain\Model\Uuid::generate());
+        $job = TranscodeJob::create(new Uuid(), QualityTier::p720(), '/tmp/private-transcode', Uuid::generate());
         $job->markFailed('Could not encode video ' . $job->getVideoId()->toString());
         $video = new PublicId();
         $connection = $this->createMock(Connection::class);

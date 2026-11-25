@@ -4,11 +4,13 @@ declare(strict_types=1);
 
 namespace Baander\Images\Tests;
 
+use Baander\DevEnvironment\WorkflowError;
 use Baander\Images\Build\Source;
 use Baander\Images\Build\SourceUnavailable;
-use Baander\Tests\Tooling\Support\DevelopmentCommandExecutor;
-use Baander\DevEnvironment\WorkflowError;
+use Baander\Images\Inventory\InventoryError;
+use Baander\Process\Execution\CommandFailure;
 use Baander\Process\Execution\ProcessResult;
+use Baander\Tests\Tooling\Support\DevelopmentCommandExecutor;
 use PHPUnit\Framework\TestCase;
 
 final class DevelopmentBuildTest extends TestCase
@@ -262,7 +264,7 @@ final class DevelopmentBuildTest extends TestCase
             ): ProcessResult {
                 if (array_slice($arguments, 0, 2) === ['git', 'clone']) {
                     mkdir($arguments[array_key_last($arguments)]);
-                    throw new \Baander\Process\Execution\CommandFailure('transport interrupted', 1);
+                    throw new CommandFailure('transport interrupted', 1);
                 }
                 return parent::execute($arguments, $cwd, $env, $input, $timeout, $check, $logPath, $interactive);
             }
@@ -300,7 +302,7 @@ final class DevelopmentBuildTest extends TestCase
                 bool $interactive = false,
             ): ProcessResult {
                 if (array_slice($arguments, 0, 2) === ['git', 'fetch']) {
-                    throw new \Baander\Process\Execution\CommandFailure('transport interrupted', 1);
+                    throw new CommandFailure('transport interrupted', 1);
                 }
                 return parent::execute($arguments, $cwd, $env, $input, $timeout, $check, $logPath, $interactive);
             }
@@ -324,7 +326,7 @@ final class DevelopmentBuildTest extends TestCase
         try {
             Source::checkoutRevision($this->runner, $this->repo, $this->root . '/managed', $this->root . '/release');
             self::fail('Expected unsafe archive refusal');
-        } catch (\Baander\Images\Inventory\InventoryError $error) {
+        } catch (InventoryError $error) {
             self::assertStringContainsString('absolute', $error->getMessage());
             self::assertSame(['.', '..'], scandir($this->root . '/release'));
         }

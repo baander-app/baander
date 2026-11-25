@@ -4,20 +4,21 @@ declare(strict_types=1);
 
 namespace App\Transcode\Infrastructure\Doctrine;
 
-use App\Shared\Domain\Model\Uuid;
 use App\Shared\Application\Port\TransactionPortInterface;
+use App\Shared\Domain\Model\Uuid;
 use App\Transcode\Application\DTO\DesiredTranscodeState;
-use App\Transcode\Application\DTO\TranscodeControlResult;
 use App\Transcode\Application\DTO\MediaWorkerIdentity;
+use App\Transcode\Application\DTO\TranscodeControlResult;
 use App\Transcode\Application\DTO\TranscodeExecutionClaim;
 use App\Transcode\Application\DTO\TranscodeRuntimeSnapshot;
 use App\Transcode\Application\Port\TranscodeExecutionOwnershipPort;
 use App\Transcode\Domain\ValueObject\AacImplementation;
 use App\Transcode\Domain\ValueObject\AudioProfile;
-use App\Transcode\Domain\ValueObject\PresentationSelection;
 use App\Transcode\Domain\ValueObject\LoudnessStandard;
+use App\Transcode\Domain\ValueObject\PresentationSelection;
 use Doctrine\DBAL\ArrayParameterType;
 use Doctrine\DBAL\Connection;
+use Doctrine\DBAL\ParameterType;
 
 final class TranscodeRuntimeState implements TranscodeExecutionOwnershipPort
 {
@@ -136,7 +137,7 @@ SQL, ['job' => $jobId->toString(), 'session' => $sessionId->toString(), 'request
 
     public function pending(int $limit = 100): array
     {
-        $rows = $this->connection->fetchAllAssociative("SELECT *, (claim_token IS NOT NULL AND lease_expires_at > clock_timestamp()) AS ownership_live FROM transcode_runtime_state WHERE outcome IN ('pending', 'accepted', 'ready') ORDER BY updated_at, job_id LIMIT ?", [max(1, min(1000, $limit))], [\Doctrine\DBAL\ParameterType::INTEGER]);
+        $rows = $this->connection->fetchAllAssociative("SELECT *, (claim_token IS NOT NULL AND lease_expires_at > clock_timestamp()) AS ownership_live FROM transcode_runtime_state WHERE outcome IN ('pending', 'accepted', 'ready') ORDER BY updated_at, job_id LIMIT ?", [max(1, min(1000, $limit))], [ParameterType::INTEGER]);
         return array_map($this->snapshot(...), $rows);
     }
 

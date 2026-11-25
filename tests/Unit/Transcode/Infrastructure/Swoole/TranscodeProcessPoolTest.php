@@ -11,14 +11,15 @@ use App\Shared\Infrastructure\Worker\NativeExecutionHandle;
 use App\Transcode\Domain\Model\TranscodeJob;
 use App\Transcode\Domain\ValueObject\QualityTier;
 use App\Transcode\Infrastructure\Swoole\TranscodeProcessPool;
+use PHPUnit\Framework\Attributes\TestWith;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
 use Symfony\Component\Serializer\Encoder\JsonEncoder;
 
 final class TranscodeProcessPoolTest extends TestCase
 {
-    #[\PHPUnit\Framework\Attributes\TestWith(['remux'])]
-    #[\PHPUnit\Framework\Attributes\TestWith(['transcode'])]
+    #[TestWith(['remux'])]
+    #[TestWith(['transcode'])]
     public function testHelpersQueueUntilThePreviousNativeAttemptIsReleased(string $capability): void
     {
         $submitted = [];

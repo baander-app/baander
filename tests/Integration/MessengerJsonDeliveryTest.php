@@ -4,8 +4,6 @@ declare(strict_types=1);
 
 namespace App\Tests\Integration;
 
-use App\Tests\Fixtures\Messaging\CancelAtCheckpoint;
-use App\Tests\Fixtures\Messaging\MessageCodecFactory;
 use App\Catalog\Application\Message\DrainAlbumMatchesMessage;
 use App\Catalog\Application\MessageHandler\DrainAlbumMatchesHandler;
 use App\Catalog\Application\MessageHandler\QueueArtistSyncsHandler;
@@ -15,47 +13,52 @@ use App\Catalog\Application\Port\AlbumMatchRequestInterface;
 use App\Catalog\Application\Port\AlbumPortInterface;
 use App\Catalog\Application\Port\ArtistMergePortInterface;
 use App\Catalog\Application\Port\ArtistPortInterface;
+use App\Catalog\Application\Port\DirectorPortInterface;
+use App\Catalog\Application\Port\GenrePortInterface;
+use App\Catalog\Application\Port\MoviePortInterface;
+use App\Catalog\Application\Port\PersonCreditPortInterface;
+use App\Catalog\Application\Port\SongPortInterface;
 use App\Catalog\Application\Query\MusicBrainzMatch\MatchCatalogReadInterface;
 use App\Catalog\Application\QueryHandler\MusicBrainzMatch\MatchComparisonBuilder;
 use App\Catalog\Application\Service\ArtistSyncQueue;
-use App\Catalog\Application\Service\MusicBrainzMatch\ArtistMatchWriter;
 use App\Catalog\Application\Service\MusicBrainzMatch\AlbumMatchQueueChain;
+use App\Catalog\Application\Service\MusicBrainzMatch\ArtistMatchWriter;
 use App\Catalog\Application\Service\MusicBrainzMatch\AutomaticAlbumMatcherInterface;
 use App\Catalog\Application\Service\MusicBrainzMatch\AutomaticMatchOutcome;
 use App\Catalog\Domain\ValueObject\AlbumMatchSource;
 use App\Catalog\Domain\ValueObject\AlbumMatchState;
 use App\Catalog\Domain\ValueObject\AlbumMatchStatus;
-use App\Catalog\Application\Port\GenrePortInterface;
-use App\Catalog\Application\Port\SongPortInterface;
-use App\Metadata\Application\SongMetadataEnricher;
+use App\Metadata\Application\Command\ExtractAlbumCoverCommand;
 use App\Metadata\Application\Message\SyncAlbumMessage;
 use App\Metadata\Application\Message\SyncArtistMessage;
 use App\Metadata\Application\Message\SyncArtistsMessage;
 use App\Metadata\Application\Message\SyncLibraryMessage;
-use App\Metadata\Application\Message\SyncSongMessage;
 use App\Metadata\Application\Message\SyncMovieMessage;
+use App\Metadata\Application\Message\SyncSongMessage;
 use App\Metadata\Application\Message\SyncTvLibraryMessage;
-use App\Metadata\Application\MessageHandler\SyncMovieHandler;
-use App\Metadata\Application\MovieMetadataEnricher;
-use App\Metadata\Infrastructure\Api\Tmdb\TmdbAdapter;
-use App\Catalog\Application\Port\MoviePortInterface;
-use App\Catalog\Application\Port\DirectorPortInterface;
 use App\Metadata\Application\MessageHandler\SyncLibraryHandler;
+use App\Metadata\Application\MessageHandler\SyncMovieHandler;
 use App\Metadata\Application\MessageHandler\SyncSongHandler;
+use App\Metadata\Application\MovieMetadataEnricher;
+use App\Metadata\Application\SongMetadataEnricher;
 use App\Metadata\Infrastructure\Api\CoverArtArchive\CoverArtArchiveAdapter;
 use App\Metadata\Infrastructure\Api\MusicBrainz\MusicBrainzAdapter;
+use App\Metadata\Infrastructure\Api\Tmdb\TmdbAdapter;
 use App\Radio\Application\Command\SyncCountryStationsCommand;
 use App\Radio\Application\CommandHandler\SyncCountryStationsHandler;
 use App\Radio\Application\Port\RadioStationPortInterface;
-use App\Metadata\Application\Command\ExtractAlbumCoverCommand;
 use App\Scheduler\Application\Command\ExecuteScheduledJobCommand;
 use App\Shared\Application\Port\CurrentJobInterface;
 use App\Shared\Application\Port\SystemSettingsPortInterface;
 use App\Shared\Domain\Model\Uuid;
+use App\Shared\Infrastructure\Messenger\JsonTransportSerializer;
 use App\Tests\Fixtures\Catalog\InMemoryAlbumMatchStates;
 use App\Tests\Fixtures\Catalog\InMemoryQueuedArtistSyncs;
 use App\Tests\Fixtures\Catalog\PassThroughTransaction;
-use App\Shared\Infrastructure\Messenger\JsonTransportSerializer;
+use App\Tests\Fixtures\Messaging\CancelAtCheckpoint;
+use App\Tests\Fixtures\Messaging\MessageCodecFactory;
+use Baander\HttpClient\PublicDestinationPolicy;
+use Baander\HttpClient\PublicHttpClient;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
@@ -63,31 +66,28 @@ use Symfony\Component\Cache\Adapter\ArrayAdapter;
 use Symfony\Component\Clock\MockClock;
 use Symfony\Component\DependencyInjection\ServiceLocator;
 use Symfony\Component\EventDispatcher\EventDispatcher;
+use Symfony\Component\HttpClient\MockHttpClient;
+use Symfony\Component\Messenger\Attribute\AsMessageHandler;
 use Symfony\Component\Messenger\Bridge\Redis\Transport\Connection;
 use Symfony\Component\Messenger\Bridge\Redis\Transport\RedisTransport;
 use Symfony\Component\Messenger\Envelope;
-use Symfony\Component\Messenger\Attribute\AsMessageHandler;
 use Symfony\Component\Messenger\Event\WorkerMessageFailedEvent;
-use Symfony\Component\Messenger\Event\WorkerMessageReceivedEvent;
 use Symfony\Component\Messenger\Event\WorkerMessageHandledEvent;
-use Symfony\Component\Messenger\Handler\HandlerDescriptor;
-use Symfony\Component\Messenger\MessageBusInterface;
-use Symfony\Component\Messenger\Stamp\ReceivedStamp;
-use Symfony\Component\Serializer\Encoder\JsonEncoder;
-use Baander\HttpClient\PublicHttpClient;
-use Baander\HttpClient\PublicDestinationPolicy;
-use Symfony\Component\HttpClient\MockHttpClient;
-use Symfony\Component\Messenger\Event\WorkerRunningEvent;
+use Symfony\Component\Messenger\Event\WorkerMessageReceivedEvent;
 use Symfony\Component\Messenger\Event\WorkerMessageRetriedEvent;
+use Symfony\Component\Messenger\Event\WorkerRunningEvent;
 use Symfony\Component\Messenger\EventListener\AddErrorDetailsStampListener;
 use Symfony\Component\Messenger\EventListener\SendFailedMessageForRetryListener;
 use Symfony\Component\Messenger\EventListener\SendFailedMessageToFailureTransportListener;
+use Symfony\Component\Messenger\Handler\HandlerDescriptor;
 use Symfony\Component\Messenger\Handler\HandlersLocator;
 use Symfony\Component\Messenger\MessageBus;
+use Symfony\Component\Messenger\MessageBusInterface;
 use Symfony\Component\Messenger\Middleware\HandleMessageMiddleware;
 use Symfony\Component\Messenger\Middleware\SendMessageMiddleware;
 use Symfony\Component\Messenger\Retry\MultiplierRetryStrategy;
 use Symfony\Component\Messenger\Stamp\ErrorDetailsStamp;
+use Symfony\Component\Messenger\Stamp\ReceivedStamp;
 use Symfony\Component\Messenger\Stamp\RedeliveryStamp;
 use Symfony\Component\Messenger\Stamp\SentToFailureTransportStamp;
 use Symfony\Component\Messenger\Transport\Sender\SendersLocator;
@@ -95,6 +95,7 @@ use Symfony\Component\Messenger\Transport\Serialization\SigningSerializer;
 use Symfony\Component\Messenger\Worker;
 use Symfony\Component\RateLimiter\RateLimiterFactory;
 use Symfony\Component\RateLimiter\Storage\InMemoryStorage;
+use Symfony\Component\Serializer\Encoder\JsonEncoder;
 
 final class MessengerJsonDeliveryTest extends TestCase
 {
@@ -286,7 +287,7 @@ final class MessengerJsonDeliveryTest extends TestCase
                 $movies,
                 $genres,
                 $logger,
-                $this->createStub(\App\Catalog\Application\Port\PersonCreditPortInterface::class),
+                $this->createStub(PersonCreditPortInterface::class),
                 new PassThroughTransaction(),
             );
             $handler = new SyncMovieHandler($movies, $enricher);
@@ -325,7 +326,7 @@ final class MessengerJsonDeliveryTest extends TestCase
             $nestedBus = $this->createMock(MessageBusInterface::class);
             $nestedBus->expects($this->once())->method('dispatch')->with($this->equalTo($tvSync))
                 ->willReturn(new Envelope($tvSync));
-            $handler = new SyncLibraryHandler($albums, $nestedBus, $logger, new CancelAtCheckpoint(), $this->createStub(\App\Catalog\Application\Port\MoviePortInterface::class));
+            $handler = new SyncLibraryHandler($albums, $nestedBus, $logger, new CancelAtCheckpoint(), $this->createStub(MoviePortInterface::class));
         } elseif ($messageType === SyncArtistsMessage::class) {
             $message = new SyncArtistsMessage();
             $artists = $this->createMock(ArtistPortInterface::class);

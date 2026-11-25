@@ -5,8 +5,9 @@ declare(strict_types=1);
 namespace App\Transcode\Application\DTO;
 
 use App\Transcode\Application\Port\AudioRenditionFormat;
+use Symfony\Component\DependencyInjection\Attribute\Exclude;
 
-#[\Symfony\Component\DependencyInjection\Attribute\Exclude]
+#[Exclude]
 final readonly class AudioRenditionInput
 {
     public function __construct(

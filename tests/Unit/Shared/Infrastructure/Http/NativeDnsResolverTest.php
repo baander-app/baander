@@ -5,8 +5,11 @@ declare(strict_types=1);
 namespace App\Tests\Unit\Shared\Infrastructure\Http;
 
 use App\Shared\Infrastructure\Http\NativeDnsResolver;
+use App\Shared\Infrastructure\Swoole\CoroutineCanceledException;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
+use Swoole\Coroutine;
+use Swoole\Runtime;
 
 final class NativeDnsResolverTest extends TestCase
 {
@@ -63,16 +66,16 @@ final class NativeDnsResolverTest extends TestCase
     #[DataProvider('hookModes')]
     public function testLifecycleYieldsWithProcessHooksEnabledOrDisabled(bool $hooks): void
     {
-        $original = \Swoole\Runtime::getHookFlags();
-        \Swoole\Runtime::setHookFlags($hooks ? SWOOLE_HOOK_ALL : 0);
+        $original = Runtime::getHookFlags();
+        Runtime::setHookFlags($hooks ? SWOOLE_HOOK_ALL : 0);
         try {
             \Swoole\Coroutine\run(function (): void {
                 $heartbeats = 0;
                 $state = new class { public bool $finished = false; };
-                \Swoole\Coroutine::create(static function () use (&$heartbeats, $state): void {
+                Coroutine::create(static function () use (&$heartbeats, $state): void {
                     while (!$state->finished) {
                         ++$heartbeats;
-                        \Swoole\Coroutine::sleep(0.005);
+                        Coroutine::sleep(0.005);
                     }
                 });
                 try {
@@ -87,7 +90,7 @@ final class NativeDnsResolverTest extends TestCase
                 self::assertCount(3, $this->resolver()->resolve('complete.baander.app', hrtime(true) / 1e9 + 2));
             });
         } finally {
-            \Swoole\Runtime::setHookFlags($original);
+            Runtime::setHookFlags($original);
         }
     }
 
@@ -103,7 +106,7 @@ final class NativeDnsResolverTest extends TestCase
         \Swoole\Coroutine\run(function (): void {
             $finished = 0;
             for ($i = 0; $i < 8; ++$i) {
-                \Swoole\Coroutine::create(function () use (&$finished): void {
+                Coroutine::create(function () use (&$finished): void {
                     try {
                         $this->resolver()->resolve('slow.baander.app', hrtime(true) / 1e9 + 0.3);
                     } catch (\RuntimeException $failure) {
@@ -113,7 +116,7 @@ final class NativeDnsResolverTest extends TestCase
                     }
                 });
             }
-            \Swoole\Coroutine::sleep(0.03);
+            Coroutine::sleep(0.03);
             try {
                 $this->resolver()->resolve('complete.baander.app', hrtime(true) / 1e9 + 1);
                 self::fail('The ninth concurrent lookup must be refused.');
@@ -122,7 +125,7 @@ final class NativeDnsResolverTest extends TestCase
             }
             $cleanupDeadline = hrtime(true) / 1e9 + 2;
             while ($finished < 8 && hrtime(true) / 1e9 < $cleanupDeadline) {
-                \Swoole\Coroutine::sleep(0.01);
+                Coroutine::sleep(0.01);
             }
             self::assertSame(8, $finished);
             self::assertCount(3, $this->resolver()->resolve('complete.baander.app', hrtime(true) / 1e9 + 2));
@@ -133,16 +136,16 @@ final class NativeDnsResolverTest extends TestCase
     {
         \Swoole\Coroutine\run(function (): void {
             $cancelled = false;
-            $cid = \Swoole\Coroutine::create(function () use (&$cancelled): void {
+            $cid = Coroutine::create(function () use (&$cancelled): void {
                 try {
                     $this->resolver()->resolve('slow.baander.app', hrtime(true) / 1e9 + 3);
-                } catch (\App\Shared\Infrastructure\Swoole\CoroutineCanceledException) {
+                } catch (CoroutineCanceledException) {
                     $cancelled = true;
                 }
             });
-            \Swoole\Coroutine::sleep(0.05);
-            self::assertTrue(\Swoole\Coroutine::cancel($cid));
-            \Swoole\Coroutine::sleep(0.1);
+            Coroutine::sleep(0.05);
+            self::assertTrue(Coroutine::cancel($cid));
+            Coroutine::sleep(0.1);
             self::assertTrue($cancelled);
             self::assertSame('', trim(file_get_contents('/proc/self/task/' . getmypid() . '/children')));
             self::assertCount(3, $this->resolver()->resolve('complete.baander.app', hrtime(true) / 1e9 + 2));

@@ -5,9 +5,10 @@ declare(strict_types=1);
 namespace App\Tests\Unit\Transcode\Infrastructure\FFmpeg;
 
 use App\Tests\Support\StubAacImplementationProbe;
+use App\Transcode\Application\DTO\HardwareTranscodeDiagnosticsReport;
 use App\Transcode\Domain\ValueObject\EncoderProfile;
-use App\Transcode\Infrastructure\FFmpeg\WorkerEncoderCapabilitiesSnapshotStore;
 use App\Transcode\Infrastructure\FFmpeg\HardwareTranscodeDiagnostics;
+use App\Transcode\Infrastructure\FFmpeg\WorkerEncoderCapabilitiesSnapshotStore;
 use PHPUnit\Framework\TestCase;
 
 final class HardwareTranscodeDiagnosticsTest extends TestCase
@@ -62,7 +63,7 @@ final class HardwareTranscodeDiagnosticsTest extends TestCase
         new HardwareTranscodeDiagnostics($store, new StubAacImplementationProbe(['libbac', 'aac'], ['libbac', 'aac']), '/usr/bin/ffmpeg')->inspect();
     }
 
-    private function inspectPublishedProfile(EncoderProfile $profile, float $multiplier): \App\Transcode\Application\DTO\HardwareTranscodeDiagnosticsReport
+    private function inspectPublishedProfile(EncoderProfile $profile, float $multiplier): HardwareTranscodeDiagnosticsReport
     {
         $directory = sys_get_temp_dir() . '/baander-diagnostics-' . (random_bytes(8) |> bin2hex(...));
         $path = $directory . '/capabilities.json';

@@ -9,7 +9,9 @@ use App\Auth\Domain\Model\OAuth\Client;
 use App\Auth\Domain\Model\OAuth\RefreshToken;
 use App\Auth\Domain\Model\OAuth\RefreshTokenState;
 use App\Auth\Domain\Model\OAuth\SignInGrant;
+use App\Auth\Domain\Model\OAuth\TokenId;
 use App\Auth\Domain\Model\OAuth\ValueObject\ChainId;
+use App\Shared\Domain\Model\Uuid;
 use DateInterval;
 use PHPUnit\Framework\TestCase;
 
@@ -96,8 +98,8 @@ final class RefreshTokenTest extends TestCase
         $usedAt = new \DateTimeImmutable('-1 minute');
 
         $token = RefreshToken::reconstitute(new RefreshTokenState(
-            id: \App\Shared\Domain\Model\Uuid::v4(),
-            tokenId: \App\Auth\Domain\Model\OAuth\TokenId::generate(),
+            id: Uuid::v4(),
+            tokenId: TokenId::generate(),
             accessToken: $this->accessToken,
             chainId: $this->chainId,
             previousRefreshToken: null,

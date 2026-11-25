@@ -5,15 +5,19 @@ declare(strict_types=1);
 namespace Baander\DevEnvironment\Tests;
 
 use Baander\DevEnvironment\Controller\ControllerPayload;
+use Baander\DevEnvironment\Host\ProcessEnvironment;
+use Baander\DevEnvironment\State\InstanceStateStore;
+use Baander\DevEnvironment\WorkflowError;
+use Baander\Filesystem\AtomicFile;
+use Baander\Filesystem\FileLock;
+use Baander\Process\Execution\CompletionPolicy;
 use Baander\Process\Execution\EngineExecutor;
 use Baander\Process\Execution\ExecutionContext;
 use Baander\Process\Execution\ProcessSpec;
-use Baander\Process\Execution\CompletionPolicy;
-use Baander\DevEnvironment\Host\ProcessEnvironment;
-use Baander\Filesystem\AtomicFile;
-use Baander\Filesystem\FileLock;
-use PHPUnit\Framework\TestCase;
+use Baander\Process\Execution\RunningProcess;
 use PHPUnit\Framework\Attributes\DataProvider;
+use PHPUnit\Framework\TestCase;
+use Swoole\Process;
 
 final class ControllerPayloadTest extends TestCase
 {
@@ -189,7 +193,7 @@ CODE);
         try {
             $this->payload->retireUnused();
             self::fail('An unsafe retained package link was accepted.');
-        } catch (\Baander\DevEnvironment\WorkflowError $error) {
+        } catch (WorkflowError $error) {
             self::assertSame('Refusing symlink controller payload.', $error->getMessage());
             self::assertTrue(is_link($link));
             self::assertSame('preserved', file_get_contents($this->root . '/outside/sentinel'));
@@ -522,7 +526,7 @@ CODE);
                 $available = FileLock::tryAcquire($this->root . '/state/controller/compatibility.lock');
                 $available?->release();
             } while ($available !== null);
-            self::assertTrue(\Swoole\Process::kill((int) file_get_contents($directory . '/ready'), SIGTERM));
+            self::assertTrue(Process::kill((int) file_get_contents($directory . '/ready'), SIGTERM));
             $this->awaitFile($executor, $directory . '/report.json');
             self::assertSame(143, AtomicFile::readJson($directory . '/report.json')['status']);
             self::assertSame($original, file_get_contents($this->root . '/state/persistent/state.json'));
@@ -537,13 +541,13 @@ CODE);
 
     private function retainedRecord(): string
     {
-        $store = new \Baander\DevEnvironment\State\InstanceStateStore($this->root . '/state');
+        $store = new InstanceStateStore($this->root . '/state');
         $record = ['id' => 'persistent', 'docker' => ['executable' => '/bin/true', 'context' => 'retained', 'daemon_id' => 'retained-daemon']];
         $store->save('persistent', $record);
         return file_get_contents($this->root . '/state/persistent/state.json');
     }
 
-    /** @return array{\Baander\Process\Execution\RunningProcess,string} */
+    /** @return array{RunningProcess,string} */
     private function conversionChild(EngineExecutor $executor, string $mode, float $seconds, ?float $owningSeconds = null): array
     {
         $directory = $this->root . '/conversion-' . bin2hex(random_bytes(4));

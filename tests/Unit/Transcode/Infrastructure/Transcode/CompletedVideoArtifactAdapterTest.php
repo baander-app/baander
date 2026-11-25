@@ -16,12 +16,13 @@ use App\Transcode\Domain\Model\TranscodeJob;
 use App\Transcode\Domain\Repository\TranscodeJobRepositoryInterface;
 use App\Transcode\Domain\ValueObject\AudioProfile;
 use App\Transcode\Domain\ValueObject\PresentationSelection;
+use App\Transcode\Domain\ValueObject\QualityTier;
 use App\Transcode\Infrastructure\Packaging\PublishedPresentationReader;
 use App\Transcode\Infrastructure\Storage\SegmentFileResolver;
 use App\Transcode\Infrastructure\Storage\TranscodeFileStorage;
 use App\Transcode\Infrastructure\Transcode\CompletedVideoArtifactAdapter;
-use PHPUnit\Framework\TestCase;
 use PHPUnit\Framework\Attributes\DataProvider;
+use PHPUnit\Framework\TestCase;
 
 final class CompletedVideoArtifactAdapterTest extends TestCase
 {
@@ -47,7 +48,7 @@ final class CompletedVideoArtifactAdapterTest extends TestCase
         );
         $job = TranscodeJob::create(
             $video->getId(),
-            \App\Transcode\Domain\ValueObject\QualityTier::p720(),
+            QualityTier::p720(),
             '/cache',
             $owner,
             presentationSelection: $selection,

@@ -3,6 +3,11 @@
 
 declare(strict_types=1);
 
+use App\Kernel;
+use App\Shared\Application\DTO\DeploymentProfile;
+use App\Shared\Infrastructure\Worker\Autoscaling\AutoscalingRunner;
+use App\Shared\Infrastructure\Worker\DeploymentLease;
+use App\Shared\Infrastructure\Worker\WorkerLaunchIdentity;
 use Baander\Core\EnvironmentVariable;
 
 // Private admitted child: inherited configuration only, never reload Dotenv files.
@@ -13,7 +18,7 @@ $kernel = null;
 $exitCode = 0;
 try {
     require dirname(__DIR__) . '/vendor/autoload.php';
-    \App\Shared\Application\DTO\DeploymentProfile::fromEnvironment();
+    DeploymentProfile::fromEnvironment();
     if (PHP_SAPI !== 'cli' || count($_SERVER['argv'] ?? []) !== 1 || getenv(EnvironmentVariable::BAANDER_WORKER_ID) !== 'autoscaler'
         || getenv(EnvironmentVariable::BAANDER_WORKER_UNIT) !== 'control'
     ) {
@@ -37,8 +42,8 @@ try {
     if (!is_string($namespace) || !is_string($bootId)) {
         throw new RuntimeException('Autoscaler requires supervisor identity.');
     }
-    new \App\Shared\Infrastructure\Worker\WorkerLaunchIdentity($namespace, $bootId, 'autoscaler', (int) $generation);
-    new \App\Shared\Infrastructure\Worker\DeploymentLease($namespace, $bootId, (int) $epoch);
+    new WorkerLaunchIdentity($namespace, $bootId, 'autoscaler', (int) $generation);
+    new DeploymentLease($namespace, $bootId, (int) $epoch);
     $environment = getenv(EnvironmentVariable::APP_ENV);
     $debug = getenv(EnvironmentVariable::APP_DEBUG);
     if (!is_string($environment) || preg_match('/\A[A-Za-z0-9_-]{1,64}\z/D', $environment) !== 1
@@ -46,10 +51,10 @@ try {
     ) {
         throw new RuntimeException('Autoscaler requires inherited kernel configuration.');
     }
-    $kernel = new \App\Kernel($environment, $debug === '1');
+    $kernel = new Kernel($environment, $debug === '1');
     $kernel->boot();
     $runner = $kernel->getContainer()->get('worker.autoscaling_runner');
-    if (!$runner instanceof \App\Shared\Infrastructure\Worker\Autoscaling\AutoscalingRunner) {
+    if (!$runner instanceof AutoscalingRunner) {
         throw new RuntimeException('Autoscaler runner is not configured.');
     }
     $runner->runUntilSignalled();

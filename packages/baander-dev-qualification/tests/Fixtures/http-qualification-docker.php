@@ -3,6 +3,8 @@
 
 declare(strict_types=1);
 
+use Swoole\Process;
+
 $arguments = array_slice($_SERVER['argv'], 1);
 file_put_contents(getenv('HTTP_FIXTURE_COMMANDS'), json_encode($arguments) . "\n", FILE_APPEND);
 if (array_splice($arguments, 0, 2) !== ['--host', getenv('HTTP_FIXTURE_ENDPOINT') ?: 'unix:///http-fixture.sock']) {
@@ -23,7 +25,7 @@ if ($command === 'info') {
     echo str_repeat('a', 64);
 } elseif ($command === 'start' && $mode === 'cancellation') {
     preg_match('/^PPid:\s+(\d+)$/m', file_get_contents('/proc/self/status'), $match);
-    Swoole\Process::kill((int) $match[1], 15);
+    Process::kill((int) $match[1], 15);
     sleep(2);
 } elseif (array_slice($arguments, 0, 2) === ['container', 'inspect']) {
     if (is_file($marker)) {
@@ -43,7 +45,7 @@ if ($command === 'info') {
     }
     if ($mode === 'cancellation') {
         preg_match('/^PPid:\s+(\d+)$/m', file_get_contents('/proc/self/status'), $match);
-        Swoole\Process::kill((int) $match[1], 15);
+        Process::kill((int) $match[1], 15);
     }
     unlink($marker);
 } elseif ($command === 'logs') {

@@ -43,7 +43,7 @@ final class FavoriteResource extends AbstractResource
         return [
             'publicId' => $source->getPublicId()->toString(),
             'entityType' => $source->getEntityType()->value,
-            'entityPublicId' => \App\Shared\Domain\Model\PublicId::fromString($source->getEntityPublicId())->toString(),
+            'entityPublicId' => PublicId::fromString($source->getEntityPublicId())->toString(),
             'createdAt' => $source->getCreatedAt()->format(\DateTimeInterface::ATOM),
         ];
     }

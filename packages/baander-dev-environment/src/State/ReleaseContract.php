@@ -5,11 +5,12 @@ declare(strict_types=1);
 namespace Baander\DevEnvironment\State;
 
 use Baander\Configuration\ApplicationLayout;
+use Baander\Configuration\Execution\WorkflowBudgets;
 use Baander\Configuration\ToolingConfiguration;
 use Baander\Containers\Docker\Target;
-use Baander\Filesystem\PrivateDirectory;
-use Baander\DevEnvironment\WorkflowError;
 use Baander\DevEnvironment\Host\CapturedConnections;
+use Baander\DevEnvironment\WorkflowError;
+use Baander\Filesystem\PrivateDirectory;
 
 /** The complete immutable input to a prepared activation. Secrets remain in env.json. */
 final readonly class ReleaseContract
@@ -70,7 +71,7 @@ final readonly class ReleaseContract
                 throw new WorkflowError('Invalid materialized source inventory.');
             }
         }
-        new \Baander\Configuration\Execution\WorkflowBudgets($data['effective']['budgets']);
+        new WorkflowBudgets($data['effective']['budgets']);
         return new self($data);
     }
 

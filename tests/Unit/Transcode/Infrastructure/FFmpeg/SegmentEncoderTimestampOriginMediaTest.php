@@ -4,18 +4,20 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Transcode\Infrastructure\FFmpeg;
 
+use App\Shared\Application\DTO\DeploymentProfile;
 use App\Transcode\Application\DTO\MediaTrack;
 use App\Transcode\Application\Port\FFmpegPortInterface;
 use App\Transcode\Application\Port\TranscodeStoragePortInterface;
+use App\Transcode\Application\Service\MediaExecutionPolicy;
 use App\Transcode\Domain\ValueObject\AudioProfile;
 use App\Transcode\Domain\ValueObject\EncoderProfile;
 use App\Transcode\Domain\ValueObject\QualityTier;
 use App\Transcode\Domain\ValueObject\VideoProbeResult;
-use App\Transcode\Infrastructure\FFmpeg\SegmentEncoder;
 use App\Transcode\Infrastructure\FFmpeg\FFmpegArguments;
 use App\Transcode\Infrastructure\FFmpeg\FFprobeArguments;
-use App\Transcode\Infrastructure\HLS\WebVttTimeline;
+use App\Transcode\Infrastructure\FFmpeg\SegmentEncoder;
 use App\Transcode\Infrastructure\HLS\ManifestGenerator;
+use App\Transcode\Infrastructure\HLS\WebVttTimeline;
 use App\Transcode\Infrastructure\Packaging\PublishedPresentationReader;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
@@ -100,7 +102,7 @@ final class SegmentEncoderTimestampOriginMediaTest extends TestCase
         self::assertTrue($probe->hasAudio());
         self::assertCount(1, $probe->subtitleStreams);
         $this->assertSubtitles($source, $probe->sourceTimestampOrigin);
-        $encoder = new SegmentEncoder(new \App\Transcode\Application\Service\MediaExecutionPolicy(new \App\Shared\Application\DTO\DeploymentProfile()), $this->createStub(FFmpegPortInterface::class), $this->createStub(TranscodeStoragePortInterface::class), EncoderProfile::software($encoderName));
+        $encoder = new SegmentEncoder(new MediaExecutionPolicy(new DeploymentProfile()), $this->createStub(FFmpegPortInterface::class), $this->createStub(TranscodeStoragePortInterface::class), EncoderProfile::software($encoderName));
         $tier = new QualityTier('fixture', 64, 64, 100_000, 200_000, 200_000,
             $encoderName === 'libx264' ? 'avc1' : 'hvc1', $encoderName === 'libx264' ? 'avc1.64001f' : 'hvc1.1.6.L93.B0');
         $profile = AudioProfile::fromString($audioProfile);

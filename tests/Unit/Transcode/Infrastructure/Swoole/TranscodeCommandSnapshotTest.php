@@ -4,6 +4,10 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Transcode\Infrastructure\Swoole;
 
+use App\Shared\Application\DTO\DeploymentProfile;
+use App\Transcode\Application\Port\FFmpegPortInterface;
+use App\Transcode\Application\Port\TranscodeStoragePortInterface;
+use App\Transcode\Application\Service\MediaExecutionPolicy;
 use App\Transcode\Domain\Service\VideoProcessingRules;
 use App\Transcode\Domain\ValueObject\ColorSpace;
 use App\Transcode\Domain\ValueObject\EncoderProfile;
@@ -149,7 +153,7 @@ final class TranscodeCommandSnapshotTest extends TestCase
 
     public function testBitrateMultiplierScalesQualityTier(): void
     {
-        $encoder = new SegmentEncoder(new \App\Transcode\Application\Service\MediaExecutionPolicy(new \App\Shared\Application\DTO\DeploymentProfile()), $this->createStub(\App\Transcode\Application\Port\FFmpegPortInterface::class), $this->createStub(\App\Transcode\Application\Port\TranscodeStoragePortInterface::class), EncoderProfile::fromEncoderName('hevc_nvenc'), 1.5);
+        $encoder = new SegmentEncoder(new MediaExecutionPolicy(new DeploymentProfile()), $this->createStub(FFmpegPortInterface::class), $this->createStub(TranscodeStoragePortInterface::class), EncoderProfile::fromEncoderName('hevc_nvenc'), 1.5);
 
         $tier = QualityTier::p1080();
         $scaled = $encoder->applyBitrateMultiplier($tier);
@@ -161,7 +165,7 @@ final class TranscodeCommandSnapshotTest extends TestCase
 
     public function testBitrateMultiplierOneIsNoop(): void
     {
-        $encoder = new SegmentEncoder(new \App\Transcode\Application\Service\MediaExecutionPolicy(new \App\Shared\Application\DTO\DeploymentProfile()), $this->createStub(\App\Transcode\Application\Port\FFmpegPortInterface::class), $this->createStub(\App\Transcode\Application\Port\TranscodeStoragePortInterface::class), EncoderProfile::software(), 1.0);
+        $encoder = new SegmentEncoder(new MediaExecutionPolicy(new DeploymentProfile()), $this->createStub(FFmpegPortInterface::class), $this->createStub(TranscodeStoragePortInterface::class), EncoderProfile::software(), 1.0);
 
         $tier = QualityTier::p1080();
         $scaled = $encoder->applyBitrateMultiplier($tier);

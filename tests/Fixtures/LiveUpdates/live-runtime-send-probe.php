@@ -11,6 +11,7 @@ use Psr\Log\NullLogger;
 use Swoole\Coroutine;
 use Swoole\Http\Request;
 use Swoole\Http\Response;
+use Swoole\Process;
 use Swoole\Server;
 use Swoole\Table;
 use Swoole\WebSocket\Frame;
@@ -107,7 +108,7 @@ if ($child === -1) {
 }
 if ($child === 0) {
     register_shutdown_function(static function () use ($master): void {
-        Swoole\Process::kill($master, SIGTERM);
+        Process::kill($master, SIGTERM);
     });
     $slow = runtimeProbeConnect($port);
     $healthy = [runtimeProbeConnect($port), runtimeProbeConnect($port)];

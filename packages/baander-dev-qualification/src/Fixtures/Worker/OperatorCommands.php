@@ -4,8 +4,9 @@ declare(strict_types=1);
 
 namespace Baander\DevQualification\Fixtures\Worker;
 
-use Baander\DevQualification\Fixtures\Runtime;
+use Baander\Configuration\ToolingConfiguration;
 use Baander\Containers\Docker\Client;
+use Baander\DevQualification\Fixtures\Runtime;
 use Baander\Filesystem\AtomicFile;
 use Baander\Process\Execution\CompletionPolicy;
 use Baander\Process\Execution\ProcessResult;
@@ -19,7 +20,7 @@ final class OperatorCommands
     /** @param array<string,string> $environment */
     public function __construct(public readonly string $root, public readonly array $environment, ?int $timeout = null)
     {
-        $tooling = \Baander\Configuration\ToolingConfiguration::forRepository($root, $environment);
+        $tooling = ToolingConfiguration::forRepository($root, $environment);
         $configuration = new OperatorConfiguration($environment, $tooling);
         $this->runtime = new Runtime($root, $timeout, $environment, $tooling, budget: $configuration->budget());
     }

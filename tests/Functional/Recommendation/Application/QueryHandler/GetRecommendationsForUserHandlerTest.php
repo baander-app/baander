@@ -14,15 +14,17 @@ use App\Catalog\Domain\Repository\SongRepositoryInterface;
 use App\Media\Application\Port\ImagePortInterface;
 use App\Media\Domain\Model\Image;
 use App\Media\Domain\Model\ImageState;
+use App\Recommendation\Application\Port\RecommendationPublicIdentityInterface;
 use App\Recommendation\Application\Query\GetRecommendationsForUserQuery;
 use App\Recommendation\Application\QueryHandler\GetRecommendationsForUserHandler;
 use App\Recommendation\Domain\Model\Recommendation;
-use App\Recommendation\Domain\ValueObject\RecommendationType;
 use App\Recommendation\Domain\Repository\RecommendationRepositoryInterface;
+use App\Recommendation\Domain\ValueObject\RecommendationType;
+use App\Recommendation\Interface\Resource\RecommendationResource;
 use App\Shared\Application\Http\PublicOrigins;
-use App\Tests\Functional\TestCase;
 use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
+use App\Tests\Functional\TestCase;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\MockObject\Stub;
 use Symfony\Component\HttpFoundation\Request;
@@ -732,11 +734,11 @@ final class GetRecommendationsForUserHandlerTest extends TestCase
         $this->assertSame($sourceArtistName, $fromArtistResult['sourceName']);
     }
 
-    private function projection(): \App\Recommendation\Application\Port\RecommendationPublicIdentityInterface
+    private function projection(): RecommendationPublicIdentityInterface
     {
-        $projection = $this->createStub(\App\Recommendation\Application\Port\RecommendationPublicIdentityInterface::class);
-        $projection->method('project')->willReturnCallback(static function (\App\Recommendation\Domain\Model\Recommendation $rec): array {
-            return \App\Recommendation\Interface\Resource\RecommendationResource::from($rec,
+        $projection = $this->createStub(RecommendationPublicIdentityInterface::class);
+        $projection->method('project')->willReturnCallback(static function (Recommendation $rec): array {
+            return RecommendationResource::from($rec,
                 substr(hash('sha256', $rec->getSourceId()), 0, 21), substr(hash('sha256', $rec->getTargetId()), 0, 21),
                 $rec->getUserId() === null ? null : substr(hash('sha256', $rec->getUserId()->toString()), 0, 21));
         });

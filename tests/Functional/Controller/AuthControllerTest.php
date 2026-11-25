@@ -12,6 +12,7 @@ use App\Shared\Domain\Model\Email;
 use App\Tests\Functional\TestCase;
 use Symfony\Bundle\FrameworkBundle\Console\Application;
 use Symfony\Component\Console\Tester\CommandTester;
+use Symfony\Component\Mime\Address;
 
 final class AuthControllerTest extends TestCase
 {
@@ -91,7 +92,7 @@ final class AuthControllerTest extends TestCase
         ]);
 
         // Verify the user was actually persisted (controller-to-handler-to-repo wiring)
-        $user = $this->userRepository->findByEmail(new \App\Shared\Domain\Model\Email($email));
+        $user = $this->userRepository->findByEmail(new Email($email));
         $this->assertNotNull($user, 'User should be persisted after registration.');
         $this->assertSame($email, $user->getEmail());
         $this->assertSame('Persisted User', $user->getName());
@@ -123,7 +124,7 @@ final class AuthControllerTest extends TestCase
         $toOwner = array_values(array_filter(
             $this->getMailerMessages(),
             static fn (object $message): bool => $message instanceof \Symfony\Component\Mime\Email
-                && array_map(static fn (\Symfony\Component\Mime\Address $a): string => $a->getAddress(), $message->getTo()) === [$email],
+                && array_map(static fn (Address $a): string => $a->getAddress(), $message->getTo()) === [$email],
         ));
         $this->assertCount(1, $toOwner, 'The owner gets one notice.');
         $notice = $toOwner[0];

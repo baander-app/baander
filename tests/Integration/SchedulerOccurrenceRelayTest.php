@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Tests\Integration;
 
-use App\Tests\Fixtures\Messaging\MessageCodecFactory;
 use App\Kernel;
 use App\Scheduler\Application\Command\ExecuteScheduledOccurrenceCommand;
 use App\Scheduler\Application\DTO\SchedulerOccurrence;
@@ -15,11 +14,14 @@ use App\Scheduler\Infrastructure\Doctrine\DoctrineSchedulerOccurrenceDispatchSto
 use App\Scheduler\Infrastructure\Doctrine\DoctrineSchedulerOccurrenceExecutionStore;
 use App\Scheduler\Infrastructure\Doctrine\DoctrineSchedulerOccurrenceStore;
 use App\Scheduler\Infrastructure\Messenger\MessengerSchedulerOccurrencePublisher;
+use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
 use App\Shared\Infrastructure\Messenger\JsonTransportSerializer;
 use App\Shared\Infrastructure\Worker\DeploymentLease;
 use App\Shared\Infrastructure\Worker\DoctrineDeploymentLease;
+use App\Tests\Fixtures\Messaging\MessageCodecFactory;
 use App\Tests\Support\DeploymentJournalFixture;
+use App\Tests\Support\FinalSchemaBootstrap;
 use Doctrine\DBAL\Connection;
 use Doctrine\DBAL\DriverManager;
 use Doctrine\DBAL\Tools\DsnParser;
@@ -53,7 +55,7 @@ final class SchedulerOccurrenceRelayTest extends TestCase
         foreach ([$this->writer, $this->observer] as $connection) {
             $connection->executeStatement('SET search_path TO ' . $this->schema . ', public');
         }
-        \App\Tests\Support\FinalSchemaBootstrap::bootstrap($this->writer);
+        FinalSchemaBootstrap::bootstrap($this->writer);
         $this->writer->executeStatement('DELETE FROM scheduled_jobs');
     }
 
@@ -206,7 +208,7 @@ final class SchedulerOccurrenceRelayTest extends TestCase
 
     private function record(): SchedulerOccurrence
     {
-        $occurrence = new SchedulerOccurrence(Uuid::generate(), Uuid::generate(), new \DateTimeImmutable('2026-10-02T10:00:00Z'), JobType::Console, 'app:relay-fixture', ['address' => 'scheduler@baander.app', 'fraction' => 1.0], jobPublicId: new \App\Shared\Domain\Model\PublicId());
+        $occurrence = new SchedulerOccurrence(Uuid::generate(), Uuid::generate(), new \DateTimeImmutable('2026-10-02T10:00:00Z'), JobType::Console, 'app:relay-fixture', ['address' => 'scheduler@baander.app', 'fraction' => 1.0], jobPublicId: new PublicId());
         self::assertTrue((new DoctrineSchedulerOccurrenceStore($this->writer))->record($occurrence));
         return $occurrence;
     }

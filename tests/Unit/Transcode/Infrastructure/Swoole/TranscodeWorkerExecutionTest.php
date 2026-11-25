@@ -15,11 +15,13 @@ use App\Library\Domain\ValueObject\LibraryType;
 use App\Library\Infrastructure\Filesystem\LibraryMediaFileResolver;
 use App\QoL\Application\Port\StreamAdmissionPortInterface;
 use App\QoL\Domain\ValueObject\EncoderWork;
+use App\Shared\Application\DTO\DeploymentProfile;
 use App\Shared\Domain\Model\Uuid;
 use App\Shared\Domain\ValueObject\FilesystemType;
-use App\Tests\Support\PublishedPresentationFixture;
 use App\Shared\Infrastructure\Worker\NativeExecutionClientInterface;
 use App\Shared\Infrastructure\Worker\NativeExecutionHandle;
+use App\Tests\Support\PublishedPresentationFixture;
+use App\Tests\Support\StubAacImplementationProbe;
 use App\Transcode\Application\DTO\DesiredTranscodeState;
 use App\Transcode\Application\DTO\MediaWorkerIdentity;
 use App\Transcode\Application\DTO\TranscodeExecutionClaim;
@@ -29,14 +31,20 @@ use App\Transcode\Application\Port\SegmentAvailabilityInterface;
 use App\Transcode\Application\Port\TranscodeExecutionOwnershipPort;
 use App\Transcode\Application\Port\TranscodeJobPortInterface;
 use App\Transcode\Application\Port\TranscodeSessionPortInterface;
+use App\Transcode\Application\Service\MediaExecutionPolicy;
 use App\Transcode\Domain\Model\TranscodeJob;
+use App\Transcode\Domain\Model\TranscodeJobState;
 use App\Transcode\Domain\Model\TranscodeSession;
 use App\Transcode\Domain\ValueObject\AacImplementation;
 use App\Transcode\Domain\ValueObject\AudioProfile;
 use App\Transcode\Domain\ValueObject\EncoderProfile;
+use App\Transcode\Domain\ValueObject\PresentationSelection;
 use App\Transcode\Domain\ValueObject\QualityTier;
+use App\Transcode\Domain\ValueObject\SubtitleTrackInfo;
 use App\Transcode\Domain\ValueObject\TranscodeStatus;
 use App\Transcode\Domain\ValueObject\VideoProbeResult;
+use App\Transcode\Infrastructure\FFmpeg\AacImplementationProbe;
+use App\Transcode\Infrastructure\FFmpeg\FFprobeArguments;
 use App\Transcode\Infrastructure\FFmpeg\SegmentEncoder;
 use App\Transcode\Infrastructure\Storage\SegmentFileResolver;
 use App\Transcode\Infrastructure\Storage\TranscodeFileStorage;
@@ -49,6 +57,7 @@ use Closure;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
+use Symfony\Component\Filesystem\Filesystem;
 use Symfony\Component\Serializer\Encoder\JsonEncoder;
 
 final class TranscodeWorkerExecutionTest extends TestCase
@@ -105,7 +114,7 @@ final class TranscodeWorkerExecutionTest extends TestCase
         mkdir($this->root, 0700);
         file_put_contents($this->root . '/source', 'source');
         $video = Video::create($this->root . '/source', hash_file('xxh3', $this->root . '/source'));
-        $this->job = TranscodeJob::create($video->getId(), QualityTier::p720(), $this->root, \App\Shared\Domain\Model\Uuid::generate());
+        $this->job = TranscodeJob::create($video->getId(), QualityTier::p720(), $this->root, Uuid::generate());
         $this->session = TranscodeSession::create(Uuid::generate(), $this->job->getId(), $video->getId(), AudioProfile::streamingStereo());
         $this->current = $this->claim(1, 1);
         $jobs = $this->createStub(TranscodeJobPortInterface::class);
@@ -215,13 +224,13 @@ final class TranscodeWorkerExecutionTest extends TestCase
             $this->completedWork = [$work->cpuSeconds, $work->outputSeconds];
         });
         $storage = new TranscodeFileStorage(new SegmentFileResolver($this->root));
-        $encoder = new SegmentEncoder(new \App\Transcode\Application\Service\MediaExecutionPolicy(new \App\Shared\Application\DTO\DeploymentProfile()), $ffmpeg, $storage, EncoderProfile::software('libx264'));
+        $encoder = new SegmentEncoder(new MediaExecutionPolicy(new DeploymentProfile()), $ffmpeg, $storage, EncoderProfile::software('libx264'));
         $lazyEncoder = fn(): SegmentEncoder => $this->forbidEncoder ? throw new \RuntimeException('Copy resolved an encoder') : $encoder;
         $this->spawner = new VideoExecutionSpawner();
         $streams = new TranscodeStreamManager($this->createStub(SegmentAvailabilityInterface::class), $storage, $lazyEncoder, new NullLogger(), $this->spawner);
-        $this->helpers = new TranscodeProcessPool($pool, new NullLogger(), new JsonEncoder(), new \App\Shared\Application\DTO\DeploymentProfile());
-        $this->workerForPolicy = fn(\App\Transcode\Application\Service\MediaExecutionPolicy $policy, ?\App\Transcode\Infrastructure\FFmpeg\AacImplementationProbe $probe = null): TranscodeSessionSubscriber => new TranscodeSessionSubscriber($policy, $jobs, $sessions, $storage, $this->helpers, $lazyEncoder, $videos, new NullLogger(), $ownership, $control, $streams, $probe ?? new \App\Tests\Support\StubAacImplementationProbe(), $this->timer, $admission);
-        $this->worker = ($this->workerForPolicy)(new \App\Transcode\Application\Service\MediaExecutionPolicy(new \App\Shared\Application\DTO\DeploymentProfile()));
+        $this->helpers = new TranscodeProcessPool($pool, new NullLogger(), new JsonEncoder(), new DeploymentProfile());
+        $this->workerForPolicy = fn(MediaExecutionPolicy $policy, ?AacImplementationProbe $probe = null): TranscodeSessionSubscriber => new TranscodeSessionSubscriber($policy, $jobs, $sessions, $storage, $this->helpers, $lazyEncoder, $videos, new NullLogger(), $ownership, $control, $streams, $probe ?? new StubAacImplementationProbe(), $this->timer, $admission);
+        $this->worker = ($this->workerForPolicy)(new MediaExecutionPolicy(new DeploymentProfile()));
     }
 
     protected function tearDown(): void
@@ -231,14 +240,14 @@ final class TranscodeWorkerExecutionTest extends TestCase
             $entry->isDir() ? rmdir($entry->getPathname()) : unlink($entry->getPathname());
         }
         rmdir($this->root);
-        new \Symfony\Component\Filesystem\Filesystem()->remove($this->root . '-outside');
+        new Filesystem()->remove($this->root . '-outside');
     }
 
     public function testAMissingSelectedAacImplementationFailsTheJobBeforeTheEncoderStarts(): void
     {
         $this->current = $this->claim(1, 1, implementation: AacImplementation::Bac);
-        $probe = new \App\Tests\Support\StubAacImplementationProbe(['libfdk_aac', 'aac'], ['libfdk_aac', 'aac']);
-        $worker = ($this->workerForPolicy)(new \App\Transcode\Application\Service\MediaExecutionPolicy(new \App\Shared\Application\DTO\DeploymentProfile()), $probe);
+        $probe = new StubAacImplementationProbe(['libfdk_aac', 'aac'], ['libfdk_aac', 'aac']);
+        $worker = ($this->workerForPolicy)(new MediaExecutionPolicy(new DeploymentProfile()), $probe);
         $worker->run($this->current, static fn(): bool => false);
         self::assertContains('failed', $this->observed);
         self::assertSame([], $this->spawner->commands, 'no encoder was spawned');
@@ -258,7 +267,7 @@ final class TranscodeWorkerExecutionTest extends TestCase
     {
         $this->copyWorker();
         $this->current = $this->claim(1, 1, implementation: AacImplementation::Bac);
-        $worker = ($this->workerForPolicy)(new \App\Transcode\Application\Service\MediaExecutionPolicy(new \App\Shared\Application\DTO\DeploymentProfile('remux', 2, 4, 1, sharedCopySlots: 2)), $this->probeWithout('libbac'));
+        $worker = ($this->workerForPolicy)(new MediaExecutionPolicy(new DeploymentProfile('remux', 2, 4, 1, sharedCopySlots: 2)), $this->probeWithout('libbac'));
         $worker->run($this->current, static fn(): bool => false);
         self::assertSame(['accepted', 'ready', 'complete'], $this->observed);
     }
@@ -267,7 +276,7 @@ final class TranscodeWorkerExecutionTest extends TestCase
     {
         $this->sourceHasAudio = false;
         $this->current = $this->claim(1, 1, implementation: AacImplementation::Bac);
-        ($this->workerForPolicy)(new \App\Transcode\Application\Service\MediaExecutionPolicy(new \App\Shared\Application\DTO\DeploymentProfile()), $this->probeWithout('libbac'))->run($this->current, static fn(): bool => false);
+        ($this->workerForPolicy)(new MediaExecutionPolicy(new DeploymentProfile()), $this->probeWithout('libbac'))->run($this->current, static fn(): bool => false);
         self::assertNotContains('failed', $this->observed);
         self::assertNotSame([], $this->spawner->commands);
     }
@@ -275,7 +284,7 @@ final class TranscodeWorkerExecutionTest extends TestCase
     public function testAnOpusSessionFromAnAacSourceNeedsTheSelectedImplementationAsDecoder(): void
     {
         $this->current = $this->claim(1, 1, profile: AudioProfile::opusStereo(), implementation: AacImplementation::Bac);
-        ($this->workerForPolicy)(new \App\Transcode\Application\Service\MediaExecutionPolicy(new \App\Shared\Application\DTO\DeploymentProfile()), $this->probeWithout('libbac'))->run($this->current, static fn(): bool => false);
+        ($this->workerForPolicy)(new MediaExecutionPolicy(new DeploymentProfile()), $this->probeWithout('libbac'))->run($this->current, static fn(): bool => false);
         self::assertContains('failed', $this->observed);
         self::assertSame([], $this->spawner->commands, 'no encoder was spawned');
         self::assertSame('AAC implementation "Bånder Audio Core" is not available in this FFmpeg build', $this->job->getFailReason());
@@ -285,23 +294,23 @@ final class TranscodeWorkerExecutionTest extends TestCase
     {
         $this->sourceAudioStreams = [['index' => 1, 'codec_type' => 'audio', 'codec_name' => 'flac', 'channels' => 2, 'sample_rate' => '48000']];
         $this->current = $this->claim(1, 1, profile: AudioProfile::opusStereo(), implementation: AacImplementation::Bac);
-        ($this->workerForPolicy)(new \App\Transcode\Application\Service\MediaExecutionPolicy(new \App\Shared\Application\DTO\DeploymentProfile()), $this->probeWithout('libbac'))->run($this->current, static fn(): bool => false);
+        ($this->workerForPolicy)(new MediaExecutionPolicy(new DeploymentProfile()), $this->probeWithout('libbac'))->run($this->current, static fn(): bool => false);
         self::assertNotContains('failed', $this->observed);
         self::assertNotSame([], $this->spawner->commands);
         self::assertNotContains('libbac', $this->spawner->commands[0]);
     }
 
-    private function probeWithout(string $codec): \App\Tests\Support\StubAacImplementationProbe
+    private function probeWithout(string $codec): StubAacImplementationProbe
     {
         $all = ['libbac', 'libfdk_aac', 'aac'];
         $present = array_diff($all, [$codec]) |> array_values(...);
 
-        return new \App\Tests\Support\StubAacImplementationProbe($present, $present);
+        return new StubAacImplementationProbe($present, $present);
     }
 
     public function testRemuxRejectsRecoveredVideoBeforeNativeWorkAndTerminatesTheClaim(): void
     {
-        $worker = ($this->workerForPolicy)(new \App\Transcode\Application\Service\MediaExecutionPolicy(new \App\Shared\Application\DTO\DeploymentProfile('remux', 2, 4, 1, sharedCopySlots: 2)));
+        $worker = ($this->workerForPolicy)(new MediaExecutionPolicy(new DeploymentProfile('remux', 2, 4, 1, sharedCopySlots: 2)));
         $worker->run($this->current, static fn(): bool => false);
         self::assertSame(['failed'], $this->observed);
         self::assertSame(['Audio and video encoding is unavailable in a remux deployment.'], $this->observedErrors);
@@ -402,8 +411,8 @@ final class TranscodeWorkerExecutionTest extends TestCase
         $this->forbidEncoder = true;
         $state = get_object_vars($this->job->getState());
         $state['qualityTierName'] = 'copy';
-        $state['presentationSelection'] = new \App\Transcode\Domain\ValueObject\PresentationSelection('copy', hash_file('xxh3', $this->root . '/source'), 0, 1, 'mp4');
-        $this->job = TranscodeJob::reconstitute(new \App\Transcode\Domain\Model\TranscodeJobState(...$state));
+        $state['presentationSelection'] = new PresentationSelection('copy', hash_file('xxh3', $this->root . '/source'), 0, 1, 'mp4');
+        $this->job = TranscodeJob::reconstitute(new TranscodeJobState(...$state));
         $this->current = $this->claim(1, 1);
         $this->sourceProbeOutput = [
             'format' => ['format_name' => 'matroska', 'start_time' => '3.229', 'duration' => '9.25'],
@@ -415,7 +424,7 @@ final class TranscodeWorkerExecutionTest extends TestCase
             ],
         ];
         $this->spawner->publishAudio = true;
-        return ($this->workerForPolicy)(new \App\Transcode\Application\Service\MediaExecutionPolicy(new \App\Shared\Application\DTO\DeploymentProfile('remux', 2, 4, 1, sharedCopySlots: 2)));
+        return ($this->workerForPolicy)(new MediaExecutionPolicy(new DeploymentProfile('remux', 2, 4, 1, sharedCopySlots: 2)));
     }
 
     public function testCompletionPublishesActualCodecAndGenerationAndReleasesAllocation(): void
@@ -612,7 +621,7 @@ final class TranscodeWorkerExecutionTest extends TestCase
         self::assertCount(3, $this->subtitleCommands);
         self::assertCount(2, $this->probeCommands);
         foreach ($this->probeCommands as $command) {
-            self::assertSame(\App\Transcode\Infrastructure\FFmpeg\FFprobeArguments::video($this->root . '/source'), $command);
+            self::assertSame(FFprobeArguments::video($this->root . '/source'), $command);
         }
         foreach ($this->spawner->commands as $index => $command) {
             $sourceStart = $index === 0 ? 0.0 : 6.0;
@@ -1014,7 +1023,7 @@ final class TranscodeWorkerExecutionTest extends TestCase
 
     public function testExpiredSubtitleBatchRetiresHelpersAndClearsQueuedTracks(): void
     {
-        $track = \App\Transcode\Domain\ValueObject\SubtitleTrackInfo::fromProbeStream(['index' => 2, 'codec_name' => 'subrip']);
+        $track = SubtitleTrackInfo::fromProbeStream(['index' => 2, 'codec_name' => 'subrip']);
         $path = $this->root.'/subtitles/s2/full.vtt';
         $key = $this->helpers->extractSubtitles($this->job, $this->root.'/source', 2, $path, 1);
         file_put_contents($path.'.part', 'unfinished');

@@ -7,6 +7,7 @@ namespace App\Tests\Unit\Scheduler\Interface\Validator;
 use App\Scheduler\Interface\Validator\CronExpression;
 use App\Scheduler\Interface\Validator\CronExpressionValidator;
 use PHPUnit\Framework\Attributes\DataProvider;
+use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Validator\Constraint;
 use Symfony\Component\Validator\Context\ExecutionContextInterface;
@@ -16,7 +17,7 @@ use Symfony\Component\Validator\Violation\ConstraintViolationBuilderInterface;
 final class CronExpressionValidatorTest extends TestCase
 {
     private CronExpressionValidator $validator;
-    private ExecutionContextInterface&\PHPUnit\Framework\MockObject\MockObject $context;
+    private ExecutionContextInterface&MockObject $context;
 
     protected function setUp(): void
     {

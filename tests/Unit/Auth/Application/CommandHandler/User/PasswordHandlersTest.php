@@ -36,6 +36,7 @@ use App\Auth\Domain\Repository\UserRepositoryInterface;
 use App\Shared\Application\Port\LiveConnectionsPortInterface;
 use App\Shared\Application\Port\TransactionPortInterface;
 use App\Shared\Domain\Model\Email;
+use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
@@ -302,7 +303,7 @@ final class PasswordHandlersTest extends TestCase
     private function userRepository(): UserRepositoryInterface
     {
         $users = $this->createStub(UserRepositoryInterface::class);
-        $users->method('findByPublicId')->willReturnCallback(function (\App\Shared\Domain\Model\PublicId $id): ?User {
+        $users->method('findByPublicId')->willReturnCallback(function (PublicId $id): ?User {
             foreach ($this->users as $user) {
                 if ($id->equals($user->getPublicId())) { return $user; }
             }

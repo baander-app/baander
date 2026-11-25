@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Tests\Integration;
 
 use App\Metadata\Application\Command\ExtractAlbumCoverCommand;
+use App\Shared\Application\DTO\DeploymentProfile;
 use App\Shared\Application\DTO\WorkerAutoscalingProfile;
 use App\Shared\Domain\Model\Uuid;
 use App\Shared\Infrastructure\Messenger\JsonTransportSerializer;
@@ -14,6 +15,7 @@ use App\Shared\Infrastructure\Worker\Autoscaling\AdmissionLedger;
 use App\Shared\Infrastructure\Worker\Autoscaling\WorkerAdmissionContext;
 use App\Shared\Infrastructure\Worker\DeploymentLease;
 use App\Shared\Infrastructure\Worker\WorkerLaunchIdentity;
+use App\Shared\Infrastructure\Worker\WorkerPeerHandshake;
 use App\Tests\Fixtures\Messaging\AdmissionObservedTransport;
 use App\Tests\Fixtures\Messaging\MessageCodecFactory;
 use App\Tests\Fixtures\Messaging\MessengerConfiguration;
@@ -62,7 +64,7 @@ final class MessengerAdmissionLifecycleTest extends TestCase
             $this->directory,
             new DeploymentLease('worker.baander.app', $this->boot, 1),
             new WorkerAutoscalingProfile(maximumConcurrency: 2),
-            new \App\Shared\Application\DTO\DeploymentProfile(),
+            new DeploymentProfile(),
         );
         $this->ledger->initialize(hrtime(true) / 1e9);
         $this->publishTarget(2);
@@ -437,7 +439,7 @@ final class MessengerAdmissionLifecycleTest extends TestCase
     {
         $now = hrtime(true) / 1e9;
         foreach (['control', 'execution'] as $unit) {
-            new \App\Shared\Infrastructure\Worker\WorkerPeerHandshake($this->directory, 'worker.baander.app', $this->boot, $unit, $now, new \App\Shared\Application\DTO\DeploymentProfile())->publish(1, true, false, $now);
+            new WorkerPeerHandshake($this->directory, 'worker.baander.app', $this->boot, $unit, $now, new DeploymentProfile())->publish(1, true, false, $now);
         }
         $this->ledger->publishDecision($target, 'test-demand', [], $now);
     }

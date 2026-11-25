@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Tests\Unit\Shared\Infrastructure\Doctrine\DQL;
 
 use App\Shared\Infrastructure\Doctrine\DQL\PgroongaMatch;
+use Doctrine\ORM\Query\AST\Node;
 use Doctrine\ORM\Query\Lexer;
 use Doctrine\ORM\Query\Parser;
 use Doctrine\ORM\Query\SqlWalker;
@@ -35,9 +36,9 @@ final class PgroongaMatchTest extends TestCase
         $this->assertSame('s.title &@~ :query', $sql);
     }
 
-    private function createMockSqlWalkerDispatchable(string $output): \Doctrine\ORM\Query\AST\Node&Stub
+    private function createMockSqlWalkerDispatchable(string $output): Node&Stub
     {
-        $mock = $this->createStub(\Doctrine\ORM\Query\AST\Node::class);
+        $mock = $this->createStub(Node::class);
         $mock->method('dispatch')->willReturn($output);
 
         return $mock;

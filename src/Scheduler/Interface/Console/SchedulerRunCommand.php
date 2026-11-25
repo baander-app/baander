@@ -5,8 +5,8 @@ declare(strict_types=1);
 namespace App\Scheduler\Interface\Console;
 
 use App\Scheduler\Application\Exception\SchedulerOccurrenceConflict;
-
 use App\Scheduler\Application\Port\SchedulerManualOccurrenceRecorderInterface;
+use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
 use App\Shared\Interface\Console\AdminCommandSupport;
 use Symfony\Component\Console\Attribute\AsCommand;
@@ -40,7 +40,7 @@ final class SchedulerRunCommand extends Command
         $messages = $json && $output instanceof ConsoleOutputInterface ? $output->getErrorOutput() : $output;
 
         try {
-            $jobId = \App\Shared\Domain\Model\PublicId::fromString((string) $input->getArgument('id'));
+            $jobId = PublicId::fromString((string) $input->getArgument('id'));
             $provided = $input->getOption('request-id');
             $requestId = $provided === null ? Uuid::generate() : Uuid::fromString((string) $provided);
         } catch (\InvalidArgumentException) {

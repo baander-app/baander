@@ -24,6 +24,7 @@ use App\Shared\Application\Port\ServerControlException;
 use App\Shared\Application\Port\ServerNotRunningException;
 use App\Shared\Application\Port\TransactionPortInterface;
 use App\Shared\Domain\Model\Email;
+use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
@@ -255,7 +256,7 @@ final class UserAdministrationHandlersTest extends TestCase
     {
         $users = $this->createStub(UserRepositoryInterface::class);
         $users->method('findByPublicId')->willReturnCallback(
-            fn (\App\Shared\Domain\Model\PublicId $id): ?User => $id->equals($this->user->getPublicId()) ? $this->user : null,
+            fn (PublicId $id): ?User => $id->equals($this->user->getPublicId()) ? $this->user : null,
         );
         $users->method('findByEmail')->willReturnCallback(
             fn (Email $email): ?User => $email->toString() === $this->user->getEmail() ? $this->user : null,

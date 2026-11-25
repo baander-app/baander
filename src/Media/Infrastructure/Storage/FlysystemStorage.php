@@ -6,6 +6,7 @@ namespace App\Media\Infrastructure\Storage;
 
 use App\Media\Application\Port\StoragePortInterface;
 use App\Media\Domain\Model\StoredFile;
+use App\Media\Infrastructure\Converter\ImageConversionAdapter;
 
 /**
  * File storage abstraction using local filesystem.
@@ -108,7 +109,7 @@ final class FlysystemStorage implements StoragePortInterface
         }
 
         // Delete preset variants: iterate PRESETS keys from ImageConversionAdapter to stay in sync
-        foreach (array_keys(\App\Media\Infrastructure\Converter\ImageConversionAdapter::PRESETS) as $preset) {
+        foreach (array_keys(ImageConversionAdapter::PRESETS) as $preset) {
             $presetPath = $this->guardPathTraversal($relativeDirectory . '/' . $filename . '_' . $preset . '.webp');
             if (file_exists($presetPath)) {
                 $derivedPaths[] = $presetPath;

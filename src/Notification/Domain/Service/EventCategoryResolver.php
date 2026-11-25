@@ -4,7 +4,17 @@ declare(strict_types=1);
 
 namespace App\Notification\Domain\Service;
 
+use App\Auth\Domain\Event\OAuth\DeviceCodeApproved;
+use App\Auth\Domain\Event\OAuth\TokenRevoked;
+use App\Auth\Domain\Event\Passkey\PasskeyDeleted;
+use App\Auth\Domain\Event\Passkey\PasskeyRegistered;
+use App\Auth\Domain\Event\PasswordChanged;
+use App\Auth\Domain\Event\UserRegistered;
+use App\Catalog\Domain\Event\AlbumCreated;
+use App\Library\Domain\Event\LibraryScanCompleted;
 use App\Notification\Domain\ValueObject\NotificationCategory;
+use App\Transcode\Domain\Event\TranscodeJobCompleted;
+use App\Transcode\Domain\Event\TranscodeJobFailed;
 
 final class EventCategoryResolver
 {
@@ -15,20 +25,20 @@ final class EventCategoryResolver
      */
     private const EVENT_MAP = [
         // Security events
-        \App\Auth\Domain\Event\PasswordChanged::class => NotificationCategory::Security,
-        \App\Auth\Domain\Event\Passkey\PasskeyRegistered::class => NotificationCategory::Security,
-        \App\Auth\Domain\Event\Passkey\PasskeyDeleted::class => NotificationCategory::Security,
-        \App\Auth\Domain\Event\OAuth\TokenRevoked::class => NotificationCategory::Security,
-        \App\Auth\Domain\Event\OAuth\DeviceCodeApproved::class => NotificationCategory::Security,
-        \App\Auth\Domain\Event\UserRegistered::class => NotificationCategory::Security,
+        PasswordChanged::class => NotificationCategory::Security,
+        PasskeyRegistered::class => NotificationCategory::Security,
+        PasskeyDeleted::class => NotificationCategory::Security,
+        TokenRevoked::class => NotificationCategory::Security,
+        DeviceCodeApproved::class => NotificationCategory::Security,
+        UserRegistered::class => NotificationCategory::Security,
 
         // Background Jobs events
-        \App\Library\Domain\Event\LibraryScanCompleted::class => NotificationCategory::BackgroundJobs,
-        \App\Transcode\Domain\Event\TranscodeJobCompleted::class => NotificationCategory::BackgroundJobs,
-        \App\Transcode\Domain\Event\TranscodeJobFailed::class => NotificationCategory::BackgroundJobs,
+        LibraryScanCompleted::class => NotificationCategory::BackgroundJobs,
+        TranscodeJobCompleted::class => NotificationCategory::BackgroundJobs,
+        TranscodeJobFailed::class => NotificationCategory::BackgroundJobs,
 
         // Media Changes events
-        \App\Catalog\Domain\Event\AlbumCreated::class => NotificationCategory::MediaChanges,
+        AlbumCreated::class => NotificationCategory::MediaChanges,
 
         // Excluded from notifications (not in the map):
         // - MetadataSynced (async context, no user)

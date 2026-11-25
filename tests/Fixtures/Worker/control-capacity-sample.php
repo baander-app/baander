@@ -1,6 +1,8 @@
 <?php
 
 declare(strict_types=1);
+use Doctrine\DBAL\DriverManager;
+use Doctrine\DBAL\Tools\DsnParser;
 
 require dirname(__DIR__, 3) . '/vendor/autoload.php';
 require_once __DIR__ . '/KillOrderSample.php';
@@ -9,7 +11,7 @@ $seconds = (float) ($argv[1] ?? 65);
 $mode = $argv[2] ?? 'control';
 $db = null;
 if ($mode === 'control') {
-    $db = Doctrine\DBAL\DriverManager::getConnection(new Doctrine\DBAL\Tools\DsnParser(['postgresql' => 'pdo_pgsql'])->parse((string) getenv('DATABASE_URL')));
+    $db = DriverManager::getConnection(new DsnParser(['postgresql' => 'pdo_pgsql'])->parse((string) getenv('DATABASE_URL')));
 }
 $redis = null;
 if ($db !== null) {

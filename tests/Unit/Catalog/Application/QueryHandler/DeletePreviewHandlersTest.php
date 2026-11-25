@@ -18,6 +18,8 @@ use App\Library\Application\Port\LibraryMediaFileCheck;
 use App\Library\Application\Port\LibraryMediaFileInspection;
 use App\Library\Application\Port\LibraryMediaFilesInterface;
 use App\Library\Application\Port\LibraryMediaFileVerdict;
+use App\Media\Application\Port\ImagePortInterface;
+use App\Media\Domain\Model\Image;
 use App\Playlist\Application\Port\PlaylistDeletionPreviewPortInterface;
 use App\Shared\Application\Exception\NotFoundException;
 use App\Shared\Domain\Model\PublicId;
@@ -29,11 +31,11 @@ final class DeletePreviewHandlersTest extends TestCase
     public function testAlbumCoverPreviewUsesTheImagePublicIdentity(): void
     {
         $album = Album::create(new Uuid(), 'Album', 'album');
-        $image = \App\Media\Domain\Model\Image::create('/covers/album.jpg', 'jpg', 'image/jpeg', 1, 10, 10, 'album', albumId: $album->getId());
+        $image = Image::create('/covers/album.jpg', 'jpg', 'image/jpeg', 1, 10, 10, 'album', albumId: $album->getId());
         $album->setCoverImage($image->getId());
         $albums = $this->createStub(AlbumPortInterface::class);
         $albums->method('findByPublicId')->willReturn($album);
-        $images = $this->createMock(\App\Media\Application\Port\ImagePortInterface::class);
+        $images = $this->createMock(ImagePortInterface::class);
         $images->expects(self::once())->method('findByUuid')->with($image->getId())->willReturn($image);
         $handler = new GetAlbumDeletePreviewHandler(
             $albums, $this->createStub(SongPortInterface::class),
@@ -65,7 +67,7 @@ final class DeletePreviewHandlersTest extends TestCase
         $files = $this->createMock(LibraryMediaFilesInterface::class);
         $files->expects(self::never())->method('inspect');
 
-        $preview = (new GetAlbumDeletePreviewHandler($albums, $songs, $playlists, $files, $this->createStub(\App\Media\Application\Port\ImagePortInterface::class)))(new GetAlbumDeletePreviewQuery($album->getPublicId()->toString()));
+        $preview = (new GetAlbumDeletePreviewHandler($albums, $songs, $playlists, $files, $this->createStub(ImagePortInterface::class)))(new GetAlbumDeletePreviewQuery($album->getPublicId()->toString()));
 
         self::assertSame([
             'album' => ['id' => $album->getPublicId()->toString(), 'title' => 'Album', 'songCount' => 2],
@@ -93,7 +95,7 @@ final class DeletePreviewHandlersTest extends TestCase
                 new LibraryMediaFileCheck('/elsewhere/outside.flac', LibraryMediaFileVerdict::OutsideRoot),
             ], false, true));
 
-        $preview = (new GetAlbumDeletePreviewHandler($albums, $songs, $this->createStub(PlaylistDeletionPreviewPortInterface::class), $files, $this->createStub(\App\Media\Application\Port\ImagePortInterface::class)))(
+        $preview = (new GetAlbumDeletePreviewHandler($albums, $songs, $this->createStub(PlaylistDeletionPreviewPortInterface::class), $files, $this->createStub(ImagePortInterface::class)))(
             new GetAlbumDeletePreviewQuery($album->getPublicId()->toString(), deleteFiles: true),
         );
 

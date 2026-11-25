@@ -1,5 +1,8 @@
 <?php
 
 declare(strict_types=1);
+use Baander\RegistryTests\CleanupContract;
+use Baander\RegistryTests\Runtime;
+
 require __DIR__ . '/bootstrap.php';
-\Baander\RegistryTests\Runtime::main(\Baander\RegistryTests\CleanupContract::storage(...));
+Runtime::main(CleanupContract::storage(...));

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Transcode\Infrastructure\Swoole;
 
+use Swoole\Timer;
 use SwooleBundle\SwooleBundle\Bridge\Symfony\Container\CoWrapper;
 
 /**
@@ -20,7 +21,7 @@ final class SwooleLoopLockRenewalTimer implements LoopLockRenewalTimerInterface
 
     public function tick(int $intervalMs, \Closure $callback): int
     {
-        $id = \Swoole\Timer::tick($intervalMs, function () use ($callback): void {
+        $id = Timer::tick($intervalMs, function () use ($callback): void {
             $this->coWrapper?->defer();
             $callback();
         });
@@ -34,6 +35,6 @@ final class SwooleLoopLockRenewalTimer implements LoopLockRenewalTimerInterface
 
     public function clear(int $id): void
     {
-        \Swoole\Timer::clear($id);
+        Timer::clear($id);
     }
 }

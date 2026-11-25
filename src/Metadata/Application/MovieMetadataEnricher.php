@@ -5,12 +5,13 @@ declare(strict_types=1);
 namespace App\Metadata\Application;
 
 use App\Catalog\Application\Port\GenrePortInterface;
-use App\Catalog\Application\Port\PersonCreditPortInterface;
-use App\Metadata\Application\Port\PersonProfileSyncRequestInterface;
-use App\Shared\Application\Port\TransactionPortInterface;
 use App\Catalog\Application\Port\MoviePortInterface;
+use App\Catalog\Application\Port\PersonCreditPortInterface;
 use App\Catalog\Domain\Model\Movie;
+use App\Metadata\Application\Port\PersonProfileSyncRequestInterface;
+use App\Metadata\Infrastructure\Api\Tmdb\DTO\TmdbMovieDto;
 use App\Metadata\Infrastructure\Api\Tmdb\TmdbAdapter;
+use App\Shared\Application\Port\TransactionPortInterface;
 use Psr\Log\LoggerInterface;
 
 final class MovieMetadataEnricher
@@ -66,7 +67,7 @@ final class MovieMetadataEnricher
         }
     }
 
-    private function searchTmdb(Movie $movie): ?\App\Metadata\Infrastructure\Api\Tmdb\DTO\TmdbMovieDto
+    private function searchTmdb(Movie $movie): ?TmdbMovieDto
     {
         if ($movie->getTmdbId() !== null) {
             return $this->tmdbAdapter->lookupMovie($movie->getTmdbId());
@@ -104,7 +105,7 @@ final class MovieMetadataEnricher
         return $firstResult;
     }
 
-    private function applyData(Movie $movie, \App\Metadata\Infrastructure\Api\Tmdb\DTO\TmdbMovieDto $data, bool $forceUpdate): EnrichmentResult
+    private function applyData(Movie $movie, TmdbMovieDto $data, bool $forceUpdate): EnrichmentResult
     {
         $updatedFields = [];
         $identifiersUpdated = false;

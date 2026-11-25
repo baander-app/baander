@@ -13,6 +13,7 @@ use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\SearchOptions;
 use App\Shared\Domain\Model\SearchResult;
 use App\Shared\Interface\Controller\ApiResponsesTrait;
+use App\Shared\Interface\DTO\ApiError;
 use App\Shared\Interface\DTO\PaginatedResponse;
 use App\Shared\Interface\Request\QueryParameters;
 use App\Shared\Interface\Resource\AbstractResource;
@@ -80,7 +81,7 @@ final readonly class TvReadController
                 response: '400',
                 description: 'Invalid page or limit',
                 content: new OA\MediaType\Json(
-                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                    schema: new OA\Schema(ref: ApiError::class),
                 ),
             ),
         ],
@@ -182,7 +183,7 @@ final readonly class TvReadController
                 response: '400',
                 description: 'Invalid page or limit',
                 content: new OA\MediaType\Json(
-                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                    schema: new OA\Schema(ref: ApiError::class),
                 ),
             ),
         ],
@@ -286,7 +287,7 @@ final readonly class TvReadController
                 response: '400',
                 description: 'Invalid page or limit',
                 content: new OA\MediaType\Json(
-                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                    schema: new OA\Schema(ref: ApiError::class),
                 ),
             ),
         ],
@@ -351,7 +352,7 @@ final readonly class TvReadController
                 response: '400',
                 description: 'Invalid page or limit',
                 content: new OA\MediaType\Json(
-                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                    schema: new OA\Schema(ref: ApiError::class),
                 ),
             ),
         ],

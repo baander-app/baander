@@ -10,10 +10,12 @@ use App\Scheduler\Application\Exception\ScheduledOccurrenceJobBusy;
 use App\Scheduler\Domain\ValueObject\JobType;
 use App\Scheduler\Infrastructure\Doctrine\DoctrineSchedulerOccurrenceExecutionStore;
 use App\Scheduler\Infrastructure\Doctrine\DoctrineSchedulerOccurrenceStore;
+use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
 use App\Shared\Infrastructure\Worker\DeploymentLease;
 use App\Shared\Infrastructure\Worker\DoctrineDeploymentLease;
 use App\Tests\Support\DeploymentJournalFixture;
+use App\Tests\Support\FinalSchemaBootstrap;
 use DateTimeImmutable;
 use Doctrine\DBAL\Connection;
 use Doctrine\DBAL\DriverManager;
@@ -48,7 +50,7 @@ final class SchedulerOccurrenceExecutionStoreTest extends TestCase
         foreach ([$this->first, $this->second] as $connection) {
             $connection->executeStatement('SET search_path TO ' . $this->schema . ', public');
         }
-        \App\Tests\Support\FinalSchemaBootstrap::bootstrap($this->first);
+        FinalSchemaBootstrap::bootstrap($this->first);
         $this->first->executeStatement('DELETE FROM scheduled_jobs');
         DeploymentJournalFixture::ready($this->first, 'baander.app:scheduler-test', str_repeat('a', 32));
         $authority = (new DoctrineDeploymentLease($this->first))->acquire('baander.app:scheduler-test', str_repeat('a', 32), 3600);
@@ -117,7 +119,7 @@ final class SchedulerOccurrenceExecutionStoreTest extends TestCase
     public function testFutureOccurrenceCannotConsumeAdmission(): void
     {
         $future = new DateTimeImmutable($this->second->fetchOne("SELECT date_trunc('minute', clock_timestamp(), 'UTC') + INTERVAL '1 day'"));
-        $occurrence = new SchedulerOccurrence(Uuid::v7(), Uuid::v7(), $future, JobType::Console, 'app:baander-check', [], jobPublicId: new \App\Shared\Domain\Model\PublicId());
+        $occurrence = new SchedulerOccurrence(Uuid::v7(), Uuid::v7(), $future, JobType::Console, 'app:baander-check', [], jobPublicId: new PublicId());
         self::assertTrue((new DoctrineSchedulerOccurrenceStore($this->first))->record($occurrence));
         $store = new DoctrineSchedulerOccurrenceExecutionStore($this->first, $this->authority);
         self::assertNull($store->begin($occurrence->id, Uuid::v7()));
@@ -553,8 +555,8 @@ final class SchedulerOccurrenceExecutionStoreTest extends TestCase
     {
         $jobId = Uuid::v7();
         $minute = new DateTimeImmutable('2026-10-02 12:00:00Z');
-        $running = new SchedulerOccurrence(Uuid::v7(), $jobId, $minute, JobType::Console, 'app:baander-check', ['first' => 1.0, 'second' => 2], jobPublicId: new \App\Shared\Domain\Model\PublicId(), origin: $runningOrigin);
-        $pending = new SchedulerOccurrence(Uuid::v7(), $jobId, $minute, JobType::Messenger, 'app:baander-next', ['manual' => 'scheduler@baander.app'], jobPublicId: new \App\Shared\Domain\Model\PublicId(), origin: $pendingOrigin);
+        $running = new SchedulerOccurrence(Uuid::v7(), $jobId, $minute, JobType::Console, 'app:baander-check', ['first' => 1.0, 'second' => 2], jobPublicId: new PublicId(), origin: $runningOrigin);
+        $pending = new SchedulerOccurrence(Uuid::v7(), $jobId, $minute, JobType::Messenger, 'app:baander-next', ['manual' => 'scheduler@baander.app'], jobPublicId: new PublicId(), origin: $pendingOrigin);
         $intents = new DoctrineSchedulerOccurrenceStore($this->first);
         self::assertTrue($intents->record($running));
         self::assertTrue($intents->record($pending));
@@ -597,7 +599,7 @@ final class SchedulerOccurrenceExecutionStoreTest extends TestCase
     #[DataProvider('commitFailures')]
     public function testManualExecutionCommitUncertaintyNeverReexecutesCommittedAttempt(bool $after): void
     {
-        $manual = new SchedulerOccurrence(Uuid::v7(), Uuid::v7(), new DateTimeImmutable('2026-10-02 12:00:00Z'), JobType::Console, 'app:baander-check', ['address' => 'manual@baander.app'], jobPublicId: new \App\Shared\Domain\Model\PublicId(), origin: SchedulerOccurrenceOrigin::Manual);
+        $manual = new SchedulerOccurrence(Uuid::v7(), Uuid::v7(), new DateTimeImmutable('2026-10-02 12:00:00Z'), JobType::Console, 'app:baander-check', ['address' => 'manual@baander.app'], jobPublicId: new PublicId(), origin: SchedulerOccurrenceOrigin::Manual);
         self::assertTrue((new DoctrineSchedulerOccurrenceStore($this->first))->record($manual));
         $attempt = Uuid::v7();
         $connection = $this->uncertainConnection($after);
@@ -638,7 +640,7 @@ final class SchedulerOccurrenceExecutionStoreTest extends TestCase
 
     private function seed(?Uuid $jobId = null, ?DateTimeImmutable $scheduledFor = null): SchedulerOccurrence
     {
-        $occurrence = new SchedulerOccurrence(Uuid::v7(), $jobId ?? Uuid::v7(), $scheduledFor ?? new DateTimeImmutable('2026-10-03 00:00:00Z'), JobType::Console, 'app:baander-check', ['integral' => 1.0, 'negativeZero' => -0.0, 'large' => 1.0e18, 'nested' => [false, null, 'worker@baander.app']], jobPublicId: new \App\Shared\Domain\Model\PublicId());
+        $occurrence = new SchedulerOccurrence(Uuid::v7(), $jobId ?? Uuid::v7(), $scheduledFor ?? new DateTimeImmutable('2026-10-03 00:00:00Z'), JobType::Console, 'app:baander-check', ['integral' => 1.0, 'negativeZero' => -0.0, 'large' => 1.0e18, 'nested' => [false, null, 'worker@baander.app']], jobPublicId: new PublicId());
         self::assertTrue((new DoctrineSchedulerOccurrenceStore($this->first))->record($occurrence));
         return $occurrence;
     }

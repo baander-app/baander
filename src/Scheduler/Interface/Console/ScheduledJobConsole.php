@@ -4,9 +4,11 @@ declare(strict_types=1);
 
 namespace App\Scheduler\Interface\Console;
 
+use App\Scheduler\Application\Port\ScheduledJobAdministrationInterface;
 use App\Scheduler\Interface\Resource\ScheduledJobResource;
 use App\Shared\Application\Exception\InvalidInputException;
 use App\Shared\Application\Exception\NotFoundException;
+use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
 use App\Shared\Interface\Console\AdminCommandSupport;
 use Symfony\Component\Console\Command\Command;
@@ -26,9 +28,9 @@ final class ScheduledJobConsole
     }
 
     /** @throws InvalidInputException when the argument is not a public ID */
-    public static function id(InputInterface $input, \App\Scheduler\Application\Port\ScheduledJobAdministrationInterface $jobs): Uuid
+    public static function id(InputInterface $input, ScheduledJobAdministrationInterface $jobs): Uuid
     {
-        try { $publicId = \App\Shared\Domain\Model\PublicId::fromString((string) $input->getArgument(self::ID_ARGUMENT)); }
+        try { $publicId = PublicId::fromString((string) $input->getArgument(self::ID_ARGUMENT)); }
         catch (\InvalidArgumentException) { throw new InvalidInputException('The job identity must be a public ID.'); }
         return ($jobs->getByPublicId($publicId) ?? throw self::notFound())->getId();
     }
@@ -73,7 +75,7 @@ final class ScheduledJobConsole
      * @param \Closure(Uuid): ?object $change the administration port's action; null when the job does not exist
      * @param string                  $done   the action in the past tense, such as "Paused"
      */
-    public static function changeStatus(InputInterface $input, SymfonyStyle $io, \Closure $change, string $done, \App\Scheduler\Application\Port\ScheduledJobAdministrationInterface $jobs): int
+    public static function changeStatus(InputInterface $input, SymfonyStyle $io, \Closure $change, string $done, ScheduledJobAdministrationInterface $jobs): int
     {
         try {
             $job = ScheduledJobResource::from($change(self::id($input, $jobs)) ?? throw self::notFound());

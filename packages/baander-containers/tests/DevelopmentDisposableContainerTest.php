@@ -6,13 +6,14 @@ namespace Baander\Containers\Tests;
 
 use Baander\Containers\Docker\Client;
 use Baander\Containers\Docker\Target;
+use Baander\Containers\Resources\DisposableContainer;
+use Baander\Containers\Resources\ResourceLedger;
 use Baander\Filesystem\AtomicFile;
 use Baander\Images\Inventory\Collector;
 use Baander\Process\Execution\CommandFailure;
 use Baander\Process\Execution\EngineExecutor;
 use Baander\Process\Execution\ExecutionContext;
-use Baander\Containers\Resources\DisposableContainer;
-use Baander\Containers\Resources\ResourceLedger;
+use Baander\Process\Execution\ProcessResult;
 use PHPUnit\Framework\TestCase;
 
 final class DevelopmentDisposableContainerTest extends TestCase
@@ -72,7 +73,7 @@ final class DevelopmentDisposableContainerTest extends TestCase
             ['image'],
             getenv(),
             5,
-            onCompletion: function (Client $docker, ?string $container, ?\Baander\Process\Execution\ProcessResult $result) use (&$observed): void {
+            onCompletion: function (Client $docker, ?string $container, ?ProcessResult $result) use (&$observed): void {
                 self::assertSame($this->docker, $docker);
                 self::assertMatchesRegularExpression('/^[a-f0-9]{64}$/D', $container);
                 self::assertSame(0, $result?->exitCode);
@@ -95,7 +96,7 @@ final class DevelopmentDisposableContainerTest extends TestCase
                 ['image'],
                 getenv(),
                 5,
-                onCompletion: static function (Client $docker, ?string $container, ?\Baander\Process\Execution\ProcessResult $result) use (&$observed): void {
+                onCompletion: static function (Client $docker, ?string $container, ?ProcessResult $result) use (&$observed): void {
                     self::assertNull($container);
                     self::assertNull($result);
                     $observed = true;

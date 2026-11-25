@@ -2,28 +2,42 @@
 
 declare(strict_types=1);
 
+use App\Kernel;
+use App\Shared\Domain\Event\Outbox\RelayOutboxCommand;
+use App\Shared\Domain\Model\PublicId;
+use App\Shared\Infrastructure\Health\HealthAlertTable;
+use App\Shared\Infrastructure\Health\HealthStatus;
+use App\Shared\Infrastructure\Health\MessengerWorkerHealth;
+use App\Shared\Infrastructure\Messenger\JobIdStamp;
+use App\Shared\Infrastructure\Redis\RedisClientFactory;
 use App\Tests\Fixtures\Messaging\MessageCodecFactory;
+use App\Tests\Support\FinalSchemaBootstrap;
+use Symfony\Component\Clock\NativeClock;
+use Symfony\Component\Dotenv\Dotenv;
+use Symfony\Component\Messenger\Bridge\Redis\Transport\Connection;
+use Symfony\Component\Messenger\Bridge\Redis\Transport\RedisTransport;
+use Symfony\Component\Messenger\Envelope;
 
 require dirname(__DIR__, 2) . '/vendor/autoload.php';
 require_once dirname(__DIR__) . '/Support/FinalSchemaBootstrap.php';
 require_once __DIR__ . '/Messaging/MessageCodecFactory.php';
-new Symfony\Component\Dotenv\Dotenv()->bootEnv(dirname(__DIR__, 2) . '/.env');
+new Dotenv()->bootEnv(dirname(__DIR__, 2) . '/.env');
 
 $mode = $argv[1] ?? '';
 if (in_array($mode, ['ready', 'busy', 'unhealthy', 'stopped'], true)) {
     // A fresh reader, as the web container is: the key itself must carry the verdict.
-    $health = new App\Shared\Infrastructure\Health\MessengerWorkerHealth(
-        new App\Shared\Infrastructure\Redis\RedisClientFactory((string) getenv('REDIS_URL')),
-        new Symfony\Component\Clock\NativeClock(),
-        new App\Shared\Infrastructure\Health\HealthAlertTable(),
+    $health = new MessengerWorkerHealth(
+        new RedisClientFactory((string) getenv('REDIS_URL')),
+        new NativeClock(),
+        new HealthAlertTable(),
     );
     $result = $health->check();
     exit(match ($mode) {
         'ready' => $result->isHealthy(),
         'busy' => $result->isHealthy() && ($result->details['phase'] ?? null) === 'busy',
-        'unhealthy' => $result->status === App\Shared\Infrastructure\Health\HealthStatus::Unhealthy,
+        'unhealthy' => $result->status === HealthStatus::Unhealthy,
         // A fresh 'stopped' heartbeat reads not available: a replacement may still report in.
-        'stopped' => $result->status === App\Shared\Infrastructure\Health\HealthStatus::NotAvailable
+        'stopped' => $result->status === HealthStatus::NotAvailable
             && ($result->details['phase'] ?? null) === 'stopped',
     } ? 0 : 1);
 }
@@ -44,13 +58,13 @@ if ($mode === 'consumer-pid') {
     exit(0);
 }
 
-$kernel = new App\Kernel('prod', false);
+$kernel = new Kernel('prod', false);
 $kernel->boot();
 $em = $kernel->getContainer()->get('doctrine')->getManager();
 $db = $em->getConnection();
 
 if ($mode === 'prepare') {
-    App\Tests\Support\FinalSchemaBootstrap::bootstrap($db);
+    FinalSchemaBootstrap::bootstrap($db);
 } elseif ($mode === 'hold-lock') {
     $db->beginTransaction();
     try {
@@ -68,13 +82,13 @@ if ($mode === 'prepare') {
         $db->rollBack();
     }
 } elseif ($mode === 'send') {
-    $transport = new Symfony\Component\Messenger\Bridge\Redis\Transport\RedisTransport(
-        Symfony\Component\Messenger\Bridge\Redis\Transport\Connection::fromDsn(getenv('MESSENGER_TRANSPORT_DSN'), ['group' => 'baander']),
+    $transport = new RedisTransport(
+        Connection::fromDsn(getenv('MESSENGER_TRANSPORT_DSN'), ['group' => 'baander']),
         MessageCodecFactory::signingSerializer(),
     );
     // The job ID that JobMonitoringMiddleware assigns at dispatch.
-    $transport->send(new Symfony\Component\Messenger\Envelope(new App\Shared\Domain\Event\Outbox\RelayOutboxCommand(), [
-        new App\Shared\Infrastructure\Messenger\JobIdStamp(new App\Shared\Domain\Model\PublicId()),
+    $transport->send(new Envelope(new RelayOutboxCommand(), [
+        new JobIdStamp(new PublicId()),
     ]));
 } elseif ($mode === 'handled') {
     $count = (int) $db->fetchOne("SELECT COUNT(*) FROM job_monitors WHERE status = 'finished'");

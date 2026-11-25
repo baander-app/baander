@@ -9,10 +9,11 @@ use App\Scheduler\Application\DTO\SchedulerOccurrenceOrigin;
 use App\Scheduler\Application\Exception\ScheduledOccurrenceJobBusy;
 use App\Scheduler\Application\Port\SchedulerOccurrenceExecutionStoreInterface;
 use App\Scheduler\Domain\ValueObject\JobType;
-use App\Shared\Domain\Model\Uuid;
 use App\Shared\Domain\Model\PublicId;
+use App\Shared\Domain\Model\Uuid;
 use App\Shared\Infrastructure\Doctrine\DedicatedConnectionFactory;
 use App\Shared\Infrastructure\Worker\DeploymentLease;
+use App\Shared\Infrastructure\Worker\DeploymentNamespaceLock;
 use Baander\Core\EnvironmentVariable;
 use DateTimeImmutable;
 use Doctrine\DBAL\Connection;
@@ -143,7 +144,7 @@ final class DoctrineSchedulerOccurrenceExecutionStore implements SchedulerOccurr
     /** The lock serializes admission with lease replacement; it cannot fence effects after commit. */
     private function requireActiveAuthority(DeploymentLease $authority): void
     {
-        \App\Shared\Infrastructure\Worker\DeploymentNamespaceLock::acquire($this->connection, $authority->namespace);
+        DeploymentNamespaceLock::acquire($this->connection, $authority->namespace);
         $locked = $this->connection->fetchOne('SELECT 1 FROM worker_deployment_leases WHERE namespace = :namespace FOR UPDATE', ['namespace' => $authority->namespace]);
         // Evaluate database time after lock acquisition, not in a pre-wait predicate.
         $active = $locked !== false && $this->connection->fetchOne(<<<'SQL'

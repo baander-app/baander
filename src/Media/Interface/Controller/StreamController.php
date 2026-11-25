@@ -10,22 +10,23 @@ use App\Shared\Application\Port\SystemSettingsPortInterface;
 use App\Shared\Domain\Model\PublicId;
 use App\Shared\Interface\Controller\ApiResponsesTrait;
 use App\Shared\Interface\Controller\TranslatorTrait;
-use App\Transcode\Application\Exception\AudioRenditionBusyException;
-use App\Transcode\Application\Exception\MediaEncodingProhibitedException;
+use App\Shared\Interface\DTO\ApiError;
 use App\Transcode\Application\DTO\MediaOperation;
-use App\Transcode\Application\Port\MediaExecutionPolicyInterface;
+use App\Transcode\Application\Exception\AudioRenditionBusyException;
 use App\Transcode\Application\Exception\AudioRenditionFailedException;
+use App\Transcode\Application\Exception\MediaEncodingProhibitedException;
 use App\Transcode\Application\Port\AudioRendition;
 use App\Transcode\Application\Port\AudioRenditionFormat;
 use App\Transcode\Application\Port\AudioRenditionPortInterface;
+use App\Transcode\Application\Port\MediaExecutionPolicyInterface;
 use App\Transcode\Application\Settings\TranscodeSettingDefinitions;
 use OpenApi\Spec as OA;
+use SwooleBundle\SwooleBundle\Bridge\Symfony\HttpFoundation\SwooleBinaryFileResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpFoundation\ResponseHeaderBag;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 use Symfony\Component\Routing\Attribute\Route;
-use SwooleBundle\SwooleBundle\Bridge\Symfony\HttpFoundation\SwooleBinaryFileResponse;
 
 #[OA\Tag(name: 'Media', description: 'Media file and streaming endpoints')]
 #[Route('/api/stream', name: 'stream_')]
@@ -90,14 +91,14 @@ final class StreamController
                 response: '400',
                 description: 'Unsupported format or invalid bitrate',
                 content: new OA\MediaType\Json(
-                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                    schema: new OA\Schema(ref: ApiError::class),
                 ),
             ),
             new OA\Response(
                 response: '403',
                 description: 'No access to the track, or a format was requested while transcode.enabled is off',
                 content: new OA\MediaType\Json(
-                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                    schema: new OA\Schema(ref: ApiError::class),
                 ),
             ),
             new OA\Response(response: '416', description: 'Requested byte range is not satisfiable'),
@@ -105,14 +106,14 @@ final class StreamController
                 response: '404',
                 description: 'Track not found',
                 content: new OA\MediaType\Json(
-                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                    schema: new OA\Schema(ref: ApiError::class),
                 ),
             ),
             new OA\Response(
                 response: '500',
                 description: 'Transcoding failed',
                 content: new OA\MediaType\Json(
-                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                    schema: new OA\Schema(ref: ApiError::class),
                 ),
             ),
             new OA\Response(
@@ -126,7 +127,7 @@ final class StreamController
                     ),
                 ],
                 content: new OA\MediaType\Json(
-                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                    schema: new OA\Schema(ref: ApiError::class),
                 ),
             ),
         ],

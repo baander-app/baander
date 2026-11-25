@@ -4,15 +4,16 @@ declare(strict_types=1);
 
 namespace App\Tests\Integration;
 
-use App\Transcode\Application\DTO\DesiredTranscodeState;
-use App\Transcode\Domain\ValueObject\AacImplementation;
-use App\Transcode\Domain\ValueObject\AudioProfile;
-use App\Transcode\Infrastructure\Doctrine\TranscodeRuntimeState;
 use App\Shared\Domain\Model\Uuid;
 use App\Shared\Infrastructure\Doctrine\DoctrineTransaction;
 use App\Shared\Infrastructure\Doctrine\Type\CustomTypesRegistrar;
+use App\Transcode\Application\DTO\DesiredTranscodeState;
 use App\Transcode\Domain\Model\TranscodeSession;
+use App\Transcode\Domain\ValueObject\AacImplementation;
+use App\Transcode\Domain\ValueObject\AudioProfile;
+use App\Transcode\Domain\ValueObject\PresentationSelection;
 use App\Transcode\Infrastructure\Doctrine\Repository\TranscodeSessionRepository;
+use App\Transcode\Infrastructure\Doctrine\TranscodeRuntimeState;
 use Doctrine\ORM\EntityManager;
 use Doctrine\ORM\Mapping\UnderscoreNamingStrategy;
 use Doctrine\ORM\ORMSetup;
@@ -43,7 +44,7 @@ final class TranscodeExecutionIntentTest extends TestCase
 
     public function testCopySelectionSurvivesControlsAndRecovery(): void
     {
-        $selection = new \App\Transcode\Domain\ValueObject\PresentationSelection('copy', 'source-hash', 2, 4, 'mp4');
+        $selection = new PresentationSelection('copy', 'source-hash', 2, 4, 'mp4');
         $this->first->transactional(function () use ($selection): void {
             $this->insertSession();
             $this->runtime->admit($this->jobId, $this->sessionId, 'copy-start', new DesiredTranscodeState(AudioProfile::streamingStereo(), presentationSelection: $selection));
@@ -80,7 +81,7 @@ final class TranscodeExecutionIntentTest extends TestCase
     {
         $this->first->transactional(function (): void {
             $this->insertSession();
-            $this->runtime->admit($this->jobId, $this->sessionId, 'start', new DesiredTranscodeState(AudioProfile::streamingStereo(), presentationSelection: new \App\Transcode\Domain\ValueObject\PresentationSelection('copy', 'source-hash', 2, 4, 'mp4')));
+            $this->runtime->admit($this->jobId, $this->sessionId, 'start', new DesiredTranscodeState(AudioProfile::streamingStereo(), presentationSelection: new PresentationSelection('copy', 'source-hash', 2, 4, 'mp4')));
         });
         self::assertNull($this->runtime->find($this->jobId)?->desired->aacImplementation, 'a state admitted without an implementation, as the copy presentation service admits it, stores none');
         $this->first->executeStatement("UPDATE transcode_runtime_state SET desired = desired - 'aacImplementation'");

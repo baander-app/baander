@@ -12,7 +12,7 @@ use App\Catalog\Application\Command\Artist\DeleteArtistCommand;
 use App\Catalog\Application\Command\Artist\RemoveArtistCreditCommand;
 use App\Catalog\Application\Command\Artist\UpdateArtistCommand;
 use App\Catalog\Application\Port\ArtistPortInterface;
-use App\Library\Application\Port\LibraryReadScopeProviderInterface;
+use App\Catalog\Domain\ValueObject\ArtistRole;
 use App\Catalog\Interface\Request\ArtistAlbumRequest;
 use App\Catalog\Interface\Request\ArtistSongRequest;
 use App\Catalog\Interface\Request\CreateArtistRequest;
@@ -20,13 +20,16 @@ use App\Catalog\Interface\Request\UpdateArtistRequest;
 use App\Catalog\Interface\Request\UpdateRoleRequest;
 use App\Catalog\Interface\Resource\ArtistResource;
 use App\Catalog\Interface\Resource\CatalogDeletionResource;
+use App\Library\Application\Port\LibraryReadScopeProviderInterface;
 use App\Media\Application\Port\ImagePortInterface;
 use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\SearchOptions;
 use App\Shared\Interface\Attribute\CliCounterpart;
 use App\Shared\Interface\Controller\ApiResponsesTrait;
 use App\Shared\Interface\Controller\DispatchesMessagesTrait;
+use App\Shared\Interface\DTO\ApiError;
 use App\Shared\Interface\DTO\PaginatedResponse;
+use App\Shared\Interface\DTO\ValidationError;
 use App\Shared\Interface\Request\QueryParameters;
 use OpenApi\Spec as OA;
 use Symfony\Component\HttpFoundation\JsonResponse;
@@ -93,7 +96,7 @@ final class ArtistController
                 response: '422',
                 description: 'Validation error',
                 content: new OA\MediaType\Json(
-                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ValidationError::class),
+                    schema: new OA\Schema(ref: ValidationError::class),
                 ),
             ),
         ],
@@ -176,7 +179,7 @@ final class ArtistController
                 response: '400',
                 description: 'Invalid page or limit',
                 content: new OA\MediaType\Json(
-                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                    schema: new OA\Schema(ref: ApiError::class),
                 ),
             ),
         ],
@@ -262,7 +265,7 @@ final class ArtistController
                 response: '404',
                 description: 'Not found',
                 content: new OA\MediaType\Json(
-                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                    schema: new OA\Schema(ref: ApiError::class),
                 ),
             ),
         ],
@@ -346,14 +349,14 @@ final class ArtistController
                 response: '404',
                 description: 'Not found',
                 content: new OA\MediaType\Json(
-                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                    schema: new OA\Schema(ref: ApiError::class),
                 ),
             ),
             new OA\Response(
                 response: '422',
                 description: 'Validation error',
                 content: new OA\MediaType\Json(
-                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ValidationError::class),
+                    schema: new OA\Schema(ref: ValidationError::class),
                 ),
             ),
         ],
@@ -415,14 +418,14 @@ final class ArtistController
                 response: '404',
                 description: 'Not found',
                 content: new OA\MediaType\Json(
-                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                    schema: new OA\Schema(ref: ApiError::class),
                 ),
             ),
             new OA\Response(
                 response: '422',
                 description: 'Invalid public ID',
                 content: new OA\MediaType\Json(
-                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ValidationError::class),
+                    schema: new OA\Schema(ref: ValidationError::class),
                 ),
             ),
         ],
@@ -470,7 +473,7 @@ final class ArtistController
                         ),
                         'role' => new OA\Schema(
                             type: 'string',
-                            enum: [\App\Catalog\Domain\ValueObject\ArtistRole::class],
+                            enum: [ArtistRole::class],
                         ),
                     ],
                 ),
@@ -485,21 +488,21 @@ final class ArtistController
                 response: '404',
                 description: 'Artist or song not found',
                 content: new OA\MediaType\Json(
-                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                    schema: new OA\Schema(ref: ApiError::class),
                 ),
             ),
             new OA\Response(
                 response: '409',
                 description: 'Another change to the same artist, song or album ran at the same time and nothing was written; `details.reason` is `credit_busy`: make the change again',
                 content: new OA\MediaType\Json(
-                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                    schema: new OA\Schema(ref: ApiError::class),
                 ),
             ),
             new OA\Response(
                 response: '422',
                 description: 'Malformed public ID or song ID, or an unknown role',
                 content: new OA\MediaType\Json(
-                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ValidationError::class),
+                    schema: new OA\Schema(ref: ValidationError::class),
                 ),
             ),
         ],
@@ -552,21 +555,21 @@ final class ArtistController
                 response: '404',
                 description: 'Artist not found, or the artist has no credit on the song',
                 content: new OA\MediaType\Json(
-                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                    schema: new OA\Schema(ref: ApiError::class),
                 ),
             ),
             new OA\Response(
                 response: '409',
                 description: 'Another change to the same artist, song or album ran at the same time and nothing was written; `details.reason` is `credit_busy`: make the change again',
                 content: new OA\MediaType\Json(
-                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                    schema: new OA\Schema(ref: ApiError::class),
                 ),
             ),
             new OA\Response(
                 response: '422',
                 description: 'Malformed public ID or song ID',
                 content: new OA\MediaType\Json(
-                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ValidationError::class),
+                    schema: new OA\Schema(ref: ValidationError::class),
                 ),
             ),
         ],
@@ -620,13 +623,13 @@ final class ArtistController
                     properties: [
                         'role' => new OA\Schema(
                             type: 'string',
-                            enum: [\App\Catalog\Domain\ValueObject\ArtistRole::class],
+                            enum: [ArtistRole::class],
                         ),
                         'currentRole' => new OA\Schema(
                             description: 'The role of the credit to change; required when the artist holds several roles on the song',
                             type: 'string',
                             nullable: true,
-                            enum: [\App\Catalog\Domain\ValueObject\ArtistRole::class, null],
+                            enum: [ArtistRole::class, null],
                         ),
                     ],
                 ),
@@ -641,21 +644,21 @@ final class ArtistController
                 response: '404',
                 description: 'Artist not found, or the artist has no such credit on the song',
                 content: new OA\MediaType\Json(
-                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                    schema: new OA\Schema(ref: ApiError::class),
                 ),
             ),
             new OA\Response(
                 response: '409',
                 description: 'Another change to the same artist, song or album ran at the same time and nothing was written; `details.reason` is `credit_busy`: make the change again',
                 content: new OA\MediaType\Json(
-                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                    schema: new OA\Schema(ref: ApiError::class),
                 ),
             ),
             new OA\Response(
                 response: '422',
                 description: 'Malformed public ID or song ID, an unknown role, or no current role while the artist holds several',
                 content: new OA\MediaType\Json(
-                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ValidationError::class),
+                    schema: new OA\Schema(ref: ValidationError::class),
                 ),
             ),
         ],
@@ -703,7 +706,7 @@ final class ArtistController
                         ),
                         'role' => new OA\Schema(
                             type: 'string',
-                            enum: [\App\Catalog\Domain\ValueObject\ArtistRole::class],
+                            enum: [ArtistRole::class],
                         ),
                     ],
                 ),
@@ -718,21 +721,21 @@ final class ArtistController
                 response: '404',
                 description: 'Artist or album not found',
                 content: new OA\MediaType\Json(
-                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                    schema: new OA\Schema(ref: ApiError::class),
                 ),
             ),
             new OA\Response(
                 response: '409',
                 description: 'Another change to the same artist, song or album ran at the same time and nothing was written; `details.reason` is `credit_busy`: make the change again',
                 content: new OA\MediaType\Json(
-                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                    schema: new OA\Schema(ref: ApiError::class),
                 ),
             ),
             new OA\Response(
                 response: '422',
                 description: 'Malformed public ID or album ID, or an unknown role',
                 content: new OA\MediaType\Json(
-                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ValidationError::class),
+                    schema: new OA\Schema(ref: ValidationError::class),
                 ),
             ),
         ],
@@ -788,21 +791,21 @@ final class ArtistController
                 response: '404',
                 description: 'Artist not found, or the artist has no credit on the album',
                 content: new OA\MediaType\Json(
-                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                    schema: new OA\Schema(ref: ApiError::class),
                 ),
             ),
             new OA\Response(
                 response: '409',
                 description: 'Another change to the same artist, song or album ran at the same time and nothing was written; `details.reason` is `credit_busy`: make the change again',
                 content: new OA\MediaType\Json(
-                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                    schema: new OA\Schema(ref: ApiError::class),
                 ),
             ),
             new OA\Response(
                 response: '422',
                 description: 'Malformed public ID or album ID',
                 content: new OA\MediaType\Json(
-                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ValidationError::class),
+                    schema: new OA\Schema(ref: ValidationError::class),
                 ),
             ),
         ],
@@ -856,13 +859,13 @@ final class ArtistController
                     properties: [
                         'role' => new OA\Schema(
                             type: 'string',
-                            enum: [\App\Catalog\Domain\ValueObject\ArtistRole::class],
+                            enum: [ArtistRole::class],
                         ),
                         'currentRole' => new OA\Schema(
                             description: 'The role of the credit to change; required when the artist holds several roles on the album',
                             type: 'string',
                             nullable: true,
-                            enum: [\App\Catalog\Domain\ValueObject\ArtistRole::class, null],
+                            enum: [ArtistRole::class, null],
                         ),
                     ],
                 ),
@@ -877,21 +880,21 @@ final class ArtistController
                 response: '404',
                 description: 'Artist not found, or the artist has no such credit on the album',
                 content: new OA\MediaType\Json(
-                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                    schema: new OA\Schema(ref: ApiError::class),
                 ),
             ),
             new OA\Response(
                 response: '409',
                 description: 'Another change to the same artist, song or album ran at the same time and nothing was written; `details.reason` is `credit_busy`: make the change again',
                 content: new OA\MediaType\Json(
-                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                    schema: new OA\Schema(ref: ApiError::class),
                 ),
             ),
             new OA\Response(
                 response: '422',
                 description: 'Malformed public ID or album ID, an unknown role, or no current role while the artist holds several',
                 content: new OA\MediaType\Json(
-                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ValidationError::class),
+                    schema: new OA\Schema(ref: ValidationError::class),
                 ),
             ),
         ],

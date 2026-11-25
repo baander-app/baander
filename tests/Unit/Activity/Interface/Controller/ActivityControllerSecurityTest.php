@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Activity\Interface\Controller;
 
+use App\Activity\Application\Command\ToggleLoveCommand;
+use App\Activity\Application\Port\ActivityIdentityProjectionPortInterface;
 use App\Activity\Application\Port\ActivityPortInterface;
 use App\Activity\Domain\Model\MediaActivity;
 use App\Activity\Infrastructure\ActivityEnrichmentService;
@@ -12,20 +14,23 @@ use App\Auth\Application\Port\AuthenticatedUserIdentityInterface;
 use App\Catalog\Application\Port\AlbumPortInterface;
 use App\Catalog\Application\Port\ArtistPortInterface;
 use App\Catalog\Application\Port\MoviePortInterface;
+use App\Catalog\Application\Port\SongAvailabilityPortInterface;
 use App\Catalog\Application\Port\SongPortInterface;
+use App\Library\Application\Port\LibraryReadScopeProviderInterface;
 use App\Media\Application\Port\ImagePortInterface;
 use App\Shared\Application\Http\PublicOrigins;
+use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
+use App\Shared\Domain\ValueObject\LibraryReadScope;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\MockObject\Stub;
 use PHPUnit\Framework\TestCase;
 use Symfony\Bundle\SecurityBundle\Security;
 use Symfony\Component\HttpFoundation\Response;
-use Symfony\Component\Messenger\MessageBusInterface;
 use Symfony\Component\Messenger\Envelope;
+use Symfony\Component\Messenger\MessageBusInterface;
 use Symfony\Component\Messenger\Stamp\HandledStamp;
 use Symfony\Component\Security\Core\User\UserInterface;
-use App\Activity\Application\Command\ToggleLoveCommand;
 use Symfony\Contracts\Translation\TranslatorInterface;
 
 final class ActivityControllerSecurityTest extends TestCase
@@ -51,15 +56,15 @@ final class ActivityControllerSecurityTest extends TestCase
         $this->moviePort = $this->createStub(MoviePortInterface::class);
         $this->imagePort = $this->createStub(ImagePortInterface::class);
 
-        $libraryScopes = $this->createStub(\App\Library\Application\Port\LibraryReadScopeProviderInterface::class);
-        $libraryScopes->method('current')->willReturn(\App\Shared\Domain\ValueObject\LibraryReadScope::none());
+        $libraryScopes = $this->createStub(LibraryReadScopeProviderInterface::class);
+        $libraryScopes->method('current')->willReturn(LibraryReadScope::none());
         $enrichmentService = new ActivityEnrichmentService(
             songService: $this->songPort,
             albumService: $this->albumPort,
             imageService: $this->imagePort,
             movieService: $this->moviePort,
             identities: $this->users(),
-            availability: $this->createStub(\App\Catalog\Application\Port\SongAvailabilityPortInterface::class),
+            availability: $this->createStub(SongAvailabilityPortInterface::class),
             libraryScopes: $libraryScopes,
         );
 
@@ -143,11 +148,11 @@ final class ActivityControllerSecurityTest extends TestCase
         return $user;
     }
 
-    private function users(): \App\Activity\Application\Port\ActivityIdentityProjectionPortInterface
+    private function users(): ActivityIdentityProjectionPortInterface
     {
-        $users = $this->createStub(\App\Activity\Application\Port\ActivityIdentityProjectionPortInterface::class);
-        $users->method('userPublicId')->willReturn(new \App\Shared\Domain\Model\PublicId());
-        $users->method('readScope')->willReturn(\App\Shared\Domain\ValueObject\LibraryReadScope::unrestricted());
+        $users = $this->createStub(ActivityIdentityProjectionPortInterface::class);
+        $users->method('userPublicId')->willReturn(new PublicId());
+        $users->method('readScope')->willReturn(LibraryReadScope::unrestricted());
 
         return $users;
     }

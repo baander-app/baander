@@ -5,6 +5,7 @@ declare(strict_types=1);
 // PHPStan Symfony extension console application loader
 // Returns the Console Application for Symfony service container analysis
 
+use App\Kernel;
 use Baander\Core\EnvironmentVariable;
 use Symfony\Bundle\FrameworkBundle\Console\Application;
 use Symfony\Component\Dotenv\Dotenv;
@@ -22,6 +23,6 @@ if (!is_dir($conversions) && !@mkdir($conversions, 0775, true) && !is_dir($conve
     $_SERVER[EnvironmentVariable::CONVERT_STORAGE_PATH] = $_ENV[EnvironmentVariable::CONVERT_STORAGE_PATH] = sys_get_temp_dir() . '/baander-phpstan/conversions';
 }
 
-$kernel = new App\Kernel('dev', true);
+$kernel = new Kernel('dev', true);
 
 return new Application($kernel);

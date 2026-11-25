@@ -4,16 +4,18 @@ declare(strict_types=1);
 
 namespace Baander\DevQualification\Tests;
 
-use Baander\Process\Execution\EngineExecutor;
-use Baander\Process\Execution\ExecutionContext;
-use Baander\Process\Execution\ProcessSpec;
-use Baander\Process\Execution\CompletionPolicy;
+use Baander\Containers\Docker\Target;
 use Baander\DevQualification\Fixtures\Worker\OperatorCleanup;
 use Baander\DevQualification\Fixtures\Worker\OperatorCommands;
 use Baander\DevQualification\Fixtures\Worker\OperatorConfiguration;
 use Baander\DevQualification\Fixtures\Worker\OperatorQualification;
-use Baander\DevQualification\Fixtures\Worker\OperatorRun;
 use Baander\DevQualification\Fixtures\Worker\OperatorResources;
+use Baander\DevQualification\Fixtures\Worker\OperatorRun;
+use Baander\Filesystem\AtomicFile;
+use Baander\Process\Execution\CompletionPolicy;
+use Baander\Process\Execution\EngineExecutor;
+use Baander\Process\Execution\ExecutionContext;
+use Baander\Process\Execution\ProcessSpec;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Throwable;
@@ -47,7 +49,7 @@ final class WorkerCleanupTest extends TestCase
             ],
         );
         $targetFile = $this->directory . '/target.json';
-        \Baander\Filesystem\AtomicFile::writeJson($targetFile, new \Baander\Containers\Docker\Target($this->directory . '/bin/docker', 'unix:///fixture.sock', 'fixture-daemon', null, null)->toArray());
+        AtomicFile::writeJson($targetFile, new Target($this->directory . '/bin/docker', 'unix:///fixture.sock', 'fixture-daemon', null, null)->toArray());
         $this->environment['BAANDER_TOOLING_TARGET_FILE'] = $targetFile;
         unset($this->environment['BAANDER_TEST_DOCKER_ENDPOINT']);
         putenv('PATH=' . $this->environment['PATH']);
@@ -182,10 +184,10 @@ final class WorkerCleanupTest extends TestCase
                 }
             }
         }
-        \Baander\Filesystem\AtomicFile::writeJson($state->artifacts . '/resources.json', [
+        AtomicFile::writeJson($state->artifacts . '/resources.json', [
             'version' => 1, 'token' => $token, 'target' => $target, 'resources' => $recorded,
         ]);
-        \Baander\Filesystem\AtomicFile::writeJson($state->artifacts . '/images.json', [
+        AtomicFile::writeJson($state->artifacts . '/images.json', [
             'version' => 1, 'token' => $token, 'target' => $target, 'images' => $images,
         ]);
         $fixture['mode'] = $mode;

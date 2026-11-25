@@ -4,14 +4,17 @@ declare(strict_types=1);
 
 namespace Baander\DevEnvironment\Host;
 
-use Baander\Process\Execution\CommandExecutor;
-use Baander\Process\Execution\ProcessSpec;
-use Baander\Process\Execution\CompletionPolicy;
+use Baander\Containers\Docker\Client;
+use Baander\Containers\Resources\DisposableContainer;
+use Baander\DevEnvironment\State\InstanceStateStore;
+use Baander\DevEnvironment\WorkflowError;
 use Baander\Filesystem\AtomicFile;
 use Baander\Filesystem\FileLock;
 use Baander\Filesystem\PrivateDirectory;
-use Baander\DevEnvironment\State\InstanceStateStore;
-use Baander\DevEnvironment\WorkflowError;
+use Baander\Process\Execution\CommandExecutor;
+use Baander\Process\Execution\CommandFailure;
+use Baander\Process\Execution\CompletionPolicy;
+use Baander\Process\Execution\ProcessSpec;
 
 final class Gateway
 {
@@ -34,7 +37,7 @@ final class Gateway
     }
 
     /** @return array<string,mixed> */
-    public static function ownedNetwork(\Baander\Containers\Docker\Client $docker, string $name, string $owner, bool $internal = false): array
+    public static function ownedNetwork(Client $docker, string $name, string $owner, bool $internal = false): array
     {
         $result = $docker->run(['network', 'inspect', $name], check: false);
         if ($result->exitCode !== 0) {
@@ -233,7 +236,7 @@ final class Gateway
             AtomicFile::write($candidate, $this->render($routes));
             $docker = $this->connections->client($record['docker']);
             $docker->validateIdentity();
-            \Baander\Containers\Resources\DisposableContainer::run($docker, $this->directory . '/config-probe-resources.json', [
+            DisposableContainer::run($docker, $this->directory . '/config-probe-resources.json', [
                 '--network',
                 'none',
                 '--mount',
@@ -249,7 +252,7 @@ final class Gateway
             try {
                 $docker->compose($record['project'], $record['compose_file'], ['exec', '-T', 'gateway', 'nginx', '-t']);
                 $docker->compose($record['project'], $record['compose_file'], ['exec', '-T', 'gateway', 'nginx', '-s', 'reload']);
-            } catch (WorkflowError|\Baander\Process\Execution\CommandFailure $error) {
+            } catch (WorkflowError|CommandFailure $error) {
                 AtomicFile::write($this->configuration, $old);
                 throw $error;
             }

@@ -10,6 +10,7 @@ use PHPUnit\Framework\Attributes\RequiresPhpExtension;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\AbstractLogger;
 use Psr\Log\NullLogger;
+use Swoole\Process;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Tester\CommandTester;
 
@@ -117,7 +118,7 @@ final class WatchFilesCommandTest extends TestCase
 
         // The watcher's own SIGTERM handler ends its loop.
         pcntl_signal(\SIGALRM, static function (): void {
-            \Swoole\Process::kill(getmypid(), \SIGTERM);
+            Process::kill(getmypid(), \SIGTERM);
         });
         pcntl_alarm(1);
 

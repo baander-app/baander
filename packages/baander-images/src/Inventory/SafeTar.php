@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Baander\Images\Inventory;
 
+use Baander\Filesystem\AtomicFile;
+
 final class SafeTar
 {
     public static function extract(string $archive, string $root, bool $allowAbsoluteLinks = true): void
@@ -91,7 +93,7 @@ final class SafeTar
                 }
             }
             if ($special !== []) {
-                \Baander\Filesystem\AtomicFile::writeJson($root . '.archive-metadata.json', $special);
+                AtomicFile::writeJson($root . '.archive-metadata.json', $special);
             }
             $directories = array_filter($entries, static fn(array $entry): bool => $entry['type'] === '5');
             uksort($directories, static fn(string $a, string $b): int => strlen($b) <=> strlen($a));

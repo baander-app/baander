@@ -5,10 +5,11 @@ declare(strict_types=1);
 namespace App\Catalog\Interface\Controller;
 
 use App\Catalog\Application\Port\AlbumDuplicatePortInterface;
-use App\Shared\Domain\Model\PublicId;
 use App\Catalog\Interface\Resource\DuplicateGroupResource;
+use App\Shared\Domain\Model\PublicId;
 use App\Shared\Interface\Attribute\CliCounterpart;
 use App\Shared\Interface\Controller\ApiResponsesTrait;
+use App\Shared\Interface\DTO\ApiError;
 use OpenApi\Spec as OA;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
@@ -64,21 +65,21 @@ final class AlbumDuplicateController
                 response: '403',
                 description: 'Forbidden - admin only',
                 content: new OA\MediaType\Json(
-                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                    schema: new OA\Schema(ref: ApiError::class),
                 ),
             ),
             new OA\Response(
                 response: '400',
                 description: 'Invalid library ID',
                 content: new OA\MediaType\Json(
-                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                    schema: new OA\Schema(ref: ApiError::class),
                 ),
             ),
             new OA\Response(
                 response: '404',
                 description: 'Library not found',
                 content: new OA\MediaType\Json(
-                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                    schema: new OA\Schema(ref: ApiError::class),
                 ),
             ),
         ],

@@ -10,13 +10,13 @@ use LogicException;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use RuntimeException;
+use SwooleBundle\SwooleBundle\Bridge\Swoole\Swoole;
 use SwooleBundle\SwooleBundle\Bridge\Symfony\Container\Resetter;
 use SwooleBundle\SwooleBundle\Bridge\Symfony\Container\ServicePool\BaseServicePool;
 use SwooleBundle\SwooleBundle\Bridge\Symfony\Container\ServicePool\ServicePool;
 use SwooleBundle\SwooleBundle\Bridge\Symfony\Container\ServicePool\ServicePoolContainer;
 use SwooleBundle\SwooleBundle\Bridge\Symfony\Container\SimpleResetter;
 use SwooleBundle\SwooleBundle\Bridge\Symfony\Container\StabilityChecker;
-use SwooleBundle\SwooleBundle\Bridge\Swoole\Swoole;
 use SwooleBundle\SwooleBundle\Component\Locking\Mutex;
 use Throwable;
 
@@ -80,7 +80,7 @@ final class ServicePoolLifecycleTest extends TestCase
         $this->captureErrors(fn() => $failed->releaseFromCoroutine($this->cid()));
     }
 
-    /** @return iterable<string, array{\Throwable}> */
+    /** @return iterable<string, array{Throwable}> */
     public static function cleanupFailures(): iterable
     {
         yield 'runtime exception' => [new RuntimeException('reset failed')];

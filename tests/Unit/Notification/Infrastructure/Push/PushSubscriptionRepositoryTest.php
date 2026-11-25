@@ -8,6 +8,7 @@ use App\Notification\Infrastructure\Doctrine\Entity\PushSubscriptionEntity;
 use App\Notification\Infrastructure\Push\PushSubscriptionRepository;
 use App\Shared\Domain\Model\Uuid;
 use Doctrine\ORM\EntityManagerInterface;
+use Doctrine\ORM\EntityRepository;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 
@@ -45,7 +46,7 @@ final class PushSubscriptionRepositoryTest extends TestCase
     {
         $userId = new Uuid();
 
-        $repo = $this->createMock(\Doctrine\ORM\EntityRepository::class);
+        $repo = $this->createMock(EntityRepository::class);
         $this->entityManager->expects($this->once())->method('getRepository')
             ->with(PushSubscriptionEntity::class)
             ->willReturn($repo);

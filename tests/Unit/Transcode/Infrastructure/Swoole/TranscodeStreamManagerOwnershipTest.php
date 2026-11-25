@@ -4,11 +4,13 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Transcode\Infrastructure\Swoole;
 
+use App\Shared\Application\DTO\DeploymentProfile;
 use App\Shared\Domain\Model\Uuid;
 use App\Tests\Support\PublishedPresentationFixture;
 use App\Transcode\Application\Port\FFmpegPortInterface;
 use App\Transcode\Application\Port\SegmentAvailabilityInterface;
 use App\Transcode\Application\Port\TranscodeStoragePortInterface;
+use App\Transcode\Application\Service\MediaExecutionPolicy;
 use App\Transcode\Domain\Model\TranscodeJob;
 use App\Transcode\Domain\ValueObject\EncoderProfile;
 use App\Transcode\Domain\ValueObject\QualityTier;
@@ -40,7 +42,7 @@ final class TranscodeStreamManagerOwnershipTest extends TestCase
         self::assertTrue(mkdir($this->directory, 0700));
         $storage = $this->createStub(TranscodeStoragePortInterface::class);
         $storage->method('resolveJobDirectory')->willReturn($this->directory);
-        $encoder = new SegmentEncoder(new \App\Transcode\Application\Service\MediaExecutionPolicy(new \App\Shared\Application\DTO\DeploymentProfile()), $this->createStub(FFmpegPortInterface::class), $storage, EncoderProfile::software('libx265'));
+        $encoder = new SegmentEncoder(new MediaExecutionPolicy(new DeploymentProfile()), $this->createStub(FFmpegPortInterface::class), $storage, EncoderProfile::software('libx265'));
         $spawner = $this->createStub(ProcessSpawnerInterface::class);
         $spawner->method('spawn')->willReturnCallback(function (): mixed {
             // Deliberately reuse the process resource to prove stream identity
@@ -72,7 +74,7 @@ final class TranscodeStreamManagerOwnershipTest extends TestCase
             $callback?->__invoke();
         });
         $this->manager = new TranscodeStreamManager($availability, $storage, $encoder, new NullLogger(), $spawner);
-        $this->job = TranscodeJob::create(Uuid::generate(), QualityTier::p720(), $this->directory, \App\Shared\Domain\Model\Uuid::generate());
+        $this->job = TranscodeJob::create(Uuid::generate(), QualityTier::p720(), $this->directory, Uuid::generate());
         $this->start();
     }
 

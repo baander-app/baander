@@ -7,6 +7,7 @@ namespace App\Tests\Unit\Catalog\Interface\Resource;
 use App\Catalog\Domain\Model\Genre;
 use App\Catalog\Domain\Model\GenreState;
 use App\Catalog\Interface\Resource\GenreResource;
+use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
 use DateTimeImmutable;
 use PHPUnit\Framework\TestCase;
@@ -49,7 +50,7 @@ final class GenreResourceTest extends TestCase
         $childId = Uuid::generate();
         $child = Genre::reconstitute(new GenreState(
             id: $childId,
-            publicId: new \App\Shared\Domain\Model\PublicId(),
+            publicId: new PublicId(),
             name: 'Ambient',
             slug: 'ambient',
             mbid: null,

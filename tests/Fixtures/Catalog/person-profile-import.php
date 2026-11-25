@@ -9,7 +9,7 @@ use App\Shared\Application\Port\TransactionPortInterface;
 use App\Tests\Fixtures\Catalog\ArtistImportIdentityRace;
 use Doctrine\DBAL\Connection;
 
-[, $schema, $tmdbId, $imdbId] = $_SERVER['argv'] ?? throw new \LogicException('Run the Person import fixture from the console.');
+[, $schema, $tmdbId, $imdbId] = $_SERVER['argv'] ?? throw new LogicException('Run the Person import fixture from the console.');
 $connection = ArtistImportIdentityRace::connect($schema);
 $transaction = new class ($connection) implements TransactionPortInterface {
     public function __construct(private readonly Connection $connection) {}

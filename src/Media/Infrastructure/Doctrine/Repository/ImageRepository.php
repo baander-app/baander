@@ -448,9 +448,9 @@ final class ImageRepository implements ImageRepositoryInterface
     }
 
     /**
-     * @param \Doctrine\ORM\QueryBuilder $qb
+     * @param QueryBuilder $qb
      */
-    private function addOwnerCondition(\Doctrine\ORM\QueryBuilder $qb, string $imageableType, Uuid $ownerId): void
+    private function addOwnerCondition(QueryBuilder $qb, string $imageableType, Uuid $ownerId): void
     {
         match ($imageableType) {
             'album' => $qb->join('i.album', 'a')->andWhere('a.id = :ownerId'),

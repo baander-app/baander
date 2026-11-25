@@ -17,8 +17,8 @@ use App\QoL\Domain\Service\LearningModel;
 use App\QoL\Domain\Service\StreamGovernor;
 use App\QoL\Domain\ValueObject\EncoderWork;
 use App\QoL\Domain\ValueObject\UtilizationSample;
-use App\QoL\Infrastructure\QoLAdminService;
 use App\QoL\Infrastructure\HostCpus;
+use App\QoL\Infrastructure\QoLAdminService;
 use App\QoL\Infrastructure\StreamAdmissionService;
 use App\QoL\Infrastructure\Swoole\AlgorithmProfileTable;
 use App\QoL\Infrastructure\Swoole\Control\QoLLearningResetOperation;
@@ -40,10 +40,12 @@ use App\Shared\Infrastructure\Swoole\Control\ServerControlOperation;
 use App\Shared\Infrastructure\Swoole\Control\ServerControlOperationRegistry;
 use App\Shared\Infrastructure\Swoole\Control\SocketServerControlClient;
 use App\Shared\Infrastructure\Swoole\Control\SwooleServerWorkers;
+use App\Tests\Unit\QoL\QoLPublicIds;
 use App\Transcode\Infrastructure\Transcode\QualityLadderPort;
 use Psr\Log\NullLogger;
 use Swoole\Http\Request as SwooleRequest;
 use Swoole\Http\Response as SwooleResponse;
+use Swoole\Process;
 use Swoole\Server;
 use Swoole\WebSocket\Server as WebSocketServer;
 use SwooleBundle\SwooleBundle\Bridge\Symfony\Event\WorkerStartedEvent;
@@ -62,7 +64,7 @@ function probeFail(string $message): never
     fwrite(STDERR, $message . "\n");
     // From the console side, stop the server too, so the probe does not hang.
     if (isset($GLOBALS['master']) && getmypid() !== $GLOBALS['master']) {
-        Swoole\Process::kill($GLOBALS['master'], SIGTERM);
+        Process::kill($GLOBALS['master'], SIGTERM);
     }
     exit(1);
 }
@@ -176,7 +178,7 @@ $registry = new ServerControlOperationRegistry([
 $coordinator = new ServerControlCoordinator($registry, $workers, REPLY_TIMEOUT);
 $client = new SocketServerControlClient($socketPath, 5.0);
 $serverControl = new ServerControl($coordinator, $client);
-$qol = new QoLAdminService($serverControl, new \App\Tests\Unit\QoL\QoLPublicIds());
+$qol = new QoLAdminService($serverControl, new QoLPublicIds());
 $holder->controller = new QoLAdminController($qol);
 $pipeMessages = new ControlPipeMessageHandler($coordinator);
 
@@ -294,7 +296,7 @@ if ($child === 0) {
         probeFail('after reset and reload: ' . json_encode($report));
     }
 
-    Swoole\Process::kill($master, SIGTERM);
+    Process::kill($master, SIGTERM);
     exit(0);
 }
 

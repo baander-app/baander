@@ -4,11 +4,12 @@ declare(strict_types=1);
 
 namespace Baander\Deployment\Presets;
 
-use Baander\Core\EnvironmentVariable;
 use Baander\Configuration\ApplicationLayout;
-use Baander\Deployment\Profiles\ImageProfile;
+use Baander\Containers\Docker\Target;
+use Baander\Core\EnvironmentVariable;
 use Baander\Deployment\Database\Pooler;
 use Baander\Deployment\Observability\LogCollection;
+use Baander\Deployment\Profiles\ImageProfile;
 use Baander\Deployment\Workers\KillOrder;
 
 final class Renderer
@@ -127,7 +128,7 @@ final class Renderer
         $services['gateway']['networks'] = ['edge' => ['ipv4_address' => $configuration->edge->ipv4->gatewayAddress]
             + ($configuration->edge->ipv6 === null ? [] : ['ipv6_address' => $configuration->edge->ipv6->gatewayAddress])];
         if ($logging !== null) {
-            $target = \Baander\Containers\Docker\Target::fromArray($logging['target']);
+            $target = Target::fromArray($logging['target']);
             $groups = [['labels' => ['org.baander.preset' => $configuration->name, 'org.baander.preset.owner' => $owner]], ['labels' => ['app.baander.worker.namespace' => $configuration->name], 'serviceLabel' => 'app.baander.worker.role']];
             $services['log-agent'] = LogCollection::service($images['operator']['id'], $layout->root, $target, $logging['credentials'], LogCollection::configuration($configuration->name, $target, $groups));
             $services['log-agent']['networks'] = ['private'];

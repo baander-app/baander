@@ -13,22 +13,24 @@ use App\Catalog\Infrastructure\Doctrine\Entity\ArtistEntity;
 use App\Catalog\Infrastructure\Doctrine\Entity\ArtistSongEntity;
 use App\Catalog\Infrastructure\Doctrine\Entity\SongEntity;
 use App\Catalog\Infrastructure\Doctrine\Query\CatalogReadScopeQuery;
+use App\Shared\Domain\Exception\CursorMismatchException;
 use App\Shared\Domain\Model\CursorPage;
 use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\SearchOptions;
 use App\Shared\Domain\Model\SearchResult;
 use App\Shared\Domain\Model\Uuid;
-use App\Shared\Infrastructure\Doctrine\Repository\RefreshedEntityTrait;
 use App\Shared\Domain\ValueObject\LibraryReadScope;
 use App\Shared\Infrastructure\Doctrine\Repository\PgroongaSearchTrait;
+use App\Shared\Infrastructure\Doctrine\Repository\RefreshedEntityTrait;
 use App\Shared\Infrastructure\Doctrine\Type\InstantType;
 use App\Shared\Infrastructure\Pagination\CursorCodec;
 use App\Shared\Infrastructure\Pagination\CursorPaginator;
 use Doctrine\DBAL\ArrayParameterType;
 use Doctrine\ORM\EntityManagerInterface;
-use Doctrine\ORM\NoResultException;
 use Doctrine\ORM\NonUniqueResultException;
+use Doctrine\ORM\NoResultException;
 use Doctrine\ORM\Query;
+use Doctrine\ORM\QueryBuilder;
 
 /**
  * Pure domain repository for songs.
@@ -80,7 +82,7 @@ final class SongRepository implements SongRepositoryInterface
             ->getSingleScalarResult();
     }
 
-    private function visibleQuery(LibraryReadScope $scope): \Doctrine\ORM\QueryBuilder
+    private function visibleQuery(LibraryReadScope $scope): QueryBuilder
     {
         $qb = $this->entityManager
             ->getRepository(SongEntity::class)
@@ -469,7 +471,7 @@ final class SongRepository implements SongRepositoryInterface
 
         CatalogReadScopeQuery::apply($qb, $scope, 'song', 's');
 
-        $applyFilters = function (\Doctrine\ORM\QueryBuilder $qb, array $filters): void {
+        $applyFilters = function (QueryBuilder $qb, array $filters): void {
             foreach ($filters as $filter) {
                 match ($filter['field']) {
                     'genres' => $this->applyGenreFilter($qb, $filter['operator'], $filter['value']),
@@ -494,7 +496,7 @@ final class SongRepository implements SongRepositoryInterface
                 }
                 PublicId::fromString($cursorId);
             } catch (\InvalidArgumentException $exception) {
-                throw new \App\Shared\Domain\Exception\CursorMismatchException('Invalid cursor public identity.', previous: $exception);
+                throw new CursorMismatchException('Invalid cursor public identity.', previous: $exception);
             }
         }
 
@@ -731,7 +733,7 @@ final class SongRepository implements SongRepositoryInterface
 
     // --- Internal ---
 
-    private function applyArtistIdFilter(\Doctrine\ORM\QueryBuilder $qb, string $artistPublicId): void
+    private function applyArtistIdFilter(QueryBuilder $qb, string $artistPublicId): void
     {
         $artistEntity = $this->entityManager
             ->getRepository(ArtistEntity::class)
@@ -749,7 +751,7 @@ final class SongRepository implements SongRepositoryInterface
         ))->setParameter('artist_filter_id', $artistEntity->getId());
     }
 
-    private function applyAlbumIdFilter(\Doctrine\ORM\QueryBuilder $qb, string $albumPublicId): void
+    private function applyAlbumIdFilter(QueryBuilder $qb, string $albumPublicId): void
     {
         $albumEntity = $this->entityManager
             ->getRepository(AlbumEntity::class)
@@ -764,7 +766,7 @@ final class SongRepository implements SongRepositoryInterface
             ->setParameter('album_filter_id', $albumEntity->getId());
     }
 
-    private function resolveSortColumn(SongSortField $sortField, \Doctrine\ORM\QueryBuilder $qb): string
+    private function resolveSortColumn(SongSortField $sortField, QueryBuilder $qb): string
     {
         return match ($sortField) {
             SongSortField::Title => 's.title',
@@ -783,7 +785,7 @@ final class SongRepository implements SongRepositoryInterface
      * the keyset condition is a WHERE clause, so an aggregate with GROUP BY
      * cannot be used.
      */
-    private function joinArtistForSort(\Doctrine\ORM\QueryBuilder $qb): string
+    private function joinArtistForSort(QueryBuilder $qb): string
     {
         $qb->leftJoin(ArtistSongEntity::class, 'ass_sort', 'WITH', "ass_sort.song = s.id AND ass_sort.role = 'primary'")
             ->leftJoin(ArtistEntity::class, 'ar_sort', 'WITH', 'ar_sort.id = ass_sort.artist')
@@ -803,7 +805,7 @@ final class SongRepository implements SongRepositoryInterface
         return "CASE WHEN ar_sort.id IS NULL THEN '' ELSE ass_sort.creditedName END";
     }
 
-    private function joinAlbumForSort(\Doctrine\ORM\QueryBuilder $qb): string
+    private function joinAlbumForSort(QueryBuilder $qb): string
     {
         $qb->leftJoin(AlbumEntity::class, 'al_sort', 'WITH', 'al_sort.id = s.album');
         return 'al_sort.title';
@@ -824,13 +826,13 @@ final class SongRepository implements SongRepositoryInterface
         };
     }
 
-    private function joinAlbumYearForSort(\Doctrine\ORM\QueryBuilder $qb): string
+    private function joinAlbumYearForSort(QueryBuilder $qb): string
     {
         $qb->leftJoin(AlbumEntity::class, 'al_y_sort', 'WITH', 'al_y_sort.id = s.album');
         return 'al_y_sort.year';
     }
 
-    private function applyGenreFilter(\Doctrine\ORM\QueryBuilder $qb, string $operator, mixed $value): void
+    private function applyGenreFilter(QueryBuilder $qb, string $operator, mixed $value): void
     {
         if (!is_string($value) || $value === '') {
             return;
@@ -866,7 +868,7 @@ final class SongRepository implements SongRepositoryInterface
         }
     }
 
-    private function applyPublicIdsFilter(\Doctrine\ORM\QueryBuilder $qb, string $publicIds): void
+    private function applyPublicIdsFilter(QueryBuilder $qb, string $publicIds): void
     {
         if ($publicIds === '') {
             return;

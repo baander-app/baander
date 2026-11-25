@@ -6,6 +6,7 @@ namespace App\Tests\Unit\Scheduler\Application\DTO;
 
 use App\Scheduler\Application\DTO\SchedulerOccurrence;
 use App\Scheduler\Domain\ValueObject\JobType;
+use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
 use DateTimeImmutable;
 use Error;
@@ -155,6 +156,6 @@ final class SchedulerOccurrenceTest extends TestCase
     /** @param array<array-key,mixed> $parameters */
     private function occurrence(?DateTimeImmutable $scheduledFor = null, string $command = 'app:occurrence', array $parameters = []): SchedulerOccurrence
     {
-        return new SchedulerOccurrence(new Uuid(), new Uuid(), $scheduledFor ?? new DateTimeImmutable('2026-10-02T08:15:00Z'), JobType::Console, $command, $parameters, jobPublicId: new \App\Shared\Domain\Model\PublicId());
+        return new SchedulerOccurrence(new Uuid(), new Uuid(), $scheduledFor ?? new DateTimeImmutable('2026-10-02T08:15:00Z'), JobType::Console, $command, $parameters, jobPublicId: new PublicId());
     }
 }

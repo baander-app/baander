@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Baander\RegistryTests;
 
+use Swoole\Coroutine;
+
 final class ObserverServer
 {
     public static function run(string $directory, int $node, int $upstreamPort, int $port): void
@@ -27,7 +29,7 @@ final class ObserverServer
             file_put_contents("{$directory}/observer.ready", 'ready');
             try {
                 while (($client = @stream_socket_accept($listener, -1)) !== false) {
-                    \Swoole\Coroutine::create(static function () use ($client, $directory, $node, $upstreamPort): void {
+                    Coroutine::create(static function () use ($client, $directory, $node, $upstreamPort): void {
                         $upstream = null;
                         try {
                             stream_set_timeout($client, 4);

@@ -4,13 +4,17 @@ declare(strict_types=1);
 
 namespace Baander\DevEnvironment\Tests;
 
-use Baander\DevEnvironment\Tests\Support\ImageRecordingRunner;
-use Baander\DevEnvironment\Release\ReleaseBuilder;
 use Baander\Configuration\ToolingConfiguration;
-use Baander\Tests\Tooling\Support\DevelopmentCommandExecutor;
+use Baander\Containers\Resources\ResourceLedger;
+use Baander\DevEnvironment\Host\ProcessEnvironment;
+use Baander\DevEnvironment\Release\ReleaseBuilder;
 use Baander\DevEnvironment\State\InstanceStateStore;
+use Baander\DevEnvironment\Tests\Support\ImageRecordingRunner;
 use Baander\DevEnvironment\WorkflowError;
+use Baander\Filesystem\AtomicFile;
+use Baander\Process\Execution\CommandFailure;
 use Baander\Process\Execution\ProcessResult;
+use Baander\Tests\Tooling\Support\DevelopmentCommandExecutor;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
@@ -46,7 +50,7 @@ final class DevelopmentImagePinsTest extends TestCase
             'docker' => DevelopmentCommandExecutor::target($this->docker, 'owned', 'daemon'),
         ];
         $store->save($this->instance['id'], $this->instance);
-        \Baander\Filesystem\AtomicFile::writeJson($store->directory($this->instance['id']) . '/env.json', ['APP_SECRET' => 'fixture']);
+        AtomicFile::writeJson($store->directory($this->instance['id']) . '/env.json', ['APP_SECRET' => 'fixture']);
         $this->builder = new ReleaseBuilder($store, $this->runner, ToolingConfiguration::resolve(['images' => ['developmentRedis' => ['reference' => 'registry.baander.app/redis:new']]]));
     }
 
@@ -215,7 +219,7 @@ final class DevelopmentImagePinsTest extends TestCase
         try {
             $this->builder->prepare($this->instance);
             self::fail('Expected interrupted creation');
-        } catch (\Baander\Process\Execution\CommandFailure $error) {
+        } catch (CommandFailure $error) {
             self::assertSame(9, $error->getCode());
             $creates = array_values(array_filter($this->runner->calls, static fn(array $args): bool => in_array('create', $args, true)));
             self::assertCount(1, $creates);
@@ -240,13 +244,13 @@ final class DevelopmentImagePinsTest extends TestCase
             self::assertStringContainsString('removal denied', $error->getMessage());
             $receipts = glob($this->root . '/state/*/builds/*-frontend-resources.json');
             self::assertCount(1, $receipts);
-            $receipt = \Baander\Filesystem\AtomicFile::readJson($receipts[0]);
+            $receipt = AtomicFile::readJson($receipts[0]);
             $resource = $receipt['resources'][0];
             self::assertSame(hash('sha256', $resource['name']), $resource['id']);
             self::assertEquals($this->instance['docker'], $receipt['target']);
             self::assertFileExists($this->root . '/resource.json');
             unlink($this->root . '/fail-remove');
-            $report = \Baander\Containers\Resources\ResourceLedger::recover($receipts[0], \Baander\DevEnvironment\Host\ProcessEnvironment::clean(), 10);
+            $report = ResourceLedger::recover($receipts[0], ProcessEnvironment::clean(), 10);
             self::assertTrue($report->successful(), $report->message());
             self::assertFileDoesNotExist($this->root . '/resource.json');
             self::assertFileDoesNotExist($receipts[0]);

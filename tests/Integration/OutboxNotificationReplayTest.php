@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Tests\Integration;
 
-use App\Tests\Fixtures\Messaging\MessageCodecFactory;
 use App\Auth\Domain\Event\UserRegistered;
 use App\Auth\Infrastructure\Event\AdminAlertSubscriber;
 use App\Notification\Application\DTO\CreateNotificationCommand;
@@ -23,18 +22,23 @@ use App\Shared\Infrastructure\Event\NotificationDeliveryBus;
 use App\Shared\Infrastructure\Event\NotificationDeliveryRepository;
 use App\Shared\Infrastructure\Event\NotificationReplayDispatcher;
 use App\Shared\Infrastructure\Event\OutboxEventDispatcher;
+use App\Shared\Infrastructure\Messaging\AsyncWorkloadCatalog;
+use App\Tests\Fixtures\Messaging\MessageCodecFactory;
+use App\Tests\Fixtures\Messaging\MessengerConfiguration;
+use App\Tests\Support\FinalSchemaBootstrap;
 use Doctrine\DBAL\Connection;
 use Doctrine\DBAL\DriverManager;
 use Doctrine\DBAL\Exception\DriverException;
 use Doctrine\DBAL\Tools\DsnParser;
 use Doctrine\ORM\EntityManagerInterface;
 use Doctrine\Persistence\ManagerRegistry;
+use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
 use RuntimeException;
 use Symfony\Component\EventDispatcher\EventDispatcher;
-use Symfony\Component\Messenger\Handler\HandlersLocator;
 use Symfony\Component\Messenger\Exception\HandlerFailedException;
+use Symfony\Component\Messenger\Handler\HandlersLocator;
 use Symfony\Component\Messenger\MessageBus;
 use Symfony\Component\Messenger\Middleware\HandleMessageMiddleware;
 
@@ -59,7 +63,7 @@ final class OutboxNotificationReplayTest extends TestCase
         foreach ([$this->first, $this->second] as $connection) {
             $connection->executeStatement('SET search_path TO ' . $this->schema . ', public');
         }
-        \App\Tests\Support\FinalSchemaBootstrap::bootstrap($this->first);
+        FinalSchemaBootstrap::bootstrap($this->first);
         $this->first->executeStatement("INSERT INTO domain_event_outbox (event_class, event_name, payload, created_at) VALUES ('Event', 'test', '{}'::jsonb, now())");
         $this->first->executeStatement('CREATE TABLE replay_notifications (id TEXT PRIMARY KEY, kind TEXT NOT NULL)');
     }
@@ -87,8 +91,8 @@ final class OutboxNotificationReplayTest extends TestCase
 
         $this->replayer($this->second, $this->notificationListeners($this->second))->dispatch($event, 1);
         $this->assertCounts($this->first, 2, 3, 1);
-        $configuration = \App\Tests\Fixtures\Messaging\MessengerConfiguration::container();
-        $catalog = new \App\Shared\Infrastructure\Messaging\AsyncWorkloadCatalog(
+        $configuration = MessengerConfiguration::container();
+        $catalog = new AsyncWorkloadCatalog(
             $configuration->getParameter('app.messenger.workloads'), $configuration->getParameter('app.messenger.transport_policies'),
         );
         foreach ($this->first->fetchAllAssociative('SELECT payload FROM domain_event_outbox_delivery') as $row) {
@@ -208,7 +212,7 @@ final class OutboxNotificationReplayTest extends TestCase
         $manager->method('getConnection')->willReturn($connection);
         $manager->method('isOpen')->willReturn(true);
         if ($expectsRollback) {
-            self::assertInstanceOf(\PHPUnit\Framework\MockObject\MockObject::class, $manager);
+            self::assertInstanceOf(MockObject::class, $manager);
             $manager->expects($this->once())->method('clear');
         }
         $registry = $this->createStub(ManagerRegistry::class);

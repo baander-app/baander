@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Notification\Domain\ValueObject;
 
+use App\Auth\Domain\Event\PasswordChanged;
+use App\Catalog\Domain\Event\AlbumCreated;
+use App\Library\Domain\Event\LibraryScanCompleted;
 use App\Notification\Domain\Service\EventCategoryResolver;
 use App\Notification\Domain\ValueObject\NotificationCategory;
 use PHPUnit\Framework\TestCase;
@@ -60,17 +63,17 @@ final class EventCategoryResolverTest extends TestCase
     {
         $this->assertSame(
             NotificationCategory::Security,
-            $this->resolver->resolve(\App\Auth\Domain\Event\PasswordChanged::class),
+            $this->resolver->resolve(PasswordChanged::class),
         );
 
         $this->assertSame(
             NotificationCategory::BackgroundJobs,
-            $this->resolver->resolve(\App\Library\Domain\Event\LibraryScanCompleted::class),
+            $this->resolver->resolve(LibraryScanCompleted::class),
         );
 
         $this->assertSame(
             NotificationCategory::MediaChanges,
-            $this->resolver->resolve(\App\Catalog\Domain\Event\AlbumCreated::class),
+            $this->resolver->resolve(AlbumCreated::class),
         );
     }
 }

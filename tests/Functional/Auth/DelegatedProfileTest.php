@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Tests\Functional\Auth;
 
 use App\Tests\Functional\TestCase;
+use Symfony\Component\HttpFoundation\Response;
 
 /** What a delegated token reads of its user's own profile. */
 final class DelegatedProfileTest extends TestCase
@@ -51,7 +52,7 @@ final class DelegatedProfileTest extends TestCase
     }
 
     /** @return array<string, mixed> */
-    private function data(\Symfony\Component\HttpFoundation\Response $response): array
+    private function data(Response $response): array
     {
         $body = json_decode((string) $response->getContent(), true, flags: JSON_THROW_ON_ERROR);
         self::assertIsArray($body['data']);

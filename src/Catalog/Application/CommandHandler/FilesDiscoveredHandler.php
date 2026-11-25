@@ -29,14 +29,15 @@ use App\Library\Application\Message\FilesDiscovered;
 use App\Library\Application\Port\LibraryMediaFilesInterface;
 use App\Library\Application\Port\LibraryMediaFileVerdict;
 use App\Lyrics\Application\Port\LyricsFetchRequestInterface;
+use App\Metadata\Application\Command\ExtractAlbumCoverCommand;
 use App\Shared\Application\Port\TransactionPortInterface;
 use App\Shared\Domain\Model\Uuid;
 use App\Shared\Domain\ValueObject\MediaContainer;
 use App\Shared\Domain\ValueObject\MediaKind;
-use App\Transcode\Application\Exception\UnsupportedMediaContainerException;
-use App\Transcode\Application\Port\VideoProbePortInterface;
 use App\Transcode\Application\DTO\AudioProbeResult;
+use App\Transcode\Application\Exception\UnsupportedMediaContainerException;
 use App\Transcode\Application\Port\AudioProbePortInterface;
+use App\Transcode\Application\Port\VideoProbePortInterface;
 use Psr\Log\LoggerInterface;
 use RuntimeException;
 use Symfony\Component\Messenger\Attribute\AsMessageHandler;
@@ -1540,7 +1541,7 @@ final class FilesDiscoveredHandler
     private function dispatchCoverExtraction(Album $album): void
     {
         $this->messageBus->dispatch(
-            new \App\Metadata\Application\Command\ExtractAlbumCoverCommand($album->getId()),
+            new ExtractAlbumCoverCommand($album->getId()),
         );
     }
 }

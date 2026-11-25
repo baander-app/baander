@@ -16,6 +16,7 @@ use App\Shared\Domain\Model\Uuid;
 use App\Tests\Fixtures\Session\PlaybackPersistenceFixture;
 use App\Tests\Support\FinalSchemaBootstrap;
 use Doctrine\DBAL\Connection;
+use Doctrine\DBAL\Exception\DriverException;
 use Doctrine\ORM\EntityManager;
 use PHPUnit\Framework\TestCase;
 
@@ -282,7 +283,7 @@ final class ConfirmedPausedRunnerPersistenceTest extends TestCase
             try {
                 $connection->executeStatement($change, ['command' => $fixture['command']]);
                 self::fail($change);
-            } catch (\Doctrine\DBAL\Exception\DriverException $error) {
+            } catch (DriverException $error) {
                 self::assertStringContainsString('chk_playback_commands_settled_revision', $error->getMessage(), $change);
             }
         }

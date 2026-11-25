@@ -5,8 +5,9 @@ declare(strict_types=1);
 namespace App\Media\Application\DTO;
 
 use App\Transcode\Application\DTO\CompletedVideoArtifact;
+use Symfony\Component\DependencyInjection\Attribute\Exclude;
 
-#[\Symfony\Component\DependencyInjection\Attribute\Exclude]
+#[Exclude]
 final readonly class DeliveryDecision
 {
     public function __construct(

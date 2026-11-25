@@ -5,8 +5,8 @@ declare(strict_types=1);
 namespace Tests\Unit\Transcode\Infrastructure\FFmpeg;
 
 use App\Transcode\Domain\ValueObject\AudioProfile;
-use App\Transcode\Domain\ValueObject\LoudnessStandard;
 use App\Transcode\Domain\ValueObject\ColorSpace;
+use App\Transcode\Domain\ValueObject\LoudnessStandard;
 use App\Transcode\Domain\ValueObject\VideoProbeResult;
 use App\Transcode\Infrastructure\FFmpeg\AudioFilterBuilder;
 use PHPUnit\Framework\TestCase;
@@ -281,7 +281,7 @@ final class AudioFilterBuilderTest extends TestCase
     }
     public function testSideSurroundProbeSelectsTheSourceChannelNames(): void
     {
-        $probe = \App\Transcode\Domain\ValueObject\VideoProbeResult::fromProbeOutput([
+        $probe = VideoProbeResult::fromProbeOutput([
             'streams' => [['codec_type' => 'audio', 'channels' => 6, 'channel_layout' => '5.1(side)']],
         ]);
         $filter = AudioFilterBuilder::create()->downmix($probe, AudioProfile::streamingStereo())->build();

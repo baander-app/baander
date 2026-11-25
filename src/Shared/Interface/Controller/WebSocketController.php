@@ -4,12 +4,6 @@ declare(strict_types=1);
 
 namespace App\Shared\Interface\Controller;
 
-use App\Shared\Domain\Model\PublicId;
-use App\Shared\Application\Exception\HandlerFailure;
-use App\Shared\Application\Exception\NotFoundException;
-use App\Shared\Application\LiveUpdates\LiveSubscription;
-use App\Shared\Application\LiveUpdates\LiveSubscriptions;
-use App\Shared\Application\Port\WebSocketIdentityLookupInterface;
 use App\Party\Application\Command\JoinPartySessionCommand;
 use App\Party\Application\Command\LeavePartySessionCommand;
 use App\Party\Application\Command\PausePlaybackCommand;
@@ -17,7 +11,15 @@ use App\Party\Application\Command\SeekPlaybackCommand;
 use App\Party\Application\Command\StartPlaybackCommand;
 use App\Party\Application\Command\SyncPlaybackCommand;
 use App\Party\Domain\ValueObject\PlaybackAction;
+use App\Shared\Application\Exception\ConflictException;
+use App\Shared\Application\Exception\HandlerFailure;
+use App\Shared\Application\Exception\InvalidInputException;
+use App\Shared\Application\Exception\NotFoundException;
+use App\Shared\Application\LiveUpdates\LiveSubscription;
+use App\Shared\Application\LiveUpdates\LiveSubscriptions;
 use App\Shared\Application\Port\ListeningSessionInteractionInterface;
+use App\Shared\Application\Port\WebSocketIdentityLookupInterface;
+use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
 use App\Shared\Infrastructure\Messenger\Stamp\PartyMemberResultStamp;
 use App\Shared\Infrastructure\Swoole\WebSocketConnectionRegistry;
@@ -30,10 +32,10 @@ use Psr\Log\LoggerInterface;
 use SwooleBundle\SwooleBundle\Bridge\Symfony\HttpKernel\AbstractWebSocketController;
 use Symfony\Component\Messenger\Exception\HandlerFailedException;
 use Symfony\Component\Messenger\MessageBusInterface;
+use Symfony\Component\Messenger\Stamp\HandledStamp;
 use Symfony\Component\Serializer\Encoder\JsonEncoder;
 use Symfony\Component\Serializer\Exception\NotEncodableValueException;
 use Throwable;
-
 use function count;
 use function is_array;
 use function is_string;
@@ -675,7 +677,7 @@ final class WebSocketController extends AbstractWebSocketController
                     (float) $latency,
                 ),
             );
-            $serverPosition = $envelope->last(\Symfony\Component\Messenger\Stamp\HandledStamp::class)?->getResult();
+            $serverPosition = $envelope->last(HandledStamp::class)?->getResult();
             if (
                 (!is_int($serverPosition) && !is_float($serverPosition))
                 || !is_finite((float) $serverPosition)
@@ -728,11 +730,11 @@ final class WebSocketController extends AbstractWebSocketController
             $endpoint = $this->playbackEndpoints[$fd] ?? null;
             $this->listeningSessions->bindPlayback($fd, $owner, $endpoint['incarnationId'] ?? null, $endpoint['capability'] ?? null);
             $this->pusher->pushToConnection($fd, ['type' => 'session.snapshot', 'data' => $result]);
-        } catch (\Throwable $error) {
+        } catch (Throwable $error) {
             if (!$this->isCurrentConnection($fd, $generation)) {
                 return;
             }
-            $this->pusher->pushToConnection($fd, ['type' => 'session.error', 'message' => $error instanceof \App\Shared\Application\Exception\ConflictException || $error instanceof \App\Shared\Application\Exception\InvalidInputException || $error instanceof \DomainException || $error instanceof \InvalidArgumentException ? $error->getMessage() : 'Playback coordination failed.']);
+            $this->pusher->pushToConnection($fd, ['type' => 'session.error', 'message' => $error instanceof ConflictException || $error instanceof InvalidInputException || $error instanceof \DomainException || $error instanceof InvalidArgumentException ? $error->getMessage() : 'Playback coordination failed.']);
         }
     }
 

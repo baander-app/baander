@@ -4,17 +4,22 @@ declare(strict_types=1);
 
 namespace Baander\DevEnvironment\Runtime;
 
-use Baander\Core\EnvironmentVariable;
 use Baander\Configuration\ApplicationLayout;
-use Baander\Process\Execution\CommandExecutor;
-use Baander\Process\Execution\ProcessSpec;
-use Baander\Process\Execution\CompletionPolicy;
-use Baander\Filesystem\AtomicFile;
-use Baander\Filesystem\PrivateDirectory;
+use Baander\Containers\Docker\Client;
+use Baander\Containers\Resources\DisposableContainer;
+use Baander\Containers\Resources\ResourceKind;
+use Baander\Containers\Resources\ResourceLedger;
+use Baander\Core\EnvironmentVariable;
 use Baander\DevEnvironment\Host\CapturedConnections;
-use Baander\DevEnvironment\State\InstanceStateStore;
 use Baander\DevEnvironment\Host\ProcessEnvironment;
+use Baander\DevEnvironment\State\InstanceStateStore;
 use Baander\DevEnvironment\WorkflowError;
+use Baander\Filesystem\AtomicFile;
+use Baander\Filesystem\Paths;
+use Baander\Filesystem\PrivateDirectory;
+use Baander\Process\Execution\CommandExecutor;
+use Baander\Process\Execution\CompletionPolicy;
+use Baander\Process\Execution\ProcessSpec;
 
 class InstanceBootstrap
 {
@@ -206,7 +211,7 @@ class InstanceBootstrap
             EnvironmentVariable::MEDIA_STORAGE_PATH => $storage . '/media',
             EnvironmentVariable::CONVERT_STORAGE_PATH => $storage . '/conversions',
         ] as $key => $default) {
-            $target = \Baander\Filesystem\Paths::absolutePath($environment[$key] ?? $default);
+            $target = Paths::absolutePath($environment[$key] ?? $default);
             if (self::covers($target, $storage) || self::covers($storage, $target)) {
                 throw new WorkflowError('Unsupported adoption topology: ' . $key . ' overlaps writable storage at ' . $storage . '. Preserve the original deployment and prepare distinct source, conversion and storage paths before adoption.');
             }
@@ -314,7 +319,7 @@ CODE;
     }
 
     /** @param array<string,mixed> $app */
-    private function imageLayout(\Baander\Containers\Docker\Client $docker, array $app): ApplicationLayout
+    private function imageLayout(Client $docker, array $app): ApplicationLayout
     {
         $images = json_decode($docker->run(['image', 'inspect', $app['Image']])->stdout, true, flags: JSON_THROW_ON_ERROR);
         $image = $images[0] ?? null;
@@ -332,7 +337,7 @@ CODE;
     /** @param array<string,mixed> $app
      * @param array<string,string> $environment
      */
-    public function verifyApplicationIdentity(\Baander\Containers\Docker\Client $docker, array $app, array $environment): void
+    public function verifyApplicationIdentity(Client $docker, array $app, array $environment): void
     {
         $layout = $this->imageLayout($docker, $app);
         $keys = [EnvironmentVariable::APP_SECRET, EnvironmentVariable::STREAM_URL_HMAC_SECRET, EnvironmentVariable::VAPID_PRIVATE_KEY, EnvironmentVariable::VAPID_PUBLIC_KEY];
@@ -481,7 +486,7 @@ CODE;
      * @param array<string,mixed> $instance
      * @param array<string,mixed> $release
      */
-    private function transferVolume(array &$instance, array $release, \Baander\Containers\Docker\Client $docker, string $key, string $destination, string $archive): void
+    private function transferVolume(array &$instance, array $release, Client $docker, string $key, string $destination, string $archive): void
     {
         $saved = $instance['adoption_transfer'][$key] ?? null;
         if ($saved !== null) {
@@ -513,16 +518,16 @@ CODE;
     }
 
     /** @param array<string,mixed> $release */
-    public function restoreArchive(\Baander\Containers\Docker\Client $docker, array $release, string $destination, string $archive): void
+    public function restoreArchive(Client $docker, array $release, string $destination, string $archive): void
     {
         $helper = 'baander-adoption-copy-' . bin2hex(random_bytes(8));
         $receipt = dirname($archive) . '/restore-' . hash('sha256', $destination) . '-resources.json';
         if (file_exists($receipt) || is_link($receipt)) {
             throw new WorkflowError('Recover the unresolved adoption helper before retrying: ' . $receipt);
         }
-        $ledger = new \Baander\Containers\Resources\ResourceLedger($receipt, $docker, $this->connections->environment());
+        $ledger = new ResourceLedger($receipt, $docker, $this->connections->environment());
         $ledger->scoped(function () use ($ledger, $docker, $helper, $release, $destination, $archive): void {
-            $ledger->create(\Baander\Containers\Resources\ResourceKind::Container, $helper, [
+            $ledger->create(ResourceKind::Container, $helper, [
                 '--network',
                 'none',
                 '--user',
@@ -592,7 +597,7 @@ CODE;
             $application = new ComposeRuntime($this->store, $this->runner, $this->connections)->applicationContainer($instance, $release, [
                 'php', 'bin/console', 'app:dev:setup', '--origin=https://' . $instance['hostname'], '--no-interaction',
             ]);
-            \Baander\Containers\Resources\DisposableContainer::run(
+            DisposableContainer::run(
                 $docker,
                 $this->store->directory($instance['id']) . '/initialize-resources.json',
                 $application['arguments'],

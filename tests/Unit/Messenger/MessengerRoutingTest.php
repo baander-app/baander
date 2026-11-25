@@ -12,6 +12,7 @@ use App\Metadata\Application\Message\SyncMovieMessage;
 use App\Metadata\Application\Message\SyncPeopleMessage;
 use App\Metadata\Application\Message\SyncTvLibraryMessage;
 use App\Notification\Application\DTO\SendPushToSubscriptionCommand;
+use App\Notification\Application\DTO\SendWebhookCommand;
 use App\Scheduler\Application\Command\ExecuteScheduledOccurrenceCommand;
 use App\Tests\Fixtures\Messaging\FailureTransportProbe;
 use App\Tests\Fixtures\Messaging\MessengerConfiguration;
@@ -35,12 +36,12 @@ final class MessengerRoutingTest extends TestCase
         self::assertSame('async', $config['routing'][PrepareTimelinePreview::class]);
         self::assertSame('async', $config['routing'][SendPushToSubscriptionCommand::class]);
         self::assertArrayNotHasKey(FetchLyricsCommand::class, $config['routing']);
-        self::assertArrayNotHasKey(\App\Notification\Application\DTO\SendWebhookCommand::class, $config['routing']);
+        self::assertArrayNotHasKey(SendWebhookCommand::class, $config['routing']);
         self::assertArrayNotHasKey(FailureTransportProbe::class, $config['routing']);
         $workloads = MessengerConfiguration::container()->getParameter('app.messenger.workloads');
         self::assertCount(25, $workloads);
         self::assertSame(['transport' => 'async', 'resource_class' => 'io', 'default' => false], $workloads[FetchLyricsCommand::class]);
-        self::assertSame(['transport' => 'async', 'resource_class' => 'io', 'default' => false], $workloads[\App\Notification\Application\DTO\SendWebhookCommand::class]);
+        self::assertSame(['transport' => 'async', 'resource_class' => 'io', 'default' => false], $workloads[SendWebhookCommand::class]);
     }
 
     public function testTestEnvironmentAddsOnlyTheExplicitFailureProbe(): void

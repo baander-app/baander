@@ -17,7 +17,7 @@ final class Controller
     {
     }
 
-    public function fullyQualified(#[\Symfony\Component\HttpKernel\Attribute\MapRequestPayload] object $payload): void
+    public function fullyQualified(#[Payload] object $payload): void
     {
     }
 
@@ -33,7 +33,7 @@ final class Controller
     {
     }
 
-    public function fullyQualifiedMissing(#[\Symfony\Component\HttpKernel\Attribute\MapRequestPayload] $payload): void
+    public function fullyQualifiedMissing(#[Payload] $payload): void
     {
     }
 

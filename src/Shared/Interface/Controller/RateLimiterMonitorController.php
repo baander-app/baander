@@ -5,10 +5,12 @@ declare(strict_types=1);
 namespace App\Shared\Interface\Controller;
 
 use App\Shared\Application\Service\RateLimiterClearer;
+use App\Shared\Interface\Attribute\CliCounterpart;
+use App\Shared\Interface\DTO\ApiError;
+use App\Shared\Interface\DTO\ValidationError;
+use Baander\RedisRateLimiter\Administration\RateLimiterAdministrationInterface;
 use Baander\RedisRateLimiter\Exception\RateLimiterClearFailedException;
 use Baander\RedisRateLimiter\Exception\UnknownRateLimiterException;
-use Baander\RedisRateLimiter\Administration\RateLimiterAdministrationInterface;
-use App\Shared\Interface\Attribute\CliCounterpart;
 use OpenApi\Spec as OA;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
@@ -148,21 +150,21 @@ final class RateLimiterMonitorController
                 response: '403',
                 description: 'Only a super admin clears rate limiters',
                 content: new OA\MediaType\Json(
-                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                    schema: new OA\Schema(ref: ApiError::class),
                 ),
             ),
             new OA\Response(
                 response: '422',
                 description: 'Missing confirm parameter',
                 content: new OA\MediaType\Json(
-                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ValidationError::class),
+                    schema: new OA\Schema(ref: ValidationError::class),
                 ),
             ),
             new OA\Response(
                 response: '503',
                 description: 'Limiter state could not be cleared',
                 content: new OA\MediaType\Json(
-                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                    schema: new OA\Schema(ref: ApiError::class),
                 ),
             ),
         ],
@@ -239,28 +241,28 @@ final class RateLimiterMonitorController
                 response: '403',
                 description: 'Only a super admin clears rate limiters',
                 content: new OA\MediaType\Json(
-                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                    schema: new OA\Schema(ref: ApiError::class),
                 ),
             ),
             new OA\Response(
                 response: '404',
                 description: 'Unknown limiter name',
                 content: new OA\MediaType\Json(
-                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                    schema: new OA\Schema(ref: ApiError::class),
                 ),
             ),
             new OA\Response(
                 response: '422',
                 description: 'Missing confirm parameter',
                 content: new OA\MediaType\Json(
-                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ValidationError::class),
+                    schema: new OA\Schema(ref: ValidationError::class),
                 ),
             ),
             new OA\Response(
                 response: '503',
                 description: 'Storage namespace clear failed',
                 content: new OA\MediaType\Json(
-                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                    schema: new OA\Schema(ref: ApiError::class),
                 ),
             ),
         ],

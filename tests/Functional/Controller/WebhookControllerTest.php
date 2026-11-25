@@ -10,6 +10,7 @@ use App\Notification\Infrastructure\Doctrine\Entity\WebhookEntity;
 use App\Shared\Domain\Model\PublicId;
 use App\Tests\Functional\Notification\WebhookDnsStub;
 use App\Tests\Functional\TestCase;
+use Doctrine\ORM\Tools\SchemaTool;
 
 /**
  * Functional tests for outgoing webhook management (Notification bounded context).
@@ -320,7 +321,7 @@ final class WebhookControllerTest extends TestCase
     public function testFreshSchemaAndGeneratedMappingRequireOnlyEncryptedSecrets(): void
     {
         $metadata = $this->entityManager->getClassMetadata(WebhookEntity::class);
-        $sql = (new \Doctrine\ORM\Tools\SchemaTool($this->entityManager))->getCreateSchemaSql([$metadata]);
+        $sql = (new SchemaTool($this->entityManager))->getCreateSchemaSql([$metadata]);
         $ddl = implode("\n", $sql);
         $this->assertStringContainsString('encrypted_secret TEXT NOT NULL', $ddl);
         $this->assertStringNotContainsString('secret_hash', $ddl);

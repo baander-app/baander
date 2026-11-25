@@ -1,9 +1,10 @@
 <?php
 
 declare(strict_types=1);
+use Baander\DevRegistry\ContainerQualification;
 
 require dirname(__DIR__, 4) . '/scripts/bootstrap.php';
-$workflow = new Baander\DevRegistry\ContainerQualification($_SERVER['argv'][1]);
+$workflow = new ContainerQualification($_SERVER['argv'][1]);
 if (getenv('REGISTRY_TEST_CLOSE_FAILURE') === '1') {
     $executor = new ReflectionProperty($workflow, 'runner')->getValue($workflow);
     $runner = new ReflectionProperty($executor, 'runner')->getValue($executor);

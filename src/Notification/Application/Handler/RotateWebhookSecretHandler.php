@@ -9,6 +9,7 @@ use App\Notification\Application\DTO\RotateWebhookSecretCommand;
 use App\Notification\Application\Port\WebhookRepositoryInterface;
 use App\Notification\Application\Port\WebhookSecretPortInterface;
 use App\Notification\Application\Service\WebhookInput;
+use App\Shared\Application\Exception\InvalidInputException;
 use App\Shared\Application\Exception\NotFoundException;
 use Symfony\Component\Messenger\Attribute\AsMessageHandler;
 
@@ -24,7 +25,7 @@ final readonly class RotateWebhookSecretHandler
      * @return IssuedWebhookSecret the webhook, with its own signing version, and the new plain secret,
      *                             which is not available again
      *
-     * @throws \App\Shared\Application\Exception\InvalidInputException when the ID is not a public ID
+     * @throws InvalidInputException when the ID is not a public ID
      * @throws NotFoundException                                         when no webhook has the ID
      */
     #[AsMessageHandler]

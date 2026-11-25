@@ -15,6 +15,7 @@ use App\Auth\Application\Command\User\ResetUserTotpCommand;
 use App\Auth\Application\Command\User\SetUserPasswordCommand;
 use App\Auth\Application\Command\User\SetUserRolesCommand;
 use App\Auth\Application\DTO\UserPage;
+use App\Auth\Application\Exception\UserNotFoundException;
 use App\Auth\Application\Port\AuthenticatedUserIdentityInterface;
 use App\Auth\Application\Port\UserPortInterface;
 use App\Auth\Application\Query\User\ListUsersQuery;
@@ -25,8 +26,11 @@ use App\Auth\Interface\Request\Admin\AdminResetPasswordRequest;
 use App\Auth\Interface\Request\Admin\AdminUpdateUserRequest;
 use App\Auth\Interface\Resource\AdminUserResource;
 use App\Shared\Domain\Model\Email;
+use App\Shared\Domain\Model\PublicId;
 use App\Shared\Interface\Attribute\CliCounterpart;
 use App\Shared\Interface\Controller\ApiResponsesTrait;
+use App\Shared\Interface\DTO\ApiError;
+use App\Shared\Interface\DTO\ValidationError;
 use App\Shared\Interface\Request\QueryParameters;
 use OpenApi\Spec as OA;
 use Symfony\Bundle\SecurityBundle\Security;
@@ -131,14 +135,14 @@ final class AdminUserController
                 response: '400',
                 description: 'Invalid query parameters',
                 content: new OA\MediaType\Json(
-                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                    schema: new OA\Schema(ref: ApiError::class),
                 ),
             ),
             new OA\Response(
                 response: '403',
                 description: 'Forbidden; admins need the admin.can_view_users setting',
                 content: new OA\MediaType\Json(
-                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                    schema: new OA\Schema(ref: ApiError::class),
                 ),
             ),
         ],
@@ -192,14 +196,14 @@ final class AdminUserController
                 response: '403',
                 description: 'Forbidden',
                 content: new OA\MediaType\Json(
-                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                    schema: new OA\Schema(ref: ApiError::class),
                 ),
             ),
             new OA\Response(
                 response: '422',
                 description: 'Validation error',
                 content: new OA\MediaType\Json(
-                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ValidationError::class),
+                    schema: new OA\Schema(ref: ValidationError::class),
                 ),
             ),
         ],
@@ -260,28 +264,28 @@ final class AdminUserController
                 response: '404',
                 description: 'User not found',
                 content: new OA\MediaType\Json(
-                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                    schema: new OA\Schema(ref: ApiError::class),
                 ),
             ),
             new OA\Response(
                 response: '403',
                 description: 'The request changes the signed-in administrator\'s own email address',
                 content: new OA\MediaType\Json(
-                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                    schema: new OA\Schema(ref: ApiError::class),
                 ),
             ),
             new OA\Response(
                 response: '409',
                 description: 'Email already taken',
                 content: new OA\MediaType\Json(
-                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                    schema: new OA\Schema(ref: ApiError::class),
                 ),
             ),
             new OA\Response(
                 response: '422',
                 description: 'Validation error',
                 content: new OA\MediaType\Json(
-                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ValidationError::class),
+                    schema: new OA\Schema(ref: ValidationError::class),
                 ),
             ),
         ],
@@ -320,14 +324,14 @@ final class AdminUserController
                 response: '404',
                 description: 'User not found',
                 content: new OA\MediaType\Json(
-                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                    schema: new OA\Schema(ref: ApiError::class),
                 ),
             ),
             new OA\Response(
                 response: '409',
                 description: 'The user is the only enabled super admin',
                 content: new OA\MediaType\Json(
-                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                    schema: new OA\Schema(ref: ApiError::class),
                 ),
             ),
         ],
@@ -369,21 +373,21 @@ final class AdminUserController
                 response: '404',
                 description: 'User not found',
                 content: new OA\MediaType\Json(
-                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                    schema: new OA\Schema(ref: ApiError::class),
                 ),
             ),
             new OA\Response(
                 response: '409',
                 description: 'The user is the only enabled super admin',
                 content: new OA\MediaType\Json(
-                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                    schema: new OA\Schema(ref: ApiError::class),
                 ),
             ),
             new OA\Response(
                 response: '422',
                 description: 'Validation error',
                 content: new OA\MediaType\Json(
-                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ValidationError::class),
+                    schema: new OA\Schema(ref: ValidationError::class),
                 ),
             ),
         ],
@@ -431,14 +435,14 @@ final class AdminUserController
                 response: '403',
                 description: 'The target is the signed-in administrator',
                 content: new OA\MediaType\Json(
-                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                    schema: new OA\Schema(ref: ApiError::class),
                 ),
             ),
             new OA\Response(
                 response: '404',
                 description: 'User not found',
                 content: new OA\MediaType\Json(
-                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                    schema: new OA\Schema(ref: ApiError::class),
                 ),
             ),
         ],
@@ -479,21 +483,21 @@ final class AdminUserController
                 response: '403',
                 description: 'The target is the signed-in administrator',
                 content: new OA\MediaType\Json(
-                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                    schema: new OA\Schema(ref: ApiError::class),
                 ),
             ),
             new OA\Response(
                 response: '404',
                 description: 'User not found',
                 content: new OA\MediaType\Json(
-                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                    schema: new OA\Schema(ref: ApiError::class),
                 ),
             ),
             new OA\Response(
                 response: '409',
                 description: 'The user has no TOTP to reset',
                 content: new OA\MediaType\Json(
-                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                    schema: new OA\Schema(ref: ApiError::class),
                 ),
             ),
         ],
@@ -535,7 +539,7 @@ final class AdminUserController
                 response: '404',
                 description: 'User not found',
                 content: new OA\MediaType\Json(
-                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                    schema: new OA\Schema(ref: ApiError::class),
                 ),
             ),
         ],
@@ -571,14 +575,14 @@ final class AdminUserController
                 response: '404',
                 description: 'User not found',
                 content: new OA\MediaType\Json(
-                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                    schema: new OA\Schema(ref: ApiError::class),
                 ),
             ),
             new OA\Response(
                 response: '409',
                 description: 'The user is the only enabled super admin',
                 content: new OA\MediaType\Json(
-                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                    schema: new OA\Schema(ref: ApiError::class),
                 ),
             ),
         ],
@@ -616,7 +620,7 @@ final class AdminUserController
                 response: '404',
                 description: 'User not found',
                 content: new OA\MediaType\Json(
-                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                    schema: new OA\Schema(ref: ApiError::class),
                 ),
             ),
         ],
@@ -665,9 +669,9 @@ final class AdminUserController
     private function publicIdentifier(string $value): string
     {
         try {
-            return \App\Shared\Domain\Model\PublicId::fromString($value)->toString();
+            return PublicId::fromString($value)->toString();
         } catch (\InvalidArgumentException) {
-            throw new \App\Auth\Application\Exception\UserNotFoundException('User not found.');
+            throw new UserNotFoundException('User not found.');
         }
     }
 

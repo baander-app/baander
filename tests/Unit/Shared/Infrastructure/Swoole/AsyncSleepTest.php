@@ -8,6 +8,7 @@ use App\Shared\Infrastructure\Swoole\Async;
 use App\Shared\Infrastructure\Swoole\CoroutineCanceledException;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
+use Swoole\Coroutine;
 use Symfony\Component\Process\Process;
 
 /**
@@ -103,14 +104,14 @@ final class AsyncSleepTest extends TestCase
 
         \Swoole\Coroutine\run(static function () use (&$cancelled): void {
             // The new coroutine runs until its sleep yields, so it is asleep when it is cancelled.
-            $sleeper = \Swoole\Coroutine::create(static function () use (&$cancelled): void {
+            $sleeper = Coroutine::create(static function () use (&$cancelled): void {
                 try {
                     Async::sleepThroughSignals(5.0);
                 } catch (CoroutineCanceledException) {
                     $cancelled = true;
                 }
             });
-            \Swoole\Coroutine::cancel($sleeper);
+            Coroutine::cancel($sleeper);
         });
 
         self::assertTrue($cancelled);

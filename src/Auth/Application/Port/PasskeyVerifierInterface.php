@@ -6,6 +6,7 @@ namespace App\Auth\Application\Port;
 
 use App\Auth\Application\Exception\PasskeyChallengeUnavailableException;
 use Webauthn\CredentialRecord;
+use Webauthn\Exception\AuthenticatorResponseVerificationException;
 use Webauthn\PublicKeyCredentialRequestOptions;
 
 /**
@@ -32,7 +33,7 @@ interface PasskeyVerifierInterface
      * @param bool $requireUserVerification Refuse an assertion whose authenticator did not verify the user
      *
      * @throws \RuntimeException
-     * @throws \Webauthn\Exception\AuthenticatorResponseVerificationException
+     * @throws AuthenticatorResponseVerificationException
      */
     public function verifyAuthenticationResponse(
         array $response,

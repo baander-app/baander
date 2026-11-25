@@ -4,14 +4,17 @@ declare(strict_types=1);
 
 use App\Auth\Domain\Event\UserRegistered;
 use App\Auth\Infrastructure\Doctrine\Entity\UserEntity;
+use App\Kernel;
 use App\Shared\Domain\Model\Email;
 use App\Shared\Domain\Model\PublicId;
+use App\Tests\Support\FinalSchemaBootstrap;
+use Symfony\Component\Dotenv\Dotenv;
 
 require dirname(__DIR__, 2) . '/vendor/autoload.php';
 require_once dirname(__DIR__) . '/Support/FinalSchemaBootstrap.php';
-(new Symfony\Component\Dotenv\Dotenv())->bootEnv(dirname(__DIR__, 2) . '/.env');
+(new Dotenv())->bootEnv(dirname(__DIR__, 2) . '/.env');
 
-$kernel = new App\Kernel('prod', false);
+$kernel = new Kernel('prod', false);
 $kernel->boot();
 $em = $kernel->getContainer()->get('doctrine')->getManager();
 $db = $em->getConnection();
@@ -25,7 +28,7 @@ $assertCount = static function (string $sql, int $expected) use ($db): void {
 };
 
 if ($mode === 'prepare') {
-    App\Tests\Support\FinalSchemaBootstrap::bootstrap($db);
+    FinalSchemaBootstrap::bootstrap($db);
 
     $user = new UserEntity(new PublicId(), 'Outbox User', 'outbox-user@baander.app', 'unused-password');
     $user->markEmailAsVerified();

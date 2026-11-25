@@ -8,10 +8,12 @@ use App\Metadata\Application\DTO\MusicBrainz\MusicBrainzArtist;
 use App\Metadata\Application\DTO\MusicBrainz\MusicBrainzRelease;
 use App\Metadata\Infrastructure\Api\CoverArtArchive\CoverArtArchiveAdapter;
 use App\Metadata\Infrastructure\Api\MusicBrainz\MusicBrainzAdapter;
-use Baander\HttpClient\PublicDestinationPolicy;
-use Baander\HttpClient\PublicHttpClient;
+use App\Metadata\Infrastructure\Api\Tmdb\TmdbAdapter;
 use Baander\DevQualification\Fixtures\Qualification\Dataset;
 use Baander\DevQualification\Fixtures\Qualification\MetadataTransport;
+use Baander\HttpClient\PublicDestinationPolicy;
+use Baander\HttpClient\PublicHttpClient;
+use Baander\HttpClient\UnsafeDestinationException;
 use PHPUnit\Framework\Attributes\RequiresPhpExtension;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
@@ -54,7 +56,7 @@ final class QualificationMetadataTransportTest extends TestCase
         self::assertSame($song['metadata']['id'], $body['recordings'][0]['id']);
         self::assertSame(100, $body['recordings'][0]['score']);
         self::assertSame('matched', json_decode(trim(file_get_contents($this->directory . '/audit.jsonl')), true, flags: JSON_THROW_ON_ERROR)['outcome']);
-        $this->expectException(\Baander\HttpClient\UnsafeDestinationException::class);
+        $this->expectException(UnsafeDestinationException::class);
         $client->request('GET', 'https://127.0.0.1/ws/2/recording', ['musicbrainz.org']);
     }
 
@@ -87,20 +89,20 @@ final class QualificationMetadataTransportTest extends TestCase
     {
         $plan = Dataset::plan('metadata-test');
         $client = new PublicHttpClient(MetadataTransport::create($this->directory . '/manifest.json', $this->directory . '/audit.jsonl'), new PublicDestinationPolicy(MetadataTransport::dnsResolver()));
-        $logger = new \Psr\Log\NullLogger();
-        $encoder = new \Symfony\Component\Serializer\Encoder\JsonEncoder();
-        $music = new \App\Metadata\Infrastructure\Api\MusicBrainz\MusicBrainzAdapter(
+        $logger = new NullLogger();
+        $encoder = new JsonEncoder();
+        $music = new MusicBrainzAdapter(
             $logger,
             $encoder,
             $client,
-            new \Symfony\Component\RateLimiter\RateLimiterFactory(['id' => 'musicbrainz', 'policy' => 'no_limit'], new \Symfony\Component\RateLimiter\Storage\InMemoryStorage()),
-            new \App\Metadata\Infrastructure\Api\CoverArtArchive\CoverArtArchiveAdapter($logger, $encoder, $client),
+            new RateLimiterFactory(['id' => 'musicbrainz', 'policy' => 'no_limit'], new InMemoryStorage()),
+            new CoverArtArchiveAdapter($logger, $encoder, $client),
         );
         $song = $plan['files'][0];
         self::assertSame($song['metadata']['id'], $music->searchRecording($song['title'], limit: 5)->recordings[0]->id);
         self::assertSame($plan['albums'][$song['album']], $music->searchReleaseGroup($song['album'], limit: 5)->releaseGroups[0]->id);
         self::assertSame($plan['artists'][$song['artist']], $music->searchArtist($song['artist'], limit: 5)->artists[0]->id);
-        $tmdb = new \App\Metadata\Infrastructure\Api\Tmdb\TmdbAdapter('fixture-token', $logger, $encoder, $client);
+        $tmdb = new TmdbAdapter('fixture-token', $logger, $encoder, $client);
         $movie = $plan['files'][2000];
         self::assertSame($movie['metadata']['tmdbId'], $tmdb->searchMovie($movie['title'], limit: 1)->first()->id);
         self::assertSame($movie['title'], $tmdb->lookupMovie($movie['metadata']['tmdbId'])->title);

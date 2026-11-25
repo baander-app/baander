@@ -8,14 +8,16 @@ use App\Shared\Infrastructure\Http\NativeDnsResolver;
 use App\Shared\Infrastructure\Swoole\CoroutineCanceledException;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
+use Swoole\Coroutine;
+use Swoole\Runtime;
 
 final class NativeDnsResolverRuntimeTest extends TestCase
 {
     #[DataProvider('hookModes')]
     public function testRepeatedTimeoutAndCancellationReleaseChildrenDescriptorsAndCapacity(int $hooks): void
     {
-        $original = \Swoole\Runtime::getHookFlags();
-        \Swoole\Runtime::setHookFlags($hooks);
+        $original = Runtime::getHookFlags();
+        Runtime::setHookFlags($hooks);
         try {
             \Swoole\Coroutine\run(function (): void {
                 $resolver = new NativeDnsResolver(dirname(__DIR__, 4) . '/Fixtures/Http/dns-helper.php');
@@ -32,7 +34,7 @@ final class NativeDnsResolverRuntimeTest extends TestCase
                     $ids = [];
                     for ($i = 0; $i < 8; ++$i) {
                         $budget = $i < 4 ? 3.0 : 1.0;
-                        $ids[] = \Swoole\Coroutine::create(static function () use ($resolver, $budget, $i, &$finished, &$cancelled, &$cancelledCallers, &$timedOut): void {
+                        $ids[] = Coroutine::create(static function () use ($resolver, $budget, $i, &$finished, &$cancelled, &$cancelledCallers, &$timedOut): void {
                             try {
                                 $resolver->resolve('slow.baander.app', hrtime(true) / 1e9 + $budget);
                                 self::fail('Stalled child unexpectedly succeeded.');
@@ -47,27 +49,27 @@ final class NativeDnsResolverRuntimeTest extends TestCase
                             }
                         });
                     }
-                    \Swoole\Coroutine::sleep(0.03);
+                    Coroutine::sleep(0.03);
                     for ($i = 0; $i < 4; ++$i) {
                         // io_uring cancellation can race the short polling sleep's completion.
                         $cancelUntil = hrtime(true) / 1e9 + 0.5;
                         do {
-                            $accepted = \Swoole\Coroutine::cancel($ids[$i]);
+                            $accepted = Coroutine::cancel($ids[$i]);
                             $error = swoole_last_error();
                             if (!$accepted && !isset($cancelledCallers[$i])) {
-                                \Swoole\Coroutine::sleep(0.001);
+                                Coroutine::sleep(0.001);
                             }
                         } while (!$accepted && !isset($cancelledCallers[$i]) && hrtime(true) / 1e9 < $cancelUntil);
                         self::assertTrue($accepted || isset($cancelledCallers[$i]), sprintf(
                             'Caller %d (cid %d) cancellation refused: finished=%d, timedOut=%d, cancelled=%d, error=%d, exists=%s, trace=%s.',
                             $i, $ids[$i], $finished, $timedOut, $cancelled, $error,
-                            json_encode(\Swoole\Coroutine::exists($ids[$i])),
-                            $accepted ? '' : json_encode(\Swoole\Coroutine::getBackTrace($ids[$i])),
+                            json_encode(Coroutine::exists($ids[$i])),
+                            $accepted ? '' : json_encode(Coroutine::getBackTrace($ids[$i])),
                         ));
                     }
                     $until = hrtime(true) / 1e9 + 2;
                     do {
-                        \Swoole\Coroutine::sleep(0.01);
+                        Coroutine::sleep(0.01);
                     } while (($finished < 8 || $this->children() !== '') && hrtime(true) / 1e9 < $until);
                     self::assertSame(8, $finished);
                     self::assertSame(4, $cancelled);
@@ -80,7 +82,7 @@ final class NativeDnsResolverRuntimeTest extends TestCase
                 }
             });
         } finally {
-            \Swoole\Runtime::setHookFlags($original);
+            Runtime::setHookFlags($original);
         }
     }
 

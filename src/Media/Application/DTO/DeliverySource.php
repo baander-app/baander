@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace App\Media\Application\DTO;
 
-#[\Symfony\Component\DependencyInjection\Attribute\Exclude]
+use Symfony\Component\DependencyInjection\Attribute\Exclude;
+
+#[Exclude]
 final readonly class DeliverySource
 {
     public function __construct(

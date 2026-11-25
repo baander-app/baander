@@ -24,6 +24,7 @@ use App\Shared\Application\Port\ServerControlException;
 use App\Shared\Application\Port\ServerNotRunningException;
 use App\Shared\Application\Port\TransactionPortInterface;
 use App\Shared\Domain\Model\Email;
+use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
@@ -227,7 +228,7 @@ final class DisableEnableUserHandlersTest extends TestCase
     private function userRepository(): UserRepositoryInterface
     {
         $users = $this->createStub(UserRepositoryInterface::class);
-        $users->method('findByPublicId')->willReturnCallback(fn (\App\Shared\Domain\Model\PublicId $id): ?User => $id->equals($this->user->getPublicId()) ? $this->user : null);
+        $users->method('findByPublicId')->willReturnCallback(fn (PublicId $id): ?User => $id->equals($this->user->getPublicId()) ? $this->user : null);
         $users->method('findByUuid')->willReturnCallback(
             fn (Uuid $id): ?User => $id->equals($this->user->getId()) ? $this->user : null,
         );

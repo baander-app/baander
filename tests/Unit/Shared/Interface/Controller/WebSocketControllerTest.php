@@ -4,24 +4,24 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Shared\Interface\Controller;
 
-use App\Shared\Application\Exception\ConflictException;
-use App\Shared\Application\Port\WebSocketIdentityLookupInterface;
-use App\Shared\Application\LiveUpdates\LiveSubscriptions;
-use App\Party\Application\Exception\PartyNotFoundException;
-use App\Party\Application\Port\PartyPublicIdentityPortInterface;
-use App\Party\Application\Port\PartySessionPortInterface;
-use App\Party\Domain\Model\SyncedPartySession;
-use App\Party\Domain\Model\SyncedPartySessionState;
-use App\Shared\Domain\Model\PublicId;
 use App\Party\Application\Command\JoinPartySessionCommand;
 use App\Party\Application\Command\LeavePartySessionCommand;
 use App\Party\Application\Command\StartPlaybackCommand;
 use App\Party\Application\Command\SyncPlaybackCommand;
+use App\Party\Application\Exception\PartyNotFoundException;
+use App\Party\Application\Port\PartyPublicIdentityPortInterface;
+use App\Party\Application\Port\PartySessionPortInterface;
 use App\Party\Domain\Event\MemberLeft;
 use App\Party\Domain\Model\PartyMember;
+use App\Party\Domain\Model\SyncedPartySession;
+use App\Party\Domain\Model\SyncedPartySessionState;
 use App\Party\Domain\ValueObject\MemberRole;
 use App\Party\Infrastructure\EventListener\LivePartyRoomListener;
+use App\Shared\Application\Exception\ConflictException;
+use App\Shared\Application\LiveUpdates\LiveSubscriptions;
 use App\Shared\Application\Port\ListeningSessionInteractionInterface;
+use App\Shared\Application\Port\WebSocketIdentityLookupInterface;
+use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
 use App\Shared\Infrastructure\Messenger\ResultStampMiddleware;
 use App\Shared\Infrastructure\Messenger\Stamp\PartyMemberResultStamp;
@@ -31,9 +31,12 @@ use App\Shared\Infrastructure\Swoole\WebSocketConnectionRegistry;
 use App\Shared\Infrastructure\Swoole\WebSocketPusher;
 use App\Shared\Infrastructure\Swoole\WebSocketRooms;
 use App\Shared\Interface\Controller\WebSocketController;
+use App\Transcode\Application\Command\UpdateTranscodePositionCommand;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\MockObject\Stub;
 use PHPUnit\Framework\TestCase;
+use Psr\Log\AbstractLogger;
+use Psr\Log\LogLevel;
 use Swoole\Table;
 use Swoole\WebSocket\Server;
 use Symfony\Component\EventDispatcher\EventDispatcher;
@@ -44,6 +47,7 @@ use Symfony\Component\Messenger\MessageBus;
 use Symfony\Component\Messenger\MessageBusInterface;
 use Symfony\Component\Messenger\Middleware\HandleMessageMiddleware;
 use Symfony\Component\Messenger\Middleware\MiddlewareInterface;
+use Symfony\Component\Security\Core\Exception\AccessDeniedException;
 use Symfony\Component\Serializer\Encoder\JsonEncoder;
 
 final class WebSocketControllerTest extends TestCase
@@ -162,7 +166,7 @@ final class WebSocketControllerTest extends TestCase
         });
         $bus = $this->createMock(MessageBusInterface::class);
         $bus->expects(self::exactly(2))->method('dispatch')->willReturnCallback(
-            static function (\App\Transcode\Application\Command\UpdateTranscodePositionCommand $command) use ($session, $requestId, $action, $generation, $revision): Envelope {
+            static function (UpdateTranscodePositionCommand $command) use ($session, $requestId, $action, $generation, $revision): Envelope {
                 self::assertTrue($command->sessionId->equals($session));
                 self::assertSame(12.5, $command->position);
                 self::assertSame($action, $command->action);
@@ -904,7 +908,7 @@ final class WebSocketControllerTest extends TestCase
     {
         $bus = new MessageBus([new HandleMessageMiddleware(new HandlersLocator([
             SyncPlaybackCommand::class => [static function (): never {
-                throw new \Symfony\Component\Security\Core\Exception\AccessDeniedException('Private party');
+                throw new AccessDeniedException('Private party');
             }],
         ]))]);
         $controller = new WebSocketController($this->registry, $this->pusher, $bus, new JsonEncoder(), $this->listeningSessions, $this->identities, $this->createStub(LiveSubscriptions::class));
@@ -1265,14 +1269,14 @@ final class WebSocketControllerTest extends TestCase
 
 }
 
-final class RefusalRecordingLogger extends \Psr\Log\AbstractLogger
+final class RefusalRecordingLogger extends AbstractLogger
 {
     /** @var list<array{string, mixed}> */
     public array $warnings = [];
 
     public function log($level, \Stringable|string $message, array $context = []): void
     {
-        if ($level === \Psr\Log\LogLevel::WARNING) {
+        if ($level === LogLevel::WARNING) {
             $this->warnings[] = [(string) $message, $context['room'] ?? null];
         }
     }

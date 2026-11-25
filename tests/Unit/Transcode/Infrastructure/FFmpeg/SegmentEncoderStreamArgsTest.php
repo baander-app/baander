@@ -4,11 +4,16 @@ declare(strict_types=1);
 
 namespace Tests\Unit\Transcode\Infrastructure\FFmpeg;
 
+use App\Shared\Application\DTO\DeploymentProfile;
+use App\Transcode\Application\Port\FFmpegPortInterface;
+use App\Transcode\Application\Port\TranscodeStoragePortInterface;
+use App\Transcode\Application\Service\MediaExecutionPolicy;
 use App\Transcode\Domain\ValueObject\AacImplementation;
 use App\Transcode\Domain\ValueObject\AudioProfile;
 use App\Transcode\Domain\ValueObject\EncoderProfile;
 use App\Transcode\Domain\ValueObject\HardwareAccelerator;
 use App\Transcode\Domain\ValueObject\QualityTier;
+use App\Transcode\Domain\ValueObject\VideoProbeResult;
 use App\Transcode\Infrastructure\FFmpeg\SegmentEncoder;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
@@ -30,7 +35,7 @@ final class SegmentEncoderStreamArgsTest extends TestCase
     ): SegmentEncoder {
         $profile = new EncoderProfile($accel, $codec, '', '', '', '');
 
-        return new SegmentEncoder(new \App\Transcode\Application\Service\MediaExecutionPolicy(new \App\Shared\Application\DTO\DeploymentProfile()), $this->createStub(\App\Transcode\Application\Port\FFmpegPortInterface::class), $this->createStub(\App\Transcode\Application\Port\TranscodeStoragePortInterface::class), $profile);
+        return new SegmentEncoder(new MediaExecutionPolicy(new DeploymentProfile()), $this->createStub(FFmpegPortInterface::class), $this->createStub(TranscodeStoragePortInterface::class), $profile);
     }
 
     /**
@@ -327,7 +332,7 @@ final class SegmentEncoderStreamArgsTest extends TestCase
     {
         $profile = new EncoderProfile(HardwareAccelerator::Vaapi, 'hevc_vaapi', 'h264', 'vaapi',
             '/dev/dri/device with spaces', 'vaapi');
-        $encoder = new SegmentEncoder(new \App\Transcode\Application\Service\MediaExecutionPolicy(new \App\Shared\Application\DTO\DeploymentProfile()), $this->createStub(\App\Transcode\Application\Port\FFmpegPortInterface::class), $this->createStub(\App\Transcode\Application\Port\TranscodeStoragePortInterface::class), $profile);
+        $encoder = new SegmentEncoder(new MediaExecutionPolicy(new DeploymentProfile()), $this->createStub(FFmpegPortInterface::class), $this->createStub(TranscodeStoragePortInterface::class), $profile);
         $args = $encoder->buildStreamArgs('/source.mp4', QualityTier::p720(), '', '/output');
         self::assertSame('/dev/dri/device with spaces', $args[array_search('-hwaccel_device', $args, true) + 1]);
         $video = self::inputArguments($args, 0);
@@ -343,7 +348,7 @@ final class SegmentEncoderStreamArgsTest extends TestCase
     {
         $profile = new EncoderProfile(HardwareAccelerator::Vaapi, 'hevc_vaapi', 'h264', 'vaapi',
             '/dev/dri/device with spaces', 'vaapi');
-        $encoder = new SegmentEncoder(new \App\Transcode\Application\Service\MediaExecutionPolicy(new \App\Shared\Application\DTO\DeploymentProfile()), $this->createStub(\App\Transcode\Application\Port\FFmpegPortInterface::class), $this->createStub(\App\Transcode\Application\Port\TranscodeStoragePortInterface::class), $profile);
+        $encoder = new SegmentEncoder(new MediaExecutionPolicy(new DeploymentProfile()), $this->createStub(FFmpegPortInterface::class), $this->createStub(TranscodeStoragePortInterface::class), $profile);
         foreach ([null, 4.0] as $origin) {
             $args = $encoder->buildStreamArgs('/source.mkv', QualityTier::p720(), '', '/output',
                 startSegment: 4, audioStreamIndex: 2, sourceFrameRate: 0.1, sourceTimestampOrigin: $origin);
@@ -682,7 +687,7 @@ final class SegmentEncoderStreamArgsTest extends TestCase
     #[DataProvider('probedEnds')]
     public function testOnlyAVideoStreamEndReplacesShortest(array $format, array $video, bool $streamEnd): void
     {
-        $probe = \App\Transcode\Domain\ValueObject\VideoProbeResult::fromProbeOutput(['format' => $format, 'streams' => [
+        $probe = VideoProbeResult::fromProbeOutput(['format' => $format, 'streams' => [
             ['index' => 0, 'codec_type' => 'video', 'codec_name' => 'h264', 'time_base' => '1/12800', ...$video],
             ['index' => 1, 'codec_type' => 'audio', 'codec_name' => 'aac', 'duration' => '18.000000'],
         ]]);
@@ -754,7 +759,7 @@ final class SegmentEncoderStreamArgsTest extends TestCase
 
     public function testProbeFieldOrderEnablesDeinterlacing(): void
     {
-        $probe = \App\Transcode\Domain\ValueObject\VideoProbeResult::fromProbeOutput([
+        $probe = VideoProbeResult::fromProbeOutput([
             'streams' => [['codec_type' => 'video', 'field_order' => 'tt']],
         ]);
         self::assertStringStartsWith('yadif,', $this->encoder()->buildVideoFilters($probe, QualityTier::p720()));
@@ -762,11 +767,11 @@ final class SegmentEncoderStreamArgsTest extends TestCase
 
     public function testVideoOnlyProbeProducesNoAudioFilters(): void
     {
-        $probe = \App\Transcode\Domain\ValueObject\VideoProbeResult::fromProbeOutput([
+        $probe = VideoProbeResult::fromProbeOutput([
             'streams' => [['codec_type' => 'video']],
         ]);
         self::assertSame('', $this->encoder()->buildAudioFiltersForProfile($probe,
-            \App\Transcode\Domain\ValueObject\AudioProfile::streamingStereo()));
+            AudioProfile::streamingStereo()));
     }
 
     public function testTheSelectedAacImplementationNamesTheEncoderAndDecodesOnlyAacSources(): void

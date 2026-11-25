@@ -17,6 +17,7 @@ use App\Tests\Functional\TestCase;
 use Symfony\Bundle\FrameworkBundle\Console\Application;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Tester\CommandTester;
+use Symfony\Component\HttpFoundation\Response;
 
 /**
  * The app:genre:* commands and GenreController reach the same use cases and report the same outcomes.
@@ -255,7 +256,7 @@ final class GenreCommandsTest extends TestCase
         return $this->entityManager->getRepository($link)->count([]);
     }
 
-    private function assertNoContent(\Symfony\Component\HttpFoundation\Response $response): void
+    private function assertNoContent(Response $response): void
     {
         self::assertSame(204, $response->getStatusCode(), (string) $response->getContent());
     }

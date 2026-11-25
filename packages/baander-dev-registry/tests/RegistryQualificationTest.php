@@ -4,9 +4,16 @@ declare(strict_types=1);
 
 namespace Baander\DevRegistry\Tests;
 
+use Baander\DevRegistry\QualificationRunner;
 use Baander\Images\Inventory\Collector;
+use Baander\Process\Execution\CommandFailure;
+use Baander\Process\Execution\ProcessRunner;
+use Baander\Process\Execution\ProcessSpec;
+use Baander\Process\Execution\SignalScope;
+use Baander\RegistryTests\ClusterContract;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
+use Swoole\Process;
 
 final class RegistryQualificationTest extends TestCase
 {
@@ -16,10 +23,10 @@ final class RegistryQualificationTest extends TestCase
 
     public function testTimedOutZeroExitFailsEvenWhenDiagnosticExitIsPermitted(): void
     {
-        $qualification = new \Baander\DevRegistry\QualificationRunner($this->root);
+        $qualification = new QualificationRunner($this->root);
         $reflection = new \ReflectionObject($qualification);
         $reflection->getProperty('work')->setValue($qualification, $this->root);
-        $signals = new \Baander\Process\Execution\SignalScope();
+        $signals = new SignalScope();
         $reflection->getProperty('signals')->setValue($qualification, $signals);
         try {
             try {
@@ -38,7 +45,7 @@ PHP],
                     'timeout' => 1.0,
                 ]);
                 self::fail('An interrupted diagnostic command must not pass.');
-            } catch (\Baander\Process\Execution\CommandFailure $failure) {
+            } catch (CommandFailure $failure) {
                 self::assertSame(124, $failure->getCode());
                 self::assertNotNull($failure->result);
                 self::assertTrue($failure->result->timedOut);
@@ -52,7 +59,7 @@ PHP],
 
     public function testPackageLoaderAndInjectedStorageValidationNeedNoRelayTestSupport(): void
     {
-        $result = new \Baander\Process\Execution\ProcessRunner()->run(new \Baander\Process\Execution\ProcessSpec(
+        $result = new ProcessRunner()->run(new ProcessSpec(
             [PHP_BINARY, dirname(__DIR__, 3) . '/packages/baander-dev-registry/tests/Fixtures/registry-storage-injection.php', $this->root],
             environment: array_replace(getenv(), [
                 'REGISTRY_FULL_DISK_ROOT' => $this->root,
@@ -221,7 +228,7 @@ PHP],
         }
         mkdir($source . '/node-0');
         file_put_contents($source . '/node-0/raft.db', 'database');
-        \Baander\RegistryTests\ClusterContract::exportDiagnostics($source, $this->root . '/diagnostics');
+        ClusterContract::exportDiagnostics($source, $this->root . '/diagnostics');
         $retained = array_diff(scandir($this->root . '/diagnostics') ?: [], ['.', '..']) |> array_values(...);
         self::assertSame(['node-0.log', 'pinned.log'], $retained);
     }
@@ -304,7 +311,7 @@ PHP],
         }
         $child = (int) file_get_contents($this->root . '/child');
         $storage = (string) file_get_contents($this->root . '/storage');
-        \Swoole\Process::kill(proc_get_status($process)['pid'], 15);
+        Process::kill(proc_get_status($process)['pid'], 15);
         [$status, $stdout, $stderr] = $this->finish($process, $pipes);
         self::assertSame(143, $status, $stdout . $stderr);
         self::assertFalse(is_dir('/proc/' . $child));

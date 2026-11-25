@@ -6,9 +6,14 @@ namespace App\Tests\Unit\Catalog\Interface\Resource;
 
 use App\Catalog\Interface\Resource\AlbumResource;
 use App\Catalog\Interface\Resource\ArtistResource;
+use App\Catalog\Interface\Resource\DuplicateGroupResource;
+use App\Catalog\Interface\Resource\GenreResource;
 use App\Catalog\Interface\Resource\MovieResource;
 use App\Catalog\Interface\Resource\SongResource;
 use App\Catalog\Interface\Resource\VideoResource;
+use App\Library\Interface\Resource\LibraryAccessResource;
+use App\Library\Interface\Resource\LibraryResource;
+use App\Media\Interface\Resource\ImageResource;
 use App\Shared\Domain\Model\PublicId;
 use OpenApi\Spec\Schema;
 use PHPUnit\Framework\Attributes\DataProvider;
@@ -63,13 +68,13 @@ final class PublicIdSchemaTest extends TestCase
     public static function relationships(): iterable
     {
         yield 'song album' => [SongResource::class, 'albumId', false];
-        yield 'genre parent' => [\App\Catalog\Interface\Resource\GenreResource::class, 'parentId', false];
+        yield 'genre parent' => [GenreResource::class, 'parentId', false];
         yield 'movie videos' => [MovieResource::class, 'videoIds', true];
-        yield 'duplicate albums' => [\App\Catalog\Interface\Resource\DuplicateGroupResource::class, 'albumIds', true];
-        yield 'image album' => [\App\Media\Interface\Resource\ImageResource::class, 'albumId', false];
-        yield 'image artist' => [\App\Media\Interface\Resource\ImageResource::class, 'artistId', false];
-        yield 'image playlist' => [\App\Media\Interface\Resource\ImageResource::class, 'playlistId', false];
-        yield 'library access' => [\App\Library\Interface\Resource\LibraryAccessResource::class, 'libraryId', false];
+        yield 'duplicate albums' => [DuplicateGroupResource::class, 'albumIds', true];
+        yield 'image album' => [ImageResource::class, 'albumId', false];
+        yield 'image artist' => [ImageResource::class, 'artistId', false];
+        yield 'image playlist' => [ImageResource::class, 'playlistId', false];
+        yield 'library access' => [LibraryAccessResource::class, 'libraryId', false];
     }
 
     /** @return iterable<string, array{class-string}> */
@@ -80,7 +85,7 @@ final class PublicIdSchemaTest extends TestCase
         yield 'song' => [SongResource::class];
         yield 'movie' => [MovieResource::class];
         yield 'video' => [VideoResource::class];
-        yield 'genre' => [\App\Catalog\Interface\Resource\GenreResource::class];
-        yield 'library' => [\App\Library\Interface\Resource\LibraryResource::class];
+        yield 'genre' => [GenreResource::class];
+        yield 'library' => [LibraryResource::class];
     }
 }

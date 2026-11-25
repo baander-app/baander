@@ -6,6 +6,7 @@ namespace Tests\Unit\Transcode\Infrastructure\FFmpeg;
 
 use App\Transcode\Domain\ValueObject\PresentationSelection;
 use App\Transcode\Infrastructure\FFmpeg\CopySourceTiming;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
 final class CopySourceTimingTest extends TestCase
@@ -29,7 +30,7 @@ final class CopySourceTimingTest extends TestCase
         ], 7.0));
     }
 
-    #[\PHPUnit\Framework\Attributes\DataProvider('boundaryPositions')]
+    #[DataProvider('boundaryPositions')]
     public function testKeepsOneEarlierGopForAudioPreroll(float $position, float $expected): void
     {
         $timing = CopySourceTiming::fromProbe([

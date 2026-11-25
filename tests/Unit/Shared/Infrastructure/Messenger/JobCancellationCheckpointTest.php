@@ -12,6 +12,7 @@ use PHPUnit\Framework\Attributes\PreserveGlobalState;
 use PHPUnit\Framework\Attributes\RequiresPhpExtension;
 use PHPUnit\Framework\Attributes\RunInSeparateProcess;
 use PHPUnit\Framework\TestCase;
+use Swoole\Coroutine;
 
 final class JobCancellationCheckpointTest extends TestCase
 {
@@ -65,12 +66,12 @@ final class JobCancellationCheckpointTest extends TestCase
 
         \Swoole\Coroutine\run(static function () use ($context, $checkpoint, &$items, &$outcome): void {
             foreach (['job-a', 'job-b'] as $jobId) {
-                \Swoole\Coroutine::create(static function () use ($jobId, $context, $checkpoint, &$items, &$outcome): void {
+                Coroutine::create(static function () use ($jobId, $context, $checkpoint, &$items, &$outcome): void {
                     try {
                         $context->run($jobId, static function () use ($jobId, $checkpoint, &$items): void {
                             for ($item = 0; $item < 3; ++$item) {
                                 // Yield, so the other job runs between this job's items.
-                                \Swoole\Coroutine::sleep(0.001);
+                                Coroutine::sleep(0.001);
                                 $checkpoint->check();
                                 ++$items[$jobId];
                             }

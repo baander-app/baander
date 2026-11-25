@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Baander\DevQualification\Fixtures\Worker;
 
+use Baander\Containers\Docker\Client;
 use Baander\DevQualification\Fixtures\FixtureSecrets;
 use Baander\DevQualification\Fixtures\Runtime;
 
@@ -166,7 +167,7 @@ final class LegacyRuntime
             return 0;
         } finally {
             $runtime->cleaning = true;
-            $docker = new \Baander\Containers\Docker\Client($runtime->cleanupExecutor(), $docker->target, $runtime->environment);
+            $docker = new Client($runtime->cleanupExecutor(), $docker->target, $runtime->environment);
             try {
                 $collected = $docker->run(
                     ['cp', $id . '-app:/tmp/' . $id . '-supervisor', $resources->artifacts . '/supervisor'],

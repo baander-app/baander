@@ -4,16 +4,16 @@ declare(strict_types=1);
 
 namespace App\Catalog\Interface\Controller;
 
-use App\Catalog\Application\Port\SongAvailabilityPortInterface;
 use App\Catalog\Application\Command\Song\DeleteSongCommand;
 use App\Catalog\Application\Command\Song\UpdateSongCommand;
+use App\Catalog\Application\Port\SongAvailabilityPortInterface;
 use App\Catalog\Application\Port\SongPortInterface;
 use App\Catalog\Application\Port\SongSortField;
-use App\Library\Application\Port\LibraryReadScopeProviderInterface;
 use App\Catalog\Domain\Model\Song;
 use App\Catalog\Interface\Request\UpdateSongRequest;
 use App\Catalog\Interface\Resource\CatalogDeletionResource;
 use App\Catalog\Interface\Resource\SongResource;
+use App\Library\Application\Port\LibraryReadScopeProviderInterface;
 use App\Shared\Domain\Exception\CursorMismatchException;
 use App\Shared\Domain\Model\Cursor;
 use App\Shared\Domain\Model\PublicId;
@@ -22,7 +22,9 @@ use App\Shared\Infrastructure\Pagination\CursorCodec;
 use App\Shared\Interface\Attribute\CliCounterpart;
 use App\Shared\Interface\Controller\ApiResponsesTrait;
 use App\Shared\Interface\Controller\DispatchesMessagesTrait;
+use App\Shared\Interface\DTO\ApiError;
 use App\Shared\Interface\DTO\CursorPaginatedResponse;
+use App\Shared\Interface\DTO\ValidationError;
 use App\Shared\Interface\Exception\InvalidQueryParameter;
 use App\Shared\Interface\Request\QueryParameters;
 use OpenApi\Spec as OA;
@@ -32,13 +34,14 @@ use Symfony\Component\HttpKernel\Attribute\MapRequestPayload;
 use Symfony\Component\Messenger\MessageBusInterface;
 use Symfony\Component\Routing\Attribute\Route;
 use Symfony\Component\Security\Core\Authorization\AuthorizationCheckerInterface;
+use Symfony\Component\Security\Http\Attribute\IsGranted;
 
 #[OA\Tag(
     name: 'Catalog',
     description: 'Album, artist, song, movie, and genre management endpoints',
 )]
 #[Route('/api/songs', name: 'song_')]
-#[\Symfony\Component\Security\Http\Attribute\IsGranted('ROLE_ADMIN', methods: ['POST', 'PUT', 'PATCH', 'DELETE'])]
+#[IsGranted('ROLE_ADMIN', methods: ['POST', 'PUT', 'PATCH', 'DELETE'])]
 final class SongController
 {
     use ApiResponsesTrait;
@@ -145,7 +148,7 @@ final class SongController
                 response: '400',
                 description: 'Unsupported sort field or order, or a cursor issued for another sort field or order',
                 content: new OA\MediaType\Json(
-                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                    schema: new OA\Schema(ref: ApiError::class),
                 ),
             ),
         ],
@@ -222,7 +225,7 @@ final class SongController
                 response: '404',
                 description: 'Not found',
                 content: new OA\MediaType\Json(
-                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                    schema: new OA\Schema(ref: ApiError::class),
                 ),
             ),
         ],
@@ -304,14 +307,14 @@ final class SongController
                 response: '404',
                 description: 'Not found',
                 content: new OA\MediaType\Json(
-                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                    schema: new OA\Schema(ref: ApiError::class),
                 ),
             ),
             new OA\Response(
                 response: '422',
                 description: 'Validation error',
                 content: new OA\MediaType\Json(
-                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ValidationError::class),
+                    schema: new OA\Schema(ref: ValidationError::class),
                 ),
             ),
         ],
@@ -376,14 +379,14 @@ final class SongController
                 response: '404',
                 description: 'Not found',
                 content: new OA\MediaType\Json(
-                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                    schema: new OA\Schema(ref: ApiError::class),
                 ),
             ),
             new OA\Response(
                 response: '422',
                 description: 'Invalid public ID',
                 content: new OA\MediaType\Json(
-                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ValidationError::class),
+                    schema: new OA\Schema(ref: ValidationError::class),
                 ),
             ),
         ],

@@ -5,6 +5,7 @@ declare(strict_types=1);
 
 use Baander\Registry\Qualification\DockerOwnership;
 use Baander\RegistryTests\Runtime;
+use Swoole\Process;
 
 require dirname(__DIR__, 2) . '/vendor/autoload.php';
 
@@ -21,8 +22,8 @@ Runtime::main(static function (): void {
         $saved['target'],
         static fn(array $argv, ?string $input, float $seconds): array => Runtime::run($argv, $input, $seconds, $environment),
     );
-    Swoole\Process::signal(2, static function (): void {});
-    Swoole\Process::signal(15, static function (): void {});
+    Process::signal(2, static function (): void {});
+    Process::signal(15, static function (): void {});
     $failures = $owner->cleanup(120);
     if ($failures !== []) {
         throw new RuntimeException(implode('; ', $failures) . '. Retry receipt: ' . $receipt);

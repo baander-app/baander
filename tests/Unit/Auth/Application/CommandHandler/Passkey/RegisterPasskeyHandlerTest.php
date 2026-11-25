@@ -13,11 +13,12 @@ use App\Auth\Domain\Model\User;
 use App\Auth\Domain\Repository\Passkey\PasskeyRepositoryInterface;
 use App\Auth\Domain\Repository\UserRepositoryInterface;
 use App\Shared\Domain\Model\Email;
+use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
 use PHPUnit\Framework\MockObject\Stub;
 use PHPUnit\Framework\TestCase;
-use Symfony\Component\EventDispatcher\EventDispatcherInterface;
 use RuntimeException;
+use Symfony\Component\EventDispatcher\EventDispatcherInterface;
 
 final class RegisterPasskeyHandlerTest extends TestCase
 {
@@ -107,7 +108,7 @@ final class RegisterPasskeyHandlerTest extends TestCase
     public function testRejectsLegacyOrForeignHandleBeforePersisting(): void
     {
         $handler = $this->handler();
-        foreach ([$this->user->getId()->toString(), (new \App\Shared\Domain\Model\PublicId())->toString()] as $handle) {
+        foreach ([$this->user->getId()->toString(), (new PublicId())->toString()] as $handle) {
             try {
                 $handler(new RegisterPasskeyCommand($this->user->getId()->toString(), 'Key', 'credential', ['userHandle' => $handle], 0));
                 self::fail('The credential handle must belong to the authenticated public user.');

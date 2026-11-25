@@ -19,6 +19,7 @@ use App\Scheduler\Domain\Model\ScheduledJob;
 use App\Scheduler\Domain\Service\SchedulerRegistry;
 use App\Scheduler\Domain\ValueObject\JobType;
 use App\Scheduler\Domain\ValueObject\ScheduleStatus;
+use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
@@ -36,7 +37,7 @@ final class ExecuteScheduledOccurrenceHandlerTest extends TestCase
 
     private function occurrence(ScheduledJob $job): SchedulerOccurrence
     {
-        return new SchedulerOccurrence(Uuid::generate(), $job->getId(), new \DateTimeImmutable('2026-10-03T12:00:00Z'), $job->getJobType(), $job->getCommand(), $job->getParameters(), jobPublicId: new \App\Shared\Domain\Model\PublicId());
+        return new SchedulerOccurrence(Uuid::generate(), $job->getId(), new \DateTimeImmutable('2026-10-03T12:00:00Z'), $job->getJobType(), $job->getCommand(), $job->getParameters(), jobPublicId: new PublicId());
     }
 
     private function handler(SchedulerOccurrenceExecutionStoreInterface $store, ScheduledJobPortInterface $jobs, MessageBusInterface $bus, ?SchedulerRegistry $registry = null): ExecuteScheduledOccurrenceHandler
@@ -206,7 +207,7 @@ final class ExecuteScheduledOccurrenceHandlerTest extends TestCase
         if ($change === 'zero_sign') {
             $job->getState()->parameters = ['value' => -0.0];
         }
-        $occurrence = new SchedulerOccurrence(Uuid::generate(), $job->getId(), new \DateTimeImmutable('2026-10-03T12:00:00Z'), $job->getJobType(), $job->getCommand(), $job->getParameters(), jobPublicId: new \App\Shared\Domain\Model\PublicId(), origin: SchedulerOccurrenceOrigin::Manual);
+        $occurrence = new SchedulerOccurrence(Uuid::generate(), $job->getId(), new \DateTimeImmutable('2026-10-03T12:00:00Z'), $job->getJobType(), $job->getCommand(), $job->getParameters(), jobPublicId: new PublicId(), origin: SchedulerOccurrenceOrigin::Manual);
         match ($change) {
             'paused' => $job->pause(),
             'disabled' => $job->disable(),

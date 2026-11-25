@@ -6,6 +6,7 @@ namespace App\Tests\Unit\Auth\Domain\Model;
 
 use App\Auth\Domain\Model\Passkey\Passkey;
 use App\Auth\Domain\Model\Passkey\PasskeyState;
+use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
 use InvalidArgumentException;
 use PHPUnit\Framework\TestCase;
@@ -49,7 +50,7 @@ final class PasskeyTest extends TestCase
 
         $passkey = Passkey::reconstitute(new PasskeyState(
             id: Uuid::v4(),
-            publicId: new \App\Shared\Domain\Model\PublicId(),
+            publicId: new PublicId(),
             name: 'Key',
             credentialId: 'cred-id',
             data: [],
@@ -66,7 +67,7 @@ final class PasskeyTest extends TestCase
     {
         $passkey = Passkey::reconstitute(new PasskeyState(
             id: Uuid::v4(),
-            publicId: new \App\Shared\Domain\Model\PublicId(),
+            publicId: new PublicId(),
             name: 'Key',
             credentialId: 'cred-id',
             data: [],

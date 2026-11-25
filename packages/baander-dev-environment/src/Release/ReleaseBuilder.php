@@ -4,19 +4,24 @@ declare(strict_types=1);
 
 namespace Baander\DevEnvironment\Release;
 
-use Baander\Process\Execution\CommandExecutor;
-use Baander\Process\Execution\ProcessSpec;
-use Baander\Process\Execution\CompletionPolicy;
-use Baander\Images\Build\BuildRequest;
 use Baander\Configuration\ApplicationLayout;
 use Baander\Configuration\ToolingConfiguration;
 use Baander\Containers\Docker\Client;
+use Baander\Containers\Resources\ResourceKind;
+use Baander\Containers\Resources\ResourceLedger;
+use Baander\DevEnvironment\Configuration\MediaMounts;
 use Baander\DevEnvironment\Host\CapturedConnections;
-use Baander\Images\Build\Source;
-use Baander\DevEnvironment\State\InstanceStateStore;
 use Baander\DevEnvironment\Host\ProcessEnvironment;
+use Baander\DevEnvironment\Runtime\ComposeRuntime;
+use Baander\DevEnvironment\State\InstanceStateStore;
+use Baander\DevEnvironment\State\ReleaseContract;
 use Baander\DevEnvironment\WorkflowError;
 use Baander\Filesystem\PrivateDirectory;
+use Baander\Images\Build\BuildRequest;
+use Baander\Images\Build\Source;
+use Baander\Process\Execution\CommandExecutor;
+use Baander\Process\Execution\CompletionPolicy;
+use Baander\Process\Execution\ProcessSpec;
 
 class ReleaseBuilder
 {
@@ -46,7 +51,7 @@ class ReleaseBuilder
             $revision = Source::snapshotWorktree($this->runner, $instance['worktree'], $source);
         }
         $layout = ApplicationLayout::load($source . '/packages/baander-configuration/resources/application-layout.json');
-        $media = new \Baander\DevEnvironment\Configuration\MediaMounts($layout)->preflight($instance['media'] ?? [], $this->store->root, new \Baander\DevEnvironment\Runtime\ComposeRuntime($this->store, $this->runner)->environment($instance), array_column(array_diff_key($instance['state_mounts'] ?? [], ['media' => true]), 'target'));
+        $media = new MediaMounts($layout)->preflight($instance['media'] ?? [], $this->store->root, new ComposeRuntime($this->store, $this->runner)->environment($instance), array_column(array_diff_key($instance['state_mounts'] ?? [], ['media' => true]), 'target'));
         $instance['media'] = $media;
         $instance['target_revision'] = $revision;
         $this->store->save($instance['id'], $instance);
@@ -93,7 +98,7 @@ class ReleaseBuilder
                 $release['image_pins'][$key] = $pin;
             }
         }
-        return \Baander\DevEnvironment\State\ReleaseContract::prepared($release, $instance, $this->configuration, $this->store)->toArray();
+        return ReleaseContract::prepared($release, $instance, $this->configuration, $this->store)->toArray();
     }
 
     public function imageId(Client $docker, string $name): string
@@ -112,13 +117,13 @@ class ReleaseBuilder
     public function frontend(Client $docker, string $source, string $image): void
     {
         $name = 'baander-assets-' . bin2hex(random_bytes(6));
-        $ledger = new \Baander\Containers\Resources\ResourceLedger(
+        $ledger = new ResourceLedger(
             dirname($source) . '/' . basename($source) . '-frontend-resources.json',
             $docker,
             $this->connections->environment(),
         );
         $ledger->scoped(function () use ($ledger, $docker, $source, $image, $name): void {
-            $ledger->create(\Baander\Containers\Resources\ResourceKind::Container, $name, [
+            $ledger->create(ResourceKind::Container, $name, [
                 '--workdir', '/work/ui/web', $image,
                 'sh', '-ec', 'yarn install --immutable && yarn build',
             ]);

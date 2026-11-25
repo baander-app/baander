@@ -247,7 +247,7 @@ final class PushAuthorizationRequestHandlerTest extends TestCase
         yield 'IPv6 on another port' => ['http://[::1]/cb', 'http://[::1]:8080/cb'];
     }
 
-    #[\PHPUnit\Framework\Attributes\DataProvider('loopbackMatches')]
+    #[DataProvider('loopbackMatches')]
     public function testALoopbackRedirectUriMatchesOnAnotherPort(string $registered, string $requested): void
     {
         $native = $this->register(Client::registerPublic('Native', [$registered]));
@@ -266,7 +266,7 @@ final class PushAuthorizationRequestHandlerTest extends TestCase
         yield 'an added query' => ['http://localhost/cb', 'http://localhost/cb?x=1'];
     }
 
-    #[\PHPUnit\Framework\Attributes\DataProvider('loopbackMismatches')]
+    #[DataProvider('loopbackMismatches')]
     public function testALoopbackRedirectUriDoesNotMatchAnotherEndpoint(string $registered, string $requested): void
     {
         $native = $this->register(Client::registerPublic('Native', [$registered]));

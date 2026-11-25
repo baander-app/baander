@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Transcode\Infrastructure\HLS;
 
+use App\Shared\Application\DTO\DeploymentProfile;
+use App\Transcode\Application\Exception\MediaEncodingProhibitedException;
+use App\Transcode\Application\Service\MediaExecutionPolicy;
 use App\Transcode\Domain\ValueObject\QualityTier;
 use App\Transcode\Infrastructure\HLS\FMP4SegmentWriter;
 use PHPUnit\Framework\TestCase;
@@ -29,12 +32,12 @@ final class FMP4SegmentWriterTest extends TestCase
     public function testRemuxRejectsBeforeCreatingOutputOrRunningEncoder(): void
     {
         $output = $this->directory . '/forbidden/init.mp4';
-        $policy = new \App\Transcode\Application\Service\MediaExecutionPolicy(new \App\Shared\Application\DTO\DeploymentProfile('remux', 2, 4, 1, sharedCopySlots: 2));
+        $policy = new MediaExecutionPolicy(new DeploymentProfile('remux', 2, 4, 1, sharedCopySlots: 2));
         $writer = new FMP4SegmentWriter($policy, $this->binary);
         try {
             $writer->encodeInitSegment('/media/input.mkv', QualityTier::p720(), $output);
             self::fail('Remux encoding was accepted.');
-        } catch (\App\Transcode\Application\Exception\MediaEncodingProhibitedException $error) {
+        } catch (MediaEncodingProhibitedException $error) {
             self::assertSame('encoding_prohibited', $error->details['reason']);
             self::assertDirectoryDoesNotExist(dirname($output));
         }
@@ -51,7 +54,7 @@ final class FMP4SegmentWriterTest extends TestCase
             printf 'fixture-init' > "$output_path"
             SH);
         chmod($this->binary, 0700);
-        $writer = new FMP4SegmentWriter(new \App\Transcode\Application\Service\MediaExecutionPolicy(new \App\Shared\Application\DTO\DeploymentProfile()), $this->binary);
+        $writer = new FMP4SegmentWriter(new MediaExecutionPolicy(new DeploymentProfile()), $this->binary);
         $output = $this->directory . '/rendition/init.mp4';
 
         $result = $writer->encodeInitSegment('/media/input.mkv', QualityTier::p720(), $output);
@@ -68,7 +71,7 @@ final class FMP4SegmentWriterTest extends TestCase
             exit 7
             SH);
         chmod($this->binary, 0700);
-        $writer = new FMP4SegmentWriter(new \App\Transcode\Application\Service\MediaExecutionPolicy(new \App\Shared\Application\DTO\DeploymentProfile()), $this->binary);
+        $writer = new FMP4SegmentWriter(new MediaExecutionPolicy(new DeploymentProfile()), $this->binary);
         $this->expectException(\RuntimeException::class);
         $this->expectExceptionMessage('Init segment encoding failed: fixture encoder failure');
 

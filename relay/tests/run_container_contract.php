@@ -3,5 +3,9 @@
 
 // SPDX-License-Identifier: Apache-2.0
 declare(strict_types=1);
+
+use Baander\RegistryTests\ContainerContract;
+use Baander\RegistryTests\Runtime;
+
 require __DIR__ . '/bootstrap.php';
-Baander\RegistryTests\Runtime::main(Baander\RegistryTests\ContainerContract::main(...));
+Runtime::main(ContainerContract::main(...));

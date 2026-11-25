@@ -4,10 +4,11 @@ declare(strict_types=1);
 
 namespace Baander\Deployment\Tests;
 
-use Baander\Tests\Tooling\Support\WorkerCommandExecutor;
-use Baander\Tests\Tooling\Support\DevDataRunner;
-use Baander\Tests\Tooling\Support\DevelopmentCommandExecutor;
+use App\Shared\Application\DTO\DeploymentProfile;
+use App\Shared\Application\DTO\DeploymentUnit;
+use App\Shared\Application\DTO\HardwareEncoder;
 use App\Shared\Infrastructure\Worker\DeploymentOperatorManifest;
+use App\Shared\Infrastructure\Worker\DeploymentRuntimeEnvironment;
 use Baander\Configuration\ApplicationLayout;
 use Baander\Deployment\Profiles\ImageProfile;
 use Baander\Deployment\Workers\Configuration;
@@ -15,6 +16,11 @@ use Baander\Deployment\Workers\Lifecycle;
 use Baander\Deployment\Workers\StateStore;
 use Baander\Filesystem\AtomicFile;
 use Baander\Images\Inventory\Collector;
+use Baander\Process\Execution\CommandFailure;
+use Baander\Process\Execution\ProcessResult;
+use Baander\Tests\Tooling\Support\DevDataRunner;
+use Baander\Tests\Tooling\Support\DevelopmentCommandExecutor;
+use Baander\Tests\Tooling\Support\WorkerCommandExecutor;
 use PHPUnit\Framework\TestCase;
 
 final class WorkerLifecycleTest extends TestCase
@@ -58,7 +64,7 @@ final class WorkerLifecycleTest extends TestCase
     {
         $profile = ImageProfile::fromArray([
             'version' => 2,
-            'deployment' => json_decode(new \App\Shared\Application\DTO\DeploymentProfile('remux', 2, 4, 1, sharedCopySlots: 2)->toJson(), true, flags: JSON_THROW_ON_ERROR),
+            'deployment' => json_decode(new DeploymentProfile('remux', 2, 4, 1, sharedCopySlots: 2)->toJson(), true, flags: JSON_THROW_ON_ERROR),
             'autoscaling' => ['minimumConcurrency' => 1, 'maximumConcurrency' => 1],
             'runtime' => ['phpHeapMiB' => 256, 'scheduledConsoleMiB' => 320],
         ]);
@@ -163,7 +169,7 @@ final class WorkerLifecycleTest extends TestCase
             return in_array('info', $arguments, true) ? '{"ID":"daemon"}' : '';
         });
         // /dev/null stands in for the render node: a character device whose group the host reports.
-        $deployment = new \App\Shared\Application\DTO\DeploymentProfile(hardware: new \App\Shared\Application\DTO\HardwareEncoder('vaapi', '/dev/null'));
+        $deployment = new DeploymentProfile(hardware: new HardwareEncoder('vaapi', '/dev/null'));
         $profile = ImageProfile::fromArray(['version' => 2, 'deployment' => json_decode($deployment->toJson(), true, flags: JSON_THROW_ON_ERROR),
             'autoscaling' => AtomicFile::readJson(dirname(__DIR__, 3) . '/tests/Fixtures/Worker/autoscaling-profile.json'),
             'runtime' => ['phpHeapMiB' => 256, 'scheduledConsoleMiB' => 320]]);
@@ -179,9 +185,9 @@ final class WorkerLifecycleTest extends TestCase
         $manifest = DeploymentOperatorManifest::fromJson($contents, '/srv/baander');
         self::assertSame(stat('/dev/null')['gid'], $manifest->deviceGroup);
         self::assertEquals($deployment, $manifest->deploymentProfile);
-        $environment = new \App\Shared\Infrastructure\Worker\DeploymentRuntimeEnvironment(['BAANDER_DEPLOYMENT_PROFILE' => $deployment->toJson()]);
-        $execution = $manifest->recipe(\App\Shared\Application\DTO\DeploymentUnit::Execution, $environment);
-        $control = $manifest->recipe(\App\Shared\Application\DTO\DeploymentUnit::Control, $environment);
+        $environment = new DeploymentRuntimeEnvironment(['BAANDER_DEPLOYMENT_PROFILE' => $deployment->toJson()]);
+        $execution = $manifest->recipe(DeploymentUnit::Execution, $environment);
+        $control = $manifest->recipe(DeploymentUnit::Control, $environment);
         self::assertSame([['/dev/null'], [stat('/dev/null')['gid']]], [$execution->devices, $execution->groups]);
         self::assertSame([[], []], [$control->devices, $control->groups]);
 
@@ -192,7 +198,7 @@ final class WorkerLifecycleTest extends TestCase
 
     public function testHardwareDeviceThatIsNotADeviceNodeIsRefusedBeforePreparation(): void
     {
-        $deployment = new \App\Shared\Application\DTO\DeploymentProfile(hardware: new \App\Shared\Application\DTO\HardwareEncoder('vaapi', '/dev/dri/baander-missing-render-node'));
+        $deployment = new DeploymentProfile(hardware: new HardwareEncoder('vaapi', '/dev/dri/baander-missing-render-node'));
         $profile = ImageProfile::fromArray(['version' => 2, 'deployment' => json_decode($deployment->toJson(), true, flags: JSON_THROW_ON_ERROR),
             'autoscaling' => ['minimumConcurrency' => 1, 'maximumConcurrency' => 1], 'runtime' => ['phpHeapMiB' => 256, 'scheduledConsoleMiB' => 320]]);
         $this->expectException(\RuntimeException::class);
@@ -304,7 +310,7 @@ final class WorkerLifecycleTest extends TestCase
         AtomicFile::writeJson($record['directory'] . '/credentials.json', ['controllerDatabaseUrl' => 'private-password']);
         $cgroupLimits = $limits['cgroup'] ?? [];
         unset($limits['cgroup']);
-        $runner = new WorkerCommandExecutor(static function (array $arguments) use ($record, $marker, $oom, $cgroupNamespace, $limits, $cgroupLimits): string|\Baander\Process\Execution\ProcessResult {
+        $runner = new WorkerCommandExecutor(static function (array $arguments) use ($record, $marker, $oom, $cgroupNamespace, $limits, $cgroupLimits): string|ProcessResult {
             if (in_array('info', $arguments, true)) {
                 return '{"ID":"daemon"}';
             }
@@ -323,7 +329,7 @@ final class WorkerLifecycleTest extends TestCase
                         'memoryEvents' => ['oom' => 0, 'oom_kill' => 0], 'swapCurrentBytes' => 0, 'swapPeakBytes' => 0, 'swapMaxBytes' => 'max',
                         'pidsCurrent' => 2, 'pidsPeak' => null, 'pidsMax' => 'max', 'unwanted' => 'private-password'], ...$cgroupLimits]];
                 $stderr = $marker ? "\nBAANDER_OPERATOR_MEASURE_V1:" . $receipt['nonce'] . ':' . json_encode($metrics, JSON_THROW_ON_ERROR | JSON_PRESERVE_ZERO_FRACTION) . "\n" : '';
-                return new \Baander\Process\Execution\ProcessResult($oom ? 137 : 0, null, false, false, '{"success":true,"action":"status","result":{"state":"ready"}}', $stderr, 1.0);
+                return new ProcessResult($oom ? 137 : 0, null, false, false, '{"success":true,"action":"status","result":{"state":"ready"}}', $stderr, 1.0);
             }
             return '';
         });
@@ -336,14 +342,14 @@ final class WorkerLifecycleTest extends TestCase
         $tag = $record['controller_tag'];
         $present = true;
         $removed = [];
-        $runner = new DevDataRunner(static function (array $arguments) use (&$present, &$removed, $record, $tag): string|\Baander\Process\Execution\ProcessResult {
+        $runner = new DevDataRunner(static function (array $arguments) use (&$present, &$removed, $record, $tag): string|ProcessResult {
             $args = array_slice($arguments, 3);
             if ($args[0] === 'info') {
                 return '{"ID":"daemon"}';
             }
             if (array_slice($args, 0, 2) === ['image', 'inspect']) {
                 return $present ? json_encode([['Id' => $record['operator_image']]], JSON_THROW_ON_ERROR)
-                    : new \Baander\Process\Execution\ProcessResult(1, null, false, false, '', 'Error response from daemon: No such image: ' . $tag, 0);
+                    : new ProcessResult(1, null, false, false, '', 'Error response from daemon: No such image: ' . $tag, 0);
             }
             if (array_slice($args, 0, 2) === ['image', 'rm']) {
                 $removed[] = $args[2];
@@ -378,18 +384,18 @@ final class WorkerLifecycleTest extends TestCase
         $tag = $record['controller_tag'];
         $present = true;
         $attempts = 0;
-        $runner = new DevDataRunner(static function (array $arguments) use (&$present, &$attempts, $record, $tag): string|\Baander\Process\Execution\ProcessResult {
+        $runner = new DevDataRunner(static function (array $arguments) use (&$present, &$attempts, $record, $tag): string|ProcessResult {
             $args = array_slice($arguments, 3);
             if ($args[0] === 'info') {
                 return '{"ID":"daemon"}';
             }
             if (array_slice($args, 0, 2) === ['image', 'inspect']) {
                 return $present ? json_encode([['Id' => $record['operator_image']]], JSON_THROW_ON_ERROR)
-                    : new \Baander\Process\Execution\ProcessResult(1, null, false, false, '', 'Error response from daemon: No such image: ' . $tag, 0);
+                    : new ProcessResult(1, null, false, false, '', 'Error response from daemon: No such image: ' . $tag, 0);
             }
             if (array_slice($args, 0, 2) === ['image', 'rm']) {
                 if (++$attempts === 1) {
-                    return new \Baander\Process\Execution\ProcessResult(1, null, false, false, '', 'remove failed', 0);
+                    return new ProcessResult(1, null, false, false, '', 'remove failed', 0);
                 }
                 $present = false;
             }
@@ -400,7 +406,7 @@ final class WorkerLifecycleTest extends TestCase
         try {
             $lifecycle->retire($record);
             self::fail('Removal failure accepted.');
-        } catch (\Baander\Process\Execution\CommandFailure) {
+        } catch (CommandFailure) {
             self::assertSame('retired', $this->store->load()['phase']);
         }
         $lifecycle->retire($record);
@@ -415,7 +421,7 @@ final class WorkerLifecycleTest extends TestCase
         $tag = 'baander-worker-controller:preset-proof-' . $record['boot_id'];
         $runner = new DevDataRunner(static fn(array $arguments): string|\Baander\Process\Execution\ProcessResult => in_array('info', $arguments, true)
             ? '{"ID":"daemon"}' : (in_array('inspect', $arguments, true)
-                ? new \Baander\Process\Execution\ProcessResult(1, null, false, false, '', 'Error response from daemon: No such image: ' . $tag, 0) : ''));
+                ? new ProcessResult(1, null, false, false, '', 'Error response from daemon: No such image: ' . $tag, 0) : ''));
         new Lifecycle($this->store, $runner, getenv())->retire($record);
         self::assertTrue($record['controller_tag_cleaned']);
         self::assertContains($tag, $runner->calls[1]['arguments']);

@@ -2,9 +2,29 @@
 
 declare(strict_types=1);
 
+use App\Auth\Domain\Event\UserRegistered;
+use App\Auth\Infrastructure\Doctrine\Entity\UserEntity;
+use App\Kernel;
+use App\Notification\Infrastructure\Doctrine\Entity\NotificationPreferenceEntity;
+use App\Scheduler\Application\Command\ExecuteScheduledOccurrenceCommand;
+use App\Scheduler\Infrastructure\Doctrine\DoctrineSchedulerManualOccurrenceRecorder;
+use App\Shared\Application\DTO\DeploymentProfile;
+use App\Shared\Application\DTO\DeploymentUnit;
+use App\Shared\Application\DTO\WorkerAutoscalingProfile;
+use App\Shared\Domain\Model\Email;
+use App\Shared\Domain\Model\PublicId;
+use App\Shared\Domain\Model\Uuid;
+use App\Shared\Infrastructure\Worker\DeploymentContainer;
+use App\Shared\Infrastructure\Worker\DeploymentLease;
+use App\Shared\Infrastructure\Worker\DoctrineDeploymentInventory;
+use App\Shared\Infrastructure\Worker\WorkerReadinessObservation;
 use App\Tests\Fixtures\Messaging\MessageCodecFactory;
 use Doctrine\DBAL\DriverManager;
 use Doctrine\DBAL\Tools\DsnParser;
+use Symfony\Component\Dotenv\Dotenv;
+use Symfony\Component\Messenger\Bridge\Redis\Transport\Connection;
+use Symfony\Component\Messenger\Bridge\Redis\Transport\RedisTransport;
+use Symfony\Component\Messenger\Envelope;
 
 require dirname(__DIR__, 3) . '/vendor/autoload.php';
 require_once __DIR__ . '/../Messaging/MessageCodecFactory.php';
@@ -90,25 +110,25 @@ if (
 ) {
     throw new RuntimeException('Invalid isolated worker check request.');
 }
-App\Shared\Infrastructure\Worker\DeploymentLease::validateIdentity($namespace, $bootId);
+DeploymentLease::validateIdentity($namespace, $bootId);
 $url = getenv('DATABASE_URL');
 if (!$url) {
     throw new RuntimeException('Disposable DATABASE_URL is required.');
 }
 $db = DriverManager::getConnection(new DsnParser(['postgresql' => 'pdo_pgsql'])->parse($url));
 if (in_array($mode, ['reserve-pair', 'claim-unit', 'register-unit', 'start-unit'], true)) {
-    $inventory = new App\Shared\Infrastructure\Worker\DoctrineDeploymentInventory($db);
+    $inventory = new DoctrineDeploymentInventory($db);
     $daemon = 'baander.app:command-drill';
     if ($mode === 'reserve-pair') {
         $controlRecipe = hash('sha256', 'control:2944:129:cpu0');
         $executionRecipe = hash('sha256', 'execution:4480:256:cpu1,2:console320');
-        $accepted = $inventory->reserveBoot($namespace, $bootId, hash('sha256', $controlRecipe . $executionRecipe), new App\Shared\Application\DTO\DeploymentProfile()->fingerprint(), $daemon, $controlRecipe, $executionRecipe);
+        $accepted = $inventory->reserveBoot($namespace, $bootId, hash('sha256', $controlRecipe . $executionRecipe), new DeploymentProfile()->fingerprint(), $daemon, $controlRecipe, $executionRecipe);
     } else {
-        $unit = App\Shared\Application\DTO\DeploymentUnit::from($arguments[4] ?? '');
+        $unit = DeploymentUnit::from($arguments[4] ?? '');
         if ($mode === 'claim-unit') {
             $accepted = $inventory->claimCreate($namespace, $bootId, $unit);
         } else {
-            $binding = new App\Shared\Infrastructure\Worker\DeploymentContainer($namespace, $bootId, $daemon, $arguments[5] ?? '', $unit);
+            $binding = new DeploymentContainer($namespace, $bootId, $daemon, $arguments[5] ?? '', $unit);
             $accepted = $mode === 'register-unit' ? $inventory->register($binding) : $inventory->claimStart($binding);
         }
     }
@@ -522,13 +542,13 @@ if ($mode === 'verify-claim-recovered') {
     exit(0);
 }
 if ($mode === 'seed-scheduler') {
-    $job = App\Shared\Domain\Model\Uuid::v7();
-    $request = App\Shared\Domain\Model\Uuid::v7();
+    $job = Uuid::v7();
+    $request = Uuid::v7();
     $db->executeStatement(<<<'SQL'
         INSERT INTO scheduled_jobs (id, public_id, revision, name, expression, job_type, command, status, parameters, created_at, updated_at, run_count)
         VALUES (:id, :public_id, :revision, 'Worker command scheduler fixture', '* * * * *', 'console', 'app:transcode:cache-sweep', 'paused', '{"dry-run":true}', clock_timestamp(), clock_timestamp(), 0)
-        SQL, ['id' => $job->toString(), 'public_id' => new App\Shared\Domain\Model\PublicId()->toString(), 'revision' => App\Shared\Domain\Model\Uuid::v7()->toString()]);
-    if (new App\Scheduler\Infrastructure\Doctrine\DoctrineSchedulerManualOccurrenceRecorder($db)->record($job, $request) === null
+        SQL, ['id' => $job->toString(), 'public_id' => new PublicId()->toString(), 'revision' => Uuid::v7()->toString()]);
+    if (new DoctrineSchedulerManualOccurrenceRecorder($db)->record($job, $request) === null
         || (int) $db->fetchOne('SELECT count(*) FROM scheduler_occurrences WHERE dispatched_at IS NOT NULL') !== 0
         || (int) $db->fetchOne('SELECT count(*) FROM scheduler_occurrence_executions') !== 0) {
         throw new RuntimeException('Manual request must remain durable and undispatched before lease admission.');
@@ -562,11 +582,11 @@ if ($mode === 'verify-scheduler' || $mode === 'replay-scheduler') {
     if ($mode === 'replay-scheduler') {
         // A returned occurrence is never claimed again by the relay. Exercise the
         // consumer's retained deduplication guard with an actual duplicate delivery.
-        $transport = new Symfony\Component\Messenger\Bridge\Redis\Transport\RedisTransport(
-            Symfony\Component\Messenger\Bridge\Redis\Transport\Connection::fromDsn('redis://default:test-only-redis-password@redis:6379/scheduler_occurrences/baander'),
+        $transport = new RedisTransport(
+            Connection::fromDsn('redis://default:test-only-redis-password@redis:6379/scheduler_occurrences/baander'),
             MessageCodecFactory::signingSerializer(),
         );
-        $transport->send(new Symfony\Component\Messenger\Envelope(new App\Scheduler\Application\Command\ExecuteScheduledOccurrenceCommand(App\Shared\Domain\Model\Uuid::fromString($occurrence['id']))));
+        $transport->send(new Envelope(new ExecuteScheduledOccurrenceCommand(Uuid::fromString($occurrence['id']))));
         echo "Replayed duplicate scheduler envelope after confirmed execution.\n";
     } else {
         echo "Independent observer verified one scheduler execution and clean dedicated-stream acknowledgment.\n";
@@ -574,14 +594,14 @@ if ($mode === 'verify-scheduler' || $mode === 'replay-scheduler') {
     exit(0);
 }
 if ($mode === 'seed-outbox') {
-    new Symfony\Component\Dotenv\Dotenv()->bootEnv(dirname(__DIR__, 3) . '/.env');
-    $kernel = new App\Kernel('prod', false);
+    new Dotenv()->bootEnv(dirname(__DIR__, 3) . '/.env');
+    $kernel = new Kernel('prod', false);
     $kernel->boot();
     $em = $kernel->getContainer()->get('doctrine')->getManager();
-    $user = new App\Auth\Infrastructure\Doctrine\Entity\UserEntity(new App\Shared\Domain\Model\PublicId(), 'Worker Command User', 'worker-command@baander.app', 'unused-password');
+    $user = new UserEntity(new PublicId(), 'Worker Command User', 'worker-command@baander.app', 'unused-password');
     $em->persist($user); // Unverified: CreateNotificationHandler does not enqueue email.
     foreach (['email', 'push', 'webhook'] as $channel) {
-        $preference = new App\Notification\Infrastructure\Doctrine\Entity\NotificationPreferenceEntity(App\Shared\Domain\Model\Uuid::v7());
+        $preference = new NotificationPreferenceEntity(Uuid::v7());
         $preference->setUserId($user->getId());
         $preference->setCategory('security');
         $preference->setChannel($channel);
@@ -589,7 +609,7 @@ if ($mode === 'seed-outbox') {
         $em->persist($preference);
     }
     $em->flush();
-    $kernel->getContainer()->get('event_dispatcher')->dispatch(new App\Auth\Domain\Event\UserRegistered($user->getId(), $user->getPublicId(), App\Shared\Domain\Model\Email::fromString($user->getEmail()), $user->getName()));
+    $kernel->getContainer()->get('event_dispatcher')->dispatch(new UserRegistered($user->getId(), $user->getPublicId(), Email::fromString($user->getEmail()), $user->getName()));
     if ((int) $db->fetchOne('SELECT count(*) FROM domain_event_outbox') !== 1 || (int) $db->fetchOne('SELECT count(*) FROM notifications') !== 0 || (int) $db->fetchOne('SELECT count(*) FROM domain_event_outbox_delivery') !== 0 || (int) $db->fetchOne('SELECT count(*) FROM domain_event_outbox_receipt') !== 0) {
         throw new RuntimeException('Real capture must commit exactly one pending event without projecting it.');
     }
@@ -678,7 +698,7 @@ foreach (glob('/proc/[0-9]*/cmdline') ?: [] as $path) {
     if (preg_match('/(?:^|\x00)BAANDER_WORKER_AUTOSCALING_PROFILE=([^\x00]+)(?:\x00|$)/', $environment, $profileMatch) !== 1) {
         throw new RuntimeException('Production role has no inherited autoscaling profile.');
     }
-    $roleProfile = \App\Shared\Application\DTO\WorkerAutoscalingProfile::fromJson($profileMatch[1]);
+    $roleProfile = WorkerAutoscalingProfile::fromJson($profileMatch[1]);
     if ($profile !== null && $profile->toJson() !== $roleProfile->toJson()) {
         throw new RuntimeException('Production roles disagree on the admitted autoscaling profile.');
     }
@@ -743,7 +763,7 @@ foreach (['messages' => ($profile ?? throw new RuntimeException('No resident aut
 }
 if ($mode === 'readiness-observation') {
     try {
-        $observed = \App\Shared\Infrastructure\Worker\WorkerReadinessObservation::observe($namespace, $bootId, $expectedEpoch, $unit, $profile->toJson(), dirname(__DIR__, 3), new \App\Shared\Application\DTO\DeploymentProfile()->toJson());
+        $observed = WorkerReadinessObservation::observe($namespace, $bootId, $expectedEpoch, $unit, $profile->toJson(), dirname(__DIR__, 3), new DeploymentProfile()->toJson());
         $observation = ['success' => true, 'roles' => $observed];
     } catch (Throwable $error) {
         $safeMessages = [

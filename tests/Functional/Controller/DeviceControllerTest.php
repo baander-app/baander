@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Tests\Functional\Controller;
 
 use App\Auth\Domain\Model\User;
+use App\Session\Infrastructure\Doctrine\Entity\DeviceEntity;
 use App\Shared\Domain\Model\PublicId;
 use App\Tests\Functional\TestCase;
 use Symfony\Component\Uid\Uuid as SymfonyUuid;
@@ -247,7 +248,7 @@ final class DeviceControllerTest extends TestCase
             'deviceId' => $token,
             'name' => 'Speaker',
         ]), 200);
-        $device = $this->entityManager->getRepository(\App\Session\Infrastructure\Doctrine\Entity\DeviceEntity::class)
+        $device = $this->entityManager->getRepository(DeviceEntity::class)
             ->findOneBy(['userId' => $user->getId()]);
         self::assertNotNull($device);
         foreach ([$device->getId()->toString(), $token] as $internalId) {

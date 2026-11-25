@@ -6,8 +6,13 @@ namespace App\Transcode\Interface\Request;
 
 use App\Shared\Domain\Model\PublicId;
 use OpenApi\Spec as OA;
-use Symfony\Component\Validator\Constraints\NotBlank;
 use Symfony\Component\Validator\Constraints\Choice;
+use Symfony\Component\Validator\Constraints\Length;
+use Symfony\Component\Validator\Constraints\NotBlank;
+use Symfony\Component\Validator\Constraints\PositiveOrZero;
+use Symfony\Component\Validator\Constraints\Range;
+use Symfony\Component\Validator\Constraints\Regex;
+use Symfony\Component\Validator\Constraints\Uuid;
 
 #[OA\Schema(
     type: 'object',
@@ -75,8 +80,8 @@ final readonly class CreateTranscodeSessionRequest
 {
     public function __construct(
         #[NotBlank(message: 'Video ID is required.')]
-        #[\Symfony\Component\Validator\Constraints\Length(exactly: PublicId::LENGTH)]
-        #[\Symfony\Component\Validator\Constraints\Regex(pattern: PublicId::REGEX)]
+        #[Length(exactly: PublicId::LENGTH)]
+        #[Regex(pattern: PublicId::REGEX)]
         public string $videoId = '',
         #[Choice(choices: ['360p', '480p', '720p', '1080p', '1440p', '4K'])]
         public string $qualityTier = '1080p',
@@ -94,11 +99,11 @@ final readonly class CreateTranscodeSessionRequest
         #[Choice(choices: ['critical', 'high', 'normal', 'low', 'bulk'])]
         public string $priority = 'normal',
         #[NotBlank]
-        #[\Symfony\Component\Validator\Constraints\Uuid]
+        #[Uuid]
         public string $requestId = '',
-        #[\Symfony\Component\Validator\Constraints\PositiveOrZero]
+        #[PositiveOrZero]
         public ?int $audioStreamIndex = null,
-        #[\Symfony\Component\Validator\Constraints\Range(min: -10000, max: 10000)]
+        #[Range(min: -10000, max: 10000)]
         public int $audioOffsetMs = 0,
     ) {
     }

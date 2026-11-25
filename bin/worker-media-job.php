@@ -3,6 +3,24 @@
 
 declare(strict_types=1);
 
+use App\Kernel;
+use App\QoL\Infrastructure\Worker\WorkerQoLLifecycle;
+use App\Shared\Application\DTO\DeploymentProfile;
+use App\Shared\Domain\Model\Uuid;
+use App\Shared\Infrastructure\Worker\NativeExecutionClient;
+use App\Shared\Infrastructure\Worker\NativeExecutionClientInterface;
+use App\Shared\Infrastructure\Worker\OutOfMemoryKillOrder;
+use App\Transcode\Application\DTO\MediaOperation;
+use App\Transcode\Application\Exception\MediaEncodingProhibitedException;
+use App\Transcode\Application\Port\AudioRenditionRuntimePort;
+use App\Transcode\Application\Port\TranscodeExecutionOwnershipPort;
+use App\Transcode\Application\Port\TranscodeLoopStarterInterface;
+use App\Transcode\Application\Service\MediaExecutionPolicy;
+use App\Transcode\Infrastructure\FFmpeg\ProcessExecutor;
+use App\Transcode\Infrastructure\FFmpeg\WorkerEncoderCapabilitiesSnapshotStore;
+use App\Transcode\Infrastructure\Transcode\AudioRenditionExecutor;
+use App\Transcode\Infrastructure\Worker\DoctrineMediaWorkerAuthority;
+use App\Transcode\Infrastructure\Worker\MediaWorkerEnvironment;
 use Baander\Core\EnvironmentVariable;
 
 ini_set('display_errors', '0');
@@ -31,23 +49,23 @@ $exitCode = 0;
 $stopping = false;
 try {
     require dirname(__DIR__) . '/vendor/autoload.php';
-    $profile = \App\Shared\Application\DTO\DeploymentProfile::fromEnvironment();
-    $executionPolicy = new \App\Transcode\Application\Service\MediaExecutionPolicy($profile);
+    $profile = DeploymentProfile::fromEnvironment();
+    $executionPolicy = new MediaExecutionPolicy($profile);
     $arguments = $_SERVER['argv'] ?? [];
     if (PHP_SAPI !== 'cli' || count($arguments) !== 3 || !in_array($arguments[1], ['video', 'audio'], true)) {
         throw new RuntimeException('Media job requires private manager admission.');
     }
-    $identity = \App\Transcode\Infrastructure\Worker\MediaWorkerEnvironment::identity();
+    $identity = MediaWorkerEnvironment::identity();
     $kind = $arguments[1];
     $key = $arguments[2];
     if ($kind === 'video') {
-        $jobId = \App\Shared\Domain\Model\Uuid::fromString($key);
+        $jobId = Uuid::fromString($key);
     } elseif (preg_match('/\A[a-f0-9]{64}\z/D', $key) !== 1) {
         throw new RuntimeException('Media job requires a canonical runtime key.');
     }
     ini_set('memory_limit', $profile->phpHeapMiB() . 'M');
     // Host memory pressure kills media children before the control unit's other processes.
-    \App\Shared\Infrastructure\Worker\OutOfMemoryKillOrder::raiseToMediaWork();
+    OutOfMemoryKillOrder::raiseToMediaWork();
     pcntl_async_signals(true);
     $stop = static function () use (&$stopping): void { $stopping = true; };
     pcntl_signal(SIGTERM, $stop);
@@ -61,7 +79,7 @@ try {
         throw new RuntimeException('Media job requires inherited kernel configuration.');
     }
     swoole_async_set(['aio_core_worker_num' => 1, 'aio_worker_num' => 1]);
-    \App\Transcode\Infrastructure\FFmpeg\ProcessExecutor::requireNativeExecution();
+    ProcessExecutor::requireNativeExecution();
     $clientId = getenv(EnvironmentVariable::BAANDER_NATIVE_CLIENT_ID);
     $clientGeneration = getenv(EnvironmentVariable::BAANDER_NATIVE_CLIENT_GENERATION);
     $generation = is_string($clientGeneration) ? filter_var($clientGeneration, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]) : false;
@@ -70,17 +88,17 @@ try {
     ) {
         throw new RuntimeException('Media job requires a native client launch fence.');
     }
-    $native = \App\Shared\Infrastructure\Worker\NativeExecutionClient::fromEnvironment($clientId, $generation);
+    $native = NativeExecutionClient::fromEnvironment($clientId, $generation);
     if (($native->handshake()['ready'] ?? null) !== true) {
         throw new RuntimeException('Native execution peer is not ready.');
     }
-    \App\Transcode\Infrastructure\FFmpeg\ProcessExecutor::configureNativeExecution($native);
-    $authority = \App\Transcode\Infrastructure\Worker\DoctrineMediaWorkerAuthority::fromDsn($controlDatabaseUrl);
+    ProcessExecutor::configureNativeExecution($native);
+    $authority = DoctrineMediaWorkerAuthority::fromDsn($controlDatabaseUrl);
     $authority->assertActive();
-    $kernel = new \App\Kernel($environment, $debug === '1');
+    $kernel = new Kernel($environment, $debug === '1');
     $kernel->boot();
     $container = $kernel->getContainer();
-    $container->set(\App\Shared\Infrastructure\Worker\NativeExecutionClientInterface::class, $native);
+    $container->set(NativeExecutionClientInterface::class, $native);
     $authorityChecking = false;
     $stopRequested = static function () use (&$stopping, &$authorityChecking, $authority): bool {
         if ($stopping) {
@@ -106,15 +124,15 @@ try {
         $authority->assertActive();
         if ($kind === 'video') {
             $runtime = $container->get('worker.media.video_runtime');
-            if (!$runtime instanceof \App\Transcode\Application\Port\TranscodeExecutionOwnershipPort) {
+            if (!$runtime instanceof TranscodeExecutionOwnershipPort) {
                 throw new RuntimeException('Media video runtime is not configured.');
             }
             $claim = $runtime->claim($jobId, $identity);
             $copy = $claim?->runtime->desired->presentationSelection?->mode === 'copy';
             if ($claim !== null) {
                 try {
-                    $executionPolicy->assertAllowed($copy ? \App\Transcode\Application\DTO\MediaOperation::VideoStreamCopy : \App\Transcode\Application\DTO\MediaOperation::VideoEncode);
-                } catch (\App\Transcode\Application\Exception\MediaEncodingProhibitedException $refusal) {
+                    $executionPolicy->assertAllowed($copy ? MediaOperation::VideoStreamCopy : MediaOperation::VideoEncode);
+                } catch (MediaEncodingProhibitedException $refusal) {
                     $runtime->observe($claim, 'failed', error: $refusal->getMessage());
                     $runtime->release($claim);
                     $claim = null;
@@ -123,7 +141,7 @@ try {
             if ($claim !== null) {
                 if (!$copy) {
                     $snapshots = $container->get('worker.media.encoder_snapshot_store');
-                    if (!$snapshots instanceof \App\Transcode\Infrastructure\FFmpeg\WorkerEncoderCapabilitiesSnapshotStore) {
+                    if (!$snapshots instanceof WorkerEncoderCapabilitiesSnapshotStore) {
                         throw new RuntimeException('Media encoder snapshot store is not configured.');
                     }
                     $snapshot = $snapshots->read();
@@ -133,11 +151,11 @@ try {
                     $container->set('worker.media.encoder_profile', $snapshot->profile);
                 }
                 $executor = $container->get('transcode.loop_starter');
-                if (!$executor instanceof \App\Transcode\Application\Port\TranscodeLoopStarterInterface) {
+                if (!$executor instanceof TranscodeLoopStarterInterface) {
                     throw new RuntimeException('Media video executor is not configured.');
                 }
                 $qol = $container->get('worker.media.qol_lifecycle');
-                if (!$qol instanceof \App\QoL\Infrastructure\Worker\WorkerQoLLifecycle) {
+                if (!$qol instanceof WorkerQoLLifecycle) {
                     throw new RuntimeException('Media worker QoL lifecycle is not configured.');
                 }
                 \Swoole\Coroutine\run(static function () use ($executor, $claim, $stopRequested, $qol, $copy): void {
@@ -155,13 +173,13 @@ try {
             }
         } else {
             $runtime = $container->get('worker.media.audio_runtime');
-            if (!$runtime instanceof \App\Transcode\Application\Port\AudioRenditionRuntimePort) {
+            if (!$runtime instanceof AudioRenditionRuntimePort) {
                 throw new RuntimeException('Media audio runtime is not configured.');
             }
             $claim = $runtime->claim($key, $identity);
             if ($claim !== null) {
                 $executor = $container->get('worker.media.audio_executor');
-                if (!$executor instanceof \App\Transcode\Infrastructure\Transcode\AudioRenditionExecutor) {
+                if (!$executor instanceof AudioRenditionExecutor) {
                     throw new RuntimeException('Media audio executor is not configured.');
                 }
                 $executor->run($claim, $stopRequested);

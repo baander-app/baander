@@ -18,6 +18,7 @@ use App\Radio\Infrastructure\Doctrine\Entity\StarredStationEntity;
 use App\Radio\Infrastructure\Doctrine\Repository\CountrySubscriptionDoctrineRepository;
 use App\Radio\Infrastructure\Doctrine\Repository\RadioSessionDoctrineRepository;
 use App\Radio\Infrastructure\Doctrine\Repository\StarredStationDoctrineRepository;
+use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
 use Doctrine\DBAL\Exception\ForeignKeyConstraintViolationException;
 use PHPUnit\Framework\Attributes\DataProvider;
@@ -154,7 +155,7 @@ final class RadioOwnershipPersistenceTest extends TestCase
         $starredAt = new \DateTimeImmutable('2024-02-29 13:14:15');
         $createdAt = new \DateTimeImmutable('2023-11-05 01:02:03');
         $star = StarredStation::reconstitute(new StarredStationState(Uuid::generate(), $owner, $station, $starredAt));
-        $subscription = CountrySubscription::reconstitute(new CountrySubscriptionState(Uuid::generate(), new \App\Shared\Domain\Model\PublicId(), $owner, $source, 'DK', null, $createdAt));
+        $subscription = CountrySubscription::reconstitute(new CountrySubscriptionState(Uuid::generate(), new PublicId(), $owner, $source, 'DK', null, $createdAt));
 
         (new StarredStationDoctrineRepository($this->manager))->save($star);
         (new CountrySubscriptionDoctrineRepository($this->manager))->save($subscription);

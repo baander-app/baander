@@ -7,6 +7,7 @@ namespace Baander\RegistryTests;
 
 use Baander\Registry\Qualification\DockerOwnership;
 use RuntimeException;
+use Swoole\Process;
 use Throwable;
 
 final class ContainerContract
@@ -84,8 +85,8 @@ final class ContainerContract
     private function finish(?Throwable $primary): void
     {
         // The owning gate's cancellation does not cancel its bounded cleanup.
-        \Swoole\Process::signal(2, static function (): void {});
-        \Swoole\Process::signal(15, static function (): void {});
+        Process::signal(2, static function (): void {});
+        Process::signal(15, static function (): void {});
         $failures = [];
         try {
             $failures = $this->ownership->cleanup($this->cleanupSeconds);
@@ -95,8 +96,8 @@ final class ContainerContract
                 $failures[] = $cleanup->getMessage();
             }
         } finally {
-            \Swoole\Process::signal(2, static fn() => throw new Interrupted(2));
-            \Swoole\Process::signal(15, static fn() => throw new Interrupted(15));
+            Process::signal(2, static fn() => throw new Interrupted(2));
+            Process::signal(15, static fn() => throw new Interrupted(15));
         }
         if ($failures !== []) {
             $status = $primary instanceof Interrupted ? 128 + $primary->signal : ($primary?->getCode() ?: 1);
@@ -341,7 +342,7 @@ final class ContainerContract
             function (): bool {
                 try {
                     return $this->request('GET', '/ready')[0] === 200;
-                } catch (\RuntimeException|\JsonException) {
+                } catch (RuntimeException|\JsonException) {
                     return false;
                 }
             },

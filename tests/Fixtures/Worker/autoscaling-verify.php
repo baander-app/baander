@@ -3,10 +3,13 @@
 
 declare(strict_types=1);
 
+use Baander\DevQualification\Fixtures\Worker\AutoscalingVerifier;
+use Baander\Process\Runtime\Requirements;
+
 require dirname(__DIR__, 3) . '/scripts/bootstrap.php';
 try {
-    Baander\Process\Runtime\Requirements::check(false);
-    exit(Baander\DevQualification\Fixtures\Worker\AutoscalingVerifier::main(array_slice($_SERVER['argv'], 1)));
+    Requirements::check(false);
+    exit(AutoscalingVerifier::main(array_slice($_SERVER['argv'], 1)));
 } catch (Throwable $error) {
     fwrite(STDERR, $error->getMessage() . "\n");
     exit(1);

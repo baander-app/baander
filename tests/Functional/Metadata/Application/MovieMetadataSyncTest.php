@@ -8,6 +8,7 @@ use App\Catalog\Application\Port\AlbumPortInterface;
 use App\Catalog\Application\Port\DirectorPortInterface;
 use App\Catalog\Application\Port\GenrePortInterface;
 use App\Catalog\Application\Port\MoviePortInterface;
+use App\Catalog\Application\Port\PersonCreditPortInterface;
 use App\Catalog\Domain\Model\Movie;
 use App\Catalog\Domain\ReadModel\DirectorReadView;
 use App\Library\Infrastructure\Doctrine\Entity\LibraryEntity;
@@ -90,7 +91,7 @@ final class MovieMetadataSyncTest extends TestCase
             $movies,
             $container->get(GenrePortInterface::class),
             new NullLogger(),
-            $container->get(\App\Catalog\Application\Port\PersonCreditPortInterface::class),
+            $container->get(PersonCreditPortInterface::class),
             $container->get(TransactionPortInterface::class),
         );
         $consumer = new SyncMovieHandler($movies, $enricher);

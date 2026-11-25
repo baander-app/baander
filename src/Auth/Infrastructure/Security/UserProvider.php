@@ -7,6 +7,7 @@ namespace App\Auth\Infrastructure\Security;
 use App\Auth\Domain\Model\User;
 use App\Auth\Domain\Repository\UserRepositoryInterface;
 use App\Shared\Domain\Model\Email;
+use App\Shared\Domain\Model\Uuid;
 use Symfony\Component\Security\Core\Exception\UnsupportedUserException;
 use Symfony\Component\Security\Core\Exception\UserNotFoundException;
 use Symfony\Component\Security\Core\User\PasswordAuthenticatedUserInterface;
@@ -46,7 +47,7 @@ final class UserProvider implements UserProviderInterface, PasswordUpgraderInter
         }
 
         $userEntity = $this->userRepository->findByUuid(
-            \App\Shared\Domain\Model\Uuid::fromString($user->getId()),
+            Uuid::fromString($user->getId()),
         );
 
         if ($userEntity === null) {
@@ -73,7 +74,7 @@ final class UserProvider implements UserProviderInterface, PasswordUpgraderInter
         }
 
         $domainUser = $this->userRepository->findByUuid(
-            \App\Shared\Domain\Model\Uuid::fromString($user->getId()),
+            Uuid::fromString($user->getId()),
         );
 
         if ($domainUser === null) {

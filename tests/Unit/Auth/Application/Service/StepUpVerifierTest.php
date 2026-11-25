@@ -13,6 +13,7 @@ use App\Auth\Application\Port\TotpVerifierInterface;
 use App\Auth\Application\Service\StepUpVerifier;
 use App\Auth\Domain\Model\User;
 use App\Shared\Domain\Model\Email;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
 
@@ -46,7 +47,7 @@ final class StepUpVerifierTest extends TestCase
         yield 'wrong code' => [self::PASSWORD, '654321'];
     }
 
-    #[\PHPUnit\Framework\Attributes\DataProvider('mismatches')]
+    #[DataProvider('mismatches')]
     public function testEveryMismatchGetsTheSameRefusal(string $password, ?string $code): void
     {
         try {

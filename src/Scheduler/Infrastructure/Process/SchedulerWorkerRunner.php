@@ -9,6 +9,7 @@ use App\Scheduler\Application\Service\SchedulerOccurrenceRelay;
 use App\Scheduler\Application\Service\SchedulerRecoveryPoller;
 use Closure;
 use Psr\Log\LoggerInterface;
+use Swoole\Coroutine;
 use Throwable;
 
 /** CLI cadence for bounded batches; database and transport calls have no wall-clock deadline here. */
@@ -41,7 +42,7 @@ final readonly class SchedulerWorkerRunner
      */
     public function runUntilSignalled(): void
     {
-        if (PHP_SAPI !== 'cli' || (extension_loaded('swoole') && \Swoole\Coroutine::getCid() > 0)) {
+        if (PHP_SAPI !== 'cli' || (extension_loaded('swoole') && Coroutine::getCid() > 0)) {
             throw new \LogicException('Scheduler worker requires CLI outside an active coroutine.');
         }
         if (!function_exists('pcntl_sigprocmask') || !function_exists('pcntl_sigtimedwait')) {
@@ -94,7 +95,7 @@ final readonly class SchedulerWorkerRunner
     /** @param Closure():bool $stopRequested */
     public function run(Closure $stopRequested): void
     {
-        if (PHP_SAPI !== 'cli' || (extension_loaded('swoole') && \Swoole\Coroutine::getCid() > 0)) {
+        if (PHP_SAPI !== 'cli' || (extension_loaded('swoole') && Coroutine::getCid() > 0)) {
             throw new \LogicException('Scheduler worker requires CLI outside an active coroutine.');
         }
         $lastTime = null;

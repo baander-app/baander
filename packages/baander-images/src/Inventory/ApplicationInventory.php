@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Baander\Images\Inventory;
 
 use Baander\Configuration\ApplicationLayout;
+use Baander\Filesystem\AtomicFile;
 
 final class ApplicationInventory
 {
@@ -199,7 +200,7 @@ final class ApplicationInventory
         if (!file_exists($path)) {
             return [];
         }
-        $entries = \Baander\Filesystem\AtomicFile::readJson($path);
+        $entries = AtomicFile::readJson($path);
         foreach ($entries as $name => $entry) {
             if (!is_string($name) || !str_starts_with($name, '/') || self::normalize($name) !== $name || !is_array($entry)
                 || count($entry) !== 4 || !in_array($entry['archive_type'] ?? null, ['character', 'block', 'fifo'], true)

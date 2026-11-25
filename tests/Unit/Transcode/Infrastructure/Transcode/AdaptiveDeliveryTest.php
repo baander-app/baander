@@ -4,16 +4,15 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Transcode\Infrastructure\Transcode;
 
-use App\Tests\Unit\Transcode\FreeTranscodeSessionShare;
 use App\Auth\Infrastructure\Security\SecurityUser;
 use App\QoL\Application\Port\AllowedQualityTiersPortInterface;
 use App\Shared\Application\Port\SleeperInterface;
-use App\Tests\Support\PublishedPresentationFixture;
-use App\Transcode\Infrastructure\Packaging\PublishedPresentationReader;
 use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
-use App\Transcode\Application\DTO\DesiredTranscodeState;
+use App\Tests\Support\PublishedPresentationFixture;
+use App\Tests\Unit\Transcode\FreeTranscodeSessionShare;
 use App\Transcode\Application\Command\CreateTranscodeSessionCommand;
+use App\Transcode\Application\DTO\DesiredTranscodeState;
 use App\Transcode\Application\DTO\MediaTrack;
 use App\Transcode\Application\DTO\TranscodeRuntimeSnapshot;
 use App\Transcode\Application\Port\LiveDeliveryAccessPort;
@@ -25,30 +24,34 @@ use App\Transcode\Domain\Model\TranscodeJobState;
 use App\Transcode\Domain\Model\TranscodeSession;
 use App\Transcode\Domain\Repository\TranscodeJobRepositoryInterface;
 use App\Transcode\Domain\ValueObject\AudioProfile;
-use App\Transcode\Domain\ValueObject\QualityTier;
 use App\Transcode\Domain\ValueObject\PresentationSelection;
+use App\Transcode\Domain\ValueObject\QualityTier;
 use App\Transcode\Infrastructure\Auth\AuthorizedPlayback;
 use App\Transcode\Infrastructure\Auth\HmacStreamAuthAdapter;
 use App\Transcode\Infrastructure\DASH\DashManifestGenerator;
 use App\Transcode\Infrastructure\FFmpeg\SegmentEncoder;
 use App\Transcode\Infrastructure\HLS\ManifestGenerator;
 use App\Transcode\Infrastructure\HLS\QualityLadderRenderer;
+use App\Transcode\Infrastructure\Packaging\PublishedPresentationReader;
 use App\Transcode\Infrastructure\Storage\SegmentFileResolver;
-use App\Transcode\Infrastructure\Swoole\TranscodeSessionSubscriber;
 use App\Transcode\Infrastructure\Storage\TranscodeFileStorage;
+use App\Transcode\Infrastructure\Swoole\TranscodeSessionSubscriber;
 use App\Transcode\Infrastructure\Transcode\TranscodeStreamingService;
 use App\Transcode\Interface\Controller\StreamManifestController;
 use App\Transcode\Interface\Controller\StreamSigningController;
 use App\Transcode\Interface\Security\SignedStreamRequest;
 use Doctrine\DBAL\Connection;
 use Doctrine\DBAL\DriverManager;
-use Symfony\Component\Messenger\Stamp\HandledStamp;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Symfony\Bundle\SecurityBundle\Security;
+use Symfony\Component\Clock\MockClock;
 use Symfony\Component\HttpFoundation\Request;
+use Symfony\Component\HttpKernel\Exception\AccessDeniedHttpException;
+use Symfony\Component\HttpKernel\Exception\BadRequestHttpException;
 use Symfony\Component\Messenger\Envelope;
 use Symfony\Component\Messenger\MessageBusInterface;
+use Symfony\Component\Messenger\Stamp\HandledStamp;
 
 final class AdaptiveDeliveryTest extends TestCase
 {
@@ -133,7 +136,7 @@ final class AdaptiveDeliveryTest extends TestCase
             $security,
             $this->connection,
             $bus,
-            new \Symfony\Component\Clock\MockClock(),
+            new MockClock(),
             $this->createStub(AllowedQualityTiersPortInterface::class),
             $this->freeSessionShare(),
         );
@@ -350,11 +353,11 @@ final class AdaptiveDeliveryTest extends TestCase
         try {
             $this->manifests->masterManifest($this->videoPublic->toString(), $request);
             self::fail('Duplicate signed jobs must be rejected.');
-        } catch (\Symfony\Component\HttpKernel\Exception\BadRequestHttpException $error) {
+        } catch (BadRequestHttpException $error) {
             self::assertSame(400, $error->getStatusCode());
         }
         $tampered = str_replace('.4', '.5', $signed['url']);
-        $this->expectException(\Symfony\Component\HttpKernel\Exception\AccessDeniedHttpException::class);
+        $this->expectException(AccessDeniedHttpException::class);
         $this->manifests->masterManifest($this->videoPublic->toString(), Request::create($tampered));
     }
 

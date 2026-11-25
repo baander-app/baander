@@ -3,6 +3,9 @@
 
 declare(strict_types=1);
 
+use Baander\Tests\Tooling\Support\WorkerResourceState;
+use Swoole\Process;
+
 $arguments = array_slice($_SERVER['argv'], 1);
 if (in_array($arguments[0] ?? '', ['--context', '--host'], true)) {
     $arguments = array_slice($arguments, 2);
@@ -13,7 +16,7 @@ file_put_contents(
     FILE_APPEND | LOCK_EX,
 );
 require dirname(__DIR__, 4) . '/vendor/autoload.php';
-\Baander\Tests\Tooling\Support\WorkerResourceState::handle($arguments);
+WorkerResourceState::handle($arguments);
 if (in_array('redis-cli', $arguments, true)) {
     echo 'PONG';
 }
@@ -26,7 +29,7 @@ if (($arguments[0] ?? '') === 'ps') {
 if (in_array('tests/Fixtures/Worker/legacy-runtime.php', $arguments, true)) {
     $stat = file_get_contents('/proc/self/stat');
     $fields = explode(' ', substr($stat, strrpos($stat, ')') + 2));
-    Swoole\Process::kill((int) $fields[1], 15);
+    Process::kill((int) $fields[1], 15);
     sleep(3);
 }
 if (($arguments[0] ?? '') === 'cp') {

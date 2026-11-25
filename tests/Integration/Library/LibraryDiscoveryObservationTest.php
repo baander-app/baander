@@ -24,6 +24,7 @@ use App\Tests\Support\FinalSchemaBootstrap;
 use Closure;
 use DAMA\DoctrineTestBundle\PHPUnit\SkipDatabaseRollback;
 use Doctrine\DBAL\Connection;
+use Doctrine\DBAL\Exception\DriverException;
 use Doctrine\ORM\EntityManagerInterface;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
@@ -261,7 +262,7 @@ SQL);
             try {
                 $this->writer->fetchOne('SELECT path FROM library_file_index WHERE path = ? FOR SHARE NOWAIT', [$paths[1001]]);
                 self::fail('The second chunk must be locked before mutation starts.');
-            } catch (\Doctrine\DBAL\Exception\DriverException $error) {
+            } catch (DriverException $error) {
                 self::assertSame('55P03', $error->getSQLState());
                 $this->writer->rollbackSavepoint('lock_probe');
             } finally {

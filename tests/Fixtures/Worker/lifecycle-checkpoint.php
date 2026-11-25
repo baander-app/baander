@@ -3,14 +3,18 @@
 
 declare(strict_types=1);
 
+use Baander\DevQualification\Fixtures\Runtime;
+use Baander\DevQualification\Fixtures\Worker\OperatorQualification;
+use Baander\Process\Runtime\Requirements;
+
 require dirname(__DIR__, 3) . '/scripts/bootstrap.php';
 try {
-    Baander\Process\Runtime\Requirements::check();
+    Requirements::check();
     $environment = getenv();
     if (!in_array($environment['BAANDER_TEST_WORKER_LIFECYCLE_PHASE'] ?? '', ['redis', 'postgres'], true)) {
         throw new InvalidArgumentException('Choose a redis or postgres worker lifecycle phase');
     }
-    exit(Baander\DevQualification\Fixtures\Worker\OperatorQualification::main(
+    exit(OperatorQualification::main(
         array_slice($_SERVER['argv'], 1),
         dirname(__DIR__, 3),
     ));
@@ -18,6 +22,6 @@ try {
     fwrite(STDERR, $error->getMessage() . "\n");
     exit($error->getCode() ?: 2);
 } catch (Throwable $error) {
-    fwrite(STDERR, Baander\DevQualification\Fixtures\Runtime::failure($error) . "\n");
-    exit(Baander\DevQualification\Fixtures\Runtime::status($error));
+    fwrite(STDERR, Runtime::failure($error) . "\n");
+    exit(Runtime::status($error));
 }

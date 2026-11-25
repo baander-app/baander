@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Activity\Application\CommandHandler;
 
 use App\Activity\Application\Command\ToggleLoveCommand;
+use App\Activity\Domain\Model\MediaActivity;
 use App\Activity\Domain\Repository\MediaActivityRepositoryInterface;
 use RuntimeException;
 use Symfony\Component\Messenger\Attribute\AsMessageHandler;
@@ -20,7 +21,7 @@ final class ToggleLoveHandler
     }
 
     #[AsMessageHandler]
-    public function __invoke(ToggleLoveCommand $command): \App\Activity\Domain\Model\MediaActivity
+    public function __invoke(ToggleLoveCommand $command): MediaActivity
     {
         $activity = $this->activityRepository->findByUuid($command->getActivityId());
 

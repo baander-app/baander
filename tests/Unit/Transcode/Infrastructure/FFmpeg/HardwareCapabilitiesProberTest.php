@@ -4,12 +4,19 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Transcode\Infrastructure\FFmpeg;
 
-use App\Transcode\Domain\ValueObject\EncoderProfile;
-use App\Transcode\Domain\ValueObject\HardwareAccelerator;
-use App\Transcode\Infrastructure\FFmpeg\HardwareCapabilitiesProber;
-use App\Transcode\Infrastructure\FFmpeg\ProcessExecutor;
+use App\Shared\Application\DTO\DeploymentProfile;
+use App\Shared\Application\DTO\HardwareEncoder;
 use App\Shared\Infrastructure\Worker\NativeExecutionClientInterface;
 use App\Shared\Infrastructure\Worker\NativeExecutionHandle;
+use App\Transcode\Application\Exception\MediaEncodingProhibitedException;
+use App\Transcode\Application\Service\MediaExecutionPolicy;
+use App\Transcode\Domain\ValueObject\EncoderProfile;
+use App\Transcode\Domain\ValueObject\HardwareAccelerator;
+use App\Transcode\Infrastructure\FFmpeg\FFmpegArguments;
+use App\Transcode\Infrastructure\FFmpeg\HardwareCapabilitiesProber;
+use App\Transcode\Infrastructure\FFmpeg\HardwareEncoderUnavailable;
+use App\Transcode\Infrastructure\FFmpeg\ProcessExecutor;
+use App\Transcode\Infrastructure\Worker\MediaWorkerFailure;
 use PHPUnit\Framework\MockObject\Stub;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
@@ -39,9 +46,9 @@ final class HardwareCapabilitiesProberTest extends TestCase
         $client = $this->createMock(NativeExecutionClientInterface::class);
         $client->expects(self::never())->method('submit');
         ProcessExecutor::configureNativeExecution($client);
-        $policy = new \App\Transcode\Application\Service\MediaExecutionPolicy(new \App\Shared\Application\DTO\DeploymentProfile('remux', 2, 4, 1, sharedCopySlots: 2));
+        $policy = new MediaExecutionPolicy(new DeploymentProfile('remux', 2, 4, 1, sharedCopySlots: 2));
         $prober = new HardwareCapabilitiesProber($policy, $this->logger);
-        $this->expectException(\App\Transcode\Application\Exception\MediaEncodingProhibitedException::class);
+        $this->expectException(MediaEncodingProhibitedException::class);
         $this->expectExceptionMessage('Audio and video encoding is unavailable in a remux deployment.');
         $prober->probeForWorker();
     }
@@ -55,7 +62,7 @@ final class HardwareCapabilitiesProberTest extends TestCase
         $client->method('inspect')->willReturn(['state' => 'exited', 'exitCode' => 0, 'stdout' => '', 'stderr' => '']);
         $client->method('release')->willReturn(true);
         ProcessExecutor::configureNativeExecution($client);
-        $prober = new HardwareCapabilitiesProber(new \App\Transcode\Application\Service\MediaExecutionPolicy(new \App\Shared\Application\DTO\DeploymentProfile()), $this->logger, preferredEncoder: 'hevc_nvenc');
+        $prober = new HardwareCapabilitiesProber(new MediaExecutionPolicy(new DeploymentProfile()), $this->logger, preferredEncoder: 'hevc_nvenc');
         $profile = $prober->probeForWorker();
         self::assertSame('libx265', $profile->encoder);
         self::assertFalse($profile->isHardware());
@@ -70,7 +77,7 @@ final class HardwareCapabilitiesProberTest extends TestCase
         $client->method('release')->willReturn(true);
         ProcessExecutor::configureNativeExecution($client);
         $this->expectException(\RuntimeException::class);
-        (new HardwareCapabilitiesProber(new \App\Transcode\Application\Service\MediaExecutionPolicy(new \App\Shared\Application\DTO\DeploymentProfile()), $this->logger))->probeForWorker();
+        (new HardwareCapabilitiesProber(new MediaExecutionPolicy(new DeploymentProfile()), $this->logger))->probeForWorker();
     }
 
     public function testRemoteStartupQualifiesTheConfiguredHardwareEncoderOnItsDevice(): void
@@ -90,7 +97,7 @@ final class HardwareCapabilitiesProberTest extends TestCase
         self::assertSame(HardwareAccelerator::Vaapi, $profile->accelerator);
         self::assertSame('hevc_vaapi', $profile->encoder);
         self::assertSame('/dev/dri/renderD129', $profile->hwaccelDevice);
-        self::assertSame(['-hwaccel', 'vaapi', '-hwaccel_device', '/dev/dri/renderD129', '-hwaccel_output_format', 'vaapi'], \App\Transcode\Infrastructure\FFmpeg\FFmpegArguments::input($profile));
+        self::assertSame(['-hwaccel', 'vaapi', '-hwaccel_device', '/dev/dri/renderD129', '-hwaccel_output_format', 'vaapi'], FFmpegArguments::input($profile));
     }
 
     public function testConfiguredH264EncoderSettingSelectsTheAcceleratorsH264Encoder(): void
@@ -131,13 +138,13 @@ final class HardwareCapabilitiesProberTest extends TestCase
         try {
             $prober->probeForWorker();
             self::fail('Startup encoded in software after the configured hardware failed.');
-        } catch (\App\Transcode\Infrastructure\FFmpeg\HardwareEncoderUnavailable $error) {
+        } catch (HardwareEncoderUnavailable $error) {
             self::assertSame(['hevc_vaapi', '/dev/dri/renderD128'], [$error->encoder, $error->device]);
             self::assertStringContainsString('The configured hardware encoder hevc_vaapi on /dev/dri/renderD128 did not initialize', $error->getMessage());
             self::assertStringContainsString('No VA display found for device /dev/dri/renderD128', $error->getMessage());
             self::assertSame([
                 'reason' => 'hardware_encoder_unavailable', 'encoder' => 'hevc_vaapi', 'device' => '/dev/dri/renderD128', 'detail' => $error->getMessage(),
-            ], \App\Transcode\Infrastructure\Worker\MediaWorkerFailure::reason($error));
+            ], MediaWorkerFailure::reason($error));
         }
         $this->expectException(\RuntimeException::class);
         $this->expectExceptionMessage('have not been probed');
@@ -146,7 +153,7 @@ final class HardwareCapabilitiesProberTest extends TestCase
 
     public function testOtherStartupFailuresNameNoReason(): void
     {
-        self::assertSame([], \App\Transcode\Infrastructure\Worker\MediaWorkerFailure::reason(new \RuntimeException('postgresql://credential:private-secret@baander.app')));
+        self::assertSame([], MediaWorkerFailure::reason(new \RuntimeException('postgresql://credential:private-secret@baander.app')));
     }
 
     //
@@ -231,7 +238,7 @@ final class HardwareCapabilitiesProberTest extends TestCase
         file_put_contents($executable, '#!' . PHP_BINARY . "\n<?php\nfile_put_contents(__DIR__ . '/argv.json', json_encode(['argv' => \$argv, 'threads' => getenv('OMP_NUM_THREADS')]));\n");
         chmod($executable, 0700);
         try {
-            $prober = new HardwareCapabilitiesProber(new \App\Transcode\Application\Service\MediaExecutionPolicy(new \App\Shared\Application\DTO\DeploymentProfile()), $this->logger, $executable, 'hevc_vaapi', '/dev/dri/device with spaces');
+            $prober = new HardwareCapabilitiesProber(new MediaExecutionPolicy(new DeploymentProfile()), $this->logger, $executable, 'hevc_vaapi', '/dev/dri/device with spaces');
             $profile = $prober->probeForWorker();
             self::assertTrue($profile->isHardware());
             $captured = json_decode((string) file_get_contents($arguments), true, flags: JSON_THROW_ON_ERROR);
@@ -447,9 +454,9 @@ final class HardwareCapabilitiesProberTest extends TestCase
 
     private function configuredProber(string $accelerator, ?string $device, string $preferredEncoder = ''): HardwareCapabilitiesProber
     {
-        $profile = new \App\Shared\Application\DTO\DeploymentProfile(videoEncoderSlots: 8, audioEncoderSlots: 12, hardware: new \App\Shared\Application\DTO\HardwareEncoder($accelerator, $device));
+        $profile = new DeploymentProfile(videoEncoderSlots: 8, audioEncoderSlots: 12, hardware: new HardwareEncoder($accelerator, $device));
 
-        return new HardwareCapabilitiesProber(new \App\Transcode\Application\Service\MediaExecutionPolicy($profile), $this->logger,
+        return new HardwareCapabilitiesProber(new MediaExecutionPolicy($profile), $this->logger,
             preferredEncoder: $preferredEncoder, deploymentProfile: $profile);
     }
 
@@ -519,7 +526,7 @@ class TestableHardwareCapabilitiesProber extends HardwareCapabilitiesProber
         float $bitrateMultiplier = 1.0,
         array $execResults = [],
     ): self {
-        $instance = new self(new \App\Transcode\Application\Service\MediaExecutionPolicy(new \App\Shared\Application\DTO\DeploymentProfile()), $logger, '/usr/bin/ffmpeg', $preferredEncoder, $hwAccelDevice, $bitrateMultiplier);
+        $instance = new self(new MediaExecutionPolicy(new DeploymentProfile()), $logger, '/usr/bin/ffmpeg', $preferredEncoder, $hwAccelDevice, $bitrateMultiplier);
         $instance->execQueue = $execResults;
 
         return $instance;
@@ -535,7 +542,7 @@ class TestableHardwareCapabilitiesProber extends HardwareCapabilitiesProber
         float $bitrateMultiplier = 1.0,
         ?\Closure $callback = null,
     ): self {
-        $instance = new self(new \App\Transcode\Application\Service\MediaExecutionPolicy(new \App\Shared\Application\DTO\DeploymentProfile()), $logger, '/usr/bin/ffmpeg', $preferredEncoder, $hwAccelDevice, $bitrateMultiplier);
+        $instance = new self(new MediaExecutionPolicy(new DeploymentProfile()), $logger, '/usr/bin/ffmpeg', $preferredEncoder, $hwAccelDevice, $bitrateMultiplier);
         $instance->callback = $callback;
 
         return $instance;

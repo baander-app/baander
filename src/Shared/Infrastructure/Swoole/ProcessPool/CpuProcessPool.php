@@ -10,6 +10,7 @@ use Psr\Log\LoggerInterface;
 use RuntimeException;
 use Swoole\Process;
 use Swoole\Table;
+use Swoole\Timer;
 use SwooleBundle\SwooleBundle\Bridge\Symfony\Container\CoWrapper;
 use SwooleBundle\SwooleBundle\Server\Runtime\Bootable;
 use Throwable;
@@ -463,7 +464,7 @@ final class CpuProcessPool implements Bootable, CpuProcessPoolInterface
         }
 
         $this->healthTimerOwnerPid = getmypid();
-        $this->healthTimerId = \Swoole\Timer::tick(5000, function (): void {
+        $this->healthTimerId = Timer::tick(5000, function (): void {
             // Each tick runs in a new coroutine the swoole bundle does not manage, and
             // reaping an exited worker logs through the pooled logger.
             $this->coWrapper?->defer();
@@ -479,7 +480,7 @@ final class CpuProcessPool implements Bootable, CpuProcessPoolInterface
     public function stopHealthCheck(): void
     {
         if ($this->healthTimerId !== null && $this->healthTimerOwnerPid === getmypid()) {
-            \Swoole\Timer::clear($this->healthTimerId);
+            Timer::clear($this->healthTimerId);
         }
         $this->healthTimerId = null;
         $this->healthTimerOwnerPid = null;

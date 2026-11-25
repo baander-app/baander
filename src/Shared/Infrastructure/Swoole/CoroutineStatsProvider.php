@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Shared\Infrastructure\Swoole;
 
+use Swoole\Coroutine;
+
 /**
  * Gathers Swoole coroutine and channel statistics.
  *
@@ -59,11 +61,11 @@ final class CoroutineStatsProvider
      */
     private function getCoroutineStats(): array
     {
-        if (!class_exists(\Swoole\Coroutine::class)) {
+        if (!class_exists(Coroutine::class)) {
             return $this->emptyCoroutineStats();
         }
 
-        $stats = \Swoole\Coroutine::stats();
+        $stats = Coroutine::stats();
         if (!is_array($stats) || empty($stats)) {
             return $this->emptyCoroutineStats();
         }
@@ -86,12 +88,12 @@ final class CoroutineStatsProvider
      */
     private function getActiveCids(): array
     {
-        if (!class_exists(\Swoole\Coroutine::class)) {
+        if (!class_exists(Coroutine::class)) {
             return [];
         }
 
         $cids = [];
-        foreach (\Swoole\Coroutine::listCoroutines() as $cid) {
+        foreach (Coroutine::listCoroutines() as $cid) {
             $cids[] = $cid;
         }
 

@@ -6,11 +6,12 @@ namespace Baander\DevEnvironment\Tests;
 
 use Baander\Containers\Docker\Client;
 use Baander\Containers\Docker\Target;
-use Baander\Process\Execution\CommandFailure;
 use Baander\DevEnvironment\Host\ProcessEnvironment;
-use Baander\Tests\Tooling\Support\DevelopmentCommandExecutor;
 use Baander\DevEnvironment\State\InstanceStateStore;
 use Baander\DevEnvironment\WorkflowError;
+use Baander\Process\Execution\CommandFailure;
+use Baander\Process\Execution\ProcessResult;
+use Baander\Tests\Tooling\Support\DevelopmentCommandExecutor;
 use PHPUnit\Framework\TestCase;
 
 final class DevelopmentStateTest extends TestCase
@@ -211,9 +212,9 @@ final class DevelopmentStateTest extends TestCase
                 bool $check = true,
                 ?string $logPath = null,
                 bool $interactive = false,
-            ): \Baander\Process\Execution\ProcessResult {
+            ): ProcessResult {
                 $this->seen[] = $arguments;
-                return new \Baander\Process\Execution\ProcessResult(0, null, false, false, '{"ID":"daemon"}', '', 0);
+                return new ProcessResult(0, null, false, false, '{"ID":"daemon"}', '', 0);
             }
         };
         $docker = new Client($runner, Target::fromArray(DevelopmentCommandExecutor::target('/selected/docker', 'selected', 'daemon')), []);

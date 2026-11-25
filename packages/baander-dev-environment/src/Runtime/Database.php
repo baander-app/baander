@@ -4,21 +4,21 @@ declare(strict_types=1);
 
 namespace Baander\DevEnvironment\Runtime;
 
+use Baander\Containers\Docker\Client;
+use Baander\Containers\Resources\DisposableContainer;
+use Baander\Containers\Resources\ResourceKind;
+use Baander\Containers\Resources\ResourceLedger;
 use Baander\Core\EnvironmentVariable;
+use Baander\Deployment\Database\Pooler;
+use Baander\DevEnvironment\Host\CapturedConnections;
+use Baander\DevEnvironment\Host\ProcessEnvironment;
+use Baander\DevEnvironment\State\InstanceStateStore;
+use Baander\DevEnvironment\WorkflowError;
+use Baander\Filesystem\AtomicFile;
+use Baander\Filesystem\PrivateDirectory;
 use Baander\Process\Execution\CommandExecutor;
 use Baander\Process\Execution\EngineExecutor;
 use Baander\Process\Execution\ExecutionContext;
-use Baander\Containers\Resources\ResourceLedger;
-use Baander\Containers\Resources\ResourceKind;
-use Baander\Containers\Resources\DisposableContainer;
-use Baander\Containers\Docker\Client;
-use Baander\Deployment\Database\Pooler;
-use Baander\Filesystem\AtomicFile;
-use Baander\Filesystem\PrivateDirectory;
-use Baander\DevEnvironment\Host\CapturedConnections;
-use Baander\DevEnvironment\State\InstanceStateStore;
-use Baander\DevEnvironment\Host\ProcessEnvironment;
-use Baander\DevEnvironment\WorkflowError;
 
 class Database
 {
@@ -58,7 +58,7 @@ SQL;
     }
 
     /** @param array<string,mixed> $instance */
-    public function docker(array $instance): \Baander\Containers\Docker\Client
+    public function docker(array $instance): Client
     {
         $docker = $this->connections->client($instance['docker']);
         $docker->validateIdentity();
@@ -66,7 +66,7 @@ SQL;
     }
 
     /** @param array<string,mixed> $instance */
-    public function container(array $instance, \Baander\Containers\Docker\Client $docker): string
+    public function container(array $instance, Client $docker): string
     {
         if (!empty($instance['adoption']) && empty($instance['ownership_transferred'])) {
             return $instance['adoption']['containers']['postgres'];

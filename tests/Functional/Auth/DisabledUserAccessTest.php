@@ -16,9 +16,9 @@ use App\Auth\Application\DTO\ClientCredentials;
 use App\Auth\Application\DTO\PushedAuthorizationRequestDTO;
 use App\Auth\Application\DTO\TokenResponseDTO;
 use App\Auth\Application\Exception\OAuthProtocolException;
-use App\Auth\Application\Service\WebSocketOriginPolicy;
 use App\Auth\Application\Port\WebSocketTicketIssuerInterface;
 use App\Auth\Application\Port\WebSocketTicketRedeemerInterface;
+use App\Auth\Application\Service\WebSocketOriginPolicy;
 use App\Auth\Domain\Model\OAuth\Client;
 use App\Auth\Domain\Model\OAuth\SignInGrant;
 use App\Auth\Domain\Model\User;
@@ -26,6 +26,7 @@ use App\Auth\Domain\Repository\OAuth\AccessTokenRepositoryInterface;
 use App\Auth\Domain\Repository\OAuth\ClientRepositoryInterface;
 use App\Auth\Domain\Repository\OAuth\TokenMetadataRepositoryInterface;
 use App\Auth\Infrastructure\Security\OAuth\OAuth2Authenticator;
+use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
 use App\Shared\Infrastructure\Security\WsTicketAuthenticator;
 use App\Tests\Fixtures\Auth\AuthenticationFailureMessages;
@@ -300,7 +301,7 @@ final class DisabledUserAccessTest extends TestCase
             201,
             'data',
         );
-        $this->clientUuids[$data['data']['publicId']] = static::getContainer()->get(\App\Auth\Domain\Repository\OAuth\ClientRepositoryInterface::class)->findClientByPublicId(\App\Shared\Domain\Model\PublicId::fromString($data['data']['publicId']))->getId()->toString();
+        $this->clientUuids[$data['data']['publicId']] = static::getContainer()->get(ClientRepositoryInterface::class)->findClientByPublicId(PublicId::fromString($data['data']['publicId']))->getId()->toString();
 
         return $data['data']['publicId'];
     }

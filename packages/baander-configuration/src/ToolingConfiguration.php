@@ -4,13 +4,15 @@ declare(strict_types=1);
 
 namespace Baander\Configuration;
 
-use Baander\Configuration\Sources\JsonDocument;
-use Baander\Configuration\Images\ImageSelection;
 use Baander\Configuration\Execution\CheckpointSelection;
-use Baander\Configuration\Images\ImageCatalog;
 use Baander\Configuration\Execution\DockerSettings;
 use Baander\Configuration\Execution\WorkflowBudgets;
+use Baander\Configuration\Images\ImageCatalog;
+use Baander\Configuration\Images\ImageSelection;
+use Baander\Configuration\Sources\JsonDocument;
 use Baander\Configuration\Sources\RepositorySettings;
+use Baander\Process\Execution\EngineExecutor;
+use Baander\Process\Execution\ExecutionContext;
 
 final readonly class ToolingConfiguration
 {
@@ -91,7 +93,7 @@ final readonly class ToolingConfiguration
     public static function forRepository(string $root, array $environment, array $flags = []): self
     {
         $defaults = self::defaults();
-        $executor = new \Baander\Process\Execution\EngineExecutor(\Baander\Process\Execution\ExecutionContext::bounded($defaults['budgets']['process'], $environment, $root));
+        $executor = new EngineExecutor(ExecutionContext::bounded($defaults['budgets']['process'], $environment, $root));
         try {
             $local = RepositorySettings::local($executor, $root, $environment);
             return self::resolve($flags, $environment, $local['tooling'] ?? []);

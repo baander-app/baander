@@ -4,11 +4,12 @@ declare(strict_types=1);
 
 namespace Baander\DevEnvironment\State;
 
+use Baander\DevEnvironment\Host\ProcessEnvironment;
+use Baander\DevEnvironment\WorkflowError;
 use Baander\Filesystem\AtomicFile;
 use Baander\Filesystem\FileLock;
+use Baander\Filesystem\Paths;
 use Baander\Filesystem\PrivateDirectory;
-use Baander\DevEnvironment\WorkflowError;
-use Baander\DevEnvironment\Host\ProcessEnvironment;
 
 final class InstanceStateStore
 {
@@ -16,7 +17,7 @@ final class InstanceStateStore
 
     public function __construct(string $root)
     {
-        $this->root = \Baander\Filesystem\Paths::absolutePath($root);
+        $this->root = Paths::absolutePath($root);
         $this->guard(fn() => PrivateDirectory::assertNoSymlinks($this->root));
     }
 

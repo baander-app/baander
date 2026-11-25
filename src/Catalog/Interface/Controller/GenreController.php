@@ -7,18 +7,20 @@ namespace App\Catalog\Interface\Controller;
 use App\Catalog\Application\Command\Genre\CreateGenreCommand;
 use App\Catalog\Application\Command\Genre\DeleteGenreCommand;
 use App\Catalog\Application\Command\Genre\UpdateGenreCommand;
+use App\Catalog\Application\Port\AlbumPortInterface;
 use App\Catalog\Application\Port\GenrePortInterface;
-use App\Library\Application\Port\LibraryReadScopeProviderInterface;
+use App\Catalog\Application\Port\SongPortInterface;
 use App\Catalog\Interface\Request\CreateGenreRequest;
 use App\Catalog\Interface\Request\GenreAlbumRequest;
 use App\Catalog\Interface\Request\GenreSongRequest;
 use App\Catalog\Interface\Request\UpdateGenreRequest;
 use App\Catalog\Interface\Resource\GenreResource;
+use App\Library\Application\Port\LibraryReadScopeProviderInterface;
 use App\Shared\Domain\Model\PublicId;
-use App\Catalog\Application\Port\SongPortInterface;
-use App\Catalog\Application\Port\AlbumPortInterface;
 use App\Shared\Interface\Attribute\CliCounterpart;
 use App\Shared\Interface\Controller\ApiResponsesTrait;
+use App\Shared\Interface\DTO\ApiError;
+use App\Shared\Interface\DTO\ValidationError;
 use OpenApi\Spec as OA;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
@@ -136,14 +138,14 @@ final class GenreController
                 response: '409',
                 description: 'Another genre has the slug',
                 content: new OA\MediaType\Json(
-                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                    schema: new OA\Schema(ref: ApiError::class),
                 ),
             ),
             new OA\Response(
                 response: '422',
                 description: 'Invalid name, slug or MusicBrainz ID, or a parent that is not an existing genre',
                 content: new OA\MediaType\Json(
-                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ValidationError::class),
+                    schema: new OA\Schema(ref: ValidationError::class),
                 ),
             ),
         ],
@@ -219,7 +221,7 @@ final class GenreController
                 response: '404',
                 description: 'Not found',
                 content: new OA\MediaType\Json(
-                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                    schema: new OA\Schema(ref: ApiError::class),
                 ),
             ),
         ],
@@ -293,21 +295,21 @@ final class GenreController
                 response: '404',
                 description: 'Not found',
                 content: new OA\MediaType\Json(
-                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                    schema: new OA\Schema(ref: ApiError::class),
                 ),
             ),
             new OA\Response(
                 response: '409',
                 description: 'Another genre has the new slug',
                 content: new OA\MediaType\Json(
-                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                    schema: new OA\Schema(ref: ApiError::class),
                 ),
             ),
             new OA\Response(
                 response: '422',
                 description: 'Invalid name, slug or MusicBrainz ID, a parent that is not an existing genre, or a parent that would create a circular reference',
                 content: new OA\MediaType\Json(
-                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ValidationError::class),
+                    schema: new OA\Schema(ref: ValidationError::class),
                 ),
             ),
         ],
@@ -349,7 +351,7 @@ final class GenreController
                 response: '404',
                 description: 'Not found',
                 content: new OA\MediaType\Json(
-                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                    schema: new OA\Schema(ref: ApiError::class),
                 ),
             ),
         ],
@@ -401,7 +403,7 @@ final class GenreController
                 response: '404',
                 description: 'Genre or song not found',
                 content: new OA\MediaType\Json(
-                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                    schema: new OA\Schema(ref: ApiError::class),
                 ),
             ),
         ],
@@ -464,7 +466,7 @@ final class GenreController
                 response: '404',
                 description: 'Genre or song not found',
                 content: new OA\MediaType\Json(
-                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                    schema: new OA\Schema(ref: ApiError::class),
                 ),
             ),
         ],
@@ -531,7 +533,7 @@ final class GenreController
                 response: '404',
                 description: 'Genre or album not found',
                 content: new OA\MediaType\Json(
-                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                    schema: new OA\Schema(ref: ApiError::class),
                 ),
             ),
         ],
@@ -594,7 +596,7 @@ final class GenreController
                 response: '404',
                 description: 'Genre or album not found',
                 content: new OA\MediaType\Json(
-                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                    schema: new OA\Schema(ref: ApiError::class),
                 ),
             ),
         ],

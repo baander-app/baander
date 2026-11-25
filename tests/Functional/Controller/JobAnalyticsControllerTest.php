@@ -6,6 +6,8 @@ namespace App\Tests\Functional\Controller;
 
 use App\Auth\Domain\Model\User;
 use App\Tests\Functional\TestCase;
+use PHPUnit\Framework\Attributes\DataProvider;
+use Symfony\Component\HttpFoundation\Response;
 
 /**
  * The analytics `from` is inclusive and `to` exclusive; both are RFC 3339 instants with a timezone.
@@ -46,7 +48,7 @@ final class JobAnalyticsControllerTest extends TestCase
         yield 'reversed range' => ['from=2026-03-15T11:00:00Z&to=2026-03-15T10:00:00Z', 'to'];
     }
 
-    #[\PHPUnit\Framework\Attributes\DataProvider('invalidRanges')]
+    #[DataProvider('invalidRanges')]
     public function testAnInvalidRangeIsABadRequest(string $query, string $parameter): void
     {
         foreach (['summary', 'timing', 'failures'] as $endpoint) {
@@ -59,7 +61,7 @@ final class JobAnalyticsControllerTest extends TestCase
         }
     }
 
-    private function summary(string $query): \Symfony\Component\HttpFoundation\Response
+    private function summary(string $query): Response
     {
         return $this->authenticatedRequest('GET', '/api/monitor/analytics/summary?' . $query, $this->admin);
     }

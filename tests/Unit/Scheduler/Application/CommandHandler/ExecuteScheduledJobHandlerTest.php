@@ -5,10 +5,10 @@ declare(strict_types=1);
 namespace App\Tests\Unit\Scheduler\Application\CommandHandler;
 
 use App\Scheduler\Application\Command\ExecuteScheduledJobCommand;
+use App\Scheduler\Application\CommandHandler\ExecuteScheduledJobHandler;
 use App\Scheduler\Application\DTO\SchedulerOccurrence;
 use App\Scheduler\Application\Exception\ScheduledConsoleCompletionUnknown;
 use App\Scheduler\Application\Port\ScheduledConsoleExecutorInterface;
-use App\Scheduler\Application\CommandHandler\ExecuteScheduledJobHandler;
 use App\Scheduler\Application\Port\ScheduledJobPortInterface;
 use App\Scheduler\Domain\Model\SchedulableCommandInterface;
 use App\Scheduler\Domain\Model\SchedulableConsoleCommandInterface;
@@ -16,15 +16,17 @@ use App\Scheduler\Domain\Model\ScheduledJob;
 use App\Scheduler\Domain\Service\SchedulerRegistry;
 use App\Scheduler\Domain\ValueObject\JobType;
 use App\Scheduler\Domain\ValueObject\ScheduleStatus;
+use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
 use PHPUnit\Framework\Attributes\DataProvider;
-use PHPUnit\Framework\TestCase;
-use PHPUnit\Framework\MockObject\Stub;
 use PHPUnit\Framework\MockObject\MockObject;
+use PHPUnit\Framework\MockObject\Stub;
+use PHPUnit\Framework\TestCase;
 use Psr\Log\AbstractLogger;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Messenger\Envelope;
+use Symfony\Component\Messenger\Exception\UnrecoverableMessageHandlingException;
 use Symfony\Component\Messenger\MessageBusInterface;
 use Symfony\Component\Messenger\Stamp\HandledStamp;
 
@@ -74,7 +76,7 @@ final class ExecuteScheduledJobHandlerTest extends TestCase
         };
         $parameters = ['ttl-hours' => 1.0];
         $job = ScheduledJob::create('Occurrence console', '* * * * *', JobType::Console, 'app:occurrence-console', parameters: $parameters);
-        $occurrence = new SchedulerOccurrence(Uuid::generate(), $job->getId(), new \DateTimeImmutable('2026-10-02T10:00:00Z'), JobType::Console, $job->getCommand(), $parameters, jobPublicId: new \App\Shared\Domain\Model\PublicId());
+        $occurrence = new SchedulerOccurrence(Uuid::generate(), $job->getId(), new \DateTimeImmutable('2026-10-02T10:00:00Z'), JobType::Console, $job->getCommand(), $parameters, jobPublicId: new PublicId());
         $this->jobService = $this->createMock(ScheduledJobPortInterface::class);
         $this->jobService->expects(self::once())->method('getById')->willReturn($job);
         $persistenceError = new \RuntimeException('Storage failure');
@@ -134,7 +136,7 @@ final class ExecuteScheduledJobHandlerTest extends TestCase
         if ($reason === 'paused') {
             $job->pause();
         }
-        $occurrence = new SchedulerOccurrence(Uuid::generate(), $job->getId(), new \DateTimeImmutable('2026-10-02T10:00:00Z'), JobType::Console, $job->getCommand(), ['value' => $reason === 'snapshot changed' ? 2.0 : 1.0], jobPublicId: new \App\Shared\Domain\Model\PublicId());
+        $occurrence = new SchedulerOccurrence(Uuid::generate(), $job->getId(), new \DateTimeImmutable('2026-10-02T10:00:00Z'), JobType::Console, $job->getCommand(), ['value' => $reason === 'snapshot changed' ? 2.0 : 1.0], jobPublicId: new PublicId());
         $this->jobService = $this->createMock(ScheduledJobPortInterface::class);
         $this->jobService->expects(self::once())->method('getById')->willReturn($job);
         $this->jobService->expects($reason === 'not registered' ? self::once() : self::never())->method('save');
@@ -152,13 +154,13 @@ final class ExecuteScheduledJobHandlerTest extends TestCase
         $this->messageBus->expects(self::never())->method('dispatch');
         $this->consoleExecutor = $this->createMock(ScheduledConsoleExecutorInterface::class);
         $this->consoleExecutor->expects(self::never())->method('execute');
-        $this->expectException(\Symfony\Component\Messenger\Exception\UnrecoverableMessageHandlingException::class);
+        $this->expectException(UnrecoverableMessageHandlingException::class);
         ($this->createHandler())(new ExecuteScheduledJobCommand(Uuid::generate()->toString(), JobType::Messenger->value, TestMessengerCommand::class, []));
     }
 
     private function executeOccurrence(ExecuteScheduledJobHandler $handler, ExecuteScheduledJobCommand $command): void
     {
-        $handler->executeOccurrence(new SchedulerOccurrence(Uuid::generate(), Uuid::fromString($command->jobId), new \DateTimeImmutable('2026-10-03T10:00:00Z'), JobType::from($command->jobType), $command->command, $command->parameters, jobPublicId: new \App\Shared\Domain\Model\PublicId()));
+        $handler->executeOccurrence(new SchedulerOccurrence(Uuid::generate(), Uuid::fromString($command->jobId), new \DateTimeImmutable('2026-10-03T10:00:00Z'), JobType::from($command->jobType), $command->command, $command->parameters, jobPublicId: new PublicId()));
     }
 
     // --- Job not found ---

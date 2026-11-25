@@ -34,7 +34,9 @@ namespace App\Shared\Infrastructure\Filesystem {
 }
 
 namespace {
-    require dirname(__DIR__, 5) . '/vendor/autoload.php';
+use App\Shared\Infrastructure\Filesystem\StoragePathBoundary;
+
+require dirname(__DIR__, 5) . '/vendor/autoload.php';
 
     $mode = $_SERVER['argv'][1] ?? throw new RuntimeException('Missing publication mode.');
     $root = sys_get_temp_dir() . '/baander-storage-boundary-' . bin2hex(random_bytes(8));
@@ -59,7 +61,7 @@ namespace {
         $result = null;
         $error = null;
         try {
-            $result = App\Shared\Infrastructure\Filesystem\StoragePathBoundary::resolve($base, $candidate);
+            $result = StoragePathBoundary::resolve($base, $candidate);
         } catch (InvalidArgumentException $exception) {
             $error = $exception->getMessage();
         }

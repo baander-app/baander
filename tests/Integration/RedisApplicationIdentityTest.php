@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Tests\Integration;
 
 use App\Shared\Infrastructure\Redis\RedisClientFactory;
+use PHPUnit\Framework\Attributes\DataProvider;
 use Psr\Cache\CacheItemPoolInterface;
 use Symfony\Bundle\FrameworkBundle\Test\KernelTestCase;
 use Symfony\Component\Cache\Adapter\RedisAdapter;
@@ -55,7 +56,7 @@ final class RedisApplicationIdentityTest extends KernelTestCase
     }
 
     /** @param list<string> $arguments */
-    #[\PHPUnit\Framework\Attributes\DataProvider('commandsOutsideTheAcl')]
+    #[DataProvider('commandsOutsideTheAcl')]
     public function testACommandOutsideTheAclFails(string $command, array $arguments): void
     {
         $factory = new RedisClientFactory($this->environment('REDIS_URL'));

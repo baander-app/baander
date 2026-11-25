@@ -5,11 +5,12 @@ declare(strict_types=1);
 namespace App\Tests\Unit\Notification\Infrastructure\Webhook;
 
 use App\Notification\Domain\ValueObject\NotificationCategory;
+use App\Notification\Infrastructure\Doctrine\Entity\WebhookDeliveryLogEntity;
 use App\Notification\Infrastructure\Doctrine\Entity\WebhookEntity;
 use App\Notification\Infrastructure\Webhook\HmacSigner;
-use App\Notification\Infrastructure\Webhook\WebhookSecretCodec;
 use App\Notification\Infrastructure\Webhook\WebhookDeliveryService;
 use App\Notification\Infrastructure\Webhook\WebhookDestinationPolicy;
+use App\Notification\Infrastructure\Webhook\WebhookSecretCodec;
 use App\Shared\Domain\Model\Uuid;
 use Doctrine\ORM\EntityManagerInterface;
 use Doctrine\ORM\EntityRepository;
@@ -19,6 +20,7 @@ use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\Messenger\Exception\UnrecoverableMessageHandlingException;
 use Symfony\Contracts\HttpClient\HttpClientInterface;
+use Symfony\Contracts\HttpClient\ResponseInterface;
 
 final class WebhookDeliveryServiceTest extends TestCase
 {
@@ -152,7 +154,7 @@ final class WebhookDeliveryServiceTest extends TestCase
 
         $this->webhookRepo->method('findAll')->willReturn([$webhook]);
 
-        $response = $this->createStub(\Symfony\Contracts\HttpClient\ResponseInterface::class);
+        $response = $this->createStub(ResponseInterface::class);
         $response->method('getStatusCode')->willReturn(200);
 
         $this->httpClient->expects($this->once())->method('request')
@@ -181,7 +183,7 @@ final class WebhookDeliveryServiceTest extends TestCase
 
         $this->webhookRepo->method('findAll')->willReturn([$webhook]);
 
-        $response = $this->createStub(\Symfony\Contracts\HttpClient\ResponseInterface::class);
+        $response = $this->createStub(ResponseInterface::class);
         $response->method('getStatusCode')->willReturn(200);
 
         $this->httpClient->expects($this->once())->method('request')
@@ -225,7 +227,7 @@ final class WebhookDeliveryServiceTest extends TestCase
 
         $this->webhookRepo->method('findAll')->willReturn([$webhook]);
 
-        $response = $this->createStub(\Symfony\Contracts\HttpClient\ResponseInterface::class);
+        $response = $this->createStub(ResponseInterface::class);
         $response->method('getStatusCode')->willReturn(200);
 
         $capturedOptions = null;
@@ -269,7 +271,7 @@ final class WebhookDeliveryServiceTest extends TestCase
         $this->httpClient->expects($this->exactly(2))->method('request')
             ->willReturnCallback(function (string $method, string $url, array $options) use (&$timestamps) {
                 $timestamps[] = $options['headers']['X-Baander-Webhook-Timestamp'];
-                $response = $this->createStub(\Symfony\Contracts\HttpClient\ResponseInterface::class);
+                $response = $this->createStub(ResponseInterface::class);
                 // First attempt 5xx (retry), second attempt 2xx (success).
                 $response->method('getStatusCode')->willReturn(count($timestamps) === 1 ? 500 : 200);
 
@@ -298,7 +300,7 @@ final class WebhookDeliveryServiceTest extends TestCase
 
         $this->webhookRepo->method('findAll')->willReturn([$webhook]);
 
-        $response = $this->createStub(\Symfony\Contracts\HttpClient\ResponseInterface::class);
+        $response = $this->createStub(ResponseInterface::class);
         $response->method('getStatusCode')->willReturn(500);
         $this->httpClient->method('request')->willReturn($response);
 
@@ -325,7 +327,7 @@ final class WebhookDeliveryServiceTest extends TestCase
 
         // Pre-fix the terminal failure log was written with status_code=null even
         // though every attempt returned 500; it must now record the last known code.
-        $this->assertInstanceOf(\App\Notification\Infrastructure\Doctrine\Entity\WebhookDeliveryLogEntity::class, $persisted);
+        $this->assertInstanceOf(WebhookDeliveryLogEntity::class, $persisted);
         $this->assertSame(500, $persisted->getHttpStatusCode());
     }
 }

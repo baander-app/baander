@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Baander\DevQualification\Fixtures\Worker;
 
 use Baander\DevQualification\Fixtures\Runtime as FixtureRuntime;
+use Baander\Process\Execution\ProcessResult;
 use RuntimeException;
 use Throwable;
 
@@ -76,7 +77,7 @@ final class OperatorQualification
         ?string $log = null,
         ?string $stdout = null,
         ?string $stderr = null,
-    ): \Baander\Process\Execution\ProcessResult {
+    ): ProcessResult {
         return $this->commands->docker($arguments, $check, $input, $log, $stdout, $stderr);
     }
 

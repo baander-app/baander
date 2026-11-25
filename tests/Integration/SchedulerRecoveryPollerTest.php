@@ -14,9 +14,12 @@ use App\Scheduler\Infrastructure\Doctrine\DoctrineSchedulerRecoveryScheduleStore
 use App\Scheduler\Infrastructure\Doctrine\Entity\ScheduledJobEntity;
 use App\Scheduler\Infrastructure\Doctrine\Repository\ScheduledJobRepository;
 use App\Shared\Domain\Model\Uuid;
+use App\Tests\Support\FinalSchemaBootstrap;
 use DAMA\DoctrineTestBundle\PHPUnit\SkipDatabaseRollback;
+use Doctrine\Common\EventManager;
 use Doctrine\DBAL\Connection;
 use Doctrine\DBAL\DriverManager;
+use Doctrine\DBAL\Exception\DriverException;
 use Doctrine\DBAL\Tools\DsnParser;
 use Doctrine\ORM\EntityManager;
 use Doctrine\ORM\EntityManagerInterface;
@@ -55,7 +58,7 @@ final class SchedulerRecoveryPollerTest extends TestCase
         foreach ([$this->writer, $this->observer] as $connection) {
             $connection->executeStatement('SET search_path TO ' . $this->schema . ', public');
         }
-        \App\Tests\Support\FinalSchemaBootstrap::bootstrap($this->writer);
+        FinalSchemaBootstrap::bootstrap($this->writer);
         $this->writer->executeStatement('DELETE FROM scheduled_jobs');
         $this->kernel = new Kernel('test', false);
         $this->kernel->boot();
@@ -64,7 +67,7 @@ final class SchedulerRecoveryPollerTest extends TestCase
         self::assertSame(0, $configured->getConnection()->getTransactionNestingLevel());
         $this->configuredManager = $configured;
         $eventManager = $configured->getEventManager();
-        self::assertInstanceOf(\Doctrine\Common\EventManager::class, $eventManager);
+        self::assertInstanceOf(EventManager::class, $eventManager);
         $this->manager = new EntityManager($this->writer, $configured->getConfiguration(), $eventManager);
         $this->jobs = new ScheduledJobRepository($this->manager);
     }
@@ -296,7 +299,7 @@ final class SchedulerRecoveryPollerTest extends TestCase
             try {
                 $this->observer->executeStatement('UPDATE scheduled_jobs SET recovery_after = CAST(:value AS TIMESTAMPTZ) WHERE id = :id', ['value' => $value, 'id' => $job->getId()->toString()]);
                 self::fail('Expected physical finite-deadline constraint rejection.');
-            } catch (\Doctrine\DBAL\Exception\DriverException $error) {
+            } catch (DriverException $error) {
                 self::assertSame('23514', $error->getSQLState());
             }
             self::assertSame($before, $this->observer->fetchOne('SELECT recovery_after::text FROM scheduled_jobs WHERE id = :id', ['id' => $job->getId()->toString()]));

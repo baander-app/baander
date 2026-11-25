@@ -7,19 +7,20 @@ namespace App\Tests\Unit\Shared\Infrastructure\Messaging;
 use App\Shared\Application\Messaging\MessagePayloadCodecInterface;
 use App\Shared\Infrastructure\Messaging\AsyncWorkloadCompilerPass;
 use App\Shared\Infrastructure\Messenger\JsonTransportSerializer;
+use App\Shared\Infrastructure\Messenger\OrdinaryAdmissionTransport;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\DependencyInjection\Argument\IteratorArgument;
 use Symfony\Component\DependencyInjection\Argument\ServiceClosureArgument;
-use Symfony\Component\DependencyInjection\ContainerBuilder;
 use Symfony\Component\DependencyInjection\Compiler\DecoratorServicePass;
 use Symfony\Component\DependencyInjection\Compiler\ResolveReferencesToAliasesPass;
-use Symfony\Component\Messenger\MessageBus;
-use Symfony\Component\Messenger\TraceableMessageBus;
+use Symfony\Component\DependencyInjection\ContainerBuilder;
 use Symfony\Component\DependencyInjection\Definition;
 use Symfony\Component\DependencyInjection\Reference;
 use Symfony\Component\Messenger\Handler\HandlerDescriptor;
+use Symfony\Component\Messenger\MessageBus;
 use Symfony\Component\Messenger\Retry\MultiplierRetryStrategy;
+use Symfony\Component\Messenger\TraceableMessageBus;
 use Symfony\Component\Messenger\Transport\Serialization\SigningSerializer;
 
 final class AsyncWorkloadCompilerPassTest extends TestCase
@@ -35,8 +36,8 @@ final class AsyncWorkloadCompilerPassTest extends TestCase
         $container = $this->container();
         $inner = $container->getDefinition('messenger.transport.async');
         $container->setDefinition('admission.inner', $inner);
-        $container->setDefinition('messenger.transport.async', new Definition(\App\Shared\Infrastructure\Messenger\OrdinaryAdmissionTransport::class, [new Reference('admission.inner')])
-            ->setFactory([\App\Shared\Infrastructure\Messenger\OrdinaryAdmissionTransport::class, 'forEnvironment']));
+        $container->setDefinition('messenger.transport.async', new Definition(OrdinaryAdmissionTransport::class, [new Reference('admission.inner')])
+            ->setFactory([OrdinaryAdmissionTransport::class, 'forEnvironment']));
         new AsyncWorkloadCompilerPass()->process($container);
         $inner->setArgument(2, new Definition(\stdClass::class));
         $this->expectException(\LogicException::class);

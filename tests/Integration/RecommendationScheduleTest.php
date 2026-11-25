@@ -7,6 +7,7 @@ namespace App\Tests\Integration;
 use App\Catalog\Infrastructure\Doctrine\Entity\AlbumEntity;
 use App\Catalog\Infrastructure\Doctrine\Entity\SongEntity;
 use App\Library\Infrastructure\Doctrine\Entity\LibraryEntity;
+use App\Recommendation\Application\Command\ExecuteRecommendationJobCommand;
 use App\Recommendation\Application\CommandHandler\GenerateRecommendationsHandler;
 use App\Recommendation\Application\Settings\RecommendationSettingDefinitions;
 use App\Scheduler\Application\CommandHandler\ExecuteScheduledJobHandler;
@@ -17,11 +18,15 @@ use App\Scheduler\Domain\ValueObject\JobType;
 use App\Shared\Application\Port\SystemSettingStoreInterface;
 use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
+use Doctrine\DBAL\ArrayParameterType;
 use DoctrineMigrations\Version20261017000000;
 use PHPUnit\Framework\TestCase;
 use Symfony\Bundle\FrameworkBundle\Console\Application;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Tester\CommandTester;
+use Symfony\Component\Messenger\MessageBusInterface;
+use Symfony\Component\Messenger\Stamp\ReceivedStamp;
+use Symfony\Component\Messenger\Transport\InMemory\InMemoryTransport;
 
 /**
  * The daily recommendation schedule runs through the
@@ -75,11 +80,11 @@ final class RecommendationScheduleTest extends TestCase
         self::assertSame(0, $this->recommendationsFrom($songs));
         $container = $this->kernel->getContainer()->get('test.service_container');
         $transport = $container->get('messenger.transport.async');
-        self::assertInstanceOf(\Symfony\Component\Messenger\Transport\InMemory\InMemoryTransport::class, $transport);
-        $bus = $container->get(\Symfony\Component\Messenger\MessageBusInterface::class);
+        self::assertInstanceOf(InMemoryTransport::class, $transport);
+        $bus = $container->get(MessageBusInterface::class);
         foreach ($transport->getSent() as $envelope) {
-            if ($envelope->getMessage() instanceof \App\Recommendation\Application\Command\ExecuteRecommendationJobCommand) {
-                $bus->dispatch($envelope->with(new \Symfony\Component\Messenger\Stamp\ReceivedStamp('async')));
+            if ($envelope->getMessage() instanceof ExecuteRecommendationJobCommand) {
+                $bus->dispatch($envelope->with(new ReceivedStamp('async')));
             }
         }
 
@@ -156,7 +161,7 @@ final class RecommendationScheduleTest extends TestCase
         return (int) $this->manager->getConnection()->fetchOne(
             "SELECT count(*) FROM recommendations WHERE source_type = 'song' AND source_id IN (?)",
             [$songIds],
-            [\Doctrine\DBAL\ArrayParameterType::STRING],
+            [ArrayParameterType::STRING],
         );
     }
 

@@ -6,6 +6,8 @@ namespace App\Tests\Unit\Transcode\Interface\Controller;
 
 use App\Auth\Infrastructure\Security\SecurityUser;
 use App\Shared\Domain\Model\Uuid;
+use App\Tests\Unit\Transcode\PublicViewStub;
+use App\Transcode\Application\Port\PlaybackAccessInterface;
 use App\Transcode\Application\Port\TranscodeJobPortInterface;
 use App\Transcode\Application\Query\TranscodeJobQueryPort;
 use App\Transcode\Interface\Controller\TranscodeJobController;
@@ -16,6 +18,7 @@ use Symfony\Component\HttpKernel\ControllerMetadata\ArgumentMetadataFactory;
 use Symfony\Component\Messenger\MessageBusInterface;
 use Symfony\Component\Security\Core\Authentication\Token\Storage\TokenStorage;
 use Symfony\Component\Security\Core\Authentication\Token\UsernamePasswordToken;
+use Symfony\Component\Security\Core\Authorization\AuthorizationCheckerInterface;
 use Symfony\Component\Security\Core\Exception\AccessDeniedException;
 use Symfony\Component\Security\Http\Controller\UserValueResolver;
 
@@ -56,9 +59,9 @@ final class TranscodeJobControllerTest extends TestCase
         return new TranscodeJobController(
             $this->createStub(MessageBusInterface::class),
             $this->createStub(TranscodeJobPortInterface::class),
-            new \App\Tests\Unit\Transcode\PublicViewStub(),
-            $this->createStub(\App\Transcode\Application\Port\PlaybackAccessInterface::class),
-            $this->createStub(\Symfony\Component\Security\Core\Authorization\AuthorizationCheckerInterface::class),
+            new PublicViewStub(),
+            $this->createStub(PlaybackAccessInterface::class),
+            $this->createStub(AuthorizationCheckerInterface::class),
         );
     }
 

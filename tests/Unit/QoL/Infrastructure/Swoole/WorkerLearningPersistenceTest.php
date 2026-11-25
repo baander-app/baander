@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Tests\Unit\QoL\Infrastructure\Swoole;
 
 use App\QoL\Application\Port\EncoderProfileFingerprintPortInterface;
+use App\QoL\Domain\Exception\StreamBudgetExhausted;
 use App\QoL\Domain\Port\QualityLadderPortInterface;
 use App\QoL\Domain\Service\LearningModel;
 use App\QoL\Domain\Service\StreamGovernor;
@@ -91,7 +92,7 @@ final class WorkerLearningPersistenceTest extends TestCase
         $nextStore->restoreForWorker();
         self::assertSame('active', $next->getState()->value);
         self::assertSame(LearningModel::MIN_SAMPLES, $next->getModel()->sampleCount());
-        $this->expectException(\App\QoL\Domain\Exception\StreamBudgetExhausted::class);
+        $this->expectException(StreamBudgetExhausted::class);
         $next->evaluateBudget(1080, 5000000, false, '1080p');
     }
 

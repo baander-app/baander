@@ -4,24 +4,24 @@ declare(strict_types=1);
 
 namespace App\Transcode\Interface\Controller;
 
+use App\Shared\Application\Port\SleeperInterface;
 use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
-use App\Shared\Application\Port\SleeperInterface;
-use App\Transcode\Application\DTO\MediaTrack;
-use App\Transcode\Application\DTO\TranscodeRenditionSet;
-use Symfony\Component\HttpKernel\Exception\BadRequestHttpException;
-use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 use App\Shared\Interface\Controller\ApiResponsesTrait;
 use App\Shared\Interface\DTO\ApiError;
+use App\Transcode\Application\DTO\MediaTrack;
+use App\Transcode\Application\DTO\TranscodeRenditionSet;
 use App\Transcode\Application\Port\LiveDeliveryAccessPort;
-use App\Transcode\Application\Port\TranscodeStreamingPortInterface;
 use App\Transcode\Application\Port\PlaybackPortInterface;
 use App\Transcode\Application\Port\TranscodePublicViewInterface;
+use App\Transcode\Application\Port\TranscodeStreamingPortInterface;
 use App\Transcode\Interface\Security\SignedStreamRequest;
-use Symfony\Component\HttpFoundation\Request;
 use OpenApi\Spec as OA;
 use Symfony\Component\HttpFoundation\JsonResponse;
+use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\StreamedResponse;
+use Symfony\Component\HttpKernel\Exception\BadRequestHttpException;
+use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 use Symfony\Component\Routing\Attribute\Route;
 
 #[OA\Tag(name: 'Streaming', description: 'HLS/DASH streaming endpoints')]
@@ -402,7 +402,7 @@ final class StreamManifestController
         return str_contains($manifest, '#EXTINF:') || str_contains($manifest, '#EXT-X-STREAM-INF:') || str_contains($manifest, '<Representation');
     }
 
-    private function requireVideo(string $publicId): \App\Shared\Domain\Model\Uuid
+    private function requireVideo(string $publicId): Uuid
     {
         try {
             $video = $this->publicView->videoId(PublicId::fromString($publicId));

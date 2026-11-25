@@ -7,10 +7,11 @@ namespace App\Metadata\Application;
 use App\Library\Application\Port\LibraryPortInterface;
 use App\Metadata\Application\Message\SyncAlbumMessage;
 use App\Metadata\Application\Message\SyncArtistsMessage;
-use App\Metadata\Application\Message\SyncPeopleMessage;
 use App\Metadata\Application\Message\SyncGenresMessage;
 use App\Metadata\Application\Message\SyncLibraryMessage;
+use App\Metadata\Application\Message\SyncPeopleMessage;
 use App\Metadata\Application\Message\SyncSongMessage;
+use App\Shared\Domain\Model\Uuid;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\Messenger\MessageBusInterface;
 use Symfony\Component\Messenger\Stamp\HandledStamp;
@@ -29,7 +30,7 @@ final class MetadataSyncOrchestrator
         bool $forceUpdate = false,
         bool $includeSongs = false,
     ): SyncLibraryResult {
-        $uuid = new \App\Shared\Domain\Model\Uuid($libraryId);
+        $uuid = new Uuid($libraryId);
         $library = $this->libraryService->findByUuid($uuid);
 
         if ($library === null) {
@@ -57,7 +58,7 @@ final class MetadataSyncOrchestrator
     public function syncAlbum(string $albumId, bool $forceUpdate = false): void
     {
         $this->bus->dispatch(new SyncAlbumMessage(
-            new \App\Shared\Domain\Model\Uuid($albumId),
+            new Uuid($albumId),
             $forceUpdate,
         ));
     }
@@ -65,7 +66,7 @@ final class MetadataSyncOrchestrator
     public function syncSong(string $songId, bool $forceUpdate = false): void
     {
         $this->bus->dispatch(new SyncSongMessage(
-            new \App\Shared\Domain\Model\Uuid($songId),
+            new Uuid($songId),
             $forceUpdate,
         ));
     }

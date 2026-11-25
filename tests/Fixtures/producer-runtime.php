@@ -6,15 +6,19 @@ use App\Auth\Application\Command\User\CreateUserCommand;
 use App\Auth\Application\Command\User\RegisterUserCommand;
 use App\Auth\Application\Command\User\VerifyEmailCommand;
 use App\Auth\Application\Settings\UserManagementSettingDefinitions;
+use App\Kernel;
 use App\Shared\Application\Command\UpdateSystemSettingsCommand;
 use App\Shared\Domain\Model\Email;
+use App\Tests\Support\FinalSchemaBootstrap;
 use Doctrine\DBAL\DriverManager;
+use Doctrine\DBAL\Exception\DriverException;
+use Symfony\Component\Dotenv\Dotenv;
 
 require dirname(__DIR__, 2) . '/vendor/autoload.php';
 require_once dirname(__DIR__) . '/Support/FinalSchemaBootstrap.php';
-(new Symfony\Component\Dotenv\Dotenv())->bootEnv(dirname(__DIR__, 2) . '/.env');
+(new Dotenv())->bootEnv(dirname(__DIR__, 2) . '/.env');
 
-$kernel = new App\Kernel('prod', false);
+$kernel = new Kernel('prod', false);
 $kernel->boot();
 $em = $kernel->getContainer()->get('doctrine')->getManager();
 $db = $em->getConnection();
@@ -33,7 +37,7 @@ $expectConstraintFailure = static function (object $command, string $constraint)
         $bus->dispatch($command);
     } catch (Throwable $error) {
         do {
-            if ($error instanceof Doctrine\DBAL\Exception\DriverException
+            if ($error instanceof DriverException
                 && $error->getSQLState() === '23514'
                 && str_contains($error->getMessage(), $constraint)) {
                 return;
@@ -58,7 +62,7 @@ $assertUserState = static function (string $email, int $users, int $tokens, int 
 };
 
 try {
-    App\Tests\Support\FinalSchemaBootstrap::bootstrap($db);
+    FinalSchemaBootstrap::bootstrap($db);
     // Self-registration ships closed; open it as app:settings:set does.
     $bus->dispatch(new UpdateSystemSettingsCommand([UserManagementSettingDefinitions::REGISTRATION_OPEN => 'true']));
 

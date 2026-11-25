@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Baander\DevQualification\Tests;
 
 use Baander\DevQualification\Fixtures\Worker\MediaCost;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use RuntimeException;
 
@@ -134,7 +135,7 @@ final class WorkerMediaCostTest extends TestCase
         yield 'limited execution unit' => ['unit'];
     }
 
-    #[\PHPUnit\Framework\Attributes\DataProvider('unprioritizedMedia')]
+    #[DataProvider('unprioritizedMedia')]
     public function testReceiptRequiresMediaPriorityAndUnlimitedUnits(string $case): void
     {
         $job = ['/usr/local/bin/php', '/opt/baander/bin/worker-media-job.php', 'video', 'key'];

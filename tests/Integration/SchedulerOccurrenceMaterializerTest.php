@@ -12,12 +12,14 @@ use App\Scheduler\Domain\ValueObject\JobType;
 use App\Scheduler\Infrastructure\Doctrine\DoctrineSchedulerOccurrenceMaterializer;
 use App\Scheduler\Infrastructure\Doctrine\DoctrineSchedulerOccurrenceStore;
 use App\Scheduler\Infrastructure\Doctrine\Entity\ScheduledJobEntity;
+use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
 use DAMA\DoctrineTestBundle\PHPUnit\SkipDatabaseRollback;
 use DateTimeImmutable;
 use DateTimeZone;
 use Doctrine\DBAL\Connection;
 use Doctrine\DBAL\DriverManager;
+use Doctrine\DBAL\Exception\DriverException;
 use Doctrine\DBAL\Tools\DsnParser;
 use Doctrine\ORM\EntityManagerInterface;
 use Doctrine\ORM\Tools\SchemaTool;
@@ -134,7 +136,7 @@ final class SchedulerOccurrenceMaterializerTest extends TestCase
         $job = $this->job();
         $base = $this->databaseMinute()->modify('-20 minutes');
         $this->seedCursor($job, $base);
-        $poison = new SchedulerOccurrence(Uuid::generate(), $job->getId(), $base->modify('+2 minutes'), JobType::Console, 'app:conflicting-snapshot', [], jobPublicId: new \App\Shared\Domain\Model\PublicId());
+        $poison = new SchedulerOccurrence(Uuid::generate(), $job->getId(), $base->modify('+2 minutes'), JobType::Console, 'app:conflicting-snapshot', [], jobPublicId: new PublicId());
         self::assertTrue((new DoctrineSchedulerOccurrenceStore($this->observer))->record($poison));
         try {
             $this->materializer()->materialize($job->getId(), 2);
@@ -156,7 +158,7 @@ final class SchedulerOccurrenceMaterializerTest extends TestCase
         $job = $this->job();
         $base = $this->databaseMinute()->modify('-20 minutes');
         $this->seedCursor($job, $base);
-        $existing = new SchedulerOccurrence(Uuid::generate(), $job->getId(), $base->modify('+1 minute'), $job->getJobType(), $job->getCommand(), $job->getParameters(), jobPublicId: new \App\Shared\Domain\Model\PublicId());
+        $existing = new SchedulerOccurrence(Uuid::generate(), $job->getId(), $base->modify('+1 minute'), $job->getJobType(), $job->getCommand(), $job->getParameters(), jobPublicId: new PublicId());
         self::assertTrue((new DoctrineSchedulerOccurrenceStore($this->observer))->record($existing));
         self::assertSame(1, $this->materializer()->materialize($job->getId(), 2));
         $rows = $this->occurrences($job);
@@ -199,7 +201,7 @@ final class SchedulerOccurrenceMaterializerTest extends TestCase
     {
         $job = $this->job();
         $base = $this->databaseMinute()->modify('-20 minutes');
-        $retained = new SchedulerOccurrence(Uuid::generate(), $job->getId(), $base, $job->getJobType(), $job->getCommand(), $job->getParameters(), jobPublicId: new \App\Shared\Domain\Model\PublicId());
+        $retained = new SchedulerOccurrence(Uuid::generate(), $job->getId(), $base, $job->getJobType(), $job->getCommand(), $job->getParameters(), jobPublicId: new PublicId());
         self::assertTrue((new DoctrineSchedulerOccurrenceStore($this->observer))->record($retained));
         if ($change === 'resume' || $change === 'enable') {
             $change === 'resume' ? $job->pause() : $job->disable();
@@ -436,7 +438,7 @@ final class SchedulerOccurrenceMaterializerTest extends TestCase
         try {
             $this->observer->executeStatement('UPDATE scheduled_jobs SET evaluated_through = CAST(:value AS TIMESTAMPTZ) WHERE id = :id', ['value' => $value, 'id' => $job->getId()->toString()]);
             self::fail('Expected physical cursor constraint rejection.');
-        } catch (\Doctrine\DBAL\Exception\DriverException $error) {
+        } catch (DriverException $error) {
             self::assertSame('23514', $error->getSQLState(), 'The actual CHECK constraint must reject the value.');
         }
         self::assertNull($this->cursor($job));

@@ -11,6 +11,7 @@ use App\Shared\Application\Port\SystemSettingStoreInterface;
 use App\Shared\Domain\Model\Uuid;
 use App\Tests\Fixtures\Auth\FirstPartyOAuthClient;
 use App\Tests\Fixtures\Auth\SignedDpopProof;
+use Doctrine\DBAL\Connection;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Mime\Email;
 
@@ -147,7 +148,7 @@ final class PasswordResetClaimTest extends RateLimitTestCase
         return $repository;
     }
 
-    private function connection(): \Doctrine\DBAL\Connection
+    private function connection(): Connection
     {
         return $this->entityManager->getConnection();
     }

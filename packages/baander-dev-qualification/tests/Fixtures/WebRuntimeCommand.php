@@ -2,6 +2,9 @@
 <?php
 
 declare(strict_types=1);
+
+use Baander\DevQualification\Tests\Support\WebDockerState;
+
 $arguments = array_slice($_SERVER['argv'], 1);
 $input = stream_get_contents(STDIN);
 file_put_contents(
@@ -26,7 +29,7 @@ require dirname(__DIR__, 4) . '/vendor/autoload.php';
 if ($arguments[0] !== 'context') {
     array_splice($arguments, 0, 2);
 }
-\Baander\DevQualification\Tests\Support\WebDockerState::handle($arguments, getenv('WEB_RUNTIME_CALLS'));
+WebDockerState::handle($arguments, getenv('WEB_RUNTIME_CALLS'));
 $mode = getenv('WEB_RUNTIME_MODE');
 if ($arguments[0] === 'cp') {
     if ((fileperms($arguments[1]) & 0777) !== 0644 || (fileperms(dirname($arguments[1])) & 0777) !== 0700) {

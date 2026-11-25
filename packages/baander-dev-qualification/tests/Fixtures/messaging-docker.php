@@ -1,6 +1,7 @@
 <?php
 
 declare(strict_types=1);
+use Swoole\Process;
 
 $args = array_slice($_SERVER['argv'], 1);
 if (in_array($args[0] ?? '', ['--host', '--context'], true)) {
@@ -76,7 +77,7 @@ if ($args === ['context', 'show']) {
         file_put_contents($root . '/sql', stream_get_contents(STDIN));
     } elseif (in_array('php', $args, true)) {
         if (getenv('PROBE_WORK_INTERRUPT') === '1') {
-            Swoole\Process::kill((int) file_get_contents($root . '/runner-pid'), 15);
+            Process::kill((int) file_get_contents($root . '/runner-pid'), 15);
             usleep(1_000_000);
         }
         if (getenv('PROBE_WORK_FAIL') === '1') {

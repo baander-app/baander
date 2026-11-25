@@ -8,10 +8,14 @@ use App\Auth\Application\Command\Passkey\AuthenticatePasskeyCommand;
 use App\Auth\Application\CommandHandler\Passkey\AuthenticatePasskeyHandler;
 use App\Auth\Application\Port\PasskeyVerifierInterface;
 use App\Auth\Domain\Model\Passkey\Passkey;
+use App\Auth\Domain\Model\User;
+use App\Auth\Domain\Model\UserState;
 use App\Auth\Domain\Repository\Passkey\PasskeyRepositoryInterface;
+use App\Auth\Domain\Repository\UserRepositoryInterface;
+use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
-use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\Attributes\AllowMockObjectsWithoutExpectations;
+use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use RuntimeException;
 use Webauthn\CredentialRecord;
@@ -24,7 +28,7 @@ final class AuthenticatePasskeyHandlerTest extends TestCase
     private PasskeyRepositoryInterface&MockObject $passkeyRepository;
     private PasskeyVerifierInterface&MockObject $passkeyVerifier;
     private AuthenticatePasskeyHandler $handler;
-    private \App\Auth\Domain\Repository\UserRepositoryInterface $users;
+    private UserRepositoryInterface $users;
 
     /** Canonical browser encoding of the binary credential identifier. */
     private const CREDENTIAL_ID = 'cmF3LWNyZWQtaWQ';
@@ -36,11 +40,11 @@ final class AuthenticatePasskeyHandlerTest extends TestCase
     {
         $this->passkeyRepository = $this->createMock(PasskeyRepositoryInterface::class);
         $this->passkeyVerifier = $this->createMock(PasskeyVerifierInterface::class);
-        $this->users = $this->createStub(\App\Auth\Domain\Repository\UserRepositoryInterface::class);
-        $this->users->method('findByUuid')->willReturnCallback(static function (Uuid $id): \App\Auth\Domain\Model\User {
+        $this->users = $this->createStub(UserRepositoryInterface::class);
+        $this->users->method('findByUuid')->willReturnCallback(static function (Uuid $id): User {
             $now = new \DateTimeImmutable();
-            return \App\Auth\Domain\Model\User::reconstitute(new \App\Auth\Domain\Model\UserState(
-                id: $id, publicId: new \App\Shared\Domain\Model\PublicId($id->toString() === self::OWNER_ID ? self::OWNER_PUBLIC_ID : str_repeat('v', 21)),
+            return User::reconstitute(new UserState(
+                id: $id, publicId: new PublicId($id->toString() === self::OWNER_ID ? self::OWNER_PUBLIC_ID : str_repeat('v', 21)),
                 name: 'Owner', email: 'owner@baander.app', password: 'hash', totpSecretCiphertext: null, createdAt: $now, updatedAt: $now,
             ));
         });
@@ -361,9 +365,9 @@ final class AuthenticatePasskeyHandlerTest extends TestCase
         $reads = [];
         $passkey = $this->createPasskey(self::CREDENTIAL_ID, 5);
         $response = $this->createValidResponse();
-        $owner = \App\Auth\Domain\Model\User::reconstitute(new \App\Auth\Domain\Model\UserState(
+        $owner = User::reconstitute(new UserState(
             id: Uuid::fromString(self::OWNER_ID),
-            publicId: \App\Shared\Domain\Model\PublicId::fromString(self::OWNER_PUBLIC_ID),
+            publicId: PublicId::fromString(self::OWNER_PUBLIC_ID),
             name: 'Owner',
             email: 'owner@baander.app',
             password: 'hash',
@@ -372,8 +376,8 @@ final class AuthenticatePasskeyHandlerTest extends TestCase
             updatedAt: new \DateTimeImmutable(),
             credentialEpoch: 7,
         ));
-        $users = $this->createStub(\App\Auth\Domain\Repository\UserRepositoryInterface::class);
-        $users->method('findByUuid')->willReturnCallback(function () use (&$reads, $owner): \App\Auth\Domain\Model\User {
+        $users = $this->createStub(UserRepositoryInterface::class);
+        $users->method('findByUuid')->willReturnCallback(function () use (&$reads, $owner): User {
             $reads[] = 'owner';
 
             return $owner;

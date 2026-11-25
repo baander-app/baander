@@ -24,7 +24,7 @@ final class Controller
     {
     }
 
-    public function fullyQualified(#[\Symfony\Component\HttpKernel\Attribute\MapRequestPayload] RequestDto $payload): void
+    public function fullyQualified(#[Payload] RequestDto $payload): void
     {
     }
 

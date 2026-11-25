@@ -11,6 +11,7 @@ use App\Shared\Application\Port\TransactionPortInterface;
 use App\Shared\Domain\Model\Uuid;
 use App\Tests\Fixtures\Library\LibraryDiscoveryObservationRace;
 use App\Tests\Fixtures\Library\LibraryScanClaimRace;
+use Doctrine\DBAL\Connection;
 use Doctrine\ORM\EntityManagerInterface;
 
 require dirname(__DIR__, 3) . '/vendor/autoload.php';
@@ -54,7 +55,7 @@ if ($kind === 'unavailable' || $kind === 'remove') {
 $library = LibraryScanClaimRace::repository($manager)->findByUuid($libraryId);
 assert($library !== null);
 $transaction = new class($connection) implements TransactionPortInterface {
-    public function __construct(private \Doctrine\DBAL\Connection $connection) {}
+    public function __construct(private Connection $connection) {}
     public function run(callable $operation): mixed
     {
         return $this->connection->transactional(static fn (): mixed => $operation());

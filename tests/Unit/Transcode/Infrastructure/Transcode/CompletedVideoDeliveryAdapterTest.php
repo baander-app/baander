@@ -21,6 +21,7 @@ use App\Transcode\Infrastructure\Storage\SegmentFileResolver;
 use App\Transcode\Infrastructure\Storage\TranscodeFileStorage;
 use App\Transcode\Infrastructure\Transcode\CompletedVideoDeliveryAdapter;
 use PHPUnit\Framework\TestCase;
+use Symfony\Component\Filesystem\Filesystem;
 
 final class CompletedVideoDeliveryAdapterTest extends TestCase
 {
@@ -94,7 +95,7 @@ final class CompletedVideoDeliveryAdapterTest extends TestCase
             $this->expectExceptionMessage('Access revoked');
             $delivery->path($job->getPublicId(), 1, MediaTrack::Video, 0, $expiry);
         } finally {
-            (new \Symfony\Component\Filesystem\Filesystem())->remove($root);
+            (new Filesystem())->remove($root);
         }
     }
 

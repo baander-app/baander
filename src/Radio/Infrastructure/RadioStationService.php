@@ -11,6 +11,7 @@ use App\Radio\Domain\Model\RadioStation\RadioStation;
 use App\Radio\Domain\Model\RadioStation\Stream;
 use App\Radio\Domain\Repository\RadioSource\RadioSourceRepositoryInterface;
 use App\Radio\Domain\Repository\RadioStation\RadioStationRepositoryInterface;
+use App\Shared\Application\Exception\NotFoundException;
 use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
 use RuntimeException;
@@ -112,7 +113,7 @@ final class RadioStationService implements RadioStationPortInterface
         return [
             'publicId' => $station->getPublicId()->toString(),
             'sourceId' => ($this->sourceRepository->find($station->getSourceId())
-                ?? throw new \App\Shared\Application\Exception\NotFoundException('Radio source not found.'))->getPublicId()->toString(),
+                ?? throw new NotFoundException('Radio source not found.'))->getPublicId()->toString(),
             'externalId' => $station->getExternalId(),
             'name' => $station->getName(),
             'country' => $station->getCountry(),

@@ -7,8 +7,10 @@ namespace App\Tests\Unit\Favorites\Application\CommandHandler;
 use App\Favorites\Application\Command\AddFavoriteCommand;
 use App\Favorites\Application\CommandHandler\AddFavoriteHandler;
 use App\Favorites\Application\Port\FavoritesPortInterface;
+use App\Favorites\Application\Port\FavoriteTargetAccessInterface;
 use App\Favorites\Domain\Model\UserFavorite;
 use App\Favorites\Domain\ValueObject\FavoriteType;
+use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
 use PHPUnit\Framework\MockObject\Stub;
 use PHPUnit\Framework\TestCase;
@@ -27,7 +29,7 @@ final class AddFavoriteHandlerTest extends TestCase
 
     private function createAddFavoriteHandlerFixture(): AddFavoriteHandler
     {
-        $fixture = new AddFavoriteHandler($this->favoritesPort, $this->createStub(\App\Favorites\Application\Port\FavoriteTargetAccessInterface::class));
+        $fixture = new AddFavoriteHandler($this->favoritesPort, $this->createStub(FavoriteTargetAccessInterface::class));
         return $fixture;
     }
 
@@ -88,7 +90,7 @@ final class AddFavoriteHandlerTest extends TestCase
 
     public function testInternalUuidIsRejectedBeforeAnyTargetLookup(): void
     {
-        $targets = $this->createMock(\App\Favorites\Application\Port\FavoriteTargetAccessInterface::class);
+        $targets = $this->createMock(FavoriteTargetAccessInterface::class);
         $targets->expects(self::never())->method('assertVisible');
         $handler = new AddFavoriteHandler($this->favoritesPort, $targets);
         $this->expectException(\InvalidArgumentException::class);
@@ -98,8 +100,8 @@ final class AddFavoriteHandlerTest extends TestCase
     public function testTargetAccessIsCheckedBeforeReturningAnExistingFavorite(): void
     {
         $actorId = new Uuid();
-        $publicId = new \App\Shared\Domain\Model\PublicId();
-        $targets = $this->createMock(\App\Favorites\Application\Port\FavoriteTargetAccessInterface::class);
+        $publicId = new PublicId();
+        $targets = $this->createMock(FavoriteTargetAccessInterface::class);
         $targets->expects(self::once())->method('assertVisible')->with($actorId, FavoriteType::Song, $publicId)
             ->willThrowException(new \OutOfBoundsException('Favorite target not found.'));
         $favorites = $this->createMock(FavoritesPortInterface::class);

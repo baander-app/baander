@@ -4,13 +4,35 @@ declare(strict_types=1);
 
 namespace Baander\DevEnvironment\Tests;
 
-use Baander\Tests\Tooling\Support\WorkerCommandExecutor;
-use Baander\Tests\Tooling\Support\DevDataTestCase;
-use Baander\Tests\Tooling\Support\DevelopmentCommandExecutor;
+use App\Shared\Application\DTO\DeploymentUnit;
+use App\Shared\Infrastructure\Worker\DeploymentRuntimeEnvironment;
+use Baander\Configuration\ApplicationLayout;
+use Baander\Configuration\ToolingConfiguration;
+use Baander\Containers\Docker\Client;
+use Baander\Containers\Docker\TargetResolver;
+use Baander\Containers\Resources\ResourceKind;
+use Baander\Containers\Resources\ResourceLedger;
+use Baander\Deployment\Workers\Lifecycle;
+use Baander\Deployment\Workers\StateStore;
+use Baander\DevEnvironment\Host\CapturedConnections;
+use Baander\DevEnvironment\Host\ProcessEnvironment;
+use Baander\DevEnvironment\State\InstanceStateStore;
+use Baander\DevEnvironment\Tests\Support\DeploymentContainerRecipe;
+use Baander\DevEnvironment\Worker\InstanceWorkerStateStore;
 use Baander\DevEnvironment\Worker\WorkerDeployment;
 use Baander\DevEnvironment\WorkflowError;
 use Baander\Filesystem\AtomicFile;
-use App\Shared\Infrastructure\Worker\DeploymentRuntimeEnvironment;
+use Baander\Process\Execution\CommandExecutor;
+use Baander\Process\Execution\CommandFailure;
+use Baander\Process\Execution\CompletionPolicy;
+use Baander\Process\Execution\EngineExecutor;
+use Baander\Process\Execution\ExecutionContext;
+use Baander\Process\Execution\ProcessResult;
+use Baander\Process\Execution\ProcessSpec;
+use Baander\Process\Execution\RunningProcess;
+use Baander\Tests\Tooling\Support\DevDataTestCase;
+use Baander\Tests\Tooling\Support\DevelopmentCommandExecutor;
+use Baander\Tests\Tooling\Support\WorkerCommandExecutor;
 use PHPUnit\Framework\Attributes\DataProvider;
 
 final class DevelopmentWorkersTest extends DevDataTestCase
@@ -40,17 +62,17 @@ final class DevelopmentWorkersTest extends DevDataTestCase
      * The daemon holds every image except a fixture boot's controller tag and the images a test
      * names as lost.
      *
-     * @param \Closure(non-empty-list<string>,?string,?array<string,string>):(string|\Baander\Process\Execution\ProcessResult) $callback
+     * @param \Closure(non-empty-list<string>,?string,?array<string,string>):(string|ProcessResult) $callback
      * @param list<string> $lost
      */
     private function runner(\Closure $callback, array $lost = []): WorkerCommandExecutor
     {
-        return new WorkerCommandExecutor(static function (array $arguments, ?string $input, ?array $environment) use ($callback, $lost): string|\Baander\Process\Execution\ProcessResult {
+        return new WorkerCommandExecutor(static function (array $arguments, ?string $input, ?array $environment) use ($callback, $lost): string|ProcessResult {
             $command = array_search('image', $arguments, true);
             $image = $arguments[array_key_last($arguments)];
             if ($command !== false && ($arguments[$command + 1] ?? null) === 'inspect'
                 && (str_starts_with($image, 'baander-worker-controller:') || in_array($image, $lost, true))) {
-                return new \Baander\Process\Execution\ProcessResult(1, null, false, false, '', 'Error response from daemon: No such image: ' . $image, 0);
+                return new ProcessResult(1, null, false, false, '', 'Error response from daemon: No such image: ' . $image, 0);
             }
             if ($command !== false && ($arguments[$command + 1] ?? null) === 'inspect' && in_array('{{.Id}}', $arguments, true)) {
                 return $image;
@@ -66,21 +88,21 @@ final class DevelopmentWorkersTest extends DevDataTestCase
     private function lifecycle(\Closure $callback, ?DevelopmentCommandExecutor $runner = null): WorkerDeployment
     {
         return new class ($this->store, $runner ?? $this->catalogRunner([]), $callback) extends WorkerDeployment {
-            private readonly \Baander\DevEnvironment\State\InstanceStateStore $testStore;
+            private readonly InstanceStateStore $testStore;
             private readonly DevelopmentCommandExecutor $testRunner;
             /** @param \Closure(array<string,mixed>,string):array<string,mixed> $callback */
-            public function __construct(\Baander\DevEnvironment\State\InstanceStateStore $store, DevelopmentCommandExecutor $runner, private readonly \Closure $callback)
+            public function __construct(InstanceStateStore $store, DevelopmentCommandExecutor $runner, private readonly \Closure $callback)
             {
                 $this->testStore = $store;
                 $this->testRunner = $runner;
                 parent::__construct($store, $runner);
             }
-            protected function lifecycle(array $instance): \Baander\Deployment\Workers\Lifecycle
+            protected function lifecycle(array $instance): Lifecycle
             {
-                return new class (new \Baander\DevEnvironment\Worker\InstanceWorkerStateStore($this->testStore, $instance), $this->testRunner, $this->callback) extends \Baander\Deployment\Workers\Lifecycle {
-                    public function __construct(\Baander\Deployment\Workers\StateStore $store, \Baander\Process\Execution\CommandExecutor $runner, private readonly \Closure $callback)
+                return new class (new InstanceWorkerStateStore($this->testStore, $instance), $this->testRunner, $this->callback) extends Lifecycle {
+                    public function __construct(StateStore $store, CommandExecutor $runner, private readonly \Closure $callback)
                     {
-                        parent::__construct($store, $runner, \Baander\DevEnvironment\Host\ProcessEnvironment::clean());
+                        parent::__construct($store, $runner, ProcessEnvironment::clean());
                     }
                     public function invoke(array $record, string $action): array
                     {
@@ -450,7 +472,7 @@ final class DevelopmentWorkersTest extends DevDataTestCase
         $stdout = json_encode(['success' => false, 'message' => 'stdout-marker ' . $database . ' runtime-private ' . str_repeat('o', 40000)], JSON_THROW_ON_ERROR);
         $runner = $this->runner(static fn(array $arguments): string|\Baander\Process\Execution\ProcessResult => in_array('info', $arguments, true)
             ? '{"ID":"daemon"}'
-            : new \Baander\Process\Execution\ProcessResult(7, null, false, false, $stdout, 'stderr-marker ' . $database . ' runtime-private', 0));
+            : new ProcessResult(7, null, false, false, $stdout, 'stderr-marker ' . $database . ' runtime-private', 0));
         try {
             new WorkerDeployment($this->store, $runner)->invoke($instance, 'status');
             self::fail('Failed operator was accepted.');
@@ -551,7 +573,7 @@ final class DevelopmentWorkersTest extends DevDataTestCase
     }
 
     /** @phpstan-impure */
-    private function recipeFingerprint(\Baander\DevEnvironment\Tests\Support\DeploymentContainerRecipe $recipe): string
+    private function recipeFingerprint(DeploymentContainerRecipe $recipe): string
     {
         return $recipe->fingerprint();
     }
@@ -560,13 +582,13 @@ final class DevelopmentWorkersTest extends DevDataTestCase
     {
         $source = $this->root . '/helper-empty-source/movies';
         try {
-            \Baander\DevEnvironment\Tests\Support\DeploymentContainerRecipe::verifySourceDirectory($source);
+            DeploymentContainerRecipe::verifySourceDirectory($source);
             self::fail('Historical admission unexpectedly accepted a missing directory.');
         } catch (\InvalidArgumentException $error) {
             self::assertStringContainsString('existing canonical absolute directory', $error->getMessage());
         }
         mkdir($source, 0700, true);
-        $recipe = new \Baander\DevEnvironment\Tests\Support\DeploymentContainerRecipe(
+        $recipe = new DeploymentContainerRecipe(
             'historical-pair',
             str_repeat('a', 32),
             'daemon',
@@ -576,7 +598,7 @@ final class DevelopmentWorkersTest extends DevDataTestCase
             128 * 1024 ** 2,
             1000000000,
             64,
-            \App\Shared\Application\DTO\DeploymentUnit::Control,
+            DeploymentUnit::Control,
             [0],
             'historical-ipc',
             mediaMounts: [['source' => $source, 'target' => '/media/movies', 'readOnly' => true, 'role' => 'source']],
@@ -586,8 +608,8 @@ final class DevelopmentWorkersTest extends DevDataTestCase
         file_put_contents($source . '/unrelated-media', 'media is not an input to retirement');
         self::assertSame($original, $this->recipeFingerprint($recipe));
         unlink($source . '/unrelated-media');
-        \Baander\DevEnvironment\Tests\Support\DeploymentContainerRecipe::verifySourceDirectory($source);
-        \Baander\DevEnvironment\Tests\Support\DeploymentContainerRecipe::verifySourceDirectory(dirname($source));
+        DeploymentContainerRecipe::verifySourceDirectory($source);
+        DeploymentContainerRecipe::verifySourceDirectory(dirname($source));
         self::assertSame($original, $this->recipeFingerprint($recipe));
         self::assertSame([], array_values(array_diff(scandir($source), ['.', '..'])));
     }
@@ -642,7 +664,7 @@ final class DevelopmentWorkersTest extends DevDataTestCase
     }
     private function preparationRunner(bool $reject = false, bool $failInitialization = false): WorkerCommandExecutor
     {
-        return $this->runner(static function (array $arguments) use ($reject, $failInitialization): string|\Baander\Process\Execution\ProcessResult {
+        return $this->runner(static function (array $arguments) use ($reject, $failInitialization): string|ProcessResult {
             if (in_array('info', $arguments, true)) {
                 return '{"ID":"daemon","NCPU":2,"MemTotal":17179869184,"SecurityOptions":["name=seccomp,profile=builtin","name=cgroupns"]}';
             }
@@ -650,10 +672,10 @@ final class DevelopmentWorkersTest extends DevDataTestCase
                 return '[{"Endpoints":{"docker":{"Host":"unix:///var/run/docker.sock"}}}]';
             }
             if ($reject && in_array('-i', $arguments, true)) {
-                return new \Baander\Process\Execution\ProcessResult(1, null, false, false, '', 'validator rejected worker-parser-test', 0);
+                return new ProcessResult(1, null, false, false, '', 'validator rejected worker-parser-test', 0);
             }
             if ($failInitialization && in_array('CHOWN', $arguments, true)) {
-                return new \Baander\Process\Execution\ProcessResult(1, null, false, false, '', 'IPC initialization failed', 0);
+                return new ProcessResult(1, null, false, false, '', 'IPC initialization failed', 0);
             }
             if (in_array('volume', $arguments, true) && in_array('create', $arguments, true)) {
                 return $arguments[array_key_last($arguments)];
@@ -781,7 +803,7 @@ final class DevelopmentWorkersTest extends DevDataTestCase
         try {
             new WorkerDeployment($this->store, $this->preparationRunner(failInitialization: true))->prepare($this->instance, $this->release);
             self::fail('IPC initialization failure was ignored.');
-        } catch (\Baander\Process\Execution\CommandFailure $error) {
+        } catch (CommandFailure $error) {
             self::assertNotNull($error->result);
             self::assertStringContainsString('IPC initialization failed', $error->result->stderr);
         }
@@ -1063,19 +1085,19 @@ final class DevelopmentWorkersTest extends DevDataTestCase
         if ($topology === 'invoke' && (empty($environment['BAANDER_TEST_WORKER_DATABASE_URL']) || $borrowedNetwork === '')) {
             self::markTestSkipped('Requires disposable migrated PostgreSQL via BAANDER_TEST_WORKER_DATABASE_URL and BAANDER_TEST_WORKER_NETWORK.');
         }
-        $configuration = \Baander\Configuration\ToolingConfiguration::forRepository(dirname(__DIR__, 3), $environment);
-        $commandEnvironment = \Baander\DevEnvironment\Host\ProcessEnvironment::clean($environment);
-        $executor = new \Baander\Process\Execution\EngineExecutor(\Baander\Process\Execution\ExecutionContext::bounded(
+        $configuration = ToolingConfiguration::forRepository(dirname(__DIR__, 3), $environment);
+        $commandEnvironment = ProcessEnvironment::clean($environment);
+        $executor = new EngineExecutor(ExecutionContext::bounded(
             $configuration->budgets->seconds('workerOperator'),
             $commandEnvironment,
         ));
         try {
-            $target = new \Baander\Containers\Docker\TargetResolver($executor, $environment)->resolve($configuration->docker, $this->root . '/transport');
-            $docker = new \Baander\Containers\Docker\Client($executor, $target, $commandEnvironment);
+            $target = new TargetResolver($executor, $environment)->resolve($configuration->docker, $this->root . '/transport');
+            $docker = new Client($executor, $target, $commandEnvironment);
             $inspection = json_decode($docker->run(['image', 'inspect', $imageReference])->stdout, true, flags: JSON_THROW_ON_ERROR)[0];
             $image = $inspection['Id'];
             self::assertMatchesRegularExpression('/^sha256:[a-f0-9]{64}$/D', $image);
-            $layout = \Baander\Configuration\ApplicationLayout::fromImage($inspection);
+            $layout = ApplicationLayout::fromImage($inspection);
             $project = 'baander-worker-parser-' . bin2hex(random_bytes(6));
             $this->instance['project'] = $project;
             $this->instance['hostname'] = 'workers.baander.app';
@@ -1102,46 +1124,46 @@ final class DevelopmentWorkersTest extends DevDataTestCase
             if ($topology === 'derived') {
                 $this->instance['state_mounts']['storage'] = ['type' => 'bind', 'source' => $this->root, 'target' => $layout->path('storage')];
             }
-            $ledger = new \Baander\Containers\Resources\ResourceLedger($this->root . '/qualification-resources.json', $docker, $commandEnvironment);
-            $recordingExecutor = new class ($executor, $ledger, 3 + count($target->transportArguments)) implements \Baander\Process\Execution\CommandExecutor {
+            $ledger = new ResourceLedger($this->root . '/qualification-resources.json', $docker, $commandEnvironment);
+            $recordingExecutor = new class ($executor, $ledger, 3 + count($target->transportArguments)) implements CommandExecutor {
                 public function __construct(
-                    private readonly \Baander\Process\Execution\CommandExecutor $executor,
-                    private readonly \Baander\Containers\Resources\ResourceLedger $ledger,
+                    private readonly CommandExecutor $executor,
+                    private readonly ResourceLedger $ledger,
                     private readonly int $prefixLength,
                 ) {}
                 public function run(
-                    \Baander\Process\Execution\ProcessSpec $command,
-                    \Baander\Process\Execution\CompletionPolicy $policy = new \Baander\Process\Execution\CompletionPolicy(),
-                ): \Baander\Process\Execution\ProcessResult {
+                    ProcessSpec $command,
+                    CompletionPolicy $policy = new CompletionPolicy(),
+                ): ProcessResult {
                     $arguments = array_slice($command->argv, $this->prefixLength);
                     if (array_slice($arguments, 0, 2) === ['volume', 'create']
                         && !array_any($arguments, static fn(string $argument): bool => str_starts_with($argument, 'org.baander.tooling.run='))) {
                         $name = array_pop($arguments);
-                        $id = $this->ledger->create(\Baander\Containers\Resources\ResourceKind::Volume, $name, array_slice($arguments, 2));
-                        return $policy->complete(new \Baander\Process\Execution\ProcessResult(0, null, false, false, $id, '', 0), $command);
+                        $id = $this->ledger->create(ResourceKind::Volume, $name, array_slice($arguments, 2));
+                        return $policy->complete(new ProcessResult(0, null, false, false, $id, '', 0), $command);
                     }
                     return $this->executor->run($command, $policy);
                 }
-                public function start(\Baander\Process\Execution\ProcessSpec $command): \Baander\Process\Execution\RunningProcess
+                public function start(ProcessSpec $command): RunningProcess
                 {
                     return $this->executor->start($command);
                 }
                 public function wait(
-                    \Baander\Process\Execution\RunningProcess $process,
-                    \Baander\Process\Execution\CompletionPolicy $policy = new \Baander\Process\Execution\CompletionPolicy(),
-                ): \Baander\Process\Execution\ProcessResult {
+                    RunningProcess $process,
+                    CompletionPolicy $policy = new CompletionPolicy(),
+                ): ProcessResult {
                     return $this->executor->wait($process, $policy);
                 }
-                public function stop(\Baander\Process\Execution\RunningProcess $process, int $signal = 15): \Baander\Process\Execution\ProcessResult
+                public function stop(RunningProcess $process, int $signal = 15): ProcessResult
                 {
                     return $this->executor->stop($process, $signal);
                 }
             };
             $ledger->scoped(function () use ($topology, $borrowedNetwork, $project, $ledger, $recordingExecutor, $commandEnvironment, $layout, $applicationEnvironment): void {
                 if ($borrowedNetwork === '') {
-                    $ledger->create(\Baander\Containers\Resources\ResourceKind::Network, $project, ['--internal']);
+                    $ledger->create(ResourceKind::Network, $project, ['--internal']);
                 }
-                $workers = new WorkerDeployment($this->store, $recordingExecutor, new \Baander\DevEnvironment\Host\CapturedConnections($recordingExecutor, $commandEnvironment));
+                $workers = new WorkerDeployment($this->store, $recordingExecutor, new CapturedConnections($recordingExecutor, $commandEnvironment));
                 if (in_array($topology, ['overlap', 'derived'], true)) {
                     try {
                         $workers->prepare($this->instance, $this->release);

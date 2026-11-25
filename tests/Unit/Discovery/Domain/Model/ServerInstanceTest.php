@@ -138,7 +138,7 @@ final class ServerInstanceTest extends TestCase
     }
 
     /**
-     * @param \App\Discovery\Domain\ValueObject\ServerStatus::* $status
+     * @param ServerStatus::* $status
      */
     private function reconstituteWith(
         bool $staleHeartbeat = false,

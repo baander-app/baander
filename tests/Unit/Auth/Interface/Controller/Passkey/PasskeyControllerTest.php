@@ -4,23 +4,41 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Auth\Interface\Controller\Passkey;
 
+use App\Auth\Application\Command\Passkey\RegisterPasskeyCommand;
+use App\Auth\Application\Exception\EmailUnverifiedException;
 use App\Auth\Application\Port\PasswordHasherInterface;
 use App\Auth\Application\Port\StepUpAttemptThrottleInterface;
 use App\Auth\Application\Port\TotpVerifierInterface;
+use App\Auth\Application\Port\UserPortInterface;
 use App\Auth\Application\Service\StepUpVerifier;
 use App\Auth\Domain\Model\Passkey\Passkey;
 use App\Auth\Domain\Model\Passkey\PasskeyState;
+use App\Auth\Domain\Model\User;
 use App\Auth\Domain\Repository\Passkey\PasskeyRepositoryInterface;
+use App\Auth\Infrastructure\Security\Passkey\PasskeyService;
 use App\Auth\Infrastructure\Security\SecurityUser;
 use App\Auth\Interface\Controller\Passkey\PasskeyController;
 use App\Auth\Interface\Request\Passkey\PasskeyRegistrationOptionsRequest;
+use App\Auth\Interface\Request\Passkey\RegisterPasskeyRequest;
 use App\Shared\Application\Http\PublicOrigins;
+use App\Shared\Domain\Model\Email;
+use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
+use App\Tests\Fixtures\Auth\InMemoryPasskeyChallengeStore;
+use App\Tests\Fixtures\Auth\WebAuthnTestCredential;
 use DateTimeImmutable;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\MockObject\Stub;
 use PHPUnit\Framework\TestCase;
+use Psr\EventDispatcher\EventDispatcherInterface;
+use Psr\Log\NullLogger;
 use Symfony\Bundle\SecurityBundle\Security;
+use Symfony\Component\HttpFoundation\Request;
+use Symfony\Component\Messenger\Envelope;
+use Symfony\Component\Messenger\MessageBusInterface;
+use Symfony\Component\Serializer\Encoder\JsonEncoder;
+use Symfony\Component\Translation\Translator;
+use Webauthn\Counter\CounterChecker;
 
 final class PasskeyControllerTest extends TestCase
 {
@@ -43,7 +61,7 @@ final class PasskeyControllerTest extends TestCase
 
         $this->setPrivate($controller, 'security', $this->security);
         $this->setPrivate($controller, 'passkeyRepository', $this->passkeyRepository);
-        $controller->setTranslator(new \Symfony\Component\Translation\Translator('en'));
+        $controller->setTranslator(new Translator('en'));
         return $controller;
     }
 
@@ -156,9 +174,9 @@ final class PasskeyControllerTest extends TestCase
 
     public function testRegistrationOptionsNeedAVerifiedAddressBeforeStepUp(): void
     {
-        $owner = \App\Auth\Domain\Model\User::register(new \App\Shared\Domain\Model\Email('passkey@baander.app'), 'hash', 'Owner');
+        $owner = User::register(new Email('passkey@baander.app'), 'hash', 'Owner');
         $this->security->method('getUser')->willReturn(new SecurityUser(id: $owner->getId()->toString(), email: $owner->getEmail(), password: 'hash'));
-        $users = $this->createStub(\App\Auth\Application\Port\UserPortInterface::class);
+        $users = $this->createStub(UserPortInterface::class);
         $users->method('findByUuid')->willReturn($owner);
         $this->setPrivate($this->controller, 'users', $users);
         $this->setPrivate($this->controller, 'stepUp', $this->stepUp());
@@ -166,17 +184,17 @@ final class PasskeyControllerTest extends TestCase
         try {
             $this->controller->registrationOptions(new PasskeyRegistrationOptionsRequest('not-the-password'));
             self::fail('Registration options must be refused for an unverified address.');
-        } catch (\App\Auth\Application\Exception\EmailUnverifiedException $exception) {
+        } catch (EmailUnverifiedException $exception) {
             self::assertSame(['reason' => 'email_unverified'], $exception->details);
         }
     }
 
     public function testRegistrationOptionsEncodeThePublicUserHandle(): void
     {
-        $owner = \App\Auth\Domain\Model\User::register(new \App\Shared\Domain\Model\Email('passkey@baander.app'), 'hash', 'Owner');
+        $owner = User::register(new Email('passkey@baander.app'), 'hash', 'Owner');
         $owner->verifyEmail();
         $this->security->method('getUser')->willReturn(new SecurityUser(id: $owner->getId()->toString(), email: $owner->getEmail(), password: 'hash'));
-        $users = $this->createStub(\App\Auth\Application\Port\UserPortInterface::class);
+        $users = $this->createStub(UserPortInterface::class);
         $users->method('findByUuid')->willReturn($owner);
         $this->passkeyRepository->method('forUser')->willReturn([]);
         $this->setPrivate($this->controller, 'users', $users);
@@ -192,55 +210,55 @@ final class PasskeyControllerTest extends TestCase
 
     public function testARegistrationCeremonyCompletesForTheUserTheChallengeWasIssuedTo(): void
     {
-        $owner = \App\Auth\Domain\Model\User::register(new \App\Shared\Domain\Model\Email('passkey@baander.app'), 'hash', 'Owner');
+        $owner = User::register(new Email('passkey@baander.app'), 'hash', 'Owner');
         $owner->verifyEmail();
-        $other = \App\Auth\Domain\Model\User::register(new \App\Shared\Domain\Model\Email('other@baander.app'), 'hash', 'Other');
+        $other = User::register(new Email('other@baander.app'), 'hash', 'Other');
         $signedIn = $owner;
         $this->security->method('getUser')->willReturnCallback(static function () use (&$signedIn): SecurityUser {
             return new SecurityUser(id: $signedIn->getId()->toString(), email: $signedIn->getEmail(), password: 'hash');
         });
-        $users = $this->createStub(\App\Auth\Application\Port\UserPortInterface::class);
-        $users->method('findByUuid')->willReturnCallback(static fn (Uuid $id): \App\Auth\Domain\Model\User => $id->equals($owner->getId()) ? $owner : $other);
+        $users = $this->createStub(UserPortInterface::class);
+        $users->method('findByUuid')->willReturnCallback(static fn (Uuid $id): User => $id->equals($owner->getId()) ? $owner : $other);
         $this->passkeyRepository->method('forUser')->willReturn([]);
         $registered = [];
-        $bus = $this->createStub(\Symfony\Component\Messenger\MessageBusInterface::class);
-        $bus->method('dispatch')->willReturnCallback(static function (object $message) use (&$registered): \Symfony\Component\Messenger\Envelope {
+        $bus = $this->createStub(MessageBusInterface::class);
+        $bus->method('dispatch')->willReturnCallback(static function (object $message) use (&$registered): Envelope {
             $registered[] = $message;
 
-            return new \Symfony\Component\Messenger\Envelope($message);
+            return new Envelope($message);
         });
         $this->setPrivate($this->controller, 'users', $users);
         $this->setPrivate($this->controller, 'passkeyService', $this->passkeyService());
         $this->setPrivate($this->controller, 'stepUp', $this->stepUp());
         $this->setPrivate($this->controller, 'commandBus', $bus);
-        $credential = new \App\Tests\Fixtures\Auth\WebAuthnTestCredential($owner->getPublicId()->toString(), 'baander.app');
+        $credential = new WebAuthnTestCredential($owner->getPublicId()->toString(), 'baander.app');
 
         $options = json_decode($this->controller->registrationOptions(new PasskeyRegistrationOptionsRequest('current-password'))->getContent(), true, 512, JSON_THROW_ON_ERROR)['data'];
         $attestation = self::asTheWebClientSendsIt($credential->attest($options['options']['challenge'], 'https://baander.app'));
         $signedIn = $other;
-        $borrowed = $this->controller->register(new \App\Auth\Interface\Request\Passkey\RegisterPasskeyRequest($options['challengeKey'], $attestation, 'Borrowed'), new \Symfony\Component\HttpFoundation\Request());
+        $borrowed = $this->controller->register(new RegisterPasskeyRequest($options['challengeKey'], $attestation, 'Borrowed'), new Request());
         $signedIn = $owner;
-        $completed = $this->controller->register(new \App\Auth\Interface\Request\Passkey\RegisterPasskeyRequest($options['challengeKey'], $attestation, 'Laptop'), new \Symfony\Component\HttpFoundation\Request());
+        $completed = $this->controller->register(new RegisterPasskeyRequest($options['challengeKey'], $attestation, 'Laptop'), new Request());
 
         self::assertSame(400, $borrowed->getStatusCode(), (string) $borrowed->getContent());
         self::assertSame('invalid_challenge', json_decode((string) $borrowed->getContent(), true, flags: JSON_THROW_ON_ERROR)['error']['details']['reason']);
         self::assertSame(201, $completed->getStatusCode(), (string) $completed->getContent());
         self::assertCount(1, $registered);
-        self::assertInstanceOf(\App\Auth\Application\Command\Passkey\RegisterPasskeyCommand::class, $registered[0]);
+        self::assertInstanceOf(RegisterPasskeyCommand::class, $registered[0]);
         self::assertSame($owner->getId()->toString(), $registered[0]->getUserId());
     }
 
-    private function passkeyService(): \App\Auth\Infrastructure\Security\Passkey\PasskeyService
+    private function passkeyService(): PasskeyService
     {
-        return new \App\Auth\Infrastructure\Security\Passkey\PasskeyService(
+        return new PasskeyService(
             publicOrigins: new PublicOrigins('https://baander.app'), appName: 'Baander', timeout: 60000,
             authenticatorAttachment: '', userVerification: 'preferred', residentKey: 'preferred', attestation: 'none',
-            counterChecker: $this->createStub(\Webauthn\Counter\CounterChecker::class),
-            eventDispatcher: $this->createStub(\Psr\EventDispatcher\EventDispatcherInterface::class),
-            logger: new \Psr\Log\NullLogger(),
-            challenges: new \App\Tests\Fixtures\Auth\InMemoryPasskeyChallengeStore(),
+            counterChecker: $this->createStub(CounterChecker::class),
+            eventDispatcher: $this->createStub(EventDispatcherInterface::class),
+            logger: new NullLogger(),
+            challenges: new InMemoryPasskeyChallengeStore(),
             supportedAlgorithmIds: [-7, -257],
-            jsonEncoder: new \Symfony\Component\Serializer\Encoder\JsonEncoder(),
+            jsonEncoder: new JsonEncoder(),
         );
     }
 
@@ -273,7 +291,7 @@ final class PasskeyControllerTest extends TestCase
             $this->createStub(StepUpAttemptThrottleInterface::class),
             $hasher,
             $this->createStub(TotpVerifierInterface::class),
-            new \Psr\Log\NullLogger(),
+            new NullLogger(),
         );
     }
 
@@ -281,7 +299,7 @@ final class PasskeyControllerTest extends TestCase
     {
         $state = new PasskeyState(
             id: $id,
-            publicId: new \App\Shared\Domain\Model\PublicId(),
+            publicId: new PublicId(),
             name: $name,
             credentialId: $credentialId,
             data: [],

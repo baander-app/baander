@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Baander\DevQualification\Fixtures\Worker;
 
 use Baander\Deployment\Database\Pooler;
+use Baander\DevQualification\Fixtures\Runtime;
 
 /**
  * The media-control drill's load proof: a full deployment through the pooler, with no
@@ -83,7 +84,7 @@ final class MediaLoad
                 self::SAMPLER_SECONDS,
             );
             $runtime->await(function () use ($runtime, $client, $docker, $checkpoint): bool {
-                \Baander\DevQualification\Fixtures\Runtime::require($runtime->alive($client), 'Load client exited during the governor warm-up');
+                Runtime::require($runtime->alive($client), 'Load client exited during the governor warm-up');
                 return $docker->run(['exec', $checkpoint->web, 'test', '-f', 'storage/two-command/load-warm'], check: false)->exitCode === 0;
             }, 1200, 1, 'The governor warm-up did not finish');
             // Two clients more than the application pool has server connections hold short

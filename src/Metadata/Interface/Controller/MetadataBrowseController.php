@@ -6,10 +6,11 @@ namespace App\Metadata\Interface\Controller;
 
 use App\Auth\Application\Port\AuthenticatedUserIdentityInterface;
 use App\Metadata\Application\DTO\MusicBrainz\MusicBrainzSlotWait;
-use App\Metadata\Infrastructure\Api\MusicBrainz\MusicBrainzAdapter;
 use App\Metadata\Infrastructure\Api\LastFm\LastFmAdapter;
+use App\Metadata\Infrastructure\Api\MusicBrainz\MusicBrainzAdapter;
 use App\Shared\Interface\Controller\ApiResponsesTrait;
 use App\Shared\Interface\Controller\TranslatorTrait;
+use App\Shared\Interface\DTO\ApiError;
 use OpenApi\Spec as OA;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpKernel\Exception\TooManyRequestsHttpException;
@@ -77,21 +78,21 @@ final class MetadataBrowseController
                 response: '404',
                 description: 'Artist not found',
                 content: new OA\MediaType\Json(
-                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                    schema: new OA\Schema(ref: ApiError::class),
                 ),
             ),
             new OA\Response(
                 response: '429',
                 description: 'The user already called MusicBrainz in the last ten seconds',
                 content: new OA\MediaType\Json(
-                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                    schema: new OA\Schema(ref: ApiError::class),
                 ),
             ),
             new OA\Response(
                 response: '503',
                 description: 'No turn under the shared MusicBrainz rate limit within ten seconds',
                 content: new OA\MediaType\Json(
-                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                    schema: new OA\Schema(ref: ApiError::class),
                 ),
             ),
         ],
@@ -144,21 +145,21 @@ final class MetadataBrowseController
                 response: '404',
                 description: 'Release group not found',
                 content: new OA\MediaType\Json(
-                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                    schema: new OA\Schema(ref: ApiError::class),
                 ),
             ),
             new OA\Response(
                 response: '429',
                 description: 'The user already called MusicBrainz in the last ten seconds',
                 content: new OA\MediaType\Json(
-                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                    schema: new OA\Schema(ref: ApiError::class),
                 ),
             ),
             new OA\Response(
                 response: '503',
                 description: 'No turn under the shared MusicBrainz rate limit within ten seconds',
                 content: new OA\MediaType\Json(
-                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                    schema: new OA\Schema(ref: ApiError::class),
                 ),
             ),
         ],

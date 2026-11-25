@@ -4,8 +4,10 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Recommendation\Application\QueryHandler;
 
+use App\Catalog\Application\Port\SongAvailabilityPortInterface;
 use App\Catalog\Domain\Model\Song;
 use App\Catalog\Domain\Repository\SongRepositoryInterface;
+use App\Recommendation\Application\Port\RecommendationPublicIdentityInterface;
 use App\Recommendation\Application\Query\GetPersonalizedRecommendationsQuery;
 use App\Recommendation\Application\QueryHandler\GetPersonalizedRecommendationsHandler;
 use App\Recommendation\Domain\Model\Recommendation;
@@ -51,9 +53,9 @@ final class GetPersonalizedRecommendationsHandlerTest extends TestCase
             ->method('findByUuids')
             ->willReturn([$targetId => $song]);
 
-        $identities = $this->createStub(\App\Recommendation\Application\Port\RecommendationPublicIdentityInterface::class);
+        $identities = $this->createStub(RecommendationPublicIdentityInterface::class);
         $identities->method('publicEntityId')->willReturn('publicReference1234567');
-        $availability = $this->createMock(\App\Catalog\Application\Port\SongAvailabilityPortInterface::class);
+        $availability = $this->createMock(SongAvailabilityPortInterface::class);
         $availability->expects(self::once())->method('forSongs')->with([$song])->willReturn([$targetId => false]);
         $handler = new GetPersonalizedRecommendationsHandler($recommendationRepository, $songRepository, $identities, $availability);
 
@@ -80,9 +82,9 @@ final class GetPersonalizedRecommendationsHandlerTest extends TestCase
         ]);
         $songs = $this->createStub(SongRepositoryInterface::class);
         $songs->method('findByUuids')->willReturn([$song->getId()->toString() => $song]);
-        $identities = $this->createStub(\App\Recommendation\Application\Port\RecommendationPublicIdentityInterface::class);
+        $identities = $this->createStub(RecommendationPublicIdentityInterface::class);
         $identities->method('publicEntityId')->willReturn(null);
-        $availability = $this->createMock(\App\Catalog\Application\Port\SongAvailabilityPortInterface::class);
+        $availability = $this->createMock(SongAvailabilityPortInterface::class);
         $availability->expects(self::never())->method('forSongs');
         $handler = new GetPersonalizedRecommendationsHandler($recommendations, $songs, $identities, $availability);
 

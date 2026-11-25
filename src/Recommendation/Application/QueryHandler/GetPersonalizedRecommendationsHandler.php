@@ -4,11 +4,14 @@ declare(strict_types=1);
 
 namespace App\Recommendation\Application\QueryHandler;
 
-use App\Catalog\Domain\Repository\SongRepositoryInterface;
 use App\Catalog\Application\Port\SongAvailabilityPortInterface;
+use App\Catalog\Domain\Model\Song;
+use App\Catalog\Domain\Repository\SongRepositoryInterface;
+use App\Recommendation\Application\Port\RecommendationPublicIdentityInterface;
 use App\Recommendation\Application\Query\GetPersonalizedRecommendationsQuery;
 use App\Recommendation\Domain\Repository\RecommendationRepositoryInterface;
 use App\Recommendation\Domain\ValueObject\RecommendationType;
+use App\Shared\Domain\Model\Uuid;
 use Symfony\Component\Messenger\Attribute\AsMessageHandler;
 
 /**
@@ -26,7 +29,7 @@ final class GetPersonalizedRecommendationsHandler
     public function __construct(
         private readonly RecommendationRepositoryInterface $recommendationRepository,
         private readonly SongRepositoryInterface $songRepository,
-        private readonly \App\Recommendation\Application\Port\RecommendationPublicIdentityInterface $identities,
+        private readonly RecommendationPublicIdentityInterface $identities,
         private readonly SongAvailabilityPortInterface $availability,
     ) {
     }
@@ -71,7 +74,7 @@ final class GetPersonalizedRecommendationsHandler
         // $topItems is keyed by target_id, so the keys are the ids themselves.
         $itemIds = array_keys($topItems);
         $songs = $this->songRepository->findByUuids(
-            array_map(fn ($id) => new \App\Shared\Domain\Model\Uuid($id), $itemIds)
+            array_map(fn ($id) => new Uuid($id), $itemIds)
         );
 
         $visibleSongs = [];
@@ -117,7 +120,7 @@ final class GetPersonalizedRecommendationsHandler
     }
 
     /** @return RecommendedSong */
-    private function songToArray(\App\Catalog\Domain\Model\Song $song, string $albumPublicId, bool $available): array
+    private function songToArray(Song $song, string $albumPublicId, bool $available): array
     {
         return [
             'public_id' => $song->getPublicId()->toString(),

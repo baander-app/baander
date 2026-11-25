@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Tests\Unit\Session\Domain\Model;
 
 use App\Session\Domain\Model\ListeningSession\ListeningSession;
+use App\Session\Domain\Model\ListeningSession\ListeningSessionState;
 use App\Session\Domain\Model\Playback\ObservedPlaybackState;
 use App\Session\Domain\Model\Playback\PlaybackMedia;
 use App\Session\Domain\Model\Playback\PlaybackState;
@@ -124,9 +125,9 @@ final class ListeningSessionTest extends TestCase
         $lastUsedAt = new DateTimeImmutable('2025-06-01 11:30:00');
         $queue = ['track-x', 'track-y'];
 
-        $state = new \App\Session\Domain\Model\ListeningSession\ListeningSessionState(
+        $state = new ListeningSessionState(
             id: $id,
-            publicId: $publicId = new \App\Shared\Domain\Model\PublicId(),
+            publicId: $publicId = new PublicId(),
             userId: $this->userId,
             activeDeviceId: $deviceId,
             queue: $queue,

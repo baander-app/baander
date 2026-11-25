@@ -5,12 +5,14 @@ declare(strict_types=1);
 namespace App\Tests\Unit\Playlist\Domain\Model;
 
 use App\Playlist\Domain\Model\Playlist;
+use App\Playlist\Domain\Model\PlaylistSong;
 use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
+use App\Shared\Infrastructure\Swoole\Async;
 use DateTimeImmutable;
 use InvalidArgumentException;
-use PHPUnit\Framework\TestCase;
 use PHPUnit\Framework\Attributes\DataProvider;
+use PHPUnit\Framework\TestCase;
 
 final class PlaylistTest extends TestCase
 {
@@ -375,7 +377,7 @@ final class PlaylistTest extends TestCase
             smartRules: [],
             createdAt: $createdAt,
             updatedAt: $updatedAt,
-            songs: [new \App\Playlist\Domain\Model\PlaylistSong($songId, 0)],
+            songs: [new PlaylistSong($songId, 0)],
         );
 
         $this->assertTrue($playlist->getId()->equals($id));
@@ -420,7 +422,7 @@ final class PlaylistTest extends TestCase
         $playlist->addSong(Uuid::v4(), 0);
         $afterAdd = $playlist->getUpdatedAt();
 
-        \App\Shared\Infrastructure\Swoole\Async::sleep(1);
+        Async::sleep(1);
 
         $playlist->clearSongs();
 

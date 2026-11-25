@@ -6,6 +6,8 @@ use App\Shared\Infrastructure\Http\NativeDnsResolver;
 use Baander\HttpClient\PublicDestinationPolicy;
 use Baander\HttpClient\PublicHttpClient;
 use Baander\HttpClient\UnsafeDestinationException;
+use Swoole\Coroutine;
+use Swoole\Runtime;
 use Symfony\Component\HttpClient\MockHttpClient;
 use Symfony\Component\HttpClient\Response\MockResponse;
 
@@ -27,17 +29,17 @@ function children(): array
 
 if (($_SERVER['argv'][1] ?? '') === 'orphan-parent') {
     Swoole\Coroutine\run(static function (): void {
-        Swoole\Coroutine::create(static function (): void {
+        Coroutine::create(static function (): void {
             $until = hrtime(true) / 1e9 + 1;
             do {
                 $pids = children();
                 if ($pids !== [] && str_contains((string) @file_get_contents('/proc/' . $pids[0] . '/cmdline'), '/bin/dns-lookup.php')) {
-                    Swoole\Coroutine::sleep(0.1);
+                    Coroutine::sleep(0.1);
                     fwrite(STDOUT, $pids[0] . "\n");
                     fflush(STDOUT);
                     posix_kill(getmypid(), SIGKILL);
                 }
-                Swoole\Coroutine::sleep(0.005);
+                Coroutine::sleep(0.005);
             } while (hrtime(true) / 1e9 < $until);
             exit(3);
         });
@@ -71,8 +73,8 @@ foreach (['private6.baander.app', 'many.baander.app', 'family-error.baander.app'
 }
 $stalls = [];
 foreach ([0, SWOOLE_HOOK_ALL] as $hooks) {
-    $original = Swoole\Runtime::getHookFlags();
-    Swoole\Runtime::setHookFlags($hooks);
+    $original = Runtime::getHookFlags();
+    Runtime::setHookFlags($hooks);
     try {
         Swoole\Coroutine\run(static function () use (&$stalls, $hooks): void {
             $ticks = 0;
@@ -80,10 +82,10 @@ foreach ([0, SWOOLE_HOOK_ALL] as $hooks) {
                 public bool $done = false;
             };
             $requests = 0;
-            Swoole\Coroutine::create(static function () use (&$ticks, $progress): void {
+            Coroutine::create(static function () use (&$ticks, $progress): void {
                 while (!$progress->done) {
                     ++$ticks;
-                    Swoole\Coroutine::sleep(0.005);
+                    Coroutine::sleep(0.005);
                 }
             });
             $transport = new MockHttpClient(static function () use (&$requests): MockResponse {
@@ -117,7 +119,7 @@ foreach ([0, SWOOLE_HOOK_ALL] as $hooks) {
             ];
         });
     } finally {
-        Swoole\Runtime::setHookFlags($original);
+        Runtime::setHookFlags($original);
     }
 }
 $process = proc_open(

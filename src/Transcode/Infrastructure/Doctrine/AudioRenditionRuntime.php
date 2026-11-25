@@ -12,6 +12,7 @@ use App\Transcode\Application\Port\AudioRenditionFormat;
 use App\Transcode\Application\Port\AudioRenditionRuntimePort;
 use App\Transcode\Domain\ValueObject\AacImplementation;
 use Doctrine\DBAL\Connection;
+use Doctrine\DBAL\ParameterType;
 
 final class AudioRenditionRuntime implements AudioRenditionRuntimePort
 {
@@ -41,7 +42,7 @@ SQL, [$input->key(), $input->trackKey, $input->sourceSignature, $input->sourcePa
     /** @return list<AudioRenditionRuntimeSnapshot> */
     public function pending(int $limit = 100): array
     {
-        $rows = $this->connection->fetchAllAssociative("SELECT *, (claim_token IS NOT NULL AND lease_expires_at > clock_timestamp()) AS ownership_live FROM audio_rendition_runtime WHERE (state = 'pending' AND (claim_token IS NULL OR lease_expires_at <= clock_timestamp())) OR (state = 'running' AND lease_expires_at <= clock_timestamp()) ORDER BY updated_at, rendition_key LIMIT ?", [max(1, min(1000, $limit))], [\Doctrine\DBAL\ParameterType::INTEGER]);
+        $rows = $this->connection->fetchAllAssociative("SELECT *, (claim_token IS NOT NULL AND lease_expires_at > clock_timestamp()) AS ownership_live FROM audio_rendition_runtime WHERE (state = 'pending' AND (claim_token IS NULL OR lease_expires_at <= clock_timestamp())) OR (state = 'running' AND lease_expires_at <= clock_timestamp()) ORDER BY updated_at, rendition_key LIMIT ?", [max(1, min(1000, $limit))], [ParameterType::INTEGER]);
         return array_map($this->snapshot(...), $rows);
     }
 

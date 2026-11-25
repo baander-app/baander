@@ -9,7 +9,9 @@ use App\Scheduler\Application\DTO\SchedulerOccurrenceDispatchClaim;
 use App\Scheduler\Domain\ValueObject\JobType;
 use App\Scheduler\Infrastructure\Doctrine\DoctrineSchedulerOccurrenceDispatchStore;
 use App\Scheduler\Infrastructure\Doctrine\DoctrineSchedulerOccurrenceStore;
+use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
+use App\Tests\Support\FinalSchemaBootstrap;
 use Doctrine\DBAL\Connection;
 use Doctrine\DBAL\DriverManager;
 use Doctrine\DBAL\Tools\DsnParser;
@@ -41,7 +43,7 @@ final class SchedulerOccurrenceDispatchStoreTest extends TestCase
         foreach ([$this->first, $this->second] as $connection) {
             $connection->executeStatement('SET search_path TO ' . $this->schema . ', public');
         }
-        \App\Tests\Support\FinalSchemaBootstrap::bootstrap($this->first);
+        FinalSchemaBootstrap::bootstrap($this->first);
         $this->first->executeStatement('DELETE FROM scheduled_jobs');
     }
 
@@ -212,7 +214,7 @@ final class SchedulerOccurrenceDispatchStoreTest extends TestCase
 
     private function seed(?\DateTimeImmutable $minute = null): Uuid
     {
-        $occurrence = new SchedulerOccurrence(Uuid::v7(), Uuid::v7(), $minute ?? new \DateTimeImmutable('2026-01-01 UTC'), JobType::Console, 'app:test', [], jobPublicId: new \App\Shared\Domain\Model\PublicId());
+        $occurrence = new SchedulerOccurrence(Uuid::v7(), Uuid::v7(), $minute ?? new \DateTimeImmutable('2026-01-01 UTC'), JobType::Console, 'app:test', [], jobPublicId: new PublicId());
         self::assertTrue((new DoctrineSchedulerOccurrenceStore($this->first))->record($occurrence));
         return $occurrence->id;
     }

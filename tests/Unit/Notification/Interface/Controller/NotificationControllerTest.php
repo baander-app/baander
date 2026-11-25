@@ -11,9 +11,11 @@ use App\Notification\Domain\ValueObject\NotificationCategory;
 use App\Notification\Interface\Controller\NotificationController;
 use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
+use App\Shared\Interface\Exception\InvalidQueryParameter;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Symfony\Bundle\SecurityBundle\Security;
+use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\Translation\Translator;
 
 final class NotificationControllerTest extends TestCase
@@ -132,7 +134,7 @@ final class NotificationControllerTest extends TestCase
         $repository->expects($this->once())->method('findByUserId')
             ->with($userId, null, null, 2, $anchor->toString(), 'desc', null)
             ->willReturn([$first, $second]);
-        $response = $this->controller($repository, $userId)->index(new \Symfony\Component\HttpFoundation\Request(['limit' => '1', 'cursor' => $anchor->toString()]));
+        $response = $this->controller($repository, $userId)->index(new Request(['limit' => '1', 'cursor' => $anchor->toString()]));
         $output = json_decode((string) $response->getContent(), true, flags: JSON_THROW_ON_ERROR);
 
         self::assertSame($first->getPublicId()->toString(), $output['nextCursor']);
@@ -145,9 +147,9 @@ final class NotificationControllerTest extends TestCase
     {
         $repository = $this->createMock(NotificationRepositoryInterface::class);
         $repository->expects($this->never())->method('findByUserId');
-        $this->expectException(\App\Shared\Interface\Exception\InvalidQueryParameter::class);
+        $this->expectException(InvalidQueryParameter::class);
 
-        $this->controller($repository, Uuid::generate())->index(new \Symfony\Component\HttpFoundation\Request(['cursor' => Uuid::generate()->toString()]));
+        $this->controller($repository, Uuid::generate())->index(new Request(['cursor' => Uuid::generate()->toString()]));
     }
 
     private function notification(Uuid $ownerId): Notification

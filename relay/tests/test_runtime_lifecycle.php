@@ -7,6 +7,7 @@ require __DIR__ . '/bootstrap.php';
 use Baander\RegistryTests\{Process, Runtime};
 use Swoole\Coroutine;
 use Swoole\Process as SwooleProcess;
+use Swoole\Timer;
 
 $case = $argv[1] ?? null;
 if ($case !== null) {
@@ -15,7 +16,7 @@ if ($case !== null) {
         $child = new Process([PHP_BINARY, '-r', 'usleep(30000000);']);
         $rootClosed = $descendantClosed = false;
         $lateClosed = $case !== 'failure-descendant';
-        $previousHooks = \Swoole\Runtime::getHookFlags();
+        $previousHooks = Swoole\Runtime::getHookFlags();
         try {
             try {
                 Runtime::runCoroutines(static function () use ($case, &$rootClosed, &$descendantClosed, &$lateClosed): void {
@@ -39,7 +40,7 @@ if ($case !== null) {
                     });
                     try {
                         if ($case === 'signal') {
-                            \Swoole\Timer::after(20, static function (): void {
+                            Timer::after(20, static function (): void {
                                 Runtime::requireThat(SwooleProcess::kill(getmypid(), 15), 'Cannot deliver lifecycle signal.');
                             });
                         }
@@ -53,10 +54,10 @@ if ($case !== null) {
                     }
                 }, $case === 'timeout' ? 0.03 : 2);
             } finally {
-                Runtime::requireThat(\Swoole\Runtime::getHookFlags() === $previousHooks, 'Coroutine scope changed caller hooks.');
+                Runtime::requireThat(Swoole\Runtime::getHookFlags() === $previousHooks, 'Coroutine scope changed caller hooks.');
                 Runtime::requireThat($rootClosed && $descendantClosed && $lateClosed, 'Coroutine scope skipped owned finally blocks.');
                 Runtime::requireThat(Coroutine::stats()['coroutine_num'] === 0, 'Coroutine scope retained descendants.');
-                Runtime::requireThat(\Swoole\Timer::stats()['num'] === 0, 'Coroutine scope retained timers.');
+                Runtime::requireThat(Timer::stats()['num'] === 0, 'Coroutine scope retained timers.');
             }
         } finally {
             $child->close(false);

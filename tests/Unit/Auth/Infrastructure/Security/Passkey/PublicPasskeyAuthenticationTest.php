@@ -21,6 +21,8 @@ use Psr\EventDispatcher\EventDispatcherInterface;
 use Psr\Log\NullLogger;
 use Symfony\Component\Serializer\Encoder\JsonEncoder;
 use Webauthn\Counter\CounterChecker;
+use Webauthn\Exception\AuthenticatorResponseVerificationException;
+use Webauthn\Exception\InvalidUserHandleException;
 
 final class PublicPasskeyAuthenticationTest extends TestCase
 {
@@ -80,9 +82,9 @@ final class PublicPasskeyAuthenticationTest extends TestCase
                 self::assertInstanceOf(\RuntimeException::class, $error);
                 self::assertSame('Credential owner does not match its registered user handle.', $error->getMessage());
             } elseif ($kind === 'foreign-assertion') {
-                self::assertInstanceOf(\Webauthn\Exception\InvalidUserHandleException::class, $error);
+                self::assertInstanceOf(InvalidUserHandleException::class, $error);
             } else {
-                self::assertInstanceOf(\Webauthn\Exception\AuthenticatorResponseVerificationException::class, $error);
+                self::assertInstanceOf(AuthenticatorResponseVerificationException::class, $error);
             }
             self::assertSame(0, $passkey->getCounter());
             return;

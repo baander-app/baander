@@ -4,18 +4,21 @@ declare(strict_types=1);
 
 namespace Baander\DevQualification\Tests;
 
-use Baander\Process\Execution\EngineExecutor;
-use Baander\Process\Execution\ExecutionContext;
-use Baander\Process\Execution\ProcessSpec;
-use Baander\Process\Execution\CompletionPolicy;
-use Baander\DevQualification\Fixtures\Runtime;
+use Baander\Containers\Docker\Client;
+use Baander\Containers\Docker\Target;
 use Baander\DevQualification\Fixtures\Failure;
+use Baander\DevQualification\Fixtures\Runtime;
 use Baander\DevQualification\Fixtures\Worker\Command;
 use Baander\DevQualification\Fixtures\Worker\ControlCapacity;
 use Baander\DevQualification\Fixtures\Worker\LegacySupervisor;
-use Baander\DevQualification\Fixtures\Worker\Production;
 use Baander\DevQualification\Fixtures\Worker\Measurements;
+use Baander\DevQualification\Fixtures\Worker\Production;
 use Baander\DevQualification\Fixtures\Worker\Reports;
+use Baander\Process\Execution\CompletionPolicy;
+use Baander\Process\Execution\EngineExecutor;
+use Baander\Process\Execution\ExecutionContext;
+use Baander\Process\Execution\ProcessSpec;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use RuntimeException;
 
@@ -33,7 +36,7 @@ final class WorkerDrillTest extends TestCase
     /** @param list<array{name:string}>|false $consumers
      * @param list<string> $missing
      */
-    #[\PHPUnit\Framework\Attributes\DataProvider('registeredConsumerSets')]
+    #[DataProvider('registeredConsumerSets')]
     public function testFixtureReadinessRequiresEveryConfiguredConsumer(array|false $consumers, array $missing): void
     {
         $runtime = new Runtime(dirname(__DIR__, 3), 5);
@@ -62,15 +65,15 @@ final class WorkerDrillTest extends TestCase
         yield 'truncated final record' => ['truncated', false];
     }
 
-    #[\PHPUnit\Framework\Attributes\DataProvider('finalProducerOutcomes')]
+    #[DataProvider('finalProducerOutcomes')]
     public function testFinalEvidenceWaitsForProducerAndRejectsFailedOrTruncatedOutput(string $mode, bool $success): void
     {
         $directory = sys_get_temp_dir() . '/baander-measurements-' . bin2hex(random_bytes(8));
         mkdir($directory, 0700);
         $runtime = new Runtime(dirname(__DIR__, 3), 5);
-        $docker = new \Baander\Containers\Docker\Client(
+        $docker = new Client(
             $runtime->executor,
-            new \Baander\Containers\Docker\Target('/usr/bin/docker', 'unix:///fixture.sock', 'fixture-daemon', null, null),
+            new Target('/usr/bin/docker', 'unix:///fixture.sock', 'fixture-daemon', null, null),
             [],
         );
         $measurements = new Measurements($runtime, $docker, $directory);

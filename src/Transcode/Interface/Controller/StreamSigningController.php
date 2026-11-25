@@ -7,16 +7,18 @@ namespace App\Transcode\Interface\Controller;
 use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
 use App\Shared\Interface\Controller\ApiResponsesTrait;
-use App\Transcode\Application\DTO\TranscodeRenditionSet;
+use App\Shared\Interface\DTO\ApiError;
 use App\Transcode\Application\DTO\RequestedQuality;
-use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
+use App\Transcode\Application\DTO\TranscodeRenditionSet;
 use App\Transcode\Application\Port\PlaybackPortInterface;
-use App\Transcode\Application\Port\TranscodePublicViewInterface;
 use App\Transcode\Application\Port\StreamAuthPortInterface;
+use App\Transcode\Application\Port\TranscodePublicViewInterface;
 use App\Transcode\Application\Port\TranscodeStreamingPortInterface;
 use OpenApi\Spec as OA;
+use Symfony\Component\HttpFoundation\Exception\JsonException;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
+use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 use Symfony\Component\Routing\Attribute\Route;
 use Symfony\Component\Security\Http\Attribute\IsGranted;
 
@@ -125,7 +127,7 @@ final class StreamSigningController
                 response: '409',
                 description: 'Playback cannot start: the video file no longer resolves inside one of its libraries, or the account already holds as many transcode sessions as the server allows and too few have been silent for two minutes to give way (`error.details.reason` is `transcode_session_limit` and `error.details.limit` the limit)',
                 content: new OA\MediaType\Json(
-                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                    schema: new OA\Schema(ref: ApiError::class),
                 ),
             ),
             new OA\Response(
@@ -155,7 +157,7 @@ final class StreamSigningController
                     ),
                 ],
                 content: new OA\MediaType\Json(
-                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                    schema: new OA\Schema(ref: ApiError::class),
                 ),
             ),
         ],
@@ -165,7 +167,7 @@ final class StreamSigningController
     {
         try {
             $data = $request->toArray();
-        } catch (\Symfony\Component\HttpFoundation\Exception\JsonException) {
+        } catch (JsonException) {
             return $this->errorResponse('Expected a JSON object.', 400);
         }
         $audioStreamIndex = $data['audioStreamIndex'] ?? null;

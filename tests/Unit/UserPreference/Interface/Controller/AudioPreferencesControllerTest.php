@@ -6,14 +6,15 @@ namespace App\Tests\Unit\UserPreference\Interface\Controller;
 
 use App\Auth\Infrastructure\Security\SecurityUser;
 use App\Shared\Domain\Model\Uuid;
+use App\UserPreference\Application\Exception\PreferenceVersionConflict;
 use App\UserPreference\Application\Port\AudioPreferencesPortInterface;
 use App\UserPreference\Interface\Controller\AudioPreferencesController;
+use App\UserPreference\Interface\Request\PreferenceRequestBody;
 use PHPUnit\Framework\MockObject\Stub;
 use PHPUnit\Framework\TestCase;
 use Symfony\Bundle\SecurityBundle\Security;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\Translation\Translator;
-use App\UserPreference\Interface\Request\PreferenceRequestBody;
 use Symfony\Component\Validator\ConstraintViolation;
 use Symfony\Component\Validator\ConstraintViolationList;
 use Symfony\Component\Validator\Validator\ValidatorInterface;
@@ -118,7 +119,7 @@ final class AudioPreferencesControllerTest extends TestCase
 
         $this->validator->method('validate')->willReturn(new ConstraintViolationList());
 
-        $this->port->method('saveForUser')->willThrowException(new \App\UserPreference\Application\Exception\PreferenceVersionConflict(5));
+        $this->port->method('saveForUser')->willThrowException(new PreferenceVersionConflict(5));
         $this->port->method('getVersion')->willReturn(5);
 
         $response = $this->controller->update($request);

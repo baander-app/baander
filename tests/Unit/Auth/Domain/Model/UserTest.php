@@ -7,8 +7,11 @@ namespace App\Tests\Unit\Auth\Domain\Model;
 use App\Auth\Domain\Model\User;
 use App\Auth\Domain\Model\UserState;
 use App\Shared\Domain\Model\Email;
+use App\Shared\Domain\Model\PublicId;
+use App\Shared\Domain\Model\Uuid;
 use DateTimeImmutable;
 use InvalidArgumentException;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
 final class UserTest extends TestCase
@@ -34,11 +37,11 @@ final class UserTest extends TestCase
 
     public function testReconstituteRestoresAllFields(): void
     {
-        $now = new \DateTimeImmutable();
-        $verifiedAt = new \DateTimeImmutable('+1 minute');
+        $now = new DateTimeImmutable();
+        $verifiedAt = new DateTimeImmutable('+1 minute');
         $user = User::reconstitute(new UserState(
-            id: \App\Shared\Domain\Model\Uuid::v4(),
-            publicId: \App\Shared\Domain\Model\PublicId::fromString('usr_abc123def456ghjkl'),
+            id: Uuid::v4(),
+            publicId: PublicId::fromString('usr_abc123def456ghjkl'),
             name: 'Bob',
             email: 'bob@baander.app',
             password: 'hashed',
@@ -56,14 +59,14 @@ final class UserTest extends TestCase
     public function testReconstituteWithNullEmailVerifiedAt(): void
     {
         $user = User::reconstitute(new UserState(
-            id: \App\Shared\Domain\Model\Uuid::v4(),
-            publicId: \App\Shared\Domain\Model\PublicId::fromString('usr_abc123def456ghjkl'),
+            id: Uuid::v4(),
+            publicId: PublicId::fromString('usr_abc123def456ghjkl'),
             name: 'Bob',
             email: 'bob@baander.app',
             password: 'hashed',
             totpSecretCiphertext: null,
-            createdAt: new \DateTimeImmutable(),
-            updatedAt: new \DateTimeImmutable(),
+            createdAt: new DateTimeImmutable(),
+            updatedAt: new DateTimeImmutable(),
             roles: ['ROLE_USER'],
         ));
 
@@ -159,7 +162,7 @@ final class UserTest extends TestCase
     }
 
     /** @param list<string> $roles */
-    #[\PHPUnit\Framework\Attributes\DataProvider('rejectedRoleSets')]
+    #[DataProvider('rejectedRoleSets')]
     public function testReplaceRolesRejectsAnEmptyOrUnknownRoleSetAndKeepsTheRoles(array $roles): void
     {
         $user = User::register(new Email('test@baander.app'), 'hashed-pw', 'Alice');
@@ -258,10 +261,10 @@ final class UserTest extends TestCase
     {
         $user = User::register(new Email('test@baander.app'), 'hashed-pw', 'Alice');
 
-        $this->assertInstanceOf(\App\Shared\Domain\Model\Uuid::class, $user->getId());
-        $this->assertInstanceOf(\App\Shared\Domain\Model\PublicId::class, $user->getPublicId());
-        $this->assertInstanceOf(\DateTimeImmutable::class, $user->getCreatedAt());
-        $this->assertInstanceOf(\DateTimeImmutable::class, $user->getUpdatedAt());
+        $this->assertInstanceOf(Uuid::class, $user->getId());
+        $this->assertInstanceOf(PublicId::class, $user->getPublicId());
+        $this->assertInstanceOf(DateTimeImmutable::class, $user->getCreatedAt());
+        $this->assertInstanceOf(DateTimeImmutable::class, $user->getUpdatedAt());
     }
 
     public function testRegisterAssignsUserRoleByDefault(): void

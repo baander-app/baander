@@ -6,9 +6,10 @@ namespace App\Tests\Functional\Catalog\Interface\Controller;
 
 use App\Catalog\Application\Port\DirectorCredit;
 use App\Catalog\Application\Port\DirectorPortInterface;
-use App\Library\Application\Port\LibraryReadScopeProviderInterface;
 use App\Catalog\Infrastructure\Doctrine\Entity\MovieEntity;
+use App\Library\Application\Port\LibraryReadScopeProviderInterface;
 use App\Library\Infrastructure\Doctrine\Entity\LibraryEntity;
+use App\Shared\Application\Port\TransactionPortInterface;
 use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\SearchOptions;
 use App\Shared\Domain\ValueObject\LibraryReadScope;
@@ -25,7 +26,7 @@ final class MovieDirectorControllerTest extends TestCase
         $this->entityManager->persist($movie);
         $this->entityManager->flush();
         $directors = static::getContainer()->get(DirectorPortInterface::class);
-        static::getContainer()->get(\App\Shared\Application\Port\TransactionPortInterface::class)->run(
+        static::getContainer()->get(TransactionPortInterface::class)->run(
             static fn(): bool => $directors->syncMovieDirectors($movie->getId(), [new DirectorCredit(2_000_000_061, 'Owned Director')]),
         );
         $director = $directors->searchVisible(SearchOptions::create(''), LibraryReadScope::unrestricted())->getItems()[0];

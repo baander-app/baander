@@ -4,11 +4,12 @@ declare(strict_types=1);
 
 namespace App\Catalog\Infrastructure;
 
-use App\Catalog\Application\Service\CoverImageDiscarder;
 use App\Catalog\Application\Port\AlbumPortInterface;
 use App\Catalog\Application\Port\ArtistIdentity;
 use App\Catalog\Application\Port\ArtistIdentityResolverInterface;
+use App\Catalog\Application\Service\CoverImageDiscarder;
 use App\Catalog\Domain\Model\Album;
+use App\Catalog\Domain\Model\Song;
 use App\Catalog\Domain\Repository\AlbumRepositoryInterface;
 use App\Catalog\Domain\ValueObject\ArtistRole;
 use App\Catalog\Domain\ValueObject\MusicbrainzId;
@@ -49,7 +50,7 @@ final class AlbumService implements AlbumPortInterface
         return $this->albumRepository->countVisible($scope);
     }
 
-    /** @return array{0: Album, 1: array<int, \App\Catalog\Domain\Model\Song>}|null */
+    /** @return array{0: Album, 1: array<int, Song>}|null */
     public function findVisibleWithSongs(Uuid $uuid, LibraryReadScope $scope): ?array
     {
         return $this->albumRepository->findVisibleWithSongs($uuid, $scope);

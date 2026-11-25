@@ -4,10 +4,11 @@ declare(strict_types=1);
 
 namespace Baander\DevEnvironment\Worker;
 
-use Baander\DevEnvironment\State\InstanceStateStore;
+use Baander\Deployment\Workers\StateStore;
 use Baander\DevEnvironment\Runtime\ComposeRuntime;
+use Baander\DevEnvironment\State\InstanceStateStore;
 
-final class InstanceWorkerStateStore implements \Baander\Deployment\Workers\StateStore
+final class InstanceWorkerStateStore implements StateStore
 {
     /** @param array<string,mixed> $instance */
     public function __construct(private readonly InstanceStateStore $store, private array $instance) {}

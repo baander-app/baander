@@ -4,11 +4,11 @@ declare(strict_types=1);
 
 namespace App\Tests\Integration\Library;
 
+use App\Library\Application\Exception\LibraryBusyException;
 use App\Library\Application\Exception\LibraryMediaDirectoryNotWritableException;
 use App\Library\Application\Exception\LibraryMediaFileOutsideRootException;
 use App\Library\Application\Exception\LibraryMediaFilesAllMissingException;
 use App\Library\Application\Exception\LibraryRootUnavailableException;
-use App\Library\Application\Exception\LibraryBusyException;
 use App\Library\Application\Message\DiscoveredFile;
 use App\Library\Application\MusicScanner;
 use App\Library\Application\Port\LibraryMediaFileClaim;
@@ -29,10 +29,13 @@ use App\Shared\Application\Exception\ConflictException;
 use App\Shared\Application\Exception\InvalidInputException;
 use App\Shared\Application\Exception\NotFoundException;
 use App\Shared\Application\Port\JobCancellationCheckpointInterface;
+use App\Shared\Application\Port\TransactionPortInterface;
 use App\Shared\Domain\Model\Uuid;
 use App\Shared\Domain\ValueObject\FilesystemType;
 use App\Tests\Integration\OwnershipPersistenceHarness;
+use Doctrine\DBAL\Connection;
 use LogicException;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
 use RuntimeException;
@@ -79,8 +82,8 @@ final class LibraryMediaFilesTest extends TestCase
                 {
                 }
             },
-            new class($this->manager->getConnection()) implements \App\Shared\Application\Port\TransactionPortInterface {
-                public function __construct(private readonly \Doctrine\DBAL\Connection $connection)
+            new class($this->manager->getConnection()) implements TransactionPortInterface {
+                public function __construct(private readonly Connection $connection)
                 {
                 }
 
@@ -303,7 +306,7 @@ final class LibraryMediaFilesTest extends TestCase
         self::assertSame([$first, $second], $this->indexedPaths($library));
     }
 
-    #[\PHPUnit\Framework\Attributes\DataProvider('publicationIndexStates')]
+    #[DataProvider('publicationIndexStates')]
     public function testAnImmediateMissingObservationSurvivesDirectoryPublication(bool $previouslyIndexed): void
     {
         [$library, $first] = $this->scannedAlbum();

@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Shared\Infrastructure\Worker;
 
+use App\Shared\Application\DTO\DeploymentProfile;
 use App\Shared\Application\DTO\DeploymentUnit;
+use App\Shared\Application\DTO\WorkerAutoscalingProfile;
 use App\Shared\Infrastructure\Worker\DeploymentOperatorManifest;
 use App\Shared\Infrastructure\Worker\DeploymentRuntimeEnvironment;
 use PHPUnit\Framework\TestCase;
@@ -48,7 +50,7 @@ final class DeploymentPairManifestTest extends TestCase
         $fields = self::fields();
         $fields['autoscaling']['maximumConcurrency'] = 4;
         self::assertSame(4, DeploymentOperatorManifest::fromJson(json_encode($fields, JSON_THROW_ON_ERROR), '/var/www/html')->autoscaling->maximumConcurrency);
-        $fields['deploymentProfile'] = json_decode((new \App\Shared\Application\DTO\DeploymentProfile('remux', 2, 4, 1, sharedCopySlots: 2))->toJson(), true, flags: JSON_THROW_ON_ERROR);
+        $fields['deploymentProfile'] = json_decode((new DeploymentProfile('remux', 2, 4, 1, sharedCopySlots: 2))->toJson(), true, flags: JSON_THROW_ON_ERROR);
         $this->expectException(\InvalidArgumentException::class);
         DeploymentOperatorManifest::fromJson(json_encode($fields, JSON_THROW_ON_ERROR), '/var/www/html');
     }
@@ -57,7 +59,7 @@ final class DeploymentPairManifestTest extends TestCase
     {
         $fields = self::fields();
         $transcode = DeploymentOperatorManifest::fromJson(json_encode($fields, JSON_THROW_ON_ERROR), '/var/www/html');
-        $profile = new \App\Shared\Application\DTO\DeploymentProfile('remux', 2, 4, 1, sharedCopySlots: 2);
+        $profile = new DeploymentProfile('remux', 2, 4, 1, sharedCopySlots: 2);
         $fields['deploymentProfile'] = json_decode($profile->toJson(), true, flags: JSON_THROW_ON_ERROR);
         $remux = DeploymentOperatorManifest::fromJson(json_encode($fields, JSON_THROW_ON_ERROR), '/var/www/html');
         $environment = new DeploymentRuntimeEnvironment();
@@ -70,11 +72,11 @@ final class DeploymentPairManifestTest extends TestCase
     public function testWebEnvironmentWithAnotherCapabilityIsRefused(): void
     {
         $fields = self::fields();
-        $fields['deploymentProfile'] = json_decode((new \App\Shared\Application\DTO\DeploymentProfile('remux', 2, 4, 1, sharedCopySlots: 2))->toJson(), true, flags: JSON_THROW_ON_ERROR);
+        $fields['deploymentProfile'] = json_decode((new DeploymentProfile('remux', 2, 4, 1, sharedCopySlots: 2))->toJson(), true, flags: JSON_THROW_ON_ERROR);
         $remux = DeploymentOperatorManifest::fromJson(json_encode($fields, JSON_THROW_ON_ERROR), '/var/www/html');
         $this->expectException(\InvalidArgumentException::class);
         $this->expectExceptionMessage('profiles must agree');
-        $remux->recipe(DeploymentUnit::Control, new DeploymentRuntimeEnvironment(['BAANDER_DEPLOYMENT_PROFILE' => (new \App\Shared\Application\DTO\DeploymentProfile())->toJson()]));
+        $remux->recipe(DeploymentUnit::Control, new DeploymentRuntimeEnvironment(['BAANDER_DEPLOYMENT_PROFILE' => (new DeploymentProfile())->toJson()]));
     }
 
     public function testPreviousManifestVersionIsRejected(): void
@@ -93,8 +95,8 @@ final class DeploymentPairManifestTest extends TestCase
             'version' => 9, 'sourceMountPolicy' => 'production', 'namespace' => 'operator.baander.app', 'bootId' => str_repeat('a', 32),
             'daemonId' => 'docker-daemon', 'imageId' => 'sha256:' . str_repeat('b', 64), 'network' => 'none',
             'dockerBinary' => '/usr/bin/docker', 'dockerEndpoint' => 'unix:///var/run/docker.sock',
-            'deploymentProfile' => json_decode((new \App\Shared\Application\DTO\DeploymentProfile())->toJson(), true, flags: JSON_THROW_ON_ERROR),
-            'autoscaling' => json_decode((new \App\Shared\Application\DTO\WorkerAutoscalingProfile())->toJson(), true, flags: JSON_THROW_ON_ERROR),
+            'deploymentProfile' => json_decode((new DeploymentProfile())->toJson(), true, flags: JSON_THROW_ON_ERROR),
+            'autoscaling' => json_decode((new WorkerAutoscalingProfile())->toJson(), true, flags: JSON_THROW_ON_ERROR),
             'deviceGroup' => null, 'scheduledConsoleMiB' => 320, 'ipcVolume' => 'worker-ipc',
             'mediaMounts' => [
                 ['volume' => 'library', 'target' => '/media/library', 'readOnly' => true, 'role' => 'source'],

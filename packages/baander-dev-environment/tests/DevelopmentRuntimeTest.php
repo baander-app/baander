@@ -4,13 +4,16 @@ declare(strict_types=1);
 
 namespace Baander\DevEnvironment\Tests;
 
-use Baander\DevEnvironment\Tests\Support\RuntimeRecordingRunner;
-use Baander\Tests\Tooling\Support\DevelopmentCommandExecutor;
 use Baander\Configuration\ApplicationLayout;
+use Baander\Containers\Resources\ResourceLedger;
+use Baander\DevEnvironment\Host\ProcessEnvironment;
 use Baander\DevEnvironment\Runtime\ComposeRuntime;
 use Baander\DevEnvironment\State\InstanceStateStore;
+use Baander\DevEnvironment\Tests\Support\RuntimeRecordingRunner;
 use Baander\DevEnvironment\WorkflowError;
+use Baander\Filesystem\AtomicFile;
 use Baander\Process\Execution\ProcessResult;
+use Baander\Tests\Tooling\Support\DevelopmentCommandExecutor;
 use PHPUnit\Framework\TestCase;
 
 final class DevelopmentRuntimeTest extends TestCase
@@ -240,13 +243,13 @@ final class DevelopmentRuntimeTest extends TestCase
             self::assertStringContainsString('removal denied', $error->getMessage());
             $receipts = glob($this->store->directory('persistent') . '/runtime-seed-public.json');
             self::assertCount(1, $receipts);
-            $receipt = \Baander\Filesystem\AtomicFile::readJson($receipts[0]);
+            $receipt = AtomicFile::readJson($receipts[0]);
             self::assertEquals($this->instance['docker'], $receipt['target']);
             $resource = $receipt['resources'][0];
             self::assertSame(hash('sha256', $resource['name']), $resource['id']);
             unlink($this->root . '/runtime-fail-start');
             unlink($this->root . '/runtime-fail-remove');
-            $report = \Baander\Containers\Resources\ResourceLedger::recover($receipts[0], \Baander\DevEnvironment\Host\ProcessEnvironment::clean(), 10);
+            $report = ResourceLedger::recover($receipts[0], ProcessEnvironment::clean(), 10);
             self::assertTrue($report->successful(), $report->message());
             self::assertFileDoesNotExist($receipts[0]);
             self::assertSame([], glob($this->root . '/runtime-resource-*.json'));

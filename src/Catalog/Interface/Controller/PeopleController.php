@@ -14,8 +14,10 @@ use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\SearchOptions;
 use App\Shared\Domain\Model\SearchResult;
 use App\Shared\Interface\Controller\ApiResponsesTrait;
+use App\Shared\Interface\DTO\ApiError;
 use App\Shared\Interface\DTO\PaginatedResponse;
 use App\Shared\Interface\Request\QueryParameters;
+use App\Shared\Interface\Resource\AbstractResource;
 use OpenApi\Spec as OA;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
@@ -84,7 +86,7 @@ final readonly class PeopleController
                 response: '400',
                 description: 'Invalid page or limit',
                 content: new OA\MediaType\Json(
-                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                    schema: new OA\Schema(ref: ApiError::class),
                 ),
             ),
         ],
@@ -196,7 +198,7 @@ final readonly class PeopleController
                 response: '400',
                 description: 'Invalid page or limit',
                 content: new OA\MediaType\Json(
-                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                    schema: new OA\Schema(ref: ApiError::class),
                 ),
             ),
         ],
@@ -272,7 +274,7 @@ final readonly class PeopleController
                 response: '400',
                 description: 'Invalid page or limit',
                 content: new OA\MediaType\Json(
-                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                    schema: new OA\Schema(ref: ApiError::class),
                 ),
             ),
         ],
@@ -322,7 +324,7 @@ final readonly class PeopleController
         return $person === null ? $this->notFound() : $this->successResponse(PersonResource::from($person));
     }
 
-    /** @param class-string<\App\Shared\Interface\Resource\AbstractResource> $resource */
+    /** @param class-string<AbstractResource> $resource */
     private function page(Request $request, SearchResult $result, string $resource = PersonResource::class): JsonResponse
     {
         $pagination = QueryParameters::page($request->query);

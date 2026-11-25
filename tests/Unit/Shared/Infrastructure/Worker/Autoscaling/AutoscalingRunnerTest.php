@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Shared\Infrastructure\Worker\Autoscaling;
 
+use App\Shared\Application\DTO\DeploymentProfile;
 use App\Shared\Application\DTO\WorkerAutoscalingProfile;
 use App\Shared\Infrastructure\Worker\Autoscaling\AdmissionLedger;
 use App\Shared\Infrastructure\Worker\Autoscaling\AutoscalingPolicy;
@@ -12,6 +13,7 @@ use App\Shared\Infrastructure\Worker\Autoscaling\QueueObservation;
 use App\Shared\Infrastructure\Worker\Autoscaling\RedisQueueSampler;
 use App\Shared\Infrastructure\Worker\Autoscaling\ResourceChannel;
 use App\Shared\Infrastructure\Worker\Autoscaling\ResourceObservation;
+use App\Shared\Infrastructure\Worker\Autoscaling\ScalingDecision;
 use App\Shared\Infrastructure\Worker\DeploymentLease;
 use App\Shared\Infrastructure\Worker\WorkerLaunchIdentity;
 use App\Shared\Infrastructure\Worker\WorkerPeerHandshake;
@@ -34,7 +36,7 @@ final class AutoscalingRunnerTest extends TestCase
         $this->heartbeat(10);
         $lease = new DeploymentLease('worker.baander.app', $this->boot, 4);
         $this->profile = new WorkerAutoscalingProfile(maximumConcurrency: 2);
-        $this->ledger = new AdmissionLedger($this->directory, $lease, $this->profile, new \App\Shared\Application\DTO\DeploymentProfile());
+        $this->ledger = new AdmissionLedger($this->directory, $lease, $this->profile, new DeploymentProfile());
         $this->ledger->initialize(10);
         $this->channel = new ResourceChannel($this->directory, $lease);
         $this->policy = new AutoscalingPolicy($this->profile);
@@ -127,7 +129,7 @@ final class AutoscalingRunnerTest extends TestCase
         }
     }
 
-    private function tick(float $now): \App\Shared\Infrastructure\Worker\Autoscaling\ScalingDecision
+    private function tick(float $now): ScalingDecision
     {
         $decision = $this->tryTick($now);
         self::assertNotNull($decision);
@@ -135,7 +137,7 @@ final class AutoscalingRunnerTest extends TestCase
         return $decision;
     }
 
-    private function tryTick(float $now): ?\App\Shared\Infrastructure\Worker\Autoscaling\ScalingDecision
+    private function tryTick(float $now): ?ScalingDecision
     {
         return $this->runner->tick($this->ledger, $this->policy, $this->channel, $this->profile,
             new QueueObservation('known', $now, 0, 0, 0, 0), $now);
@@ -144,7 +146,7 @@ final class AutoscalingRunnerTest extends TestCase
     private function heartbeat(float $now): void
     {
         foreach (['control', 'execution'] as $unit) {
-            (new WorkerPeerHandshake($this->directory, 'worker.baander.app', $this->boot, $unit, $now, new \App\Shared\Application\DTO\DeploymentProfile()))->publish(4, true, false, $now);
+            (new WorkerPeerHandshake($this->directory, 'worker.baander.app', $this->boot, $unit, $now, new DeploymentProfile()))->publish(4, true, false, $now);
         }
     }
 }

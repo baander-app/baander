@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Shared\Infrastructure\Worker\Autoscaling;
 
+use App\Shared\Application\DTO\DeploymentProfile;
 use App\Shared\Application\DTO\WorkerAutoscalingProfile;
 use App\Shared\Infrastructure\Worker\Autoscaling\AdmissionLedger;
 use App\Shared\Infrastructure\Worker\Autoscaling\AdmissionLockContended;
@@ -23,7 +24,7 @@ final class AdmissionLedgerTest extends TestCase
         $this->directory = sys_get_temp_dir() . '/baander-admission-' . bin2hex(random_bytes(8));
         $this->boot = str_repeat('a', 32);
         $this->heartbeat(10);
-        $this->ledger = new AdmissionLedger($this->directory, new DeploymentLease('worker.baander.app', $this->boot, 4), new WorkerAutoscalingProfile(maximumConcurrency: 4), new \App\Shared\Application\DTO\DeploymentProfile());
+        $this->ledger = new AdmissionLedger($this->directory, new DeploymentLease('worker.baander.app', $this->boot, 4), new WorkerAutoscalingProfile(maximumConcurrency: 4), new DeploymentProfile());
         $this->ledger->initialize(10);
         $this->ledger->publishDecision(4, 'demand', [], 10);
     }
@@ -40,7 +41,7 @@ final class AdmissionLedgerTest extends TestCase
     public function testForeignDeploymentProfileHeartbeatCannotGrantAdmission(): void
     {
         (new WorkerPeerHandshake($this->directory, 'worker.baander.app', $this->boot, 'execution', 0,
-            new \App\Shared\Application\DTO\DeploymentProfile('remux', 2, 4, 1, sharedCopySlots: 2)))->publish(4, true, false, 10);
+            new DeploymentProfile('remux', 2, 4, 1, sharedCopySlots: 2)))->publish(4, true, false, 10);
         $this->expectExceptionMessage('Foreign admission peer heartbeat');
         $this->ledger->acquire($this->identity(), 1, $this->request(), 10);
     }
@@ -48,7 +49,7 @@ final class AdmissionLedgerTest extends TestCase
     public function testRemuxProfileGrantsItsConfiguredOrdinarySlot(): void
     {
         $directory = $this->directory . '/remux';
-        $profile = new \App\Shared\Application\DTO\DeploymentProfile('remux', 2, 4, 1, sharedCopySlots: 2);
+        $profile = new DeploymentProfile('remux', 2, 4, 1, sharedCopySlots: 2);
         foreach (['control', 'execution'] as $unit) {
             (new WorkerPeerHandshake($directory, 'worker.baander.app', $this->boot, $unit, 0, $profile))->publish(4, true, false, 10);
         }
@@ -69,7 +70,7 @@ final class AdmissionLedgerTest extends TestCase
     public function testDeploymentProfileIsPartOfTheLedgerFingerprint(): void
     {
         $foreign = new AdmissionLedger($this->directory, new DeploymentLease('worker.baander.app', $this->boot, 4),
-            new WorkerAutoscalingProfile(maximumConcurrency: 4), new \App\Shared\Application\DTO\DeploymentProfile('remux', 2, 4, 1, sharedCopySlots: 2));
+            new WorkerAutoscalingProfile(maximumConcurrency: 4), new DeploymentProfile('remux', 2, 4, 1, sharedCopySlots: 2));
         $this->expectException(\RuntimeException::class);
         $foreign->snapshot(10);
     }
@@ -187,7 +188,7 @@ final class AdmissionLedgerTest extends TestCase
 
     public function testForeignLeaseCannotReadState(): void
     {
-        $foreign = new AdmissionLedger($this->directory, new DeploymentLease('worker.baander.app', $this->boot, 5), new WorkerAutoscalingProfile(maximumConcurrency: 4), new \App\Shared\Application\DTO\DeploymentProfile());
+        $foreign = new AdmissionLedger($this->directory, new DeploymentLease('worker.baander.app', $this->boot, 5), new WorkerAutoscalingProfile(maximumConcurrency: 4), new DeploymentProfile());
         $this->expectException(\RuntimeException::class);
         $foreign->snapshot(10);
     }
@@ -286,7 +287,7 @@ final class AdmissionLedgerTest extends TestCase
     private function heartbeat(float $now): void
     {
         foreach (['control', 'execution'] as $unit) {
-            (new WorkerPeerHandshake($this->directory, 'worker.baander.app', $this->boot, $unit, 0, new \App\Shared\Application\DTO\DeploymentProfile()))->publish(4, true, false, $now);
+            (new WorkerPeerHandshake($this->directory, 'worker.baander.app', $this->boot, $unit, 0, new DeploymentProfile()))->publish(4, true, false, $now);
         }
     }
 }

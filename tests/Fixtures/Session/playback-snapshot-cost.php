@@ -38,6 +38,7 @@ use Doctrine\DBAL\DriverManager;
 use Doctrine\DBAL\Logging\Middleware;
 use Doctrine\DBAL\Tools\DsnParser;
 use Doctrine\ORM\EntityManager;
+use Pdo\Pgsql;
 use Psr\Log\AbstractLogger;
 
 require_once __DIR__ . '/playback-concurrent-transfer.php';
@@ -77,7 +78,7 @@ final class PlaybackCostFixture
             throw new \LogicException('Requires disposable PostgreSQL.');
         }
         $params = new DsnParser(['postgresql' => 'pdo_pgsql'])->parse($url);
-        $params['driverOptions'] = [\Pdo\Pgsql::ATTR_DISABLE_PREPARES => true] + ($params['driverOptions'] ?? []);
+        $params['driverOptions'] = [Pgsql::ATTR_DISABLE_PREPARES => true] + ($params['driverOptions'] ?? []);
         $configuration = new Configuration()->setMiddlewares([new BaanderDriverMiddleware(), new Middleware($log)]);
         $connection = DriverManager::getConnection($params, $configuration);
         $connection->executeStatement('SET search_path TO ' . $connection->quoteIdentifier($schema) . ', public');

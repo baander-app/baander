@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Transcode\Infrastructure\Worker;
 
+use App\Shared\Application\DTO\DeploymentProfile;
+use App\Shared\Infrastructure\Worker\NativeExecutionException;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
@@ -109,7 +111,7 @@ PHP);
     #[DataProvider('launchFenceClients')]
     public function testLaunchFenceAdmitsOnlyTheProfilesSlotClients(string $kind, string $clientId, bool $admitted): void
     {
-        $profile = new \App\Shared\Application\DTO\DeploymentProfile(videoEncoderSlots: 8, audioEncoderSlots: 1);
+        $profile = new DeploymentProfile(videoEncoderSlots: 8, audioEncoderSlots: 1);
         $environment = [
             'BAANDER_DEPLOYMENT_PROFILE' => $profile->toJson(),
             'BAANDER_WORKER_NAMESPACE' => 'test.baander.app',
@@ -134,7 +136,7 @@ PHP);
         self::assertSame(1, proc_close($process));
         $report = json_decode($diagnostic, true, flags: JSON_THROW_ON_ERROR);
         // An admitted client passes the fence and fails only at the absent native socket.
-        self::assertSame($admitted ? \App\Shared\Infrastructure\Worker\NativeExecutionException::class : \RuntimeException::class, $report['exceptionClass']);
+        self::assertSame($admitted ? NativeExecutionException::class : \RuntimeException::class, $report['exceptionClass']);
     }
 
     /** @return iterable<string, array{string, string, bool}> */

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Baander\DevQualification\Fixtures\Worker;
 
+use Baander\Filesystem\AtomicFile;
 use JsonException;
 use RuntimeException;
 
@@ -157,7 +158,7 @@ final class Reports
     /** @param array<mixed> $report */
     public static function publish(string $path, array $report): void
     {
-        \Baander\Filesystem\AtomicFile::writeJson($path, $report);
+        AtomicFile::writeJson($path, $report);
     }
 
     public static function truth(mixed $value): bool

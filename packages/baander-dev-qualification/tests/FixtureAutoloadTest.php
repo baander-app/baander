@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Baander\DevQualification\Tests;
 
+use Baander\DevQualification\Fixtures\Worker\OperatorProvisioning;
 use Baander\Process\Execution\CompletionPolicy;
 use Baander\Process\Execution\EngineExecutor;
 use Baander\Process\Execution\ExecutionContext;
@@ -48,7 +49,7 @@ PHP;
             $executor->run(new ProcessSpec(['composer', 'dump-autoload', '--no-dev', '--optimize', '--no-interaction', '--no-scripts', '--no-plugins']));
             $before = $executor->run(new ProcessSpec([PHP_BINARY, '-r', $probe, $directory]));
             self::assertSame(['workload' => false, 'codec' => false, 'handler' => false, 'phpunit' => false], json_decode($before->stdout, true, flags: JSON_THROW_ON_ERROR));
-            $dockerfile = new \ReflectionClass(\Baander\DevQualification\Fixtures\Worker\OperatorProvisioning::class)->getConstant('FIXTURE_DOCKERFILE');
+            $dockerfile = new \ReflectionClass(OperatorProvisioning::class)->getConstant('FIXTURE_DOCKERFILE');
             $command = $dockerfile
                 |> (static fn(string $source): array => explode("\n", $source))
                 |> (static fn(array $lines): ?string => array_find($lines, static fn(string $line): bool => str_starts_with($line, 'RUN composer dump-autoload ')));

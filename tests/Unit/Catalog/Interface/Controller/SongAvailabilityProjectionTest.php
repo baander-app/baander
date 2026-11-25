@@ -19,6 +19,7 @@ use App\Library\Application\Port\LibraryReadScopeProviderInterface;
 use App\Media\Application\Port\ImagePortInterface;
 use App\Shared\Application\Http\PublicOrigins;
 use App\Shared\Domain\Model\CursorPage;
+use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
 use App\Shared\Domain\ValueObject\LibraryReadScope;
 use App\Shared\Infrastructure\Pagination\CursorCodec;
@@ -98,7 +99,7 @@ final class SongAvailabilityProjectionTest extends TestCase
         $controller = new SongController($this->createStub(SongPortInterface::class), $scopes, new CursorCodec(new JsonEncoder()), $this->createStub(MessageBusInterface::class), $availability, $this->createStub(AuthorizationCheckerInterface::class));
         $controller->setTranslator(new Translator('en'));
 
-        self::assertSame(404, $controller->show((new \App\Shared\Domain\Model\PublicId())->toString())->getStatusCode());
+        self::assertSame(404, $controller->show((new PublicId())->toString())->getStatusCode());
     }
 
     private function song(Album $album, string $title): Song

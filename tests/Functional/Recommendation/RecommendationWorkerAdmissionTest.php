@@ -7,6 +7,7 @@ namespace App\Tests\Functional\Recommendation;
 use App\Recommendation\Application\Command\ExecuteRecommendationJobCommand;
 use App\Recommendation\Application\DTO\RecommendationGenerationResult;
 use App\Recommendation\Application\Port\RecommendationJobPortInterface;
+use App\Recommendation\Domain\Model\RecommendationJob;
 use App\Tests\Functional\TestCase;
 use Symfony\Component\Messenger\Envelope;
 use Symfony\Component\Messenger\MessageBusInterface;
@@ -16,7 +17,7 @@ use Symfony\Component\Messenger\Transport\InMemory\InMemoryTransport;
 final class RecommendationWorkerAdmissionTest extends TestCase
 {
     /** @phpstan-impure */
-    private function jobStatus(\App\Recommendation\Domain\Model\RecommendationJob $job): string
+    private function jobStatus(RecommendationJob $job): string
     {
         return $job->getStatus()->value;
     }

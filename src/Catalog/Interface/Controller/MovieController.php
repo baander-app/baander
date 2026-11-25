@@ -7,18 +7,20 @@ namespace App\Catalog\Interface\Controller;
 use App\Catalog\Application\Command\Movie\DeleteMovieCommand;
 use App\Catalog\Application\Command\Movie\UpdateMovieCommand;
 use App\Catalog\Application\Port\MoviePortInterface;
-use App\Library\Application\Port\LibraryReadScopeProviderInterface;
 use App\Catalog\Application\Port\VideoPortInterface;
 use App\Catalog\Interface\Request\UpdateMovieRequest;
 use App\Catalog\Interface\Resource\CatalogDeletionResource;
 use App\Catalog\Interface\Resource\MovieResource;
+use App\Library\Application\Port\LibraryReadScopeProviderInterface;
 use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\SearchOptions;
 use App\Shared\Domain\Model\Uuid;
 use App\Shared\Interface\Attribute\CliCounterpart;
 use App\Shared\Interface\Controller\ApiResponsesTrait;
 use App\Shared\Interface\Controller\DispatchesMessagesTrait;
+use App\Shared\Interface\DTO\ApiError;
 use App\Shared\Interface\DTO\PaginatedResponse;
+use App\Shared\Interface\DTO\ValidationError;
 use App\Shared\Interface\Request\QueryParameters;
 use OpenApi\Spec as OA;
 use OpenApi\Spec\Parameter;
@@ -28,13 +30,14 @@ use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpKernel\Attribute\MapRequestPayload;
 use Symfony\Component\Messenger\MessageBusInterface;
 use Symfony\Component\Routing\Attribute\Route;
+use Symfony\Component\Security\Http\Attribute\IsGranted;
 
 #[OA\Tag(
     name: 'Catalog',
     description: 'Album, artist, song, movie, and genre management endpoints',
 )]
 #[Route('/api/movies', name: 'movie_')]
-#[\Symfony\Component\Security\Http\Attribute\IsGranted('ROLE_ADMIN', methods: ['POST', 'PUT', 'PATCH', 'DELETE'])]
+#[IsGranted('ROLE_ADMIN', methods: ['POST', 'PUT', 'PATCH', 'DELETE'])]
 final class MovieController
 {
     use ApiResponsesTrait;
@@ -57,14 +60,14 @@ final class MovieController
                 response: '200',
                 description: 'Paginated list of movies',
                 content: new OA\MediaType\Json(
-                    schema: new OA\Schema(ref: PaginatedResponse::class),
+                    schema: new ParameterSchema(ref: PaginatedResponse::class),
                 ),
             ),
             new OA\Response(
                 response: '400',
                 description: 'Invalid page or limit',
                 content: new OA\MediaType\Json(
-                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                    schema: new ParameterSchema(ref: ApiError::class),
                 ),
             ),
         ],
@@ -120,10 +123,10 @@ final class MovieController
                 response: '200',
                 description: 'Movie details',
                 content: new OA\MediaType\Json(
-                    schema: new OA\Schema(
+                    schema: new ParameterSchema(
                         type: 'object',
                         properties: [
-                            'data' => new OA\Schema(ref: MovieResource::class),
+                            'data' => new ParameterSchema(ref: MovieResource::class),
                         ],
                     ),
                 ),
@@ -132,7 +135,7 @@ final class MovieController
                 response: '404',
                 description: 'Not found',
                 content: new OA\MediaType\Json(
-                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                    schema: new ParameterSchema(ref: ApiError::class),
                 ),
             ),
         ],
@@ -198,12 +201,12 @@ final class MovieController
         summary: 'Update a movie',
         requestBody: new OA\RequestBody(
             content: new OA\MediaType\Json(
-                schema: new OA\Schema(
+                schema: new ParameterSchema(
                     type: 'object',
                     properties: [
-                        'title' => new OA\Schema(type: 'string', nullable: true),
-                        'year' => new OA\Schema(type: 'integer', nullable: true),
-                        'summary' => new OA\Schema(type: 'string', nullable: true),
+                        'title' => new ParameterSchema(type: 'string', nullable: true),
+                        'year' => new ParameterSchema(type: 'integer', nullable: true),
+                        'summary' => new ParameterSchema(type: 'string', nullable: true),
                     ],
                 ),
             ),
@@ -213,10 +216,10 @@ final class MovieController
                 response: '200',
                 description: 'Movie updated',
                 content: new OA\MediaType\Json(
-                    schema: new OA\Schema(
+                    schema: new ParameterSchema(
                         type: 'object',
                         properties: [
-                            'data' => new OA\Schema(ref: MovieResource::class),
+                            'data' => new ParameterSchema(ref: MovieResource::class),
                         ],
                     ),
                 ),
@@ -225,14 +228,14 @@ final class MovieController
                 response: '404',
                 description: 'Not found',
                 content: new OA\MediaType\Json(
-                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                    schema: new ParameterSchema(ref: ApiError::class),
                 ),
             ),
             new OA\Response(
                 response: '422',
                 description: 'Validation error',
                 content: new OA\MediaType\Json(
-                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ValidationError::class),
+                    schema: new ParameterSchema(ref: ValidationError::class),
                 ),
             ),
         ],
@@ -274,10 +277,10 @@ final class MovieController
                 response: '200',
                 description: 'Deleted',
                 content: new OA\MediaType\Json(
-                    schema: new OA\Schema(
+                    schema: new ParameterSchema(
                         type: 'object',
                         properties: [
-                            'data' => new OA\Schema(ref: CatalogDeletionResource::class),
+                            'data' => new ParameterSchema(ref: CatalogDeletionResource::class),
                         ],
                     ),
                 ),
@@ -286,14 +289,14 @@ final class MovieController
                 response: '404',
                 description: 'Not found',
                 content: new OA\MediaType\Json(
-                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                    schema: new ParameterSchema(ref: ApiError::class),
                 ),
             ),
             new OA\Response(
                 response: '422',
                 description: 'Invalid public ID',
                 content: new OA\MediaType\Json(
-                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ValidationError::class),
+                    schema: new ParameterSchema(ref: ValidationError::class),
                 ),
             ),
         ],

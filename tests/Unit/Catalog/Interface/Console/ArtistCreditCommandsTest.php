@@ -10,9 +10,14 @@ use App\Catalog\Application\Command\Artist\RemoveArtistCreditCommand;
 use App\Catalog\Application\CommandHandler\Artist\AddArtistCreditHandler;
 use App\Catalog\Application\CommandHandler\Artist\ChangeArtistCreditRoleHandler;
 use App\Catalog\Application\CommandHandler\Artist\RemoveArtistCreditHandler;
+use App\Catalog\Application\Port\AlbumPortInterface;
 use App\Catalog\Application\Port\ArtistMergePortInterface;
 use App\Catalog\Application\Port\ArtistPortInterface;
+use App\Catalog\Application\Port\SongPortInterface;
+use App\Catalog\Domain\Model\Album;
+use App\Catalog\Domain\Model\AlbumState;
 use App\Catalog\Domain\Model\Artist;
+use App\Catalog\Domain\Model\Song;
 use App\Catalog\Interface\Console\ArtistAlbumAddCommand;
 use App\Catalog\Interface\Console\ArtistAlbumRemoveCommand;
 use App\Catalog\Interface\Console\ArtistAlbumRoleCommand;
@@ -23,6 +28,7 @@ use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
 use App\Shared\Interface\Console\AdminCommandSupport;
 use App\Tests\Fixtures\Catalog\PassThroughTransaction;
+use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Tester\CommandTester;
@@ -35,22 +41,22 @@ final class ArtistCreditCommandsTest extends TestCase
     private Artist $artist;
     private string $song;
     private Uuid $targetId;
-    private \App\Catalog\Application\Port\SongPortInterface $songs;
-    private \App\Catalog\Application\Port\AlbumPortInterface $albums;
+    private SongPortInterface $songs;
+    private AlbumPortInterface $albums;
 
     protected function setUp(): void
     {
         $this->artist = Artist::create('Nina Simone');
-        $album = \App\Catalog\Domain\Model\Album::create(new Uuid(), 'Album', 'album');
-        $song = \App\Catalog\Domain\Model\Song::create($album->getId(), 'Song', '/music/song.flac', 1, 'audio/flac');
+        $album = Album::create(new Uuid(), 'Album', 'album');
+        $song = Song::create($album->getId(), 'Song', '/music/song.flac', 1, 'audio/flac');
         $this->song = $song->getPublicId()->toString();
         $this->targetId = $song->getId();
-        $this->songs = $this->createStub(\App\Catalog\Application\Port\SongPortInterface::class);
+        $this->songs = $this->createStub(SongPortInterface::class);
         $this->songs->method('findByPublicId')->willReturn($song);
         $this->songs->method('findFreshByUuid')->willReturn($song);
-        $this->albums = $this->createStub(\App\Catalog\Application\Port\AlbumPortInterface::class);
+        $this->albums = $this->createStub(AlbumPortInterface::class);
         $state = $album->getState();
-        $album = \App\Catalog\Domain\Model\Album::reconstitute(new \App\Catalog\Domain\Model\AlbumState(...array_replace(get_object_vars($state), ['id' => $song->getId(), 'publicId' => $song->getPublicId()])));
+        $album = Album::reconstitute(new AlbumState(...array_replace(get_object_vars($state), ['id' => $song->getId(), 'publicId' => $song->getPublicId()])));
         $this->albums->method('findByPublicId')->willReturn($album);
         $this->albums->method('findFreshByUuid')->willReturn($album);
     }
@@ -127,7 +133,7 @@ final class ArtistCreditCommandsTest extends TestCase
         return $this->artist->getPublicId()->toString();
     }
 
-    private function artists(): ArtistPortInterface&\PHPUnit\Framework\MockObject\MockObject
+    private function artists(): ArtistPortInterface&MockObject
     {
         $artists = $this->createMock(ArtistPortInterface::class);
         $artists->method('findByPublicId')->willReturnCallback(

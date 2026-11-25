@@ -3,6 +3,8 @@
 
 declare(strict_types=1);
 
+use Swoole\Process;
+
 $directory = getenv('BACKEND_FAKE_ROOT');
 $arguments = array_slice($_SERVER['argv'], 1);
 file_put_contents(
@@ -159,7 +161,7 @@ if ($command === 'exec') {
         $fields = file_get_contents('/proc/self/stat')
             |> (static fn(string $stat): string => substr($stat, strrpos($stat, ')') + 2))
             |> (static fn(string $stat): array => explode(' ', $stat));
-        Swoole\Process::kill((int) $fields[1], 15);
+        Process::kill((int) $fields[1], 15);
         usleep(2_000_000);
     }
     if ($failure === $mode) {

@@ -76,7 +76,7 @@ final class PublicHttpClientTest extends TestCase
     #[DataProvider('forbiddenRedirects')]
     public function testRejectedRedirectIsCancelledAndNeverRequested(string $location): void
     {
-        $response = $this->createMock(\Symfony\Contracts\HttpClient\ResponseInterface::class);
+        $response = $this->createMock(ResponseInterface::class);
         $response->method('getStatusCode')->willReturn(302);
         $response->method('getHeaders')->willReturn(['location' => [$location]]);
         $response->expects(self::once())->method('cancel');

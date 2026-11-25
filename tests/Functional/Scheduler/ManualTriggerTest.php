@@ -11,6 +11,7 @@ use App\Shared\Domain\Model\Email;
 use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
 use App\Tests\Functional\TestCase;
+use App\Tests\Support\FinalSchemaBootstrap;
 use Doctrine\DBAL\Connection;
 use Doctrine\DBAL\DriverManager;
 use Doctrine\DBAL\Tools\DsnParser;
@@ -42,7 +43,7 @@ final class ManualTriggerTest extends TestCase
         $this->observer = DriverManager::getConnection((new DsnParser(['postgresql' => 'pdo_pgsql']))->parse($url));
         $this->observer->executeStatement('SET search_path TO ' . $this->schema . ', public');
 
-        \App\Tests\Support\FinalSchemaBootstrap::bootstrap($this->scheduler);
+        FinalSchemaBootstrap::bootstrap($this->scheduler);
         $this->scheduler->executeStatement('DELETE FROM scheduled_jobs');
 
         $recorder = new DoctrineSchedulerManualOccurrenceRecorder($this->scheduler);
@@ -149,7 +150,7 @@ final class ManualTriggerTest extends TestCase
 
     private function path(Uuid $job): string
     {
-        return '/api/admin/scheduler/jobs/' . ($this->publicJobs[$job->toString()] ?? (new \App\Shared\Domain\Model\PublicId())->toString()) . '/trigger';
+        return '/api/admin/scheduler/jobs/' . ($this->publicJobs[$job->toString()] ?? (new PublicId())->toString()) . '/trigger';
     }
 
     private function trigger(Uuid $job, User $user, string $requestId): Response

@@ -4,17 +4,20 @@ declare(strict_types=1);
 
 namespace App\Tests\Integration;
 
+use App\Shared\Application\DTO\DeploymentProfile;
+use App\Tests\Support\FixedAacImplementationSetting;
+use App\Tests\Support\NativeExecutionFixture;
+use App\Transcode\Application\CommandHandler\SweepTranscodeCacheHandler;
 use App\Transcode\Application\Exception\AudioRenditionBusyException;
 use App\Transcode\Application\Exception\AudioRenditionFailedException;
-use App\Transcode\Application\CommandHandler\SweepTranscodeCacheHandler;
+use App\Transcode\Application\Port\AudioRenditionFormat;
 use App\Transcode\Application\Port\TranscodeJobPortInterface;
 use App\Transcode\Application\Port\TranscodeSessionPortInterface;
-use App\Transcode\Infrastructure\Storage\TranscodeFileStorage;
-use App\Transcode\Application\Port\AudioRenditionFormat;
+use App\Transcode\Application\Service\MediaExecutionPolicy;
 use App\Transcode\Infrastructure\Doctrine\AudioRenditionRuntime;
 use App\Transcode\Infrastructure\Storage\SegmentFileResolver;
+use App\Transcode\Infrastructure\Storage\TranscodeFileStorage;
 use App\Transcode\Infrastructure\Transcode\AudioRenditionCache;
-use App\Tests\Support\NativeExecutionFixture;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
 use Symfony\Component\Process\Process;
@@ -224,7 +227,7 @@ final class AudioRenditionWorkerHandoffTest extends TestCase
 
     private function cache(float $startTimeoutSeconds = 3): AudioRenditionCache
     {
-        return new AudioRenditionCache(new \App\Transcode\Application\Service\MediaExecutionPolicy(new \App\Shared\Application\DTO\DeploymentProfile()), new SegmentFileResolver($this->root . '/cache'), new AudioRenditionRuntime($this->first), new NullLogger(), new \App\Tests\Support\FixedAacImplementationSetting(), pollIntervalSeconds: .005, startTimeoutSeconds: $startTimeoutSeconds);
+        return new AudioRenditionCache(new MediaExecutionPolicy(new DeploymentProfile()), new SegmentFileResolver($this->root . '/cache'), new AudioRenditionRuntime($this->first), new NullLogger(), new FixedAacImplementationSetting(), pollIntervalSeconds: .005, startTimeoutSeconds: $startTimeoutSeconds);
     }
 
     private function startWorker(float $delay): void

@@ -2,10 +2,13 @@
 
 declare(strict_types=1);
 
+use App\Shared\Application\DTO\DeploymentProfile;
 use App\Transcode\Application\Port\FFmpegPortInterface;
 use App\Transcode\Application\Port\TranscodeStoragePortInterface;
+use App\Transcode\Application\Service\MediaExecutionPolicy;
 use App\Transcode\Domain\ValueObject\EncoderProfile;
 use App\Transcode\Domain\ValueObject\QualityTier;
+use App\Transcode\Domain\ValueObject\VideoProbeResult;
 use App\Transcode\Infrastructure\Auth\HmacStreamAuthAdapter;
 use App\Transcode\Infrastructure\FFmpeg\SegmentEncoder;
 use PHPUnit\Framework\MockObject\Generator\Generator;
@@ -49,10 +52,10 @@ $ffmpegPort = $generator->testDouble(FFmpegPortInterface::class, false);
 $storagePort = $generator->testDouble(TranscodeStoragePortInterface::class, false);
 assert($ffmpegPort instanceof FFmpegPortInterface);
 assert($storagePort instanceof TranscodeStoragePortInterface);
-$encoder = new SegmentEncoder(new \App\Transcode\Application\Service\MediaExecutionPolicy(\App\Shared\Application\DTO\DeploymentProfile::fromEnvironment()), $ffmpegPort, $storagePort, EncoderProfile::software('libx264'));
+$encoder = new SegmentEncoder(new MediaExecutionPolicy(DeploymentProfile::fromEnvironment()), $ffmpegPort, $storagePort, EncoderProfile::software('libx264'));
 $arguments = $encoder->buildStreamArgs($source, QualityTier::p720(), '', $directory,
     audioFilters: 'aformat=channel_layouts=stereo', hasAudio: true,
-    sourceDuration: \App\Transcode\Domain\ValueObject\VideoProbeResult::fromProbeOutput($probe)->videoEnd ?? 0.0);
+    sourceDuration: VideoProbeResult::fromProbeOutput($probe)->videoEnd ?? 0.0);
 $input = array_search('-i', $arguments, true);
 if ($input === false) {
     throw new RuntimeException('The producer command omitted its source.');

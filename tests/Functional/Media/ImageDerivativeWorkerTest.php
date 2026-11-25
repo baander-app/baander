@@ -6,12 +6,28 @@ namespace App\Tests\Functional\Media;
 
 use App\Media\Application\Command\GenerateImageDerivativeCommand;
 use App\Media\Application\CommandHandler\GenerateImageDerivativeHandler;
+use App\Media\Application\Port\ImagePortInterface;
+use App\Media\Application\Port\MediaReadScopeProviderInterface;
 use App\Media\Application\Port\StoragePortInterface;
+use App\Media\Domain\ReadModel\ImageReadView;
 use App\Media\Infrastructure\Converter\ImageConversionAdapter;
 use App\Media\Infrastructure\Converter\ImageDerivativeGenerator;
+use App\Media\Interface\Controller\ImageController;
+use App\Shared\Domain\Model\PublicId;
+use App\Shared\Domain\Model\Uuid;
+use App\Shared\Domain\ValueObject\MediaReadScope;
 use App\Tests\Fixtures\Messaging\MessageCodecFactory;
+use Baander\ImageProcessing\BlurHash\BlurHashGenerator;
 use Baander\ImageProcessing\GdImageConverter as ImageProcessor;
 use PHPUnit\Framework\TestCase;
+use Psr\Log\NullLogger;
+use Symfony\Component\DependencyInjection\ServiceLocator;
+use Symfony\Component\HttpFoundation\BinaryFileResponse;
+use Symfony\Component\HttpFoundation\Request;
+use Symfony\Component\Messenger\MessageBus;
+use Symfony\Component\Messenger\Middleware\SendMessageMiddleware;
+use Symfony\Component\Messenger\Transport\InMemory\InMemoryTransport;
+use Symfony\Component\Messenger\Transport\Sender\SendersLocator;
 
 final class ImageDerivativeWorkerTest extends TestCase
 {
@@ -25,37 +41,37 @@ final class ImageDerivativeWorkerTest extends TestCase
         imagepng(imagecreatetruecolor(32, 16), $directory . '/source.png');
         $storage = $this->createStub(StoragePortInterface::class);
         $storage->method('resolve')->willReturnCallback(static fn (string $path): string => $directory . '/' . $path);
-        $publicId = new \App\Shared\Domain\Model\PublicId();
-        $images = $this->createStub(\App\Media\Application\Port\ImagePortInterface::class);
-        $images->method('findVisibleByPublicId')->willReturn(new \App\Media\Domain\ReadModel\ImageReadView(
-            \App\Shared\Domain\Model\Uuid::v7(), $publicId, 'source.png', 'png', 'image/png', null, 100, 32, 16,
+        $publicId = new PublicId();
+        $images = $this->createStub(ImagePortInterface::class);
+        $images->method('findVisibleByPublicId')->willReturn(new ImageReadView(
+            Uuid::v7(), $publicId, 'source.png', 'png', 'image/png', null, 100, 32, 16,
             'album', null, null, null, new \DateTimeImmutable(), new \DateTimeImmutable(),
         ));
-        $scope = $this->createStub(\App\Media\Application\Port\MediaReadScopeProviderInterface::class);
-        $scope->method('current')->willReturn(\App\Shared\Domain\ValueObject\MediaReadScope::none());
-        $transport = new \Symfony\Component\Messenger\Transport\InMemory\InMemoryTransport();
-        $bus = new \Symfony\Component\Messenger\MessageBus([
-            new \Symfony\Component\Messenger\Middleware\SendMessageMiddleware(
-                new \Symfony\Component\Messenger\Transport\Sender\SendersLocator(
+        $scope = $this->createStub(MediaReadScopeProviderInterface::class);
+        $scope->method('current')->willReturn(MediaReadScope::none());
+        $transport = new InMemoryTransport();
+        $bus = new MessageBus([
+            new SendMessageMiddleware(
+                new SendersLocator(
                     [GenerateImageDerivativeCommand::class => ['async']],
-                    new \Symfony\Component\DependencyInjection\ServiceLocator(['async' => static fn () => $transport]),
+                    new ServiceLocator(['async' => static fn () => $transport]),
                 ),
             ),
         ]);
-        $controller = new \App\Media\Interface\Controller\ImageController(
-            $images, $storage, new \Baander\ImageProcessing\BlurHash\BlurHashGenerator(new \Psr\Log\NullLogger()),
-            new \Psr\Log\NullLogger(), $bus, $scope,
+        $controller = new ImageController(
+            $images, $storage, new BlurHashGenerator(new NullLogger()),
+            new NullLogger(), $bus, $scope,
         );
         try {
-            $response = $controller->file($publicId->toString(), new \Symfony\Component\HttpFoundation\Request());
-            self::assertInstanceOf(\Symfony\Component\HttpFoundation\BinaryFileResponse::class, $response);
+            $response = $controller->file($publicId->toString(), new Request());
+            self::assertInstanceOf(BinaryFileResponse::class, $response);
             self::assertSame($directory . '/source.png', $response->getFile()->getPathname());
             self::assertCount(1, $transport->getSent());
             self::assertFileDoesNotExist($directory . '/source.webp');
             $worker = new GenerateImageDerivativeHandler(new ImageDerivativeGenerator($storage, new ImageConversionAdapter(new ImageProcessor())));
             $worker($transport->getSent()[0]->getMessage());
-            $response = $controller->file($publicId->toString(), new \Symfony\Component\HttpFoundation\Request());
-            self::assertInstanceOf(\Symfony\Component\HttpFoundation\BinaryFileResponse::class, $response);
+            $response = $controller->file($publicId->toString(), new Request());
+            self::assertInstanceOf(BinaryFileResponse::class, $response);
             self::assertSame($directory . '/source.webp', $response->getFile()->getPathname());
             self::assertCount(1, $transport->getSent());
         } finally {

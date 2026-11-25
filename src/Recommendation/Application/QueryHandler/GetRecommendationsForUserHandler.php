@@ -8,12 +8,13 @@ use App\Catalog\Domain\Repository\AlbumRepositoryInterface;
 use App\Catalog\Domain\Repository\ArtistRepositoryInterface;
 use App\Catalog\Domain\Repository\SongRepositoryInterface;
 use App\Media\Application\Port\ImagePortInterface;
+use App\Recommendation\Application\Port\RecommendationPublicIdentityInterface;
 use App\Recommendation\Application\Query\GetRecommendationsForUserQuery;
 use App\Recommendation\Domain\Repository\RecommendationRepositoryInterface;
 use App\Shared\Application\Http\PublicOrigins;
 use App\Shared\Domain\Model\Uuid;
-use Symfony\Component\Messenger\Attribute\AsMessageHandler;
 use Symfony\Component\HttpFoundation\RequestStack;
+use Symfony\Component\Messenger\Attribute\AsMessageHandler;
 
 final class GetRecommendationsForUserHandler
 {
@@ -25,7 +26,7 @@ final class GetRecommendationsForUserHandler
         private readonly ImagePortInterface $imagePort,
         private readonly RequestStack $requestStack,
         private readonly PublicOrigins $publicOrigins,
-        private readonly \App\Recommendation\Application\Port\RecommendationPublicIdentityInterface $identities,
+        private readonly RecommendationPublicIdentityInterface $identities,
     ) {
     }
 

@@ -8,12 +8,14 @@ use App\Media\Application\Port\MediaReadScopeProviderInterface;
 use App\Media\Application\Port\StreamPortInterface;
 use App\Media\Domain\Model\TrackStreamMetadata;
 use App\Media\Interface\Controller\StreamController;
+use App\Shared\Application\DTO\DeploymentProfile;
+use App\Shared\Application\Port\SystemSettingsPortInterface;
 use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
 use App\Shared\Domain\ValueObject\LibraryReadScope;
 use App\Shared\Domain\ValueObject\MediaReadScope;
-use App\Shared\Application\Port\SystemSettingsPortInterface;
 use App\Transcode\Application\Port\AudioRenditionPortInterface;
+use App\Transcode\Application\Service\MediaExecutionPolicy;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\HttpFoundation\Request;
@@ -47,7 +49,7 @@ final class StreamControllerRangeTest extends TestCase
             new Uuid(),
             LibraryReadScope::unrestricted(),
         ));
-        $this->controller = new StreamController(new \App\Transcode\Application\Service\MediaExecutionPolicy(new \App\Shared\Application\DTO\DeploymentProfile()), $stream, $scopes, $this->createStub(AudioRenditionPortInterface::class), $this->createStub(SystemSettingsPortInterface::class));
+        $this->controller = new StreamController(new MediaExecutionPolicy(new DeploymentProfile()), $stream, $scopes, $this->createStub(AudioRenditionPortInterface::class), $this->createStub(SystemSettingsPortInterface::class));
     }
 
     protected function tearDown(): void

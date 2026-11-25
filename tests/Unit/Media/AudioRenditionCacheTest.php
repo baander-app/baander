@@ -4,29 +4,34 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Media;
 
-use App\Transcode\Application\DTO\AudioRenditionInput;
 use App\Shared\Application\DTO\DeploymentProfile;
 use App\Shared\Application\Port\SystemSettingsPortInterface;
 use App\Shared\Infrastructure\Swoole\CoroutineCanceledException;
-use App\Transcode\Application\Service\MediaExecutionPolicy;
+use App\Transcode\Application\DTO\AudioRenditionInput;
 use App\Transcode\Application\DTO\AudioRenditionRuntimeSnapshot;
 use App\Transcode\Application\Exception\AudioRenditionBusyException;
 use App\Transcode\Application\Exception\AudioRenditionFailedException;
+use App\Transcode\Application\Exception\MediaEncodingProhibitedException;
 use App\Transcode\Application\Port\AudioRenditionFormat;
 use App\Transcode\Application\Port\AudioRenditionRuntimePort;
+use App\Transcode\Application\Service\MediaExecutionPolicy;
 use App\Transcode\Application\Settings\TranscodeSettingDefinitions;
 use App\Transcode\Domain\ValueObject\AacImplementation;
 use App\Transcode\Infrastructure\Storage\SegmentFileResolver;
+use App\Transcode\Infrastructure\Storage\TranscodeFileStorage;
 use App\Transcode\Infrastructure\Transcode\AudioRenditionCache;
-use PHPUnit\Framework\TestCase;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\{PreserveGlobalState, RunInSeparateProcess};
+use PHPUnit\Framework\MockObject\Stub;
+use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
+use Swoole\Coroutine;
 
 final class AudioRenditionCacheTest extends TestCase
 {
     private string $root;
     private string $source;
-    private AudioRenditionRuntimePort&\PHPUnit\Framework\MockObject\Stub $runtime;
+    private AudioRenditionRuntimePort&Stub $runtime;
     private AudioRenditionInput $input;
 
     protected function setUp(): void
@@ -136,7 +141,7 @@ final class AudioRenditionCacheTest extends TestCase
         };
 
         \Swoole\Coroutine\run(static function () use ($rendition, &$lookups, &$observed, $hasOpenPartial): void {
-            $consumer = \Swoole\Coroutine::create(static function () use ($rendition, &$lookups, &$observed, $hasOpenPartial): void {
+            $consumer = Coroutine::create(static function () use ($rendition, &$lookups, &$observed, $hasOpenPartial): void {
                 $chunks = $rendition->chunks();
                 if (!$chunks instanceof \Generator) {
                     throw new \LogicException('Expected a progressive rendition generator.');
@@ -147,7 +152,7 @@ final class AudioRenditionCacheTest extends TestCase
                 // A cancelled response write resumes its consumer the same way: the raw wait
                 // returns false, and iteration resumes the producer immediately after its yield.
                 $observed['waiting'] = true;
-                $observed['wait'] = \Swoole\Coroutine::sleep(10);
+                $observed['wait'] = Coroutine::sleep(10);
                 try {
                     $chunks->next();
                     $observed['exception'] = null;
@@ -160,9 +165,9 @@ final class AudioRenditionCacheTest extends TestCase
             });
             $deadline = microtime(true) + 2;
             while (!($observed['waiting'] ?? false) && microtime(true) < $deadline) {
-                \Swoole\Coroutine::sleep(.001);
+                Coroutine::sleep(.001);
             }
-            $observed['cancelled'] = \Swoole\Coroutine::cancel($consumer);
+            $observed['cancelled'] = Coroutine::cancel($consumer);
         });
 
         self::assertNotSame('', $observed['first_chunk']);
@@ -204,7 +209,7 @@ final class AudioRenditionCacheTest extends TestCase
         $this->cache()->open('track', $this->source, AudioRenditionFormat::Mp3, 192000);
     }
 
-    #[\PHPUnit\Framework\Attributes\DataProvider('copyAndEncodeStarts')]
+    #[DataProvider('copyAndEncodeStarts')]
     public function testQueuedWorkThatNoSlotClaimsReportsBusySlotsWhenTheStartWaitExpires(bool $copy): void
     {
         $this->runtime->method('find')->willReturnCallback(fn (): AudioRenditionRuntimeSnapshot => $this->snapshot('pending', live: false));
@@ -308,7 +313,7 @@ final class AudioRenditionCacheTest extends TestCase
         self::assertSame('re-encoded', file_get_contents($this->cache(1.0, 'ffmpeg', $runtime)->open('track', $this->source, AudioRenditionFormat::Mp3, 192000)->path));
     }
 
-    #[\PHPUnit\Framework\Attributes\DataProvider('failuresThatStayFailed')]
+    #[DataProvider('failuresThatStayFailed')]
     public function testAFailureUnderTheSelectedOrNoAacImplementationStaysFailed(?AacImplementation $failedUnder): void
     {
         $runtime = $this->createMock(AudioRenditionRuntimePort::class);
@@ -330,7 +335,7 @@ final class AudioRenditionCacheTest extends TestCase
         yield 'failed without an AAC implementation' => [null];
     }
 
-    #[\PHPUnit\Framework\Attributes\DataProvider('evictionResetResults')]
+    #[DataProvider('evictionResetResults')]
     public function testEvictedCompletedRenditionIsRebuiltWithoutChangingTheSource(bool $resetWon): void
     {
         $generation = 1;
@@ -362,7 +367,7 @@ final class AudioRenditionCacheTest extends TestCase
         $cache = $this->cache();
         $first = $cache->open('track', $this->source, AudioRenditionFormat::Mp3, 192000);
         self::assertSame('original', file_get_contents($first->path));
-        (new \App\Transcode\Infrastructure\Storage\TranscodeFileStorage(new SegmentFileResolver($this->root)))->deleteDirectory($this->root . '/audio-renditions/track');
+        (new TranscodeFileStorage(new SegmentFileResolver($this->root)))->deleteDirectory($this->root . '/audio-renditions/track');
         $rebuilt = $cache->open('track', $this->source, AudioRenditionFormat::Mp3, 192000);
         self::assertSame('rebuilt', file_get_contents($rebuilt->path));
         self::assertStringContainsString('/generation-2/', $rebuilt->path);
@@ -412,7 +417,7 @@ final class AudioRenditionCacheTest extends TestCase
         $runtime->expects(self::never())->method('resetCompleted');
         $runtime->method('find')->willReturn(null);
         $cache = new AudioRenditionCache(new MediaExecutionPolicy(new DeploymentProfile('remux', 2, 4, 1, sharedCopySlots: 2)), new SegmentFileResolver($this->root), $runtime, new NullLogger(), $this->settings());
-        $this->expectException(\App\Transcode\Application\Exception\MediaEncodingProhibitedException::class);
+        $this->expectException(MediaEncodingProhibitedException::class);
         $cache->open('track', $this->source, AudioRenditionFormat::Mp3, 192000);
     }
 

@@ -7,6 +7,9 @@ namespace Baander\Process\Tests;
 use Baander\Process\Execution\ProcessRunner;
 use Baander\Process\Execution\ProcessSpec;
 use PHPUnit\Framework\TestCase;
+use Swoole\Event;
+use Swoole\Process;
+use Swoole\Timer;
 
 final class ProcessRunnerTest extends TestCase
 {
@@ -50,7 +53,7 @@ final class ProcessRunnerTest extends TestCase
     {
         $runner = new ProcessRunner();
         $process = $runner->start(new ProcessSpec(argv: $this->child('sleep')));
-        \Swoole\Timer::after(40, static fn() => $process->cancel(2));
+        Timer::after(40, static fn() => $process->cancel(2));
         $result = $runner->wait($process);
         self::assertTrue($result->cancelled);
         self::assertSame(2, $result->signal);
@@ -148,7 +151,7 @@ final class ProcessRunnerTest extends TestCase
             self::assertSame(0, $result->exitCode);
             self::assertLessThan(2, $result->duration);
         } finally {
-            \Swoole\Process::kill((int) trim($result->stdout), 15);
+            Process::kill((int) trim($result->stdout), 15);
         }
     }
 
@@ -193,15 +196,15 @@ final class ProcessRunnerTest extends TestCase
 
     public function testCallerTimersRemainOwnedByTheCaller(): void
     {
-        $timer = \Swoole\Timer::after(3000, static function (): void {});
+        $timer = Timer::after(3000, static function (): void {});
         try {
             $runner = new ProcessRunner();
             $first = $runner->run(new ProcessSpec(argv: [PHP_BINARY, '-r', 'exit(0);']));
             self::assertSame(0, $first->exitCode);
-            self::assertTrue(\Swoole\Timer::exists($timer));
+            self::assertTrue(Timer::exists($timer));
         } finally {
-            \Swoole\Timer::clear($timer);
-            \Swoole\Event::wait();
+            Timer::clear($timer);
+            Event::wait();
         }
     }
 
@@ -382,7 +385,7 @@ final class ProcessRunnerTest extends TestCase
                 terminationGrace: 0.7,
             ));
             if (!$timeout) {
-                \Swoole\Timer::after(100, static fn() => $process->cancel());
+                Timer::after(100, static fn() => $process->cancel());
             }
             $result = $runner->wait($process);
             self::assertSame($timeout, $result->timedOut);

@@ -4,6 +4,11 @@ declare(strict_types=1);
 
 namespace App\Tests\Functional\Controller;
 
+use App\Library\Application\Port\LibraryAccessPortInterface;
+use App\Library\Application\Port\LibraryPortInterface;
+use App\Library\Domain\ValueObject\LibrarySlug;
+use App\Shared\Domain\Model\PublicId;
+use App\Shared\Domain\Model\Uuid;
 use App\Tests\Functional\TestCase;
 
 final class LibraryControllerTest extends TestCase
@@ -71,13 +76,13 @@ final class LibraryControllerTest extends TestCase
         ]);
 
         $data = $this->assertJsonResponse($response, 201, 'data');
-        $library = static::getContainer()->get(\App\Library\Application\Port\LibraryPortInterface::class)->findByPublicId(\App\Shared\Domain\Model\PublicId::fromString($data['data']['publicId']));
+        $library = static::getContainer()->get(LibraryPortInterface::class)->findByPublicId(PublicId::fromString($data['data']['publicId']));
         self::assertNotNull($library);
         $libraryId = $library->getId();
         self::assertArrayNotHasKey('id', $data['data']);
-        $userId = \App\Shared\Domain\Model\Uuid::fromString($user->getId()->toString());
+        $userId = Uuid::fromString($user->getId()->toString());
 
-        $libraryAccess = static::getContainer()->get(\App\Library\Application\Port\LibraryAccessPortInterface::class);
+        $libraryAccess = static::getContainer()->get(LibraryAccessPortInterface::class);
 
         $this->assertTrue($libraryAccess->hasAccess($userId, $libraryId));
     }
@@ -95,8 +100,8 @@ final class LibraryControllerTest extends TestCase
         ]);
 
         $this->assertJsonResponse($response, 403);
-        $libraries = static::getContainer()->get(\App\Library\Application\Port\LibraryPortInterface::class);
-        $this->assertNull($libraries->findBySlug(new \App\Library\Domain\ValueObject\LibrarySlug($slug)));
+        $libraries = static::getContainer()->get(LibraryPortInterface::class);
+        $this->assertNull($libraries->findBySlug(new LibrarySlug($slug)));
     }
 
     public function testValidatePathIsForbiddenForNonAdmin(): void

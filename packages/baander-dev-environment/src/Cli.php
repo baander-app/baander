@@ -4,22 +4,30 @@ declare(strict_types=1);
 
 namespace Baander\DevEnvironment;
 
-use Baander\Process\Execution\CommandExecutor;
-use Baander\Process\Execution\ProcessSpec;
-use Baander\Process\Execution\CompletionPolicy;
-use Baander\Process\Arguments\Words;
-use Baander\Images\Build\Source;
-use Baander\DevEnvironment\Host\ProcessEnvironment;
-use Baander\DevEnvironment\State\InstanceStateStore;
+use Baander\Configuration\ApplicationLayout;
+use Baander\Configuration\ToolingConfiguration;
+use Baander\Containers\Docker\Client;
+use Baander\Containers\Docker\TargetResolver;
 use Baander\DevEnvironment\Configuration\LocalConfiguration;
-use Baander\DevEnvironment\Host\CapturedConnections;
-use Baander\DevEnvironment\Runtime\ComposeRuntime;
 use Baander\DevEnvironment\Configuration\MediaMounts;
-use Baander\DevEnvironment\State\RetainedState;
-use Baander\DevEnvironment\Runtime\InstanceBootstrap;
-use Baander\DevEnvironment\Host\HostSetup;
-use Baander\DevEnvironment\Release\Updater;
 use Baander\DevEnvironment\Controller\Supervisor;
+use Baander\DevEnvironment\Host\CapturedConnections;
+use Baander\DevEnvironment\Host\HostSetup;
+use Baander\DevEnvironment\Host\ProcessEnvironment;
+use Baander\DevEnvironment\Release\Updater;
+use Baander\DevEnvironment\Runtime\ComposeRuntime;
+use Baander\DevEnvironment\Runtime\InstanceBootstrap;
+use Baander\DevEnvironment\State\InstanceStateStore;
+use Baander\DevEnvironment\State\RetainedState;
+use Baander\Filesystem\Paths;
+use Baander\Images\Build\Source;
+use Baander\Process\Arguments\Words;
+use Baander\Process\Execution\CommandExecutor;
+use Baander\Process\Execution\CommandFailure;
+use Baander\Process\Execution\CompletionPolicy;
+use Baander\Process\Execution\EngineExecutor;
+use Baander\Process\Execution\ExecutionContext;
+use Baander\Process\Execution\ProcessSpec;
 
 final class Cli
 {
@@ -160,7 +168,7 @@ final class Cli
             $identity = trim($remote->stdout);
         } else {
             $common = trim($runner->run(new ProcessSpec(['git', 'rev-parse', '--git-common-dir'], cwd: $root, processGroup: true))->stdout);
-            $identity = \Baander\Filesystem\Paths::resolvedPath(str_starts_with($common, '/') ? $common : $root . '/' . $common);
+            $identity = Paths::resolvedPath(str_starts_with($common, '/') ? $common : $root . '/' . $common);
         }
         return [$root, $identity];
     }
@@ -168,10 +176,10 @@ final class Cli
     /** @param array<string,string> $environment
      * @return array<string,mixed>
      */
-    public static function dockerTarget(CommandExecutor $runner, \Baander\Configuration\ToolingConfiguration $configuration, string $directory, array $environment): array
+    public static function dockerTarget(CommandExecutor $runner, ToolingConfiguration $configuration, string $directory, array $environment): array
     {
-        $target = new \Baander\Containers\Docker\TargetResolver($runner, $environment)->resolve($configuration->docker, $directory);
-        $docker = new \Baander\Containers\Docker\Client($runner, $target, ProcessEnvironment::clean($environment));
+        $target = new TargetResolver($runner, $environment)->resolve($configuration->docker, $directory);
+        $docker = new Client($runner, $target, ProcessEnvironment::clean($environment));
         $docker->assertLocalPublishedPorts();
         if (!str_starts_with($target->endpoint, 'unix:///') || preg_match('/[\x00-\x1f\x7f,"]/', substr($target->endpoint, 7)) === 1) {
             throw new WorkflowError('The local development worker controller requires a representable daemon-visible Unix socket.');
@@ -188,7 +196,7 @@ final class Cli
 
     public static function validateStateRoot(InstanceStateStore $store, string $root): void
     {
-        if (self::within(\Baander\Filesystem\Paths::resolvedPath($store->root), \Baander\Filesystem\Paths::resolvedPath($root))) {
+        if (self::within(Paths::resolvedPath($store->root), Paths::resolvedPath($root))) {
             throw new WorkflowError('Development state must be outside the worktree.');
         }
     }
@@ -196,9 +204,9 @@ final class Cli
     /** @param list<array<string,mixed>> $media */
     public static function validateMediaState(array $media, string $stateRoot): void
     {
-        $state = \Baander\Filesystem\Paths::resolvedPath($stateRoot);
+        $state = Paths::resolvedPath($stateRoot);
         foreach ($media as $mount) {
-            $source = \Baander\Filesystem\Paths::resolvedPath($mount['source']);
+            $source = Paths::resolvedPath($mount['source']);
             if (self::within($source, $state) || self::within($state, $source)) {
                 throw new WorkflowError('Media directories must not contain development state or be inside it.');
             }
@@ -210,7 +218,7 @@ final class Cli
      * @param array<string,mixed>|null $local
      * @return array<string,mixed>
      */
-    public static function configure(InstanceStateStore $store, CommandExecutor $runner, string $root, string $repository, array $options, ?array $environment = null, ?\Baander\Configuration\ToolingConfiguration $configuration = null, ?array $local = null): array
+    public static function configure(InstanceStateStore $store, CommandExecutor $runner, string $root, string $repository, array $options, ?array $environment = null, ?ToolingConfiguration $configuration = null, ?array $local = null): array
     {
         self::validateStateRoot($store, $root);
         $environment ??= getenv();
@@ -218,11 +226,11 @@ final class Cli
         $configuration ??= self::configuration($options, $environment, $local);
         $connections = new CapturedConnections($runner, ProcessEnvironment::clean($environment));
         $libraries = LocalConfiguration::libraries($runner, $root, $local);
-        $layout = \Baander\Configuration\ApplicationLayout::load($root . '/packages/baander-configuration/resources/application-layout.json');
+        $layout = ApplicationLayout::load($root . '/packages/baander-configuration/resources/application-layout.json');
         $explicit = [];
         foreach ($options['media'] as $value) {
             $parts = explode('=', $value, 2);
-            $source = \Baander\Filesystem\Paths::resolvedPath($parts[0]);
+            $source = Paths::resolvedPath($parts[0]);
             $explicit[] = ['source' => $source, 'target' => $parts[1] ?? $source];
         }
         $configured = array_map(
@@ -393,7 +401,7 @@ final class Cli
         }
         try {
             $store = $options['state-root'] === null ? InstanceStateStore::default($environment) : new InstanceStateStore($options['state-root']);
-            $defaults = \Baander\Configuration\ToolingConfiguration::defaults();
+            $defaults = ToolingConfiguration::defaults();
             $bootstrapBudget = $defaults['budgets']['process'] ?? null;
             if (!is_int($bootstrapBudget) && !is_float($bootstrapBudget)) {
                 throw new WorkflowError('The installed controller has no numeric bootstrap process budget.');
@@ -440,7 +448,7 @@ final class Cli
                 if (!isset($instance['tooling'])) {
                     throw new WorkflowError('Run up to capture the persistent instance preparation settings before enabling automatic updates.');
                 }
-                $configuration = \Baander\Configuration\ToolingConfiguration::fromArray($instance['tooling']);
+                $configuration = ToolingConfiguration::fromArray($instance['tooling']);
                 $runner = self::executor($configuration->budgets->seconds('backend'), $environment);
                 new Updater($store, $runner, $configuration, $environment)->update('persistent', automatic: true);
                 return 0;
@@ -538,7 +546,7 @@ final class Cli
             }
         } catch (\RuntimeException|\InvalidArgumentException|\JsonException $error) {
             fwrite(STDERR, $error->getMessage() . "\n");
-            return $error instanceof \Baander\Process\Execution\CommandFailure ? $error->getCode() : ($error->getCode() >= 1 && $error->getCode() <= 255 ? $error->getCode() : 1);
+            return $error instanceof CommandFailure ? $error->getCode() : ($error->getCode() >= 1 && $error->getCode() <= 255 ? $error->getCode() : 1);
         }
     }
 
@@ -546,7 +554,7 @@ final class Cli
      * @param array<string,string> $environment
      * @param array<string,mixed> $local
      */
-    private static function configuration(array $options, array $environment, array $local): \Baander\Configuration\ToolingConfiguration
+    private static function configuration(array $options, array $environment, array $local): ToolingConfiguration
     {
         $dockerFlags = [];
         foreach (['context', 'host', 'executable'] as $key) {
@@ -554,7 +562,7 @@ final class Cli
                 $dockerFlags[$key] = $options['docker-' . $key];
             }
         }
-        return \Baander\Configuration\ToolingConfiguration::resolve(
+        return ToolingConfiguration::resolve(
             flags: $dockerFlags === [] ? [] : ['docker' => $dockerFlags],
             environment: $environment,
             local: $local['tooling'] ?? [],
@@ -562,10 +570,10 @@ final class Cli
     }
 
     /** @param array<string,string> $environment */
-    private static function executor(float $seconds, array $environment, bool $ignoreCancellation = false): \Baander\Process\Execution\EngineExecutor
+    private static function executor(float $seconds, array $environment, bool $ignoreCancellation = false): EngineExecutor
     {
-        return new \Baander\Process\Execution\EngineExecutor(
-            \Baander\Process\Execution\ExecutionContext::bounded($seconds, ProcessEnvironment::clean($environment), ignoreCancellation: $ignoreCancellation),
+        return new EngineExecutor(
+            ExecutionContext::bounded($seconds, ProcessEnvironment::clean($environment), ignoreCancellation: $ignoreCancellation),
         );
     }
 
@@ -610,7 +618,7 @@ final class Cli
             try {
                 $data['worker_snapshot_current'] = Source::snapshotWorktree($runner, $instance['worktree'], null) === ($instance['worker_snapshot'] ?? null);
             } catch (\RuntimeException $error) {
-                if ($error instanceof \Baander\Process\Execution\CommandFailure && ($error->getCode() === 124 || $error->result?->cancelled || $error->result?->signal !== null)) {
+                if ($error instanceof CommandFailure && ($error->getCode() === 124 || $error->result?->cancelled || $error->result?->signal !== null)) {
                     throw $error;
                 }
                 $data['worker_snapshot_current'] = 'unavailable';

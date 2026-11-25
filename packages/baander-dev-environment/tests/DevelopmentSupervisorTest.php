@@ -4,14 +4,15 @@ declare(strict_types=1);
 
 namespace Baander\DevEnvironment\Tests;
 
-use Baander\Tests\Tooling\Support\HostCommandExecutor;
-use Baander\DevEnvironment\State\InstanceStateStore;
+use Baander\DevEnvironment\Controller\ControllerPayload;
 use Baander\DevEnvironment\Controller\Supervisor;
+use Baander\DevEnvironment\State\InstanceStateStore;
 use Baander\DevEnvironment\WorkflowError;
 use Baander\Process\Execution\CommandFailure;
 use Baander\Process\Execution\ProcessResult;
 use Baander\Process\Execution\ProcessRunner;
 use Baander\Process\Execution\ProcessSpec;
+use Baander\Tests\Tooling\Support\HostCommandExecutor;
 use PHPUnit\Framework\TestCase;
 
 final class DevelopmentSupervisorTest extends TestCase
@@ -116,7 +117,7 @@ PHP,
         file_put_contents($this->store->root . '/controller/scripts/dev-environment.py', 'legacy');
         $supervisor = $this->supervisor($this->runner());
         $supervisor->install();
-        $payload = new \Baander\DevEnvironment\Controller\ControllerPayload($this->store->root);
+        $payload = new ControllerPayload($this->store->root);
         $generation = $this->store->root . '/controller/generations/' . $payload->selectedGeneration();
         $controller = $payload->launcher();
         $unit = (string) file_get_contents($this->root . '/config/systemd/user/' . $supervisor->unit . '.service');
@@ -197,7 +198,7 @@ PHP,
         $supervisor = $this->supervisor($this->runner());
         $supervisor->install();
         $supervisor->install();
-        $payload = new \Baander\DevEnvironment\Controller\ControllerPayload($this->store->root);
+        $payload = new ControllerPayload($this->store->root);
         $generation = $this->store->root . '/controller/generations/' . $payload->selectedGeneration();
         foreach (['filesystem', 'process', 'configuration', 'containers', 'dev-environment'] as $name) {
             self::assertSame(

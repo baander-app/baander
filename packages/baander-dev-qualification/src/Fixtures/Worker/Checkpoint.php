@@ -6,6 +6,7 @@ namespace Baander\DevQualification\Fixtures\Worker;
 
 use Baander\Containers\Docker\Client;
 use Baander\DevQualification\Fixtures\Runtime;
+use Baander\Filesystem\AtomicFile;
 use Baander\Process\Execution\RunningProcess;
 
 final readonly class Checkpoint
@@ -146,7 +147,7 @@ final readonly class Checkpoint
     public static function operatorEnvironment(Runtime $runtime, string $artifacts): array
     {
         $targetFile = $artifacts . '-target.json';
-        \Baander\Filesystem\AtomicFile::writeJson($targetFile, $runtime->docker()->target->toArray());
+        AtomicFile::writeJson($targetFile, $runtime->docker()->target->toArray());
         return array_replace($runtime->environment, ['BAANDER_TOOLING_TARGET_FILE' => $targetFile]);
     }
 

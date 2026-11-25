@@ -15,14 +15,15 @@ use App\Library\Domain\ValueObject\LibrarySlug;
 use App\Notification\Application\DTO\CreateNotificationCommand;
 use App\Notification\Domain\Repository\NotificationRepositoryInterface;
 use App\Shared\Application\Http\BaanderHeader;
+use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
 use App\Tests\Functional\TestCase;
 use App\UserPreference\Application\Port\UserSettingsContractInterface;
 use Symfony\Bundle\FrameworkBundle\Console\Application;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Tester\CommandTester;
-use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Filesystem\Filesystem;
+use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Messenger\MessageBusInterface;
 
 /**
@@ -355,7 +356,7 @@ final class LibraryAdministrationTest extends TestCase
     {
         $admin = $this->createAdminUser();
         $library = $this->createThroughApi('locale-' . bin2hex(random_bytes(3)), $admin);
-        $missing = (new \App\Shared\Domain\Model\PublicId())->toString();
+        $missing = (new PublicId())->toString();
         // The same root as well: the slug is reported, not the overlap.
         $duplicate = ['name' => 'Again', 'path' => $library['path'], 'type' => 'music', 'slug' => $library['slug']];
 

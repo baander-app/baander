@@ -7,7 +7,10 @@ namespace App\Tests\Unit\Party\Interface\Controller;
 use App\Auth\Application\Port\AuthenticatedUserIdentityInterface;
 use App\Party\Application\Command\CreatePartySessionCommand;
 use App\Party\Application\Command\JoinPartySessionCommand;
+use App\Party\Application\DTO\PartyMemberView;
+use App\Party\Application\DTO\PartySessionView;
 use App\Party\Application\Port\PartyMemberPortInterface;
+use App\Party\Application\Port\PartyPublicIdentityPortInterface;
 use App\Party\Application\Port\PartySessionPortInterface;
 use App\Party\Domain\Model\PartyMember;
 use App\Party\Domain\Model\SyncedPartySession;
@@ -20,12 +23,12 @@ use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\MockObject\Stub;
 use PHPUnit\Framework\TestCase;
-use Symfony\Component\Messenger\Envelope;
-use Symfony\Component\Messenger\MessageBusInterface;
-use Symfony\Component\Messenger\Stamp\HandledStamp;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpKernel\ControllerMetadata\ArgumentMetadataFactory;
+use Symfony\Component\Messenger\Envelope;
+use Symfony\Component\Messenger\MessageBusInterface;
+use Symfony\Component\Messenger\Stamp\HandledStamp;
 use Symfony\Component\Security\Core\Authentication\Token\Storage\TokenStorage;
 use Symfony\Component\Security\Core\Authentication\Token\UsernamePasswordToken;
 use Symfony\Component\Security\Core\Exception\AccessDeniedException;
@@ -53,9 +56,9 @@ final class PartySessionControllerTest extends TestCase
         $this->hostPublicId = new PublicId();
         $this->videoPublicId = new PublicId();
         $this->jobPublicId = new PublicId();
-        $this->identities = $this->createStub(\App\Party\Application\Port\PartyPublicIdentityPortInterface::class);
-        $this->identities->method('session')->willReturnCallback(fn (SyncedPartySession $session) => new \App\Party\Application\DTO\PartySessionView($session, $this->hostPublicId, $this->videoPublicId, $this->jobPublicId));
-        $this->identities->method('member')->willReturnCallback(fn (PartyMember $member) => new \App\Party\Application\DTO\PartyMemberView($member, $this->hostPublicId, new PublicId()));
+        $this->identities = $this->createStub(PartyPublicIdentityPortInterface::class);
+        $this->identities->method('session')->willReturnCallback(fn (SyncedPartySession $session) => new PartySessionView($session, $this->hostPublicId, $this->videoPublicId, $this->jobPublicId));
+        $this->identities->method('member')->willReturnCallback(fn (PartyMember $member) => new PartyMemberView($member, $this->hostPublicId, new PublicId()));
 
         $this->controller = new PartySessionController(
             $this->commandBus,

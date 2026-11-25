@@ -5,6 +5,9 @@ declare(strict_types=1);
 namespace Baander\DevQualification\Tests;
 
 use Baander\DevQualification\Fixtures\Messaging\Qualification;
+use Baander\Process\Execution\ProcessResult;
+use Baander\Process\Execution\ProcessRunner;
+use Baander\Process\Execution\ProcessSpec;
 use PHPUnit\Framework\TestCase;
 
 final class MessagingWorkflowTest extends TestCase
@@ -47,7 +50,7 @@ final class MessagingWorkflowTest extends TestCase
     }
 
     /** @param array<string,string> $environment */
-    private function execute(string $mode, array $environment = [], float $seconds = 60): \Baander\Process\Execution\ProcessResult
+    private function execute(string $mode, array $environment = [], float $seconds = 60): ProcessResult
     {
         $code = <<<'PHP_CODE'
         require $argv[1];
@@ -70,7 +73,7 @@ final class MessagingWorkflowTest extends TestCase
             $r->close();
         }
         PHP_CODE;
-        return new \Baander\Process\Execution\ProcessRunner()->run(new \Baander\Process\Execution\ProcessSpec(
+        return new ProcessRunner()->run(new ProcessSpec(
             argv: [
                 PHP_BINARY,
                 '-r',

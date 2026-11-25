@@ -3,6 +3,19 @@
 
 declare(strict_types=1);
 
+use App\Shared\Application\DTO\DeploymentUnit;
+use App\Shared\Infrastructure\Doctrine\DedicatedConnectionFactory;
+use App\Shared\Infrastructure\Worker\DeploymentOperatorCredentials;
+use App\Shared\Infrastructure\Worker\DeploymentOperatorManifest;
+use App\Shared\Infrastructure\Worker\DeploymentReadiness;
+use App\Shared\Infrastructure\Worker\DockerDeploymentCreate;
+use App\Shared\Infrastructure\Worker\DockerWorkerCommand;
+use App\Shared\Infrastructure\Worker\DoctrineDeploymentInventory;
+use App\Shared\Infrastructure\Worker\DoctrineDeploymentLease;
+use App\Shared\Infrastructure\Worker\DoctrineDeploymentRetirement;
+use App\Shared\Infrastructure\Worker\OutOfMemoryKillOrder;
+use App\Shared\Infrastructure\Worker\RegisteredDeploymentRecovery;
+use App\Shared\Infrastructure\Worker\RegisteredDeploymentStart;
 use Baander\Core\EnvironmentVariable;
 
 // Trusted host-only composition root. Never boot Symfony, load dotenv, or mount
@@ -44,19 +57,19 @@ try {
         throw new InvalidArgumentException('Operator image must declare APP_HOME.');
     }
     // A manifest that leaves the hardware encoder device's group unset takes it from this host.
-    $manifest = \App\Shared\Infrastructure\Worker\DeploymentOperatorManifest::fromJson($json, $appHome,
-        \App\Shared\Infrastructure\Worker\DeploymentOperatorManifest::hostDeviceGroup(...));
-    $credentials = \App\Shared\Infrastructure\Worker\DeploymentOperatorCredentials::fromFile($arguments[3]);
+    $manifest = DeploymentOperatorManifest::fromJson($json, $appHome,
+        DeploymentOperatorManifest::hostDeviceGroup(...));
+    $credentials = DeploymentOperatorCredentials::fromFile($arguments[3]);
     $recipes = [
-        'control' => $manifest->recipe(\App\Shared\Application\DTO\DeploymentUnit::Control, $credentials->runtimeEnvironment),
-        'execution' => $manifest->recipe(\App\Shared\Application\DTO\DeploymentUnit::Execution, $credentials->runtimeEnvironment),
+        'control' => $manifest->recipe(DeploymentUnit::Control, $credentials->runtimeEnvironment),
+        'execution' => $manifest->recipe(DeploymentUnit::Execution, $credentials->runtimeEnvironment),
     ];
     $manifestHash = $manifest->fingerprint($credentials->runtimeEnvironment);
-    $connection = \App\Shared\Infrastructure\Doctrine\DedicatedConnectionFactory::fromParams($credentials->connectionParameters());
-    $inventory = new \App\Shared\Infrastructure\Worker\DoctrineDeploymentInventory($connection);
-    $retirements = new \App\Shared\Infrastructure\Worker\DoctrineDeploymentRetirement($connection);
-    $docker = new \App\Shared\Infrastructure\Worker\DockerWorkerCommand($manifest->dockerBinary, $manifest->dockerEndpoint);
-    $creator = new \App\Shared\Infrastructure\Worker\DockerDeploymentCreate($inventory, $docker->execute(...));
+    $connection = DedicatedConnectionFactory::fromParams($credentials->connectionParameters());
+    $inventory = new DoctrineDeploymentInventory($connection);
+    $retirements = new DoctrineDeploymentRetirement($connection);
+    $docker = new DockerWorkerCommand($manifest->dockerBinary, $manifest->dockerEndpoint);
+    $creator = new DockerDeploymentCreate($inventory, $docker->execute(...));
     $configured = true;
     $success = true;
     $result = [];
@@ -72,7 +85,7 @@ try {
             if (!is_array($host) || ($host['id'] ?? null) !== $manifest->daemonId || ($host['cgroupVersion'] ?? null) !== '2') {
                 throw new RuntimeException('Docker host does not match the worker manifest or lacks cgroup v2.');
             }
-            \App\Shared\Infrastructure\Worker\OutOfMemoryKillOrder::assertApplicable($host['securityOptions'] ?? null);
+            OutOfMemoryKillOrder::assertApplicable($host['securityOptions'] ?? null);
             if (!$inventory->reserveBoot($manifest->namespace, $manifest->bootId, $manifestHash, $manifest->deploymentProfile->fingerprint(), $manifest->daemonId,
                 $recipes['control']->fingerprint(), $recipes['execution']->fingerprint())) {
                 $success = false;
@@ -109,7 +122,7 @@ try {
             }
             foreach ([$boot->control, $boot->execution] as $state) {
                 $recipe = $recipes[$state->unit->value];
-                if ($state->binding === null || !(new \App\Shared\Infrastructure\Worker\RegisteredDeploymentStart($inventory, $docker->execute(...), $recipe))->start($state->binding)) {
+                if ($state->binding === null || !(new RegisteredDeploymentStart($inventory, $docker->execute(...), $recipe))->start($state->binding)) {
                     $success = false;
                     break;
                 }
@@ -120,17 +133,17 @@ try {
             }
             break;
         case 'recover':
-            $success = (new \App\Shared\Infrastructure\Worker\RegisteredDeploymentRecovery($inventory, $retirements, $docker->execute(...), $recipes))
+            $success = (new RegisteredDeploymentRecovery($inventory, $retirements, $docker->execute(...), $recipes))
                 ->recover($manifest->namespace, $manifest->bootId);
             $result = ['state' => $success ? 'retired' : 'unconfirmed'];
             break;
         case 'readiness':
-            (new \App\Shared\Infrastructure\Worker\DeploymentReadiness($connection, $docker->execute(...)))
+            (new DeploymentReadiness($connection, $docker->execute(...)))
                 ->verify($manifest, $credentials->runtimeEnvironment);
             $result = ['state' => 'ready', 'readiness' => 'ready'];
             break;
         case 'status':
-            $lease = (new \App\Shared\Infrastructure\Worker\DoctrineDeploymentLease($connection))->findForContainment($manifest->namespace);
+            $lease = (new DoctrineDeploymentLease($connection))->findForContainment($manifest->namespace);
             $result = ['manifestMatches' => $boot?->manifestHash === $manifestHash,
                 'retirement' => $boot === null ? 'unregistered' : ($boot->retired ? 'completed' : ($boot->retirementRequested ? 'pending' : 'none')),
                 'reservation' => $lease === null ? 'none' : ($lease->bootId === $manifest->bootId ? 'this_boot' : 'another_boot'),

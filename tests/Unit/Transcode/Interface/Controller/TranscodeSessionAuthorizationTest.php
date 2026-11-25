@@ -6,9 +6,10 @@ namespace App\Tests\Unit\Transcode\Interface\Controller;
 
 use App\Auth\Infrastructure\Security\SecurityUser;
 use App\Shared\Domain\Model\Uuid;
+use App\Tests\Unit\Transcode\PublicViewStub;
 use App\Transcode\Application\Command\UpdateTranscodePositionCommand;
-use App\Transcode\Application\Port\TranscodeSessionPortInterface;
 use App\Transcode\Application\Port\PlaybackPortInterface;
+use App\Transcode\Application\Port\TranscodeSessionPortInterface;
 use App\Transcode\Domain\Model\TranscodeSession;
 use App\Transcode\Domain\ValueObject\AudioProfile;
 use App\Transcode\Interface\Controller\TranscodeSessionController;
@@ -18,6 +19,7 @@ use PHPUnit\Framework\TestCase;
 use Symfony\Bundle\SecurityBundle\Security;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpKernel\Exception\HttpException;
+use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 use Symfony\Component\Messenger\Envelope;
 use Symfony\Component\Messenger\MessageBusInterface;
 use Symfony\Component\Security\Core\Exception\AccessDeniedException;
@@ -34,9 +36,9 @@ final class TranscodeSessionAuthorizationTest extends TestCase
         $bus->expects(self::never())->method('dispatch');
         $controller = new TranscodeSessionController(
             $this->createStub(Security::class), $bus, $sessions,
-            $this->createStub(PlaybackPortInterface::class), new \App\Tests\Unit\Transcode\PublicViewStub(),
+            $this->createStub(PlaybackPortInterface::class), new PublicViewStub(),
         );
-        $this->expectException(\Symfony\Component\HttpKernel\Exception\NotFoundHttpException::class);
+        $this->expectException(NotFoundHttpException::class);
         $uuid = (new Uuid())->toString();
 
         match ($operation) {
@@ -72,7 +74,7 @@ final class TranscodeSessionAuthorizationTest extends TestCase
         $bus = $this->createMock(MessageBusInterface::class);
         $bus->expects($allowed && !in_array($operation, ['show', 'update'], true) ? $this->once() : $this->never())
             ->method('dispatch')->willReturnCallback(static fn (object $message): Envelope => new Envelope($message));
-        $controller = new TranscodeSessionController($security, $bus, $port, $this->createStub(PlaybackPortInterface::class), new \App\Tests\Unit\Transcode\PublicViewStub());
+        $controller = new TranscodeSessionController($security, $bus, $port, $this->createStub(PlaybackPortInterface::class), new PublicViewStub());
         if (!$allowed) {
             $this->expectException($actor === 'anonymous' ? HttpException::class : AccessDeniedException::class);
         }
@@ -121,7 +123,7 @@ final class TranscodeSessionAuthorizationTest extends TestCase
                 }
                 return new Envelope($command);
             });
-        $controller = new TranscodeSessionController($security, $bus, $port, $this->createStub(PlaybackPortInterface::class), new \App\Tests\Unit\Transcode\PublicViewStub());
+        $controller = new TranscodeSessionController($security, $bus, $port, $this->createStub(PlaybackPortInterface::class), new PublicViewStub());
         $response = $controller->updatePosition($session->getPublicId()->toString(), Request::create('/', 'POST', content: $json));
         self::assertSame($status, $response->getStatusCode());
     }
@@ -147,7 +149,7 @@ final class TranscodeSessionAuthorizationTest extends TestCase
                 return new Envelope($command);
             },
         );
-        $controller = new TranscodeSessionController($security, $bus, $port, $this->createStub(PlaybackPortInterface::class), new \App\Tests\Unit\Transcode\PublicViewStub());
+        $controller = new TranscodeSessionController($security, $bus, $port, $this->createStub(PlaybackPortInterface::class), new PublicViewStub());
         $request = Request::create('/', 'POST', content: json_encode(['position' => 12.5, 'action' => 'pause', 'requestId' => $requestId], JSON_THROW_ON_ERROR));
         for ($attempt = 0; $attempt < 2; ++$attempt) {
             $response = $controller->updatePosition($session->getPublicId()->toString(), $request);

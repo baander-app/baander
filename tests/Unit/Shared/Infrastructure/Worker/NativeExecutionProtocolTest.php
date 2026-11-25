@@ -4,11 +4,13 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Shared\Infrastructure\Worker;
 
+use App\Shared\Application\DTO\DeploymentProfile;
 use App\Shared\Infrastructure\Worker\NativeExecutionClient;
 use App\Shared\Infrastructure\Worker\NativeExecutionException;
 use App\Shared\Infrastructure\Worker\NativeExecutionProtocol;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
+use Swoole\Coroutine;
 
 final class NativeExecutionProtocolTest extends TestCase
 {
@@ -42,7 +44,7 @@ final class NativeExecutionProtocolTest extends TestCase
         $path = sys_get_temp_dir() . '/baander-native-silent-' . bin2hex(random_bytes(6)) . '.sock';
         $server = stream_socket_server('unix://' . $path, $errno, $error);
         self::assertIsResource($server);
-        $client = new NativeExecutionClient($path, 'baander.app:workers', str_repeat('a', 32), 1, 'test', 1, new \App\Shared\Application\DTO\DeploymentProfile());
+        $client = new NativeExecutionClient($path, 'baander.app:workers', str_repeat('a', 32), 1, 'test', 1, new DeploymentProfile());
         $start = hrtime(true);
         try {
             $client->handshake();
@@ -68,14 +70,14 @@ final class NativeExecutionProtocolTest extends TestCase
         $ticks = 0;
         try {
             \Swoole\Coroutine\run(function () use ($path, &$ticks): void {
-                \Swoole\Coroutine::create(function () use (&$ticks): void {
+                Coroutine::create(function () use (&$ticks): void {
                     for ($i = 0; $i < 10; ++$i) {
-                        \Swoole\Coroutine::sleep(0.01);
+                        Coroutine::sleep(0.01);
                         ++$ticks;
                     }
                 });
                 try {
-                    (new NativeExecutionClient($path, 'baander.app:workers', str_repeat('a', 32), 1, 'test', 1, new \App\Shared\Application\DTO\DeploymentProfile()))->handshake();
+                    (new NativeExecutionClient($path, 'baander.app:workers', str_repeat('a', 32), 1, 'test', 1, new DeploymentProfile()))->handshake();
                     self::fail('Silent peer must time out.');
                 } catch (NativeExecutionException) {
                     self::assertSame(10, $ticks);

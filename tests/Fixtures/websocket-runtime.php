@@ -4,19 +4,23 @@ declare(strict_types=1);
 
 // Production HTTP/upgrade checks; the runner owns disposable services and credentials.
 use App\Auth\Domain\Model\OAuth\SignInGrant;
+use App\Auth\Infrastructure\Doctrine\Entity\UserEntity;
+use App\Kernel;
 use App\Shared\Domain\Model\PublicId;
 use App\Tests\Fixtures\Auth\FirstPartyOAuthClient;
 use App\Tests\Fixtures\Auth\SignedDpopProof;
 use App\Tests\Fixtures\WebRuntime\HttpExchange;
 use App\Tests\Fixtures\WebRuntime\StreamClient;
 use Doctrine\ORM\EntityManagerInterface;
+use Swoole\Coroutine;
 use Swoole\Coroutine\Channel;
 use Swoole\Coroutine\Http\Client;
 use Swoole\WebSocket\CloseFrame;
 use Swoole\WebSocket\Frame;
+use Symfony\Component\Dotenv\Dotenv;
 
 require dirname(__DIR__, 2) . '/vendor/autoload.php';
-(new Symfony\Component\Dotenv\Dotenv())->bootEnv(dirname(__DIR__, 2) . '/.env');
+(new Dotenv())->bootEnv(dirname(__DIR__, 2) . '/.env');
 
 const WS_SERVER = 'http://127.0.0.1:9501';
 const WS_ORIGIN = 'https://baander.app';
@@ -105,13 +109,13 @@ if ($mode === 'outage') {
     exit(0);
 }
 
-$kernel = new App\Kernel('prod', false);
+$kernel = new Kernel('prod', false);
 $kernel->boot();
 $manager = $kernel->getContainer()->get('doctrine')->getManager();
 wsCheck($manager instanceof EntityManagerInterface, 'No entity manager.');
 // The fixture uses mapped entities to seed disposable credentials, then the real HTTP firewall.
 $email = 'websocket-' . bin2hex(random_bytes(6)) . '@baander.app';
-$user = new App\Auth\Infrastructure\Doctrine\Entity\UserEntity(new PublicId(), 'WebSocket runtime', $email, 'test-only-unused-password');
+$user = new UserEntity(new PublicId(), 'WebSocket runtime', $email, 'test-only-unused-password');
 $user->markEmailAsVerified();
 $manager->persist($user);
 $manager->flush();
@@ -170,7 +174,7 @@ $value = $ticket();
 \Swoole\Coroutine\run(static function () use ($value): void {
     $results = new Channel(2);
     for ($i = 0; $i < 2; ++$i) {
-        \Swoole\Coroutine::create(static function () use ($value, $results): void {
+        Coroutine::create(static function () use ($value, $results): void {
             $ws = wsOpen('ticket=' . $value);
             try {
                 $results->push($ws->statusCode);

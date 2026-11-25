@@ -6,6 +6,7 @@ require dirname(__DIR__, 4) . '/relay/tests/bootstrap.php';
 
 use Baander\Registry\Qualification\DockerOwnership;
 use Baander\RegistryTests\ContainerContract;
+use Baander\RegistryTests\Interrupted;
 use Baander\RegistryTests\Runtime;
 
 $root = $_SERVER['argv'][1];
@@ -29,7 +30,7 @@ $reflection->getProperty('directory')->setValue($contract, $root . '/fixture');
 try {
     $failure = match ($primary) {
         0 => null,
-        143 => new Baander\RegistryTests\Interrupted(15),
+        143 => new Interrupted(15),
         default => new RuntimeException('primary gate failed', $primary),
     };
     $reflection->getMethod('finish')->invoke($contract, $failure);

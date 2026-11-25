@@ -14,6 +14,7 @@ declare(strict_types=1);
 
 require dirname(__DIR__, 5) . '/vendor/autoload.php';
 
+use App\Shared\Application\Port\ServerNotRunningException;
 use App\Shared\Domain\Model\Uuid;
 use App\Shared\Infrastructure\Swoole\Control\ControlPipeMessageHandler;
 use App\Shared\Infrastructure\Swoole\Control\ControlSocketConfigurator;
@@ -26,9 +27,9 @@ use App\Shared\Infrastructure\Swoole\Control\SwooleServerWorkers;
 use App\Shared\Infrastructure\Swoole\SwooleLiveConnections;
 use App\Shared\Infrastructure\Swoole\WebSocketConnectionRegistry;
 use App\Shared\Infrastructure\Swoole\WebSocketPusher;
-use App\Shared\Application\Port\ServerNotRunningException;
 use Swoole\Http\Request;
 use Swoole\Http\Response;
+use Swoole\Process;
 use Swoole\Server;
 use Swoole\WebSocket\Frame;
 use Swoole\WebSocket\Server as WebSocketServer;
@@ -256,7 +257,7 @@ if ($child === 0) {
     assertAlive($other, 'bystander at the end');
     fclose($other['socket']);
 
-    Swoole\Process::kill($master, SIGTERM);
+    Process::kill($master, SIGTERM);
     exit(0);
 }
 

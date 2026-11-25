@@ -4,11 +4,16 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Shared\Interface\Console;
 
+use App\Shared\Application\DTO\DeploymentProfile;
+use App\Shared\Application\DTO\WorkerAutoscalingProfile;
 use App\Shared\Application\DTO\WorkerRuntimeConfiguration;
+use App\Shared\Application\Exception\DatabaseTimeZoneException;
 use App\Shared\Application\Port\WorkerSupervisorRunnerInterface;
+use App\Shared\Infrastructure\Messaging\WorkerTransportConfiguration;
 use App\Shared\Interface\Console\WorkerCommand;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
+use Symfony\Component\Console\Exception\InvalidOptionException;
 use Symfony\Component\Console\Tester\CommandTester;
 
 final class WorkerCommandTest extends TestCase
@@ -40,7 +45,7 @@ final class WorkerCommandTest extends TestCase
         try {
             (new CommandTester(new WorkerCommand($runner)))->execute([...$this->options(), $option => $value]);
             self::fail('A removed resource option was accepted.');
-        } catch (\Symfony\Component\Console\Exception\InvalidOptionException $error) {
+        } catch (InvalidOptionException $error) {
             self::assertStringContainsString(ltrim($option, '-'), $error->getMessage());
         }
         self::assertNull($runner->configuration);
@@ -127,7 +132,7 @@ final class WorkerCommandTest extends TestCase
         $runner = new class implements WorkerSupervisorRunnerInterface {
             public function run(WorkerRuntimeConfiguration $configuration): int
             {
-                \App\Shared\Infrastructure\Messaging\WorkerTransportConfiguration::validate([
+                WorkerTransportConfiguration::validate([
                     'MESSENGER_TRANSPORT_DSN' => 'redis://operator:private-password@redis.baander.app/messages/baander/fixed',
                 ]);
                 return 0;
@@ -145,7 +150,7 @@ final class WorkerCommandTest extends TestCase
         $runner = new class implements WorkerSupervisorRunnerInterface {
             public function run(WorkerRuntimeConfiguration $configuration): int
             {
-                throw \App\Shared\Application\Exception\DatabaseTimeZoneException::notUtc('Europe/Copenhagen');
+                throw DatabaseTimeZoneException::notUtc('Europe/Copenhagen');
             }
         };
         $tester = new CommandTester(new WorkerCommand($runner));
@@ -158,8 +163,8 @@ final class WorkerCommandTest extends TestCase
     private function options(): array
     {
         return ['--deployment' => 'baander.app:workers', '--boot-id' => str_repeat('a', 32),
-            '--deployment-profile' => (new \App\Shared\Application\DTO\DeploymentProfile())->toJson(),
-            '--autoscaling-profile' => (new \App\Shared\Application\DTO\WorkerAutoscalingProfile())->toJson(),
+            '--deployment-profile' => (new DeploymentProfile())->toJson(),
+            '--autoscaling-profile' => (new WorkerAutoscalingProfile())->toJson(),
             '--unit' => 'execution',
             '--lock-dir' => '/tmp/baander-worker-locks', '--ipc-dir' => '/run/baander-worker'];
     }

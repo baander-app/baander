@@ -4,10 +4,11 @@ declare(strict_types=1);
 
 namespace App\Tests\Functional\Notification\Interface\Console;
 
+use App\Auth\Domain\Model\User;
 use App\Notification\Application\Port\WebhookSecretPortInterface;
 use App\Notification\Infrastructure\Doctrine\Entity\WebhookEntity;
-use App\Shared\Domain\Model\Uuid;
 use App\Shared\Domain\Model\PublicId;
+use App\Shared\Domain\Model\Uuid;
 use App\Tests\Functional\Notification\WebhookDnsStub;
 use App\Tests\Functional\TestCase;
 use Symfony\Bundle\FrameworkBundle\Console\Application;
@@ -156,7 +157,7 @@ final class WebhookCommandsTest extends TestCase
         self::assertSame('https://baander.app/hook', $this->storedWebhook($viaCli)->getUrl());
     }
 
-    private function createFiltered(\App\Auth\Domain\Model\User $admin): string
+    private function createFiltered(User $admin): string
     {
         return $this->assertJsonResponse($this->authenticatedRequest('POST', '/api/webhooks/', $admin, [
             'url' => 'https://baander.app/hook',

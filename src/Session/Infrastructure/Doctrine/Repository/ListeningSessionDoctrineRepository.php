@@ -6,8 +6,12 @@ namespace App\Session\Infrastructure\Doctrine\Repository;
 
 use App\Session\Domain\Model\ListeningSession\ListeningSession;
 use App\Session\Domain\Model\ListeningSession\ListeningSessionState;
+use App\Session\Domain\Model\Playback\ObservedPlaybackState;
+use App\Session\Domain\Model\Playback\PlaybackMedia;
+use App\Session\Domain\Model\Playback\PlaybackState;
 use App\Session\Domain\Repository\ListeningSession\ListeningSessionRepositoryInterface;
 use App\Session\Infrastructure\Doctrine\Entity\ListeningSessionEntity;
+use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
 use Doctrine\ORM\EntityManagerInterface;
 
@@ -81,9 +85,9 @@ final class ListeningSessionDoctrineRepository implements ListeningSessionReposi
             updatedAt: $entity->getUpdatedAt(),
             lastUsedAt: $entity->getLastUsedAt(),
             revision: $entity->getRevision(),
-            media: $entity->getMedia() === null ? null : new \App\Session\Domain\Model\Playback\PlaybackMedia($entity->getMedia()['kind'], \App\Shared\Domain\Model\PublicId::fromString($entity->getMedia()['publicId'])),
-            desiredState: \App\Session\Domain\Model\Playback\PlaybackState::from($entity->getDesiredState()),
-            observedState: \App\Session\Domain\Model\Playback\ObservedPlaybackState::from($entity->getObservedState()),
+            media: $entity->getMedia() === null ? null : new PlaybackMedia($entity->getMedia()['kind'], PublicId::fromString($entity->getMedia()['publicId'])),
+            desiredState: PlaybackState::from($entity->getDesiredState()),
+            observedState: ObservedPlaybackState::from($entity->getObservedState()),
             selectedDestinationId: $entity->getSelectedDestinationId(),
             activeIncarnationId: $entity->getActiveIncarnationId(),
         ));

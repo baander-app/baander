@@ -3,9 +3,13 @@
 declare(strict_types=1);
 
 use App\Auth\Domain\Model\OAuth\SignInGrant;
+use App\Auth\Infrastructure\Doctrine\Entity\UserEntity;
+use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
 use App\Tests\Fixtures\WebRuntime\HttpExchange;
 use App\Tests\Fixtures\WebRuntime\StreamClient;
+use Doctrine\DBAL\Connection;
+use Doctrine\ORM\EntityManagerInterface;
 
 /**
  * Drives one job per media kind in isolation, then the configured slots together,
@@ -14,8 +18,8 @@ use App\Tests\Fixtures\WebRuntime\StreamClient;
  * buffer-ahead throttle stops it.
  *
  * @var string $project
- * @var Doctrine\ORM\EntityManagerInterface $manager
- * @var Doctrine\DBAL\Connection $db
+ * @var EntityManagerInterface $manager
+ * @var Connection $db
  */
 require_once $project . '/tests/Fixtures/Worker/MediaControlObservation.php';
 
@@ -31,8 +35,8 @@ ensure(mkdir(ROOT . '/cost-progress', 0700) || is_dir(ROOT . '/cost-progress'), 
 $owners = [];
 foreach (range(0, 7) as $index) {
     $email = 'media-cost-' . $index . '@baander.app';
-    $owner = new App\Auth\Infrastructure\Doctrine\Entity\UserEntity(
-        new App\Shared\Domain\Model\PublicId(), 'Media cost ' . $index, $email, 'unused-password', roles: ['ROLE_ADMIN'],
+    $owner = new UserEntity(
+        new PublicId(), 'Media cost ' . $index, $email, 'unused-password', roles: ['ROLE_ADMIN'],
     );
     $owner->markEmailAsVerified();
     $manager->persist($owner);

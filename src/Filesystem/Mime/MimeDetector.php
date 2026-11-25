@@ -4,13 +4,15 @@ declare(strict_types=1);
 
 namespace App\Filesystem\Mime;
 
+use App\Filesystem\Application\Port\MimeDetectorPortInterface;
+
 /**
  * Detects MIME types by reading file magic bytes.
  *
  * Unlike finfo_file(), this implementation provides fine-grained control
  * over detection and handles edge cases for media files.
  */
-final class MimeDetector implements \App\Filesystem\Application\Port\MimeDetectorPortInterface
+final class MimeDetector implements MimeDetectorPortInterface
 {
     /** Magic byte signatures keyed by MIME type. */
     private const array SIGNATURES = [

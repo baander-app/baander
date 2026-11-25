@@ -4,18 +4,27 @@ declare(strict_types=1);
 
 namespace Baander\DevWebsite;
 
+use Baander\DevWebsite\Assets\Screenshots;
+use Baander\DevWebsite\Content\SiteMenu;
+use Baander\DevWebsite\Markdown\CodeBlock;
+use Baander\DevWebsite\Markdown\CodeHighlighter;
+use Baander\DevWebsite\Markdown\HeadingSlugNormalizer;
+use Baander\DevWebsite\Markdown\RenderedCode;
+use Baander\DevWebsite\Metadata\SearchMetadata;
+use Baander\DevWebsite\Metadata\Sitemap;
+use Baander\DevWebsite\Metadata\SourceHistory;
 use Baander\Filesystem\Paths;
 use Closure;
 use DOMDocument;
 use League\CommonMark\Environment\Environment;
 use League\CommonMark\Extension\CommonMark\CommonMarkCoreExtension;
-use League\CommonMark\Extension\CommonMark\Node\Block\Heading;
 use League\CommonMark\Extension\CommonMark\Node\Block\FencedCode;
+use League\CommonMark\Extension\CommonMark\Node\Block\Heading;
 use League\CommonMark\Extension\CommonMark\Node\Inline\Image;
 use League\CommonMark\Extension\CommonMark\Node\Inline\Link;
-use League\CommonMark\Extension\Table\TableExtension;
-use League\CommonMark\Extension\HeadingPermalink\HeadingPermalinkExtension;
 use League\CommonMark\Extension\HeadingPermalink\HeadingPermalink;
+use League\CommonMark\Extension\HeadingPermalink\HeadingPermalinkExtension;
+use League\CommonMark\Extension\Table\TableExtension;
 use League\CommonMark\Node\Block\Document;
 use League\CommonMark\Node\RawMarkupContainerInterface;
 use League\CommonMark\Node\StringContainerHelper;
@@ -25,15 +34,6 @@ use RecursiveDirectoryIterator;
 use RecursiveIteratorIterator;
 use RuntimeException;
 use Throwable;
-use Baander\DevWebsite\Content\SiteMenu;
-use Baander\DevWebsite\Markdown\HeadingSlugNormalizer;
-use Baander\DevWebsite\Markdown\RenderedCode;
-use Baander\DevWebsite\Metadata\SourceHistory;
-use Baander\DevWebsite\Assets\Screenshots;
-use Baander\DevWebsite\Metadata\SearchMetadata;
-use Baander\DevWebsite\Metadata\Sitemap;
-use Baander\DevWebsite\Markdown\CodeHighlighter;
-use Baander\DevWebsite\Markdown\CodeBlock;
 
 /**
  * A public page names its template and data. Its trail lists the ancestors below the homepage. Its
@@ -244,7 +244,7 @@ final class WebsiteBuilder
                 if ($language === 'php') {
                     try {
                         $html = new CodeHighlighter()->highlight($node->getLiteral());
-                    } catch (\Throwable $error) {
+                    } catch (Throwable $error) {
                         fwrite(STDERR, $source . ', block ' . $ordinal . ': PHP highlighting failed; using escaped source: ' . $error->getMessage() . "\n");
                         $html = htmlspecialchars($node->getLiteral(), ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
                     }

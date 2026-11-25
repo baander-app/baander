@@ -4,22 +4,23 @@ declare(strict_types=1);
 
 namespace App\Tests\Integration;
 
-use App\Tests\Fixtures\Messaging\MessageCodecFactory;
 use App\Kernel;
 use App\Scheduler\Application\Command\ExecuteScheduledOccurrenceCommand;
 use App\Scheduler\Infrastructure\Process\SchedulerWorkerRunner;
 use App\Shared\Domain\Model\Uuid;
 use App\Shared\Infrastructure\Messenger\JsonTransportSerializer;
 use App\Shared\Infrastructure\Worker\DoctrineDeploymentLease;
-use App\Tests\Support\DeploymentJournalFixture;
 use App\Shared\Infrastructure\Worker\WorkerChildProcess;
+use App\Tests\Fixtures\Messaging\MessageCodecFactory;
+use App\Tests\Support\DeploymentJournalFixture;
+use App\Tests\Support\FinalSchemaBootstrap;
 use Doctrine\DBAL\Connection;
 use Doctrine\DBAL\DriverManager;
 use Doctrine\DBAL\Tools\DsnParser;
 use PHPUnit\Framework\TestCase;
-use Symfony\Component\Messenger\Envelope;
 use Symfony\Component\Messenger\Bridge\Redis\Transport\Connection as RedisConnection;
 use Symfony\Component\Messenger\Bridge\Redis\Transport\RedisTransport;
+use Symfony\Component\Messenger\Envelope;
 
 /** Actual isolated child, PostgreSQL and Redis; never consumes or executes the published jobs. */
 final class SchedulerWorkerRunnerTest extends TestCase
@@ -48,7 +49,7 @@ final class SchedulerWorkerRunnerTest extends TestCase
         $this->schema = 'scheduler_loop_' . (random_bytes(8) |> bin2hex(...));
         $this->database->executeStatement('CREATE SCHEMA ' . $this->schema);
         $this->database->executeStatement('SET search_path TO ' . $this->schema . ', public');
-        \App\Tests\Support\FinalSchemaBootstrap::bootstrap($this->database);
+        FinalSchemaBootstrap::bootstrap($this->database);
         $this->database->executeStatement('DELETE FROM scheduled_jobs');
         DeploymentJournalFixture::ready($this->database, 'scheduler.baander.app', str_repeat('a', 32));
         $lease = new DoctrineDeploymentLease($this->database)->acquire('scheduler.baander.app', str_repeat('a', 32), 300);

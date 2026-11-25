@@ -5,13 +5,14 @@ declare(strict_types=1);
 namespace App\Tests\Unit\Playlist\Interface\Controller;
 
 use App\Auth\Application\Port\AuthenticatedUserIdentityInterface;
+use App\Catalog\Application\Port\SongAvailabilityPortInterface;
 use App\Catalog\Application\Port\SongPortInterface;
-use App\Playlist\Application\Port\PlaylistSongVisibilityInterface;
 use App\Library\Application\Port\LibraryReadScopeProviderInterface;
 use App\Playlist\Application\Command\AddCollaboratorCommand;
 use App\Playlist\Application\Command\RemoveCollaboratorCommand;
 use App\Playlist\Application\Port\PlaylistCollaboratorResolverInterface;
 use App\Playlist\Application\Port\PlaylistPortInterface;
+use App\Playlist\Application\Port\PlaylistSongVisibilityInterface;
 use App\Playlist\Domain\Model\Playlist;
 use App\Playlist\Interface\Controller\PlaylistController;
 use App\Shared\Application\Exception\NotFoundException;
@@ -68,7 +69,7 @@ final class PlaylistCollaboratorRoutesTest extends TestCase
             $this->createStub(LibraryReadScopeProviderInterface::class),
             $this->users,
             $this->createStub(PlaylistSongVisibilityInterface::class),
-            $this->createStub(\App\Catalog\Application\Port\SongAvailabilityPortInterface::class),
+            $this->createStub(SongAvailabilityPortInterface::class),
         );
         $this->controller->setTranslator(new Translator('en'));
     }

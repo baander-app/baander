@@ -4,20 +4,25 @@ declare(strict_types=1);
 
 namespace Baander\Deployment\Tests;
 
-use Baander\Deployment\Presets\Configuration;
-use Baander\Deployment\Presets\StateStore;
-use Baander\Deployment\Presets\Renderer;
-use Baander\Deployment\Presets\RedisCredentials;
-use Baander\Deployment\Profiles\ImageProfile;
+use App\Shared\Application\DTO\DeploymentProfile;
+use App\Shared\Application\DTO\HardwareEncoder;
+use App\Shared\Application\DTO\MediaSlotBounds;
+use App\Shared\Infrastructure\Worker\DeploymentRuntimeEnvironment;
+use App\Shared\Infrastructure\Worker\OutOfMemoryKillOrder;
 use Baander\Configuration\ApplicationLayout;
 use Baander\Configuration\Sources\JsonDocument;
-use Baander\Deployment\Preset;
-use Baander\Deployment\Workers\KillOrder;
+use Baander\Containers\Docker\Client;
+use Baander\Containers\Docker\Target;
 use Baander\Deployment\Database\Pooler;
 use Baander\Deployment\Database\PostgresConfiguration;
 use Baander\Deployment\Database\PostgresSettings;
-use Baander\Containers\Docker\Client;
-use Baander\Containers\Docker\Target;
+use Baander\Deployment\Preset;
+use Baander\Deployment\Presets\Configuration;
+use Baander\Deployment\Presets\RedisCredentials;
+use Baander\Deployment\Presets\Renderer;
+use Baander\Deployment\Presets\StateStore;
+use Baander\Deployment\Profiles\ImageProfile;
+use Baander\Deployment\Workers\KillOrder;
 use Baander\Filesystem\AtomicFile;
 use Baander\Images\Inventory\Collector;
 use Baander\Process\Execution\CommandExecutor;
@@ -26,12 +31,9 @@ use Baander\Process\Execution\EngineExecutor;
 use Baander\Process\Execution\ExecutionContext;
 use Baander\Process\Execution\ProcessResult;
 use Baander\Process\Execution\ProcessSpec;
-use App\Shared\Application\DTO\DeploymentProfile;
-use App\Shared\Application\DTO\HardwareEncoder;
-use App\Shared\Application\DTO\MediaSlotBounds;
-use App\Shared\Infrastructure\Worker\DeploymentRuntimeEnvironment;
-use App\Shared\Infrastructure\Worker\OutOfMemoryKillOrder;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
+use Symfony\Component\Dotenv\Dotenv;
 
 final class PresetDeploymentTest extends TestCase
 {
@@ -274,7 +276,7 @@ final class PresetDeploymentTest extends TestCase
         $variables = ['APP_SECRET' => 'APP_SECRET', 'STREAM_URL_HMAC_SECRET' => 'STREAM_URL_HMAC_SECRET', 'AUTH_TOTP_ENCRYPTION_KEY' => 'AUTH_TOTP_ENCRYPTION_KEY', 'REDIS_PASSWORD' => 'REDIS_PASSWORD'];
         $urls = ['DATABASE_URL' => 'DB_PASSWORD', 'DATABASE_CONTROL_URL' => 'DB_PASSWORD', 'REDIS_URL' => 'REDIS_PASSWORD'];
         foreach (['.env.dev', '.env.example', '.env.test'] as $file) {
-            $values = new \Symfony\Component\Dotenv\Dotenv()->parse((string) file_get_contents(dirname(__DIR__, 3) . '/' . $file), $file);
+            $values = new Dotenv()->parse((string) file_get_contents(dirname(__DIR__, 3) . '/' . $file), $file);
             foreach ($variables as $variable => $setting) {
                 if (($values[$variable] ?? '') !== '') {
                     yield $file . ' ' . $variable => [$setting, $values[$variable]];
@@ -289,7 +291,7 @@ final class PresetDeploymentTest extends TestCase
         }
     }
 
-    #[\PHPUnit\Framework\Attributes\DataProvider('committedSecrets')]
+    #[DataProvider('committedSecrets')]
     public function testThePresetRefusesEverySecretATrackedEnvironmentFileCommits(string $setting, string $value): void
     {
         $data = self::configuration();
@@ -313,7 +315,7 @@ final class PresetDeploymentTest extends TestCase
         yield '31-byte TOTP key' => ['AUTH_TOTP_ENCRYPTION_KEY', str_repeat("\x02", 31) |> base64_encode(...), 'AUTH_TOTP_ENCRYPTION_KEY is shorter than 32 bytes'];
     }
 
-    #[\PHPUnit\Framework\Attributes\DataProvider('shortSecrets')]
+    #[DataProvider('shortSecrets')]
     public function testRenderingRefusesAShortSecretOrPassword(string $setting, string $value, string $problem): void
     {
         $data = self::configuration();

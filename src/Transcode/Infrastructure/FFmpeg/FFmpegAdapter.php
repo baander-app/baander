@@ -5,11 +5,12 @@ declare(strict_types=1);
 namespace App\Transcode\Infrastructure\FFmpeg;
 
 use App\Shared\Application\Port\SystemSettingsPortInterface;
+use App\Shared\Infrastructure\Worker\NativeExecutionException;
 use App\Transcode\Application\DTO\MediaOperation;
-use App\Transcode\Application\Service\MediaExecutionPolicy;
 use App\Transcode\Application\Port\FFmpegPortInterface;
-use App\Transcode\Domain\Service\AudioProcessingRules;
+use App\Transcode\Application\Service\MediaExecutionPolicy;
 use App\Transcode\Application\Settings\TranscodeSettingDefinitions;
+use App\Transcode\Domain\Service\AudioProcessingRules;
 use App\Transcode\Domain\Service\VideoProcessingRules;
 use App\Transcode\Domain\ValueObject\AacImplementation;
 use App\Transcode\Domain\ValueObject\AudioProfile;
@@ -94,7 +95,7 @@ final class FFmpegAdapter implements FFmpegPortInterface
         try {
             $probe = $this->ffprobeAdapter->probeVideo($sourcePath);
             $sourceCodec = $probe->videoCodec;
-        } catch (\App\Shared\Infrastructure\Worker\NativeExecutionException $error) {
+        } catch (NativeExecutionException $error) {
             throw $error;
         } catch (\Throwable) {
             // ffprobe may fail for some sources; continue without hardware decode

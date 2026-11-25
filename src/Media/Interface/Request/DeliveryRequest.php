@@ -5,9 +5,10 @@ declare(strict_types=1);
 namespace App\Media\Interface\Request;
 
 use OpenApi\Spec as OA;
+use Symfony\Component\DependencyInjection\Attribute\Exclude;
 use Symfony\Component\Validator\Constraints as Assert;
 
-#[\Symfony\Component\DependencyInjection\Attribute\Exclude]
+#[Exclude]
 #[OA\Schema(
     type: 'object',
     properties: [

@@ -10,27 +10,32 @@ use App\Auth\Domain\Model\OAuth\ClientType;
 use App\Auth\Domain\Model\OAuth\SignInGrant;
 use App\Auth\Domain\Model\OAuth\TokenId;
 use App\Auth\Domain\Model\OAuth\TokenIssuance;
+use App\Auth\Domain\Model\OAuth\TokenMetadata;
+use App\Auth\Domain\Model\User;
 use App\Auth\Domain\Repository\OAuth\AccessTokenRepositoryInterface;
 use App\Auth\Domain\Repository\OAuth\ClientRepositoryInterface;
-use App\Auth\Domain\Repository\UserRepositoryInterface;
-use App\Auth\Domain\Model\OAuth\TokenMetadata;
 use App\Auth\Domain\Repository\OAuth\TokenMetadataRepositoryInterface;
+use App\Auth\Domain\Repository\UserRepositoryInterface;
 use App\Auth\Infrastructure\Security\OAuth\OAuth2Authenticator;
 use App\Auth\Infrastructure\Security\SecurityUser;
+use App\Shared\Domain\Model\Email;
+use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
 use App\Tests\Fixtures\Auth\AuthenticationFailureMessages;
 use League\OAuth2\Server\Exception\OAuthServerException;
 use League\OAuth2\Server\ResourceServer;
+use Nyholm\Psr7\ServerRequest as Psr7Request;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\MockObject\Stub;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
 use Symfony\Bridge\PsrHttpMessage\HttpMessageFactoryInterface;
-use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\JsonResponse;
+use Symfony\Component\HttpFoundation\Request;
+use Symfony\Component\Security\Core\Authentication\Token\TokenInterface;
+use Symfony\Component\Security\Core\Exception\BadCredentialsException;
 use Symfony\Component\Security\Core\Exception\CustomUserMessageAuthenticationException;
 use Symfony\Component\Security\Http\Authenticator\Passport\SelfValidatingPassport;
-use Nyholm\Psr7\ServerRequest as Psr7Request;
 
 final class OAuth2AuthenticatorTest extends TestCase
 {
@@ -48,7 +53,7 @@ final class OAuth2AuthenticatorTest extends TestCase
         $tokenMetadataRepository = $this->createStub(TokenMetadataRepositoryInterface::class);
         $this->authenticator = new OAuth2Authenticator(
             $this->resourceServer,
-            $this->createStub(\App\Auth\Domain\Repository\UserRepositoryInterface::class),
+            $this->createStub(UserRepositoryInterface::class),
             $this->psrFactory,
             $logger,
             $tokenMetadataRepository,
@@ -86,7 +91,7 @@ final class OAuth2AuthenticatorTest extends TestCase
     {
         $result = $this->authenticator->onAuthenticationSuccess(
             Request::create('/'),
-            $this->createStub(\Symfony\Component\Security\Core\Authentication\Token\TokenInterface::class),
+            $this->createStub(TokenInterface::class),
             'main',
         );
 
@@ -97,7 +102,7 @@ final class OAuth2AuthenticatorTest extends TestCase
     {
         $result = $this->authenticator->onAuthenticationFailure(
             Request::create('/'),
-            new \Symfony\Component\Security\Core\Exception\CustomUserMessageAuthenticationException(
+            new CustomUserMessageAuthenticationException(
                 'Invalid or expired token.',
                 ['error_code' => 'AUTH_INVALID_TOKEN'],
             ),
@@ -118,7 +123,7 @@ final class OAuth2AuthenticatorTest extends TestCase
     {
         $request = Request::create('/api/libraries', server: ['HTTP_ACCEPT_LANGUAGE' => 'th']);
 
-        $result = $this->authenticator->onAuthenticationFailure($request, new \Symfony\Component\Security\Core\Exception\CustomUserMessageAuthenticationException(
+        $result = $this->authenticator->onAuthenticationFailure($request, new CustomUserMessageAuthenticationException(
             'Invalid or expired token.',
             ['error_code' => 'AUTH_INVALID_TOKEN'],
         ));
@@ -133,7 +138,7 @@ final class OAuth2AuthenticatorTest extends TestCase
     {
         $result = $this->authenticator->onAuthenticationFailure(
             Request::create('/'),
-            new \Symfony\Component\Security\Core\Exception\BadCredentialsException('Invalid credentials'),
+            new BadCredentialsException('Invalid credentials'),
         );
 
         $this->assertInstanceOf(JsonResponse::class, $result);
@@ -158,7 +163,7 @@ final class OAuth2AuthenticatorTest extends TestCase
     {
         // League exposes the JWT jti, the access token's public identifier.
         $accessTokenId = TokenId::generate();
-        $this->setupSuccessfulResourceServerValidation($accessTokenId->toString(), (new \App\Shared\Domain\Model\PublicId())->toString());
+        $this->setupSuccessfulResourceServerValidation($accessTokenId->toString(), (new PublicId())->toString());
 
         $tokenMetadataRepository = $this->createMock(TokenMetadataRepositoryInterface::class);
         $tokenMetadataRepository->expects($this->once())->method('findByTokenId')
@@ -195,7 +200,7 @@ final class OAuth2AuthenticatorTest extends TestCase
     /** The approval endpoints read the epoch the token was issued under from the request. */
     public function testACurrentTokenSetsItsCredentialEpochOnTheRequest(): void
     {
-        $this->setupSuccessfulResourceServerValidation(TokenId::generate()->toString(), (new \App\Shared\Domain\Model\PublicId())->toString());
+        $this->setupSuccessfulResourceServerValidation(TokenId::generate()->toString(), (new PublicId())->toString());
         $request = Request::create('/');
         $request->headers->set('Authorization', 'Bearer token123');
 
@@ -207,7 +212,7 @@ final class OAuth2AuthenticatorTest extends TestCase
     /** A token issued before the user's latest password change is refused, even when nothing revoked it. */
     public function testATokenBehindTheUsersCredentialEpochDoesNotAuthenticate(): void
     {
-        $this->setupSuccessfulResourceServerValidation(TokenId::generate()->toString(), (new \App\Shared\Domain\Model\PublicId())->toString());
+        $this->setupSuccessfulResourceServerValidation(TokenId::generate()->toString(), (new PublicId())->toString());
         $request = Request::create('/');
         $request->headers->set('Authorization', 'Bearer token123');
 
@@ -219,8 +224,8 @@ final class OAuth2AuthenticatorTest extends TestCase
 
     public function testATokenOfADisabledAccountDoesNotAuthenticate(): void
     {
-        $user = \App\Auth\Domain\Model\User::register(
-            new \App\Shared\Domain\Model\Email('disabled@baander.app'),
+        $user = User::register(
+            new Email('disabled@baander.app'),
             'hashed-pw',
             'Disabled User',
         );
@@ -268,7 +273,7 @@ final class OAuth2AuthenticatorTest extends TestCase
     {
         $user = $this->user('bound@baander.app');
         $this->setupSuccessfulResourceServerValidation(TokenId::generate()->toString(), $user->getPublicId()->toString(), 'bound-key-thumbprint');
-        $userRepository = $this->createMock(\App\Auth\Domain\Repository\UserRepositoryInterface::class);
+        $userRepository = $this->createMock(UserRepositoryInterface::class);
         $userRepository->expects($this->never())->method('findByPublicId');
         $authenticator = $this->createAuthenticator($this->createStub(TokenMetadataRepositoryInterface::class), userRepository: $userRepository);
 
@@ -397,7 +402,7 @@ final class OAuth2AuthenticatorTest extends TestCase
     public function testTheSpaPublicIdOnAClientThatIsNotFirstPartyIsDelegated(): void
     {
         $admin = $this->admin();
-        $client = Client::create('Impostor', [], publicId: \App\Shared\Domain\Model\PublicId::fromString(self::SPA_CLIENT_ID));
+        $client = Client::create('Impostor', [], publicId: PublicId::fromString(self::SPA_CLIENT_ID));
         $this->setupSuccessfulResourceServerValidation(TokenId::generate()->toString(), $admin->getPublicId()->toString(), 'jkt', self::SPA_CLIENT_ID, ['library']);
 
         $request = $this->dpopRequest();
@@ -410,12 +415,12 @@ final class OAuth2AuthenticatorTest extends TestCase
 
     private function firstPartyClient(): Client
     {
-        return Client::create('Baander', [], firstParty: true, passwordClient: true, publicId: \App\Shared\Domain\Model\PublicId::fromString(self::SPA_CLIENT_ID));
+        return Client::create('Baander', [], firstParty: true, passwordClient: true, publicId: PublicId::fromString(self::SPA_CLIENT_ID));
     }
 
-    private function admin(): \App\Auth\Domain\Model\User
+    private function admin(): User
     {
-        return \App\Auth\Domain\Model\User::createByOperator(new \App\Shared\Domain\Model\Email('admin-' . bin2hex(random_bytes(4)) . '@baander.app'), 'hashed-pw', 'Admin', ['ROLE_USER', 'ROLE_ADMIN']);
+        return User::createByOperator(new Email('admin-' . bin2hex(random_bytes(4)) . '@baander.app'), 'hashed-pw', 'Admin', ['ROLE_USER', 'ROLE_ADMIN']);
     }
 
     private function dpopRequest(): Request
@@ -426,9 +431,9 @@ final class OAuth2AuthenticatorTest extends TestCase
         return $request;
     }
 
-    private function user(string $email): \App\Auth\Domain\Model\User
+    private function user(string $email): User
     {
-        return \App\Auth\Domain\Model\User::register(new \App\Shared\Domain\Model\Email($email), 'hashed-pw', 'Test User');
+        return User::register(new Email($email), 'hashed-pw', 'Test User');
     }
 
 
@@ -470,14 +475,14 @@ final class OAuth2AuthenticatorTest extends TestCase
 
     private function createAuthenticator(
         TokenMetadataRepositoryInterface $tokenMetadataRepository,
-        ?\App\Auth\Domain\Model\User $user = null,
-        ?\App\Auth\Domain\Repository\UserRepositoryInterface $userRepository = null,
+        ?User $user = null,
+        ?UserRepositoryInterface $userRepository = null,
         ?Client $client = null,
         ?int $credentialEpoch = 5,
         SignInGrant $grant = SignInGrant::AuthorizationCode,
     ): OAuth2Authenticator {
         if ($userRepository === null) {
-            $userRepository = $this->createStub(\App\Auth\Domain\Repository\UserRepositoryInterface::class);
+            $userRepository = $this->createStub(UserRepositoryInterface::class);
             $userRepository->method('findByPublicId')->willReturn($user ?? $this->user('test@baander.app'));
         }
         $clients = $this->createStub(ClientRepositoryInterface::class);

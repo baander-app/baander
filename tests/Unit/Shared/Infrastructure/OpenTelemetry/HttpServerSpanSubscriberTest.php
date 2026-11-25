@@ -11,6 +11,7 @@ use App\Shared\Infrastructure\OpenTelemetry\InMemorySpanProcessor;
 use App\Shared\Infrastructure\OpenTelemetry\SpanBridge;
 use App\Shared\Infrastructure\OpenTelemetry\TracerProviderFactory;
 use OpenTelemetry\API\Trace\Span;
+use OpenTelemetry\API\Trace\TracerProviderInterface;
 use OpenTelemetry\SDK\Trace\SpanExporter\InMemoryExporter;
 use OpenTelemetry\SDK\Trace\SpanExporterInterface;
 use PHPUnit\Framework\TestCase;
@@ -197,7 +198,7 @@ final class HttpServerSpanSubscriberTest extends TestCase
         return new HttpSpanCapturePolicy($settings);
     }
 
-    private function tracerProvider(bool $exportEnabled): \OpenTelemetry\API\Trace\TracerProviderInterface
+    private function tracerProvider(bool $exportEnabled): TracerProviderInterface
     {
         return (new TracerProviderFactory(new InMemorySpanProcessor($this->bridge), $exportEnabled, '', 'baander'))->create();
     }

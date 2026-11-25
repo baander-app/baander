@@ -1,6 +1,15 @@
 <?php
 
 declare(strict_types=1);
+use App\Shared\Application\DTO\DeploymentProfile;
+use App\Shared\Application\DTO\WorkerAutoscalingProfile;
+use App\Shared\Infrastructure\Worker\Autoscaling\AutoscalingStatus;
+use App\Shared\Infrastructure\Worker\DeploymentLease;
+use Baander\DevQualification\Fixtures\Worker\AutoscalingStatusObservation;
+use Baander\DevQualification\Fixtures\Worker\CompletionCursor;
+use Baander\DevQualification\Fixtures\Worker\EvidenceMode;
+use Doctrine\DBAL\DriverManager;
+use Doctrine\DBAL\Tools\DsnParser;
 
 require dirname(__DIR__, 3) . '/vendor/autoload.php';
 require dirname(__DIR__, 3) . '/scripts/vendor/autoload.php';
@@ -10,9 +19,9 @@ $seconds = (int) ($argv[2] ?? 480);
 if (!in_array($unit, ['control', 'execution'], true) || $seconds < 1 || $seconds > 500) {
     throw new InvalidArgumentException('Invalid bounded sampler.');
 }
-$db = $unit === 'control' ? Doctrine\DBAL\DriverManager::getConnection((new Doctrine\DBAL\Tools\DsnParser(['postgresql' => 'pdo_pgsql']))->parse((string) getenv('DATABASE_URL'))) : null;
+$db = $unit === 'control' ? DriverManager::getConnection((new DsnParser(['postgresql' => 'pdo_pgsql']))->parse((string) getenv('DATABASE_URL'))) : null;
 $directory = (getenv('BAANDER_WORKER_IPC_DIRECTORY') ?: '/run/baander-worker') . '/' . getenv('BAANDER_WORKER_BOOT_ID');
-$completions = new \Baander\DevQualification\Fixtures\Worker\CompletionCursor($directory . '/autoscaling-completions.jsonl');
+$completions = new CompletionCursor($directory . '/autoscaling-completions.jsonl');
 $deadline = hrtime(true) / 1e9 + $seconds;
 // The figures an unlimited cgroup is measured against: the host's CPUs, memory and task bound.
 $kernel = static fn(string $name): int => (int) trim((string) @file_get_contents('/proc/sys/kernel/' . $name));
@@ -35,10 +44,10 @@ while (true) {
         $state = $sample['admission'];
         $profileFields = json_decode((string) file_get_contents(__DIR__ . '/autoscaling-profile.json'), true, flags: JSON_THROW_ON_ERROR);
         $profileFields['maximumConcurrency'] = count($state['slots']);
-        $profile = App\Shared\Application\DTO\WorkerAutoscalingProfile::fromJson(json_encode($profileFields, JSON_THROW_ON_ERROR));
-        $lease = new App\Shared\Infrastructure\Worker\DeploymentLease($state['namespace'], $state['bootId'], $state['epoch']);
-        $status = new App\Shared\Infrastructure\Worker\Autoscaling\AutoscalingStatus(dirname($directory), $lease, $profile, \App\Shared\Application\DTO\DeploymentProfile::fromEnvironment());
-        $observation = \Baander\DevQualification\Fixtures\Worker\AutoscalingStatusObservation::capture($status->snapshot(...));
+        $profile = WorkerAutoscalingProfile::fromJson(json_encode($profileFields, JSON_THROW_ON_ERROR));
+        $lease = new DeploymentLease($state['namespace'], $state['bootId'], $state['epoch']);
+        $status = new AutoscalingStatus(dirname($directory), $lease, $profile, DeploymentProfile::fromEnvironment());
+        $observation = AutoscalingStatusObservation::capture($status->snapshot(...));
         $sample['status'] = $observation['status'];
         $sample['statusAttempts'] = $observation['attempts'];
     }
@@ -65,7 +74,7 @@ while (true) {
     if ($db !== null) {
         $sample['lease'] = $db->fetchAssociative('SELECT owner_boot_id, epoch, state, expires_at > clock_timestamp() AS unexpired FROM worker_deployment_leases WHERE namespace = ?', [getenv('BAANDER_WORKER_NAMESPACE')]);
         $sample['connections'] = (int) $db->fetchOne('SELECT count(*) FROM pg_stat_activity WHERE datname = current_database()');
-        $sample['completions'] = $completions->read($stopping ? \Baander\DevQualification\Fixtures\Worker\EvidenceMode::Completed : \Baander\DevQualification\Fixtures\Worker\EvidenceMode::Live);
+        $sample['completions'] = $completions->read($stopping ? EvidenceMode::Completed : EvidenceMode::Live);
     }
     $sample['capturedAt'] = hrtime(true) / 1e9;
     echo json_encode($sample, JSON_THROW_ON_ERROR) . "\n";
@@ -73,5 +82,5 @@ while (true) {
     if ($stopping) {
         break;
     }
-    usleep(\Baander\DevQualification\Fixtures\Worker\AutoscalingStatusObservation::INTERVAL_MICROSECONDS);
+    usleep(AutoscalingStatusObservation::INTERVAL_MICROSECONDS);
 }

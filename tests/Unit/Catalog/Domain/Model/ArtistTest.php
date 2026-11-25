@@ -10,6 +10,7 @@ use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
 use DateTimeImmutable;
 use InvalidArgumentException;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
 final class ArtistTest extends TestCase
@@ -296,15 +297,15 @@ final class ArtistTest extends TestCase
         yield 'country' => ['country', ['country' => 'GB']];
         yield 'gender' => ['gender', ['gender' => 'female']];
         yield 'type' => ['type', ['type' => 'Group']];
-        yield 'lifeSpanBegin' => ['lifeSpanBegin', ['lifeSpanBegin' => new \DateTimeImmutable('1960-01-01')]];
-        yield 'lifeSpanEnd' => ['lifeSpanEnd', ['lifeSpanEnd' => new \DateTimeImmutable('1970-01-01')]];
+        yield 'lifeSpanBegin' => ['lifeSpanBegin', ['lifeSpanBegin' => new DateTimeImmutable('1960-01-01')]];
+        yield 'lifeSpanEnd' => ['lifeSpanEnd', ['lifeSpanEnd' => new DateTimeImmutable('1970-01-01')]];
         yield 'disambiguation' => ['disambiguation', ['disambiguation' => 'UK band']];
         yield 'sortName' => ['sortName', ['sortName' => 'Beatles, The']];
         yield 'biography' => ['biography', ['biography' => 'Formed in Liverpool.']];
     }
 
     /** @param array<string, mixed> $change */
-    #[\PHPUnit\Framework\Attributes\DataProvider('everyLockableField')]
+    #[DataProvider('everyLockableField')]
     public function testUpdateMetadataRejectsAChangeToAnyLockedField(string $field, array $change): void
     {
         $artist = Artist::create('Test');

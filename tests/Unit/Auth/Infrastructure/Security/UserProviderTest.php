@@ -10,11 +10,14 @@ use App\Auth\Domain\Repository\UserRepositoryInterface;
 use App\Auth\Infrastructure\Security\SecurityUser;
 use App\Auth\Infrastructure\Security\UserProvider;
 use App\Shared\Domain\Model\Email;
+use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
 use PHPUnit\Framework\MockObject\Stub;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Security\Core\Exception\UnsupportedUserException;
 use Symfony\Component\Security\Core\Exception\UserNotFoundException;
+use Symfony\Component\Security\Core\User\PasswordAuthenticatedUserInterface;
+use Symfony\Component\Security\Core\User\UserInterface;
 
 final class UserProviderTest extends TestCase
 {
@@ -39,7 +42,7 @@ final class UserProviderTest extends TestCase
     {
         return User::reconstitute(new UserState(
             id: Uuid::v4(),
-            publicId: new \App\Shared\Domain\Model\PublicId(),
+            publicId: new PublicId(),
             name: 'Test User',
             email: $email,
             password: $password,
@@ -136,7 +139,7 @@ final class UserProviderTest extends TestCase
 
     public function testThrowsWhenRefreshingNonSecurityUser(): void
     {
-        $otherUser = $this->createStub(\Symfony\Component\Security\Core\User\UserInterface::class);
+        $otherUser = $this->createStub(UserInterface::class);
 
         $this->expectException(UnsupportedUserException::class);
 
@@ -196,7 +199,7 @@ final class UserProviderTest extends TestCase
         $this->userRepository = $this->createMock(UserRepositoryInterface::class);
         $this->provider = $this->createUserProviderFixture();
 
-        $otherUser = $this->createStub(\Symfony\Component\Security\Core\User\PasswordAuthenticatedUserInterface::class);
+        $otherUser = $this->createStub(PasswordAuthenticatedUserInterface::class);
 
         $this->userRepository
             ->expects($this->never())

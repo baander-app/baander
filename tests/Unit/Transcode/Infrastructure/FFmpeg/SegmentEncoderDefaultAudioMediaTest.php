@@ -4,25 +4,27 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Transcode\Infrastructure\FFmpeg;
 
-use App\Transcode\Application\DTO\MediaTrack;
+use App\Shared\Application\DTO\DeploymentProfile;
 use App\Shared\Domain\Model\Uuid;
-use App\Transcode\Application\Port\SegmentAvailabilityInterface;
-use App\Transcode\Domain\Model\TranscodeJob;
-use App\Transcode\Infrastructure\Swoole\ProcessSpawnerInterface;
-use App\Transcode\Infrastructure\Swoole\TranscodeStreamManager;
-use Psr\Log\NullLogger;
+use App\Transcode\Application\DTO\MediaTrack;
 use App\Transcode\Application\Port\FFmpegPortInterface;
+use App\Transcode\Application\Port\SegmentAvailabilityInterface;
 use App\Transcode\Application\Port\TranscodeStoragePortInterface;
+use App\Transcode\Application\Service\MediaExecutionPolicy;
+use App\Transcode\Domain\Model\TranscodeJob;
 use App\Transcode\Domain\ValueObject\AudioProfile;
 use App\Transcode\Domain\ValueObject\EncoderProfile;
 use App\Transcode\Domain\ValueObject\QualityTier;
 use App\Transcode\Domain\ValueObject\VideoProbeResult;
-use App\Transcode\Infrastructure\FFmpeg\SegmentEncoder;
 use App\Transcode\Infrastructure\FFmpeg\FFprobeArguments;
+use App\Transcode\Infrastructure\FFmpeg\SegmentEncoder;
 use App\Transcode\Infrastructure\HLS\ManifestGenerator;
 use App\Transcode\Infrastructure\Packaging\PublishedPresentationReader;
+use App\Transcode\Infrastructure\Swoole\ProcessSpawnerInterface;
+use App\Transcode\Infrastructure\Swoole\TranscodeStreamManager;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
+use Psr\Log\NullLogger;
 use Symfony\Component\Filesystem\Filesystem;
 use Symfony\Component\Process\Process;
 
@@ -117,7 +119,7 @@ final class SegmentEncoderDefaultAudioMediaTest extends TestCase
         $profile = AudioProfile::fromString($profileName);
         $tier = new QualityTier('fixture', 64, 64, 100_000, 200_000, 200_000, 'avc1', 'avc1.64001f');
         $encoder = new SegmentEncoder(
-            new \App\Transcode\Application\Service\MediaExecutionPolicy(new \App\Shared\Application\DTO\DeploymentProfile()),
+            new MediaExecutionPolicy(new DeploymentProfile()),
             $this->createStub(FFmpegPortInterface::class),
             $this->createStub(TranscodeStoragePortInterface::class),
             EncoderProfile::software('libx264'),

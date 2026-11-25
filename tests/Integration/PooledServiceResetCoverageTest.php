@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace App\Tests\Integration;
 
 use App\Kernel;
+use App\Shared\Infrastructure\Logging\BoundedWebProcessor;
+use App\Shared\Infrastructure\Logging\CorrelationIdProcessor;
 use PHPUnit\Framework\TestCase;
 use SwooleBundle\SwooleBundle\Bridge\Symfony\Container\ServicePool\DiServicePool;
 use SwooleBundle\SwooleBundle\Bridge\Symfony\Container\SimpleResetter;
@@ -74,7 +76,7 @@ final class PooledServiceResetCoverageTest extends TestCase
     public function testTheLogProcessorsThatHoldRequestStateArePooled(): void
     {
         // Each coroutine logs its own request's URL and correlation ID.
-        foreach ([\App\Shared\Infrastructure\Logging\BoundedWebProcessor::class, \App\Shared\Infrastructure\Logging\CorrelationIdProcessor::class] as $processor) {
+        foreach ([BoundedWebProcessor::class, CorrelationIdProcessor::class] as $processor) {
             self::assertSame(['reset'], self::$kernel->pools[$processor]['methods'] ?? null, $processor);
         }
     }

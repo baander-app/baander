@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Baander\Images\Inventory;
 
+use Baander\Configuration\ToolingConfiguration;
 use Baander\Process\Runtime\Requirements;
 
 final class Commands
@@ -58,7 +59,7 @@ final class Commands
                 if (!is_array($saved)) {
                     throw new InventoryError('Inventory collection requires resolved invocation configuration.');
                 }
-                $configuration = \Baander\Configuration\ToolingConfiguration::fromArray($saved);
+                $configuration = ToolingConfiguration::fromArray($saved);
                 $result = Collector::collect($required('image'), $required('target'), $required('revision'), $required('output'), $required('session'), $loader, $configuration, $environment);
             } elseif ($command === 'generate') {
                 $identity = ApplicationInventory::imageIdentity(Json::read($required('image-inspect')), $required('target'));

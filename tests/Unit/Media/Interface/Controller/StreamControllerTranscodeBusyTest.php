@@ -8,6 +8,7 @@ use App\Media\Application\Port\MediaReadScopeProviderInterface;
 use App\Media\Application\Port\StreamPortInterface;
 use App\Media\Domain\Model\TrackStreamMetadata;
 use App\Media\Interface\Controller\StreamController;
+use App\Shared\Application\DTO\DeploymentProfile;
 use App\Shared\Application\Http\RequestLocale;
 use App\Shared\Application\Port\SystemSettingsPortInterface;
 use App\Shared\Domain\Model\PublicId;
@@ -17,6 +18,7 @@ use App\Shared\Domain\ValueObject\MediaReadScope;
 use App\Transcode\Application\Exception\AudioRenditionBusyException;
 use App\Transcode\Application\Port\AudioRenditionFormat;
 use App\Transcode\Application\Port\AudioRenditionPortInterface;
+use App\Transcode\Application\Service\MediaExecutionPolicy;
 use App\Transcode\Application\Settings\TranscodeSettingDefinitions;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\HttpFoundation\Request;
@@ -91,7 +93,7 @@ final class StreamControllerTranscodeBusyTest extends TestCase
         $translator->addResource('yaml', dirname(__DIR__, 5) . '/translations/media+intl-icu.da.yaml', 'da', 'media+intl-icu');
         $requests = new RequestStack();
         $requests->push($request);
-        $controller = new StreamController(new \App\Transcode\Application\Service\MediaExecutionPolicy(new \App\Shared\Application\DTO\DeploymentProfile()), $stream, $scopes, $renditions, $settings);
+        $controller = new StreamController(new MediaExecutionPolicy(new DeploymentProfile()), $stream, $scopes, $renditions, $settings);
         $controller->setTranslator($translator);
         $controller->setTranslationRequests($requests);
 

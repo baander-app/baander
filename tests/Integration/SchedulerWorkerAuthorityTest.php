@@ -6,6 +6,7 @@ namespace App\Tests\Integration;
 
 use App\Scheduler\Infrastructure\Doctrine\DoctrineSchedulerWorkerAuthority;
 use App\Shared\Infrastructure\Worker\DeploymentLease;
+use App\Tests\Support\FinalSchemaBootstrap;
 use Doctrine\DBAL\Connection;
 use Doctrine\DBAL\DriverManager;
 use Doctrine\DBAL\Exception\DriverException;
@@ -41,7 +42,7 @@ final class SchedulerWorkerAuthorityTest extends TestCase
         foreach ([$this->first, $this->second] as $connection) {
             $connection->executeStatement('SET search_path TO ' . $this->schema . ', public');
         }
-        \App\Tests\Support\FinalSchemaBootstrap::bootstrap($this->first);
+        FinalSchemaBootstrap::bootstrap($this->first);
         $this->first->executeStatement('DELETE FROM scheduled_jobs');
         $this->lease = new DeploymentLease('baander.app:scheduler-authority-test', str_repeat('a', 32), 1);
         $this->first->executeStatement("INSERT INTO worker_deployment_boots (namespace, boot_id, daemon_id, manifest_hash) VALUES (:namespace, :boot, 'authority.baander.app', :manifest)", ['namespace' => $this->lease->namespace, 'boot' => $this->lease->bootId, 'manifest' => str_repeat('f', 64)]);

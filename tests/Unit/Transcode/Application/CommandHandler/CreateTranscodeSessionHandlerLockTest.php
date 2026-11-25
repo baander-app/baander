@@ -4,28 +4,32 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Transcode\Application\CommandHandler;
 
+use App\Shared\Application\DTO\DeploymentProfile;
 use App\Shared\Application\Port\SleeperInterface;
+use App\Shared\Application\Port\SystemSettingsPortInterface;
 use App\Shared\Application\Port\TransactionPortInterface;
 use App\Shared\Domain\Model\Uuid;
+use App\Tests\Unit\Transcode\FreeTranscodeSessionShare;
 use App\Transcode\Application\Command\CreateTranscodeSessionCommand;
 use App\Transcode\Application\CommandHandler\CreateTranscodeSessionHandler;
 use App\Transcode\Application\DTO\DesiredTranscodeState;
-use App\Transcode\Application\DTO\TranscodeRuntimeSnapshot;
-use App\Tests\Unit\Transcode\FreeTranscodeSessionShare;
 use App\Transcode\Application\DTO\HeldTranscodeSession;
+use App\Transcode\Application\DTO\TranscodeRuntimeSnapshot;
 use App\Transcode\Application\Exception\TranscodeSessionLimitException;
 use App\Transcode\Application\Exception\TranscodeStartupUnavailableException;
-use App\Transcode\Application\Port\TranscodeSessionSharePort;
+use App\Transcode\Application\Port\EncodePresentationPort;
 use App\Transcode\Application\Port\TranscodeExecutionOwnershipPort;
 use App\Transcode\Application\Port\TranscodeJobPortInterface;
 use App\Transcode\Application\Port\TranscodeSessionPortInterface;
+use App\Transcode\Application\Port\TranscodeSessionSharePort;
 use App\Transcode\Application\Port\TranscodeStoragePortInterface;
-use App\Transcode\Application\Port\EncodePresentationPort;
+use App\Transcode\Application\Service\MediaExecutionPolicy;
 use App\Transcode\Domain\Model\TranscodeJob;
 use App\Transcode\Domain\Model\TranscodeSession;
+use App\Transcode\Domain\ValueObject\AacImplementation;
 use App\Transcode\Domain\ValueObject\AudioProfile;
-use App\Transcode\Domain\ValueObject\QualityTier;
 use App\Transcode\Domain\ValueObject\PresentationSelection;
+use App\Transcode\Domain\ValueObject\QualityTier;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 
@@ -86,7 +90,7 @@ final class CreateTranscodeSessionHandlerLockTest extends TestCase
             self::assertFalse($this->insideTransaction, 'Waiting cannot hold the producer transaction.');
             $this->sleeps[] = $seconds;
         });
-        $this->handler = new CreateTranscodeSessionHandler(new \App\Transcode\Application\Service\MediaExecutionPolicy(new \App\Shared\Application\DTO\DeploymentProfile()), $this->jobs, $this->sessions, $storage, $this->ownership, $transaction, $sleeper, $presentations, $this->settings(), $this->freeSessionShare($this->share));
+        $this->handler = new CreateTranscodeSessionHandler(new MediaExecutionPolicy(new DeploymentProfile()), $this->jobs, $this->sessions, $storage, $this->ownership, $transaction, $sleeper, $presentations, $this->settings(), $this->freeSessionShare($this->share));
     }
 
     private function snapshot(string $outcome): TranscodeRuntimeSnapshot
@@ -199,7 +203,7 @@ final class CreateTranscodeSessionHandlerLockTest extends TestCase
         $this->ownership->method('find')->willReturnOnConsecutiveCalls($this->snapshot($outcome), $this->snapshot($outcome), $this->snapshot('accepted'));
         $this->sessions->expects(self::never())->method('findByUuid');
         $this->sessions->expects(self::once())->method('createSession')->willReturn($this->session);
-        $this->ownership->expects(self::once())->method('admit')->with($this->job->getId(), $this->session->getId(), $this->command->requestId, self::callback(static fn (DesiredTranscodeState $desired): bool => $desired->aacImplementation === \App\Transcode\Domain\ValueObject\AacImplementation::FdkAac))->willReturn($this->snapshot('pending'));
+        $this->ownership->expects(self::once())->method('admit')->with($this->job->getId(), $this->session->getId(), $this->command->requestId, self::callback(static fn (DesiredTranscodeState $desired): bool => $desired->aacImplementation === AacImplementation::FdkAac))->willReturn($this->snapshot('pending'));
         self::assertSame($this->session, ($this->handler)($this->command));
     }
 
@@ -226,9 +230,9 @@ final class CreateTranscodeSessionHandlerLockTest extends TestCase
         self::assertSame($this->session, ($this->handler)($this->command));
     }
 
-    private function settings(): \App\Shared\Application\Port\SystemSettingsPortInterface
+    private function settings(): SystemSettingsPortInterface
     {
-        $settings = $this->createStub(\App\Shared\Application\Port\SystemSettingsPortInterface::class);
+        $settings = $this->createStub(SystemSettingsPortInterface::class);
         // A non-default position, so the admitted state shows it came from the setting.
         $settings->method('get')->willReturn('fdk_aac');
         return $settings;

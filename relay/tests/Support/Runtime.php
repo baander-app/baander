@@ -5,7 +5,10 @@ declare(strict_types=1);
 namespace Baander\RegistryTests;
 
 use RuntimeException;
+use Swoole\Coroutine;
+use Swoole\Event;
 use Swoole\Process as SwooleProcess;
+use Swoole\Timer;
 use Throwable;
 
 final class Runtime
@@ -212,7 +215,7 @@ final class Runtime
             $failure = null;
             $complete = false;
             $deadline = $timeout === null ? null : self::now() + $timeout;
-            $task = \Swoole\Coroutine::create(static function () use ($run, &$failure, &$complete): void {
+            $task = Coroutine::create(static function () use ($run, &$failure, &$complete): void {
                 try {
                     $run();
                 } catch (Throwable $error) {
@@ -238,13 +241,13 @@ final class Runtime
                 $cleanupDeadline = self::now() + 2;
                 $canceller = null;
                 while (self::coroutineCount() !== 0) {
-                    if ($canceller === null || !\Swoole\Coroutine::exists($canceller)) {
-                        $coroutines = iterator_to_array(\Swoole\Coroutine::list(), false);
-                        $canceller = \Swoole\Coroutine::create(static function () use ($coroutines, &$failure): void {
+                    if ($canceller === null || !Coroutine::exists($canceller)) {
+                        $coroutines = iterator_to_array(Coroutine::list(), false);
+                        $canceller = Coroutine::create(static function () use ($coroutines, &$failure): void {
                             foreach ($coroutines as $id) {
                                 try {
-                                    if (\Swoole\Coroutine::exists($id)) {
-                                        \Swoole\Coroutine::cancel($id);
+                                    if (Coroutine::exists($id)) {
+                                        Coroutine::cancel($id);
                                     }
                                 } catch (Throwable $error) {
                                     $failure ??= $error;
@@ -280,17 +283,17 @@ final class Runtime
     /** @phpstan-impure */
     private static function coroutineCount(): int
     {
-        return \Swoole\Coroutine::stats()['coroutine_num'];
+        return Coroutine::stats()['coroutine_num'];
     }
 
     private static function dispatch(): void
     {
-        $wake = \Swoole\Timer::after(1, static function (): void {});
+        $wake = Timer::after(1, static function (): void {});
         try {
-            \Swoole\Event::dispatch();
+            Event::dispatch();
         } finally {
-            if (\Swoole\Timer::exists($wake)) {
-                \Swoole\Timer::clear($wake);
+            if (Timer::exists($wake)) {
+                Timer::clear($wake);
             }
         }
         self::throwIfInterrupted();
@@ -324,8 +327,8 @@ final class Runtime
             if (extension_loaded('swoole')) {
                 SwooleProcess::signal(2, null);
                 SwooleProcess::signal(15, null);
-                if (\Swoole\Timer::stats()['num'] === 0) {
-                    \Swoole\Event::wait();
+                if (Timer::stats()['num'] === 0) {
+                    Event::wait();
                 }
             }
         }

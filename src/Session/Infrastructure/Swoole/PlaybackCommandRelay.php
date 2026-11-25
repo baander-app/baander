@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Session\Infrastructure\Swoole;
 
+use App\Session\Application\Port\PlaybackConnectionsInterface;
 use App\Session\Application\Port\PlaybackCoordinationInterface;
 use App\Session\Application\Port\PlaybackOperation;
 use App\Shared\Application\Port\ServerDrainStateInterface;
@@ -17,7 +18,7 @@ use SwooleBundle\SwooleBundle\Bridge\Symfony\Event\WorkerStartedEvent;
 use SwooleBundle\SwooleBundle\Bridge\Symfony\Event\WorkerStoppedEvent;
 use Symfony\Component\EventDispatcher\EventSubscriberInterface;
 
-final class PlaybackCommandRelay implements EventSubscriberInterface, WorkerTimerInterface, \App\Session\Application\Port\PlaybackConnectionsInterface
+final class PlaybackCommandRelay implements EventSubscriberInterface, WorkerTimerInterface, PlaybackConnectionsInterface
 {
     /** @var array<int,array{owner:Uuid,incarnation:?string,capability:?string,digest:?string,generation:int}> */
     private array $connections = [];

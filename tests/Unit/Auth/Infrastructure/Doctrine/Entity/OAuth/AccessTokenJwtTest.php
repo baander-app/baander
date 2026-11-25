@@ -11,6 +11,7 @@ use App\Auth\Infrastructure\Doctrine\Entity\UserEntity;
 use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
 use Lcobucci\JWT\Encoding\JoseEncoder;
+use Lcobucci\JWT\Signer\InvalidKeyProvided;
 use Lcobucci\JWT\Signer\Key\InMemory;
 use Lcobucci\JWT\Signer\Rsa\Sha256;
 use Lcobucci\JWT\Token\Parser;
@@ -71,7 +72,7 @@ final class AccessTokenJwtTest extends TestCase
         $entity = new AccessTokenEntity('opaque-token', new ClientEntity(new PublicId(), 'JWT client', '[]'), SignInGrant::AuthorizationCode, expiresAt: new \DateTimeImmutable('+10 minutes'));
         $entity->setPrivateKey(new CryptKey($pem));
         $entity->setResourceServerUri('https://baander.app');
-        $this->expectException(\Lcobucci\JWT\Signer\InvalidKeyProvided::class);
+        $this->expectException(InvalidKeyProvided::class);
         $entity->toString();
     }
 

@@ -7,9 +7,11 @@ namespace App\Tests\Unit\Auth\Domain\Model;
 use App\Auth\Domain\Model\OAuth\Client;
 use App\Auth\Domain\Model\OAuth\DeviceCode;
 use App\Auth\Domain\Model\OAuth\DeviceCodeState;
-use App\Auth\Domain\Model\User;
+use App\Auth\Domain\Model\OAuth\TokenId;
 use App\Auth\Domain\Model\OAuth\ValueObject\Scope;
+use App\Auth\Domain\Model\User;
 use App\Shared\Domain\Model\Email;
+use App\Shared\Domain\Model\Uuid;
 use DateInterval;
 use PHPUnit\Framework\TestCase;
 use RuntimeException;
@@ -164,10 +166,10 @@ final class DeviceCodeTest extends TestCase
 
     public function testApprovingAnExpiredCodeThrows(): void
     {
-        $code = DeviceCode::create($this->client, 'BCDF-GHJK', '/verify', ttl: new \DateInterval('PT0S'));
+        $code = DeviceCode::create($this->client, 'BCDF-GHJK', '/verify', ttl: new DateInterval('PT0S'));
         usleep(1000);
 
-        $this->expectException(\RuntimeException::class);
+        $this->expectException(RuntimeException::class);
         $this->expectExceptionMessage('expired');
 
         $code->approve($this->user, 0);
@@ -178,8 +180,8 @@ final class DeviceCodeTest extends TestCase
         $now = new \DateTimeImmutable();
 
         $code = DeviceCode::reconstitute(new DeviceCodeState(
-            id: \App\Shared\Domain\Model\Uuid::v4(),
-            deviceCode: \App\Auth\Domain\Model\OAuth\TokenId::generate(),
+            id: Uuid::v4(),
+            deviceCode: TokenId::generate(),
             userCode: 'CODE',
             user: null,
             client: $this->client,
@@ -205,8 +207,8 @@ final class DeviceCodeTest extends TestCase
         $consumedAt = new \DateTimeImmutable('+1 second');
 
         $code = DeviceCode::reconstitute(new DeviceCodeState(
-            id: \App\Shared\Domain\Model\Uuid::v4(),
-            deviceCode: \App\Auth\Domain\Model\OAuth\TokenId::generate(),
+            id: Uuid::v4(),
+            deviceCode: TokenId::generate(),
             userCode: 'CODE',
             user: $this->user,
             client: $this->client,

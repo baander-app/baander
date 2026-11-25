@@ -7,6 +7,7 @@ namespace App\Shared\Infrastructure\Http;
 use App\Shared\Infrastructure\Swoole\Async;
 use App\Shared\Infrastructure\Swoole\CoroutineCanceledException;
 use App\Shared\Infrastructure\Swoole\Drain\SwooleHooks;
+use Swoole\Coroutine;
 
 /** Complete native DNS answers from a bounded, fresh PHP process. */
 final class NativeDnsResolver
@@ -75,7 +76,7 @@ final class NativeDnsResolver
             if (isset(self::$children[$pid])) {
                 self::$children[$pid]['abandoned'] = true;
                 self::native(static fn () => proc_terminate(self::$children[$pid]['process'], SIGKILL));
-                if (Async::inCoroutine() && \Swoole\Coroutine::isCanceled()) {
+                if (Async::inCoroutine() && Coroutine::isCanceled()) {
                     self::handoff($pid);
                 } else {
                     try {
@@ -161,7 +162,7 @@ final class NativeDnsResolver
     private static function handoff(int $pid): void
     {
         // A fresh coroutine is not canceled with its requester. No process-wide timer survives it.
-        \Swoole\Coroutine::create(static function () use ($pid): void {
+        Coroutine::create(static function () use ($pid): void {
             self::cleanup($pid);
         });
     }

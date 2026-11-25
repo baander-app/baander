@@ -4,15 +4,16 @@ declare(strict_types=1);
 
 namespace App\Catalog\Interface\Controller;
 
-use App\Catalog\Application\Port\AlbumPortInterface;
 use App\Catalog\Application\Command\BatchExtractCoversCommand;
+use App\Catalog\Application\Port\AlbumPortInterface;
 use App\Shared\Interface\Attribute\CliCounterpart;
 use App\Shared\Interface\Controller\ApiResponsesTrait;
+use App\Shared\Interface\DTO\ApiError;
 use OpenApi\Spec as OA;
 use Symfony\Component\HttpFoundation\JsonResponse;
+use Symfony\Component\Messenger\MessageBusInterface;
 use Symfony\Component\Routing\Attribute\Route;
 use Symfony\Component\Security\Http\Attribute\IsGranted;
-use Symfony\Component\Messenger\MessageBusInterface;
 
 #[OA\Tag(name: 'Album Cover')]
 #[Route('/api/albums/covers/extract', name: 'album_covers_')]
@@ -48,14 +49,14 @@ final class ExtractCoversController
                 response: '401',
                 description: 'Not authenticated',
                 content: new OA\MediaType\Json(
-                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                    schema: new OA\Schema(ref: ApiError::class),
                 ),
             ),
             new OA\Response(
                 response: '403',
                 description: 'Forbidden',
                 content: new OA\MediaType\Json(
-                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                    schema: new OA\Schema(ref: ApiError::class),
                 ),
             ),
         ],

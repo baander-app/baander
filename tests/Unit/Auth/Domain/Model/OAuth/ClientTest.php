@@ -6,12 +6,14 @@ namespace App\Tests\Unit\Auth\Domain\Model;
 
 use App\Auth\Domain\Model\OAuth\Client;
 use App\Auth\Domain\Model\OAuth\ClientAuthMethod;
+use App\Auth\Domain\Model\OAuth\ClientState;
 use App\Auth\Domain\Model\OAuth\ClientType;
 use App\Auth\Domain\Model\OAuth\ValueObject\ClientKeySource;
 use App\Auth\Domain\Model\OAuth\ValueObject\ClientSecret;
-use App\Auth\Domain\Model\OAuth\ClientState;
+use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
 use InvalidArgumentException;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
 final class ClientTest extends TestCase
@@ -77,8 +79,8 @@ final class ClientTest extends TestCase
     public function testReconstituteRestoresRevokedState(): void
     {
         $client = Client::reconstitute(new ClientState(
-            id: \App\Shared\Domain\Model\Uuid::v4(),
-            publicId: \App\Shared\Domain\Model\PublicId::fromString('cli_abc123def456ghjkl'),
+            id: Uuid::v4(),
+            publicId: PublicId::fromString('cli_abc123def456ghjkl'),
             name: 'Test',
             secretHash: null,
             authMethod: ClientAuthMethod::None,
@@ -201,7 +203,7 @@ final class ClientTest extends TestCase
     }
 
     /** @param list<string> $uris */
-    #[\PHPUnit\Framework\Attributes\DataProvider('invalidRedirectUris')]
+    #[DataProvider('invalidRedirectUris')]
     public function testRegistrationRejectsUnsafeRedirectUris(array $uris): void
     {
         $this->expectException(InvalidArgumentException::class);
@@ -231,8 +233,8 @@ final class ClientTest extends TestCase
     {
         $client = Client::create('Test', []);
 
-        $this->assertInstanceOf(\App\Shared\Domain\Model\Uuid::class, $client->getId());
-        $this->assertInstanceOf(\App\Shared\Domain\Model\PublicId::class, $client->getPublicId());
+        $this->assertInstanceOf(Uuid::class, $client->getId());
+        $this->assertInstanceOf(PublicId::class, $client->getPublicId());
         $this->assertInstanceOf(\DateTimeImmutable::class, $client->getCreatedAt());
         $this->assertInstanceOf(\DateTimeImmutable::class, $client->getUpdatedAt());
     }
@@ -293,7 +295,7 @@ final class ClientTest extends TestCase
         $userId = Uuid::v4();
         $client = Client::reconstitute(new ClientState(
             id: Uuid::v4(),
-            publicId: \App\Shared\Domain\Model\PublicId::fromString('cli_abc123def456ghjkl'),
+            publicId: PublicId::fromString('cli_abc123def456ghjkl'),
             name: 'Test',
             secretHash: null,
             authMethod: ClientAuthMethod::None,

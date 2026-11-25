@@ -6,7 +6,6 @@ namespace App\Tests\Unit\Metadata\Application\CommandHandler;
 
 use App\Library\Application\Port\LibraryPortInterface;
 use App\Library\Domain\Model\Library;
-use App\Shared\Domain\ValueObject\FilesystemType;
 use App\Library\Domain\ValueObject\LibraryPath;
 use App\Library\Domain\ValueObject\LibrarySlug;
 use App\Library\Domain\ValueObject\LibraryType;
@@ -15,8 +14,10 @@ use App\Metadata\Application\CommandHandler\SyncMetadataHandler;
 use App\Metadata\Application\Message\SyncArtistsMessage;
 use App\Metadata\Application\Message\SyncGenresMessage;
 use App\Metadata\Application\Message\SyncLibraryMessage;
+use App\Metadata\Application\Message\SyncPeopleMessage;
 use App\Metadata\Application\MetadataSyncOrchestrator;
 use App\Shared\Application\Exception\InvalidInputException;
+use App\Shared\Domain\ValueObject\FilesystemType;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
 use Symfony\Component\Messenger\Envelope;
@@ -44,7 +45,7 @@ final class SyncMetadataHandlerTest extends TestCase
             self::assertFalse($message->forceUpdate);
             self::assertTrue($message->includeSongs);
         }
-        self::assertInstanceOf(\App\Metadata\Application\Message\SyncPeopleMessage::class, $this->dispatched[4]);
+        self::assertInstanceOf(SyncPeopleMessage::class, $this->dispatched[4]);
         self::assertEquals([new SyncArtistsMessage()], array_filter($this->dispatched, static fn (object $message): bool => $message instanceof SyncArtistsMessage) |> array_values(...));
     }
 

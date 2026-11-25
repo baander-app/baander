@@ -20,6 +20,7 @@ use Psr\Log\AbstractLogger;
 use Psr\Log\LoggerInterface;
 use Psr\Log\LogLevel;
 use Symfony\Component\Clock\MockClock;
+use Symfony\Component\HttpClient\Exception\TransportException;
 use Symfony\Component\HttpClient\MockHttpClient;
 use Symfony\Component\HttpClient\Response\MockResponse;
 use Symfony\Component\RateLimiter\Exception\MaxWaitDurationExceededException;
@@ -326,7 +327,7 @@ final class LrclibClientTest extends TestCase
 
         // Simulate a transport-level error that Symfony wraps in an exception
         $this->httpClient->method('request')->willThrowException(
-            new \Symfony\Component\HttpClient\Exception\TransportException('Connection refused'),
+            new TransportException('Connection refused'),
         );
 
         $this->logger->expects($this->atLeastOnce())->method('warning');

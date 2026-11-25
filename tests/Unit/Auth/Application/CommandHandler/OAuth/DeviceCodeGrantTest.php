@@ -8,16 +8,17 @@ use App\Auth\Application\Command\OAuth\ExchangeDeviceCodeCommand;
 use App\Auth\Application\Command\OAuth\RequestDeviceAuthorizationCommand;
 use App\Auth\Application\CommandHandler\OAuth\ExchangeDeviceCodeHandler;
 use App\Auth\Application\CommandHandler\OAuth\RequestDeviceAuthorizationHandler;
-use App\Auth\Application\DTO\DeviceAuthorizationDTO;
 use App\Auth\Application\DTO\ClientCredentials;
+use App\Auth\Application\DTO\DeviceAuthorizationDTO;
+use App\Auth\Application\DTO\TokenResponseDTO;
 use App\Auth\Application\Exception\OAuthProtocolException;
 use App\Auth\Application\ScopeAllowlist;
 use App\Auth\Domain\Model\OAuth\Client;
 use App\Auth\Domain\Model\OAuth\DeviceCode;
-use App\Auth\Domain\Model\OAuth\ValueObject\ClientSecret;
 use App\Auth\Domain\Model\OAuth\DeviceCodeState;
 use App\Auth\Domain\Model\OAuth\SignInGrant;
 use App\Auth\Domain\Model\OAuth\TokenId;
+use App\Auth\Domain\Model\OAuth\ValueObject\ClientSecret;
 use App\Auth\Domain\Model\User;
 use App\Auth\Domain\Repository\OAuth\DeviceCodeRepositoryInterface;
 use App\Shared\Domain\Model\Email;
@@ -197,7 +198,7 @@ final class DeviceCodeGrantTest extends TestCase
         ));
     }
 
-    private function poll(?string $deviceCode, ?string $clientId = null): \App\Auth\Application\DTO\TokenResponseDTO
+    private function poll(?string $deviceCode, ?string $clientId = null): TokenResponseDTO
     {
         $handler = new ExchangeDeviceCodeHandler($this->clientAuthenticator(), $this->deviceCodes(), $this->tokenPairIssuer(), $this->clientThrottle());
 

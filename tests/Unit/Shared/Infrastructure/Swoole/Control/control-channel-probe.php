@@ -26,6 +26,7 @@ use Swoole\Atomic;
 use Swoole\Coroutine;
 use Swoole\Http\Request;
 use Swoole\Http\Response;
+use Swoole\Process;
 use Swoole\Server;
 use Swoole\WebSocket\Server as WebSocketServer;
 
@@ -195,7 +196,7 @@ if ($child === 0) {
         probeFail('after late reply: ' . json_encode($again));
     }
 
-    Swoole\Process::kill($master, SIGTERM);
+    Process::kill($master, SIGTERM);
     exit(0);
 }
 

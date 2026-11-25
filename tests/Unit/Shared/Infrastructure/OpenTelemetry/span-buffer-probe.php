@@ -31,9 +31,11 @@ use App\Shared\Infrastructure\Swoole\Control\SocketServerControlClient;
 use App\Shared\Infrastructure\Swoole\Control\SwooleServerWorkers;
 use App\Shared\Infrastructure\Swoole\ServerDiagnostics;
 use App\Shared\Interface\Console\ServerSpansCommand;
+use Swoole\Atomic;
 use Swoole\Http\Request;
 use Swoole\Http\Response;
 use Swoole\Http\Server;
+use Swoole\Process;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Tester\CommandTester;
 use Symfony\Component\HttpFoundation\Request as SymfonyRequest;
@@ -50,7 +52,7 @@ function probeFail(string $message): never
     // A failing console side stops the server, so the probe ends instead of hanging.
     $master = $GLOBALS['probeMaster'] ?? null;
     if (is_int($master) && $master !== getmypid()) {
-        Swoole\Process::kill($master, SIGTERM);
+        Process::kill($master, SIGTERM);
     }
     exit(1);
 }
@@ -110,8 +112,8 @@ $port = (int) substr(strrchr((string) stream_socket_get_name($probe, false), ':'
 fclose($probe);
 
 $bridge = new SpanBridge();
-$captureEnabled = new Swoole\Atomic(1);
-$captureClock = new Swoole\Atomic(1);
+$captureEnabled = new Atomic(1);
+$captureClock = new Atomic(1);
 $workers = new SwooleServerWorkers();
 $registry = new ServerControlOperationRegistry([new DebugSpansOperation($bridge), new DebugSpansClearOperation($bridge)]);
 $coordinator = new ServerControlCoordinator($registry, $workers, 1.0);
@@ -224,7 +226,7 @@ if ($child === 0) {
     }
     probeSpans($serverControl, 10);
 
-    Swoole\Process::kill($master, SIGTERM);
+    Process::kill($master, SIGTERM);
     exit(0);
 }
 
@@ -234,7 +236,7 @@ $subscriber = new HttpServerSpanSubscriber(
     (new TracerProviderFactory(new InMemorySpanProcessor($bridge), false, '', 'baander'))->create(),
     new HttpSpanCapturePolicy(
         new class ($captureEnabled) implements SystemSettingsPortInterface {
-            public function __construct(private Swoole\Atomic $enabled) {}
+            public function __construct(private Atomic $enabled) {}
             public function get(string $key): bool { return $this->enabled->get() === 1; }
         },
         static fn (): float => (float) $captureClock->get(),

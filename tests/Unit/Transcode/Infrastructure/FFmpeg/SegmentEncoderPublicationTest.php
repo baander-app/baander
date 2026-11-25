@@ -4,8 +4,10 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Transcode\Infrastructure\FFmpeg;
 
+use App\Shared\Application\DTO\DeploymentProfile;
 use App\Transcode\Application\Port\FFmpegPortInterface;
 use App\Transcode\Application\Port\TranscodeStoragePortInterface;
+use App\Transcode\Application\Service\MediaExecutionPolicy;
 use App\Transcode\Domain\ValueObject\EncoderProfile;
 use App\Transcode\Domain\ValueObject\QualityTier;
 use App\Transcode\Infrastructure\FFmpeg\SegmentEncoder;
@@ -43,7 +45,7 @@ final class SegmentEncoderPublicationTest extends TestCase
         ]);
         $output = $this->directory . '/output';
         mkdir($output);
-        $encoder = new SegmentEncoder(new \App\Transcode\Application\Service\MediaExecutionPolicy(new \App\Shared\Application\DTO\DeploymentProfile()), $this->createStub(FFmpegPortInterface::class), $this->createStub(TranscodeStoragePortInterface::class), EncoderProfile::software('libx264'));
+        $encoder = new SegmentEncoder(new MediaExecutionPolicy(new DeploymentProfile()), $this->createStub(FFmpegPortInterface::class), $this->createStub(TranscodeStoragePortInterface::class), EncoderProfile::software('libx264'));
         $tier = new QualityTier('fixture', 64, 64, 100_000, 200_000, 200_000, 'avc1', 'avc1.64001f');
         $args = $encoder->buildStreamArgs($source, $tier, '', $output, $startSegment);
         $watch = inotify_init();

@@ -10,12 +10,14 @@ use App\Auth\Application\Exception\CredentialsChangedException;
 use App\Auth\Application\Exception\TotpStepAlreadySpentException;
 use App\Auth\Domain\Repository\OAuth\ClientRepositoryInterface;
 use App\Auth\Domain\Repository\UserRepositoryInterface;
+use App\Auth\Interface\Request\User\LoginRequest;
 use App\Auth\Interface\Resource\TokenResource;
 use App\Auth\Interface\Resource\UserResource;
 use App\Shared\Application\Exception\HandlerFailure;
 use App\Shared\Application\Http\BaanderHeader;
 use App\Shared\Domain\Model\PublicId;
 use App\Shared\Interface\Controller\ApiResponsesTrait;
+use App\Shared\Interface\DTO\ApiError;
 use OpenApi\Spec as OA;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
@@ -45,7 +47,7 @@ final class LoginController
         requestBody: new OA\RequestBody(
             required: true,
             content: new OA\MediaType\Json(
-                schema: new OA\Schema(ref: \App\Auth\Interface\Request\User\LoginRequest::class),
+                schema: new OA\Schema(ref: LoginRequest::class),
             ),
         ),
         responses: [
@@ -60,7 +62,7 @@ final class LoginController
                 response: '401',
                 description: 'Invalid credentials',
                 content: new OA\MediaType\Json(
-                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                    schema: new OA\Schema(ref: ApiError::class),
                 ),
             ),
             new OA\Response(
@@ -74,7 +76,7 @@ final class LoginController
                     ),
                 ],
                 content: new OA\MediaType\Json(
-                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                    schema: new OA\Schema(ref: ApiError::class),
                 ),
             ),
         ],

@@ -9,6 +9,7 @@ use App\Notification\Application\DTO\IssuedWebhookSecret;
 use App\Notification\Application\Port\WebhookRepositoryInterface;
 use App\Notification\Application\Port\WebhookSecretPortInterface;
 use App\Notification\Application\Service\WebhookInput;
+use App\Shared\Application\Exception\InvalidInputException;
 use App\Shared\Domain\Model\Uuid;
 use Symfony\Component\Messenger\Attribute\AsMessageHandler;
 
@@ -24,7 +25,7 @@ final readonly class CreateWebhookHandler
     /**
      * @return IssuedWebhookSecret the new webhook with its plain secret, which is not available again
      *
-     * @throws \App\Shared\Application\Exception\InvalidInputException when the URL or the category filter is rejected
+     * @throws InvalidInputException when the URL or the category filter is rejected
      */
     #[AsMessageHandler]
     public function __invoke(CreateWebhookCommand $command): IssuedWebhookSecret

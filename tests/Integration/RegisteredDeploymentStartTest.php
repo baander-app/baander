@@ -4,12 +4,14 @@ declare(strict_types=1);
 
 namespace App\Tests\Integration;
 
+use App\Shared\Application\DTO\DeploymentProfile;
 use App\Shared\Application\DTO\DeploymentUnit;
-
 use App\Shared\Infrastructure\Worker\DeploymentContainer;
 use App\Shared\Infrastructure\Worker\DeploymentContainerRecipe;
 use App\Shared\Infrastructure\Worker\DoctrineDeploymentInventory;
+use App\Shared\Infrastructure\Worker\OutOfMemoryKillOrder;
 use App\Shared\Infrastructure\Worker\RegisteredDeploymentStart;
+use App\Tests\Support\FinalSchemaBootstrap;
 use Doctrine\DBAL\Connection;
 use Doctrine\DBAL\DriverManager;
 use Doctrine\DBAL\Tools\DsnParser;
@@ -38,7 +40,7 @@ final class RegisteredDeploymentStartTest extends TestCase
         foreach ([$this->first, $this->second] as $connection) {
             $connection->executeStatement('SET search_path TO ' . $this->schema . ', public');
         }
-        \App\Tests\Support\FinalSchemaBootstrap::bootstrap($this->first);
+        FinalSchemaBootstrap::bootstrap($this->first);
     }
 
     public function testBindingAndOneShotClaimAreCommittedBeforeDockerStart(): void
@@ -178,7 +180,7 @@ final class RegisteredDeploymentStartTest extends TestCase
     {
         return new DeploymentContainerRecipe('baander.app:startup', str_repeat('a', 32), 'baander.app-daemon', 'sha256:' . str_repeat('f', 64),
             ['/usr/local/bin/php', '/var/www/html/bin/console', 'app:worker', '--unit=' . $unit->value],
-            'none', $unit, 'worker-ipc', '/var/www/html', new \App\Shared\Application\DTO\DeploymentProfile());
+            'none', $unit, 'worker-ipc', '/var/www/html', new DeploymentProfile());
     }
 
     private function binding(): DeploymentContainer
@@ -225,7 +227,7 @@ final class RegisteredDeploymentStartTest extends TestCase
                     'status' => 'created', 'running' => false, 'pid' => 0, 'restart' => 'no', 'restarting' => false, 'retryCount' => 0], $override), JSON_THROW_ON_ERROR);
             }
             return json_encode(['id' => $binding->containerId, 'namespace' => $binding->namespace, 'bootId' => $binding->bootId, 'role' => $binding->unit->value,
-                'memory' => 0, 'memorySwap' => 0, 'nanoCpus' => 0, 'cpuQuota' => 0, 'cpuShares' => 0, 'pidsLimit' => null, 'cpuSet' => '', 'oomScoreAdj' => \App\Shared\Infrastructure\Worker\OutOfMemoryKillOrder::unit($binding->unit), 'restart' => 'no', 'retryCount' => 0,
+                'memory' => 0, 'memorySwap' => 0, 'nanoCpus' => 0, 'cpuQuota' => 0, 'cpuShares' => 0, 'pidsLimit' => null, 'cpuSet' => '', 'oomScoreAdj' => OutOfMemoryKillOrder::unit($binding->unit), 'restart' => 'no', 'retryCount' => 0,
                 'privileged' => false, 'pidMode' => '', 'cgroupnsMode' => 'private', 'mounts' => [['Type' => 'volume', 'Name' => 'worker-ipc', 'Driver' => 'local', 'Source' => '/var/lib/docker/volumes/worker-ipc/_data', 'Destination' => '/run/baander-worker', 'RW' => true]], 'binds' => null, 'tmpfs' => null,
                 'devices' => [], 'deviceRequests' => [], 'groupAdd' => null, 'capAdd' => null, 'capDrop' => ['ALL'], 'securityOpt' => ['no-new-privileges']], JSON_THROW_ON_ERROR);
         };

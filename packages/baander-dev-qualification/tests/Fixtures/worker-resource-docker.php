@@ -3,6 +3,8 @@
 
 declare(strict_types=1);
 
+use Baander\Tests\Tooling\Support\WorkerResourceState;
+
 $arguments = array_slice($_SERVER['argv'], 1);
 file_put_contents(
     getenv('WORKER_RESOURCE_COMMANDS'),
@@ -13,7 +15,7 @@ if (in_array($arguments[0] ?? '', ['--context', '--host'], true)) {
     $arguments = array_slice($arguments, 2);
 }
 require dirname(__DIR__, 4) . '/vendor/autoload.php';
-\Baander\Tests\Tooling\Support\WorkerResourceState::handle($arguments);
+WorkerResourceState::handle($arguments);
 if (($arguments[0] ?? '') === 'ps') {
     $filter = $arguments[array_search('--filter', $arguments, true) + 1];
     if (str_starts_with($filter, 'name=^/')) {

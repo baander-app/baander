@@ -14,6 +14,7 @@ use App\Favorites\Interface\Resource\FavoriteResource;
 use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
 use App\Shared\Interface\Controller\ApiResponsesTrait;
+use App\Shared\Interface\DTO\ApiError;
 use App\Shared\Interface\DTO\PaginatedResponse;
 use App\Shared\Interface\Request\QueryParameters;
 use OpenApi\Spec as OA;
@@ -78,7 +79,7 @@ final class FavoritesController
                         properties: [
                             'data' => new OA\Schema(
                                 type: 'array',
-                                items: new OA\Schema(ref: \App\Favorites\Interface\Resource\FavoriteResource::class),
+                                items: new OA\Schema(ref: FavoriteResource::class),
                             ),
                             'meta' => new OA\Schema(
                                 type: 'object',
@@ -97,7 +98,7 @@ final class FavoritesController
                 response: '400',
                 description: 'Invalid page or limit',
                 content: new OA\MediaType\Json(
-                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                    schema: new OA\Schema(ref: ApiError::class),
                 ),
             ),
         ],
@@ -155,7 +156,7 @@ final class FavoritesController
                     schema: new OA\Schema(
                         type: 'object',
                         properties: [
-                            'data' => new OA\Schema(ref: \App\Favorites\Interface\Resource\FavoriteResource::class),
+                            'data' => new OA\Schema(ref: FavoriteResource::class),
                         ],
                     ),
                 ),

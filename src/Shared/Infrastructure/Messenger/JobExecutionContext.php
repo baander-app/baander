@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Shared\Infrastructure\Messenger;
 
 use App\Shared\Application\Port\CurrentJobInterface;
+use Swoole\Coroutine;
 
 /**
  * The job the current execution is handling, so a cancellation checkpoint can find its job
@@ -54,6 +55,6 @@ final class JobExecutionContext implements CurrentJobInterface
 
     private static function coroutineId(): int
     {
-        return \extension_loaded('swoole') ? \Swoole\Coroutine::getCid() : -1;
+        return \extension_loaded('swoole') ? Coroutine::getCid() : -1;
     }
 }

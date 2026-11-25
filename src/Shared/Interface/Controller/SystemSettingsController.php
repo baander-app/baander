@@ -11,6 +11,8 @@ use App\Shared\Application\Exception\UnknownSettingException;
 use App\Shared\Application\Service\SettingDefinitionRegistry;
 use App\Shared\Application\Service\SystemSettings;
 use App\Shared\Interface\Attribute\CliCounterpart;
+use App\Shared\Interface\DTO\ApiError;
+use App\Shared\Interface\DTO\ValidationError;
 use App\Shared\Interface\Request\UpdateSystemSettingsRequest;
 use App\Shared\Interface\Resource\SettingDefinitionResource;
 use App\Shared\Interface\Resource\SystemSettingResource;
@@ -61,7 +63,7 @@ final class SystemSettingsController
                 response: '403',
                 description: 'Forbidden',
                 content: new OA\MediaType\Json(
-                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                    schema: new OA\Schema(ref: ApiError::class),
                 ),
             ),
         ],
@@ -96,7 +98,7 @@ final class SystemSettingsController
                 response: '403',
                 description: 'Forbidden',
                 content: new OA\MediaType\Json(
-                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                    schema: new OA\Schema(ref: ApiError::class),
                 ),
             ),
         ],
@@ -147,21 +149,21 @@ final class SystemSettingsController
                 response: '400',
                 description: 'Malformed request body',
                 content: new OA\MediaType\Json(
-                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                    schema: new OA\Schema(ref: ApiError::class),
                 ),
             ),
             new OA\Response(
                 response: '403',
                 description: 'Forbidden — SUPER_ADMIN only',
                 content: new OA\MediaType\Json(
-                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                    schema: new OA\Schema(ref: ApiError::class),
                 ),
             ),
             new OA\Response(
                 response: '422',
                 description: 'Unknown setting or invalid value, per key; nothing was written',
                 content: new OA\MediaType\Json(
-                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ValidationError::class),
+                    schema: new OA\Schema(ref: ValidationError::class),
                 ),
             ),
         ],
@@ -213,14 +215,14 @@ final class SystemSettingsController
                 response: '403',
                 description: 'Forbidden — SUPER_ADMIN only',
                 content: new OA\MediaType\Json(
-                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                    schema: new OA\Schema(ref: ApiError::class),
                 ),
             ),
             new OA\Response(
                 response: '404',
                 description: 'Unknown setting',
                 content: new OA\MediaType\Json(
-                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                    schema: new OA\Schema(ref: ApiError::class),
                 ),
             ),
         ],

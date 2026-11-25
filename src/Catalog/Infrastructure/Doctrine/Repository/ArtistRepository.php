@@ -8,21 +8,24 @@ use App\Catalog\Domain\Model\Artist;
 use App\Catalog\Domain\Model\ArtistState;
 use App\Catalog\Domain\Repository\ArtistRepositoryInterface;
 use App\Catalog\Domain\ValueObject\MusicbrainzId;
+use App\Catalog\Infrastructure\Doctrine\Entity\AlbumEntity;
 use App\Catalog\Infrastructure\Doctrine\Entity\ArtistAlbumEntity;
 use App\Catalog\Infrastructure\Doctrine\Entity\ArtistEntity;
 use App\Catalog\Infrastructure\Doctrine\Entity\ArtistSongEntity;
 use App\Catalog\Infrastructure\Doctrine\Entity\GenreSongEntity;
+use App\Catalog\Infrastructure\Doctrine\Entity\PersonArtistLinkEntity;
 use App\Catalog\Infrastructure\Doctrine\Entity\SongEntity;
-use App\Catalog\Infrastructure\Doctrine\Entity\AlbumEntity;
 use App\Catalog\Infrastructure\Doctrine\Query\CatalogReadScopeQuery;
+use App\Media\Infrastructure\Doctrine\Entity\ImageEntity;
 use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\SearchOptions;
 use App\Shared\Domain\Model\SearchResult;
 use App\Shared\Domain\Model\Uuid;
-use App\Shared\Infrastructure\Doctrine\Repository\RefreshedEntityTrait;
 use App\Shared\Domain\ValueObject\LibraryReadScope;
 use App\Shared\Infrastructure\Doctrine\Repository\PgroongaSearchTrait;
+use App\Shared\Infrastructure\Doctrine\Repository\RefreshedEntityTrait;
 use Doctrine\ORM\EntityManagerInterface;
+use Doctrine\ORM\QueryBuilder;
 
 /**
  * Pure domain repository for artists.
@@ -68,7 +71,7 @@ final class ArtistRepository implements ArtistRepositoryInterface
             ->getSingleScalarResult();
     }
 
-    private function visibleQuery(LibraryReadScope $scope): \Doctrine\ORM\QueryBuilder
+    private function visibleQuery(LibraryReadScope $scope): QueryBuilder
     {
         $qb = $this->entityManager
             ->getRepository(ArtistEntity::class)
@@ -226,7 +229,7 @@ final class ArtistRepository implements ArtistRepositoryInterface
                 'artist.sortName IS NULL OR artist.type IS NULL OR artist.country IS NULL'
                 . ' OR artist.disambiguation IS NULL OR artist.lifeSpanBegin IS NULL OR artist.lifeSpanEnd IS NULL'
                 . " OR (LOWER(artist.type) = 'person' AND NOT EXISTS (SELECT 1 FROM "
-                . \App\Catalog\Infrastructure\Doctrine\Entity\PersonArtistLinkEntity::class
+                . PersonArtistLinkEntity::class
                 . ' personLink WHERE IDENTITY(personLink.artist) = artist.id'
                 . ' AND (personLink.managedByOperator = true OR personLink.artistMbid = LOWER(artist.mbid))))',
             )
@@ -270,7 +273,7 @@ final class ArtistRepository implements ArtistRepositoryInterface
     /**
      * @param list<array{field: string, operator: string, value: mixed}> $filters
      */
-    private function applyArtistFilters(\Doctrine\ORM\QueryBuilder $qb, array $filters, LibraryReadScope $scope): void
+    private function applyArtistFilters(QueryBuilder $qb, array $filters, LibraryReadScope $scope): void
     {
         foreach ($filters as $filter) {
             match ($filter['field']) {
@@ -280,7 +283,7 @@ final class ArtistRepository implements ArtistRepositoryInterface
         }
     }
 
-    private function applyGenreFilter(\Doctrine\ORM\QueryBuilder $qb, string $genreSlug, LibraryReadScope $scope): void
+    private function applyGenreFilter(QueryBuilder $qb, string $genreSlug, LibraryReadScope $scope): void
     {
         $libraryPredicate = $scope->isUnrestricted()
             ? ''
@@ -295,7 +298,7 @@ final class ArtistRepository implements ArtistRepositoryInterface
         ))->setParameter('genre_slug', $genreSlug);
     }
 
-    private function applyArtistSort(\Doctrine\ORM\QueryBuilder $qb, SearchOptions $options): void
+    private function applyArtistSort(QueryBuilder $qb, SearchOptions $options): void
     {
         if (!$options->hasSort()) {
             $qb->orderBy('a.name', 'ASC');
@@ -370,7 +373,7 @@ final class ArtistRepository implements ArtistRepositoryInterface
         // Sync cover image relationship
         if ($artist->getCoverImageId() !== null) {
             $imageEntity = $this->entityManager
-                ->getRepository(\App\Media\Infrastructure\Doctrine\Entity\ImageEntity::class)
+                ->getRepository(ImageEntity::class)
                 ->find($artist->getCoverImageId());
             $entity->setCoverImage($imageEntity);
         } else {

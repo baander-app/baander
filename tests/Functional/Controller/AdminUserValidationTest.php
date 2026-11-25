@@ -6,6 +6,7 @@ namespace App\Tests\Functional\Controller;
 
 use App\Auth\Domain\Model\User;
 use App\Shared\Domain\Model\Email;
+use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
 use App\Tests\Functional\TestCase;
 use PHPUnit\Framework\Attributes\DataProvider;
@@ -96,7 +97,7 @@ final class AdminUserValidationTest extends TestCase
 
         $data = $this->assertJsonResponse($response, 201, 'data')['data'];
         $this->assertSame(' New User ', $data['name']);
-        $stored = $this->userRepository->findByPublicId(\App\Shared\Domain\Model\PublicId::fromString($data['publicId']));
+        $stored = $this->userRepository->findByPublicId(PublicId::fromString($data['publicId']));
         $this->assertSame(' New User ', $stored->getName());
         $this->assertSame('created@baander.app', $stored->getEmail());
     }

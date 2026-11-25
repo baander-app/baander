@@ -9,6 +9,7 @@ require_once dirname(__DIR__, 2) . '/Support/FinalSchemaBootstrap.php';
 use App\Shared\Application\DTO\DeploymentProfile;
 use App\Shared\Application\DTO\DeploymentUnit;
 use App\Shared\Infrastructure\Worker\DeploymentContainerRecipe;
+use App\Shared\Infrastructure\Worker\DeploymentLease;
 use App\Shared\Infrastructure\Worker\DeploymentRuntimeEnvironment;
 use App\Shared\Infrastructure\Worker\DockerDeploymentCreate;
 use App\Shared\Infrastructure\Worker\DockerWorkerCommand;
@@ -18,6 +19,7 @@ use App\Shared\Infrastructure\Worker\DoctrineDeploymentLease;
 use App\Shared\Infrastructure\Worker\DoctrineDeploymentRetirement;
 use App\Shared\Infrastructure\Worker\RegisteredDeploymentRecovery;
 use App\Shared\Infrastructure\Worker\RegisteredDeploymentStart;
+use App\Tests\Support\FinalSchemaBootstrap;
 use Doctrine\DBAL\DriverManager;
 
 $arguments = $_SERVER['argv'] ?? [];
@@ -39,7 +41,7 @@ try {
     foreach ([$connection, $observer] as $session) {
         $session->executeStatement('SET search_path TO ' . $schema . ', public');
     }
-    \App\Tests\Support\FinalSchemaBootstrap::bootstrap($connection);
+    FinalSchemaBootstrap::bootstrap($connection);
     $daemon = trim($command->execute(['info', '--format', '{{.ID}}']));
     $inventory = new DoctrineDeploymentInventory($connection);
     $leases = new DoctrineDeploymentLease($connection);
@@ -199,7 +201,7 @@ try {
     try {
         (new DockerWorkerContainment($command->execute(...), $recipes['control']))->retire(
             $control->containerId,
-            new \App\Shared\Infrastructure\Worker\DeploymentLease($namespace, $replacementBoot, 1),
+            new DeploymentLease($namespace, $replacementBoot, 1),
             DeploymentUnit::Control,
         );
         throw new LogicException('Wrong owner retired a live unit.');

@@ -4,14 +4,18 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Activity\Interface\Controller;
 
+use App\Activity\Application\Port\ActivityIdentityProjectionPortInterface;
 use App\Activity\Application\Port\ActivityPortInterface;
 use App\Activity\Infrastructure\ActivityEnrichmentService;
 use App\Activity\Interface\Controller\UserRecentController;
 use App\Catalog\Application\Port\AlbumPortInterface;
 use App\Catalog\Application\Port\MoviePortInterface;
+use App\Catalog\Application\Port\SongAvailabilityPortInterface;
 use App\Catalog\Application\Port\SongPortInterface;
+use App\Library\Application\Port\LibraryReadScopeProviderInterface;
 use App\Media\Application\Port\ImagePortInterface;
 use App\Shared\Application\Http\PublicOrigins;
+use App\Shared\Domain\Model\PublicId;
 use PHPUnit\Framework\TestCase;
 use Symfony\Bundle\SecurityBundle\Security;
 use Symfony\Component\HttpFoundation\Request;
@@ -32,8 +36,8 @@ final class RecentIdentityTest extends TestCase
             $this->createStub(ImagePortInterface::class),
             $this->createStub(MoviePortInterface::class),
             $this->users(),
-            $this->createStub(\App\Catalog\Application\Port\SongAvailabilityPortInterface::class),
-            $this->createStub(\App\Library\Application\Port\LibraryReadScopeProviderInterface::class),
+            $this->createStub(SongAvailabilityPortInterface::class),
+            $this->createStub(LibraryReadScopeProviderInterface::class),
         );
         $controller = new UserRecentController($security, $activities, $enrichment, new PublicOrigins('https://baander.app'));
         $controller->setTranslator(new Translator('en'));
@@ -41,10 +45,10 @@ final class RecentIdentityTest extends TestCase
         self::assertSame(401, $controller->recent(new Request())->getStatusCode());
     }
 
-    private function users(): \App\Activity\Application\Port\ActivityIdentityProjectionPortInterface
+    private function users(): ActivityIdentityProjectionPortInterface
     {
-        $users = $this->createStub(\App\Activity\Application\Port\ActivityIdentityProjectionPortInterface::class);
-        $users->method('userPublicId')->willReturn(new \App\Shared\Domain\Model\PublicId());
+        $users = $this->createStub(ActivityIdentityProjectionPortInterface::class);
+        $users->method('userPublicId')->willReturn(new PublicId());
 
         return $users;
     }

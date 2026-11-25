@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Notification\Interface\Controller;
 
 use App\Auth\Infrastructure\Security\SecurityUser;
+use App\Notification\Domain\Model\Notification;
 use App\Notification\Domain\Repository\NotificationRepositoryInterface;
 use App\Notification\Domain\ValueObject\NotificationCategory;
 use App\Notification\Interface\Resource\NotificationResource;
@@ -12,6 +13,7 @@ use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
 use App\Shared\Interface\Controller\ApiResponsesTrait;
 use App\Shared\Interface\Controller\TranslatorTrait;
+use App\Shared\Interface\DTO\ApiError;
 use App\Shared\Interface\Request\QueryParameters;
 use OpenApi\Spec as OA;
 use Symfony\Bundle\SecurityBundle\Security;
@@ -115,7 +117,7 @@ final class NotificationController
                 response: '400',
                 description: 'Invalid query parameters',
                 content: new OA\MediaType\Json(
-                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                    schema: new OA\Schema(ref: ApiError::class),
                 ),
             ),
         ],
@@ -249,14 +251,14 @@ final class NotificationController
                 response: '404',
                 description: 'Not found',
                 content: new OA\MediaType\Json(
-                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                    schema: new OA\Schema(ref: ApiError::class),
                 ),
             ),
             new OA\Response(
                 response: '403',
                 description: 'Forbidden',
                 content: new OA\MediaType\Json(
-                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                    schema: new OA\Schema(ref: ApiError::class),
                 ),
             ),
         ],
@@ -358,14 +360,14 @@ final class NotificationController
                 response: '404',
                 description: 'Not found',
                 content: new OA\MediaType\Json(
-                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                    schema: new OA\Schema(ref: ApiError::class),
                 ),
             ),
             new OA\Response(
                 response: '403',
                 description: 'Forbidden',
                 content: new OA\MediaType\Json(
-                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                    schema: new OA\Schema(ref: ApiError::class),
                 ),
             ),
         ],
@@ -389,7 +391,7 @@ final class NotificationController
         return $this->noContent();
     }
 
-    private function findNotification(string $publicId): ?\App\Notification\Domain\Model\Notification
+    private function findNotification(string $publicId): ?Notification
     {
         try {
             PublicId::fromString($publicId);

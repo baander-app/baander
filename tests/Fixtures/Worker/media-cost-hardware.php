@@ -12,6 +12,8 @@ declare(strict_types=1);
 
 use App\Shared\Application\DTO\DeploymentProfile;
 use App\Shared\Infrastructure\Worker\NativeExecutionDaemon;
+use App\Transcode\Application\Port\FFmpegPortInterface;
+use App\Transcode\Application\Port\TranscodeStoragePortInterface;
 use App\Transcode\Application\Service\MediaExecutionPolicy;
 use App\Transcode\Domain\ValueObject\AudioProfile;
 use App\Transcode\Domain\ValueObject\EncoderProfile;
@@ -65,8 +67,8 @@ $stub = static function (string $interface): object {
     }
     return eval('return new class implements \\' . $interface . " {\n" . $methods . '};');
 };
-$ffmpeg = $stub(App\Transcode\Application\Port\FFmpegPortInterface::class);
-$storage = $stub(App\Transcode\Application\Port\TranscodeStoragePortInterface::class);
+$ffmpeg = $stub(FFmpegPortInterface::class);
+$storage = $stub(TranscodeStoragePortInterface::class);
 $tier = QualityTier::p1080();
 $audioProfile = AudioProfile::streamingStereo();
 $command = static function (string $encoder, string $output) use ($device, $ffmpeg, $storage, $probe, $tier, $audioProfile, $source): array {

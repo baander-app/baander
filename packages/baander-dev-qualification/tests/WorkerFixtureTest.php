@@ -4,16 +4,23 @@ declare(strict_types=1);
 
 namespace Baander\DevQualification\Tests;
 
-use Baander\Process\Execution\EngineExecutor;
-use Baander\Process\Execution\ExecutionContext;
-use Baander\Process\Execution\ProcessSpec;
-use Baander\Process\Execution\CompletionPolicy;
+use Baander\Configuration\ApplicationLayout;
+use Baander\Containers\Docker\Client;
+use Baander\Containers\Docker\Target;
+use Baander\DevQualification\Fixtures\Runtime;
 use Baander\DevQualification\Fixtures\Worker\AutoscalingVerifier;
+use Baander\DevQualification\Fixtures\Worker\ContainedSamplerDrain;
 use Baander\DevQualification\Fixtures\Worker\ControlCapacityVerifier;
+use Baander\DevQualification\Fixtures\Worker\EvidenceMode;
+use Baander\DevQualification\Fixtures\Worker\Measurements;
 use Baander\DevQualification\Fixtures\Worker\MediaControlVerifier;
 use Baander\DevQualification\Fixtures\Worker\Reports;
-use Baander\DevQualification\Fixtures\Worker\EvidenceMode;
-use Baander\Configuration\ApplicationLayout;
+use Baander\Process\Execution\CommandFailure;
+use Baander\Process\Execution\CompletionPolicy;
+use Baander\Process\Execution\EngineExecutor;
+use Baander\Process\Execution\ExecutionContext;
+use Baander\Process\Execution\ProcessResult;
+use Baander\Process\Execution\ProcessSpec;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use RuntimeException;
@@ -834,7 +841,7 @@ final class WorkerFixtureTest extends TestCase
         } elseif ($case === 'pressure-truncated') {
             file_put_contents($this->root . '/pressure.log', '{', FILE_APPEND);
         }
-        $result = new \Baander\Process\Execution\ProcessResult(
+        $result = new ProcessResult(
             $case === 'other-exit' ? 7 : (in_array($case, ['early-zero', 'zero', 'pressure-zero'], true) ? 0 : 137),
             $case === 'signal' ? 9 : null,
             $case === 'timeout',
@@ -843,7 +850,7 @@ final class WorkerFixtureTest extends TestCase
             '',
             1,
         );
-        $completion = new \Baander\DevQualification\Fixtures\Worker\ContainedSamplerDrain($this->root, $phase, [
+        $completion = new ContainedSamplerDrain($this->root, $phase, [
             'control' => ['name' => 'control-name', 'id' => $case === 'wrong-id' ? 'foreign' : 'control'],
             'execution' => ['name' => 'execution-name', 'id' => 'execution'],
         ]);
@@ -875,17 +882,17 @@ final class WorkerFixtureTest extends TestCase
             PHP_CHILD;
         file_put_contents($this->root . '/docker', '#!' . PHP_BINARY . "\n" . $script);
         chmod($this->root . '/docker', 0700);
-        $runtime = new \Baander\DevQualification\Fixtures\Runtime(dirname(__DIR__, 3), 5);
-        $docker = new \Baander\Containers\Docker\Client(
+        $runtime = new Runtime(dirname(__DIR__, 3), 5);
+        $docker = new Client(
             $runtime->executor,
-            new \Baander\Containers\Docker\Target($this->root . '/docker', 'unix:///fixture.sock', 'fixture-daemon', null, null),
+            new Target($this->root . '/docker', 'unix:///fixture.sock', 'fixture-daemon', null, null),
             [],
         );
-        $measurements = new \Baander\DevQualification\Fixtures\Worker\Measurements($runtime, $docker, $this->root);
+        $measurements = new Measurements($runtime, $docker, $this->root);
         try {
             $process = $measurements->container(['exec', 'control-name', 'sampler'], 'control-samples.jsonl', 'errors.log', 3);
             $runtime->await(static fn(): bool => !$runtime->alive($process), 2, .01);
-            $measurements->finish(new \Baander\DevQualification\Fixtures\Worker\ContainedSamplerDrain($this->root, 'native-loss', [
+            $measurements->finish(new ContainedSamplerDrain($this->root, 'native-loss', [
                 'control' => ['name' => 'control-name', 'id' => 'control'],
                 'execution' => ['name' => 'execution-name', 'id' => 'execution'],
             ]));
@@ -937,14 +944,14 @@ final class WorkerFixtureTest extends TestCase
             }
             $this->json('control-drain-capture.json', $receipt);
         }
-        $completion = new \Baander\DevQualification\Fixtures\Worker\ContainedSamplerDrain($this->root, 'native-loss', [
+        $completion = new ContainedSamplerDrain($this->root, 'native-loss', [
             'control' => ['name' => 'control-name', 'id' => 'control'],
             'execution' => ['name' => 'execution-name', 'id' => 'execution'],
         ]);
         if (!$success) {
             $this->expectException(RuntimeException::class);
         }
-        $completion->complete('control-name', 'control-samples.jsonl', new \Baander\Process\Execution\ProcessResult(137, null, false, false, '', '', 1));
+        $completion->complete('control-name', 'control-samples.jsonl', new ProcessResult(137, null, false, false, '', '', 1));
         self::assertSame('control:/run/baander-worker/boot/control.json', $completion->terminalHeartbeatSource());
         $samples = Reports::samples($this->root . '/control-samples.jsonl');
         self::assertCount(66, $samples);
@@ -1000,9 +1007,9 @@ final class WorkerFixtureTest extends TestCase
                 logPath: $this->root . '/pressure.log',
             ), new CompletionPolicy(null));
             if (in_array($case, ['timeout', 'cancelled', 'signal'], true)) {
-                $result = new \Baander\Process\Execution\ProcessResult(137, $case === 'signal' ? 9 : null, $case === 'timeout', $case === 'cancelled', '', '', 1);
+                $result = new ProcessResult(137, $case === 'signal' ? 9 : null, $case === 'timeout', $case === 'cancelled', '', '', 1);
             }
-            $completion = new \Baander\DevQualification\Fixtures\Worker\ContainedSamplerDrain($this->root, 'native-loss', [
+            $completion = new ContainedSamplerDrain($this->root, 'native-loss', [
                 'control' => ['name' => 'control-name', 'id' => 'control'],
                 'execution' => ['name' => 'execution-name', 'id' => 'execution'],
             ]);
@@ -1015,8 +1022,8 @@ final class WorkerFixtureTest extends TestCase
                 if (!$success) {
                     $expectedStatus = $result->timedOut ? 124 : ($result->cancelled ? 143 : ($result->exitCode ?: 1));
                     $cleanup = new RuntimeException('Later cleanup failed', previous: $error);
-                    self::assertSame($expectedStatus, \Baander\DevQualification\Fixtures\Runtime::status($cleanup));
-                    self::assertStringContainsString($error->getMessage(), \Baander\DevQualification\Fixtures\Runtime::failure($cleanup));
+                    self::assertSame($expectedStatus, Runtime::status($cleanup));
+                    self::assertStringContainsString($error->getMessage(), Runtime::failure($cleanup));
                     self::assertFileDoesNotExist($this->root . '/qualification.json');
                 }
                 throw $error;
@@ -1032,7 +1039,7 @@ final class WorkerFixtureTest extends TestCase
     {
         $this->capacityFixture('native-loss');
         $this->lines('pressure.log', []);
-        $completion = new \Baander\DevQualification\Fixtures\Worker\ContainedSamplerDrain($this->root, 'native-loss', [
+        $completion = new ContainedSamplerDrain($this->root, 'native-loss', [
             'control' => ['name' => 'control-name', 'id' => 'control'],
             'execution' => ['name' => 'execution-name', 'id' => 'execution'],
         ]);
@@ -1044,7 +1051,7 @@ final class WorkerFixtureTest extends TestCase
                 $completion->checkOutcome($pressure);
                 $completion->complete('control-name', 'control-samples.jsonl', $sampler);
                 self::fail('Unexpected pressure exit was accepted');
-            } catch (\Baander\Process\Execution\CommandFailure $error) {
+            } catch (CommandFailure $error) {
                 self::assertSame($status, $error->getCode());
                 self::assertSame($pressure, $error->result);
                 self::assertFileDoesNotExist($this->root . '/qualification.json');
@@ -1105,8 +1112,8 @@ final class WorkerFixtureTest extends TestCase
         if ($case === 'truncated') {
             file_put_contents($this->root . '/owned-failure.jsonl', '{', FILE_APPEND);
         }
-        $result = new \Baander\Process\Execution\ProcessResult($status, $case === 'signal' ? 9 : null, $case === 'timeout', $case === 'cancelled', '', '', 1);
-        $completion = new \Baander\DevQualification\Fixtures\Worker\ContainedSamplerDrain($this->root, $phase, [
+        $result = new ProcessResult($status, $case === 'signal' ? 9 : null, $case === 'timeout', $case === 'cancelled', '', '', 1);
+        $completion = new ContainedSamplerDrain($this->root, $phase, [
             'control' => ['name' => 'control-name', 'id' => 'control'],
             'execution' => ['name' => 'execution-name', 'id' => 'execution'],
         ]);

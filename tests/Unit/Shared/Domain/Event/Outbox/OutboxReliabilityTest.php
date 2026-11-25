@@ -6,6 +6,8 @@ namespace App\Tests\Unit\Shared\Domain\Event\Outbox;
 
 use App\Auth\Domain\Event\UserRegistered;
 use App\Shared\Domain\Event\AbstractDomainEvent;
+use App\Shared\Domain\Event\Outbox\OutboxEventDispatcherInterface;
+use App\Shared\Domain\Event\Outbox\OutboxRelayException;
 use App\Shared\Domain\Event\Outbox\OutboxRepository;
 use App\Shared\Domain\Event\Outbox\OutboxSubscriber;
 use App\Shared\Domain\Event\Outbox\OutboxSubscriberPass;
@@ -14,13 +16,13 @@ use App\Shared\Domain\Event\Outbox\RelayOutboxHandler;
 use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
 use Doctrine\DBAL\Connection;
+use Doctrine\DBAL\Result;
 use PHPUnit\Framework\Attributes\AllowMockObjectsWithoutExpectations;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
 use RuntimeException;
 use Symfony\Component\DependencyInjection\ContainerBuilder;
 use Symfony\Component\DependencyInjection\Definition;
-use App\Shared\Domain\Event\Outbox\OutboxEventDispatcherInterface;
 
 /**
  * Concrete event class used to prove that OutboxSubscriberPass only sees
@@ -60,7 +62,7 @@ final class OutboxReliabilityTest extends TestCase
                 $this->anything(),
                 $this->anything(),
             )
-            ->willReturn($this->createMock(\Doctrine\DBAL\Result::class));
+            ->willReturn($this->createMock(Result::class));
 
         $repository = new OutboxRepository($connection);
         $repository->fetchPending();
@@ -114,11 +116,11 @@ final class OutboxReliabilityTest extends TestCase
 
         $handler = new RelayOutboxHandler($repository, $dispatcher, new NullLogger());
 
-        $this->expectException(\App\Shared\Domain\Event\Outbox\OutboxRelayException::class);
+        $this->expectException(OutboxRelayException::class);
 
         try {
             $handler(new RelayOutboxCommand());
-        } catch (\App\Shared\Domain\Event\Outbox\OutboxRelayException $e) {
+        } catch (OutboxRelayException $e) {
             $this->assertCount(1, $e->getFailures());
             $this->assertSame('user.registered', $e->getFailures()[0]['event']);
 
@@ -172,7 +174,7 @@ final class OutboxReliabilityTest extends TestCase
 
         $handler = new RelayOutboxHandler($repository, $dispatcher, new NullLogger());
 
-        $this->expectException(\App\Shared\Domain\Event\Outbox\OutboxRelayException::class);
+        $this->expectException(OutboxRelayException::class);
 
         $handler(new RelayOutboxCommand());
     }
@@ -205,9 +207,9 @@ final class OutboxReliabilityTest extends TestCase
     /**
      * @param array<int, array<string, mixed>> $rows
      */
-    private function createResultMock(array $rows): \Doctrine\DBAL\Result
+    private function createResultMock(array $rows): Result
     {
-        $result = $this->createMock(\Doctrine\DBAL\Result::class);
+        $result = $this->createMock(Result::class);
         $result->method('fetchAllAssociative')->willReturn($rows);
 
         return $result;

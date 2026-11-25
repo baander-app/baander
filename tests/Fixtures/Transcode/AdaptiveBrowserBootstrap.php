@@ -2,11 +2,13 @@
 
 declare(strict_types=1);
 
+use App\Shared\Application\DTO\DeploymentProfile;
 use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
 use App\Transcode\Application\DTO\TranscodeRenditionSet;
 use App\Transcode\Application\Port\FFmpegPortInterface;
 use App\Transcode\Application\Port\TranscodeStoragePortInterface;
+use App\Transcode\Application\Service\MediaExecutionPolicy;
 use App\Transcode\Domain\Model\TranscodeJob;
 use App\Transcode\Domain\ValueObject\AacImplementation;
 use App\Transcode\Domain\ValueObject\AudioProfile;
@@ -14,9 +16,9 @@ use App\Transcode\Domain\ValueObject\EncoderProfile;
 use App\Transcode\Domain\ValueObject\QualityTier;
 use App\Transcode\Domain\ValueObject\VideoProbeResult;
 use App\Transcode\Infrastructure\Auth\HmacStreamAuthAdapter;
-use App\Transcode\Infrastructure\FFmpeg\SegmentEncoder;
 use App\Transcode\Infrastructure\FFmpeg\FFmpegArguments;
 use App\Transcode\Infrastructure\FFmpeg\FFprobeArguments;
+use App\Transcode\Infrastructure\FFmpeg\SegmentEncoder;
 use App\Transcode\Infrastructure\HLS\WebVttTimeline;
 use PHPUnit\Framework\MockObject\Generator\Generator;
 use Symfony\Component\Process\Process;
@@ -192,7 +194,7 @@ $ffmpegPort = $generator->testDouble(FFmpegPortInterface::class, false);
 $storagePort = $generator->testDouble(TranscodeStoragePortInterface::class, false);
 assert($ffmpegPort instanceof FFmpegPortInterface);
 assert($storagePort instanceof TranscodeStoragePortInterface);
-$encoder = new SegmentEncoder(new \App\Transcode\Application\Service\MediaExecutionPolicy(\App\Shared\Application\DTO\DeploymentProfile::fromEnvironment()), $ffmpegPort, $storagePort, EncoderProfile::software('libx264'));
+$encoder = new SegmentEncoder(new MediaExecutionPolicy(DeploymentProfile::fromEnvironment()), $ffmpegPort, $storagePort, EncoderProfile::software('libx264'));
 $origin = 'https://adaptive.baander.app:18779';
 $state = ['origin' => $origin, 'videoId' => Uuid::generate(), 'videoPublicId' => new PublicId(),
     'audioProfile' => $audioProfile->name, 'sourceStartTime' => $sourceStartTime, 'jobs' => []];

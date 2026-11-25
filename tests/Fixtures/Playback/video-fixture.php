@@ -11,13 +11,14 @@ use App\Catalog\Infrastructure\Doctrine\ImportIdentity\PersonWriteLock;
 use App\Catalog\Infrastructure\Doctrine\Repository\DirectorRepository;
 use App\Catalog\Infrastructure\Doctrine\Repository\MovieRepository;
 use App\Kernel;
-use App\Shared\Domain\Model\SearchOptions;
-use App\Shared\Domain\ValueObject\LibraryReadScope;
 use App\Shared\Domain\Model\PublicId;
+use App\Shared\Domain\Model\SearchOptions;
 use App\Shared\Domain\Model\Uuid;
+use App\Shared\Domain\ValueObject\LibraryReadScope;
 use App\Shared\Infrastructure\Redis\RedisClientFactory;
 use App\Transcode\Domain\ValueObject\VideoProbeResult;
 use App\Transcode\Infrastructure\Preview\VideoTimelinePreview;
+use Doctrine\DBAL\ArrayParameterType;
 use Doctrine\DBAL\Connection;
 use Doctrine\DBAL\DriverManager;
 use Doctrine\DBAL\Tools\DsnParser;
@@ -277,7 +278,7 @@ final class PlaybackVideoFixture
                 $existing = $connection->fetchOne(
                     "SELECT 1 FROM person_external_ids WHERE namespace = 'tmdb_person' AND external_id IN (:ids) LIMIT 1",
                     ['ids' => $personIds],
-                    ['ids' => \Doctrine\DBAL\ArrayParameterType::STRING],
+                    ['ids' => ArrayParameterType::STRING],
                 );
                 if ($existing !== false) {
                     throw new RuntimeException('Director fixture identity collision; existing identities were not changed.');

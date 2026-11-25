@@ -1,10 +1,14 @@
 <?php
 
 declare(strict_types=1);
+use App\Kernel;
+use App\Shared\Application\Http\PublicOrigins;
+use App\Tests\Fixtures\Auth\SignedDpopProof;
+use Symfony\Component\Dotenv\Dotenv;
 
 // Raw HTTP probes run next to app:serve on a disposable, isolated container network.
 require dirname(__DIR__, 2) . '/vendor/autoload.php';
-new Symfony\Component\Dotenv\Dotenv()->bootEnv(dirname(__DIR__, 2) . '/.env');
+new Dotenv()->bootEnv(dirname(__DIR__, 2) . '/.env');
 
 function check(bool $condition, string $message): void
 {
@@ -66,7 +70,7 @@ function odd2048BitNumber(): string
  */
 function rsaProofRequest(string $origin, string $nonce, string $exponent): string
 {
-    $encode = App\Tests\Fixtures\Auth\SignedDpopProof::encode(...);
+    $encode = SignedDpopProof::encode(...);
     $header = ['typ' => 'dpop+jwt', 'alg' => 'PS256', 'jwk' => ['kty' => 'RSA', 'n' => $encode(odd2048BitNumber()), 'e' => $encode($exponent)]];
     $claims = ['jti' => random_bytes(16) |> bin2hex(...), 'htm' => 'POST', 'htu' => $origin . '/api/oauth/token', 'iat' => time(), 'nonce' => $nonce];
     $proof = $encode(json_encode($header, JSON_THROW_ON_ERROR)) . '.' . $encode(json_encode($claims, JSON_THROW_ON_ERROR)) . '.' . $encode("\0" . random_bytes(255));
@@ -74,7 +78,7 @@ function rsaProofRequest(string $origin, string $nonce, string $exponent): strin
     return "POST /api/oauth/token HTTP/1.1\r\nHost: baander.app\r\nDPoP: " . $proof . "\r\nContent-Length: 0\r\nConnection: close\r\n\r\n";
 }
 
-$kernel = new App\Kernel('prod', false);
+$kernel = new Kernel('prod', false);
 $kernel->boot();
 $connection = $kernel->getContainer()->get('doctrine')->getConnection();
 $tables = ['users', 'oauth_access_tokens', 'oauth_refresh_tokens', 'password_reset_tokens', 'login_blocks'];
@@ -127,7 +131,7 @@ $signInBody = (static function (): string {
 $probe('oversized sign-in body', "POST /api/auth/login HTTP/1.1\r\nHost: baander.app\r\nContent-Type: application/json\r\nAccept: application/json\r\nConnection: close\r\nContent-Length: " . strlen($signInBody) . "\r\n\r\n" . $signInBody, [413]);
 // A worker that verifies an RSA proof in pure-PHP arithmetic is held for minutes by the first exponent and for over a second
 // by the second, the one ordinary keys have. The error named shows the nonce was accepted and the proof itself refused.
-$origin = new App\Shared\Application\Http\PublicOrigins((string) $kernel->getContainer()->getParameter('auth.oauth.issuer'))->primary;
+$origin = new PublicOrigins((string) $kernel->getContainer()->getParameter('auth.oauth.issuer'))->primary;
 foreach (['a 2048-bit exponent' => odd2048BitNumber(), 'the exponent 65537' => "\x01\x00\x01"] as $name => $exponent) {
     $probe('RSA proof with ' . $name, rsaProofRequest($origin, dpopNonce(), $exponent), [400], deadline: 1.0, error: 'invalid_dpop_proof');
 }

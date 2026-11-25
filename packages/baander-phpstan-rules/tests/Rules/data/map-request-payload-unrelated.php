@@ -19,7 +19,7 @@ final class Controller
     {
     }
 
-    public function fullyQualified(#[\Baander\PHPStan\Tests\Fixtures\UnrelatedPayload\MapRequestPayload] object $payload): void
+    public function fullyQualified(#[MapRequestPayload] object $payload): void
     {
     }
 }

@@ -4,15 +4,19 @@ declare(strict_types=1);
 
 namespace Baander\DevCi\Tests\Backend;
 
+use Baander\Configuration\ApplicationLayout;
+use Baander\Containers\Docker\Client;
+use Baander\Containers\Docker\Target;
+use Baander\Containers\Resources\ResourceLedger;
 use Baander\DevCi\Backend\StaticCheck;
 use Baander\Images\Inventory\Collector;
+use Baander\Images\Inventory\SafeTar;
 use Baander\Process\Execution\CompletionPolicy;
 use Baander\Process\Execution\EngineExecutor;
 use Baander\Process\Execution\ExecutionContext;
 use Baander\Process\Execution\ProcessSpec;
-use RuntimeException;
-use Baander\Images\Inventory\SafeTar;
 use PHPUnit\Framework\TestCase;
+use RuntimeException;
 
 final class BackendStaticCheckTest extends TestCase
 {
@@ -209,22 +213,22 @@ final class BackendStaticCheckTest extends TestCase
         }
     }
 
-    /** @return array{\Baander\Containers\Docker\Client,\Baander\Containers\Resources\ResourceLedger} */
+    /** @return array{Client,ResourceLedger} */
     private function resourceClient(): array
     {
         $environment = array_replace(getenv(), ['RESOURCE_TEST_STATE' => $this->root]);
-        $client = new \Baander\Containers\Docker\Client(
-            new \Baander\Process\Execution\EngineExecutor(\Baander\Process\Execution\ExecutionContext::bounded(20, $environment)),
-            new \Baander\Containers\Docker\Target(dirname(__DIR__, 4) . '/packages/baander-dev-ci/tests/Backend/Fixtures/static-check-resource-docker.php', 'unix:///baander.app/docker.sock', 'owned-daemon', null, null),
+        $client = new Client(
+            new EngineExecutor(ExecutionContext::bounded(20, $environment)),
+            new Target(dirname(__DIR__, 4) . '/packages/baander-dev-ci/tests/Backend/Fixtures/static-check-resource-docker.php', 'unix:///baander.app/docker.sock', 'owned-daemon', null, null),
             $environment,
         );
-        return [$client, new \Baander\Containers\Resources\ResourceLedger($this->root . '/receipt.json', $client, $environment)];
+        return [$client, new ResourceLedger($this->root . '/receipt.json', $client, $environment)];
     }
 
     public function testCachedRuntimeGetsCurrentArchiveAndUnprivilegedCommandWithExitStatus(): void
     {
         [$client, $ledger] = $this->resourceClient();
-        self::assertSame(7, StaticCheck::runCheck($client, 'cached-runtime', '/tmp/current.tar', ['php', 'current.php', 'literal $x; space'], \Baander\Configuration\ApplicationLayout::load(), $ledger, 10));
+        self::assertSame(7, StaticCheck::runCheck($client, 'cached-runtime', '/tmp/current.tar', ['php', 'current.php', 'literal $x; space'], ApplicationLayout::load(), $ledger, 10));
         self::assertFileDoesNotExist($this->root . '/resource.json');
         self::assertFileDoesNotExist($this->root . '/receipt.json');
         $calls = array_map(static fn(string $line): array => json_decode($line, true), file($this->root . '/calls.jsonl', FILE_IGNORE_NEW_LINES));
@@ -237,7 +241,7 @@ final class BackendStaticCheckTest extends TestCase
         self::assertStringEndsWith(':/tmp/checkout.tar', $copy[2]);
         $exec = array_values(array_filter($calls, static fn(array $call): bool => $call[0] === 'exec'));
         self::assertStringContainsString('tar -xf /tmp/checkout.tar', end($exec[0]));
-        $applicationRoot = escapeshellarg(\Baander\Configuration\ApplicationLayout::load()->root);
+        $applicationRoot = escapeshellarg(ApplicationLayout::load()->root);
         self::assertStringContainsString("cp {$applicationRoot}/.env.example {$applicationRoot}/.env", end($exec[0]));
         self::assertSame(['php', 'current.php', 'literal $x; space'], array_slice($exec[1], -3));
     }
@@ -247,9 +251,9 @@ final class BackendStaticCheckTest extends TestCase
         [$client, $ledger] = $this->resourceClient();
         touch($this->root . '/fail-copy');
         try {
-            StaticCheck::runCheck($client, 'cached-runtime', '/tmp/current.tar', ['php', 'current.php'], \Baander\Configuration\ApplicationLayout::load(), $ledger, 10);
+            StaticCheck::runCheck($client, 'cached-runtime', '/tmp/current.tar', ['php', 'current.php'], ApplicationLayout::load(), $ledger, 10);
             self::fail('Expected provisioning failure.');
-        } catch (\RuntimeException $error) {
+        } catch (RuntimeException $error) {
             self::assertSame(19, $error->getCode());
             self::assertStringContainsString('copy failed', $error->getMessage());
         }
@@ -262,9 +266,9 @@ final class BackendStaticCheckTest extends TestCase
         [$client, $ledger] = $this->resourceClient();
         touch($this->root . '/wrong-layout');
         try {
-            StaticCheck::runCheck($client, 'cached-runtime', '/tmp/current.tar', ['php', 'current.php'], \Baander\Configuration\ApplicationLayout::load(), $ledger, 10);
+            StaticCheck::runCheck($client, 'cached-runtime', '/tmp/current.tar', ['php', 'current.php'], ApplicationLayout::load(), $ledger, 10);
             self::fail('Expected image layout rejection.');
-        } catch (\RuntimeException $error) {
+        } catch (RuntimeException $error) {
             self::assertStringContainsString('layout', $error->getMessage());
         }
         self::assertFileDoesNotExist($this->root . '/receipt.json');
@@ -278,9 +282,9 @@ final class BackendStaticCheckTest extends TestCase
         touch($this->root . '/fail-remove');
         touch($this->root . '/check-success');
         try {
-            StaticCheck::runCheck($client, 'cached-runtime', '/tmp/current.tar', ['php', 'current.php'], \Baander\Configuration\ApplicationLayout::load(), $ledger, 10);
+            StaticCheck::runCheck($client, 'cached-runtime', '/tmp/current.tar', ['php', 'current.php'], ApplicationLayout::load(), $ledger, 10);
             self::fail('Expected cleanup failure.');
-        } catch (\RuntimeException $error) {
+        } catch (RuntimeException $error) {
             self::assertSame(1, $error->getCode());
             self::assertStringContainsString('cleanup', $error->getMessage());
         }
@@ -293,9 +297,9 @@ final class BackendStaticCheckTest extends TestCase
         unlink($this->root . '/check-success');
         touch($this->root . '/fail-remove');
         try {
-            StaticCheck::runCheck($client, 'cached-runtime', '/tmp/current.tar', ['php', 'current.php'], \Baander\Configuration\ApplicationLayout::load(), $ledger, 10);
+            StaticCheck::runCheck($client, 'cached-runtime', '/tmp/current.tar', ['php', 'current.php'], ApplicationLayout::load(), $ledger, 10);
             self::fail('Expected cleanup failure alongside failed check.');
-        } catch (\RuntimeException $error) {
+        } catch (RuntimeException $error) {
             self::assertSame(7, $error->getCode());
             self::assertStringContainsString('cleanup', $error->getMessage());
         }

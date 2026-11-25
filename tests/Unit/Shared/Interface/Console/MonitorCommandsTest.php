@@ -5,8 +5,8 @@ declare(strict_types=1);
 namespace App\Tests\Unit\Shared\Interface\Console;
 
 use App\Shared\Application\DTO\InlineJobRun;
-use App\Shared\Application\DTO\JobCancellation;
 use App\Shared\Application\DTO\JobAnalyticsRange;
+use App\Shared\Application\DTO\JobCancellation;
 use App\Shared\Application\DTO\JobMonitorOverview;
 use App\Shared\Application\DTO\JobMonitorPage;
 use App\Shared\Application\DTO\JobMonitorPruneResult;
@@ -20,12 +20,13 @@ use App\Shared\Domain\Model\JobStatus;
 use App\Shared\Interface\Console\MonitorAnalyticsCommand;
 use App\Shared\Interface\Console\MonitorJobCancelCommand;
 use App\Shared\Interface\Console\MonitorJobRetryCommand;
-use App\Shared\Interface\Console\MonitorJobShowCommand;
 use App\Shared\Interface\Console\MonitorJobsCommand;
+use App\Shared\Interface\Console\MonitorJobShowCommand;
 use App\Shared\Interface\Console\MonitorStatusCommand;
 use App\Shared\Interface\Console\PruneJobMonitorsCommand;
 use App\Shared\Interface\Controller\JobMonitorController;
 use App\Shared\Interface\Resource\JobMonitorResource;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Tester\CommandTester;
@@ -240,7 +241,7 @@ final class MonitorCommandsTest extends TestCase
     }
 
     /** @param array<string, string> $input */
-    #[\PHPUnit\Framework\Attributes\DataProvider('invalidAnalyticsInput')]
+    #[DataProvider('invalidAnalyticsInput')]
     public function testInvalidAnalyticsInputIsInvalid(array $input): void
     {
         $tester = new CommandTester(new MonitorAnalyticsCommand($this->monitor));

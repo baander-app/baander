@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Tests\Integration;
 
-use App\Tests\Fixtures\Messaging\MessageCodecFactory;
 use App\Kernel;
 use App\Scheduler\Application\Command\ExecuteScheduledOccurrenceCommand;
 use App\Scheduler\Application\CommandHandler\ExecuteScheduledJobHandler;
@@ -12,43 +11,47 @@ use App\Scheduler\Application\CommandHandler\ExecuteScheduledOccurrenceHandler;
 use App\Scheduler\Application\DTO\SchedulerOccurrence;
 use App\Scheduler\Application\DTO\SchedulerOccurrenceOrigin;
 use App\Scheduler\Application\Exception\ScheduledOccurrenceJobBusy;
-use App\Scheduler\Application\Port\ScheduledJobPortInterface;
 use App\Scheduler\Application\Port\ScheduledConsoleExecutorInterface;
+use App\Scheduler\Application\Port\ScheduledJobPortInterface;
 use App\Scheduler\Application\Port\SchedulerOccurrenceExecutionStoreInterface;
 use App\Scheduler\Domain\Model\SchedulableCommandInterface;
 use App\Scheduler\Domain\Model\ScheduledJob;
 use App\Scheduler\Domain\Service\SchedulerRegistry;
 use App\Scheduler\Domain\ValueObject\JobType;
+use App\Scheduler\Domain\ValueObject\ScheduleStatus;
 use App\Scheduler\Infrastructure\Doctrine\DoctrineSchedulerOccurrenceExecutionStore;
 use App\Scheduler\Infrastructure\Doctrine\DoctrineSchedulerOccurrenceStore;
+use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
 use App\Shared\Infrastructure\Messenger\JsonTransportSerializer;
 use App\Shared\Infrastructure\Worker\DeploymentLease;
 use App\Shared\Infrastructure\Worker\DoctrineDeploymentLease;
+use App\Tests\Fixtures\Messaging\MessageCodecFactory;
 use App\Tests\Support\DeploymentJournalFixture;
+use App\Tests\Support\FinalSchemaBootstrap;
 use DateTimeImmutable;
 use Doctrine\DBAL\Connection;
 use Doctrine\DBAL\DriverManager;
 use Doctrine\DBAL\Tools\DsnParser;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
-use Symfony\Component\Messenger\Envelope;
-use Symfony\Component\Messenger\MessageBusInterface;
 use Symfony\Component\DependencyInjection\ServiceLocator;
 use Symfony\Component\EventDispatcher\EventDispatcher;
 use Symfony\Component\Messenger\Bridge\Redis\Transport\Connection as RedisConnection;
 use Symfony\Component\Messenger\Bridge\Redis\Transport\RedisTransport;
-use Symfony\Component\Messenger\Event\WorkerMessageReceivedEvent;
+use Symfony\Component\Messenger\Envelope;
 use Symfony\Component\Messenger\Event\WorkerMessageFailedEvent;
-use Symfony\Component\Messenger\Exception\HandlerFailedException;
+use Symfony\Component\Messenger\Event\WorkerMessageReceivedEvent;
 use Symfony\Component\Messenger\Event\WorkerMessageRetriedEvent;
 use Symfony\Component\Messenger\Event\WorkerRunningEvent;
 use Symfony\Component\Messenger\EventListener\AddErrorDetailsStampListener;
 use Symfony\Component\Messenger\EventListener\SendFailedMessageForRetryListener;
 use Symfony\Component\Messenger\EventListener\SendFailedMessageToFailureTransportListener;
+use Symfony\Component\Messenger\Exception\HandlerFailedException;
 use Symfony\Component\Messenger\Handler\HandlerDescriptor;
 use Symfony\Component\Messenger\Handler\HandlersLocator;
 use Symfony\Component\Messenger\MessageBus;
+use Symfony\Component\Messenger\MessageBusInterface;
 use Symfony\Component\Messenger\Middleware\HandleMessageMiddleware;
 use Symfony\Component\Messenger\Middleware\SendMessageMiddleware;
 use Symfony\Component\Messenger\Retry\MultiplierRetryStrategy;
@@ -80,7 +83,7 @@ final class SchedulerOccurrenceGuardTest extends TestCase
         foreach ([$this->writer, $this->observer] as $connection) {
             $connection->executeStatement('SET search_path TO ' . $this->schema . ', public');
         }
-        \App\Tests\Support\FinalSchemaBootstrap::bootstrap($this->writer);
+        FinalSchemaBootstrap::bootstrap($this->writer);
         $this->writer->executeStatement('DELETE FROM scheduled_jobs');
         DeploymentJournalFixture::ready($this->writer, 'baander.app:scheduler-guard', str_repeat('a', 32));
         $authority = (new DoctrineDeploymentLease($this->writer))->acquire('baander.app:scheduler-guard', str_repeat('a', 32), 300);
@@ -256,7 +259,7 @@ final class SchedulerOccurrenceGuardTest extends TestCase
     public function testBusyJobExhaustsBoundedRetriesWithoutConsumptionAndCanBeExplicitlyRetriedAfterReturn(): void
     {
         [$blocker, $job] = $this->recordOccurrence();
-        $pending = new SchedulerOccurrence(Uuid::v7(), $job->getId(), $blocker->scheduledFor->modify('+1 minute'), $blocker->jobType, $blocker->command, $blocker->parameters, jobPublicId: new \App\Shared\Domain\Model\PublicId());
+        $pending = new SchedulerOccurrence(Uuid::v7(), $job->getId(), $blocker->scheduledFor->modify('+1 minute'), $blocker->jobType, $blocker->command, $blocker->parameters, jobPublicId: new PublicId());
         self::assertTrue((new DoctrineSchedulerOccurrenceStore($this->writer))->record($pending));
         $attempt = Uuid::v7();
         $owner = new DoctrineSchedulerOccurrenceExecutionStore($this->observer, $this->authority);
@@ -328,7 +331,7 @@ final class SchedulerOccurrenceGuardTest extends TestCase
     public function testPersistedManualOriginRunsPausedJobAndCannotRepeatItsAttempt(): void
     {
         [$scheduled, $job] = $this->recordOccurrence();
-        $manual = new SchedulerOccurrence(Uuid::v7(), $job->getId(), $scheduled->scheduledFor, $scheduled->jobType, $scheduled->command, $scheduled->parameters, jobPublicId: new \App\Shared\Domain\Model\PublicId(), origin: SchedulerOccurrenceOrigin::Manual);
+        $manual = new SchedulerOccurrence(Uuid::v7(), $job->getId(), $scheduled->scheduledFor, $scheduled->jobType, $scheduled->command, $scheduled->parameters, jobPublicId: new PublicId(), origin: SchedulerOccurrenceOrigin::Manual);
         self::assertTrue((new DoctrineSchedulerOccurrenceStore($this->writer))->record($manual));
         $job->pause();
         $effects = 0;
@@ -338,7 +341,7 @@ final class SchedulerOccurrenceGuardTest extends TestCase
         $guard($command);
         self::assertSame(1, $effects);
         self::assertSame(1, $job->getRunCount());
-        self::assertSame(\App\Scheduler\Domain\ValueObject\ScheduleStatus::Paused, $job->getStatus());
+        self::assertSame(ScheduleStatus::Paused, $job->getStatus());
         self::assertNotNull($this->receipt($manual)['returned_at']);
         self::assertSame(1, (int) $this->observer->fetchOne('SELECT count(*) FROM scheduler_occurrence_executions'));
         self::assertSame($scheduled->id->toString(), (new DoctrineSchedulerOccurrenceStore($this->writer))->find($job->getId(), $scheduled->scheduledFor)?->id->toString());
@@ -361,7 +364,7 @@ final class SchedulerOccurrenceGuardTest extends TestCase
     {
         $job = ScheduledJob::create('Guarded schedule', '* * * * *', JobType::Messenger, GuardedSchedulerMessage::class,
             parameters: ['address' => 'worker@baander.app', 'fraction' => 1.0]);
-        $occurrence = new SchedulerOccurrence(Uuid::v7(), $job->getId(), new DateTimeImmutable('2026-10-02T10:00:00Z'), JobType::Messenger, $job->getCommand(), $job->getParameters(), jobPublicId: new \App\Shared\Domain\Model\PublicId());
+        $occurrence = new SchedulerOccurrence(Uuid::v7(), $job->getId(), new DateTimeImmutable('2026-10-02T10:00:00Z'), JobType::Messenger, $job->getCommand(), $job->getParameters(), jobPublicId: new PublicId());
         self::assertTrue((new DoctrineSchedulerOccurrenceStore($this->writer))->record($occurrence));
         return [$occurrence, $job];
     }

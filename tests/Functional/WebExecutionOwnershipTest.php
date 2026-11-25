@@ -25,8 +25,8 @@ use App\Transcode\Application\Port\TranscodeSessionPortInterface;
 use App\Transcode\Application\Port\TranscodeStoragePortInterface;
 use App\Transcode\Application\Port\TranscodeStreamingPortInterface;
 use App\Transcode\Infrastructure\FFmpeg\HardwareCapabilitiesProber;
-use App\Transcode\Infrastructure\Swoole\TranscodeSessionSubscriber;
 use App\Transcode\Infrastructure\Swoole\NativeProcessSpawner;
+use App\Transcode\Infrastructure\Swoole\TranscodeSessionSubscriber;
 use App\Transcode\Infrastructure\Swoole\TranscodeStreamManager;
 use PHPUnit\Framework\Attributes\PreserveGlobalState;
 use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
@@ -39,6 +39,7 @@ use SwooleBundle\SwooleBundle\Server\HttpServerConfiguration;
 use SwooleBundle\SwooleBundle\Server\LifecycleHandler\ServerBeforeShutdownHandler;
 use SwooleBundle\SwooleBundle\Server\LifecycleHandler\ServerShutdownHandler;
 use SwooleBundle\SwooleBundle\Server\Runtime\CallableBootManager;
+use Symfony\Component\DependencyInjection\Container;
 use Symfony\Component\DependencyInjection\ContainerBuilder;
 use Symfony\Component\EventDispatcher\EventDispatcherInterface;
 use Symfony\Component\Filesystem\Filesystem;
@@ -56,7 +57,7 @@ final class WebExecutionOwnershipTest extends TestCase
         try {
             $kernel->boot();
             $container = $kernel->getContainer();
-            self::assertInstanceOf(\Symfony\Component\DependencyInjection\Container::class, $container);
+            self::assertInstanceOf(Container::class, $container);
             foreach (WebExecutionOwnershipKernel::WORKER_EXECUTION_SERVICES as $service) {
                 self::assertContains('web.ownership.' . $service, $container->getServiceIds());
                 self::assertFalse($container->initialized('web.ownership.' . $service));

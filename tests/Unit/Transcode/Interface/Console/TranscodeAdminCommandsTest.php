@@ -6,12 +6,17 @@ namespace App\Tests\Unit\Transcode\Interface\Console;
 
 use App\Auth\Application\Exception\UserNotFoundException;
 use App\Auth\Application\Port\UserIdentifierResolverInterface;
+use App\Shared\Application\Port\TransactionPortInterface;
+use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
 use App\Shared\Interface\Console\AdminCommandSupport;
+use App\Tests\Unit\Transcode\PublicViewStub;
 use App\Transcode\Application\Command\CleanupOrphanedJobsCommand;
 use App\Transcode\Application\CommandHandler\CleanupOrphanedJobsHandler;
+use App\Transcode\Application\Port\TranscodeExecutionOwnershipPort;
 use App\Transcode\Application\Port\TranscodeJobPortInterface;
 use App\Transcode\Application\Port\TranscodeSessionPortInterface;
+use App\Transcode\Application\Service\StaleTranscodeSessionExpiry;
 use App\Transcode\Domain\Model\TranscodeSession;
 use App\Transcode\Domain\ValueObject\AudioProfile;
 use App\Transcode\Interface\Console\TranscodeJobCleanupCommand;
@@ -20,6 +25,8 @@ use App\Transcode\Interface\Console\TranscodeSessionShowCommand;
 use App\Transcode\Interface\Resource\TranscodeSessionResource;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
+use Psr\Log\NullLogger;
+use Symfony\Component\Clock\MockClock;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Tester\CommandTester;
 use Symfony\Component\Messenger\Handler\HandlersLocator;
@@ -38,7 +45,7 @@ final class TranscodeAdminCommandsTest extends TestCase
         $users = $this->createMock(UserIdentifierResolverInterface::class);
         $users->expects(self::never())->method('userId');
 
-        $tester = new CommandTester(new TranscodeSessionListCommand($sessions, $users, new \App\Tests\Unit\Transcode\PublicViewStub()));
+        $tester = new CommandTester(new TranscodeSessionListCommand($sessions, $users, new PublicViewStub()));
 
         self::assertSame(Command::SUCCESS, $tester->execute([]));
         $display = $tester->getDisplay();
@@ -70,10 +77,10 @@ final class TranscodeAdminCommandsTest extends TestCase
         $users = $this->createMock(UserIdentifierResolverInterface::class);
         $users->expects(self::once())->method('userId')->with($identifier)->willReturn($owner);
 
-        $tester = new CommandTester(new TranscodeSessionListCommand($sessions, $users, new \App\Tests\Unit\Transcode\PublicViewStub()));
+        $tester = new CommandTester(new TranscodeSessionListCommand($sessions, $users, new PublicViewStub()));
 
         self::assertSame(Command::SUCCESS, $tester->execute(['--user' => $identifier, '--json' => true]));
-        self::assertJsonStringEqualsJsonString(json_encode(TranscodeSessionResource::collection([(new \App\Tests\Unit\Transcode\PublicViewStub())->session($own)]), JSON_THROW_ON_ERROR), $tester->getDisplay());
+        self::assertJsonStringEqualsJsonString(json_encode(TranscodeSessionResource::collection([(new PublicViewStub())->session($own)]), JSON_THROW_ON_ERROR), $tester->getDisplay());
     }
 
     /** @return iterable<string, array{string}> */
@@ -92,7 +99,7 @@ final class TranscodeAdminCommandsTest extends TestCase
         $sessions = $this->createMock(TranscodeSessionPortInterface::class);
         $sessions->expects(self::never())->method('findActiveByUser');
         $sessions->expects(self::never())->method('findActive');
-        $tester = new CommandTester(new TranscodeSessionListCommand($sessions, $users, new \App\Tests\Unit\Transcode\PublicViewStub()));
+        $tester = new CommandTester(new TranscodeSessionListCommand($sessions, $users, new PublicViewStub()));
 
         self::assertSame(Command::FAILURE, $tester->execute(['--user' => $identifier]));
         self::assertStringContainsString(sprintf('User "%s" not found.', $identifier), $tester->getDisplay());
@@ -104,22 +111,22 @@ final class TranscodeAdminCommandsTest extends TestCase
         $sessions = $this->createMock(TranscodeSessionPortInterface::class);
         $sessions->expects(self::once())
             ->method('findByPublicId')
-            ->with(self::callback(static fn (\App\Shared\Domain\Model\PublicId $id): bool => $id->equals($session->getPublicId())))
+            ->with(self::callback(static fn (PublicId $id): bool => $id->equals($session->getPublicId())))
             ->willReturn($session);
 
-        $tester = new CommandTester(new TranscodeSessionShowCommand($sessions, new \App\Tests\Unit\Transcode\PublicViewStub()));
+        $tester = new CommandTester(new TranscodeSessionShowCommand($sessions, new PublicViewStub()));
 
         self::assertSame(Command::SUCCESS, $tester->execute(['publicId' => $session->getPublicId()->toString(), '--json' => true]));
-        self::assertJsonStringEqualsJsonString(json_encode(TranscodeSessionResource::from((new \App\Tests\Unit\Transcode\PublicViewStub())->session($session)), JSON_THROW_ON_ERROR), $tester->getDisplay());
+        self::assertJsonStringEqualsJsonString(json_encode(TranscodeSessionResource::from((new PublicViewStub())->session($session)), JSON_THROW_ON_ERROR), $tester->getDisplay());
     }
 
     public function testSessionShowReportsAnUnknownAndAMalformedSession(): void
     {
         $sessions = $this->createStub(TranscodeSessionPortInterface::class);
         $sessions->method('findByPublicId')->willReturn(null);
-        $tester = new CommandTester(new TranscodeSessionShowCommand($sessions, new \App\Tests\Unit\Transcode\PublicViewStub()));
+        $tester = new CommandTester(new TranscodeSessionShowCommand($sessions, new PublicViewStub()));
 
-        self::assertSame(Command::FAILURE, $tester->execute(['publicId' => (new \App\Shared\Domain\Model\PublicId())->toString()]));
+        self::assertSame(Command::FAILURE, $tester->execute(['publicId' => (new PublicId())->toString()]));
         self::assertStringContainsString('Session not found.', $tester->getDisplay());
 
         self::assertSame(Command::INVALID, $tester->execute(['publicId' => 'not-a-public-id']));
@@ -131,14 +138,14 @@ final class TranscodeAdminCommandsTest extends TestCase
         $jobs = $this->createMock(TranscodeJobPortInterface::class);
         $jobs->expects(self::once())->method('cleanupOrphanedJobs')->willReturn(3);
         $support = new AdminCommandSupport(new MessageBus([new HandleMessageMiddleware(new HandlersLocator([
-            CleanupOrphanedJobsCommand::class => [new CleanupOrphanedJobsHandler($jobs, new \App\Transcode\Application\Service\StaleTranscodeSessionExpiry(
-                $this->createStub(\App\Transcode\Application\Port\TranscodeSessionPortInterface::class),
-                $this->createStub(\App\Transcode\Application\Port\TranscodeExecutionOwnershipPort::class),
+            CleanupOrphanedJobsCommand::class => [new CleanupOrphanedJobsHandler($jobs, new StaleTranscodeSessionExpiry(
+                $this->createStub(TranscodeSessionPortInterface::class),
+                $this->createStub(TranscodeExecutionOwnershipPort::class),
                 $jobs,
-                $this->createStub(\App\Shared\Application\Port\TransactionPortInterface::class),
-                new \Symfony\Component\Clock\MockClock(),
-                new \Psr\Log\NullLogger(),
-            ), new \Psr\Log\NullLogger())],
+                $this->createStub(TransactionPortInterface::class),
+                new MockClock(),
+                new NullLogger(),
+            ), new NullLogger())],
         ]))]));
 
         $tester = new CommandTester(new TranscodeJobCleanupCommand($support));

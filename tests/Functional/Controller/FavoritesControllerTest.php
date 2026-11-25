@@ -5,6 +5,12 @@ declare(strict_types=1);
 namespace App\Tests\Functional\Controller;
 
 use App\Auth\Domain\Model\User;
+use App\Catalog\Infrastructure\Doctrine\Entity\AlbumEntity;
+use App\Catalog\Infrastructure\Doctrine\Entity\SongEntity;
+use App\Library\Application\Port\LibraryAccessPortInterface;
+use App\Library\Infrastructure\Doctrine\Entity\LibraryEntity;
+use App\Shared\Domain\Model\PublicId;
+use App\Shared\Domain\Model\Uuid;
 use App\Tests\Functional\TestCase;
 use Symfony\Component\HttpFoundation\Response;
 
@@ -148,7 +154,7 @@ final class FavoritesControllerTest extends TestCase
     {
         $user = $this->createTestUser();
         $response = $this->authenticatedRequest('POST', '/api/favorites/', $user, [
-            'entityType' => 'song', 'entityPublicId' => (new \App\Shared\Domain\Model\Uuid())->toString(),
+            'entityType' => 'song', 'entityPublicId' => (new Uuid())->toString(),
         ]);
         self::assertSame(422, $response->getStatusCode());
         $other = $this->createTestUser();
@@ -195,14 +201,14 @@ final class FavoritesControllerTest extends TestCase
 
     private function addFavorite(User $user, string $entityType, string $entityPublicId): Response
     {
-        $library = new \App\Library\Infrastructure\Doctrine\Entity\LibraryEntity('Favorites', 'favorites-' . bin2hex(random_bytes(4)), '/media/favorites/' . bin2hex(random_bytes(4)), 'music', 'local');
-        $album = new \App\Catalog\Infrastructure\Doctrine\Entity\AlbumEntity(new \App\Shared\Domain\Model\PublicId(), $library, 'Favorite album', 'album');
-        $song = new \App\Catalog\Infrastructure\Doctrine\Entity\SongEntity(new \App\Shared\Domain\Model\PublicId(), $album, 'Favorite song', '/media/favorites/song.flac', 1, 'audio/flac');
+        $library = new LibraryEntity('Favorites', 'favorites-' . bin2hex(random_bytes(4)), '/media/favorites/' . bin2hex(random_bytes(4)), 'music', 'local');
+        $album = new AlbumEntity(new PublicId(), $library, 'Favorite album', 'album');
+        $song = new SongEntity(new PublicId(), $album, 'Favorite song', '/media/favorites/song.flac', 1, 'audio/flac');
         foreach ([$library, $album, $song] as $entity) {
             $this->entityManager->persist($entity);
         }
         $this->entityManager->flush();
-        static::getContainer()->get(\App\Library\Application\Port\LibraryAccessPortInterface::class)->grant($user->getId(), $library->getId());
+        static::getContainer()->get(LibraryAccessPortInterface::class)->grant($user->getId(), $library->getId());
         $publicId = $entityType === 'song' ? $song->getPublicId() : $album->getPublicId();
         return $this->authenticatedRequest('POST', '/api/favorites/', $user, [
             'entityType' => $entityType,

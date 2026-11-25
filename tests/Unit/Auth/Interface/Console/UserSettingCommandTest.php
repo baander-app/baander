@@ -15,6 +15,7 @@ use App\Shared\Application\Service\SettingValueParser;
 use App\Shared\Application\Service\SystemSettings;
 use App\Shared\Application\Settings\SharedSettingDefinitions;
 use App\Shared\Domain\Model\Email;
+use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
 use App\UserPreference\Application\CommandHandler\ResetUserSettingHandler;
 use App\UserPreference\Application\CommandHandler\SetUserSettingHandler;
@@ -216,7 +217,7 @@ final class UserSettingCommandTest extends TestCase
     private function users(): UserRepositoryInterface
     {
         $users = $this->createStub(UserRepositoryInterface::class);
-        $users->method('findByPublicId')->willReturnCallback(fn (\App\Shared\Domain\Model\PublicId $id): ?User => $id->equals($this->alice->getPublicId()) ? $this->alice : null);
+        $users->method('findByPublicId')->willReturnCallback(fn (PublicId $id): ?User => $id->equals($this->alice->getPublicId()) ? $this->alice : null);
         $users->method('findByEmail')->willReturnCallback(
             fn (Email $email): ?User => $email->toString() === 'alice@baander.app' ? $this->alice : null,
         );

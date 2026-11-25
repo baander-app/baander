@@ -4,14 +4,21 @@ declare(strict_types=1);
 
 namespace App\Tests\Integration;
 
-use App\Shared\Domain\Event\Outbox\OutboxRepository;
+use App\Auth\Domain\Event\UserRegistered;
+use App\Shared\Domain\Event\Outbox\OutboxEventDispatcherInterface;
 use App\Shared\Domain\Event\Outbox\OutboxRelayException;
+use App\Shared\Domain\Event\Outbox\OutboxRepository;
 use App\Shared\Domain\Event\Outbox\RelayOutboxCommand;
 use App\Shared\Domain\Event\Outbox\RelayOutboxHandler;
+use App\Shared\Domain\Model\Email;
+use App\Shared\Domain\Model\PublicId;
+use App\Shared\Domain\Model\Uuid;
+use App\Tests\Support\FinalSchemaBootstrap;
 use Doctrine\DBAL\Connection;
 use Doctrine\DBAL\DriverManager;
 use Doctrine\DBAL\Tools\DsnParser;
 use PHPUnit\Framework\TestCase;
+use Psr\Log\NullLogger;
 
 final class OutboxLeaseTest extends TestCase
 {
@@ -33,7 +40,7 @@ final class OutboxLeaseTest extends TestCase
         foreach ([$this->first, $this->second] as $connection) {
             $connection->executeStatement('SET search_path TO ' . $this->schema . ', public');
         }
-        \App\Tests\Support\FinalSchemaBootstrap::bootstrap($this->first);
+        FinalSchemaBootstrap::bootstrap($this->first);
     }
 
     protected function tearDown(): void
@@ -102,17 +109,17 @@ final class OutboxLeaseTest extends TestCase
     {
         $repository = new OutboxRepository($this->first);
         $repository->append('App\\MissingOutboxEvent', 'missing.event', ['value' => 'poison']);
-        $event = new \App\Auth\Domain\Event\UserRegistered(
-            \App\Shared\Domain\Model\Uuid::v4(),
-            \App\Shared\Domain\Model\PublicId::fromString('aaaaaaaaaaaaaaaaaaaaa'),
-            \App\Shared\Domain\Model\Email::fromString('outbox@baander.app'),
+        $event = new UserRegistered(
+            Uuid::v4(),
+            PublicId::fromString('aaaaaaaaaaaaaaaaaaaaa'),
+            Email::fromString('outbox@baander.app'),
             'Outbox test',
         );
         $repository->append($event::class, $event->eventName(), $event->toPayload());
-        $dispatcher = $this->createMock(\App\Shared\Domain\Event\Outbox\OutboxEventDispatcherInterface::class);
+        $dispatcher = $this->createMock(OutboxEventDispatcherInterface::class);
         $dispatcher->expects($this->once())->method('dispatch')
             ->with($this->isInstanceOf($event::class), $this->greaterThan(0));
-        $handler = new RelayOutboxHandler($repository, $dispatcher, new \Psr\Log\NullLogger());
+        $handler = new RelayOutboxHandler($repository, $dispatcher, new NullLogger());
 
         for ($attempt = 1; $attempt <= 5; ++$attempt) {
             try {

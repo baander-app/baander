@@ -4,12 +4,13 @@ declare(strict_types=1);
 
 namespace Baander\DevEnvironment\Runtime;
 
-use Baander\Process\Execution\CommandExecutor;
-use Baander\Process\Execution\ProcessSpec;
-use Baander\Process\Execution\CompletionPolicy;
 use Baander\DevEnvironment\Host\CapturedConnections;
 use Baander\DevEnvironment\Host\ProcessEnvironment;
 use Baander\DevEnvironment\WorkflowError;
+use Baander\Process\Execution\CommandExecutor;
+use Baander\Process\Execution\CommandFailure;
+use Baander\Process\Execution\CompletionPolicy;
+use Baander\Process\Execution\ProcessSpec;
 
 class Libraries
 {
@@ -48,7 +49,7 @@ class Libraries
                 }
                 $existing[$library['slug']] = $library;
             }
-        } catch (WorkflowError|\Baander\Process\Execution\CommandFailure|\JsonException $error) {
+        } catch (WorkflowError|CommandFailure|\JsonException $error) {
             throw new WorkflowError('Cannot list development libraries: ' . $error->getMessage(), previous: $error);
         }
         foreach ($definitions as $definition) {
@@ -85,7 +86,7 @@ class Libraries
                     $definition['target'],
                     $definition['type'],
                 ]);
-            } catch (WorkflowError|\Baander\Process\Execution\CommandFailure $error) {
+            } catch (WorkflowError|CommandFailure $error) {
                 throw new WorkflowError(sprintf(
                     'Cannot create development library "%s": %s',
                     $definition['slug'],

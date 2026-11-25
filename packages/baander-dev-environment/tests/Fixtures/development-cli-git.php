@@ -1,27 +1,30 @@
 <?php
 
 declare(strict_types=1);
+use Swoole\Event;
+use Swoole\Process;
+use Swoole\Timer;
 
 $configuration = json_decode(file_get_contents($_SERVER['argv'][1]), true, flags: JSON_THROW_ON_ERROR);
 $arguments = array_slice($_SERVER['argv'], 2);
 $waitForTermination = static function (int $milliseconds, string $started) use ($configuration): void {
     $terminated = false;
     $finished = false;
-    Swoole\Process::signal(15, static function () use (&$terminated): void {
+    Process::signal(15, static function () use (&$terminated): void {
         $terminated = true;
     });
-    $timer = Swoole\Timer::after($milliseconds, static function () use (&$finished): void {
+    $timer = Timer::after($milliseconds, static function () use (&$finished): void {
         $finished = true;
     });
     file_put_contents($configuration['marker'], $started);
     while (!$terminated && !$finished) {
-        Swoole\Event::dispatch();
+        Event::dispatch();
     }
-    Swoole\Process::signal(15, null);
-    if (Swoole\Timer::exists($timer)) {
-        Swoole\Timer::clear($timer);
+    Process::signal(15, null);
+    if (Timer::exists($timer)) {
+        Timer::clear($timer);
     }
-    Swoole\Event::wait();
+    Event::wait();
     if ($terminated) {
         file_put_contents($configuration['marker'] . '.stopped', '0');
         exit(0);

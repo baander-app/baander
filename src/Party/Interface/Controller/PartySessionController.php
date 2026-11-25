@@ -5,9 +5,6 @@ declare(strict_types=1);
 namespace App\Party\Interface\Controller;
 
 use App\Auth\Application\Port\AuthenticatedUserIdentityInterface;
-use App\Shared\Domain\Model\Uuid;
-use App\Shared\Domain\Model\PublicId;
-use App\Shared\Interface\Controller\ApiResponsesTrait;
 use App\Party\Application\Command\CreatePartySessionCommand;
 use App\Party\Application\Command\EndPartySessionCommand;
 use App\Party\Application\Command\JoinPartySessionCommand;
@@ -16,12 +13,17 @@ use App\Party\Application\Command\SyncPlaybackCommand;
 use App\Party\Application\Exception\PartyMediaNotFoundException;
 use App\Party\Application\Exception\TranscodeJobVideoMismatchException;
 use App\Party\Application\Port\PartyMemberPortInterface;
-use App\Party\Application\Port\PartySessionPortInterface;
 use App\Party\Application\Port\PartyPublicIdentityPortInterface;
+use App\Party\Application\Port\PartySessionPortInterface;
 use App\Party\Interface\Request\CreatePartySessionRequest;
 use App\Party\Interface\Request\SyncPlaybackRequest;
 use App\Party\Interface\Resource\PartyMemberResource;
 use App\Party\Interface\Resource\PartySessionResource;
+use App\Shared\Domain\Model\PublicId;
+use App\Shared\Domain\Model\Uuid;
+use App\Shared\Interface\Controller\ApiResponsesTrait;
+use App\Shared\Interface\DTO\ApiError;
+use App\Shared\Interface\DTO\ValidationError;
 use OpenApi\Spec as OA;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Response;
@@ -85,14 +87,14 @@ final class PartySessionController
                 response: '404',
                 description: 'The video or transcode job does not exist, another user owns the job, or the user may not play its video',
                 content: new OA\MediaType\Json(
-                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                    schema: new OA\Schema(ref: ApiError::class),
                 ),
             ),
             new OA\Response(
                 response: '422',
                 description: 'Validation error, including a transcode job of another video',
                 content: new OA\MediaType\Json(
-                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ValidationError::class),
+                    schema: new OA\Schema(ref: ValidationError::class),
                 ),
             ),
         ],
@@ -161,7 +163,7 @@ final class PartySessionController
                 response: '401',
                 description: 'Not authenticated',
                 content: new OA\MediaType\Json(
-                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                    schema: new OA\Schema(ref: ApiError::class),
                 ),
             ),
         ],
@@ -232,14 +234,14 @@ final class PartySessionController
                 response: '401',
                 description: 'Not authenticated',
                 content: new OA\MediaType\Json(
-                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                    schema: new OA\Schema(ref: ApiError::class),
                 ),
             ),
             new OA\Response(
                 response: '404',
                 description: 'The session does not exist, or the caller is neither its host nor a member',
                 content: new OA\MediaType\Json(
-                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                    schema: new OA\Schema(ref: ApiError::class),
                 ),
             ),
         ],
@@ -304,21 +306,21 @@ final class PartySessionController
                 response: '401',
                 description: 'Not authenticated',
                 content: new OA\MediaType\Json(
-                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                    schema: new OA\Schema(ref: ApiError::class),
                 ),
             ),
             new OA\Response(
                 response: '404',
                 description: 'The session does not exist, or the caller is neither a member of it nor invited to it',
                 content: new OA\MediaType\Json(
-                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                    schema: new OA\Schema(ref: ApiError::class),
                 ),
             ),
             new OA\Response(
                 response: '409',
                 description: 'The session has ended, or it is full and the caller is not a member of it yet',
                 content: new OA\MediaType\Json(
-                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                    schema: new OA\Schema(ref: ApiError::class),
                 ),
             ),
         ],
@@ -377,7 +379,7 @@ final class PartySessionController
                 response: '404',
                 description: 'The session does not exist, or the caller is neither its host nor a member',
                 content: new OA\MediaType\Json(
-                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                    schema: new OA\Schema(ref: ApiError::class),
                 ),
             ),
         ],
@@ -436,7 +438,7 @@ final class PartySessionController
                 response: '404',
                 description: 'The session does not exist, or the caller is neither its host nor a member',
                 content: new OA\MediaType\Json(
-                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                    schema: new OA\Schema(ref: ApiError::class),
                 ),
             ),
         ],
@@ -497,14 +499,14 @@ final class PartySessionController
                 response: '403',
                 description: 'The caller is a member of the session but not its host',
                 content: new OA\MediaType\Json(
-                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                    schema: new OA\Schema(ref: ApiError::class),
                 ),
             ),
             new OA\Response(
                 response: '404',
                 description: 'The session does not exist, or the caller is neither its host nor a member',
                 content: new OA\MediaType\Json(
-                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                    schema: new OA\Schema(ref: ApiError::class),
                 ),
             ),
         ],

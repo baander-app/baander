@@ -4,8 +4,9 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Shared\Infrastructure\Worker;
 
+use App\Shared\Application\DTO\DeploymentProfile;
 use App\Shared\Application\DTO\DeploymentUnit;
-
+use App\Shared\Infrastructure\Worker\DeploymentContainerRecipe;
 use App\Shared\Infrastructure\Worker\DeploymentLease;
 use App\Shared\Infrastructure\Worker\DockerWorkerContainment;
 use InvalidArgumentException;
@@ -20,10 +21,10 @@ final class DockerWorkerContainmentTest extends TestCase
 
     public function testRetirementStopsAndCheckpointsTheExactContainerBeforeRemoval(): void
     {
-        $recipe = new \App\Shared\Infrastructure\Worker\DeploymentContainerRecipe(
+        $recipe = new DeploymentContainerRecipe(
             namespace: 'worker.baander.app', bootId: self::BOOT, daemonId: 'daemon', imageId: 'sha256:' . str_repeat('a', 64),
             command: ['/usr/local/bin/php', '/app/bin/console', 'app:worker'], network: 'private', unit: DeploymentUnit::Control,
-            ipcVolume: 'private-ipc', appHome: '/app', deploymentProfile: new \App\Shared\Application\DTO\DeploymentProfile(), logVolume: 'retained-logs',
+            ipcVolume: 'private-ipc', appHome: '/app', deploymentProfile: new DeploymentProfile(), logVolume: 'retained-logs',
         );
         $inspection = self::inspection();
         $inspection['mounts'] = array_map(static fn(array $item): array => [

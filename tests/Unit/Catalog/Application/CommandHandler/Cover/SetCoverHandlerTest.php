@@ -9,6 +9,7 @@ use App\Catalog\Application\Command\Cover\SetCoverCommand;
 use App\Shared\Application\Exception\InvalidInputException;
 use App\Shared\Application\Exception\NotFoundException;
 use App\Shared\Domain\Model\PublicId;
+use PHPUnit\Framework\Attributes\DataProvider;
 
 final class SetCoverHandlerTest extends CoverTestCase
 {
@@ -119,7 +120,7 @@ final class SetCoverHandlerTest extends CoverTestCase
     /**
      * @param \Closure(self): string $file
      */
-    #[\PHPUnit\Framework\Attributes\DataProvider('rejectedFiles')]
+    #[DataProvider('rejectedFiles')]
     public function testAFileThatCannotBeACoverIsInvalidInputAndChangesNothing(\Closure $file, string $message): void
     {
         $album = $this->album();

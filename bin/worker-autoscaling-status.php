@@ -3,6 +3,11 @@
 
 declare(strict_types=1);
 
+use App\Shared\Application\DTO\DeploymentProfile;
+use App\Shared\Application\DTO\WorkerAutoscalingProfile;
+use App\Shared\Infrastructure\Worker\Autoscaling\AutoscalingStatus;
+use App\Shared\Infrastructure\Worker\DeploymentLease;
+
 // Private host status probe: no kernel boot, environment loading or network I/O.
 ini_set('display_errors', '0');
 ini_set('log_errors', '0');
@@ -19,10 +24,10 @@ try {
         || (strlen($epoch) === strlen((string) PHP_INT_MAX) && strcmp($epoch, (string) PHP_INT_MAX) > 0)) {
         throw new RuntimeException('Status requires a bounded lease epoch.');
     }
-    $lease = new \App\Shared\Infrastructure\Worker\DeploymentLease($namespace, $bootId, (int) $epoch);
-    $profile = \App\Shared\Application\DTO\WorkerAutoscalingProfile::fromJson($profileJson);
-    $deploymentProfile = \App\Shared\Application\DTO\DeploymentProfile::fromJson($deploymentProfileJson);
-    $status = new \App\Shared\Infrastructure\Worker\Autoscaling\AutoscalingStatus('/run/baander-worker', $lease, $profile, $deploymentProfile);
+    $lease = new DeploymentLease($namespace, $bootId, (int) $epoch);
+    $profile = WorkerAutoscalingProfile::fromJson($profileJson);
+    $deploymentProfile = DeploymentProfile::fromJson($deploymentProfileJson);
+    $status = new AutoscalingStatus('/run/baander-worker', $lease, $profile, $deploymentProfile);
     $json = json_encode($status->snapshot(hrtime(true) / 1e9), JSON_THROW_ON_ERROR);
     if (strlen($json) > 8192) {
         throw new RuntimeException('Status exceeds its output bound.');

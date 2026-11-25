@@ -11,6 +11,7 @@ use App\Auth\Domain\Model\OAuth\Client;
 use App\Auth\Domain\Repository\OAuth\ClientRepositoryInterface;
 use App\Shared\Application\Port\TransactionPortInterface;
 use App\Shared\Domain\Model\Uuid;
+use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 
 final class CreatePersonalAccessClientHandlerTest extends TestCase
@@ -66,7 +67,7 @@ final class CreatePersonalAccessClientHandlerTest extends TestCase
         $this->handler($repository)(new CreatePersonalAccessClientCommand(Uuid::generate(), '   '));
     }
 
-    /** @return ClientRepositoryInterface&\PHPUnit\Framework\MockObject\MockObject */
+    /** @return ClientRepositoryInterface&MockObject */
     private function repository(int $heldClients): ClientRepositoryInterface
     {
         $repository = $this->createMock(ClientRepositoryInterface::class);

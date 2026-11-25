@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Catalog\Application\Port;
 
 use App\Catalog\Domain\Model\Album;
+use App\Catalog\Domain\Model\Song;
 use App\Catalog\Domain\ValueObject\ArtistRole;
 use App\Catalog\Domain\ValueObject\MusicbrainzId;
 use App\Shared\Domain\Model\PublicId;
@@ -23,7 +24,7 @@ interface AlbumPortInterface
 
     public function countVisible(LibraryReadScope $scope): int;
 
-    /** @return array{0: Album, 1: array<int, \App\Catalog\Domain\Model\Song>}|null */
+    /** @return array{0: Album, 1: array<int, Song>}|null */
     public function findVisibleWithSongs(Uuid $uuid, LibraryReadScope $scope): ?array;
 
     /** @return array<int, array{name: string, role: string|null}> */

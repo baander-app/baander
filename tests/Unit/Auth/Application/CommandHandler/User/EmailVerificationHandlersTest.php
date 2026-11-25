@@ -21,6 +21,7 @@ use App\Auth\Domain\Model\User;
 use App\Auth\Domain\Repository\UserRepositoryInterface;
 use App\Shared\Application\Port\TransactionPortInterface;
 use App\Shared\Domain\Model\Email;
+use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
 use PHPUnit\Framework\TestCase;
 
@@ -193,7 +194,7 @@ final class EmailVerificationHandlersTest extends TestCase
     private function userRepository(): UserRepositoryInterface
     {
         $repository = $this->createStub(UserRepositoryInterface::class);
-        $repository->method('findByPublicId')->willReturnCallback(function (\App\Shared\Domain\Model\PublicId $id): ?User {
+        $repository->method('findByPublicId')->willReturnCallback(function (PublicId $id): ?User {
             foreach ($this->users as $user) {
                 if ($id->equals($user->getPublicId())) { return $user; }
             }

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Baander\Deployment\Profiles;
 
+use Baander\Containers\Docker\Client;
 use Baander\Filesystem\AtomicFile;
 use Baander\Process\Execution\ProcessResult;
 
@@ -67,13 +68,13 @@ final class ContainerMeasurement
 })();
 CODE;
         return ['bootstrap' => str_replace('__NONCE__', var_export($nonce, true), $bootstrap), 'path' => $path,
-            'onCompletion' => static function (\Baander\Containers\Docker\Client $docker, ?string $container, ?ProcessResult $result) use ($receipt, $path): void {
+            'onCompletion' => static function (Client $docker, ?string $container, ?ProcessResult $result) use ($receipt, $path): void {
                 self::completeOperatorMeasurement($docker, $container, $result, $receipt, $path);
             }];
     }
 
     /** @param array<string,mixed> $receipt */
-    private static function completeOperatorMeasurement(\Baander\Containers\Docker\Client $docker, ?string $container, ?ProcessResult $result, array $receipt, string $path): void
+    private static function completeOperatorMeasurement(Client $docker, ?string $container, ?ProcessResult $result, array $receipt, string $path): void
     {
         $receipt['containerId'] = $container;
         $errors = [];

@@ -4,14 +4,16 @@ declare(strict_types=1);
 
 namespace App\Session\Domain\Model\Device;
 
-use App\Shared\Domain\Model\Uuid;
+use App\Session\Domain\Event\DeviceRegistered;
+use App\Shared\Domain\Event\AbstractDomainEvent;
 use App\Shared\Domain\Model\PublicId;
+use App\Shared\Domain\Model\Uuid;
 use DateTimeImmutable;
 
 final class Device
 {
     /**
-     * @var list<\App\Shared\Domain\Event\AbstractDomainEvent>
+     * @var list<AbstractDomainEvent>
      */
     private array $pendingEvents = [];
 
@@ -37,7 +39,7 @@ final class Device
             createdAt: $now,
         ));
 
-        $device->pendingEvents[] = new \App\Session\Domain\Event\DeviceRegistered(
+        $device->pendingEvents[] = new DeviceRegistered(
             userId: $userId,
             deviceId: $deviceId,
             occurredAt: $now,

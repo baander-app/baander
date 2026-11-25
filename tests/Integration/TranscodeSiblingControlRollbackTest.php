@@ -11,6 +11,7 @@ use App\Transcode\Application\Command\UpdateTranscodePositionCommand;
 use App\Transcode\Application\CommandHandler\CancelTranscodeSessionHandler;
 use App\Transcode\Application\CommandHandler\UpdateTranscodePositionHandler;
 use App\Transcode\Application\DTO\DesiredTranscodeState;
+use App\Transcode\Application\Port\TranscodeExecutionOwnershipPort;
 use App\Transcode\Application\Port\TranscodeSessionPortInterface;
 use App\Transcode\Application\Port\TranscodeStoragePortInterface;
 use App\Transcode\Application\Service\TranscodePlaybackControl;
@@ -31,6 +32,7 @@ use Doctrine\ORM\ORMSetup;
 use Doctrine\Persistence\ManagerRegistry;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
+use Psr\Log\NullLogger;
 use SwooleBundle\SwooleBundle\Bridge\Swoole\Swoole;
 use Symfony\Component\EventDispatcher\EventDispatcher;
 
@@ -66,7 +68,7 @@ final class TranscodeSiblingControlRollbackTest extends TestCase
         $jobs = new TranscodeJobRepository($manager);
         $sessions = new TranscodeSessionRepository($manager);
         $sessionService = new TranscodeSessionService($sessions);
-        $jobService = new TranscodeJobService($jobs, $this->createStub(TranscodeStoragePortInterface::class), new EventDispatcher(), $this->createStub(\App\Transcode\Application\Port\TranscodeExecutionOwnershipPort::class), $transaction, new \Psr\Log\NullLogger());
+        $jobService = new TranscodeJobService($jobs, $this->createStub(TranscodeStoragePortInterface::class), new EventDispatcher(), $this->createStub(TranscodeExecutionOwnershipPort::class), $transaction, new NullLogger());
         $tierSessions = [];
         $clientId = 'start';
         foreach ([QualityTier::p1080(), QualityTier::p360(), QualityTier::p720()] as $index => $tier) {

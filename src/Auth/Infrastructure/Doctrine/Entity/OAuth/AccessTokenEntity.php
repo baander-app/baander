@@ -11,11 +11,11 @@ use Doctrine\ORM\Mapping as ORM;
 use Lcobucci\JWT\Configuration;
 use Lcobucci\JWT\Signer\Key\InMemory;
 use Lcobucci\JWT\Signer\Rsa\Sha256;
-use RuntimeException;
+use League\OAuth2\Server\CryptKeyInterface;
 use League\OAuth2\Server\Entities\AccessTokenEntityInterface;
 use League\OAuth2\Server\Entities\ClientEntityInterface;
 use League\OAuth2\Server\Entities\ScopeEntityInterface;
-use League\OAuth2\Server\CryptKeyInterface;
+use RuntimeException;
 
 #[ORM\Entity]
 #[ORM\Table(name: 'oauth_access_tokens')]
@@ -173,7 +173,7 @@ class AccessTokenEntity implements AccessTokenEntityInterface
     public function setUserIdentifier(string $identifier): void
     {
         if ($this->user === null) {
-            throw new \RuntimeException('Cannot set user identifier: no user entity is associated with this access token.');
+            throw new RuntimeException('Cannot set user identifier: no user entity is associated with this access token.');
         }
     }
 
@@ -185,7 +185,7 @@ class AccessTokenEntity implements AccessTokenEntityInterface
     public function setClient(ClientEntityInterface $client): void
     {
         if (!$client instanceof ClientEntity) {
-            throw new \RuntimeException(sprintf(
+            throw new RuntimeException(sprintf(
                 'Expected %s, got %s.',
                 ClientEntity::class,
                 get_debug_type($client),

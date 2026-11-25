@@ -5,10 +5,11 @@ declare(strict_types=1);
 namespace App\Recommendation\Application\CommandHandler;
 
 use App\Activity\Application\Port\ActivityPortInterface;
+use App\Catalog\Domain\Model\Song;
 use App\Catalog\Domain\Repository\SongRepositoryInterface;
 use App\Recommendation\Application\Command\DeleteRecommendationsBySourceCommand;
-use App\Recommendation\Application\Command\GenerateRecommendationsCommand;
 use App\Recommendation\Application\Command\ExecuteRecommendationJobCommand;
+use App\Recommendation\Application\Command\GenerateRecommendationsCommand;
 use App\Recommendation\Application\Command\SaveRecommendationCommand;
 use App\Recommendation\Application\DTO\RecommendationGenerationResult;
 use App\Recommendation\Application\Port\RecommendationJobPortInterface;
@@ -171,7 +172,7 @@ final class GenerateRecommendationsHandler
     /**
      * Replaces the recommendations of the given songs, one strategy after another.
      *
-     * @param \App\Catalog\Domain\Model\Song[] $songs
+     * @param Song[] $songs
      *
      * @return array{0: array<string, int>, 1: bool} the counts per strategy, and whether the run stopped because its job moved on, such as an admin cancelling it
      */
@@ -264,7 +265,7 @@ final class GenerateRecommendationsHandler
     }
 
     /**
-     * @param \App\Catalog\Domain\Model\Song[] $songs
+     * @param Song[] $songs
      * @param array<string, array<string, int>> $listeningHistories
      * @return SaveRecommendationCommand[]
      */
@@ -306,7 +307,7 @@ final class GenerateRecommendationsHandler
     }
 
     /**
-     * @param \App\Catalog\Domain\Model\Song[] $songs
+     * @param Song[] $songs
      * @return SaveRecommendationCommand[]
      */
     private function generateContentRecommendations(array $songs): array
@@ -355,7 +356,7 @@ final class GenerateRecommendationsHandler
     }
 
     /**
-     * @param \App\Catalog\Domain\Model\Song[] $songs
+     * @param Song[] $songs
      * @return SaveRecommendationCommand[]
      */
     private function generateGenreRecommendations(array $songs): array
@@ -405,7 +406,7 @@ final class GenerateRecommendationsHandler
     /**
      * @return array<string, float>
      */
-    private function extractFeatures(\App\Catalog\Domain\Model\Song $song): array
+    private function extractFeatures(Song $song): array
     {
         return [
             'energy' => $song->getEnergy() ?? 0.5,

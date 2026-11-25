@@ -12,6 +12,7 @@ use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
 use Doctrine\DBAL\ParameterType;
 use Doctrine\ORM\EntityManagerInterface;
+use Doctrine\ORM\EntityRepository;
 
 final class NotificationRepository implements NotificationRepositoryInterface
 {
@@ -20,8 +21,8 @@ final class NotificationRepository implements NotificationRepositoryInterface
     ) {
     }
 
-    /** @return \Doctrine\ORM\EntityRepository<NotificationEntity> */
-    private function getEntityRepository(): \Doctrine\ORM\EntityRepository
+    /** @return EntityRepository<NotificationEntity> */
+    private function getEntityRepository(): EntityRepository
     {
         return $this->entityManager->getRepository(NotificationEntity::class);
     }

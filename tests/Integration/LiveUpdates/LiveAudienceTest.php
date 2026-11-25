@@ -16,6 +16,7 @@ use App\Shared\Infrastructure\LiveUpdates\DoctrineLiveRevisionStore;
 use App\Shared\Infrastructure\LiveUpdates\DoctrineLiveSnapshotReader;
 use Doctrine\DBAL\Connection;
 use Doctrine\DBAL\DriverManager;
+use Doctrine\DBAL\Exception\DriverException;
 use Doctrine\DBAL\Tools\DsnParser;
 use PHPUnit\Framework\TestCase;
 
@@ -191,7 +192,7 @@ final class LiveAudienceTest extends TestCase
         try {
             $this->snapshots($authority)->read($this->principal);
             self::fail('Timed-out authority read produced a snapshot.');
-        } catch (\Doctrine\DBAL\Exception\DriverException $error) {
+        } catch (DriverException $error) {
             self::assertSame('57014', $error->getSQLState());
         }
         self::assertSame(0, $this->reader->getTransactionNestingLevel());
@@ -214,7 +215,7 @@ final class LiveAudienceTest extends TestCase
         try {
             $this->snapshots($authority)->read($this->principal);
             self::fail('Expired transaction produced a snapshot.');
-        } catch (\Doctrine\DBAL\Exception\DriverException $error) {
+        } catch (DriverException $error) {
             self::assertStringContainsString('transaction timeout', $error->getMessage());
         }
         self::assertFalse($this->reader->isConnected());

@@ -4,16 +4,24 @@ declare(strict_types=1);
 
 namespace Baander\DevQualification\Tests;
 
+use Baander\Configuration\ToolingConfiguration;
+use Baander\Containers\Docker\Client;
+use Baander\Containers\Docker\Target;
+use Baander\DevQualification\Acceptance\BrowserCheckpoint;
 use Baander\DevQualification\Acceptance\Support;
+use Baander\Process\Execution\CompletionPolicy;
+use Baander\Process\Execution\EngineExecutor;
+use Baander\Process\Execution\ExecutionContext;
+use Baander\Process\Execution\ProcessSpec;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
 final class DevelopmentBrowserCleanupTest extends TestCase
 {
-    private \Baander\Process\Execution\EngineExecutor $executor;
+    private EngineExecutor $executor;
     protected function setUp(): void
     {
-        $this->executor = new \Baander\Process\Execution\EngineExecutor(new \Baander\Process\Execution\ExecutionContext(getenv()));
+        $this->executor = new EngineExecutor(new ExecutionContext(getenv()));
     }
 
     protected function tearDown(): void
@@ -46,7 +54,7 @@ final class DevelopmentBrowserCleanupTest extends TestCase
                 'resources' => [['kind' => 'container', 'name' => 'baander-browser-cleanup-test', 'id' => str_repeat('b', 64)]],
             ], JSON_THROW_ON_ERROR));
             symlink(dirname(__DIR__, 3) . '/packages/baander-dev-qualification/tests/Fixtures/browser-cleanup-docker.php', $root . '/docker');
-            $result = $this->executor->run(new \Baander\Process\Execution\ProcessSpec([
+            $result = $this->executor->run(new ProcessSpec([
                 'bash',
                 dirname(__DIR__, 3) . '/scripts/test-two-command-browser-checkpoint.sh',
                 'cleanup',
@@ -59,7 +67,7 @@ final class DevelopmentBrowserCleanupTest extends TestCase
                 'BAANDER_BROWSER_IMAGE' => 'invalid image must not be revalidated during recovery',
                 'DOCKER_HOST' => 'unix:///wrong.sock',
                 'DOCKER_CONTEXT' => 'deleted-context',
-            ], processGroup: true), new \Baander\Process\Execution\CompletionPolicy(null));
+            ], processGroup: true), new CompletionPolicy(null));
             self::assertSame($status, $result->exitCode, $result->stderr);
             self::assertSame($retained, file_exists($marker));
         } finally {
@@ -78,13 +86,13 @@ final class DevelopmentBrowserCleanupTest extends TestCase
             file_put_contents($root . '/ui/web/tests/e2e/two-command/browser.mjs', '');
             file_put_contents($root . '/artifacts/browser.json', '{}');
             $environment = array_replace(getenv(), ['BROWSER_TEST_COMMANDS' => $root . '/commands', 'BAANDER_TEST_BROWSER_ENGINE' => '', 'DOCKER_HOST' => 'unix:///wrong.sock']);
-            $configuration = \Baander\Configuration\ToolingConfiguration::resolve(
+            $configuration = ToolingConfiguration::resolve(
                 ['images' => ['browser' => ['reference' => 'registry.baander.app/browser:approved', 'playwrightVersion' => '1.60.0']]],
                 $environment,
             );
-            $executor = new \Baander\Process\Execution\EngineExecutor(\Baander\Process\Execution\ExecutionContext::bounded(10, $environment));
-            $target = new \Baander\Containers\Docker\Target(dirname(__DIR__, 3) . '/packages/baander-dev-qualification/tests/Fixtures/browser-checkpoint-docker.php', 'unix:///selected.sock', 'selected-daemon', null, null);
-            $checkpoint = new \Baander\DevQualification\Acceptance\BrowserCheckpoint(new \Baander\Containers\Docker\Client($executor, $target, $environment), $configuration, $environment, $root);
+            $executor = new EngineExecutor(ExecutionContext::bounded(10, $environment));
+            $target = new Target(dirname(__DIR__, 3) . '/packages/baander-dev-qualification/tests/Fixtures/browser-checkpoint-docker.php', 'unix:///selected.sock', 'selected-daemon', null, null);
+            $checkpoint = new BrowserCheckpoint(new Client($executor, $target, $environment), $configuration, $environment, $root);
             ob_start();
             try {
                 self::assertSame(0, $checkpoint->run('authenticated', $root . '/artifacts', 'https://browser.baander.app'));
@@ -117,11 +125,11 @@ final class DevelopmentBrowserCleanupTest extends TestCase
             mkdir($root . '/ui/web/node_modules/playwright-core', 0700, true);
             file_put_contents($root . '/ui/web/node_modules/playwright-core/package.json', '{"version":"1.59.0"}');
             $environment = array_replace(getenv(), ['BROWSER_TEST_COMMANDS' => $root . '/commands']);
-            $configuration = \Baander\Configuration\ToolingConfiguration::resolve(environment: $environment);
-            $executor = new \Baander\Process\Execution\EngineExecutor(\Baander\Process\Execution\ExecutionContext::bounded(5, $environment));
-            $target = new \Baander\Containers\Docker\Target(dirname(__DIR__, 3) . '/packages/baander-dev-qualification/tests/Fixtures/browser-checkpoint-docker.php', 'unix:///selected.sock', 'selected-daemon', null, null);
+            $configuration = ToolingConfiguration::resolve(environment: $environment);
+            $executor = new EngineExecutor(ExecutionContext::bounded(5, $environment));
+            $target = new Target(dirname(__DIR__, 3) . '/packages/baander-dev-qualification/tests/Fixtures/browser-checkpoint-docker.php', 'unix:///selected.sock', 'selected-daemon', null, null);
             try {
-                new \Baander\DevQualification\Acceptance\BrowserCheckpoint(new \Baander\Containers\Docker\Client($executor, $target, $environment), $configuration, $environment, $root)->run('authenticated', $root, 'https://browser.baander.app');
+                new BrowserCheckpoint(new Client($executor, $target, $environment), $configuration, $environment, $root)->run('authenticated', $root, 'https://browser.baander.app');
                 self::fail('Expected the installed Playwright mismatch to fail.');
             } catch (\InvalidArgumentException $error) {
                 self::assertStringContainsString('installed package is 1.59.0', $error->getMessage());

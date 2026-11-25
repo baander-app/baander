@@ -10,6 +10,7 @@ use SebastianBergmann\CodeCoverage\CodeCoverage;
 use SebastianBergmann\CodeCoverage\Data\ProcessedCodeCoverageData;
 use SebastianBergmann\CodeCoverage\Driver\Driver;
 use SebastianBergmann\CodeCoverage\Filter;
+use SebastianBergmann\CodeCoverage\Serialization\FileCouldNotBeReadException;
 use SebastianBergmann\CodeCoverage\Serialization\Serializer;
 use Symfony\Component\Filesystem\Filesystem;
 use Symfony\Component\Process\Process;
@@ -177,7 +178,7 @@ final class BackendTestRunnerTest extends TestCase
         file_put_contents($this->directory . '/ordinary.junit.xml', '<testsuite><testcase classname="A" name="test"/></testsuite>');
         file_put_contents($this->directory . '/ordinary.cov', 'corrupt');
         \BackendTestRunner::writeJson($this->directory . '/ordinary.result.json', ['status' => 0, 'runId' => 'current', 'hashes' => ['junit' => hash_file('sha256', $this->directory . '/ordinary.junit.xml'), 'coverage' => hash_file('sha256', $this->directory . '/ordinary.cov')]]);
-        $this->expectException(\SebastianBergmann\CodeCoverage\Serialization\FileCouldNotBeReadException::class);
+        $this->expectException(FileCouldNotBeReadException::class);
         \BackendTestRunner::finalize($this->directory);
     }
 
@@ -239,7 +240,7 @@ PHP_SOURCE;
             \BackendTestRunner::writeJson($this->directory . '/' . $lane . '.json', ['files' => ['/' . $lane . '.php'], 'processes' => 1, 'batch' => 1]);
             $report = $this->directory . '/' . $lane . '.junit.xml';
             file_put_contents($report, '<testsuite><testcase classname="' . $identity[0] . '" name="test"/></testsuite>');
-            $data = new \SebastianBergmann\CodeCoverage\Data\ProcessedCodeCoverageData();
+            $data = new ProcessedCodeCoverageData();
             $lines = [4 => null, 8 => null, 12 => [], 16 => $lane === 'first' ? [] : null];
             $lines[$coveredLine] = [0 => 1];
             $data->setLineCoverage(['included.php' => $lines]);
@@ -292,7 +293,7 @@ PHP_SOURCE;
         \BackendTestRunner::writeJson($this->directory . '/ordinary.json', ['files' => ['/test.php'], 'processes' => 1, 'batch' => 1]);
         $report = $this->directory . '/ordinary.junit.xml';
         file_put_contents($report, '<testsuite><testcase classname="A" name="test"/></testsuite>');
-        $data = new \SebastianBergmann\CodeCoverage\Data\ProcessedCodeCoverageData();
+        $data = new ProcessedCodeCoverageData();
         $data->setLineCoverage(['included.php' => [4 => [0 => 1]]]);
         $coverage = $this->directory . '/ordinary.cov';
         $this->writeCoverage($coverage, $data, 'A::test');

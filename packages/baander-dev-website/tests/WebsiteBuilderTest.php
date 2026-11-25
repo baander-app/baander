@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace Baander\DevWebsite\Tests;
 
+use Baander\DevWebsite\Metadata\SourceHistory;
 use Baander\DevWebsite\WebsiteBuilder;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
 final class WebsiteBuilderTest extends TestCase
@@ -101,7 +103,7 @@ final class WebsiteBuilderTest extends TestCase
     public function testWritesSitemapAndRobotsForEveryPublishedPage(): void
     {
         file_put_contents($this->root . '/ui/site/templates/extra.php', '<?php echo "extra";');
-        $history = \Baander\DevWebsite\Metadata\SourceHistory::fromGitLog("\x1e2026-11-04T10:00:00+00:00\n\ndocs-book/part-1-operator-guide/chapter.md\nui/site/templates/extra.php\n");
+        $history = SourceHistory::fromGitLog("\x1e2026-11-04T10:00:00+00:00\n\ndocs-book/part-1-operator-guide/chapter.md\nui/site/templates/extra.php\n");
         $this->builder()->build(publicPages: [['template' => 'extra', 'url' => '/extra/', 'title' => 'Extra', 'description' => 'Extra page', 'data' => []]], history: $history);
         $document = new \DOMDocument();
         self::assertTrue($document->load($this->root . '/var/website/sitemap.xml'));
@@ -392,7 +394,7 @@ final class WebsiteBuilderTest extends TestCase
         yield 'second title' => ["# Notes\n# More", 'NOTES.md: a reference source opens with its title, its only level-1 heading'];
     }
 
-    #[\PHPUnit\Framework\Attributes\DataProvider('unusableReferenceSources')]
+    #[DataProvider('unusableReferenceSources')]
     public function testReferenceSourceMustExistHaveContentAndOpenWithItsOnlyTitle(?string $content, string $problem): void
     {
         if ($content !== null) {

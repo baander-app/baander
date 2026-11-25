@@ -8,6 +8,7 @@ use App\Catalog\Domain\Model\Album;
 use App\Catalog\Domain\ValueObject\MusicbrainzId;
 use App\Catalog\Interface\Resource\AlbumResource;
 use App\Media\Domain\Model\Image;
+use App\Media\Domain\Model\ImageState;
 use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
 use PHPUnit\Framework\TestCase;
@@ -174,7 +175,7 @@ final class AlbumResourceTest extends TestCase
     {
         $imageId = Uuid::v4();
         $image = Image::reconstitute(
-            new \App\Media\Domain\Model\ImageState(
+            new ImageState(
                 id: $imageId,
                 publicId: new PublicId(),
                 path: '/storage/covers/cover.jpg',
@@ -205,7 +206,7 @@ final class AlbumResourceTest extends TestCase
         $publicId = new PublicId();
 
         $image = Image::reconstitute(
-            new \App\Media\Domain\Model\ImageState(
+            new ImageState(
                 id: Uuid::v4(),
                 publicId: $publicId,
                 path: '/storage/covers/cover.jpg',
@@ -235,7 +236,7 @@ final class AlbumResourceTest extends TestCase
         $publicId = new PublicId();
 
         $image = Image::reconstitute(
-            new \App\Media\Domain\Model\ImageState(
+            new ImageState(
                 id: Uuid::v4(),
                 publicId: $publicId,
                 path: '/storage/covers/cover.jpg',

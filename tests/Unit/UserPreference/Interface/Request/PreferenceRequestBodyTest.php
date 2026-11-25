@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\UserPreference\Interface\Request;
 
+use App\UserPreference\Interface\Exception\InvalidPreferenceRequestBody;
 use App\UserPreference\Interface\Request\PreferenceRequestBody;
 use PHPUnit\Framework\TestCase;
 
@@ -34,7 +35,7 @@ final class PreferenceRequestBodyTest extends TestCase
 
     public function testNumericPreferenceFieldNamesAreRejected(): void
     {
-        $this->expectException(\App\UserPreference\Interface\Exception\InvalidPreferenceRequestBody::class);
+        $this->expectException(InvalidPreferenceRequestBody::class);
         (new PreferenceRequestBody())->save('{"payload":{"0":true},"version":0}');
     }
 

@@ -3,17 +3,22 @@
 declare(strict_types=1);
 
 use App\Auth\Domain\Model\OAuth\SignInGrant;
+use App\Kernel;
 use App\Shared\Domain\Model\Uuid;
 use App\Tests\Fixtures\Auth\FirstPartyOAuthClient;
 use App\Tests\Fixtures\WebRuntime\HttpExchange;
 use App\Tests\Fixtures\WebRuntime\StreamClient;
+use Doctrine\DBAL\Connection;
+use Doctrine\ORM\EntityManagerInterface;
+use Swoole\Coroutine\Http\Client;
+use Swoole\WebSocket\Frame;
 
 /**
  * @var string $project
- * @var App\Kernel $kernel
+ * @var Kernel $kernel
  * @var Closure(): StreamClient $client
- * @var Doctrine\ORM\EntityManagerInterface $manager
- * @var Doctrine\DBAL\Connection $db
+ * @var EntityManagerInterface $manager
+ * @var Connection $db
  */
 require_once $project . '/tests/Fixtures/Worker/MediaControlObservation.php';
 
@@ -52,7 +57,7 @@ function mediaSocket(StreamClient $auth, array $payload): void
     $ticket = $auth->webSocketTicket(BASE . '/api/ws/tickets', BASE);
     $failure = null;
     Swoole\Coroutine\run(static function () use ($ticket, $payload, &$failure): void {
-        $socket = new Swoole\Coroutine\Http\Client('127.0.0.1', 9501);
+        $socket = new Client('127.0.0.1', 9501);
         try {
             $socket->set(['timeout' => 2]);
             $socket->setHeaders(['Origin' => BASE]);
@@ -61,7 +66,7 @@ function mediaSocket(StreamClient $auth, array $payload): void
             $deadline = microtime(true) + 2;
             do {
                 $frame = $socket->recv(max(.01, $deadline - microtime(true)));
-                ensure($frame instanceof Swoole\WebSocket\Frame, 'Control socket closed before acknowledgement.');
+                ensure($frame instanceof Frame, 'Control socket closed before acknowledgement.');
                 $message = json_decode($frame->data, true, flags: JSON_THROW_ON_ERROR);
                 if (($message['type'] ?? '') === 'transcode.position_ack') {
                     ensure(($message['requestId'] ?? null) === $payload['requestId'] && $message['status'] === 'processed', 'Socket omitted handling receipt identity.');

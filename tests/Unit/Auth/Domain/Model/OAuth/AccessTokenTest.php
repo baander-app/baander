@@ -8,9 +8,12 @@ use App\Auth\Domain\Model\OAuth\AccessToken;
 use App\Auth\Domain\Model\OAuth\AccessTokenState;
 use App\Auth\Domain\Model\OAuth\Client;
 use App\Auth\Domain\Model\OAuth\SignInGrant;
-use App\Auth\Domain\Model\User;
+use App\Auth\Domain\Model\OAuth\TokenId;
+use App\Auth\Domain\Model\OAuth\ValueObject\ChainId;
 use App\Auth\Domain\Model\OAuth\ValueObject\Scope;
+use App\Auth\Domain\Model\User;
 use App\Shared\Domain\Model\Email;
+use App\Shared\Domain\Model\Uuid;
 use DateInterval;
 use PHPUnit\Framework\TestCase;
 
@@ -29,7 +32,7 @@ final class AccessTokenTest extends TestCase
     {
         $token = AccessToken::issue($this->client, SignInGrant::AuthorizationCode);
 
-        $this->assertInstanceOf(\App\Shared\Domain\Model\Uuid::class, $token->getId());
+        $this->assertInstanceOf(Uuid::class, $token->getId());
         $this->assertNull($token->getUser());
         $this->assertNull($token->getName());
         $this->assertSame($this->client, $token->getClient());
@@ -49,7 +52,7 @@ final class AccessTokenTest extends TestCase
             scopes: $scopes,
             name: 'My Token',
             ttl: new DateInterval('PT1H'),
-            chainId: \App\Auth\Domain\Model\OAuth\ValueObject\ChainId::generate(),
+            chainId: ChainId::generate(),
         );
 
         $this->assertSame($this->user, $token->getUser());
@@ -57,7 +60,7 @@ final class AccessTokenTest extends TestCase
         $this->assertSame('My Token', $token->getName());
         $this->assertCount(2, $token->getScopes());
         $this->assertNotNull($token->getExpiresAt());
-        $this->assertInstanceOf(\App\Auth\Domain\Model\OAuth\ValueObject\ChainId::class, $token->getChainId());
+        $this->assertInstanceOf(ChainId::class, $token->getChainId());
     }
 
     public function testIssueWithoutTtlHasNoExpiry(): void
@@ -113,13 +116,13 @@ final class AccessTokenTest extends TestCase
 
     public function testReconstitute(): void
     {
-        $chainId = \App\Auth\Domain\Model\OAuth\ValueObject\ChainId::generate();
+        $chainId = ChainId::generate();
         $now = new \DateTimeImmutable();
         $expiresAt = (new \DateTimeImmutable())->add(new DateInterval('PT1H'));
 
         $token = AccessToken::reconstitute(new AccessTokenState(
-            id: \App\Shared\Domain\Model\Uuid::v4(),
-            tokenId: \App\Auth\Domain\Model\OAuth\TokenId::generate(),
+            id: Uuid::v4(),
+            tokenId: TokenId::generate(),
             user: $this->user,
             client: $this->client,
             grant: SignInGrant::DeviceCode,

@@ -6,14 +6,15 @@ namespace App\Catalog\Domain\Repository;
 
 use App\Catalog\Domain\Model\Song;
 use App\Catalog\Domain\ValueObject\ArtistRole;
+use App\Shared\Domain\Exception\CursorMismatchException;
 use App\Shared\Domain\Model\Cursor;
 use App\Shared\Domain\Model\CursorPage;
 use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\SearchOptions;
 use App\Shared\Domain\Model\SearchResult;
 use App\Shared\Domain\Model\Uuid;
-use App\Shared\Domain\ValueObject\LibraryReadScope;
 use App\Shared\Domain\Repository\Searchable;
+use App\Shared\Domain\ValueObject\LibraryReadScope;
 
 interface SongRepositoryInterface extends Searchable
 {
@@ -34,7 +35,7 @@ interface SongRepositoryInterface extends Searchable
     /**
      * The sort field, when set, must be one of the song list sort fields: title, artist, album, year or added.
      *
-     * @throws \App\Shared\Domain\Exception\CursorMismatchException when the cursor was issued for another sort field or order
+     * @throws CursorMismatchException when the cursor was issued for another sort field or order
      */
     public function searchVisibleWithCursor(SearchOptions $options, LibraryReadScope $scope): CursorPage;
 

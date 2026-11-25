@@ -7,6 +7,8 @@ namespace App\Tests\Functional\Controller;
 use App\Shared\Application\Http\BaanderHeader;
 use App\Tests\Functional\TestCase;
 use PHPUnit\Framework\Attributes\DataProvider;
+use Symfony\Bundle\FrameworkBundle\Console\Application;
+use Symfony\Component\Console\Tester\CommandTester;
 
 final class AdminUserControllerTest extends TestCase
 {
@@ -181,8 +183,8 @@ final class AdminUserControllerTest extends TestCase
     public function testTheConsoleCanStillChangeAnAdministratorsEmail(): void
     {
         $superAdmin = $this->createSuperAdminUser();
-        $application = new \Symfony\Bundle\FrameworkBundle\Console\Application(static::$kernel);
-        $command = new \Symfony\Component\Console\Tester\CommandTester($application->find('app:user:change-email'));
+        $application = new Application(static::$kernel);
+        $command = new CommandTester($application->find('app:user:change-email'));
 
         $this->assertSame(0, $command->execute(['identifier' => $superAdmin->getEmail(), 'email' => 'console-change@baander.app'], ['interactive' => false]), $command->getDisplay());
 

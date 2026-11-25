@@ -4,8 +4,9 @@ declare(strict_types=1);
 
 namespace Baander\DevQualification\Fixtures\Worker;
 
-use Throwable;
 use Baander\Containers\Resources\DisposableContainer;
+use Baander\Process\Execution\ProcessResult;
+use Throwable;
 
 final class OperatorCleanup
 {
@@ -20,7 +21,7 @@ final class OperatorCleanup
     }
 
     /** @param list<string> $arguments */
-    private function docker(array $arguments, ?string $log = null, bool $required = true): ?\Baander\Process\Execution\ProcessResult
+    private function docker(array $arguments, ?string $log = null, bool $required = true): ?ProcessResult
     {
         try {
             return $this->commands->docker($arguments, log: $log, timeout: 5, cleanup: true);

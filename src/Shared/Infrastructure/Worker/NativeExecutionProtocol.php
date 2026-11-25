@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Shared\Infrastructure\Worker;
 
+use App\Shared\Application\DTO\DeploymentProfile;
 use Symfony\Component\DependencyInjection\Attribute\Exclude;
 
 #[Exclude]
@@ -18,7 +19,7 @@ final class NativeExecutionProtocol
     public const int RESPONSE_BYTES = 3_000_000;
 
     /** @return array{commands:int, results:int, clients:int} */
-    public static function limits(\App\Shared\Application\DTO\DeploymentProfile $profile): array
+    public static function limits(DeploymentProfile $profile): array
     {
         return ['commands' => $profile->nativeCommandLimit(), 'results' => $profile->nativeResultLimit(), 'clients' => $profile->nativeClientLimit()];
     }

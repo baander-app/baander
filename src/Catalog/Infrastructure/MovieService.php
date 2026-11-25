@@ -55,7 +55,7 @@ final class MovieService implements MoviePortInterface
     }
 
     /**
-     * @return \App\Catalog\Domain\Model\Movie[]
+     * @return Movie[]
      */
     public function findByLibrary(Uuid $libraryId): array
     {

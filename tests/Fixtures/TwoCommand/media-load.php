@@ -7,6 +7,9 @@ use App\Shared\Application\DTO\DeploymentProfile;
 use App\Shared\Domain\Model\Uuid;
 use App\Tests\Fixtures\WebRuntime\HttpExchange;
 use App\Tests\Fixtures\WebRuntime\StreamClient;
+use Doctrine\DBAL\DriverManager;
+use Doctrine\DBAL\Tools\DsnParser;
+use Doctrine\ORM\EntityManagerInterface;
 
 /**
  * Drives the load proof. It first warms the playback governor with 1080p encodes until the
@@ -18,7 +21,7 @@ use App\Tests\Fixtures\WebRuntime\StreamClient;
  * rendition after another of its own track while any video still encodes.
  *
  * @var string $project
- * @var Doctrine\ORM\EntityManagerInterface $manager
+ * @var EntityManagerInterface $manager
  */
 require_once $project . '/tests/Fixtures/Worker/MediaControlObservation.php';
 
@@ -37,7 +40,7 @@ $profile = DeploymentProfile::fromEnvironment();
 [$videoSlots, $audioSlots] = [$profile->videoEncoderSlots, $profile->audioEncoderSlots];
 ensure($videoSlots > 0 && $audioSlots > 0 && count($load['tracks']) >= $audioSlots, 'The load proof needs video and audio slots and a track per audio slot.');
 // Observation reads PostgreSQL directly, so the drill's own queries never wait in the pooled application pool.
-$direct = Doctrine\DBAL\DriverManager::getConnection((new Doctrine\DBAL\Tools\DsnParser(['postgresql' => 'pdo_pgsql']))
+$direct = DriverManager::getConnection((new DsnParser(['postgresql' => 'pdo_pgsql']))
     ->parse((string) getenv('BAANDER_TEST_DIRECT_DATABASE_URL')));
 ensure(mkdir(ROOT . '/cost-progress', 0700) || is_dir(ROOT . '/cost-progress'), 'Cannot enable native progress evidence.');
 /** @var list<StreamClient> $owners */

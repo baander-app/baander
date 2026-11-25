@@ -6,9 +6,10 @@ namespace App\Shared\Infrastructure\LogViewer\Sql;
 
 use App\Shared\Application\Exception\InvalidInputException;
 use App\Shared\Application\Exception\ServiceUnavailableException;
-use Closure;
 use App\Shared\Infrastructure\Swoole\Async;
 use App\Shared\Infrastructure\Swoole\Drain\SwooleHooks;
+use Closure;
+use Swoole\Runtime;
 
 /** Isolated child adapter; coroutine execution requires the Swoole process hooks. */
 final readonly class SqlQueryRunner
@@ -22,7 +23,7 @@ final readonly class SqlQueryRunner
      */
     public function run(string $sql, array $records): array
     {
-        if (Async::inCoroutine() && (\Swoole\Runtime::getHookFlags() & SWOOLE_HOOK_PROC) === 0) {
+        if (Async::inCoroutine() && (Runtime::getHookFlags() & SWOOLE_HOOK_PROC) === 0) {
             throw new ServiceUnavailableException('SQL process hooks are unavailable.');
         }
         try {

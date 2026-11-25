@@ -8,6 +8,7 @@ use Doctrine\DBAL\Connection;
 use Doctrine\DBAL\DriverManager;
 use Doctrine\DBAL\Exception\DriverException;
 use Doctrine\DBAL\Tools\DsnParser;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
 /**
@@ -59,7 +60,7 @@ final class ApplicationDatabaseRoleTest extends TestCase
         yield 'read a server file' => ["SELECT pg_read_file('/etc/passwd')"];
     }
 
-    #[\PHPUnit\Framework\Attributes\DataProvider('privilegedStatements')]
+    #[DataProvider('privilegedStatements')]
     public function testAStatementThatNeedsASuperuserIsRefused(string $sql): void
     {
         $this->connection->executeStatement('CREATE TEMPORARY TABLE IF NOT EXISTS copy_probe (value int)');

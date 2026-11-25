@@ -4,13 +4,15 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Library\Interface\Resource;
 
-use App\Shared\Domain\ValueObject\FilesystemType;
 use App\Library\Domain\Model\Library;
 use App\Library\Domain\Model\LibraryState;
 use App\Library\Domain\ValueObject\LibraryPath;
 use App\Library\Domain\ValueObject\LibrarySlug;
 use App\Library\Domain\ValueObject\LibraryType;
 use App\Library\Interface\Resource\LibraryResource;
+use App\Shared\Domain\Model\PublicId;
+use App\Shared\Domain\Model\Uuid;
+use App\Shared\Domain\ValueObject\FilesystemType;
 use PHPUnit\Framework\TestCase;
 
 final class LibraryResourceTest extends TestCase
@@ -21,12 +23,12 @@ final class LibraryResourceTest extends TestCase
         ?\DateTimeImmutable $lastScan = null,
         ?string $scanStatus = null,
     ): Library {
-        $id = \App\Shared\Domain\Model\Uuid::v4();
+        $id = Uuid::v4();
         $now = new \DateTimeImmutable('2024-06-15T12:00:00+00:00');
 
         return Library::reconstitute(new LibraryState(
             id: $id,
-            publicId: new \App\Shared\Domain\Model\PublicId(),
+            publicId: new PublicId(),
             name: $name ?? 'My Music',
             slug: new LibrarySlug('my-music'),
             path: new LibraryPath('/media/music'),

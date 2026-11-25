@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Auth\Domain\Model;
 
 use App\Shared\Domain\Model\Email;
+use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
 use DateTimeImmutable;
 use InvalidArgumentException;
@@ -35,7 +36,7 @@ final class User
 
         return new self(new UserState(
             id: new Uuid(),
-            publicId: new \App\Shared\Domain\Model\PublicId(),
+            publicId: new PublicId(),
             name: $name,
             email: $email->toString(),
             password: $hashedPassword,
@@ -165,7 +166,7 @@ final class User
         return $this->state->id;
     }
 
-    public function getPublicId(): \App\Shared\Domain\Model\PublicId
+    public function getPublicId(): PublicId
     {
         return $this->state->publicId;
     }
@@ -274,7 +275,7 @@ final class User
 
         return new self(new UserState(
             id: new Uuid(),
-            publicId: new \App\Shared\Domain\Model\PublicId(),
+            publicId: new PublicId(),
             name: $name,
             email: $email->toString(),
             password: $hashedPassword,

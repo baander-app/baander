@@ -21,8 +21,10 @@ use Doctrine\DBAL\Connection;
 use Doctrine\DBAL\DriverManager;
 use Doctrine\DBAL\Tools\DsnParser;
 use Psr\Log\AbstractLogger;
+use Swoole\Coroutine;
 use Swoole\Http\Request;
 use Swoole\Http\Response;
+use Swoole\Process;
 use Swoole\Server;
 use Swoole\Table;
 use Swoole\Timer;
@@ -165,7 +167,7 @@ final class BridgeConnectionPool implements ServicePool
 
     public function get(): Connection
     {
-        $this->assigned[Swoole\Coroutine::getCid()] = true;
+        $this->assigned[Coroutine::getCid()] = true;
         $this->results->set('assigned-' . $this->worker, ['value' => count($this->assigned)]);
         $this->connection->executeStatement('SET search_path TO ' . $this->schema);
 
@@ -293,7 +295,7 @@ if ($child === 0) {
             fclose($client['socket']);
         }
         $bridgeStage = 'worker reload';
-        Swoole\Process::kill($master, SIGUSR1);
+        Process::kill($master, SIGUSR1);
         bridgeAwait(static fn(): bool => $results->get('starts', 'value') >= 4, 'Workers did not reload.');
         $bridgeStage = 'subscription ready after reload';
         $reconnected = [bridgeConnect($port), bridgeConnect($port)];
@@ -347,7 +349,7 @@ if ($child === 0) {
             stream_get_contents($shutdownSocket);
             fclose($shutdownSocket);
         }
-        Swoole\Process::kill($master, SIGTERM);
+        Process::kill($master, SIGTERM);
     }
     exit($exit);
 }

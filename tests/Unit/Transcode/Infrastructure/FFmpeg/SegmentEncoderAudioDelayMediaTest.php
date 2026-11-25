@@ -4,15 +4,17 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Transcode\Infrastructure\FFmpeg;
 
+use App\Shared\Application\DTO\DeploymentProfile;
 use App\Transcode\Application\DTO\MediaTrack;
 use App\Transcode\Application\Port\FFmpegPortInterface;
 use App\Transcode\Application\Port\TranscodeStoragePortInterface;
+use App\Transcode\Application\Service\MediaExecutionPolicy;
 use App\Transcode\Domain\ValueObject\AudioProfile;
 use App\Transcode\Domain\ValueObject\EncoderProfile;
 use App\Transcode\Domain\ValueObject\QualityTier;
 use App\Transcode\Domain\ValueObject\VideoProbeResult;
-use App\Transcode\Infrastructure\FFmpeg\SegmentEncoder;
 use App\Transcode\Infrastructure\FFmpeg\FFprobeArguments;
+use App\Transcode\Infrastructure\FFmpeg\SegmentEncoder;
 use App\Transcode\Infrastructure\HLS\ManifestGenerator;
 use App\Transcode\Infrastructure\Packaging\PublishedPresentationReader;
 use PHPUnit\Framework\Attributes\DataProvider;
@@ -83,7 +85,7 @@ final class SegmentEncoderAudioDelayMediaTest extends TestCase
             self::assertEqualsWithDelta($audioDelay, (float) $sourceAudio[0]['pts_time'], 0.002);
         }
         $encoder = new SegmentEncoder(
-            new \App\Transcode\Application\Service\MediaExecutionPolicy(new \App\Shared\Application\DTO\DeploymentProfile()),
+            new MediaExecutionPolicy(new DeploymentProfile()),
             $this->createStub(FFmpegPortInterface::class),
             $this->createStub(TranscodeStoragePortInterface::class),
             EncoderProfile::software($encoderName),

@@ -4,10 +4,11 @@ declare(strict_types=1);
 
 namespace Baander\DevRegistry\Tests;
 
-use Baander\Process\Execution\ProcessRunner;
-use Baander\Process\Execution\ProcessSpec;
+use Baander\Images\Inventory\Collector;
 use Baander\Process\Execution\EngineExecutor;
 use Baander\Process\Execution\ExecutionContext;
+use Baander\Process\Execution\ProcessRunner;
+use Baander\Process\Execution\ProcessSpec;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
@@ -42,7 +43,7 @@ PHP;
             self::assertSame(0, $result->exitCode, $result->stdout . $result->stderr);
             self::assertStringContainsString('relay-only qualification autoload passed', $result->stdout);
         } finally {
-            \Baander\Images\Inventory\Collector::remove($root);
+            Collector::remove($root);
         }
     }
 
@@ -88,7 +89,7 @@ PHP;
             self::assertStringNotContainsString('--filter', file_get_contents($root . '/calls'));
         } finally {
             $executor->close();
-            \Baander\Images\Inventory\Collector::remove($root);
+            Collector::remove($root);
         }
     }
 
@@ -140,7 +141,7 @@ PHP;
             self::assertSame(0, $retry->exitCode, $retry->stdout . $retry->stderr);
             self::assertFileDoesNotExist($receipt);
         } finally {
-            \Baander\Images\Inventory\Collector::remove($root);
+            Collector::remove($root);
         }
     }
 

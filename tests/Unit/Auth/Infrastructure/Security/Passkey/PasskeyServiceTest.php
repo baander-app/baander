@@ -17,12 +17,14 @@ use Psr\EventDispatcher\EventDispatcherInterface;
 use Psr\Log\LoggerInterface;
 use RuntimeException;
 use Symfony\Component\Serializer\Encoder\JsonEncoder;
+use Symfony\Component\Uid\Uuid;
 use Webauthn\Counter\CounterChecker;
 use Webauthn\CredentialRecord;
 use Webauthn\Exception\AttestationStatementLoadingException;
 use Webauthn\Exception\AuthenticatorResponseVerificationException;
 use Webauthn\Exception\InvalidDataException;
 use Webauthn\PublicKeyCredentialRequestOptions;
+use Webauthn\TrustPath\EmptyTrustPath;
 
 final class PasskeyServiceTest extends TestCase
 {
@@ -293,8 +295,8 @@ final class PasskeyServiceTest extends TestCase
             type: 'public-key',
             transports: ['internal', 'hybrid'],
             attestationType: 'none',
-            trustPath: \Webauthn\TrustPath\EmptyTrustPath::create(),
-            aaguid: \Symfony\Component\Uid\Uuid::fromString('00000000-0000-0000-0000-000000000000'),
+            trustPath: EmptyTrustPath::create(),
+            aaguid: Uuid::fromString('00000000-0000-0000-0000-000000000000'),
             credentialPublicKey: 'pub-key',
             userHandle: 'user-handle',
             counter: 42,
@@ -318,8 +320,8 @@ final class PasskeyServiceTest extends TestCase
             type: 'public-key',
             transports: ['internal'],
             attestationType: 'none',
-            trustPath: \Webauthn\TrustPath\EmptyTrustPath::create(),
-            aaguid: \Symfony\Component\Uid\Uuid::fromString('00000000-0000-0000-0000-000000000000'),
+            trustPath: EmptyTrustPath::create(),
+            aaguid: Uuid::fromString('00000000-0000-0000-0000-000000000000'),
             credentialPublicKey: 'pub-key',
             userHandle: 'user-handle',
             counter: 10,

@@ -4,24 +4,26 @@ declare(strict_types=1);
 
 namespace Baander\DevEnvironment\Release;
 
-use Baander\Process\Execution\CommandExecutor;
-use Baander\Process\Execution\ProcessSpec;
-use Baander\Process\Execution\CompletionPolicy;
+use Baander\Configuration\ApplicationLayout;
 use Baander\Configuration\ToolingConfiguration;
-use Baander\Images\Build\SourceUnavailable;
-use Baander\DevEnvironment\Runtime\ComposeRuntime;
+use Baander\DevEnvironment\Configuration\MediaMounts;
+use Baander\DevEnvironment\Host\CapturedConnections;
 use Baander\DevEnvironment\Host\Gateway;
+use Baander\DevEnvironment\Host\ProcessEnvironment;
+use Baander\DevEnvironment\Runtime\ComposeRuntime;
 use Baander\DevEnvironment\Runtime\Database;
 use Baander\DevEnvironment\Runtime\InstanceBootstrap;
-use Baander\DevEnvironment\Worker\WorkerDeployment;
 use Baander\DevEnvironment\Runtime\Libraries;
-use Baander\DevEnvironment\Host\CapturedConnections;
 use Baander\DevEnvironment\State\InstanceStateStore;
-use Baander\DevEnvironment\Host\ProcessEnvironment;
-use Baander\DevEnvironment\WorkflowError;
-use Baander\DevEnvironment\Configuration\MediaMounts;
-use Baander\DevEnvironment\State\RetainedState;
 use Baander\DevEnvironment\State\ReleaseContract;
+use Baander\DevEnvironment\State\RetainedState;
+use Baander\DevEnvironment\Worker\WorkerDeployment;
+use Baander\DevEnvironment\WorkflowError;
+use Baander\Images\Build\SourceUnavailable;
+use Baander\Process\Execution\CommandExecutor;
+use Baander\Process\Execution\CommandFailure;
+use Baander\Process\Execution\CompletionPolicy;
+use Baander\Process\Execution\ProcessSpec;
 
 class Updater
 {
@@ -102,8 +104,8 @@ class Updater
         if (!empty($observed['media'])) {
             $savedLayout = $observed['release']['layout'] ?? $observed['prepared_release']['layout'] ?? null;
             $layout = $savedLayout === null
-                ? \Baander\Configuration\ApplicationLayout::load()
-                : \Baander\Configuration\ApplicationLayout::fromArray($savedLayout);
+                ? ApplicationLayout::load()
+                : ApplicationLayout::fromArray($savedLayout);
             new MediaMounts($layout)->preflight(
                 $observed['media'],
                 $this->store->root,
@@ -136,7 +138,7 @@ class Updater
             }
             try {
                 $detected = $instance['kind'] === 'persistent' ? $this->head($instance) : null;
-            } catch (WorkflowError|\Baander\Process\Execution\CommandFailure $error) {
+            } catch (WorkflowError|CommandFailure $error) {
                 $delay = min(300, max(60, ($instance['retry_delay'] ?? 30) * 2));
                 $this->save($instance, [
                     'retry_delay' => $delay,
@@ -256,8 +258,8 @@ class Updater
                 $current = $this->required($identity);
                 try {
                     $this->save($current, ['detected_revision' => $this->head($instance)]);
-                } catch (WorkflowError|\Baander\Process\Execution\CommandFailure $error) {
-                    if ($error instanceof \Baander\Process\Execution\CommandFailure && ($error->getCode() === 124 || $error->result?->cancelled || $error->result?->signal !== null)) {
+                } catch (WorkflowError|CommandFailure $error) {
+                    if ($error instanceof CommandFailure && ($error->getCode() === 124 || $error->result?->cancelled || $error->result?->signal !== null)) {
                         throw $error;
                     }
                     $this->save($current, ['failure' => 'Release is ready; checking for a newer master will retry on the next tick.']);
@@ -464,8 +466,8 @@ class Updater
             try {
                 $readiness = $this->runtime->ready($instance);
                 break;
-            } catch (WorkflowError|\Baander\Process\Execution\CommandFailure $error) {
-                if ($error instanceof \Baander\Process\Execution\CommandFailure && ($error->getCode() === 124 || $error->result?->cancelled || $error->result?->signal !== null)) {
+            } catch (WorkflowError|CommandFailure $error) {
+                if ($error instanceof CommandFailure && ($error->getCode() === 124 || $error->result?->cancelled || $error->result?->signal !== null)) {
                     throw $error;
                 }
                 if (hrtime(true) >= $deadline) {

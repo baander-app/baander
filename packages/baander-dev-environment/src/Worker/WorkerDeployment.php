@@ -4,17 +4,19 @@ declare(strict_types=1);
 
 namespace Baander\DevEnvironment\Worker;
 
-use Baander\Core\EnvironmentVariable;
 use Baander\Configuration\ApplicationLayout;
+use Baander\Core\EnvironmentVariable;
 use Baander\Deployment\Profiles\ImageProfile;
 use Baander\Deployment\Workers\Configuration;
 use Baander\Deployment\Workers\Lifecycle;
-use Baander\Process\Execution\CommandExecutor;
 use Baander\DevEnvironment\Host\CapturedConnections;
-use Baander\DevEnvironment\State\InstanceStateStore;
 use Baander\DevEnvironment\Host\ProcessEnvironment;
 use Baander\DevEnvironment\Runtime\ComposeRuntime;
+use Baander\DevEnvironment\State\InstanceStateStore;
 use Baander\DevEnvironment\WorkflowError;
+use Baander\Filesystem\Paths;
+use Baander\Process\Execution\CommandExecutor;
+use Baander\Process\Execution\CommandFailure;
 
 class WorkerDeployment
 {
@@ -42,7 +44,7 @@ class WorkerDeployment
             $mounts = [];
             foreach ($instance['media'] ?? [] as $item) {
                 $mounts[] = [
-                    'source' => \Baander\Filesystem\Paths::resolvedPath($item['source']),
+                    'source' => Paths::resolvedPath($item['source']),
                     'target' => $item['target'],
                     'role' => 'source',
                     'readOnly' => true,
@@ -71,7 +73,7 @@ class WorkerDeployment
                 );
                 if ($configured && $role === 'source' && $configured['type'] === 'bind' && !empty($configured['read_only'])) {
                     $mounts[] = [
-                        'source' => \Baander\Filesystem\Paths::resolvedPath($configured['source']),
+                        'source' => Paths::resolvedPath($configured['source']),
                         'target' => $target,
                         'role' => 'source',
                         'readOnly' => true,
@@ -259,7 +261,7 @@ class WorkerDeployment
     {
         try {
             return $operation();
-        } catch (WorkflowError|\Baander\Process\Execution\CommandFailure $error) {
+        } catch (WorkflowError|CommandFailure $error) {
             throw $error;
         } catch (\RuntimeException $error) {
             throw new WorkflowError($error->getMessage(), previous: $error->getPrevious() ?? $error);

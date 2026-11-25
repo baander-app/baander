@@ -20,6 +20,7 @@ use App\Auth\Domain\Model\OAuth\SignInGrant;
 use App\Auth\Infrastructure\Doctrine\Entity\UserEntity;
 use App\Catalog\Infrastructure\Doctrine\Entity\AlbumEntity;
 use App\Catalog\Infrastructure\Doctrine\Entity\SongEntity;
+use App\Kernel;
 use App\Library\Infrastructure\Doctrine\Entity\LibraryEntity;
 use App\Library\Infrastructure\Doctrine\Entity\UserLibraryAccessEntity;
 use App\Shared\Domain\Model\PublicId;
@@ -28,10 +29,11 @@ use App\Tests\Fixtures\WebRuntime\HeldRendition;
 use App\Tests\Fixtures\WebRuntime\HttpExchange;
 use App\Tests\Fixtures\WebRuntime\StreamClient;
 use Doctrine\ORM\EntityManagerInterface;
+use Symfony\Component\Dotenv\Dotenv;
 
 $projectDir = dirname(__DIR__, 2);
 require $projectDir . '/vendor/autoload.php';
-(new Symfony\Component\Dotenv\Dotenv())->bootEnv($projectDir . '/.env');
+(new Dotenv())->bootEnv($projectDir . '/.env');
 
 const SERVER = 'http://127.0.0.1:9501';
 const MAILPIT = 'http://mailpit:8025/api/v1';
@@ -66,7 +68,7 @@ set_exception_handler(static function (Throwable $error) use ($mode): never {
     fwrite(STDERR, sprintf("web-runtime %s failed: %s\n  at %s:%d\n", $mode, $error->getMessage(), $error->getFile(), $error->getLine()));
     exit(1);
 });
-$kernel = new App\Kernel('prod', false);
+$kernel = new Kernel('prod', false);
 $kernel->boot();
 $manager = $kernel->getContainer()->get('doctrine')->getManager();
 check($manager instanceof EntityManagerInterface, 'No entity manager.');

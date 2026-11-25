@@ -4,23 +4,24 @@ declare(strict_types=1);
 
 namespace Baander\DevEnvironment\Tests;
 
+use Baander\DevEnvironment\Host\ProcessEnvironment;
 use Baander\DevEnvironment\Release\ReleaseBuilder;
+use Baander\DevEnvironment\Release\Updater;
+use Baander\DevEnvironment\Runtime\ComposeRuntime;
 use Baander\DevEnvironment\Runtime\Database;
 use Baander\DevEnvironment\Runtime\Libraries;
-use Baander\Tests\Tooling\Support\DevelopmentCommandExecutor;
-use Baander\DevEnvironment\Runtime\ComposeRuntime;
 use Baander\DevEnvironment\State\InstanceStateStore;
-use Baander\DevEnvironment\Release\Updater;
 use Baander\DevEnvironment\Worker\WorkerDeployment;
 use Baander\DevEnvironment\WorkflowError;
-use Baander\Process\Execution\ProcessResult;
-use Baander\Process\Execution\EngineExecutor;
-use Baander\Process\Execution\ExecutionContext;
-use Baander\DevEnvironment\Host\ProcessEnvironment;
 use Baander\Filesystem\PrivateDirectory;
 use Baander\Images\Inventory\Collector;
-use PHPUnit\Framework\TestCase;
+use Baander\Process\Execution\EngineExecutor;
+use Baander\Process\Execution\ExecutionContext;
+use Baander\Process\Execution\ProcessResult;
+use Baander\Process\Execution\ProcessSpec;
+use Baander\Tests\Tooling\Support\DevelopmentCommandExecutor;
 use PHPUnit\Framework\Attributes\DataProvider;
+use PHPUnit\Framework\TestCase;
 
 final class DevelopmentActivationTest extends TestCase
 {
@@ -119,7 +120,7 @@ final class DevelopmentActivationTest extends TestCase
         $database->expects(self::never())->method('migrate');
         $this->updater->database = $database;
         $runner = $this->createMock(DevelopmentCommandExecutor::class);
-        $runner->expects(self::exactly(2))->method('run')->willReturnCallback(static function (\Baander\Process\Execution\ProcessSpec $command): ProcessResult {
+        $runner->expects(self::exactly(2))->method('run')->willReturnCallback(static function (ProcessSpec $command): ProcessResult {
             $arguments = $command->argv;
             if (in_array('app:library:list', $arguments, true)) {
                 return new ProcessResult(0, null, false, false, '[]', '', 0);
@@ -152,7 +153,7 @@ final class DevelopmentActivationTest extends TestCase
         });
         $this->updater->runtime = $runtime;
         $runner = $this->createMock(DevelopmentCommandExecutor::class);
-        $runner->expects(self::once())->method('run')->willReturnCallback(static function (\Baander\Process\Execution\ProcessSpec $command) use (&$runtimeReady): ProcessResult {
+        $runner->expects(self::once())->method('run')->willReturnCallback(static function (ProcessSpec $command) use (&$runtimeReady): ProcessResult {
             $arguments = $command->argv;
             self::assertTrue($runtimeReady);
             self::assertContains('app:library:list', $arguments);

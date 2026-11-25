@@ -3,7 +3,12 @@
 
 declare(strict_types=1);
 
+use App\Shared\Infrastructure\Doctrine\DedicatedConnectionFactory;
+use App\Shared\Infrastructure\Worker\DeploymentLease;
+use App\Shared\Infrastructure\Worker\DoctrineDeploymentLease;
+use App\Shared\Infrastructure\Worker\LeaseAgentProcess;
 use Baander\Core\EnvironmentVariable;
+use Doctrine\DBAL\Tools\DsnParser;
 
 // Fresh CLI only: no kernel, environment-file loading, handlers or containment acknowledgment.
 ini_set('display_errors', '0');
@@ -21,7 +26,7 @@ try {
     if (!is_array($decoded)) {
         throw new InvalidArgumentException('Invalid request.');
     }
-    $request = \App\Shared\Infrastructure\Worker\LeaseAgentProcess::validateRequest($decoded);
+    $request = LeaseAgentProcess::validateRequest($decoded);
     $result['action'] = $request['action'];
     $result['sequence'] = $request['sequence'];
 } catch (Throwable) {
@@ -33,19 +38,19 @@ try {
     if (!$url) {
         throw new RuntimeException('Database not configured.');
     }
-    $params = (new \Doctrine\DBAL\Tools\DsnParser(['postgresql' => 'pdo_pgsql']))->parse($url);
+    $params = (new DsnParser(['postgresql' => 'pdo_pgsql']))->parse($url);
     if (($params['driver'] ?? null) !== 'pdo_pgsql') {
         throw new RuntimeException('Unsupported database.');
     }
-    $connection = \App\Shared\Infrastructure\Doctrine\DedicatedConnectionFactory::fromParams($params);
-    $repository = new \App\Shared\Infrastructure\Worker\DoctrineDeploymentLease($connection);
+    $connection = DedicatedConnectionFactory::fromParams($params);
+    $repository = new DoctrineDeploymentLease($connection);
     if ($request['action'] === 'observe') {
         $lease = $repository->observe($request['namespace'], $request['bootId'], $request['ttlSeconds']);
         $success = $lease !== null && ($request['epoch'] === null || $lease->epoch === $request['epoch']);
     } else {
         $lease = $request['action'] === 'acquire'
             ? $repository->acquire($request['namespace'], $request['bootId'], $request['ttlSeconds'])
-            : new \App\Shared\Infrastructure\Worker\DeploymentLease($request['namespace'], $request['bootId'], $request['epoch']);
+            : new DeploymentLease($request['namespace'], $request['bootId'], $request['epoch']);
         $success = $lease !== null && ($request['action'] === 'acquire' || $repository->renew($lease, $request['ttlSeconds']));
     }
     $result['success'] = $success;

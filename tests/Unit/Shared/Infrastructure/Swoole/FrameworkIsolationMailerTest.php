@@ -11,13 +11,13 @@ use ProxyManager\Configuration;
 use ProxyManager\Factory\AccessInterceptorValueHolderFactory;
 use ProxyManager\GeneratorStrategy\EvaluatingGeneratorStrategy;
 use Swoole\Coroutine;
+use SwooleBundle\SwooleBundle\Bridge\Swoole\Swoole;
 use SwooleBundle\SwooleBundle\Bridge\Symfony\Bundle\DependencyInjection\CompilerPass\StatefulServicesPass;
 use SwooleBundle\SwooleBundle\Bridge\Symfony\Bundle\DependencyInjection\ContainerConstants;
 use SwooleBundle\SwooleBundle\Bridge\Symfony\Container\Proxy\Generator;
 use SwooleBundle\SwooleBundle\Bridge\Symfony\Container\Proxy\Instantiator;
 use SwooleBundle\SwooleBundle\Bridge\Symfony\Container\Proxy\UnmanagedFactoryInstantiator;
 use SwooleBundle\SwooleBundle\Bridge\Symfony\Container\ServicePool\ServicePoolContainer;
-use SwooleBundle\SwooleBundle\Bridge\Swoole\Swoole;
 use SwooleBundle\SwooleBundle\Component\Locking\Channel\ChannelMutexFactory;
 use Symfony\Component\Config\Loader\LoaderInterface;
 use Symfony\Component\Config\Resource\FileResource;
@@ -75,7 +75,7 @@ final class FrameworkIsolationMailerTest extends TestCase
         );
         $factory = $instantiator->newInstance(new EsmtpTransportFactory(), $configs, 4);
         $transport = $factory->create(new Dsn('smtp', 'smtp.baander.app', port: 1025));
-        self::assertInstanceOf(\Symfony\Component\Mailer\Transport\Smtp\EsmtpTransport::class, $transport);
+        self::assertInstanceOf(EsmtpTransport::class, $transport);
         $streams = [];
         \Swoole\Coroutine\run(static function () use ($transport, $pools, &$streams): void {
             $ready = new Coroutine\Channel(2);

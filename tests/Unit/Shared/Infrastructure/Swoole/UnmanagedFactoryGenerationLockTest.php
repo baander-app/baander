@@ -12,6 +12,7 @@ use ProxyManager\Configuration;
 use ProxyManager\Factory\AccessInterceptorValueHolderFactory;
 use ProxyManager\GeneratorStrategy\EvaluatingGeneratorStrategy;
 use ProxyManager\GeneratorStrategy\GeneratorStrategyInterface;
+use Swoole\Coroutine;
 use SwooleBundle\SwooleBundle\Bridge\Swoole\Swoole;
 use SwooleBundle\SwooleBundle\Bridge\Symfony\Container\Proxy\Generator;
 use SwooleBundle\SwooleBundle\Bridge\Symfony\Container\Proxy\Instantiator;
@@ -179,7 +180,7 @@ final class UnmanagedFactoryGenerationStrategy implements GeneratorStrategyInter
         }
 
         if ($this->yieldDuringGeneration) {
-            \Swoole\Coroutine::sleep(.01);
+            Coroutine::sleep(.01);
         }
 
         return (new EvaluatingGeneratorStrategy())->generate($classGenerator);

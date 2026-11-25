@@ -6,6 +6,7 @@ namespace App\Shared\Infrastructure\Messaging;
 
 use App\Shared\Application\Messaging\MessagePayloadCodecInterface;
 use App\Shared\Infrastructure\Messenger\JsonTransportSerializer;
+use App\Shared\Infrastructure\Messenger\OrdinaryAdmissionTransport;
 use Symfony\Component\DependencyInjection\Argument\ArgumentInterface;
 use Symfony\Component\DependencyInjection\Compiler\CompilerPassInterface;
 use Symfony\Component\DependencyInjection\ContainerBuilder;
@@ -65,7 +66,7 @@ final class AsyncWorkloadCompilerPass implements CompilerPassInterface
         $retryReferences = $container->findDefinition('messenger.retry_strategy_locator')->getArgument(0);
         foreach ($catalog->transportPolicies() as $transport => $policy) {
             $definition = $container->findDefinition('messenger.transport.' . $transport);
-            if ($definition->getFactory() === [\App\Shared\Infrastructure\Messenger\OrdinaryAdmissionTransport::class, 'forEnvironment']) {
+            if ($definition->getFactory() === [OrdinaryAdmissionTransport::class, 'forEnvironment']) {
                 $definition = $this->definition($container, $definition->getArgument(0))
                     ?? throw new \LogicException('Admission requires a concrete inner transport.');
             }

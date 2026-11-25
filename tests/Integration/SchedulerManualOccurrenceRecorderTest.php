@@ -10,7 +10,9 @@ use App\Scheduler\Application\DTO\SchedulerOccurrenceOrigin;
 use App\Scheduler\Domain\ValueObject\JobType;
 use App\Scheduler\Infrastructure\Doctrine\DoctrineSchedulerManualOccurrenceRecorder;
 use App\Scheduler\Infrastructure\Doctrine\DoctrineSchedulerOccurrenceStore;
+use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
+use App\Tests\Support\FinalSchemaBootstrap;
 use DAMA\DoctrineTestBundle\PHPUnit\SkipDatabaseRollback;
 use DateTimeImmutable;
 use DateTimeZone;
@@ -47,7 +49,7 @@ final class SchedulerManualOccurrenceRecorderTest extends TestCase
         foreach ([$this->first, $this->second] as $connection) {
             $connection->executeStatement('SET search_path TO ' . $this->schema . ', public');
         }
-        \App\Tests\Support\FinalSchemaBootstrap::bootstrap($this->first);
+        FinalSchemaBootstrap::bootstrap($this->first);
         $this->first->executeStatement('DELETE FROM scheduled_jobs');
     }
 
@@ -146,7 +148,7 @@ final class SchedulerManualOccurrenceRecorderTest extends TestCase
         $other = $this->job();
         $request = Uuid::v7();
         if ($scheduled) {
-            $existing = new SchedulerOccurrence($request, $job, $this->databaseMinute(), JobType::Console, 'app:scheduled-fixture', [], jobPublicId: new \App\Shared\Domain\Model\PublicId());
+            $existing = new SchedulerOccurrence($request, $job, $this->databaseMinute(), JobType::Console, 'app:scheduled-fixture', [], jobPublicId: new PublicId());
             self::assertTrue((new DoctrineSchedulerOccurrenceStore($this->second))->record($existing));
         } else {
             self::assertNotNull((new DoctrineSchedulerManualOccurrenceRecorder($this->second))->record($other, $request));
@@ -382,7 +384,7 @@ CHILD;
     {
         $job = $this->job();
         $request = Uuid::v7();
-        $winner = new SchedulerOccurrence($request, $job, $this->databaseMinute()->modify('-1 day'), JobType::Console, 'app:winning-manual-fixture', ['z' => 1.0, 'a' => -0.0], jobPublicId: new \App\Shared\Domain\Model\PublicId(), origin: SchedulerOccurrenceOrigin::Manual);
+        $winner = new SchedulerOccurrence($request, $job, $this->databaseMinute()->modify('-1 day'), JobType::Console, 'app:winning-manual-fixture', ['z' => 1.0, 'a' => -0.0], jobPublicId: new PublicId(), origin: SchedulerOccurrenceOrigin::Manual);
         $application = 'manual_retry_' . bin2hex(random_bytes(8));
         $code = <<<'CHILD'
 require $argv[1];

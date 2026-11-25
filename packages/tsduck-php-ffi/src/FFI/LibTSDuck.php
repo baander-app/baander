@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tsduck\FFI;
 
 use FFI;
+use FFI\Exception;
 use Tsduck\Exception\TsduckException;
 use Tsduck\Exception\VersionMismatchException;
 
@@ -141,7 +142,7 @@ final class LibTSDuck
             } else {
                 $ffi = FFI::cdef($header, 'tsduck');
             }
-        } catch (\FFI\Exception $e) {
+        } catch (Exception $e) {
             throw new TsduckException(sprintf(
                 'Failed to load TSDuck library: %s. '
                 . 'Make sure libtsduck is installed. '

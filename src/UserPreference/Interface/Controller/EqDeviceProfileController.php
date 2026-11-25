@@ -8,10 +8,13 @@ use App\Auth\Infrastructure\Security\SecurityUser;
 use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
 use App\Shared\Interface\Controller\ApiResponsesTrait;
+use App\Shared\Interface\DTO\ApiError;
+use App\Shared\Interface\DTO\ValidationError;
 use App\UserPreference\Application\Exception\EqDeviceProfileNotFound;
 use App\UserPreference\Application\Port\EqDeviceProfilePortInterface;
 use App\UserPreference\Interface\Request\CreateEqDeviceProfileRequest;
 use App\UserPreference\Interface\Request\UpdateEqDeviceProfileRequest;
+use App\UserPreference\Interface\Resource\EqDeviceProfileResource;
 use OpenApi\Spec as OA;
 use Symfony\Bundle\SecurityBundle\Security;
 use Symfony\Component\HttpFoundation\JsonResponse;
@@ -66,7 +69,7 @@ final class EqDeviceProfileController
                 response: '401',
                 description: 'Not authenticated',
                 content: new OA\MediaType\Json(
-                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                    schema: new OA\Schema(ref: ApiError::class),
                 ),
             ),
         ],
@@ -97,28 +100,28 @@ final class EqDeviceProfileController
                 response: '400',
                 description: 'The body is not a JSON object',
                 content: new OA\MediaType\Json(
-                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                    schema: new OA\Schema(ref: ApiError::class),
                 ),
             ),
             new OA\Response(
                 response: '401',
                 description: 'Not authenticated',
                 content: new OA\MediaType\Json(
-                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                    schema: new OA\Schema(ref: ApiError::class),
                 ),
             ),
             new OA\Response(
                 response: '409',
                 description: 'The user already keeps the most profiles a user may keep (reason eq_profile_limit)',
                 content: new OA\MediaType\Json(
-                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                    schema: new OA\Schema(ref: ApiError::class),
                 ),
             ),
             new OA\Response(
                 response: '422',
                 description: 'Invalid input',
                 content: new OA\MediaType\Json(
-                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ValidationError::class),
+                    schema: new OA\Schema(ref: ValidationError::class),
                 ),
             ),
         ],
@@ -149,7 +152,7 @@ final class EqDeviceProfileController
                     schema: new OA\Schema(
                         type: 'object',
                         properties: [
-                            'data' => new OA\Schema(ref: \App\UserPreference\Interface\Resource\EqDeviceProfileResource::class),
+                            'data' => new OA\Schema(ref: EqDeviceProfileResource::class),
                         ],
                     ),
                 ),
@@ -158,14 +161,14 @@ final class EqDeviceProfileController
                 response: '401',
                 description: 'Not authenticated',
                 content: new OA\MediaType\Json(
-                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                    schema: new OA\Schema(ref: ApiError::class),
                 ),
             ),
             new OA\Response(
                 response: '404',
                 description: 'Profile not found',
                 content: new OA\MediaType\Json(
-                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                    schema: new OA\Schema(ref: ApiError::class),
                 ),
             ),
         ],
@@ -201,7 +204,7 @@ final class EqDeviceProfileController
                     schema: new OA\Schema(
                         type: 'object',
                         properties: [
-                            'data' => new OA\Schema(ref: \App\UserPreference\Interface\Resource\EqDeviceProfileResource::class),
+                            'data' => new OA\Schema(ref: EqDeviceProfileResource::class),
                         ],
                     ),
                 ),
@@ -210,28 +213,28 @@ final class EqDeviceProfileController
                 response: '400',
                 description: 'The body is not a JSON object',
                 content: new OA\MediaType\Json(
-                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                    schema: new OA\Schema(ref: ApiError::class),
                 ),
             ),
             new OA\Response(
                 response: '401',
                 description: 'Not authenticated',
                 content: new OA\MediaType\Json(
-                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                    schema: new OA\Schema(ref: ApiError::class),
                 ),
             ),
             new OA\Response(
                 response: '404',
                 description: 'Profile not found',
                 content: new OA\MediaType\Json(
-                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                    schema: new OA\Schema(ref: ApiError::class),
                 ),
             ),
             new OA\Response(
                 response: '422',
                 description: 'Invalid input',
                 content: new OA\MediaType\Json(
-                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ValidationError::class),
+                    schema: new OA\Schema(ref: ValidationError::class),
                 ),
             ),
         ],
@@ -282,21 +285,21 @@ final class EqDeviceProfileController
                 response: '401',
                 description: 'Not authenticated',
                 content: new OA\MediaType\Json(
-                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                    schema: new OA\Schema(ref: ApiError::class),
                 ),
             ),
             new OA\Response(
                 response: '404',
                 description: 'Profile not found',
                 content: new OA\MediaType\Json(
-                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                    schema: new OA\Schema(ref: ApiError::class),
                 ),
             ),
             new OA\Response(
                 response: '422',
                 description: 'Cannot delete default profile',
                 content: new OA\MediaType\Json(
-                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ValidationError::class),
+                    schema: new OA\Schema(ref: ValidationError::class),
                 ),
             ),
         ],
@@ -327,7 +330,7 @@ final class EqDeviceProfileController
                     schema: new OA\Schema(
                         type: 'object',
                         properties: [
-                            'data' => new OA\Schema(ref: \App\UserPreference\Interface\Resource\EqDeviceProfileResource::class),
+                            'data' => new OA\Schema(ref: EqDeviceProfileResource::class),
                         ],
                     ),
                 ),
@@ -336,14 +339,14 @@ final class EqDeviceProfileController
                 response: '401',
                 description: 'Not authenticated',
                 content: new OA\MediaType\Json(
-                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                    schema: new OA\Schema(ref: ApiError::class),
                 ),
             ),
             new OA\Response(
                 response: '404',
                 description: 'Profile not found',
                 content: new OA\MediaType\Json(
-                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                    schema: new OA\Schema(ref: ApiError::class),
                 ),
             ),
         ],

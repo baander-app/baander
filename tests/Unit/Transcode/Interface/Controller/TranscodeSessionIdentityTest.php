@@ -5,9 +5,10 @@ declare(strict_types=1);
 namespace App\Tests\Unit\Transcode\Interface\Controller;
 
 use App\Auth\Infrastructure\Security\SecurityUser;
-use App\Shared\Domain\Model\Uuid;
-use App\Catalog\Domain\Model\Video;
 use App\Catalog\Application\Port\VideoPortInterface;
+use App\Catalog\Domain\Model\Video;
+use App\Shared\Domain\Model\Uuid;
+use App\Tests\Unit\Transcode\PublicViewStub;
 use App\Transcode\Application\Command\CreateTranscodeSessionCommand;
 use App\Transcode\Application\Command\UpdateTranscodePositionCommand;
 use App\Transcode\Application\Port\PlaybackPortInterface;
@@ -44,7 +45,7 @@ final class TranscodeSessionIdentityTest extends TestCase
         $this->expectNoCalls($sessions, TranscodeSessionPortInterface::class);
         $this->expectNoCalls($playback, PlaybackPortInterface::class);
         $this->expectNoCalls($query, TranscodeSessionQueryPort::class);
-        $controller = new TranscodeSessionController($security, $bus, $sessions, $playback, new \App\Tests\Unit\Transcode\PublicViewStub());
+        $controller = new TranscodeSessionController($security, $bus, $sessions, $playback, new PublicViewStub());
         $controller->setTranslator(new Translator('en'));
 
         $response = match ($action) {
@@ -85,7 +86,7 @@ final class TranscodeSessionIdentityTest extends TestCase
             $this->expectNoCalls($sessions, TranscodeSessionPortInterface::class);
             $query->expects(self::once())->method('findByUser')->with($owner)->willReturn([]);
         }
-        $controller = new TranscodeSessionController($security, $bus, $sessions, $playback, new \App\Tests\Unit\Transcode\PublicViewStub());
+        $controller = new TranscodeSessionController($security, $bus, $sessions, $playback, new PublicViewStub());
 
         $response = $action === 'index' ? $controller->index() : $controller->listSessions($query);
 
@@ -124,7 +125,7 @@ final class TranscodeSessionIdentityTest extends TestCase
                 return new Envelope($command, [new HandledStamp($session, 'test-handler')]);
             },
         );
-        $controller = new TranscodeSessionController($security, $bus, $sessions, $playback, new \App\Tests\Unit\Transcode\PublicViewStub($video));
+        $controller = new TranscodeSessionController($security, $bus, $sessions, $playback, new PublicViewStub($video));
 
         $response = $controller->create(new CreateTranscodeSessionRequest(videoId: $videoModel->getPublicId()->toString(), qualityTier: '720p', requestId: $requestId));
 
@@ -152,7 +153,7 @@ final class TranscodeSessionIdentityTest extends TestCase
                 return new Envelope($command, [new HandledStamp($generation, 'test-handler')]);
             },
         );
-        $controller = new TranscodeSessionController($security, $bus, $sessions, $this->createStub(PlaybackPortInterface::class), new \App\Tests\Unit\Transcode\PublicViewStub());
+        $controller = new TranscodeSessionController($security, $bus, $sessions, $this->createStub(PlaybackPortInterface::class), new PublicViewStub());
         $request = new Request(content: json_encode(['position' => 61, 'action' => 'seek', 'generation' => 3, 'requestId' => $requestId], JSON_THROW_ON_ERROR));
 
         $response = $controller->updatePosition($session->getPublicId()->toString(), $request);

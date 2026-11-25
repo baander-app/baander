@@ -4,20 +4,20 @@ declare(strict_types=1);
 
 namespace App\Catalog\Interface\Controller;
 
-use App\Catalog\Application\Port\SongAvailabilityPortInterface;
 use App\Catalog\Application\Command\Album\DeleteAlbumCommand;
 use App\Catalog\Application\Command\Album\UpdateAlbumCommand;
-use App\Catalog\Application\Port\AlbumPortInterface;
-use App\Library\Application\Port\LibraryReadScopeProviderInterface;
 use App\Catalog\Application\Port\AlbumDuplicatePortInterface;
 use App\Catalog\Application\Port\AlbumMergePortInterface;
+use App\Catalog\Application\Port\AlbumPortInterface;
+use App\Catalog\Application\Port\SongAvailabilityPortInterface;
 use App\Catalog\Domain\Model\Album;
 use App\Catalog\Interface\Request\MergeAlbumsRequest;
 use App\Catalog\Interface\Request\UpdateAlbumRequest;
-use App\Catalog\Interface\Resource\CatalogDeletionResource;
 use App\Catalog\Interface\Resource\AlbumResource;
-use App\Catalog\Interface\Resource\SongResource;
+use App\Catalog\Interface\Resource\CatalogDeletionResource;
 use App\Catalog\Interface\Resource\DuplicateGroupResource;
+use App\Catalog\Interface\Resource\SongResource;
+use App\Library\Application\Port\LibraryReadScopeProviderInterface;
 use App\Media\Application\Port\ImagePortInterface;
 use App\Shared\Application\Http\PublicOrigins;
 use App\Shared\Domain\Model\PublicId;
@@ -28,16 +28,18 @@ use App\Shared\Interface\Controller\ApiResponsesTrait;
 use App\Shared\Interface\Controller\DispatchesMessagesTrait;
 use App\Shared\Interface\DTO\ApiError;
 use App\Shared\Interface\DTO\PaginatedResponse;
-use App\Shared\Interface\Request\QueryParameters;
 use App\Shared\Interface\DTO\ValidationError;
+use App\Shared\Interface\Request\QueryParameters;
 use InvalidArgumentException;
 use OpenApi\Spec as OA;
 use Symfony\Component\HttpFoundation\JsonResponse;
+use Symfony\Component\HttpFoundation\RedirectResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpKernel\Attribute\MapRequestPayload;
 use Symfony\Component\Messenger\MessageBusInterface;
 use Symfony\Component\Routing\Attribute\Route;
 use Symfony\Component\Security\Core\Authorization\AuthorizationCheckerInterface;
+use Symfony\Component\Security\Http\Attribute\IsGranted;
 use Throwable;
 
 #[OA\Tag(
@@ -45,7 +47,7 @@ use Throwable;
     description: 'Album, artist, song, movie, and genre management endpoints',
 )]
 #[Route('/api/albums', name: 'album_')]
-#[\Symfony\Component\Security\Http\Attribute\IsGranted('ROLE_ADMIN', methods: ['POST', 'PUT', 'PATCH', 'DELETE'])]
+#[IsGranted('ROLE_ADMIN', methods: ['POST', 'PUT', 'PATCH', 'DELETE'])]
 final class AlbumController
 {
     use ApiResponsesTrait;
@@ -135,7 +137,7 @@ final class AlbumController
                 response: '400',
                 description: 'Invalid page or limit',
                 content: new OA\MediaType\Json(
-                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                    schema: new OA\Schema(ref: ApiError::class),
                 ),
             ),
         ],
@@ -349,13 +351,13 @@ final class AlbumController
                 response: '404',
                 description: 'Album or cover image not found',
                 content: new OA\MediaType\Json(
-                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                    schema: new OA\Schema(ref: ApiError::class),
                 ),
             ),
         ],
     )]
     #[Route('/{publicId}/cover', name: 'cover', methods: ['GET'])]
-    public function cover(string $publicId, Request $request): \Symfony\Component\HttpFoundation\RedirectResponse|\Symfony\Component\HttpFoundation\JsonResponse
+    public function cover(string $publicId, Request $request): RedirectResponse|JsonResponse
     {
         $album = $this->findVisibleAlbum($publicId, $this->libraryReadScopeProvider->current());
 
@@ -421,7 +423,7 @@ final class AlbumController
                 response: '404',
                 description: 'Album not found',
                 content: new OA\MediaType\Json(
-                    schema: new OA\Schema(ref: \App\Shared\Interface\DTO\ApiError::class),
+                    schema: new OA\Schema(ref: ApiError::class),
                 ),
             ),
         ],

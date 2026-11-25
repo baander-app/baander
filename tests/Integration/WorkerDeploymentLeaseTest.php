@@ -6,8 +6,9 @@ namespace App\Tests\Integration;
 
 use App\Shared\Infrastructure\Worker\DeploymentLease;
 use App\Shared\Infrastructure\Worker\DoctrineDeploymentLease;
-use App\Tests\Support\DeploymentJournalFixture;
 use App\Shared\Infrastructure\Worker\DoctrineDeploymentRetirement;
+use App\Tests\Support\DeploymentJournalFixture;
+use App\Tests\Support\FinalSchemaBootstrap;
 use Doctrine\DBAL\Connection;
 use Doctrine\DBAL\DriverManager;
 use Doctrine\DBAL\Exception\DriverException;
@@ -39,7 +40,7 @@ final class WorkerDeploymentLeaseTest extends TestCase
         foreach ([$this->first, $this->second] as $connection) {
             $connection->executeStatement('SET search_path TO ' . $this->schema . ', public');
         }
-        \App\Tests\Support\FinalSchemaBootstrap::bootstrap($this->first);
+        FinalSchemaBootstrap::bootstrap($this->first);
         DeploymentJournalFixture::ready($this->first, 'deployment', str_repeat('a', 32));
         DeploymentJournalFixture::ready($this->first, 'baander.app:workers', str_repeat('a', 32));
     }

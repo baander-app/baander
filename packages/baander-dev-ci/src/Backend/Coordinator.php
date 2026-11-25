@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Baander\DevCi\Backend;
 
+use Baander\Configuration\ApplicationLayout;
+use Baander\Configuration\ToolingConfiguration;
 use InvalidArgumentException;
 use RuntimeException;
 use Throwable;
@@ -31,7 +33,7 @@ final class Coordinator
         if ($files === [] || count(array_unique($files)) !== count($files)) {
             throw new InvalidArgumentException('Discovery must contain unique, nonempty test files');
         }
-        $applicationRoot ??= \Baander\Configuration\ApplicationLayout::load()->root;
+        $applicationRoot ??= ApplicationLayout::load()->root;
         $ordinary = $serial = $services = [];
         sort($files, SORT_STRING);
         foreach ($files as $file) {
@@ -91,9 +93,9 @@ final class Coordinator
         if (!in_array($disable, ['0', '1'], true)) {
             throw new InvalidArgumentException('BAANDER_TEST_DISABLE_SWOOLE must be 0 or 1');
         }
-        $configuration = \Baander\Configuration\ToolingConfiguration::forRepository($root, $environment);
+        $configuration = ToolingConfiguration::forRepository($root, $environment);
         $timeout = $configuration->budgets->seconds('backend');
-        \Baander\Configuration\ApplicationLayout::load($root . '/packages/baander-configuration/resources/application-layout.json');
+        ApplicationLayout::load($root . '/packages/baander-configuration/resources/application-layout.json');
         $artifacts = $environment['BAANDER_TEST_ARTIFACTS'] ?? $root . '/var/test-runs';
         if (!str_starts_with($artifacts, '/')) {
             $artifacts = getcwd() . '/' . $artifacts;

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Tests\Unit\Media\Domain\Model;
 
 use App\Media\Domain\Model\Image;
+use App\Media\Domain\Model\ImageState;
 use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
 use DateTimeImmutable;
@@ -188,7 +189,7 @@ final class ImageTest extends TestCase
         $updatedAt = new DateTimeImmutable('2025-01-02 00:00:00');
 
         $image = Image::reconstitute(
-            new \App\Media\Domain\Model\ImageState(
+            new ImageState(
                 id: $id,
                 publicId: $publicId,
                 path: 'images/restored.jpg',
@@ -227,7 +228,7 @@ final class ImageTest extends TestCase
     public function testReconstituteWithNullBlurhash(): void
     {
         $image = Image::reconstitute(
-            new \App\Media\Domain\Model\ImageState(
+            new ImageState(
                 id: Uuid::v4(),
                 publicId: PublicId::fromString(str_repeat('a', 21)),
                 path: 'images/no-blur.jpg',

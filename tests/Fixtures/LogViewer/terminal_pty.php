@@ -1,6 +1,7 @@
 <?php
 
 declare(strict_types=1);
+use FFI\CData;
 
 // Run from the repository root: php tests/Fixtures/LogViewer/terminal_pty.php.
 
@@ -10,7 +11,7 @@ function terminalSymbol(FFI $library, string $name): Closure
     return static fn(mixed ...$arguments): mixed => $library->{$name}(...$arguments);
 }
 
-function terminalDescriptor(FFI\CData $descriptor): int
+function terminalDescriptor(CData $descriptor): int
 {
     $value = unpack('i', FFI::string(FFI::addr($descriptor), FFI::sizeof($descriptor)));
     if ($value === false || !is_int($value[1] ?? null)) {
@@ -81,7 +82,7 @@ function finishTerminal($process, $master): array
 function runTerminalCase(string $action): void
 {
     $libc = FFI::cdef('int openpty(int *master, int *slave, char *name, const void *termios, const void *winsize); int close(int fd);');
-    /** @var Closure(FFI\CData, FFI\CData, FFI\CData, ?FFI\CData, ?FFI\CData): int $openpty */
+    /** @var Closure(CData, CData, CData, ?CData, ?CData): int $openpty */
     $openpty = terminalSymbol($libc, 'openpty');
     /** @var Closure(int): int $close */
     $close = terminalSymbol($libc, 'close');

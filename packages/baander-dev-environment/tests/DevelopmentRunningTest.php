@@ -4,11 +4,12 @@ declare(strict_types=1);
 
 namespace Baander\DevEnvironment\Tests;
 
-use Baander\Tests\Tooling\Support\DevelopmentCommandExecutor;
 use Baander\DevEnvironment\Runtime\ComposeRuntime;
 use Baander\DevEnvironment\State\InstanceStateStore;
 use Baander\DevEnvironment\WorkflowError;
 use Baander\Process\Execution\ProcessResult;
+use Baander\Tests\Tooling\Support\DevelopmentCommandExecutor;
+use PHPUnit\Framework\Assert;
 use PHPUnit\Framework\TestCase;
 
 final class DevelopmentRunningTest extends TestCase
@@ -73,7 +74,7 @@ final class DevelopmentRunningTest extends TestCase
                 ?string $logPath = null,
                 bool $interactive = false,
             ): ProcessResult {
-                \PHPUnit\Framework\Assert::assertNotContains('compose', $arguments, 'A stale topology must be rendered before selecting new services.');
+                Assert::assertNotContains('compose', $arguments, 'A stale topology must be rendered before selecting new services.');
                 return new ProcessResult(0, null, false, false, '{"ID":"daemon"}', '', 0);
             }
         };

@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Shared\Infrastructure\Swoole;
 
+use Swoole\Coroutine;
+
 /**
  * Context-aware async primitives.
  *
@@ -15,7 +17,7 @@ final class Async
     /** @throws CoroutineCanceledException when the current coroutine has been cancelled */
     public static function throwIfCanceled(): void
     {
-        if (self::inCoroutine() && \Swoole\Coroutine::isCanceled()) {
+        if (self::inCoroutine() && Coroutine::isCanceled()) {
             throw new CoroutineCanceledException('The coroutine was cancelled.');
         }
     }
@@ -29,7 +31,7 @@ final class Async
     public static function sleep(float $seconds): void
     {
         if (self::inCoroutine()) {
-            if (\Swoole\Coroutine::sleep($seconds) === false && \Swoole\Coroutine::isCanceled()) {
+            if (Coroutine::sleep($seconds) === false && Coroutine::isCanceled()) {
                 throw new CoroutineCanceledException('The coroutine was cancelled while it slept.');
             }
         } else {
@@ -68,6 +70,6 @@ final class Async
 
     public static function inCoroutine(): bool
     {
-        return \extension_loaded('swoole') && \Swoole\Coroutine::getCid() > 0;
+        return \extension_loaded('swoole') && Coroutine::getCid() > 0;
     }
 }

@@ -4,22 +4,24 @@ declare(strict_types=1);
 
 namespace Baander\DevQualification\Tests;
 
-use Baander\DevQualification\Tests\Support\WorkerSamplerRecordingRunner;
-use Baander\Process\Execution\EngineExecutor;
-use Baander\Process\Execution\ExecutionContext;
-use Baander\DevEnvironment\Host\ProcessEnvironment;
+use App\Shared\Infrastructure\Worker\NativeExecutionDaemon;
+use App\Shared\Infrastructure\Worker\OutOfMemoryKillOrder;
 use Baander\Containers\Docker\Client;
 use Baander\Containers\Docker\Target;
-use Baander\Process\Execution\CommandExecutor;
-use Baander\Process\Execution\CompletionPolicy;
-use Baander\Process\Execution\ProcessSpec;
-use Baander\Process\Execution\RunningProcess;
-use Baander\DevQualification\Fixtures\Worker\PostgresSampler;
+use Baander\DevEnvironment\Host\ProcessEnvironment;
+use Baander\DevQualification\Fixtures\Worker\AutoscalingStatusObservation;
 use Baander\DevQualification\Fixtures\Worker\CompletionCursor;
 use Baander\DevQualification\Fixtures\Worker\EvidenceMode;
-use Baander\DevQualification\Fixtures\Worker\AutoscalingStatusObservation;
 use Baander\DevQualification\Fixtures\Worker\KillOrderEvidence;
+use Baander\DevQualification\Fixtures\Worker\PostgresSampler;
+use Baander\DevQualification\Tests\Support\WorkerSamplerRecordingRunner;
+use Baander\Process\Execution\CommandExecutor;
+use Baander\Process\Execution\CompletionPolicy;
+use Baander\Process\Execution\EngineExecutor;
+use Baander\Process\Execution\ExecutionContext;
 use Baander\Process\Execution\ProcessResult;
+use Baander\Process\Execution\ProcessSpec;
+use Baander\Process\Execution\RunningProcess;
 use PHPUnit\Framework\TestCase;
 use RuntimeException;
 
@@ -376,11 +378,11 @@ final class WorkerSamplerTest extends TestCase
 
     public function testKillOrderEvidenceMatchesTheApplicationAndTheStandInEncoders(): void
     {
-        self::assertSame(\App\Shared\Infrastructure\Worker\OutOfMemoryKillOrder::CONTROL_UNIT, KillOrderEvidence::CONTROL_UNIT);
-        self::assertSame(\App\Shared\Infrastructure\Worker\OutOfMemoryKillOrder::EXECUTION_UNIT, KillOrderEvidence::EXECUTION_UNIT);
-        self::assertSame(\App\Shared\Infrastructure\Worker\OutOfMemoryKillOrder::MEDIA_WORK, KillOrderEvidence::MEDIA_WORK);
-        self::assertSame(\App\Shared\Infrastructure\Worker\NativeExecutionDaemon::COMMAND_NICENESS, KillOrderEvidence::NATIVE_COMMAND_NICENESS);
-        $launcher = \App\Shared\Infrastructure\Worker\NativeExecutionDaemon::launcher();
+        self::assertSame(OutOfMemoryKillOrder::CONTROL_UNIT, KillOrderEvidence::CONTROL_UNIT);
+        self::assertSame(OutOfMemoryKillOrder::EXECUTION_UNIT, KillOrderEvidence::EXECUTION_UNIT);
+        self::assertSame(OutOfMemoryKillOrder::MEDIA_WORK, KillOrderEvidence::MEDIA_WORK);
+        self::assertSame(NativeExecutionDaemon::COMMAND_NICENESS, KillOrderEvidence::NATIVE_COMMAND_NICENESS);
+        $launcher = NativeExecutionDaemon::launcher();
         self::assertSame(['/usr/bin/setsid', '/usr/bin/nice', '-n', '10', '/usr/bin/choom', '-n', '600', '--'], $launcher);
         $fixtures = dirname(__DIR__, 3) . '/tests/Fixtures/Worker/';
         $replay = (string) file_get_contents($fixtures . 'media-cost-replay.php');

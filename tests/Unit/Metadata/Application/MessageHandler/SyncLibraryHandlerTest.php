@@ -5,9 +5,13 @@ declare(strict_types=1);
 namespace App\Tests\Unit\Metadata\Application\MessageHandler;
 
 use App\Catalog\Application\Port\AlbumPortInterface;
+use App\Catalog\Application\Port\MoviePortInterface;
 use App\Catalog\Domain\Model\Album;
+use App\Catalog\Domain\Model\Movie;
 use App\Metadata\Application\Message\SyncAlbumMessage;
 use App\Metadata\Application\Message\SyncLibraryMessage;
+use App\Metadata\Application\Message\SyncMovieMessage;
+use App\Metadata\Application\Message\SyncTvLibraryMessage;
 use App\Metadata\Application\MessageHandler\SyncLibraryHandler;
 use App\Shared\Application\JobCancelledException;
 use App\Shared\Domain\Model\Uuid;
@@ -22,16 +26,16 @@ final class SyncLibraryHandlerTest extends TestCase
     public function testLibrarySyncQueuesItsMoviesWithForcePropagation(): void
     {
         $libraryId = Uuid::v7();
-        $movie = \App\Catalog\Domain\Model\Movie::create($libraryId, 'Owned Film', 2026);
-        $movies = $this->createMock(\App\Catalog\Application\Port\MoviePortInterface::class);
+        $movie = Movie::create($libraryId, 'Owned Film', 2026);
+        $movies = $this->createMock(MoviePortInterface::class);
         $movies->expects(self::once())->method('movieIdsByLibraryAfter')->with($libraryId, null, 100)->willReturn([$movie->getId()]);
         $bus = $this->createMock(MessageBusInterface::class);
         $bus->expects(self::exactly(2))->method('dispatch')->willReturnCallback(static function (object $message) use ($movie): Envelope {
-            if ($message instanceof \App\Metadata\Application\Message\SyncTvLibraryMessage) {
+            if ($message instanceof SyncTvLibraryMessage) {
                 self::assertTrue($message->forceUpdate);
                 return new Envelope($message);
             }
-            self::assertInstanceOf(\App\Metadata\Application\Message\SyncMovieMessage::class, $message);
+            self::assertInstanceOf(SyncMovieMessage::class, $message);
             self::assertTrue($movie->getId()->equals($message->movieId));
             self::assertTrue($message->forceUpdate);
 
@@ -46,7 +50,7 @@ final class SyncLibraryHandlerTest extends TestCase
     {
         $libraryId = Uuid::v7();
         $ids = array_map(static fn(int $number): Uuid => Uuid::v7(), range(1, 101));
-        $movies = $this->createMock(\App\Catalog\Application\Port\MoviePortInterface::class);
+        $movies = $this->createMock(MoviePortInterface::class);
         $movies->expects(self::never())->method('findByLibrary');
         $reads = 0;
         $movies->expects(self::exactly(2))->method('movieIdsByLibraryAfter')->willReturnCallback(
@@ -65,11 +69,11 @@ final class SyncLibraryHandlerTest extends TestCase
         $queued = [];
         $bus = $this->createStub(MessageBusInterface::class);
         $bus->method('dispatch')->willReturnCallback(static function (object $message) use (&$queued): Envelope {
-            if ($message instanceof \App\Metadata\Application\Message\SyncTvLibraryMessage) {
+            if ($message instanceof SyncTvLibraryMessage) {
                 self::assertTrue($message->forceUpdate);
                 return new Envelope($message);
             }
-            self::assertInstanceOf(\App\Metadata\Application\Message\SyncMovieMessage::class, $message);
+            self::assertInstanceOf(SyncMovieMessage::class, $message);
             self::assertTrue($message->forceUpdate);
             $queued[] = $message->movieId->toString();
             return new Envelope($message);
@@ -106,7 +110,7 @@ final class SyncLibraryHandlerTest extends TestCase
         $checkpoint = new CancelAtCheckpoint(passes: 2);
 
         try {
-            (new SyncLibraryHandler($catalog, $bus, new NullLogger(), $checkpoint, $this->createStub(\App\Catalog\Application\Port\MoviePortInterface::class)))(new SyncLibraryMessage($libraryId));
+            (new SyncLibraryHandler($catalog, $bus, new NullLogger(), $checkpoint, $this->createStub(MoviePortInterface::class)))(new SyncLibraryMessage($libraryId));
             self::fail('A cancelled library sync must stop.');
         } catch (JobCancelledException) {
         }

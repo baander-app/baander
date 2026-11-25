@@ -4,8 +4,10 @@ declare(strict_types=1);
 
 namespace App\Tests\Integration\Docker;
 
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Filesystem\Filesystem;
+use Symfony\Component\Process\Process;
 
 /**
  * Validates both nginx configs: the dev template (envsubst) and the
@@ -573,7 +575,7 @@ final class NginxTemplateTest extends TestCase
         yield 'development' => [self::DEV_TEMPLATE_PATH];
     }
 
-    #[\PHPUnit\Framework\Attributes\DataProvider('nginxConfigurations')]
+    #[DataProvider('nginxConfigurations')]
     public function testEveryAccessLogUsesAFormatWithoutTheQueryStringOrReferrer(string $path): void
     {
         $config = (string) file_get_contents($path);
@@ -589,7 +591,7 @@ final class NginxTemplateTest extends TestCase
         }
     }
 
-    #[\PHPUnit\Framework\Attributes\DataProvider('nginxConfigurations')]
+    #[DataProvider('nginxConfigurations')]
     public function testAnAccessLogLineForASignedDeliveryUrlHasNoQueryString(string $path): void
     {
         $directory = sys_get_temp_dir() . '/baander-nginx-log-' . (random_bytes(6) |> bin2hex(...));
@@ -606,7 +608,7 @@ final class NginxTemplateTest extends TestCase
             'server { listen unix:' . $directory . '/nginx.sock; location / { return 204; } }',
             '}',
         ]));
-        $nginx = new \Symfony\Component\Process\Process(['nginx', '-c', $directory . '/nginx.conf', '-p', $directory]);
+        $nginx = new Process(['nginx', '-c', $directory . '/nginx.conf', '-p', $directory]);
         $nginx->start();
         try {
             for ($attempt = 0; $attempt < 100 && !file_exists($directory . '/nginx.sock'); ++$attempt) {

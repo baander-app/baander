@@ -9,6 +9,7 @@ use App\Auth\Domain\Model\User;
 use App\Shared\Domain\Model\Email;
 use App\Tests\Functional\TestCase;
 use PHPUnit\Framework\Attributes\DataProvider;
+use Symfony\Component\HttpFoundation\Response;
 
 /** `admin.can_view_users` and `admin.can_create_users` decide what a non-super admin may do. */
 final class AdminUserManagementToggleTest extends TestCase
@@ -90,7 +91,7 @@ final class AdminUserManagementToggleTest extends TestCase
     }
 
     /** @param list<string>|null $roles */
-    private function createUser(User $actor, string $email, ?array $roles = null): \Symfony\Component\HttpFoundation\Response
+    private function createUser(User $actor, string $email, ?array $roles = null): Response
     {
         $payload = ['email' => $email, 'password' => 'securePassword123', 'name' => 'Created User'];
         if ($roles !== null) {

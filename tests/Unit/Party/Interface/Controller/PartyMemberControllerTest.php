@@ -6,16 +6,18 @@ namespace App\Tests\Unit\Party\Interface\Controller;
 
 use App\Auth\Infrastructure\Security\SecurityUser;
 use App\Party\Application\Command\TransferHostCommand;
+use App\Party\Application\DTO\PartyMemberView;
 use App\Party\Application\Port\PartyMemberPortInterface;
+use App\Party\Application\Port\PartyPublicIdentityPortInterface;
 use App\Party\Application\Port\PartySessionPortInterface;
 use App\Party\Domain\Model\PartyMember;
+use App\Party\Domain\Model\SyncedPartySession;
 use App\Party\Interface\Controller\PartyMemberController;
 use App\Party\Interface\Request\TransferHostRequest;
 use App\Party\Interface\Request\UpdatePartyMemberRequest;
 use App\Shared\Application\Exception\NotFoundException;
-use App\Shared\Domain\Model\Uuid;
 use App\Shared\Domain\Model\PublicId;
-use App\Party\Domain\Model\SyncedPartySession;
+use App\Shared\Domain\Model\Uuid;
 use PHPUnit\Framework\MockObject\Stub;
 use PHPUnit\Framework\TestCase;
 use Symfony\Bundle\SecurityBundle\Security;
@@ -246,10 +248,10 @@ final class PartyMemberControllerTest extends TestCase
 
         return new Security($container);
     }
-    private function identities(): \App\Party\Application\Port\PartyPublicIdentityPortInterface&Stub
+    private function identities(): PartyPublicIdentityPortInterface&Stub
     {
-        $identities = $this->createStub(\App\Party\Application\Port\PartyPublicIdentityPortInterface::class);
-        $identities->method('member')->willReturnCallback(static fn (PartyMember $member) => new \App\Party\Application\DTO\PartyMemberView($member, new PublicId(), new PublicId()));
+        $identities = $this->createStub(PartyPublicIdentityPortInterface::class);
+        $identities->method('member')->willReturnCallback(static fn (PartyMember $member) => new PartyMemberView($member, new PublicId(), new PublicId()));
 
         return $identities;
     }

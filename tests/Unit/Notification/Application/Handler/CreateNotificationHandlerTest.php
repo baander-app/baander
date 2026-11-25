@@ -4,10 +4,15 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Notification\Application\Handler;
 
+use App\Auth\Domain\Event\EmailVerified;
+use App\Auth\Domain\Event\OAuth\TokenRevoked;
+use App\Auth\Domain\Event\Passkey\PasskeyRegistered;
+use App\Auth\Domain\Event\PasswordChanged;
 use App\Auth\Domain\Model\User;
 use App\Auth\Domain\Model\UserState;
 use App\Auth\Domain\Repository\UserRepositoryInterface;
 use App\Library\Application\Query\LibraryMembershipQueryPort;
+use App\Library\Domain\Event\LibraryScanCompleted;
 use App\Notification\Application\DTO\CreateNotificationCommand;
 use App\Notification\Application\DTO\SendEmailCommand;
 use App\Notification\Application\DTO\TranslatableParameter;
@@ -16,6 +21,7 @@ use App\Notification\Application\Service\NotificationContentResolver;
 use App\Notification\Domain\Model\Notification;
 use App\Notification\Domain\Repository\NotificationRepositoryInterface;
 use App\Notification\Domain\Service\EventCategoryResolver;
+use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
 use PHPUnit\Framework\MockObject\Stub;
 use PHPUnit\Framework\TestCase;
@@ -70,7 +76,7 @@ final class CreateNotificationHandlerTest extends TestCase
 
         $userId = Uuid::generate();
         $command = new CreateNotificationCommand(
-            eventClass: \App\Auth\Domain\Event\PasswordChanged::class,
+            eventClass: PasswordChanged::class,
             payload: ['user_id' => $userId->toString(), 'email' => 'test@baander.app', 'occurred_at' => '2026-04-19T00:00:00+00:00'],
             eventName: 'user.password_changed',
         );
@@ -93,7 +99,7 @@ final class CreateNotificationHandlerTest extends TestCase
             ->willReturn([$user1->toString(), $user2->toString()]);
 
         $command = new CreateNotificationCommand(
-            eventClass: \App\Library\Domain\Event\LibraryScanCompleted::class,
+            eventClass: LibraryScanCompleted::class,
             payload: ['library_id' => $libraryId->toString(), 'files_discovered' => 150, 'files_processed' => 120, 'occurred_at' => '2026-04-19T00:00:00+00:00'],
             eventName: 'library.scan_completed',
         );
@@ -109,7 +115,7 @@ final class CreateNotificationHandlerTest extends TestCase
         $this->notificationRepository = $this->createMock(NotificationRepositoryInterface::class);
 
         $command = new CreateNotificationCommand(
-            eventClass: \App\Auth\Domain\Event\EmailVerified::class,
+            eventClass: EmailVerified::class,
             payload: ['user_id' => Uuid::generate()->toString(), 'email' => 'listener@baander.app', 'occurred_at' => '2026-10-07T00:00:00+00:00'],
             eventName: 'user.email_verified',
         );
@@ -129,7 +135,7 @@ final class CreateNotificationHandlerTest extends TestCase
             ->willReturn([]);
 
         $command = new CreateNotificationCommand(
-            eventClass: \App\Library\Domain\Event\LibraryScanCompleted::class,
+            eventClass: LibraryScanCompleted::class,
             payload: ['library_id' => $libraryId->toString(), 'files_discovered' => 10, 'files_processed' => 5, 'occurred_at' => '2026-04-19T00:00:00+00:00'],
             eventName: 'library.scan_completed',
         );
@@ -144,7 +150,7 @@ final class CreateNotificationHandlerTest extends TestCase
         $this->notificationRepository = $this->createMock(NotificationRepositoryInterface::class);
 
         $command = new CreateNotificationCommand(
-            eventClass: \App\Auth\Domain\Event\OAuth\TokenRevoked::class,
+            eventClass: TokenRevoked::class,
             payload: ['token_id' => 'abc', 'token_type' => 'access_token'],
             eventName: 'token.revoked',
         );
@@ -165,7 +171,7 @@ final class CreateNotificationHandlerTest extends TestCase
             ->willReturn([$userId->toString()]);
 
         $command = new CreateNotificationCommand(
-            eventClass: \App\Library\Domain\Event\LibraryScanCompleted::class,
+            eventClass: LibraryScanCompleted::class,
             payload: ['library_id' => $libraryId->toString(), 'files_discovered' => 200, 'files_processed' => 180, 'occurred_at' => '2026-04-19T00:00:00+00:00'],
             eventName: 'library.scan_completed',
         );
@@ -191,7 +197,7 @@ final class CreateNotificationHandlerTest extends TestCase
 
         $user = User::reconstitute(new UserState(
             id: $userId,
-            publicId: new \App\Shared\Domain\Model\PublicId(),
+            publicId: new PublicId(),
             name: 'Test',
             email: 'user@baander.app',
             password: 'hashed',
@@ -204,7 +210,7 @@ final class CreateNotificationHandlerTest extends TestCase
         $this->userRepository->expects($this->once())->method('findByUuid')->with($userId)->willReturn($user);
 
         $command = new CreateNotificationCommand(
-            eventClass: \App\Auth\Domain\Event\PasswordChanged::class,
+            eventClass: PasswordChanged::class,
             payload: ['user_id' => $userId->toString(), 'email' => 'user@baander.app', 'occurred_at' => '2026-04-19T00:00:00+00:00'],
             eventName: 'user.password_changed',
         );
@@ -225,7 +231,7 @@ final class CreateNotificationHandlerTest extends TestCase
 
         $user = User::reconstitute(new UserState(
             id: $userId,
-            publicId: new \App\Shared\Domain\Model\PublicId(),
+            publicId: new PublicId(),
             name: 'Test',
             email: 'user@baander.app',
             password: 'hashed',
@@ -237,7 +243,7 @@ final class CreateNotificationHandlerTest extends TestCase
         $this->userRepository->expects($this->once())->method('findByUuid')->with($userId)->willReturn($user);
 
         $command = new CreateNotificationCommand(
-            eventClass: \App\Auth\Domain\Event\PasswordChanged::class,
+            eventClass: PasswordChanged::class,
             payload: ['user_id' => $userId->toString(), 'email' => 'user@baander.app', 'occurred_at' => '2026-04-19T00:00:00+00:00'],
             eventName: 'user.password_changed',
         );
@@ -259,7 +265,7 @@ final class CreateNotificationHandlerTest extends TestCase
         $this->userRepository->expects($this->once())->method('findByUuid')->with($userId)->willReturn(null);
 
         $command = new CreateNotificationCommand(
-            eventClass: \App\Auth\Domain\Event\PasswordChanged::class,
+            eventClass: PasswordChanged::class,
             payload: ['user_id' => $userId->toString(), 'email' => 'user@baander.app', 'occurred_at' => '2026-04-19T00:00:00+00:00'],
             eventName: 'user.password_changed',
         );
@@ -286,7 +292,7 @@ final class CreateNotificationHandlerTest extends TestCase
         });
 
         ($this->createHandler())(new CreateNotificationCommand(
-            eventClass: \App\Auth\Domain\Event\Passkey\PasskeyRegistered::class,
+            eventClass: PasskeyRegistered::class,
             payload: ['user_id' => $userId->toString(), 'name' => null, 'occurred_at' => '2026-10-07T00:00:00+00:00'],
             eventName: 'user.passkey_registered',
         ));
@@ -330,7 +336,7 @@ final class CreateNotificationHandlerTest extends TestCase
             }));
 
         ($this->createHandler())(new CreateNotificationCommand(
-            eventClass: \App\Auth\Domain\Event\Passkey\PasskeyRegistered::class,
+            eventClass: PasskeyRegistered::class,
             payload: ['user_id' => $userId->toString(), 'name' => null, 'occurred_at' => '2026-10-07T00:00:00+00:00'],
             eventName: 'user.passkey_registered',
         ));
@@ -340,7 +346,7 @@ final class CreateNotificationHandlerTest extends TestCase
     {
         return User::reconstitute(new UserState(
             id: $userId,
-            publicId: new \App\Shared\Domain\Model\PublicId(),
+            publicId: new PublicId(),
             name: 'Test',
             email: 'user@baander.app',
             password: 'hashed',
