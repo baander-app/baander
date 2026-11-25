@@ -4,6 +4,7 @@
 #include "registry/core.hpp"
 #include <boost/asio/awaitable.hpp>
 #include <boost/asio/io_context.hpp>
+#include <boost/asio/ssl/context.hpp>
 #include <chrono>
 #include <memory>
 #include <optional>
@@ -31,6 +32,10 @@ struct DatabaseResponse {
     Json body;
 };
 Json parse_json_body(const std::string &body, std::size_t maximum_bytes, unsigned maximum_depth);
+// The listener and the database client negotiate TLS 1.2 or 1.3 only. TLS 1.2 is limited to
+// ECDHE key exchange with AEAD ciphers, so neither side accepts static-RSA key exchange, which
+// has no forward secrecy, or CBC; every TLS 1.3 suite OpenSSL enables by default is AEAD.
+void restrict_tls(boost::asio::ssl::context &tls);
 // Confined to one io_context event-loop thread; construction/destruction and all calls
 // must be serialized. The pool must outlive every request coroutine. A future multi-thread
 // runner must add a strand or synchronized state rather than running these slots concurrently.

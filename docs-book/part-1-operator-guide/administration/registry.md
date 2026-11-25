@@ -77,10 +77,15 @@ registry columns that differ from what the API expects, registration and lookup
 answer `503` until the schema matches again. The API checks again every second and
 reopens by itself; it does not need a monitor to call `/ready`.
 
-If the API is alive but unready, inspect API logs, database reachability, TLS and
-credentials, then voter membership and available quorum. Preserve state when a
-member fails to restart. The startup guard deliberately refuses mismatched or
-incomplete storage instead of repairing it silently.
+If the API is alive but unready, inspect the API log, then database reachability,
+TLS and credentials, then voter membership and available quorum. The API logs one
+line at startup, one at shutdown, a `Readiness lost:` line with its reason when
+rqlite reports an incompatible schema, and `Readiness restored.` when it recovers.
+A readiness probe that failed for any other reason leaves no line, because the
+registry kept serving. Compose rotates the log at 10 MB, keeping three files.
+
+Preserve state when a member fails to restart. The startup guard deliberately
+refuses mismatched or incomplete storage instead of repairing it silently.
 
 The repository provides no general quorum-loss repair procedure. It rejects
 `raft/peers.json` recovery files. Do not reduce the expected voters, delete state

@@ -46,6 +46,15 @@ Json parse_json_body(const std::string &body, std::size_t maximum_bytes, unsigne
         throw Failure(400, "Malformed JSON body.");
     }
 }
+void restrict_tls(ssl::context &tls) {
+    tls.set_options(ssl::context::default_workarounds | ssl::context::no_sslv2 |
+                    ssl::context::no_sslv3 | ssl::context::no_tlsv1 | ssl::context::no_tlsv1_1);
+    if (SSL_CTX_set_cipher_list(tls.native_handle(),
+                                "ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:"
+                                "ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384:"
+                                "ECDHE-ECDSA-CHACHA20-POLY1305:ECDHE-RSA-CHACHA20-POLY1305") != 1)
+        throw std::invalid_argument("TLS cipher policy is unavailable.");
+}
 namespace {
 std::string authorization(const DatabaseConfig &config) {
     if (config.username.empty() || config.username.size() > 128 ||
@@ -151,8 +160,7 @@ struct DatabasePool::Impl {
             this->config.client_key.empty()) {
             throw std::invalid_argument("Invalid bounded database pool configuration.");
         }
-        tls.set_options(ssl::context::default_workarounds | ssl::context::no_sslv2 |
-                        ssl::context::no_sslv3 | ssl::context::no_tlsv1 | ssl::context::no_tlsv1_1);
+        restrict_tls(tls);
         tls.set_verify_mode(ssl::verify_peer);
         tls.load_verify_file(this->config.ca_file);
         tls.use_certificate_chain_file(this->config.client_certificate);

@@ -12,6 +12,16 @@ final class Inventory
 {
     public const string BUNDLE_PATH = '/usr/share/registry-inventory';
     public const array EXECUTABLES = ['api' => ['baander-registry'], 'rqlite' => ['rqlited'], 'backup' => ['age', 'age-keygen', 'rclone']];
+    /** Set by relay/CMakeLists.txt for Release builds; every compile command must carry them. */
+    public const array API_COMPILE_HARDENING = [
+        '-fstack-protector-strong',
+        '-fstack-clash-protection',
+        '-fcf-protection=full',
+        '-D_FORTIFY_SOURCE=3',
+        '-D_GLIBCXX_ASSERTIONS',
+    ];
+    /** Full RELRO: the link command of the executable must carry both. */
+    public const array API_LINK_HARDENING = ['-Wl,-z,relro', '-Wl,-z,now'];
 
     public static function digest(string $data): string
     {
@@ -485,11 +495,43 @@ final class Inventory
     }
 
     /**
+     * Requires the hardening flags in `ninja -t commands baander-registry` output: the compile
+     * flags on every compile command and the linker flags on the executable's link command.
+     */
+    public static function requireApiHardening(string $commands): void
+    {
+        $compiles = $links = [];
+        foreach (explode("\n", $commands) as $line) {
+            $words = self::words($line);
+            $output = array_search('-o', $words, true);
+            if (in_array('-c', $words, true)) {
+                $compiles[] = $words;
+            } elseif ($output !== false && ($words[$output + 1] ?? null) === 'baander-registry') {
+                $links[] = $words;
+            }
+        }
+        if ($compiles === [] || count($links) !== 1) {
+            throw new InventoryError('API build commands lack compile commands or the executable link command');
+        }
+        foreach (self::API_COMPILE_HARDENING as $flag) {
+            if (!array_all($compiles, static fn(array $words): bool => in_array($flag, $words, true))) {
+                throw new InventoryError('API build lacks hardening flag: ' . $flag);
+            }
+        }
+        foreach (self::API_LINK_HARDENING as $flag) {
+            if (!in_array($flag, $links[0], true)) {
+                throw new InventoryError('API build lacks hardening flag: ' . $flag);
+            }
+        }
+    }
+
+    /**
      * @param array<string, mixed> $evidence
      * @param array<string, string> $sourceFiles
      */
     public static function validateApiSources(array $evidence, array $sourceFiles): void
     {
+        self::requireApiHardening($evidence['link_commands'] ?? '');
         $observed = [];
         foreach ($evidence['inputs'] as $item) {
             foreach (['_deps/boost_headers-src/' => 'boost/', '_deps/json-src/' => 'json/'] as $marker => $prefix) {
@@ -820,6 +862,7 @@ final class Inventory
         if (!str_contains($commands, 'libssl.a') || !str_contains($commands, 'libcrypto.a')) {
             throw new InventoryError('API linker evidence lacks static OpenSSL archives');
         }
+        self::requireApiHardening($commands);
         $libraries = [];
         foreach (self::apiStaticArchives($commands) as $path) {
             $libraries[] = [

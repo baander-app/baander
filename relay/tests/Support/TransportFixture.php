@@ -11,6 +11,7 @@ final class TransportFixture
     public static function serve(string $configPath): void
     {
         $config = json_decode(file_get_contents($configPath), true, flags: JSON_THROW_ON_ERROR);
+        $staticRsa = $config['staticRsa'] ?? false;
         $context = stream_context_create(['ssl' => [
             'local_cert' => $config['certificate'],
             'local_pk' => $config['key'],
@@ -19,7 +20,11 @@ final class TransportFixture
             'verify_peer_name' => false,
             'allow_self_signed' => false,
             'capture_peer_cert' => true,
-            'ciphers' => $config['legacy'] ? 'DEFAULT:@SECLEVEL=0' : 'DEFAULT',
+            'ciphers' => match (true) {
+                $config['legacy'] => 'DEFAULT:@SECLEVEL=0',
+                $staticRsa => 'AES128-GCM-SHA256:AES256-GCM-SHA384',
+                default => 'DEFAULT',
+            },
             'security_level' => $config['legacy'] ? 0 : 2,
         ]]);
         $server = stream_socket_server(
@@ -58,7 +63,12 @@ final class TransportFixture
                         json_encode(['type' => 'handshake', 'name' => $name]) . "\n",
                         FILE_APPEND | LOCK_EX,
                     );
-                    $method = $config['legacy'] ? STREAM_CRYPTO_METHOD_TLSv1_1_SERVER : STREAM_CRYPTO_METHOD_TLS_SERVER;
+                    // TLS 1.3 suites carry no key exchange, so the static-RSA peer stops at TLS 1.2.
+                    $method = match (true) {
+                        $config['legacy'] => STREAM_CRYPTO_METHOD_TLSv1_1_SERVER,
+                        $staticRsa => STREAM_CRYPTO_METHOD_TLSv1_2_SERVER,
+                        default => STREAM_CRYPTO_METHOD_TLS_SERVER,
+                    };
                     if (!@stream_socket_enable_crypto($client, true, $method)) {
                         fclose($client);
                         continue;

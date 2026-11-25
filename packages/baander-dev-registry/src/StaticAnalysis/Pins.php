@@ -58,14 +58,14 @@ final class Pins
             'Registry environment dependency inventory changed; review its licenses.',
         );
         Support::requireThat(
-            str_contains($cmake, 'find_package(OpenSSL 3.5.3 EXACT REQUIRED)'),
+            str_contains($cmake, 'find_package(OpenSSL 3.5.9 EXACT REQUIRED)'),
             'Registry OpenSSL pin changed; review its source and license.',
         );
         foreach ([
             [
                 'relay/docker/Dockerfile',
-                'openssl-3.5.3',
-                'c9489d2abcf943cdc8329a57092331c598a402938054dc3a22218aea8a8ec3bf',
+                'openssl-3.5.9',
+                '603f5602e2eef00d77fbd429d34dcd5822bb301757a1bc9cdb24c670f1eb859a',
                 false,
             ],
             [

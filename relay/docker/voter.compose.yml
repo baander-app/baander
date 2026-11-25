@@ -13,6 +13,11 @@ services:
     cpus: 0.75
     mem_limit: 352m
     stop_grace_period: 15s
+    logging:
+      driver: local
+      options:
+        max-size: "10m"
+        max-file: "3"
     tmpfs:
       - /tmp:rw,noexec,nosuid,nodev,size=32m
     ports:

@@ -14,6 +14,14 @@ require dirname(__DIR__, 3) . '/relay/vendor/autoload.php';
 
 final class RegistryInventoryTest extends TestCase
 {
+    private const array COMPILE_HARDENING = [
+        '-fstack-protector-strong',
+        '-fstack-clash-protection',
+        '-fcf-protection=full',
+        '-D_FORTIFY_SOURCE=3',
+        '-D_GLIBCXX_ASSERTIONS',
+    ];
+    private const array LINK_HARDENING = ['-Wl,-z,relro', '-Wl,-z,now'];
     private string $temporary;
     private string $root;
     private string $resolutions;
@@ -97,7 +105,7 @@ final class RegistryInventoryTest extends TestCase
             Inventory::canonical([
                 'sha256' => Inventory::digest($this->binaries['baander-registry']),
                 'linker_map' => 'fixture map',
-                'link_commands' => '/opt/openssl/lib/libssl.a /opt/openssl/lib/libcrypto.a',
+                'link_commands' => self::buildCommands('/opt/openssl/lib/libssl.a /opt/openssl/lib/libcrypto.a'),
                 'static_libraries' => [
                     ['path' => '/opt/openssl/lib/libssl.a', 'sha256' => str_repeat('d', 64)],
                     ['path' => '/opt/openssl/lib/libcrypto.a', 'sha256' => str_repeat('e', 64)],
@@ -158,6 +166,14 @@ final class RegistryInventoryTest extends TestCase
         }
         $raw .= $extra . pack('H*', 'f932433186182072008242104116d8f2');
         return "\xff Go buildinf:\x08\x02" . str_repeat("\0", 16) . $string('go1.25.3') . $string($raw);
+    }
+
+    /** A compile command and the executable's link command, both hardened. */
+    private static function buildCommands(string $archives): string
+    {
+        return 'c++ ' . implode(' ', self::COMPILE_HARDENING) . " -o server.o -c server.cpp\n"
+            . 'c++ -Wl,-Map,/build/baander-registry.map ' . implode(' ', self::LINK_HARDENING)
+            . ' server.o -o baander-registry ' . $archives . "\n";
     }
 
     private function rejects(callable $operation, string $message): void
@@ -426,7 +442,7 @@ final class RegistryInventoryTest extends TestCase
         );
         $fixture = '#!' . PHP_BINARY . "\n<?php\n" . <<<'FIXTURE'
 if ($argv[4] === 'commands') {
-    echo "c++ source.cpp libssl.a libcrypto.a\n";
+    echo getenv('FIXTURE_COMMANDS');
 } elseif ($argv[4] === 'deps') {
     echo "object.o:\n    _deps/boost_headers-src/boost/fixture.hpp\n    _deps/json-src/include/fixture.hpp\n";
 } else {
@@ -437,10 +453,19 @@ FIXTURE;
         chmod($this->temporary . '/capture-bin/ninja', 0755);
         $previous = getenv('PATH');
         putenv('PATH=' . $this->temporary . '/capture-bin:' . $previous);
+        putenv('FIXTURE_COMMANDS=' . self::buildCommands('libssl.a libcrypto.a'));
         try {
             Inventory::captureApi($build, $build . '/evidence.json');
+            foreach ([...self::COMPILE_HARDENING, ...self::LINK_HARDENING] as $flag) {
+                putenv('FIXTURE_COMMANDS=' . str_replace(' ' . $flag . ' ', ' ', self::buildCommands('libssl.a libcrypto.a')));
+                $this->rejects(
+                    static fn() => Inventory::captureApi($build, $build . '/unhardened.json'),
+                    'API build lacks hardening flag: ' . $flag,
+                );
+            }
         } finally {
             putenv($previous === false ? 'PATH' : 'PATH=' . $previous);
+            putenv('FIXTURE_COMMANDS');
         }
         $evidence = Inventory::readJson($build . '/evidence.json');
         self::assertSame(hash('sha256', 'native bytes'), $evidence['sha256']);
@@ -449,6 +474,25 @@ FIXTURE;
         self::assertSame(hash('sha256', 'crypto archive'), $evidence['static_libraries'][0]['sha256']);
         self::assertCount(3, $evidence['inputs']);
         self::assertSame('c++ source.cpp', $evidence['compile_commands'][0]['command']);
+        self::assertFileDoesNotExist($build . '/unhardened.json');
+    }
+
+    public function testApiLinkCommandsMustCarryHardeningFlags(): void
+    {
+        $path = $this->bundle . '/api-build.json';
+        $original = Inventory::readJson($path);
+        $this->generate('api');
+        foreach ([...self::COMPILE_HARDENING, ...self::LINK_HARDENING] as $flag) {
+            $evidence = $original;
+            $evidence['link_commands'] = str_replace(' ' . $flag . ' ', ' ', $evidence['link_commands']);
+            Inventory::write($path, Inventory::canonical($evidence));
+            $this->rejects(fn() => $this->generate('api'), 'API build lacks hardening flag: ' . $flag);
+            $this->rejects(
+                fn() => Inventory::verify($this->root, $this->bundle . '/inventory.json'),
+                'API build lacks hardening flag: ' . $flag,
+            );
+            Inventory::write($path, Inventory::canonical($original));
+        }
     }
 
     public function testMalformedGoLengthsAndUnmatchedReplacementsFail(): void

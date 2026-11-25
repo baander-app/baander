@@ -15,6 +15,11 @@ services:
     mem_limit: 512m
     pids_limit: 64
     stop_grace_period: 15s
+    logging:
+      driver: local
+      options:
+        max-size: "10m"
+        max-file: "3"
     tmpfs:
       - /var/spool/registry-backup:rw,noexec,nosuid,nodev,size=272m,uid=10001,gid=10001,mode=0700
       - /tmp:rw,noexec,nosuid,nodev,size=8m,uid=10001,gid=10001,mode=0700

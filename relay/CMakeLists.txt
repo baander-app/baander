@@ -20,7 +20,7 @@ endif()
 if(REGISTRY_SANITIZERS AND REGISTRY_THREAD_SANITIZER)
   message(FATAL_ERROR "ThreadSanitizer must run separately from address/undefined sanitizers")
 endif()
-find_package(OpenSSL 3.5.3 EXACT REQUIRED)
+find_package(OpenSSL 3.5.9 EXACT REQUIRED)
 find_package(Threads REQUIRED)
 FetchContent_Declare(boost_headers URL https://archives.boost.io/release/1.88.0/source/boost_1_88_0.tar.bz2 SOURCE_SUBDIR registry_headers_only URL_HASH SHA256=46d9d2c06637b219270877c9e16155cbd015b6dc84349af064c088e9b5b12f7b DOWNLOAD_EXTRACT_TIMESTAMP TRUE)
 # The full pinned Boost archive supplies header-only Asio/Beast and Boost.URL's
@@ -45,6 +45,17 @@ endif()
 if(REGISTRY_THREAD_SANITIZER)
   target_compile_options(registry_core PUBLIC -fsanitize=thread -fno-omit-frame-pointer -g)
   target_link_options(registry_core PUBLIC -fsanitize=thread)
+endif()
+# Hardening for the configuration that ships, so the release contracts test the shipped
+# binary. Every first-party target links registry_boost_url, so its usage requirements reach
+# all of them. Sanitizer builds are excluded, and so is -O0: there glibc warns that
+# _FORTIFY_SOURCE needs optimization, which -Werror turns into an error.
+# relay/tools/inventory/Inventory.php refuses an image whose link commands lack these flags.
+if(CMAKE_BUILD_TYPE STREQUAL "Release" AND NOT REGISTRY_SANITIZERS AND NOT REGISTRY_THREAD_SANITIZER)
+  target_compile_options(registry_boost_url PUBLIC
+    -fstack-protector-strong -fstack-clash-protection -fcf-protection=full
+    -U_FORTIFY_SOURCE -D_FORTIFY_SOURCE=3 -D_GLIBCXX_ASSERTIONS)
+  target_link_options(registry_boost_url PUBLIC LINKER:-z,relro LINKER:-z,now)
 endif()
 include(CTest)
 if(BUILD_TESTING)

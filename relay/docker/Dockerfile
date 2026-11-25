@@ -19,10 +19,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 WORKDIR /tmp
 RUN curl --fail --silent --show-error --location --max-time 180 \
-      https://github.com/openssl/openssl/releases/download/openssl-3.5.3/openssl-3.5.3.tar.gz \
+      https://github.com/openssl/openssl/releases/download/openssl-3.5.9/openssl-3.5.9.tar.gz \
       -o openssl.tar.gz \
-    && echo 'c9489d2abcf943cdc8329a57092331c598a402938054dc3a22218aea8a8ec3bf  openssl.tar.gz' | sha256sum -c - \
-    && tar -xzf openssl.tar.gz && cd openssl-3.5.3 \
+    && echo '603f5602e2eef00d77fbd429d34dcd5822bb301757a1bc9cdb24c670f1eb859a  openssl.tar.gz' | sha256sum -c - \
+    && tar -xzf openssl.tar.gz && cd openssl-3.5.9 \
     && ./Configure --prefix=/opt/openssl --libdir=lib no-shared no-tests \
     && make -j2 && make install_sw
 WORKDIR /source

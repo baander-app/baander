@@ -298,17 +298,32 @@ final class HttpContract
     /**
      * @param array<string,mixed> $config
      */
-    private function launch(array $config, string $name): Process
+    private function launch(array $config, string $name, string $log = 'api.log'): Process
     {
         $path = $this->directory . '/' . $name . '.json';
         file_put_contents($path, self::json($config));
-        return $this->processes[] = new Process([$this->server, '--config', $path], $this->directory . '/api.log');
+        return $this->processes[] = new Process([$this->server, '--config', $path], $this->directory . '/' . $log);
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function logLines(string $log = 'api.log'): array
+    {
+        return file($this->directory . '/' . $log, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES) ?: [];
+    }
+
+    private function logCount(string $prefix): int
+    {
+        return $this->logLines()
+            |> (static fn(array $lines): array => array_filter($lines, static fn(string $line): bool => str_starts_with($line, $prefix)))
+            |> count(...);
     }
 
     /**
      * @return array{int,Process}
      */
-    private function graceful(int $grace, string $name, ?int $deadline = 1000, ?int $databaseDeadline = 500): array
+    private function graceful(int $grace, string $name, ?int $deadline = 1000, ?int $databaseDeadline = 500, string $log = 'api.log'): array
     {
         $config = $this->config;
         $port = Runtime::port();
@@ -324,7 +339,7 @@ final class HttpContract
         } else {
             $config['database']['deadlineMs'] = $databaseDeadline;
         }
-        $process = $this->launch($config, $name);
+        $process = $this->launch($config, $name, $log);
         $this->ready($port);
         return [$port, $process];
     }
@@ -559,6 +574,7 @@ final class HttpContract
         }
         $this->malformed($encoded, $owned, $snapshot, $hostile);
         $this->readBounds($hostile);
+        $this->cipherPolicy();
         $this->concurrencyAndLimits($registration, $owned);
         $this->databaseAndLifecycle($registration, $owned, $encoded, $api, $db);
         $this->noSecrets(file_get_contents($d . '/api.log'));
@@ -676,6 +692,38 @@ final class HttpContract
         } finally {
             fclose($socket);
         }
+    }
+
+    /**
+     * The listener negotiates TLS 1.2 only with ECDHE key exchange: a client that offers only
+     * static-RSA suites is refused after the same client with an ECDHE suite connects.
+     */
+    private function cipherPolicy(): void
+    {
+        $connect = fn(string $ciphers) => Http::connect(
+            'api.registry.baander.app',
+            '127.0.0.1',
+            $this->port,
+            $this->tls + ['crypto_method' => STREAM_CRYPTO_METHOD_TLSv1_2_CLIENT, 'ciphers' => $ciphers],
+        );
+        $control = $connect('ECDHE-RSA-AES128-GCM-SHA256');
+        try {
+            $crypto = stream_get_meta_data($control)['crypto'];
+            self::check(
+                $crypto['protocol'] === 'TLSv1.2' && $crypto['cipher_name'] === 'ECDHE-RSA-AES128-GCM-SHA256',
+                'TLS 1.2 ECDHE control did not connect.',
+            );
+        } finally {
+            fclose($control);
+        }
+        $refused = false;
+        try {
+            fclose($connect('AES128-GCM-SHA256:AES256-GCM-SHA384'));
+        } catch (\RuntimeException) {
+            $refused = true;
+        }
+        self::check($refused, 'Listener accepted static-RSA key exchange.');
+        self::check($this->request('GET', '/health')[0] === 200, 'Refused handshake broke liveness.');
     }
 
     private function readBounds(string $hostile): void
@@ -881,9 +929,11 @@ final class HttpContract
         );
         $this->change(['closeReadiness' => false]);
         self::check($this->request('GET', '/ready')[0] === 200, 'Readiness did not return after a transport failure.');
-        [$latchedPort, $latched] = $this->graceful(3000, 'latched');
+        [$latchedPort, $latched] = $this->graceful(3000, 'latched', log: 'latched.log');
+        [$lost, $restored] = [$this->logCount('Readiness lost: '), $this->logCount('Readiness restored.')];
         $this->change(['malformedReadiness' => true]);
         self::check($this->request('GET', '/ready')[0] === 503, 'Malformed readiness accepted.');
+        self::check($this->logCount('Readiness lost: ') === $lost + 1, 'Lost readiness did not log one line.');
         self::check($this->request('GET', '/api/servers/server-one')[0] === 503, 'Malformed schema allowed lookup.');
         self::check($this->request('GET', '/ready', port: $latchedPort)[0] === 503, 'Malformed readiness accepted.');
         $start = microtime(true);
@@ -892,8 +942,20 @@ final class HttpContract
             $latched->wait(2) === 0 && microtime(true) - $start < 1,
             'Registry with lost readiness took a second or more to stop.',
         );
+        // The instance answered several readiness requests; only state changes are logged.
+        self::check(
+            $this->logLines('latched.log') === [
+                'Registry API listening on 127.0.0.1:' . $latchedPort . '.',
+                'Readiness lost: Registry table is incompatible.',
+                'Registry API stopping.',
+            ],
+            'Registry log is not one line per state change: ' . implode(' | ', $this->logLines('latched.log')),
+        );
+        $this->noSecrets(file_get_contents($this->directory . '/latched.log'));
         $this->change(['malformedReadiness' => false]);
         $this->lookupRecovers('Malformed schema did not recover without a readiness request.');
+        self::check($this->logCount('Readiness restored.') === $restored + 1, 'Restored readiness did not log one line.');
+        self::check($this->logCount('Readiness lost: ') === $lost + 1, 'Lost readiness logged more than once.');
         self::check($this->request('GET', '/ready')[0] === 200, 'Malformed schema did not recover.');
         $checksum = $this->database(['SELECT checksum FROM schema_migrations'], true)['results'][0]['rows'][0]['checksum'];
         $this->database([['UPDATE schema_migrations SET checksum=?', 'incompatible']]);

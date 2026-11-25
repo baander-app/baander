@@ -133,7 +133,7 @@ if ($name === 'docker') {
 } elseif ($name === 'git') {
     echo str_repeat('a', 40), "\n";
 } elseif ($name === 'tar' && str_contains(implode(' ', $args), 'openssl.tar.gz')) {
-    $source = $args[array_search('-C', $args, true) + 1] . '/openssl-3.5.3';
+    $source = $args[array_search('-C', $args, true) + 1] . '/openssl-3.5.9';
     mkdir($source);
     file_put_contents($source . '/Configure', "#!/bin/sh\nexit 0\n");
     chmod($source . '/Configure', 0755);

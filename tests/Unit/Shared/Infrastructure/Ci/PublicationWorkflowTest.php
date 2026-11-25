@@ -1440,9 +1440,9 @@ printf '%s %s\n' "$tool" "$*" >> "$CALL_LOG"
 case "$tool" in
     tar)
         if [[ "$*" == *openssl.tar.gz* ]]; then
-            mkdir -p "$4/openssl-3.5.3"
-            printf '#!/bin/sh\nexit 0\n' > "$4/openssl-3.5.3/Configure"
-            chmod +x "$4/openssl-3.5.3/Configure"
+            mkdir -p "$4/openssl-3.5.9"
+            printf '#!/bin/sh\nexit 0\n' > "$4/openssl-3.5.9/Configure"
+            chmod +x "$4/openssl-3.5.9/Configure"
         fi
         ;;
 esac

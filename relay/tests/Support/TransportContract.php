@@ -22,7 +22,7 @@ final class TransportContract
             file_put_contents($directory . '/password', "disposable-test-secret\n");
             $events = $directory . '/events';
             file_put_contents($events, '');
-            $start = static function (string $name, string $key, string $certificate, bool $legacy = false, ?string $body = null) use ($directory, $events, &$processes, &$stops): array {
+            $start = static function (string $name, string $key, string $certificate, bool $legacy = false, ?string $body = null, bool $staticRsa = false) use ($directory, $events, &$processes, &$stops): array {
                 $port = Runtime::port();
                 $state = $directory . '/' . $name . '-state.json';
                 file_put_contents(
@@ -48,6 +48,7 @@ final class TransportContract
                         'certificate' => $certificate,
                         'ca' => $directory . '/ca.crt',
                         'legacy' => $legacy,
+                        'staticRsa' => $staticRsa,
                     ]),
                 );
                 $process = new Process([PHP_BINARY, __DIR__ . '/transport_fixture.php', $configuration], $directory . '/' . $name . '.log');
@@ -226,10 +227,32 @@ final class TransportContract
                 fclose($control);
             }
             $rejected('TLS 1.1 protocol', ['url' => 'https://rqlite.baander.app:' . $legacyPort]);
+            [$staticRsaPort] = $start('static-rsa', $serverKey, $serverCertificate, staticRsa: true);
+            $control = stream_socket_client('tcp://127.0.0.1:' . $staticRsaPort, $error, $message, 2, STREAM_CLIENT_CONNECT, stream_context_create(['ssl' => [
+                'cafile' => $directory . '/ca.crt',
+                'local_cert' => $clientCertificate,
+                'local_pk' => $clientKey,
+                'peer_name' => 'rqlite.baander.app',
+                'verify_peer' => true,
+                'verify_peer_name' => true,
+                'ciphers' => 'AES128-GCM-SHA256',
+            ]]));
+            Runtime::requireThat($control !== false, 'Static-RSA TLS control failed to connect');
+            try {
+                stream_set_timeout($control, 2);
+                Runtime::requireThat(
+                    stream_socket_enable_crypto($control, true, STREAM_CRYPTO_METHOD_TLSv1_2_CLIENT) === true
+                        && stream_get_meta_data($control)['crypto']['cipher_name'] === 'AES128-GCM-SHA256',
+                    'Static-RSA TLS control did not negotiate static-RSA key exchange',
+                );
+            } finally {
+                fclose($control);
+            }
+            $rejected('Static-RSA key exchange', ['url' => 'https://rqlite.baander.app:' . $staticRsaPort]);
             echo "PASS: native TLS authentication/SNI, saturation/deadline, same-pool reconnect/keepalive, "
                 . "observed-error rotation without replay, redirect, malformed response, bounded response reads, "
                 . "hostname verification, "
-                . "untrusted server/client chains, expired server certificate, TLS 1.1 rejection with positive control, "
+                . "untrusted server/client chains, expired server certificate, TLS 1.1 and static-RSA rejection with positive controls, "
                 . "credential redaction and healthy recovery.\n";
         } finally {
             foreach ($stops as $stop) {

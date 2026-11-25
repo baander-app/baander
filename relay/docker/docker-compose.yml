@@ -14,6 +14,11 @@ services:
     cpus: 0.25
     mem_limit: 96m
     stop_grace_period: 7s
+    logging:
+      driver: local
+      options:
+        max-size: "10m"
+        max-file: "3"
     ports:
       - "${REGISTRY_PUBLIC_BIND_IP:?Configure public bind IP}:9502:9502"
     volumes:

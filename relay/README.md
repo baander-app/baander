@@ -118,9 +118,17 @@ bash scripts/test-registry.sh fuzz
 The `thread` and `fuzz` recipes do not require the bounded mount or run the full-disk
 contract.
 
-The entrypoint compiles OpenSSL 3.5.3 into an isolated prefix and checks its source archive
+The entrypoint compiles OpenSSL 3.5.9 into an isolated prefix and checks its source archive
 against the official release SHA-256
-`c9489d2abcf943cdc8329a57092331c598a402938054dc3a22218aea8a8ec3bf`.
+`603f5602e2eef00d77fbd429d34dcd5822bb301757a1bc9cdb24c670f1eb859a`.
+The `release` mode builds the configuration that ships: `Release` without
+sanitizers, with stack protection (`-fstack-protector-strong`), stack-clash
+protection, control-flow protection (`-fcf-protection=full`),
+`_FORTIFY_SOURCE=3`, `_GLIBCXX_ASSERTIONS` and full RELRO (`-z relro -z now`).
+`relay/CMakeLists.txt` sets these flags, so the release contracts test the binary
+the image ships, and the image build refuses a link command that lacks one of
+them. The `-O0` and sanitizer builds omit them: `_FORTIFY_SOURCE` needs
+optimization, and sanitizers replace these checks.
 The `sanitize` mode instruments first-party targets with ASan/LSan and UBSan.
 The separate `thread` mode uses Clang, `RelWithDebInfo` and ThreadSanitizer with
 `TSAN_OPTIONS=halt_on_error=1:exitcode=66`. CI installs `clang-19` and its matching
@@ -145,7 +153,7 @@ threads to post work to that loop; it does not qualify calls directly from
 multiple threads or multiple concurrent event-loop runners.
 The manual commands below also work with an appropriately pinned environment.
 Dependencies are fetched from versioned archives and verified with SHA-256 in
-CMake. OpenSSL 3.5.3 must be supplied by the build environment; CMake verifies its
+CMake. OpenSSL 3.5.9 must be supplied by the build environment; CMake verifies its
 exact reported version. Build outputs belong outside the checkout.
 
 ```sh
@@ -447,7 +455,20 @@ file. Set its filesystem access for the service account only. Optional endpoint
 `connectAddress` supplies a static IP without changing the verified hostname.
 Redirects are rejected with 503, never followed to an unconfigured host or weaker
 read level; a subsequent connection rotates through configured endpoints.
-Neither API credentials, database auth headers nor request bodies are logged.
+Both TLS contexts accept TLS 1.2 and 1.3 only. TLS 1.2 is limited to ECDHE key
+exchange with AES-GCM or ChaCha20-Poly1305, so neither the listener nor the database
+client negotiates static-RSA key exchange or CBC; rqlite's Go TLS server offers
+these suites. The HTTP and transport contracts refuse a TLS 1.2 peer that offers
+only static-RSA suites after a positive control connects.
+
+The API writes one line to standard error for each state change and nothing per
+request: `Registry API listening on ADDRESS:PORT.` at startup,
+`Registry API stopping.` when a termination signal arrives,
+`Readiness lost: REASON` when rqlite reports an incompatible schema, and
+`Readiness restored.` when a later read is compatible again. The Compose files
+rotate every registry service's log with the `local` driver, 10 MB per file and
+three files. Neither API credentials, database auth headers nor request bodies are
+logged.
 The public server does not proxy rqlite administration routes. Deploy rqlite's
 TLS listener and Raft ports on private interfaces with network access restricted
 to registry/cluster peers; actual host exposure is a deployment acceptance check.
@@ -465,7 +486,7 @@ the components actually shipped in each image.
 | Boost (Asio, Beast, URL and headers) | 1.88.0 | `46d9d2c06637b219270877c9e16155cbd015b6dc84349af064c088e9b5b12f7b` | Boost Software License 1.0 |
 | nlohmann/json | 3.12.0 | `42f6e95cad6ec532fd372391373363b62a14af6d771056dbfc86160e6dfff7aa` | MIT |
 | GoogleTest (tests only) | 1.17.0 | `65fab701d9829d38cb77c14acdc431d2108bfdbf8979e40eb8ae567edf10b27c` | BSD-3-Clause |
-| OpenSSL (environment library; isolated CI source build) | 3.5.3 | `c9489d2abcf943cdc8329a57092331c598a402938054dc3a22218aea8a8ec3bf` | Apache-2.0 |
+| OpenSSL (environment library; isolated CI source build) | 3.5.9 | `603f5602e2eef00d77fbd429d34dcd5822bb301757a1bc9cdb24c670f1eb859a` | Apache-2.0 |
 | rqlite (external database/test binary) | 10.5.1 | Linux amd64 release: `f0ebf593b573595022947add67cd22e6cbb02c1d2a1ed8c7da45c94093a49b0d` | MIT |
 | age (backup encryption) | 1.3.2 | Linux amd64 release: `cbe24006683f8eb669266162894b9a522a1af52f2665fbc63a4bb032ed26ac10` | BSD-3-Clause |
 | rclone (backup object transfer) | 1.71.2 | Linux amd64 release: `ab9fa5877cee91c64fdfd61a27028a458cf618b39259e5c371dc2ec34a12e415` | MIT |
@@ -594,8 +615,9 @@ The image build context allowlists native sources, qualification and inventory
 tooling, Composer metadata and the generated autoloader. Local data, keys and
 operator configuration are excluded. Build stages use PHP to capture evidence and
 generate inventories; the final API and voter images contain no PHP runtime.
-The API image builds C++20 Release code with static
-OpenSSL 3.5.3 and the CMake dependency checksums above. The voter image uses
+The API image builds C++20 Release code, with the hardening flags described under
+[Local checks](#local-checks), against static OpenSSL 3.5.9 and the CMake dependency
+checksums above. The voter image uses
 a clean build of the rqlite 10.5.1 source commit. Both use the immutable official
 Debian base
 `sha256:3783cc01769c7b2b1b83a5c5ad96c815348e28ed7da68e2e3687004faa906251`.

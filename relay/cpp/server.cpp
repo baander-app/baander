@@ -11,6 +11,8 @@
 #include <iostream>
 #include <memory>
 #include <set>
+#include <sstream>
+#include <string_view>
 
 namespace registry {
 namespace asio = boost::asio;
@@ -18,6 +20,10 @@ namespace beast = boost::beast;
 namespace http = beast::http;
 namespace ssl = asio::ssl;
 using tcp = asio::ip::tcp;
+
+// One line per state change on stderr, which the container runtime collects. Requests are
+// never logged, so the log neither grows with traffic nor carries request data.
+void log_state(std::string_view line) { std::cerr << line << '\n'; }
 
 struct Server {
     struct Session;
@@ -65,8 +71,7 @@ struct Server {
         if (!enrollment_file.is_open() || enrollment_file.bad() || enrollment_key.size() < 32 ||
             enrollment_key.size() > 4096)
             throw std::invalid_argument("Invalid enrollment key file.");
-        tls.set_options(ssl::context::default_workarounds | ssl::context::no_sslv2 |
-                        ssl::context::no_sslv3 | ssl::context::no_tlsv1 | ssl::context::no_tlsv1_1);
+        restrict_tls(tls);
         tls.use_certificate_chain_file(config.at("certificate"));
         tls.use_private_key_file(config.at("key"), ssl::context::pem);
         if (SSL_CTX_check_private_key(tls.native_handle()) != 1)
@@ -180,13 +185,17 @@ struct Server {
         try {
             const auto result = co_await database.request(readiness_request(), database_deadline);
             validate_readiness_result(schema_snapshot, result.status, result.body);
-        } catch (const SchemaIncompatible &) {
+        } catch (const SchemaIncompatible &incompatible) {
+            if (initialized)
+                log_state(std::string("Readiness lost: ") + incompatible.what());
             initialized = false;
             ++readiness_generation;
             throw;
         }
         if (generation != readiness_generation)
             throw Failure(503, "Registry schema is not ready.");
+        if (!initialized)
+            log_state("Readiness restored.");
         initialized = true;
     }
     asio::awaitable<void> listen();
@@ -308,6 +317,7 @@ void Server::stop() {
     if (stopping)
         return;
     stopping = true;
+    log_state("Registry API stopping.");
     readiness_cancellation.emit(asio::cancellation_type::terminal);
     boost::system::error_code ignored;
     acceptor.close(ignored);
@@ -359,6 +369,9 @@ int main(int argc, char **argv) {
         db.deadline = std::chrono::milliseconds(database.value("deadlineMs", 2000));
         boost::asio::io_context context(1);
         registry::Server server(context, config.at("api"), std::move(db));
+        std::ostringstream listening;
+        listening << "Registry API listening on " << server.acceptor.local_endpoint() << '.';
+        registry::log_state(listening.str());
         boost::asio::signal_set signals(context, SIGINT, SIGTERM);
         signals.async_wait([&server](const boost::system::error_code &error, int) {
             if (!error)

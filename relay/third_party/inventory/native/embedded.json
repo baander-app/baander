@@ -372,10 +372,10 @@
     "association_role": "supplementary-source-notice",
     "evidence_scope": "source-archive candidates; compiler dependencies and final linker map establish artifact associations",
     "name": "SipHash reference implementation",
-    "version": "as bundled in OpenSSL 3.5.3",
+    "version": "as bundled in OpenSSL 3.5.9",
     "source": {
-      "url": "https://github.com/openssl/openssl/releases/download/openssl-3.5.3/openssl-3.5.3.tar.gz",
-      "sha256": "c9489d2abcf943cdc8329a57092331c598a402938054dc3a22218aea8a8ec3bf"
+      "url": "https://github.com/openssl/openssl/releases/download/openssl-3.5.9/openssl-3.5.9.tar.gz",
+      "sha256": "603f5602e2eef00d77fbd429d34dcd5822bb301757a1bc9cdb24c670f1eb859a"
     },
     "source_path": [
       "crypto/siphash/siphash.c"
@@ -385,7 +385,7 @@
     "notices": [
       {
         "path": "native/licenses/openssl/crypto/siphash/siphash.c",
-        "sha256": "81429486f9ff136cbcbd25ae1c086945a22c7c8eeddbc48443c24b7ab414d371"
+        "sha256": "c4ccb2e4b59c5cce86918cb5858a856dd0834ad245dafdb3716de9d740af7f32"
       },
       {
         "path": "native/licenses/openssl/CC0-1.0.txt",
@@ -406,25 +406,20 @@
     "association_role": "supplementary-source-notice",
     "evidence_scope": "source-archive candidates; compiler dependencies and final linker map establish artifact associations",
     "name": "Rijndael reference implementation",
-    "version": "as bundled in OpenSSL 3.5.3",
+    "version": "as bundled in OpenSSL 3.5.9",
     "source": {
-      "url": "https://github.com/openssl/openssl/releases/download/openssl-3.5.3/openssl-3.5.3.tar.gz",
-      "sha256": "c9489d2abcf943cdc8329a57092331c598a402938054dc3a22218aea8a8ec3bf"
+      "url": "https://github.com/openssl/openssl/releases/download/openssl-3.5.9/openssl-3.5.9.tar.gz",
+      "sha256": "603f5602e2eef00d77fbd429d34dcd5822bb301757a1bc9cdb24c670f1eb859a"
     },
     "source_path": [
-      "crypto/aes/aes_core.c",
-      "crypto/aes/aes_x86core.c"
+      "crypto/aes/aes_core.c"
     ],
     "source_scope": "incorporated source in the pinned parent archive; source presence does not establish linked object inclusion",
     "license": "LicenseRef-Rijndael-Public-Domain",
     "notices": [
       {
         "path": "native/licenses/openssl/crypto/aes/aes_core.c",
-        "sha256": "d4015f2fc3f53e644b3d770063c3755572f91e8a36b937819eb439e06a8ce0db"
-      },
-      {
-        "path": "native/licenses/openssl/crypto/aes/aes_x86core.c",
-        "sha256": "a6d9f9632ff048b02a6e22132b2ad8dcc30c6a6eaf12d344944a9e0612d944ec"
+        "sha256": "a70bf52702b68dbd07c7ef376e88c5b926b1a99ccfb43bef1225a59e3ab98287"
       }
     ],
     "scope": "runtime",
@@ -437,10 +432,10 @@
     "association_role": "supplementary-source-notice",
     "evidence_scope": "source-archive candidates; compiler dependencies and final linker map establish artifact associations",
     "name": "NSRI ARIA reference implementation",
-    "version": "as bundled in OpenSSL 3.5.3",
+    "version": "as bundled in OpenSSL 3.5.9",
     "source": {
-      "url": "https://github.com/openssl/openssl/releases/download/openssl-3.5.3/openssl-3.5.3.tar.gz",
-      "sha256": "c9489d2abcf943cdc8329a57092331c598a402938054dc3a22218aea8a8ec3bf"
+      "url": "https://github.com/openssl/openssl/releases/download/openssl-3.5.9/openssl-3.5.9.tar.gz",
+      "sha256": "603f5602e2eef00d77fbd429d34dcd5822bb301757a1bc9cdb24c670f1eb859a"
     },
     "source_path": [
       "crypto/aria/aria.c"
@@ -450,7 +445,7 @@
     "notices": [
       {
         "path": "native/licenses/openssl/crypto/aria/aria.c",
-        "sha256": "6e62515e67910aea2f04b64c643aa2545732f9dd7bf0abf87d8accf8c2c1fb88"
+        "sha256": "0b3d584f0823ce98ec4bc36460c5a0e9fa3c50ac00b987f03d835bd9aef52361"
       }
     ],
     "scope": "runtime",
@@ -463,10 +458,10 @@
     "association_role": "supplementary-source-notice",
     "evidence_scope": "source-archive candidates; compiler dependencies and final linker map establish artifact associations",
     "name": "SUPERCOP ChaCha",
-    "version": "as bundled in OpenSSL 3.5.3",
+    "version": "as bundled in OpenSSL 3.5.9",
     "source": {
-      "url": "https://github.com/openssl/openssl/releases/download/openssl-3.5.3/openssl-3.5.3.tar.gz",
-      "sha256": "c9489d2abcf943cdc8329a57092331c598a402938054dc3a22218aea8a8ec3bf"
+      "url": "https://github.com/openssl/openssl/releases/download/openssl-3.5.9/openssl-3.5.9.tar.gz",
+      "sha256": "603f5602e2eef00d77fbd429d34dcd5822bb301757a1bc9cdb24c670f1eb859a"
     },
     "source_path": [
       "crypto/chacha/chacha_enc.c"
@@ -476,7 +471,7 @@
     "notices": [
       {
         "path": "native/licenses/openssl/crypto/chacha/chacha_enc.c",
-        "sha256": "08874ccd7036ca13062b51741c4ba1417826a7c4c6e5778af5e20a86d1b281ca"
+        "sha256": "6bff8a2e69892124567ebf1ca3905918240d25eae6e1728a514aea6603c2a660"
       }
     ],
     "scope": "runtime",
@@ -489,10 +484,10 @@
     "association_role": "supplementary-source-notice",
     "evidence_scope": "source-archive candidates; compiler dependencies and final linker map establish artifact associations",
     "name": "KISA SEED",
-    "version": "as bundled in OpenSSL 3.5.3",
+    "version": "as bundled in OpenSSL 3.5.9",
     "source": {
-      "url": "https://github.com/openssl/openssl/releases/download/openssl-3.5.3/openssl-3.5.3.tar.gz",
-      "sha256": "c9489d2abcf943cdc8329a57092331c598a402938054dc3a22218aea8a8ec3bf"
+      "url": "https://github.com/openssl/openssl/releases/download/openssl-3.5.9/openssl-3.5.9.tar.gz",
+      "sha256": "603f5602e2eef00d77fbd429d34dcd5822bb301757a1bc9cdb24c670f1eb859a"
     },
     "source_path": [
       "crypto/seed/seed.c",
@@ -503,11 +498,11 @@
     "notices": [
       {
         "path": "native/licenses/openssl/crypto/seed/seed.c",
-        "sha256": "2b0909c6e8f3f1c348f447b759e1ea500f555db5de63a3d5a8c28ffcd232d5b8"
+        "sha256": "8c9570c84df2db7e996113359fe61643cbded637822b85f7be06a8914b525568"
       },
       {
         "path": "native/licenses/openssl/crypto/seed/seed_local.h",
-        "sha256": "a7f0d1699042ca94e64221d43abfb70b94abd1d992b9a1e101af0a7a2b3ecdbe"
+        "sha256": "4c45f8bc37f317f9369d9898a591a8a709aabe9ded2223016b59cff72c71ae1c"
       }
     ],
     "scope": "runtime",
@@ -520,10 +515,10 @@
     "association_role": "supplementary-source-notice",
     "evidence_scope": "source-archive candidates; compiler dependencies and final linker map establish artifact associations",
     "name": "Patrick Powell formatting implementation",
-    "version": "as bundled in OpenSSL 3.5.3",
+    "version": "as bundled in OpenSSL 3.5.9",
     "source": {
-      "url": "https://github.com/openssl/openssl/releases/download/openssl-3.5.3/openssl-3.5.3.tar.gz",
-      "sha256": "c9489d2abcf943cdc8329a57092331c598a402938054dc3a22218aea8a8ec3bf"
+      "url": "https://github.com/openssl/openssl/releases/download/openssl-3.5.9/openssl-3.5.9.tar.gz",
+      "sha256": "603f5602e2eef00d77fbd429d34dcd5822bb301757a1bc9cdb24c670f1eb859a"
     },
     "source_path": [
       "crypto/bio/bio_print.c"
@@ -533,7 +528,7 @@
     "notices": [
       {
         "path": "native/licenses/openssl/crypto/bio/bio_print.c",
-        "sha256": "cdcff413696b0cb07a7d710fe9f3568e02005037c27a4f2c4cd4bacc10b66036"
+        "sha256": "3cb98b581053b05bba144f94a5ba7e4a26ed84db8f508d71e7afff26235957f3"
       }
     ],
     "scope": "runtime",
@@ -546,10 +541,10 @@
     "association_role": "supplementary-source-notice",
     "evidence_scope": "source-archive candidates; compiler dependencies and final linker map establish artifact associations",
     "name": "Richard Levitte LPdir",
-    "version": "as bundled in OpenSSL 3.5.3",
+    "version": "as bundled in OpenSSL 3.5.9",
     "source": {
-      "url": "https://github.com/openssl/openssl/releases/download/openssl-3.5.3/openssl-3.5.3.tar.gz",
-      "sha256": "c9489d2abcf943cdc8329a57092331c598a402938054dc3a22218aea8a8ec3bf"
+      "url": "https://github.com/openssl/openssl/releases/download/openssl-3.5.9/openssl-3.5.9.tar.gz",
+      "sha256": "603f5602e2eef00d77fbd429d34dcd5822bb301757a1bc9cdb24c670f1eb859a"
     },
     "source_path": [
       "crypto/LPdir_unix.c"
@@ -559,7 +554,7 @@
     "notices": [
       {
         "path": "native/licenses/openssl/crypto/LPdir_unix.c",
-        "sha256": "a63d8af424e50744b7804634a79eafb389a8d5a5488c5df42343b661c0027370"
+        "sha256": "5b08afaef95f9fae98635c98d767c3180fb237aa70da612df8fe76dae127d895"
       },
       {
         "path": "native/licenses/openssl/LICENSE.txt",
@@ -576,10 +571,10 @@
     "association_role": "supplementary-source-notice",
     "evidence_scope": "source-archive candidates; compiler dependencies and final linker map establish artifact associations",
     "name": "KTH proxy certificate extensions",
-    "version": "as bundled in OpenSSL 3.5.3",
+    "version": "as bundled in OpenSSL 3.5.9",
     "source": {
-      "url": "https://github.com/openssl/openssl/releases/download/openssl-3.5.3/openssl-3.5.3.tar.gz",
-      "sha256": "c9489d2abcf943cdc8329a57092331c598a402938054dc3a22218aea8a8ec3bf"
+      "url": "https://github.com/openssl/openssl/releases/download/openssl-3.5.9/openssl-3.5.9.tar.gz",
+      "sha256": "603f5602e2eef00d77fbd429d34dcd5822bb301757a1bc9cdb24c670f1eb859a"
     },
     "source_path": [
       "crypto/x509/v3_pci.c",
@@ -590,11 +585,11 @@
     "notices": [
       {
         "path": "native/licenses/openssl/crypto/x509/v3_pci.c",
-        "sha256": "621182026f498566c44d15630ef85948acda34890c601e6a44afdd55098266e7"
+        "sha256": "b6c7ff275722c3bc6eff60ac3e7ac1337e08f5ac40a917db0f81b7ff15fa1608"
       },
       {
         "path": "native/licenses/openssl/crypto/x509/v3_pcia.c",
-        "sha256": "89c9915e8e65700504bbf1d5cad187bc7723dafbd2f018fe03a10d04ba5711c6"
+        "sha256": "46d265cde1a0f29a47dd5d775677971bb50dd7da808a13c6a2f03cbd36f05e3d"
       },
       {
         "path": "native/licenses/openssl/LICENSE.txt",
@@ -611,10 +606,10 @@
     "association_role": "supplementary-source-notice",
     "evidence_scope": "source-archive candidates; compiler dependencies and final linker map establish artifact associations",
     "name": "Samuel Neves BLAKE2 implementation",
-    "version": "as bundled in OpenSSL 3.5.3",
+    "version": "as bundled in OpenSSL 3.5.9",
     "source": {
-      "url": "https://github.com/openssl/openssl/releases/download/openssl-3.5.3/openssl-3.5.3.tar.gz",
-      "sha256": "c9489d2abcf943cdc8329a57092331c598a402938054dc3a22218aea8a8ec3bf"
+      "url": "https://github.com/openssl/openssl/releases/download/openssl-3.5.9/openssl-3.5.9.tar.gz",
+      "sha256": "603f5602e2eef00d77fbd429d34dcd5822bb301757a1bc9cdb24c670f1eb859a"
     },
     "source_path": [
       "providers/implementations/digests/blake2b_prov.c",
@@ -625,11 +620,11 @@
     "notices": [
       {
         "path": "native/licenses/openssl/providers/implementations/digests/blake2b_prov.c",
-        "sha256": "10bf65ebaf71eec075966a95799d4350733b9f6e0ff5c4d2c08448f9ee0139a2"
+        "sha256": "89bd3c26f33a79873dcba798c9eecb8b2f586e07ee6f2d5fb466f839c941607e"
       },
       {
         "path": "native/licenses/openssl/providers/implementations/digests/blake2s_prov.c",
-        "sha256": "72fb44ea296baa5dc9d8eec7f3ee90ee112ae7cc33545a4921fe3b3c58c5c792"
+        "sha256": "5ae09603694411a1f8cc3fabc1119f7ed9e37a627d1f592638d6a11453902945"
       },
       {
         "path": "native/licenses/openssl/LICENSE.txt",
@@ -646,10 +641,10 @@
     "association_role": "supplementary-source-notice",
     "evidence_scope": "source-archive candidates; compiler dependencies and final linker map establish artifact associations",
     "name": "NTT Camellia implementation",
-    "version": "as bundled in OpenSSL 3.5.3",
+    "version": "as bundled in OpenSSL 3.5.9",
     "source": {
-      "url": "https://github.com/openssl/openssl/releases/download/openssl-3.5.3/openssl-3.5.3.tar.gz",
-      "sha256": "c9489d2abcf943cdc8329a57092331c598a402938054dc3a22218aea8a8ec3bf"
+      "url": "https://github.com/openssl/openssl/releases/download/openssl-3.5.9/openssl-3.5.9.tar.gz",
+      "sha256": "603f5602e2eef00d77fbd429d34dcd5822bb301757a1bc9cdb24c670f1eb859a"
     },
     "source_path": [
       "crypto/camellia/camellia.c"
@@ -659,7 +654,7 @@
     "notices": [
       {
         "path": "native/licenses/openssl/crypto/camellia/camellia.c",
-        "sha256": "f24d35eeac86fd0f212efb45c8d1ba0cbff9c09c69a900b2d487d62cb3978c7c"
+        "sha256": "b545c30c8efcdc8b72351e644a83f9a3fae8f8b768a55823cd80c2794eb525c0"
       },
       {
         "path": "native/licenses/openssl/LICENSE.txt",
@@ -676,10 +671,10 @@
     "association_role": "supplementary-source-notice",
     "evidence_scope": "source-archive candidates; compiler dependencies and final linker map establish artifact associations",
     "name": "Eric Rescorla DTLS-SRTP implementation",
-    "version": "as bundled in OpenSSL 3.5.3",
+    "version": "as bundled in OpenSSL 3.5.9",
     "source": {
-      "url": "https://github.com/openssl/openssl/releases/download/openssl-3.5.3/openssl-3.5.3.tar.gz",
-      "sha256": "c9489d2abcf943cdc8329a57092331c598a402938054dc3a22218aea8a8ec3bf"
+      "url": "https://github.com/openssl/openssl/releases/download/openssl-3.5.9/openssl-3.5.9.tar.gz",
+      "sha256": "603f5602e2eef00d77fbd429d34dcd5822bb301757a1bc9cdb24c670f1eb859a"
     },
     "source_path": [
       "ssl/d1_srtp.c"
@@ -689,7 +684,7 @@
     "notices": [
       {
         "path": "native/licenses/openssl/ssl/d1_srtp.c",
-        "sha256": "0428c8a95e331243d973128056dd1da5223216dd497607202f1133d92b303f04"
+        "sha256": "9e6e86b8bf849a15d09041da62344e5c4a3a810839a67cf3e3beeb1a84087752"
       },
       {
         "path": "native/licenses/openssl/LICENSE.txt",

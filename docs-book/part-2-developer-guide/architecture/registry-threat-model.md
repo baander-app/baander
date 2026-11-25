@@ -89,7 +89,10 @@ Registration hashes the submitted credential with SHA-256; SQL persists the dige
 not the raw credential. Response builders select public fields explicitly.
 Database errors become fixed public failures rather than upstream response bodies.
 Transport exceptions do not log request bodies, credentials or authentication
-headers. Responses carry `Cache-Control: no-store`.
+headers. The API logs only its state changes: startup, shutdown, lost readiness
+with the incompatibility it read, and restored readiness. A line marks a state
+change, not a request, so traffic cannot grow the log and no line carries request
+data. Responses carry `Cache-Control: no-store`.
 
 `relay/tests/security_test.cpp` checks response field selection and malformed
 database results containing secret markers. `relay/tests/run_http_contract.php`
@@ -222,10 +225,15 @@ binding, redirects, deadlines and reconnection with disposable TLS peers.
 
 ### TLS or quorum downgrade
 
-Both API and database TLS contexts disable SSLv2/3 and TLS 1.0/1.1. The transport
-contract probes upstream legacy TLS rejection, untrusted/expired certificates and
-hostname mismatch. It does not qualify inbound legacy TLS negotiation; that
-listener setting has source evidence until a dedicated probe is run.
+Both API and database TLS contexts disable SSLv2/3 and TLS 1.0/1.1, and one cipher
+list limits TLS 1.2 to ECDHE key exchange with AES-GCM or ChaCha20-Poly1305. Neither
+side negotiates static-RSA key exchange, which has no forward secrecy, or a CBC
+suite. The transport contract probes upstream legacy TLS rejection, a database peer
+that offers only static-RSA suites, untrusted/expired certificates and hostname
+mismatch. The HTTP contract refuses a TLS 1.2 client that offers only static-RSA
+suites after the same client with an ECDHE suite connects. Neither contract
+qualifies inbound legacy TLS negotiation; that listener setting has source evidence
+until a dedicated probe is run.
 
 Lookup and readiness request `level=linearizable`. Registration uses a transaction
 on the unified endpoint with the same consistency level; it does not queue writes

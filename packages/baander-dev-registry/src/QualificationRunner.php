@@ -157,12 +157,12 @@ final class QualificationRunner
         $this->contract('test_runtime_lifecycle');
         $this->contract('test_cluster_convergence');
         $this->download(
-            'https://github.com/openssl/openssl/releases/download/openssl-3.5.3/openssl-3.5.3.tar.gz',
+            'https://github.com/openssl/openssl/releases/download/openssl-3.5.9/openssl-3.5.9.tar.gz',
             'openssl.tar.gz',
-            'c9489d2abcf943cdc8329a57092331c598a402938054dc3a22218aea8a8ec3bf',
+            '603f5602e2eef00d77fbd429d34dcd5822bb301757a1bc9cdb24c670f1eb859a',
         );
         $this->command(['tar', '-xzf', $this->work . '/openssl.tar.gz', '-C', $this->work]);
-        $openssl = $this->work . '/openssl-3.5.3';
+        $openssl = $this->work . '/openssl-3.5.9';
         foreach ([
             ['./Configure', '--prefix=' . $this->work . '/openssl', '--libdir=lib', 'no-shared', 'no-tests'],
             ['make', '-j2'],

@@ -136,20 +136,20 @@ final class StaticQualification
         $primary = null;
         try {
             $this->download(
-                'https://github.com/openssl/openssl/releases/download/openssl-3.5.3/openssl-3.5.3.tar.gz',
+                'https://github.com/openssl/openssl/releases/download/openssl-3.5.9/openssl-3.5.9.tar.gz',
                 $work . '/openssl.tar.gz',
-                'c9489d2abcf943cdc8329a57092331c598a402938054dc3a22218aea8a8ec3bf',
+                '603f5602e2eef00d77fbd429d34dcd5822bb301757a1bc9cdb24c670f1eb859a',
             );
             $this->checked(['tar', '-xzf', $work . '/openssl.tar.gz', '-C', $work], timeout: 180);
-            $this->same($root . '/relay/third_party/openssl-LICENSE.txt', $work . '/openssl-3.5.3/LICENSE.txt');
+            $this->same($root . '/relay/third_party/openssl-LICENSE.txt', $work . '/openssl-3.5.9/LICENSE.txt');
             $log = $work . '/openssl-build.log';
             $this->build(
                 ['./Configure', '--prefix=' . $work . '/openssl', '--libdir=lib', 'no-shared', 'no-tests'],
                 $log,
-                $work . '/openssl-3.5.3',
+                $work . '/openssl-3.5.9',
             );
-            $this->build(['make', '-j2'], $log, $work . '/openssl-3.5.3');
-            $this->build(['make', 'install_sw'], $log, $work . '/openssl-3.5.3');
+            $this->build(['make', '-j2'], $log, $work . '/openssl-3.5.9');
+            $this->build(['make', 'install_sw'], $log, $work . '/openssl-3.5.9');
             $this->environment['PKG_CONFIG_PATH'] = $work . '/openssl/lib/pkgconfig' . ($previousPkg ? ':' . $previousPkg : '');
             $this->build(
                 [
