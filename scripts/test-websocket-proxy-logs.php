@@ -3,12 +3,16 @@
 
 declare(strict_types=1);
 
+use Baander\DevQualification\Fixtures\Http\ProxyQualification;
+use Baander\DevQualification\Fixtures\Runtime;
+use Baander\Process\Runtime\Requirements;
+
 require __DIR__ . '/bootstrap.php';
 
 try {
-    Baander\Process\Runtime\Requirements::check();
-    exit(Baander\DevQualification\Fixtures\Http\ProxyQualification::main(array_slice($_SERVER['argv'], 1), dirname(__DIR__)));
+    Requirements::check();
+    exit(ProxyQualification::main(array_slice($_SERVER['argv'], 1), dirname(__DIR__)));
 } catch (Throwable $error) {
     fwrite(STDERR, $error->getMessage() . "\n");
-    exit(Baander\DevQualification\Fixtures\Runtime::status($error));
+    exit(Runtime::status($error));
 }

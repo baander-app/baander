@@ -3,16 +3,20 @@
 
 declare(strict_types=1);
 
+use Baander\DevQualification\Fixtures\Runtime;
+use Baander\DevQualification\Fixtures\Web\CapacityWorkflow;
+use Baander\Process\Runtime\Requirements;
+
 require __DIR__ . '/bootstrap.php';
 
 try {
-    Baander\Process\Runtime\Requirements::check();
+    Requirements::check();
     $arguments = $_SERVER['argv'];
     if (count($arguments) !== 2) {
         throw new InvalidArgumentException('Usage: php scripts/test-live-capacity-exec.php MANIFEST');
     }
-    exit(Baander\DevQualification\Fixtures\Web\CapacityWorkflow::executeFixture(dirname(__DIR__), $arguments[1]));
+    exit(CapacityWorkflow::executeFixture(dirname(__DIR__), $arguments[1]));
 } catch (Throwable $error) {
-    fwrite(STDERR, Baander\DevQualification\Fixtures\Runtime::failure($error) . "\n");
-    exit(Baander\DevQualification\Fixtures\Runtime::status($error));
+    fwrite(STDERR, Runtime::failure($error) . "\n");
+    exit(Runtime::status($error));
 }

@@ -5,9 +5,15 @@ declare(strict_types=1);
 
 require __DIR__ . '/bootstrap.php';
 
+use Baander\Configuration\ToolingConfiguration;
+use Baander\Containers\Docker\Client;
+use Baander\Containers\Docker\TargetResolver;
+use Baander\DevEnvironment\State\InstanceStateStore;
 use Baander\DevQualification\Acceptance\Qualification;
 use Baander\DevQualification\Acceptance\Support;
-use Baander\DevEnvironment\State\InstanceStateStore;
+use Baander\Filesystem\AtomicFile;
+use Baander\Process\Execution\EngineExecutor;
+use Baander\Process\Execution\ExecutionContext;
 use Baander\Process\Runtime\Requirements;
 
 $qualification = null;
@@ -36,13 +42,13 @@ try {
     umask(0077);
     Support::check(!file_exists(Support::path((string) $args['workspace'])), 'Select a new workspace for disposable qualification.');
     $environment = getenv();
-    $configuration = \Baander\Configuration\ToolingConfiguration::forRepository(dirname(__DIR__), $environment);
-    $executor = new \Baander\Process\Execution\EngineExecutor(\Baander\Process\Execution\ExecutionContext::bounded((float) $args['timeout'], $environment));
-    $target = new \Baander\Containers\Docker\TargetResolver($executor, $environment)->resolve($configuration->docker, $args['state-root'] . '/host-setup/acceptance-transport');
+    $configuration = ToolingConfiguration::forRepository(dirname(__DIR__), $environment);
+    $executor = new EngineExecutor(ExecutionContext::bounded((float) $args['timeout'], $environment));
+    $target = new TargetResolver($executor, $environment)->resolve($configuration->docker, $args['state-root'] . '/host-setup/acceptance-transport');
     $targetFile = $args['state-root'] . '/host-setup/acceptance-target.json';
-    \Baander\Filesystem\AtomicFile::writeJson($targetFile, $target->toArray());
+    AtomicFile::writeJson($targetFile, $target->toArray());
     $environment['BAANDER_TOOLING_TARGET_FILE'] = $targetFile;
-    $qualification = new Qualification($args, $executor, new \Baander\Containers\Docker\Client($executor, $target, $environment), $environment);
+    $qualification = new Qualification($args, $executor, new Client($executor, $target, $environment), $environment);
     $qualification->run();
 } catch (Throwable $error) {
     if ($qualification !== null) {

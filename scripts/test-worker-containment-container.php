@@ -3,14 +3,18 @@
 
 declare(strict_types=1);
 
+use Baander\DevQualification\Fixtures\Runtime;
+use Baander\DevQualification\Fixtures\Worker\Containment;
+use Baander\Process\Runtime\Requirements;
+
 require __DIR__ . '/bootstrap.php';
 try {
-    Baander\Process\Runtime\Requirements::check();
-    exit(Baander\DevQualification\Fixtures\Worker\Containment::main(array_slice($_SERVER['argv'], 1), dirname(__DIR__)));
+    Requirements::check();
+    exit(Containment::main(array_slice($_SERVER['argv'], 1), dirname(__DIR__)));
 } catch (InvalidArgumentException $error) {
-    fwrite(STDERR, Baander\DevQualification\Fixtures\Runtime::failure($error) . "\n");
+    fwrite(STDERR, Runtime::failure($error) . "\n");
     exit(2);
 } catch (Throwable $error) {
-    fwrite(STDERR, Baander\DevQualification\Fixtures\Runtime::failure($error) . "\n");
-    exit(Baander\DevQualification\Fixtures\Runtime::status($error));
+    fwrite(STDERR, Runtime::failure($error) . "\n");
+    exit(Runtime::status($error));
 }

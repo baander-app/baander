@@ -1,11 +1,16 @@
 #!/usr/bin/env php
 <?php 
 declare(strict_types=1);
+
+use Baander\DevQualification\Fixtures\Runtime;
+use Baander\DevQualification\Fixtures\Web\RuntimeWorkflow;
+use Baander\Process\Runtime\Requirements;
+
 require __DIR__ . '/bootstrap.php';
 try {
-    Baander\Process\Runtime\Requirements::check();
-    exit(Baander\DevQualification\Fixtures\Web\RuntimeWorkflow::main(dirname(__DIR__)));
+    Requirements::check();
+    exit(RuntimeWorkflow::main(dirname(__DIR__)));
 } catch (Throwable $error) {
-    fwrite(STDERR, Baander\DevQualification\Fixtures\Runtime::failure($error) . "\n");
-    exit(Baander\DevQualification\Fixtures\Runtime::status($error));
+    fwrite(STDERR, Runtime::failure($error) . "\n");
+    exit(Runtime::status($error));
 }

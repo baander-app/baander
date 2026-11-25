@@ -440,6 +440,7 @@
       "cache:clear": "symfony-cmd",
       "assets:install %PUBLIC_DIR%": "symfony-cmd"
     },
+    "check:imports": "@php vendor/bin/php-cs-fixer check --config=.php-cs-fixer.imports.php --using-cache=no",
     "check:js-dependencies": "@php scripts/check-js-dependencies.php --online",
     "check:js-dependencies:advisories": "@php scripts/check-js-dependencies.php --advisories-only",
     "check:js-dependencies:local": "@php scripts/check-js-dependencies.php --local-only",
@@ -456,6 +457,7 @@
     "deptrac:baseline": "deptrac analyse --formatter=baseline --output=deptrac.baseline.yaml",
     "deptrac:graph": "deptrac analyse --formatter=graphviz --output=deptrac-graph.dot",
     "deptrac:tooling": "@php vendor/bin/deptrac analyse --config-file=deptrac-tooling.yaml --no-cache --no-progress",
+    "format:imports": "@php vendor/bin/php-cs-fixer fix --config=.php-cs-fixer.imports.php --using-cache=no",
     "format:tooling": "@php vendor/bin/php-cs-fixer fix --config=.php-cs-fixer.tooling.php",
     "openapi": "./bin/console app:export-openapi-spec  --format=json --output=openapi.json",
     "test:registry-subjects": [

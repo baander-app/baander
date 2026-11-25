@@ -4,11 +4,12 @@
 declare(strict_types=1);
 
 use Baander\DevEnvironment\Cli;
+use Baander\Process\Runtime\Requirements;
 
 require __DIR__ . '/bootstrap.php';
 
 try {
-    Baander\Process\Runtime\Requirements::check();
+    Requirements::check();
 } catch (RuntimeException $error) {
     fwrite(STDERR, $error->getMessage() . "\n");
     exit(1);

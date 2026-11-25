@@ -2,9 +2,37 @@
 
 declare(strict_types=1);
 
+use App\Catalog\Application\Command\BatchExtractCoversCommand;
+use App\Catalog\Application\Message\DrainAlbumMatchesMessage;
+use App\Library\Application\Command\ScanLibraryCommand;
+use App\Library\Application\Message\FilesDiscovered;
 use App\Lyrics\Application\Command\FetchLyricsCommand;
+use App\Media\Application\Command\GenerateImageDerivativeCommand;
+use App\Media\Application\Command\PruneMissingImagesCommand;
+use App\Metadata\Application\Command\ExtractAlbumCoverCommand;
+use App\Metadata\Application\Message\SyncAlbumMessage;
+use App\Metadata\Application\Message\SyncArtistMessage;
+use App\Metadata\Application\Message\SyncArtistsMessage;
+use App\Metadata\Application\Message\SyncLibraryMessage;
+use App\Metadata\Application\Message\SyncMovieMessage;
+use App\Metadata\Application\Message\SyncPeopleMessage;
+use App\Metadata\Application\Message\SyncSongMessage;
+use App\Metadata\Application\Message\SyncTvLibraryMessage;
+use App\Notification\Application\DTO\SendEmailCommand;
+use App\Notification\Application\DTO\SendPushCommand;
+use App\Notification\Application\DTO\SendPushToSubscriptionCommand;
+use App\Notification\Application\DTO\SendWebhookCommand;
+use App\Radio\Application\Command\SyncCountryStationsCommand;
+use App\Recommendation\Application\Command\ExecuteRecommendationJobCommand;
+use App\Scheduler\Application\Command\ExecuteScheduledOccurrenceCommand;
+use App\Shared\Domain\Event\Outbox\RelayOutboxCommand;
+use App\Shared\Infrastructure\Messenger\CorrelationIdMiddleware;
+use App\Shared\Infrastructure\Messenger\JobCancellationMiddleware;
+use App\Shared\Infrastructure\Messenger\JobMonitoringMiddleware;
 use App\Shared\Infrastructure\Messenger\JsonTransportSerializer;
+use App\Shared\Infrastructure\Messenger\ResultStampMiddleware;
 use App\Tests\Fixtures\Messaging\FailureTransportProbe;
+use App\Transcode\Application\Command\PrepareTimelinePreview;
 use Symfony\Component\DependencyInjection\Loader\Configurator\ContainerConfigurator;
 
 return static function (ContainerConfigurator $container): void {
@@ -14,122 +42,122 @@ return static function (ContainerConfigurator $container): void {
 
     // Resource classes describe the work; capacity reservations remain worker policy.
     $workloads = [
-        \App\Catalog\Application\Command\BatchExtractCoversCommand::class => [
+        BatchExtractCoversCommand::class => [
             'transport' => 'async',
             'resource_class' => 'coordination',
             'default' => true,
         ],
-        \App\Catalog\Application\Message\DrainAlbumMatchesMessage::class => [
+        DrainAlbumMatchesMessage::class => [
             'transport' => 'async',
             'resource_class' => 'io',
             'default' => true,
         ],
-        \App\Library\Application\Command\ScanLibraryCommand::class => [
+        ScanLibraryCommand::class => [
             'transport' => 'async',
             'resource_class' => 'io',
             'default' => true,
         ],
-        \App\Library\Application\Message\FilesDiscovered::class => [
+        FilesDiscovered::class => [
             'transport' => 'async',
             'resource_class' => 'io',
             'default' => true,
         ],
-        \App\Metadata\Application\Command\ExtractAlbumCoverCommand::class => [
+        ExtractAlbumCoverCommand::class => [
             'transport' => 'async',
             'resource_class' => 'cpu',
             'default' => true,
         ],
-        \App\Metadata\Application\Message\SyncSongMessage::class => [
+        SyncSongMessage::class => [
             'transport' => 'async',
             'resource_class' => 'io',
             'default' => true,
         ],
-        \App\Metadata\Application\Message\SyncAlbumMessage::class => [
+        SyncAlbumMessage::class => [
             'transport' => 'async',
             'resource_class' => 'io',
             'default' => true,
         ],
-        \App\Metadata\Application\Message\SyncPeopleMessage::class => [
+        SyncPeopleMessage::class => [
             'transport' => 'async',
             'resource_class' => 'io',
             'default' => true,
         ],
-        \App\Metadata\Application\Message\SyncTvLibraryMessage::class => [
+        SyncTvLibraryMessage::class => [
             'transport' => 'async',
             'resource_class' => 'io',
             'default' => true,
         ],
-        \App\Metadata\Application\Message\SyncMovieMessage::class => [
+        SyncMovieMessage::class => [
             'transport' => 'async',
             'resource_class' => 'io',
             'default' => true,
         ],
-        \App\Metadata\Application\Message\SyncLibraryMessage::class => [
+        SyncLibraryMessage::class => [
             'transport' => 'async',
             'resource_class' => 'coordination',
             'default' => true,
         ],
-        \App\Metadata\Application\Message\SyncArtistsMessage::class => [
+        SyncArtistsMessage::class => [
             'transport' => 'async',
             'resource_class' => 'io',
             'default' => true,
         ],
-        \App\Metadata\Application\Message\SyncArtistMessage::class => [
+        SyncArtistMessage::class => [
             'transport' => 'async',
             'resource_class' => 'io',
             'default' => true,
         ],
-        \App\Notification\Application\DTO\SendEmailCommand::class => [
+        SendEmailCommand::class => [
             'transport' => 'async',
             'resource_class' => 'io',
             'default' => true,
         ],
-        \App\Notification\Application\DTO\SendPushCommand::class => [
+        SendPushCommand::class => [
             'transport' => 'async',
             'resource_class' => 'io',
             'default' => true,
         ],
-        \App\Notification\Application\DTO\SendPushToSubscriptionCommand::class => [
+        SendPushToSubscriptionCommand::class => [
             'transport' => 'async',
             'resource_class' => 'io',
             'default' => true,
         ],
-        \App\Media\Application\Command\PruneMissingImagesCommand::class => [
+        PruneMissingImagesCommand::class => [
             'transport' => 'async',
             'resource_class' => 'io',
             'default' => true,
         ],
-        \App\Radio\Application\Command\SyncCountryStationsCommand::class => [
+        SyncCountryStationsCommand::class => [
             'transport' => 'async',
             'resource_class' => 'io',
             'default' => true,
         ],
-        \App\Scheduler\Application\Command\ExecuteScheduledOccurrenceCommand::class => [
+        ExecuteScheduledOccurrenceCommand::class => [
             'transport' => 'scheduler',
             'resource_class' => 'coordination',
             'default' => true,
         ],
-        \App\Shared\Domain\Event\Outbox\RelayOutboxCommand::class => [
+        RelayOutboxCommand::class => [
             'transport' => 'async',
             'resource_class' => 'coordination',
             'default' => true,
         ],
-        \App\Recommendation\Application\Command\ExecuteRecommendationJobCommand::class => [
+        ExecuteRecommendationJobCommand::class => [
             'transport' => 'async',
             'resource_class' => 'cpu',
             'default' => true,
         ],
-        \App\Media\Application\Command\GenerateImageDerivativeCommand::class => [
+        GenerateImageDerivativeCommand::class => [
             'transport' => 'async',
             'resource_class' => 'cpu',
             'default' => true,
         ],
-        \App\Transcode\Application\Command\PrepareTimelinePreview::class => [
+        PrepareTimelinePreview::class => [
             'transport' => 'async',
             'resource_class' => 'cpu',
             'default' => true,
         ],
-        \App\Notification\Application\DTO\SendWebhookCommand::class => [
+        SendWebhookCommand::class => [
             'transport' => 'async',
             'resource_class' => 'io',
             'default' => false,
@@ -194,11 +222,11 @@ return static function (ContainerConfigurator $container): void {
         'failure_transport' => 'failed',
         'routing' => $routing,
         'buses' => ['messenger.bus.default' => ['middleware' => [
-            ['id' => \App\Shared\Infrastructure\Messenger\CorrelationIdMiddleware::class],
+            ['id' => CorrelationIdMiddleware::class],
             // Assign the job ID before storage, then propagate cancellation to handlers.
-            ['id' => \App\Shared\Infrastructure\Messenger\JobMonitoringMiddleware::class],
-            ['id' => \App\Shared\Infrastructure\Messenger\JobCancellationMiddleware::class],
-            ['id' => \App\Shared\Infrastructure\Messenger\ResultStampMiddleware::class],
+            ['id' => JobMonitoringMiddleware::class],
+            ['id' => JobCancellationMiddleware::class],
+            ['id' => ResultStampMiddleware::class],
         ]]],
     ]]);
 };

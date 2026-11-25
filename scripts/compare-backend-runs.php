@@ -3,11 +3,14 @@
 
 declare(strict_types=1);
 
+use Baander\DevCi\Backend\Comparison;
+use Baander\Process\Runtime\Requirements;
+
 require __DIR__ . '/bootstrap.php';
 
 try {
-    Baander\Process\Runtime\Requirements::check(extensions: ['dom']);
-    exit(Baander\DevCi\Backend\Comparison::main(array_slice($_SERVER['argv'], 1), dirname(__DIR__)));
+    Requirements::check(extensions: ['dom']);
+    exit(Comparison::main(array_slice($_SERVER['argv'], 1), dirname(__DIR__)));
 } catch (InvalidArgumentException $error) {
     fwrite(STDERR, $error->getMessage() . "\n");
     exit(2);

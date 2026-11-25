@@ -5,19 +5,27 @@ declare(strict_types=1);
 
 require __DIR__ . '/bootstrap.php';
 
+use Baander\Configuration\ToolingConfiguration;
+use Baander\Containers\Docker\Client;
+use Baander\Containers\Docker\TargetResolver;
+use Baander\Containers\Resources\ResourceKind;
+use Baander\Containers\Resources\ResourceLedger;
 use Baander\DevQualification\Acceptance\Support;
+use Baander\Process\Execution\CommandFailure;
+use Baander\Process\Execution\EngineExecutor;
+use Baander\Process\Execution\ExecutionContext;
 use Baander\Process\Runtime\Requirements;
 
 try {
     Requirements::check();
     $environment = getenv();
-    $configuration = \Baander\Configuration\ToolingConfiguration::forRepository(dirname(__DIR__), $environment);
-    $executor = new \Baander\Process\Execution\EngineExecutor(\Baander\Process\Execution\ExecutionContext::bounded($configuration->budgets->seconds('backend'), $environment));
+    $configuration = ToolingConfiguration::forRepository(dirname(__DIR__), $environment);
+    $executor = new EngineExecutor(ExecutionContext::bounded($configuration->budgets->seconds('backend'), $environment));
     $artifacts = Support::temporary('baander-xdebug-check-');
-    $target = new \Baander\Containers\Docker\TargetResolver($executor, $environment)->resolve($configuration->docker, $artifacts . '/transport');
-    $docker = new \Baander\Containers\Docker\Client($executor, $target, $environment);
+    $target = new TargetResolver($executor, $environment)->resolve($configuration->docker, $artifacts . '/transport');
+    $docker = new Client($executor, $target, $environment);
     $image = $docker->resolveImage($configuration->images->role('application'), pull: false)->id;
-    $ledger = new \Baander\Containers\Resources\ResourceLedger($artifacts . '/resources.json', $docker, $environment);
+    $ledger = new ResourceLedger($artifacts . '/resources.json', $docker, $environment);
     $ledger->scoped(function () use ($docker, $ledger, $image): void {
         $version = <<<'CODE'
 $expected = getenv("XDEBUG_VERSION");
@@ -53,11 +61,11 @@ SH;
             ['--network', 'none', '-e', 'XDEBUG_MODE=coverage', $image, 'php', '-r', $coverage],
             ['--network', 'none', $image, 'bash', '-c', $aliases],
         ] as $arguments) {
-            $container = $ledger->create(\Baander\Containers\Resources\ResourceKind::Container, 'baander-xdebug-' . bin2hex(random_bytes(6)), $arguments);
+            $container = $ledger->create(ResourceKind::Container, 'baander-xdebug-' . bin2hex(random_bytes(6)), $arguments);
             $docker->run(['start', '--attach', $container], interactive: true);
             $status = (int) trim($docker->run(['wait', $container])->stdout);
             if ($status !== 0) {
-                throw new \Baander\Process\Execution\CommandFailure('Xdebug container check failed.', $status);
+                throw new CommandFailure('Xdebug container check failed.', $status);
             }
         }
     }, $configuration->budgets->seconds('cleanup'));

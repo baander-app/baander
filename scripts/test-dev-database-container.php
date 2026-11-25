@@ -3,30 +3,30 @@
 
 declare(strict_types=1);
 
-use Baander\DevEnvironment\Runtime\InstanceBootstrap;
-use Baander\DevEnvironment\Runtime\Database;
+use Baander\Configuration\ApplicationLayout;
+use Baander\Configuration\ToolingConfiguration;
 use Baander\Containers\Docker\Client;
 use Baander\Containers\Docker\TargetResolver;
-use Baander\Configuration\ToolingConfiguration;
-use Baander\Configuration\ApplicationLayout;
+use Baander\Containers\Resources\DisposableContainer;
+use Baander\Containers\Resources\ResourceKind;
+use Baander\Containers\Resources\ResourceLedger;
 use Baander\DevEnvironment\Host\ProcessEnvironment;
-use Baander\Process\Execution\CommandExecutor;
-use Baander\Process\Execution\CommandFailure;
-use Baander\Process\Execution\CompletionPolicy;
-use Baander\Process\Execution\EngineExecutor;
-use Baander\Process\Execution\ExecutionContext;
-use Baander\Process\Execution\ProcessSpec;
-use Baander\Process\Execution\RunningProcess;
 use Baander\DevEnvironment\Runtime\ComposeRuntime;
+use Baander\DevEnvironment\Runtime\Database;
+use Baander\DevEnvironment\Runtime\InstanceBootstrap;
 use Baander\DevEnvironment\State\InstanceStateStore;
 use Baander\DevEnvironment\WorkflowError;
 use Baander\Filesystem\AtomicFile;
 use Baander\Filesystem\PrivateDirectory;
 use Baander\Images\Inventory\SafeTar;
-use Baander\Containers\Resources\ResourceLedger;
-use Baander\Containers\Resources\ResourceKind;
-use Baander\Containers\Resources\DisposableContainer;
+use Baander\Process\Execution\CommandExecutor;
+use Baander\Process\Execution\CommandFailure;
+use Baander\Process\Execution\CompletionPolicy;
+use Baander\Process\Execution\EngineExecutor;
+use Baander\Process\Execution\ExecutionContext;
 use Baander\Process\Execution\ProcessResult;
+use Baander\Process\Execution\ProcessSpec;
+use Baander\Process\Execution\RunningProcess;
 use Baander\Process\Runtime\Requirements;
 
 require __DIR__ . '/bootstrap.php';
@@ -97,12 +97,12 @@ final class DatabaseDrillExecutor implements CommandExecutor
     public array $rehearsalVersions = [];
     public Client $docker;
 
-    /** @var \WeakMap<RunningProcess,ProcessSpec> */
-    private \WeakMap $commands;
+    /** @var WeakMap<RunningProcess,ProcessSpec> */
+    private WeakMap $commands;
 
     public function __construct(private readonly CommandExecutor $executor)
     {
-        $this->commands = new \WeakMap();
+        $this->commands = new WeakMap();
     }
 
     public function run(ProcessSpec $command, CompletionPolicy $policy = new CompletionPolicy()): ProcessResult

@@ -8,6 +8,8 @@ require __DIR__ . '/bootstrap.php';
 use Baander\DevQualification\Acceptance\MediaProbe;
 use Baander\DevQualification\Acceptance\Support;
 use Baander\Filesystem\AtomicFile;
+use Baander\Process\Execution\EngineExecutor;
+use Baander\Process\Execution\ExecutionContext;
 use Baander\Process\Runtime\Requirements;
 
 $output = null;
@@ -35,7 +37,7 @@ try {
     umask(0077);
     $output = Support::path((string) $args['workspace']) . '/media-evidence.json';
     $environment = getenv();
-    $executor = new \Baander\Process\Execution\EngineExecutor(\Baander\Process\Execution\ExecutionContext::bounded((float) $args['timeout'], $environment));
+    $executor = new EngineExecutor(ExecutionContext::bounded((float) $args['timeout'], $environment));
     $result = new MediaProbe($executor, $executor->context)->qualify($args);
     $executor->close();
     AtomicFile::writeJson($output, $result);

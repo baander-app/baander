@@ -278,6 +278,9 @@ jobs:
                 run: |
                     docker run --rm "$CI_IMAGE" vendor/bin/deptrac analyse --no-cache --no-progress
 
+            -   name: Imports
+                run: docker run --rm --network none "$CI_IMAGE" composer check:imports
+
             -   name: Docker Compose availability
                 run: docker compose version
 

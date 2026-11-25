@@ -3,10 +3,13 @@
 
 declare(strict_types=1);
 
+use Baander\DevQualification\Fixtures\Qualification\Qualification;
+use Baander\Process\Runtime\Requirements;
+
 require __DIR__ . '/bootstrap.php';
 try {
-    Baander\Process\Runtime\Requirements::check();
-    exit(Baander\DevQualification\Fixtures\Qualification\Qualification::main(array_slice($_SERVER['argv'], 1), dirname(__DIR__), getenv()));
+    Requirements::check();
+    exit(Qualification::main(array_slice($_SERVER['argv'], 1), dirname(__DIR__), getenv()));
 } catch (Throwable $error) {
     fwrite(STDERR, $error->getMessage() . "\n");
     exit($error->getCode() > 0 && $error->getCode() <= 255 ? $error->getCode() : 1);

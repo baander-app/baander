@@ -143,6 +143,7 @@ ci: ## Run static and backend checks in disposable CI containers
 	@$(STATIC_CHECK) $(STATIC_IMAGE) -- composer normalize --dry-run
 	@$(MAKE) phpstan
 	@$(STATIC_CHECK) $(STATIC_IMAGE) -- vendor/bin/deptrac analyse --no-cache --no-progress
+	@$(STATIC_CHECK) $(STATIC_IMAGE) -- composer check:imports
 	@$(MAKE) phpunit
 
 # ── Profiling (reli-prof) ────────────────────────────────────────────────────

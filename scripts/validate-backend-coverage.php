@@ -3,11 +3,14 @@
 
 declare(strict_types=1);
 
+use Baander\DevCi\Backend\Coverage;
+use Baander\Process\Runtime\Requirements;
+
 require __DIR__ . '/bootstrap.php';
 
 try {
-    Baander\Process\Runtime\Requirements::check(extensions: ['dom']);
-    exit(Baander\DevCi\Backend\Coverage::main(array_slice($_SERVER['argv'], 1)));
+    Requirements::check(extensions: ['dom']);
+    exit(Coverage::main(array_slice($_SERVER['argv'], 1)));
 } catch (InvalidArgumentException $error) {
     fwrite(STDERR, $error->getMessage() . "\n");
     exit(2);
