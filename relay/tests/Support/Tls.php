@@ -18,7 +18,7 @@ final class Tls
         Runtime::requireThat($result['code'] === 0, 'Certificate command failed: ' . $result['stderr']);
         return $result;
     }
-    public static function authority(string $directory): void
+    public static function authority(string $directory, string $name = 'ca'): void
     {
         self::command([
             'openssl',
@@ -28,9 +28,9 @@ final class Tls
             'rsa:2048',
             '-nodes',
             '-keyout',
-            $directory . '/ca.key',
+            $directory . '/' . $name . '.key',
             '-out',
-            $directory . '/ca.crt',
+            $directory . '/' . $name . '.crt',
             '-days',
             '1',
             '-addext',
@@ -38,13 +38,13 @@ final class Tls
             '-addext',
             'keyUsage=critical,keyCertSign,cRLSign',
             '-subj',
-            '/CN=Baander disposable CA',
+            '/CN=Baander disposable ' . $name,
         ]);
     }
     /**
      * @return array{string,string}
      */
-    public static function certificate(string $directory, string $name, ?string $hostname = null, bool $expired = false): array
+    public static function certificate(string $directory, string $name, ?string $hostname = null, bool $expired = false, string $authority = 'ca'): array
     {
         $key = $directory . '/' . $name . '.key';
         $csr = $directory . '/' . $name . '.csr';
@@ -74,9 +74,9 @@ final class Tls
             '-in',
             $csr,
             '-CA',
-            $directory . '/ca.crt',
+            $directory . '/' . $authority . '.crt',
             '-CAkey',
-            $directory . '/ca.key',
+            $directory . '/' . $authority . '.key',
             '-CAcreateserial',
             '-out',
             $crt,

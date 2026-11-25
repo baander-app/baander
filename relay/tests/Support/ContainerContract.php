@@ -127,7 +127,7 @@ final class ContainerContract
         }
         return $result;
     }
-    private function issue(string $name, ?string $dns = null): void
+    private function issue(string $name, string $authority, ?string $dns = null): void
     {
         $path = $this->directory . '/' . $name;
         $result = Runtime::run([
@@ -156,9 +156,9 @@ final class ContainerContract
             '-in',
             $path . '.csr',
             '-CA',
-            $this->directory . '/ca.crt',
+            $this->directory . '/' . $authority . '.crt',
             '-CAkey',
-            $this->directory . '/ca.key',
+            $this->directory . '/' . $authority . '.key',
             '-CAcreateserial',
             '-out',
             $path . '.crt',
@@ -277,7 +277,7 @@ final class ContainerContract
             '--config',
             '/fixture/' . $configuration,
             '--cacert',
-            '/fixture/ca.crt',
+            '/fixture/node-ca.crt',
             '--cert',
             '/fixture/client.crt',
             '--key',
@@ -307,7 +307,7 @@ final class ContainerContract
             '--max-time',
             '3',
             '--cacert',
-            '/fixture/ca.crt',
+            '/fixture/client-ca.crt',
             '--request',
             $method,
             '--write-out',
@@ -351,9 +351,10 @@ final class ContainerContract
     }
     private function qualify(bool $guardsOnly): void
     {
-        Tls::authority($this->directory);
-        $this->issue('api', 'DNS:api.registry.baander.app');
-        $this->issue('client');
+        Tls::authority($this->directory, 'client-ca');
+        Tls::authority($this->directory, 'node-ca');
+        $this->issue('api', 'client-ca', 'DNS:api.registry.baander.app');
+        $this->issue('client', 'client-ca');
         $auth = [
             ['username' => 'registry', 'password' => $this->password, 'perms' => ['query', 'execute']],
             ['username' => 'registry-cluster', 'password' => $this->password, 'perms' => ['join']],
@@ -365,11 +366,12 @@ final class ContainerContract
         file_put_contents($this->directory . '/auth.json', json_encode($auth, JSON_THROW_ON_ERROR));
         $secrets = [];
         for ($index = 0; $index < 5; ++$index) {
-            $this->issue("node-{$index}", "DNS:raft.registry.baander.app,DNS:node-{$index}.rqlite.baander.app");
+            $this->issue("node-{$index}", 'node-ca', "DNS:raft.registry.baander.app,DNS:node-{$index}.rqlite.baander.app");
             $target = $this->directory . '/secrets-' . $index;
             mkdir($target, 0755);
             foreach ([
-                'ca.crt' => 'ca.crt',
+                'client-ca.crt' => 'client-ca.crt',
+                'node-ca.crt' => 'node-ca.crt',
                 "node-{$index}.crt" => 'node.crt',
                 "node-{$index}.key" => 'node.key',
                 'auth.json' => 'auth.json',
@@ -403,7 +405,30 @@ final class ContainerContract
             Runtime::requireThat($result['code'] === 64 && str_contains($result['stderr'], $expected), $result['stderr']);
             Runtime::requireThat(!str_contains($result['stderr'], $this->password), 'Guard leaked password');
         }
-        echo "PASS: empty restart, reduced voters, missing join peers and public DB binding rejected\n";
+        $shared = $this->directory . '/secrets-shared-ca';
+        mkdir($shared, 0755);
+        foreach ([
+            'client-ca.crt' => 'node-ca.crt',
+            'node-ca.crt' => 'node-ca.crt',
+            'node.crt' => 'node-0.crt',
+            'node.key' => 'node-0.key',
+            'auth.json' => 'auth.json',
+        ] as $destination => $source) {
+            copy($this->directory . '/' . $source, $shared . '/' . $destination);
+            chmod($shared . '/' . $destination, 0644);
+        }
+        $separate = $this->secretVolumes[0];
+        $this->secretVolumes[0] = $this->copyFixture($shared, 'shared-ca');
+        try {
+            $result = $this->start(0, 'bootstrap', [], false, false);
+        } finally {
+            $this->secretVolumes[0] = $separate;
+        }
+        Runtime::requireThat(
+            $result['code'] === 64 && str_contains($result['stderr'], 'client and node certificate authorities must differ'),
+            $result['stderr'],
+        );
+        echo "PASS: empty restart, reduced voters, missing join peers, public DB binding and one CA for clients and peers rejected\n";
         $this->start(0, 'bootstrap');
         $node = $this->prefix . '-node-0';
         $this->waitFor(
@@ -455,7 +480,7 @@ final class ContainerContract
             ],
             'database' => [
                 'endpoints' => array_map(static fn(int $i): array => ['url' => "https://node-{$i}.rqlite.baander.app:4001"], range(0, 4)),
-                'ca' => '/fixture/ca.crt',
+                'ca' => '/fixture/node-ca.crt',
                 'certificate' => '/fixture/client.crt',
                 'key' => '/fixture/client.key',
                 'username' => 'registry',
@@ -472,7 +497,8 @@ final class ContainerContract
             'api.key',
             'client.crt',
             'client.key',
-            'ca.crt',
+            'client-ca.crt',
+            'node-ca.crt',
             'password',
             'enrollment.key',
             'database-curl.conf',

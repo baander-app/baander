@@ -12,7 +12,7 @@ final class ObserverServer
             $context = stream_context_create(['ssl' => [
                 'local_cert' => "{$directory}/node-{$node}.crt",
                 'local_pk' => "{$directory}/node-{$node}.key",
-                'cafile' => "{$directory}/ca.crt",
+                'cafile' => "{$directory}/client-ca.crt",
                 'verify_peer' => true,
                 'verify_peer_name' => false,
             ]]);
@@ -39,7 +39,7 @@ final class ObserverServer
                                 '127.0.0.1',
                                 $upstreamPort,
                                 [
-                                    'cafile' => "{$directory}/ca.crt",
+                                    'cafile' => "{$directory}/node-ca.crt",
                                     'local_cert' => "{$directory}/client.crt",
                                     'local_pk' => "{$directory}/client.key",
                                 ],

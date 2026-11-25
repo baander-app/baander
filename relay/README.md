@@ -669,25 +669,38 @@ docker compose --env-file /etc/baander-registry/inventory.env \
 ```
 
 The API mounts `api.crt`, `api.key`, `api-ca.crt` (health check trust),
-`database-ca.crt`, `database-client.crt`, `database-client.key` and
+`database-ca.crt` (the node CA, which signed the voters' certificates),
+`database-client.crt` and `database-client.key` (issued by the client CA) and
 `database-password` under `/run/secrets/registry`. It binds `0.0.0.0` inside its
 container and publishes only port 9502. The health check verifies the API's
 configured certificate hostname and CA; it never disables verification. Monitor
 `/ready` separately for authoritative database readiness; `/health` is liveness.
 
-Each voter mounts `ca.crt`, `node.crt`, `node.key` and `auth.json` under
-`/run/secrets/rqlite`. Voter certificates need their private HTTP hostname and
+Each voter mounts `client-ca.crt`, `node-ca.crt`, `node.crt`, `node.key` and
+`auth.json` under `/run/secrets/rqlite`. The cluster uses two certificate
+authorities. The client CA issues the certificates of the voters' HTTP clients,
+the API's database client and the backup worker; voters verify HTTP clients
+against `client-ca.crt` only. The node CA issues voter certificates; voters verify Raft
+peers against `node-ca.crt` only, so a client certificate never passes as a peer.
+The entrypoint refuses to start, with exit status 64, when the two files are
+identical. Voter certificates need their private HTTP hostname and
 `raft.registry.baander.app` in their DNS SANs, with both server and client TLS
-usage. Raft verifies that shared cluster hostname and the trusted peer CA;
-HTTP clients verify the individual endpoint hostname. Issuance of peer certificates
-therefore grants cluster trust and must remain restricted. The `registry` auth
+usage; one voter certificate serves HTTP and Raft. Raft verifies that shared
+cluster hostname and the node CA; HTTP clients verify the individual endpoint
+hostname against the node CA. Issuance of node certificates therefore grants
+cluster trust and must remain restricted. The cluster contract connects a
+client-CA certificate to a voter's Raft listener and requires the voter to refuse
+it, with a node certificate as the positive control. Under the pinned rqlite
+10.5.1, joins, membership queries, partition recovery and restore succeed with
+voters that hold no client-CA certificate, so on those paths no voter makes a
+client-authenticated HTTP call to another. The `registry` auth
 account needs `query` and `execute`; `registry-cluster` needs the `join` permission
 for joining and bootstrap notifications. Keep administrative accounts separate.
 The API password file and
 rqlite auth file must agree. Credentials are supplied through mounted files,
 not command-line passwords. Private files must be readable by UID/GID 10001,
 for example owned by that UID with mode 0600; never make operator keys world-readable.
-Do not mount the CA signing key into either runtime.
+Do not mount either CA signing key into any runtime.
 
 Voter startup modes are explicit:
 

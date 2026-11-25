@@ -129,6 +129,54 @@ final class ClusterContract
         } while (Runtime::now() < $until);
         throw new \RuntimeException('Voters did not rejoin/apply acknowledged state within 30 seconds. ' . $last);
     }
+    /**
+     * Connects to the voter's own Raft listener, bypassing the fault network. Under TLS 1.3 the
+     * client finishes its handshake before the voter checks the client certificate, so a
+     * refusal shows as an alert or a close on the first read, while an accepted peer stays
+     * connected until the read times out.
+     */
+    public static function raftAccepts(Cluster $cluster, int $voter, string $certificate, string $key): bool
+    {
+        $context = stream_context_create(['ssl' => [
+            'cafile' => $cluster->directory . '/node-ca.crt',
+            'local_cert' => $certificate,
+            'local_pk' => $key,
+            'peer_name' => 'raft.registry.baander.app',
+            'verify_peer' => true,
+            'verify_peer_name' => true,
+        ]]);
+        $stream = @stream_socket_client(
+            'tls://127.0.0.1:' . $cluster->network->realPorts[$voter],
+            $code,
+            $error,
+            3,
+            STREAM_CLIENT_CONNECT,
+            $context,
+        );
+        if ($stream === false) {
+            return false;
+        }
+        try {
+            stream_set_timeout($stream, 1);
+            $read = @fread($stream, 1);
+            $state = stream_get_meta_data($stream);
+            return ($read === false || $read === '') && $state['timed_out'] && !$state['eof'];
+        } finally {
+            fclose($stream);
+        }
+    }
+    public static function verifyPeerTrust(Cluster $cluster, int $voter): void
+    {
+        Runtime::requireThat(
+            self::raftAccepts($cluster, $voter, "{$cluster->directory}/node-{$voter}.crt", "{$cluster->directory}/node-{$voter}.key"),
+            'Voter refused a node certificate on its Raft listener.',
+        );
+        Runtime::requireThat(
+            !self::raftAccepts($cluster, $voter, $cluster->clientCert, $cluster->clientKey),
+            'Voter accepted a client certificate as a Raft peer.',
+        );
+        echo "PASS: Raft listener accepts a node certificate and refuses a client certificate\n";
+    }
     public static function waitLookup(Api $api, string $identifier): void
     {
         $until = Runtime::now() + 30;
@@ -240,6 +288,7 @@ final class ClusterContract
         try {
             $cluster = new Cluster($directory, $rqlited, $nodes);
             $initial = $cluster->start();
+            self::verifyPeerTrust($cluster, $initial);
             $minority = [$initial];
             if ($nodes === 5) {
                 $minority[] = array_values(array_diff(range(0, $nodes - 1), [$initial]))[0];

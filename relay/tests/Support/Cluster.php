@@ -52,9 +52,12 @@ final class Cluster
         file_put_contents($this->enrollmentKeyFile, $this->enrollmentKey);
         chmod($this->enrollmentKeyFile, 0600);
         try {
-            Tls::authority($directory);
-            [$this->clientKey, $this->clientCert] = Tls::certificate($directory, 'client');
-            [$this->apiKey, $this->apiCert] = Tls::certificate($directory, 'api', 'api.registry.baander.app');
+            // Voters verify HTTP clients against the client CA and Raft peers against the node
+            // CA, so a client certificate never passes as a peer.
+            Tls::authority($directory, 'client-ca');
+            Tls::authority($directory, 'node-ca');
+            [$this->clientKey, $this->clientCert] = Tls::certificate($directory, 'client', authority: 'client-ca');
+            [$this->apiKey, $this->apiCert] = Tls::certificate($directory, 'api', 'api.registry.baander.app', authority: 'client-ca');
             for ($index = 0; $index < $count; ++$index) {
                 $name = "node-{$index}";
                 Runtime::checked([
@@ -82,9 +85,9 @@ final class Cluster
                     '-in',
                     "{$directory}/{$name}.csr",
                     '-CA',
-                    "{$directory}/ca.crt",
+                    "{$directory}/node-ca.crt",
                     '-CAkey',
-                    "{$directory}/ca.key",
+                    "{$directory}/node-ca.key",
                     '-CAcreateserial',
                     '-out',
                     "{$directory}/{$name}.crt",
@@ -109,13 +112,13 @@ final class Cluster
                 ),
             );
             $this->tls = [
-                'cafile' => "{$directory}/ca.crt",
+                'cafile' => "{$directory}/node-ca.crt",
                 'local_cert' => $this->clientCert,
                 'local_pk' => $this->clientKey,
                 'verify_peer' => true,
                 'verify_peer_name' => true,
             ];
-            $this->apiTls = ['cafile' => "{$directory}/ca.crt", 'verify_peer' => true, 'verify_peer_name' => true];
+            $this->apiTls = ['cafile' => "{$directory}/client-ca.crt", 'verify_peer' => true, 'verify_peer_name' => true];
             $this->network = new FaultNetwork($directory, $count, array_slice($ports, $count));
         } catch (\Throwable $failure) {
             foreach ($this->reservations as $socket) {
@@ -149,14 +152,14 @@ final class Cluster
             '-http-key',
             "{$directory}/node-{$index}.key",
             '-http-ca-cert',
-            "{$directory}/ca.crt",
+            "{$directory}/client-ca.crt",
             '-http-verify-client',
             '-node-cert',
             "{$directory}/node-{$index}.crt",
             '-node-key',
             "{$directory}/node-{$index}.key",
             '-node-ca-cert',
-            "{$directory}/ca.crt",
+            "{$directory}/node-ca.crt",
             '-node-verify-client',
             '-node-verify-server-name',
             'raft.registry.baander.app',

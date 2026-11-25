@@ -360,10 +360,11 @@ final class HttpContract
     {
         $this->server = $server;
         $d = $this->directory;
-        Tls::authority($d);
-        [$dbKey, $dbCertificate] = Tls::certificate($d, 'database', 'rqlite.baander.app');
-        [$apiKey, $apiCertificate] = Tls::certificate($d, 'api', 'api.registry.baander.app');
-        [$clientKey, $clientCertificate] = Tls::certificate($d, 'client');
+        Tls::authority($d, 'client-ca');
+        Tls::authority($d, 'node-ca');
+        [$dbKey, $dbCertificate] = Tls::certificate($d, 'database', 'rqlite.baander.app', authority: 'node-ca');
+        [$apiKey, $apiCertificate] = Tls::certificate($d, 'api', 'api.registry.baander.app', authority: 'client-ca');
+        [$clientKey, $clientCertificate] = Tls::certificate($d, 'client', authority: 'client-ca');
         file_put_contents($d . '/password', "disposable-test-secret\n");
         file_put_contents(
             $d . '/auth.json',
@@ -375,8 +376,8 @@ final class HttpContract
         $this->port = Runtime::port();
         $raftPort = Runtime::port();
         $proxyPort = Runtime::port();
-        $this->tls = ['cafile' => $d . '/ca.crt'];
-        $this->clientTls = $this->tls + ['local_cert' => $clientCertificate, 'local_pk' => $clientKey];
+        $this->tls = ['cafile' => $d . '/client-ca.crt'];
+        $this->clientTls = ['cafile' => $d . '/node-ca.crt', 'local_cert' => $clientCertificate, 'local_pk' => $clientKey];
         $this->statePath = $d . '/proxy-state.json';
         file_put_contents(
             $this->statePath,
@@ -396,7 +397,8 @@ final class HttpContract
             'databasePort' => $this->databasePort,
             'certificate' => $dbCertificate,
             'key' => $dbKey,
-            'ca' => $d . '/ca.crt',
+            'clientCa' => $d . '/client-ca.crt',
+            'ca' => $d . '/node-ca.crt',
             'clientCertificate' => $clientCertificate,
             'clientKey' => $clientKey,
             'state' => $this->statePath,
@@ -410,7 +412,7 @@ final class HttpContract
         $this->config = [
             'database' => [
                 'endpoints' => [['url' => 'https://rqlite.baander.app:' . $proxyPort, 'connectAddress' => '127.0.0.1']],
-                'ca' => $d . '/ca.crt',
+                'ca' => $d . '/node-ca.crt',
                 'certificate' => $clientCertificate,
                 'key' => $clientKey,
                 'username' => 'registry',
@@ -441,7 +443,7 @@ final class HttpContract
                 '-http-key',
                 $dbKey,
                 '-http-ca-cert',
-                $d . '/ca.crt',
+                $d . '/client-ca.crt',
                 '-http-verify-client',
                 '-auth',
                 $d . '/auth.json',

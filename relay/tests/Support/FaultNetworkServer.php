@@ -23,7 +23,7 @@ final class FaultNetworkServer
                 $context = stream_context_create(['ssl' => [
                     'local_cert' => "{$directory}/node-{$index}.crt",
                     'local_pk' => "{$directory}/node-{$index}.key",
-                    'cafile' => "{$directory}/ca.crt",
+                    'cafile' => "{$directory}/node-ca.crt",
                     'verify_peer' => true,
                     'verify_peer_name' => false,
                     'capture_peer_cert' => true,
@@ -107,7 +107,7 @@ final class FaultNetworkServer
                     }
                     $source = (int) $match[1];
                     $context = stream_context_create(['ssl' => [
-                        'cafile' => "{$directory}/ca.crt",
+                        'cafile' => "{$directory}/node-ca.crt",
                         'local_cert' => "{$directory}/node-{$source}.crt",
                         'local_pk' => "{$directory}/node-{$source}.key",
                         'peer_name' => 'raft.registry.baander.app',

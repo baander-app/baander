@@ -26,9 +26,13 @@ esac
 data=${RQLITE_DATA_DIR:-/var/lib/rqlite}
 secrets=${RQLITE_SECRETS_DIR:-/run/secrets/rqlite}
 mode=${RQLITE_START_MODE:-restart}
-for file in ca.crt node.crt node.key auth.json; do
+for file in client-ca.crt node-ca.crt node.crt node.key auth.json; do
     [ -r "$secrets/$file" ] && [ -s "$secrets/$file" ] || fail "required TLS/auth file is unavailable."
 done
+# HTTP clients chain to client-ca.crt and Raft peers to node-ca.crt. With one CA for
+# both, every client certificate would also pass as a Raft peer.
+[ "$(cat "$secrets/client-ca.crt")" != "$(cat "$secrets/node-ca.crt")" ] \
+    || fail "client and node certificate authorities must differ."
 [ -d "$data" ] && [ -w "$data" ] || fail "data directory must exist and be writable."
 [ ! -e "$data/raft/peers.json" ] || fail "manual quorum recovery requires a separate reviewed procedure."
 case "$mode" in
@@ -58,9 +62,9 @@ set -- -node-id "$RQLITE_NODE_ID" \
     -http-addr 0.0.0.0:4001 -http-adv-addr "$RQLITE_HTTP_ADVERTISE" \
     -raft-addr 0.0.0.0:4002 -raft-adv-addr "$RQLITE_RAFT_ADVERTISE" \
     -http-cert "$secrets/node.crt" -http-key "$secrets/node.key" \
-    -http-ca-cert "$secrets/ca.crt" -http-verify-client \
+    -http-ca-cert "$secrets/client-ca.crt" -http-verify-client \
     -node-cert "$secrets/node.crt" -node-key "$secrets/node.key" \
-    -node-ca-cert "$secrets/ca.crt" -node-verify-client \
+    -node-ca-cert "$secrets/node-ca.crt" -node-verify-client \
     -node-verify-server-name raft.registry.baander.app -auth "$secrets/auth.json"
 case "$mode" in
     restart)

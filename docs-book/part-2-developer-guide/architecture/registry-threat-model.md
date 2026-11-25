@@ -63,6 +63,17 @@ database connections use operator-configured endpoints. Voter HTTP and Raft
 listeners need private network access rules even though their transports also
 require certificates and authentication.
 
+Voters trust two certificate authorities. The client CA issues the certificates of
+the API's database client and the backup worker, and voters accept it only on their
+HTTP listener. The node CA issues voter certificates, and voters accept it only as
+Raft peers. Before the split, one CA served both, so any client certificate also
+passed the Raft listener's certificate check. The [voter startup wrapper](../../../relay/docker/rqlite-entrypoint.sh)
+refuses identical CA files. `relay/tests/run_cluster_contract.php` connects a
+client-CA certificate to a voter's own Raft listener and requires an alert or a
+close, with a node certificate as the positive control; the same check fails
+against the former one-CA layout. Issuing a node certificate still grants cluster
+trust.
+
 The source boundaries are [registration and SQL](../../../relay/cpp/core.cpp),
 [TLS HTTP handling](../../../relay/cpp/server.cpp),
 [database transport and JSON parsing](../../../relay/cpp/transport.cpp), and

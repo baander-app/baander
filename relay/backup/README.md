@@ -33,20 +33,23 @@ reachable. This worker has no election or destination failover mechanism.
    deletion access. Recovery operators need separate read access. Configure
    retention or bucket versioning separately if required by your storage policy.
 
-3. Create a dedicated rqlite account with `backup` permission and provision a client
-   certificate trusted by the voters. Keep that account separate from the public
-   API account. The HTTP endpoint must use hostname-verified TLS and client
-   authentication. Do not copy the CA signing key to this worker.
+3. Create a dedicated rqlite account with `backup` permission and issue a client
+   certificate from the client CA, the authority in the voters' `client-ca.crt`.
+   Never issue it from the node CA: voters accept a node-CA certificate as a Raft
+   peer. Keep that account separate from the public API account. The HTTP endpoint
+   must use hostname-verified TLS and client authentication. Do not copy either CA
+   signing key to this worker.
 
 ## Configure and start one worker
 
 Copy `backup.example.json` to a private configuration directory as `backup.json`.
 Copy `curl.example.conf` and `rclone.example.conf` to a separate private secrets
 directory as `curl.conf` and `rclone.conf`. Replace all example values. Place
-`recipients.txt`, `rqlite-ca.crt`, `client.crt` and `client.key` in that secrets
-directory. The curl file holds the database username/password and TLS file paths;
-the rclone file holds the S3 endpoint, region and credentials. Use an HTTPS S3
-endpoint. These files are operator configuration and must not be committed.
+`recipients.txt`, `rqlite-ca.crt` (the node CA, which signed the voters'
+certificates), `client.crt` and `client.key` in that secrets directory. The curl
+file holds the database username/password and TLS file paths; the rclone file
+holds the S3 endpoint, region and credentials. Use an HTTPS S3 endpoint. These
+files are operator configuration and must not be committed.
 
 Both directories and their files must be accessible to container UID/GID 10001.
 Keep secret files private, for example owned by that UID with mode 0600 in a

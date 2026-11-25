@@ -53,7 +53,7 @@ final class EncryptedBackupContract
             $curl,
             implode("\n", [
                 'user = "registry:disposable-cluster-secret"',
-                'cacert = "' . $source->directory . '/ca.crt"',
+                'cacert = "' . $source->directory . '/node-ca.crt"',
                 'cert = "' . $source->clientCert . '"',
                 'key = "' . $source->clientKey . '"',
                 'resolve = "node-' . $leader . '.rqlite.baander.app:' . $source->httpPorts[$leader] . ':127.0.0.1"',

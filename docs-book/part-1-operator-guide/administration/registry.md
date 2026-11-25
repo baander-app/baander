@@ -37,6 +37,12 @@ application's `dc` context. Follow its certificate, UID/GID, port and volume
 requirements before starting services. The public API must not proxy rqlite
 administration endpoints.
 
+The voters need two certificate authorities. Issue the API's database client
+certificate and the backup worker's certificate from the client CA, and the voter
+certificates from the node CA. A voter refuses to start when its `client-ca.crt`
+and `node-ca.crt` are the same file, because a client certificate would then also
+pass as a cluster peer.
+
 Voter startup modes have distinct purposes:
 
 | Mode | Required state | Result |

@@ -150,7 +150,9 @@ final class RestoreContract
             $sourceApi = $source = null;
             Runtime::requireThat(iterator_count(new \FilesystemIterator($restoredDirectory)) === 0);
             $restored = new Cluster($restoredDirectory, $rqlited, $nodes);
-            Runtime::requireThat(file_get_contents($sourceDirectory . '/ca.crt') !== file_get_contents($restoredDirectory . '/ca.crt'));
+            foreach (['client-ca.crt', 'node-ca.crt'] as $authority) {
+                Runtime::requireThat(file_get_contents($sourceDirectory . '/' . $authority) !== file_get_contents($restoredDirectory . '/' . $authority));
+            }
             $leader = $restored->start();
             Runtime::requireThat(self::queryRows($restored, $leader, "SELECT name FROM sqlite_master WHERE type='table'") === []);
             [$status, $payload] = self::binaryRequest($restored, $leader, 'POST', '/db/load', $backup);

@@ -42,7 +42,7 @@ final class HttpProxy
             'enable_coroutine' => true,
             'ssl_cert_file' => $config['certificate'],
             'ssl_key_file' => $config['key'],
-            'ssl_client_cert_file' => $config['ca'],
+            'ssl_client_cert_file' => $config['clientCa'],
             'ssl_verify_peer' => true,
             'ssl_allow_self_signed' => false,
             'log_file' => $config['log'],

@@ -30,7 +30,7 @@ final class Api
                     ],
                     $endpoints,
                 ),
-                'ca' => "{$directory}/ca.crt",
+                'ca' => "{$directory}/node-ca.crt",
                 'certificate' => $cluster->clientCert,
                 'key' => $cluster->clientKey,
                 'username' => 'registry',
