@@ -4,33 +4,46 @@ declare(strict_types=1);
 
 namespace App\Tests\Integration;
 
+use App\Activity\Application\Port\ActivityPortInterface;
+use App\Catalog\Domain\Repository\SongRepositoryInterface;
 use App\Catalog\Infrastructure\Doctrine\Entity\AlbumEntity;
 use App\Catalog\Infrastructure\Doctrine\Entity\SongEntity;
 use App\Library\Infrastructure\Doctrine\Entity\LibraryEntity;
 use App\Recommendation\Application\Command\ExecuteRecommendationJobCommand;
+use App\Recommendation\Application\Command\GenerateRecommendationsCommand;
+use App\Recommendation\Application\Command\SaveRecommendationCommand;
 use App\Recommendation\Application\CommandHandler\GenerateRecommendationsHandler;
+use App\Recommendation\Application\DTO\RecommendationGenerationResult;
+use App\Recommendation\Application\Port\RecommendationJobPortInterface;
 use App\Recommendation\Application\Settings\RecommendationSettingDefinitions;
+use App\Recommendation\Domain\Service\CollaborativeFilteringCalculator;
+use App\Recommendation\Domain\Service\ContentSimilarityCalculator;
+use App\Recommendation\Domain\Service\GenreSimilarityCalculator;
 use App\Scheduler\Application\CommandHandler\ExecuteScheduledJobHandler;
 use App\Scheduler\Application\DTO\SchedulerOccurrence;
 use App\Scheduler\Application\Port\ScheduledJobPortInterface;
 use App\Scheduler\Domain\Service\SchedulerRegistry;
 use App\Scheduler\Domain\ValueObject\JobType;
+use App\Shared\Application\Port\SystemSettingsPortInterface;
 use App\Shared\Application\Port\SystemSettingStoreInterface;
 use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
 use Doctrine\DBAL\ArrayParameterType;
 use DoctrineMigrations\Version20261017000000;
 use PHPUnit\Framework\TestCase;
+use Psr\Log\NullLogger;
 use Symfony\Bundle\FrameworkBundle\Console\Application;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Tester\CommandTester;
+use Symfony\Component\Messenger\Envelope;
 use Symfony\Component\Messenger\MessageBusInterface;
+use Symfony\Component\Messenger\Stamp\HandledStamp;
 use Symfony\Component\Messenger\Stamp\ReceivedStamp;
 use Symfony\Component\Messenger\Transport\InMemory\InMemoryTransport;
 
 /**
- * The daily recommendation schedule runs through the
- * scheduler's occurrence path on the fully migrated disposable PostgreSQL inside one
+ * The daily recommendation schedule runs through the scheduler's occurrence path, and
+ * generation runs overlap, on the fully migrated disposable PostgreSQL inside one
  * rolled-back transaction.
  */
 final class RecommendationScheduleTest extends TestCase
@@ -105,6 +118,57 @@ final class RecommendationScheduleTest extends TestCase
         $console = new Application($this->kernel);
         $tester = new CommandTester($console->find('app:recommendation:generate'));
         self::assertSame(Command::SUCCESS, $tester->execute([]));
+        self::assertGreaterThan(0, $this->recommendationsFrom($songs));
+    }
+
+    /**
+     * The second run starts after the first run's delete and ends before the first run's first
+     * write, so every row the first run writes is stored already.
+     */
+    public function testOverlappingRunsBothComplete(): void
+    {
+        $songs = $this->createSongs();
+        $container = $this->kernel->getContainer()->get('test.service_container');
+        $bus = $container->get(MessageBusInterface::class);
+        self::assertInstanceOf(MessageBusInterface::class, $bus);
+        $overlapping = new class ($bus) implements MessageBusInterface {
+            public mixed $second = null;
+
+            public function __construct(private readonly MessageBusInterface $bus)
+            {
+            }
+
+            public function dispatch(object $message, array $stamps = []): Envelope
+            {
+                if ($message instanceof SaveRecommendationCommand && $this->second === null) {
+                    $this->second = $this->bus
+                        ->dispatch(new GenerateRecommendationsCommand(foreground: true))
+                        ->last(HandledStamp::class)
+                        ?->getResult();
+                }
+
+                return $this->bus->dispatch($message, $stamps);
+            }
+        };
+        $firstRun = new GenerateRecommendationsHandler(
+            $overlapping,
+            $container->get(SongRepositoryInterface::class),
+            $container->get(ActivityPortInterface::class),
+            new CollaborativeFilteringCalculator(),
+            new ContentSimilarityCalculator(),
+            new GenreSimilarityCalculator(),
+            $container->get(RecommendationJobPortInterface::class),
+            $container->get(SystemSettingsPortInterface::class),
+            new NullLogger(),
+        );
+
+        $first = $firstRun(new GenerateRecommendationsCommand(foreground: true));
+
+        self::assertInstanceOf(RecommendationGenerationResult::class, $first);
+        self::assertInstanceOf(RecommendationGenerationResult::class, $overlapping->second);
+        self::assertSame(['completed', 'completed'], [$first->status, $overlapping->second->status]);
+        // The first run saved none of its rows, and counts none.
+        self::assertSame(['collaborative' => 0, 'content' => 0, 'genre' => 0], $first->counts);
         self::assertGreaterThan(0, $this->recommendationsFrom($songs));
     }
 

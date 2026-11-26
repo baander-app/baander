@@ -16,8 +16,12 @@ final class SaveRecommendationHandler
     ) {
     }
 
+    /**
+     * @return bool whether the row was stored; false when a member's row or another run's holds
+     *              its source, target, name and user
+     */
     #[AsMessageHandler]
-    public function __invoke(SaveRecommendationCommand $command): Recommendation
+    public function __invoke(SaveRecommendationCommand $command): bool
     {
         $recommendation = Recommendation::create(
             sourceType: (string) $command->getSourceType(),
@@ -30,8 +34,6 @@ final class SaveRecommendationHandler
             position: $command->getPosition(),
         );
 
-        $this->recommendationRepository->save($recommendation);
-
-        return $recommendation;
+        return $this->recommendationRepository->insertUnlessStored($recommendation);
     }
 }

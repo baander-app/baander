@@ -5,17 +5,24 @@ declare(strict_types=1);
 namespace App\Tests\Functional\Controller;
 
 use App\Auth\Domain\Model\User;
+use App\Recommendation\Application\Command\GenerateRecommendationsCommand;
 use App\Recommendation\Application\Command\SaveRecommendationCommand;
+use App\Recommendation\Application\DTO\RecommendationGenerationResult;
 use App\Recommendation\Domain\Model\Recommendation;
 use App\Recommendation\Domain\Repository\RecommendationRepositoryInterface;
+use App\Recommendation\Domain\ValueObject\RecommendationOrigin;
 use App\Recommendation\Domain\ValueObject\RecommendationType;
+use App\Recommendation\Infrastructure\Doctrine\Entity\RecommendationEntity;
 use App\Shared\Application\Http\BaanderHeader;
 use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
 use App\Tests\Functional\TestCase;
+use Doctrine\ORM\Event\PostPersistEventArgs;
+use Doctrine\ORM\Events;
 use PHPUnit\Framework\Attributes\DataProvider;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Messenger\MessageBusInterface;
+use Symfony\Component\Messenger\Stamp\HandledStamp;
 
 final class RecommendationControllerTest extends TestCase
 {
@@ -60,6 +67,90 @@ final class RecommendationControllerTest extends TestCase
         $withInternalTarget = array_replace($payload, ['target_id' => $target]);
         $this->assertJsonResponse($this->authenticatedRequest('POST', '/api/recommendations/', $user, $withInternalTarget), 404);
         self::assertCount(1, $this->recommendations->findBySource('song', $source, null));
+    }
+
+    public function testCreationAnswersTheCreatedRecommendationByItsPublicReferences(): void
+    {
+        $user = $this->createTestUser();
+        [$source, $sourcePublic] = $this->song($user);
+        [, $targetPublic] = $this->song($user);
+
+        $response = $this->authenticatedRequest('POST', '/api/recommendations/', $user, [
+            'source_type' => 'song',
+            'source_id' => $sourcePublic,
+            'target_type' => 'song',
+            'target_id' => $targetPublic,
+            'score' => 0.75,
+            'name' => 'evening',
+            'position' => 3,
+        ]);
+
+        $data = $this->assertJsonResponse($response, 201, 'data')['data'];
+        $stored = $this->recommendations->findBySource('song', $source, null, 'evening');
+        self::assertCount(1, $stored);
+        self::assertSame(
+            [
+                'public_id' => $stored[0]->getPublicId()->toString(),
+                'name' => 'evening',
+                'source_type' => 'song',
+                'source_id' => $sourcePublic,
+                'target_type' => 'song',
+                'target_id' => $targetPublic,
+                'score' => 0.75,
+                'position' => 3,
+                'user_id' => $user->getPublicId()->toString(),
+            ],
+            array_diff_key($data, ['created_at' => true, 'updated_at' => true]),
+        );
+        foreach (['created_at', 'updated_at'] as $instant) {
+            self::assertInstanceOf(
+                \DateTimeImmutable::class,
+                \DateTimeImmutable::createFromFormat(\DateTimeInterface::ATOM, $data[$instant]),
+                $instant,
+            );
+        }
+    }
+
+    public function testCreationAnswersTheRowAsAddressedWhenItsTargetTurnsInvisibleBeforeTheAnswer(): void
+    {
+        $user = $this->createTestUser();
+        [, $sourcePublic] = $this->song($user);
+        [$target, $targetPublic] = $this->song($user);
+        // Access to the target's library ends once the row is stored, before the answer is built.
+        $revoke = new class (fn () => $this->revokeLibraryOf($target, $user)) {
+            public function __construct(private readonly \Closure $revoke)
+            {
+            }
+
+            public function postPersist(PostPersistEventArgs $event): void
+            {
+                if ($event->getObject() instanceof RecommendationEntity) {
+                    ($this->revoke)();
+                }
+            }
+        };
+        $events = $this->entityManager->getEventManager();
+        $events->addEventListener([Events::postPersist], $revoke);
+        try {
+            $response = $this->authenticatedRequest('POST', '/api/recommendations/', $user, [
+                'source_type' => 'song',
+                'source_id' => $sourcePublic,
+                'target_type' => 'song',
+                'target_id' => $targetPublic,
+                'score' => 0.5,
+            ]);
+        } finally {
+            $events->removeEventListener([Events::postPersist], $revoke);
+        }
+
+        $data = $this->assertJsonResponse($response, 201, 'data')['data'];
+        self::assertSame(
+            [$sourcePublic, $targetPublic, $user->getPublicId()->toString()],
+            [$data['source_id'], $data['target_id'], $data['user_id']],
+        );
+        // The listings no longer show the row.
+        $listed = $this->authenticatedRequest('GET', '/api/recommendations/source/song/' . $sourcePublic, $user);
+        self::assertSame([], $this->assertJsonResponse($listed, 200, 'data')['data']);
     }
 
     public function testAnEmptyBodyIsAValidationErrorNamingEveryRequiredField(): void
@@ -250,7 +341,7 @@ final class RecommendationControllerTest extends TestCase
         $db = $this->entityManager->getConnection();
         $library = $db->fetchOne('SELECT album.library_id FROM songs song JOIN albums album ON album.id = song.album_id WHERE song.id = ?', [$source]);
         $db->insert('user_library_access', ['user_id' => $other->getId()->toString(), 'library_id' => $library, 'granted_at' => new \DateTimeImmutable()->format('Y-m-d H:i:s.uP')]);
-        $rec = Recommendation::create('song', $source, 'song', $source, 0.5, $owner->getId());
+        $rec = Recommendation::create('song', $source, 'song', $source, 0.5, $owner->getId(), origin: RecommendationOrigin::Member);
         $this->recommendations->save($rec);
         self::assertSame([], $this->assertJsonResponse($this->authenticatedRequest('GET', '/api/recommendations/source/song/' . $public, $other), 200, 'data')['data']);
         self::assertSame(204, $this->authenticatedRequest('DELETE', '/api/recommendations/source/song/' . $public, $other)->getStatusCode());
@@ -258,6 +349,69 @@ final class RecommendationControllerTest extends TestCase
         self::assertSame(204, $this->authenticatedRequest('DELETE', '/api/recommendations/source/song/' . $public, $owner)->getStatusCode());
         $this->entityManager->clear();
         self::assertNull($this->recommendations->findByUuid($rec->getId()));
+    }
+
+    public function testAMemberDeletingBySourceRemovesOnlyTheRowsTheyWrote(): void
+    {
+        $owner = $this->createTestUser();
+        [$source, $sourcePublic] = $this->song($owner);
+        [$target] = $this->song($owner);
+        $written = Recommendation::create('song', $source, 'song', $target, 0.5, $owner->getId(), origin: RecommendationOrigin::Member);
+        $generatedForOwner = Recommendation::create('song', $source, 'song', $target, 0.5, $owner->getId(), 'collaborative');
+        $generated = Recommendation::create('song', $source, 'song', $target, 0.5, name: 'content');
+        $this->recommendations->saveMany([$written, $generatedForOwner, $generated]);
+
+        $response = $this->authenticatedRequest('DELETE', '/api/recommendations/source/song/' . $sourcePublic, $owner);
+
+        self::assertSame(204, $response->getStatusCode());
+        $this->entityManager->clear();
+        self::assertNull($this->recommendations->findByUuid($written->getId()));
+        self::assertNotNull($this->recommendations->findByUuid($generatedForOwner->getId()));
+        self::assertNotNull($this->recommendations->findByUuid($generated->getId()));
+    }
+
+    public function testAGenerationRunKeepsTheRowsMembersWrote(): void
+    {
+        $user = $this->createTestUser();
+        [$source] = $this->song($user);
+        [$target] = $this->song($user);
+        $written = Recommendation::create('song', $source, 'song', $target, 0.5, $user->getId(), origin: RecommendationOrigin::Member);
+        $this->recommendations->save($written);
+
+        $result = $this->generate(new GenerateRecommendationsCommand(foreground: true));
+
+        self::assertSame('completed', $result->status);
+        $this->entityManager->clear();
+        self::assertNotNull($this->recommendations->findByUuid($written->getId()));
+        self::assertContains($target, $this->targetsOf($source, null, 'content'));
+    }
+
+    public function testARunForAUserCompletesAndKeepsTheUsersOwnRowUnderAGeneratedName(): void
+    {
+        $user = $this->createTestUser();
+        [$source] = $this->song($user);
+        [$target] = $this->song($user);
+        $this->played($user, $source, 3);
+        $this->played($user, $target, 2);
+        $written = Recommendation::create(
+            'song',
+            $source,
+            'song',
+            $target,
+            0.5,
+            $user->getId(),
+            'collaborative',
+            origin: RecommendationOrigin::Member,
+        );
+        $this->recommendations->save($written);
+
+        $result = $this->generate(new GenerateRecommendationsCommand(userId: $user->getId(), foreground: true));
+
+        self::assertSame('completed', $result->status);
+        $this->entityManager->clear();
+        self::assertSame(RecommendationOrigin::Member, $this->recommendations->findByUuid($written->getId())?->getOrigin());
+        // The run still writes the user's collaborative row from the other song.
+        self::assertContains($source, $this->targetsOf($target, $user->getId(), 'collaborative'));
     }
 
     public function testAnonymousRequestsRemainRejected(): void
@@ -290,6 +444,46 @@ final class RecommendationControllerTest extends TestCase
     private function storedRows(User $user): int
     {
         return (int) $this->entityManager->getConnection()->fetchOne('SELECT count(*) FROM recommendations WHERE user_id = ?', [$user->getId()->toString()]);
+    }
+
+    private function generate(GenerateRecommendationsCommand $command): RecommendationGenerationResult
+    {
+        $result = static::getContainer()->get(MessageBusInterface::class)->dispatch($command)->last(HandledStamp::class)?->getResult();
+        self::assertInstanceOf(RecommendationGenerationResult::class, $result);
+
+        return $result;
+    }
+
+    /** @return list<string> */
+    private function targetsOf(string $source, ?Uuid $viewer, string $name): array
+    {
+        return array_map(
+            static fn (Recommendation $row): string => $row->getTargetId(),
+            $this->recommendations->findBySource('song', $source, $viewer, $name),
+        );
+    }
+
+    private function played(User $user, string $song, int $plays): void
+    {
+        $now = new \DateTimeImmutable()->format('Y-m-d H:i:s.uP');
+        $this->entityManager->getConnection()->insert('media_activities', [
+            'id' => Uuid::v7()->toString(),
+            'public_id' => new PublicId()->toString(),
+            'user_id' => $user->getId()->toString(),
+            'activity_type' => 'play',
+            'song_id' => $song,
+            'play_count' => $plays,
+            'last_played_at' => $now,
+            'created_at' => $now,
+            'updated_at' => $now,
+        ]);
+    }
+
+    private function revokeLibraryOf(string $song, User $user): void
+    {
+        $db = $this->entityManager->getConnection();
+        $library = $db->fetchOne('SELECT album.library_id FROM songs song JOIN albums album ON album.id = song.album_id WHERE song.id = ?', [$song]);
+        $db->delete('user_library_access', ['user_id' => $user->getId()->toString(), 'library_id' => $library]);
     }
 
     private function grantLibraryOf(string $song, User $user): void

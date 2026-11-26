@@ -18,6 +18,14 @@ interface RecommendationRepositoryInterface
     public function saveMany(array $recommendations): void;
 
     /**
+     * Stores the recommendation unless a stored row has its source, target, name and user,
+     * whoever wrote that row; the stored row stays as it is.
+     *
+     * @return bool whether the recommendation was stored
+     */
+    public function insertUnlessStored(Recommendation $recommendation): bool;
+
+    /**
      * Makes the user's member-written recommendations take turns until the caller's transaction
      * ends. Requires an open transaction.
      */
@@ -58,9 +66,16 @@ interface RecommendationRepositoryInterface
     public function findForUser(Uuid $userId, int $limit = 50): array;
 
     /**
-     * Delete all recommendations for a given source.
+     * Deletes the source's rows the actor wrote as a member, or every row of the source when no
+     * actor is given.
      */
     public function deleteBySource(string $sourceType, string $sourceId, ?Uuid $actorId = null): void;
+
+    /**
+     * Deletes the source's generator rows that belong to the user or to no user, which a run for
+     * the user writes anew; a null user deletes only the rows of no user. Member rows stay.
+     */
+    public function deleteGeneratedBySource(string $sourceType, string $sourceId, ?Uuid $userId): void;
 
     public function delete(Recommendation $recommendation): void;
 }

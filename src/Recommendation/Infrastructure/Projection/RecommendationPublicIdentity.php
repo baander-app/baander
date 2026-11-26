@@ -71,10 +71,34 @@ final readonly class RecommendationPublicIdentity implements RecommendationPubli
             return null;
         }
         $user = $recommendation->getUserId();
-        $userPublicId = $user === null ? null : $this->connection->fetchOne('SELECT public_id FROM users WHERE id = :id', ['id' => $user->toString()]);
-        if ($user !== null && !is_string($userPublicId)) {
+        $userPublicId = $user === null ? null : $this->userPublicId($user);
+        if ($user !== null && $userPublicId === null) {
             return null;
         }
+        return $this->row($recommendation, $source, $target, $userPublicId);
+    }
+
+    public function projectAsAddressed(Recommendation $recommendation, string $sourcePublicId, string $targetPublicId): array
+    {
+        $user = $recommendation->getUserId();
+        $userPublicId = $user === null ? null : $this->userPublicId($user);
+        if ($user !== null && $userPublicId === null) {
+            throw new NotFoundException('Recommendation not found.');
+        }
+
+        return $this->row($recommendation, $sourcePublicId, $targetPublicId, $userPublicId);
+    }
+
+    private function userPublicId(Uuid $user): ?string
+    {
+        $publicId = $this->connection->fetchOne('SELECT public_id FROM users WHERE id = :id', ['id' => $user->toString()]);
+
+        return is_string($publicId) ? $publicId : null;
+    }
+
+    /** @return array{public_id: string, name: string, source_type: string, source_id: string, target_type: string, target_id: string, score: float, position: int|null, user_id: string|null, created_at: string, updated_at: string} */
+    private function row(Recommendation $recommendation, string $source, string $target, ?string $userPublicId): array
+    {
         return [
             'public_id' => $recommendation->getPublicId()->toString(), 'name' => $recommendation->getName(),
             'source_type' => (string) $recommendation->getSourceType(), 'source_id' => $source,

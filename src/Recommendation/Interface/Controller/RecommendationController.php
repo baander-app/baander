@@ -25,6 +25,7 @@ use OpenApi\Spec as OA;
 use Symfony\Bundle\SecurityBundle\Security;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
+use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpKernel\Attribute\MapRequestPayload;
 use Symfony\Component\Messenger\MessageBusInterface;
 use Symfony\Component\Messenger\Stamp\HandledStamp;
@@ -419,7 +420,7 @@ final class RecommendationController
 
         $userId = Uuid::fromString($user->getId());
         $administrator = $this->security->isGranted('ROLE_ADMIN');
-        $this->bus->dispatch(new CreateRecommendationCommand(
+        $recommendation = $this->bus->dispatch(new CreateRecommendationCommand(
             sourceType: $payload->source_type,
             sourceId: $this->identities->internalEntityId($payload->source_type, $payload->source_id, $userId, $administrator)->toString(),
             targetType: $payload->target_type,
@@ -428,9 +429,14 @@ final class RecommendationController
             userId: $userId,
             name: $payload->name,
             position: $payload->position,
-        ));
+        ))->last(HandledStamp::class)?->getResult();
 
-        return $this->created(['message' => 'Recommendation created.']);
+        // project() answers null once access to the source or target was revoked after the write;
+        // the answer then names them by the public identities the member sent.
+        $data = $this->identities->project($recommendation, $userId, $administrator)
+            ?? $this->identities->projectAsAddressed($recommendation, $payload->source_id, $payload->target_id);
+
+        return $this->successResponse($data, Response::HTTP_CREATED);
     }
 
     /**

@@ -49,14 +49,15 @@ Each domain service implements one recommendation algorithm:
 
 | Command | Handler | Purpose |
 |---------|---------|---------|
-| `SaveRecommendationCommand` | `SaveRecommendationHandler` | Persist a single computed recommendation |
+| `SaveRecommendationCommand` | `SaveRecommendationHandler` | Store a single computed recommendation unless a row with its source, target, name and user is stored, and report whether it stored one |
 | `CreateRecommendationCommand` | `CreateRecommendationHandler` | Store a recommendation a user wrote through the API, under the per-user cap |
 | `GenerateRecommendationsCommand` | `GenerateRecommendationsHandler` | Run recommendation generation (dispatched by the console command, the admin action and the scheduler) |
 | `ExecuteRecommendationJobCommand` | `ExecuteRecommendationJobHandler` | Execute a queued recommendation job on the `async` Messenger transport |
 | `CancelRecommendationJobCommand` | `CancelRecommendationJobHandler` | Cancel a pending or in-progress recommendation job |
 | `RequeueRecommendationJobCommand` | `RequeueRecommendationJobHandler` | Create and dispatch a new recommendation job from a failed or cancelled job |
 | `DeleteRecommendationCommand` | `DeleteRecommendationHandler` | Remove one recommendation by UUID |
-| `DeleteRecommendationsBySourceCommand` | `DeleteRecommendationsBySourceHandler` | Remove all recommendations originating from a source entity |
+| `DeleteRecommendationsBySourceCommand` | `DeleteRecommendationsBySourceHandler` | Remove the `member` rows a user wrote from a source entity, or, without a user, every row from it |
+| `DeleteGeneratedRecommendationsBySourceCommand` | `DeleteGeneratedRecommendationsBySourceHandler` | Remove the `generator` rows from a source entity that belong to a run's user or to no user, before the run writes its own |
 
 ## Scheduled Generation
 
@@ -65,6 +66,8 @@ Each domain service implements one recommendation algorithm:
 The handler reads the system setting `recommendations.auto_generate` (off by default, contributed by `RecommendationSettingDefinitions`) when a command with `automatic: true` arrives. While the setting is off, the handler logs at info level and returns `skipped: recommendations.auto_generate is off`, which the scheduler records as the job's last result. Commands without `automatic`, from `app:recommendation:generate`, the admin action or a schedule an administrator creates, always generate. An unknown mode throws instead of falling back to incremental.
 
 Unless `$command->foreground` is `true` (used by the CLI commands `app:recommendation:generate` and `app:recommendation:job:requeue`), `GenerateRecommendationsHandler` creates a `RecommendationJob` and dispatches `ExecuteRecommendationJobCommand` to the `async` Messenger transport (`ExecuteRecommendationJobHandler`). An incremental run loads the songs updated in the last seven days; a full run loads every song. Both load every user's listening history, which is why the seeded scheduled job is incremental.
+
+A run replaces only the generator's rows. Before writing, it deletes each song's `generator` rows that belong to the run's user or to no user; `member` rows stay. It writes each row with `ON CONFLICT DO NOTHING` on `uniq_recommendations_source_target_name_user_id`. When a member's row already holds the key, such as the member's own `collaborative` row in a run for that member, or an overlapping run stored the row first, the stored row stays and the run goes on. The run completes, and its per-strategy counts include only the rows it stored.
 
 ## Queries & Query Handlers
 
@@ -105,11 +108,13 @@ User endpoints live under `RecommendationController` with the `/api/recommendati
 | GET | `/api/recommendations/targeting/{targetType}/{targetId}` | Recommendations targeting a specific entity |
 | POST | `/api/recommendations/` | Create a recommendation (see below) |
 | DELETE | `/api/recommendations/{publicId}` | Delete a single recommendation by `publicId` |
-| DELETE | `/api/recommendations/source/{sourceType}/{sourceId}` | Delete all recommendations for a source |
+| DELETE | `/api/recommendations/source/{sourceType}/{sourceId}` | Delete the rows from a source the member wrote through the API, or every row from it for an administrator |
 
 `POST /api/recommendations/` binds its body to `CreateRecommendationRequest`, whose bounds live in `RecommendationLimits`. Both types are one of `song`, `album`, `artist`, `movie` and `video`; `score` is a finite number from 0 to 1, the range the generator scores in; `name` has at most 255 characters and defaults to `default`; `position` fits the 32-bit `position` column. A malformed body answers 422. A source or target ID that is not the public ID of an entity the user can see answers 404.
 
 `CreateRecommendationHandler` caps the rows a user writes through the API. Under a transaction-scoped advisory lock on the user, it counts the user's `member` rows and refuses the 1,001st with 409 (`reason` `recommendation_limit`, `limit` 1000), and it refuses a row with the same source, target, name and user with 409 (`reason` `recommendation_exists`). The generator's rows do not count, including the `collaborative` rows of a run for one user, and the generator writes past the cap. The partial index `idx_recommendations_user_id_member` serves the count. The database checks the name length with `chk_recommendations_name_length`, added `NOT VALID`, so a longer name stored before the bound stays readable.
+
+A stored recommendation answers 201 with the row as a `RecommendationResource` under `data`. When the user loses access to the source or target between the write and the answer, the answer still names them by the public IDs the request sent.
 
 ### Admin Endpoints
 

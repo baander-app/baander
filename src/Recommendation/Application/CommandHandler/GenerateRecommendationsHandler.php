@@ -7,7 +7,7 @@ namespace App\Recommendation\Application\CommandHandler;
 use App\Activity\Application\Port\ActivityPortInterface;
 use App\Catalog\Domain\Model\Song;
 use App\Catalog\Domain\Repository\SongRepositoryInterface;
-use App\Recommendation\Application\Command\DeleteRecommendationsBySourceCommand;
+use App\Recommendation\Application\Command\DeleteGeneratedRecommendationsBySourceCommand;
 use App\Recommendation\Application\Command\ExecuteRecommendationJobCommand;
 use App\Recommendation\Application\Command\GenerateRecommendationsCommand;
 use App\Recommendation\Application\Command\SaveRecommendationCommand;
@@ -29,6 +29,7 @@ use App\Shared\Domain\Model\Uuid;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\Messenger\Attribute\AsMessageHandler;
 use Symfony\Component\Messenger\MessageBusInterface;
+use Symfony\Component\Messenger\Stamp\HandledStamp;
 use Throwable;
 
 final class GenerateRecommendationsHandler
@@ -170,7 +171,9 @@ final class GenerateRecommendationsHandler
     }
 
     /**
-     * Replaces the recommendations of the given songs, one strategy after another.
+     * Replaces the generator's recommendations of the given songs, one strategy after another.
+     * Member rows stay; a row whose key a member's row or an overlapping run holds is skipped and
+     * not counted.
      *
      * @param Song[] $songs
      *
@@ -186,9 +189,10 @@ final class GenerateRecommendationsHandler
         ];
 
         foreach ($songs as $song) {
-            $this->commandBus->dispatch(new DeleteRecommendationsBySourceCommand(
+            $this->commandBus->dispatch(new DeleteGeneratedRecommendationsBySourceCommand(
                 sourceType: (string) RecommendationType::song(),
                 sourceId: $song->getId()->toString(),
+                userId: $userId,
             ));
         }
 
@@ -209,8 +213,9 @@ final class GenerateRecommendationsHandler
             }
 
             foreach ($recommendations() as $recommendation) {
-                $this->commandBus->dispatch($recommendation);
-                $counts[$strategy]++;
+                if ($this->commandBus->dispatch($recommendation)->last(HandledStamp::class)?->getResult() === true) {
+                    $counts[$strategy]++;
+                }
             }
         }
 

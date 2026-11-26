@@ -11,6 +11,7 @@ use App\Recommendation\Domain\ValueObject\RecommendationOrigin;
 use App\Recommendation\Infrastructure\Doctrine\Entity\RecommendationEntity;
 use App\Shared\Domain\Model\Uuid;
 use App\Shared\Domain\Model\PublicId;
+use Doctrine\DBAL\Types\Types;
 use Doctrine\ORM\EntityManagerInterface;
 use Doctrine\ORM\QueryBuilder;
 use RuntimeException;
@@ -46,6 +47,43 @@ final class RecommendationRepository implements RecommendationRepositoryInterfac
         }
 
         $this->entityManager->flush();
+    }
+
+    public function insertUnlessStored(Recommendation $recommendation): bool
+    {
+        // SQL because DQL has no INSERT, and a flush that meets the unique key fails and closes
+        // the entity manager. The conflict target is uniq_recommendations_source_target_name_user_id,
+        // whose NULLS NOT DISTINCT makes rows of no user conflict as well.
+        $inserted = $this->entityManager->getConnection()->executeStatement(
+            <<<'SQL'
+                INSERT INTO recommendations (id, public_id, user_id, name, source_type, source_id, target_type, target_id, score, "position", origin, created_at, updated_at)
+                VALUES (:id, :publicId, :userId, :name, :sourceType, :sourceId, :targetType, :targetId, :score, :position, :origin, :createdAt, :updatedAt)
+                ON CONFLICT (source_type, source_id, target_type, target_id, name, user_id) DO NOTHING
+                SQL,
+            [
+                'id' => $recommendation->getId()->toString(),
+                'publicId' => $recommendation->getPublicId()->toString(),
+                'userId' => $recommendation->getUserId()?->toString(),
+                'name' => $recommendation->getName(),
+                'sourceType' => (string) $recommendation->getSourceType(),
+                'sourceId' => $recommendation->getSourceId(),
+                'targetType' => (string) $recommendation->getTargetType(),
+                'targetId' => $recommendation->getTargetId(),
+                'score' => $recommendation->getScore(),
+                'position' => $recommendation->getPosition(),
+                'origin' => $recommendation->getOrigin()->value,
+                'createdAt' => $recommendation->getCreatedAt(),
+                'updatedAt' => $recommendation->getUpdatedAt(),
+            ],
+            [
+                'score' => Types::FLOAT,
+                'position' => Types::INTEGER,
+                'createdAt' => Types::DATETIME_IMMUTABLE,
+                'updatedAt' => Types::DATETIME_IMMUTABLE,
+            ],
+        );
+
+        return $inserted === 1;
     }
 
     public function findByPublicId(PublicId $publicId): ?Recommendation
@@ -89,7 +127,7 @@ final class RecommendationRepository implements RecommendationRepositoryInterfac
             ->select('COUNT(r.id)')
             ->from(RecommendationEntity::class, 'r')
             ->where('IDENTITY(r.user) = :user')
-            ->andWhere(sprintf("r.origin = '%s'", RecommendationOrigin::Member->value))
+            ->andWhere(self::origin(RecommendationOrigin::Member))
             ->setParameter('user', $userId, 'uuid')
             ->getQuery()
             ->getSingleScalarResult();
@@ -186,11 +224,41 @@ final class RecommendationRepository implements RecommendationRepositoryInterfac
 
     public function deleteBySource(string $sourceType, string $sourceId, ?Uuid $actorId = null): void
     {
-        $query = $this->entityManager->getRepository(RecommendationEntity::class)->createQueryBuilder('r')->delete()
-            ->where('r.sourceType = :sourceType')->andWhere('r.sourceId = :sourceId')
-            ->setParameter('sourceType', $sourceType)->setParameter('sourceId', $sourceId);
-        if ($actorId !== null) { $query->andWhere('r.user = :actor')->setParameter('actor', $actorId); }
+        $query = $this->deleteOfSource($sourceType, $sourceId);
+        if ($actorId !== null) {
+            $query->andWhere('r.user = :actor')
+                ->andWhere(self::origin(RecommendationOrigin::Member))
+                ->setParameter('actor', $actorId);
+        }
         $query->getQuery()->execute();
+    }
+
+    public function deleteGeneratedBySource(string $sourceType, string $sourceId, ?Uuid $userId): void
+    {
+        $query = $this->deleteOfSource($sourceType, $sourceId)->andWhere(self::origin(RecommendationOrigin::Generator));
+        if ($userId === null) {
+            $query->andWhere('r.user IS NULL');
+        } else {
+            $query->andWhere('(r.user IS NULL OR r.user = :user)')->setParameter('user', $userId);
+        }
+        $query->getQuery()->execute();
+    }
+
+    private function deleteOfSource(string $sourceType, string $sourceId): QueryBuilder
+    {
+        return $this->entityManager->getRepository(RecommendationEntity::class)
+            ->createQueryBuilder('r')
+            ->delete()
+            ->where('r.sourceType = :sourceType')
+            ->andWhere('r.sourceId = :sourceId')
+            ->setParameter('sourceType', $sourceType)
+            ->setParameter('sourceId', $sourceId);
+    }
+
+    /** The origin as a literal, not a parameter, so even a generic plan can prove a partial index's predicate. */
+    private static function origin(RecommendationOrigin $origin): string
+    {
+        return sprintf("r.origin = '%s'", $origin->value);
     }
 
     public function delete(Recommendation $recommendation): void
