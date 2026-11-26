@@ -222,7 +222,7 @@ if ($arguments[0] === 'inspect') {
     exit(0);
 }
 PHP;
-        $boundary = '\Baander\DevQualification\Tests\Support\WebDockerState::handle($arguments, getenv(\'WEB_RUNTIME_CALLS\'));';
+        $boundary = 'WebDockerState::handle($arguments, getenv(\'WEB_RUNTIME_CALLS\'));';
         file_put_contents($this->directory . '/docker', str_replace($boundary, $handler . "\n" . $boundary, $source));
         file_put_contents($this->directory . '/capacity.php', <<<'PHP'
 <?php
