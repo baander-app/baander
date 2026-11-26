@@ -59,10 +59,10 @@ final class MediaCost
                 'maximumConcurrent' => self::concurrency($window, $native),
                 'executionUnit' => self::unit($window),
                 'mediaChildren' => $media,
-                'services' => self::services(array_values(array_filter(
+                'services' => array_filter(
                     array_slice($host, 1),
                     static fn(array $sample): bool => $start <= $sample['t'] && $sample['t'] <= $end,
-                ))),
+                ) |> array_values(...) |> self::services(...),
                 'client' => array_diff_key($phase, array_flip(['name', 'startedAt', 'endedAt'])),
             ];
         }
@@ -147,7 +147,7 @@ final class MediaCost
             }
         }
         $result = ['encoder' => $step['encoder'], 'concurrency' => $step['concurrency'], 'streams' => count($streams),
-            'failedProcesses' => $failed, 'stoppedAtDeadline' => count(array_filter(array_column($end['processes'], 'stoppedAtDeadline')))];
+            'failedProcesses' => $failed, 'stoppedAtDeadline' => array_column($end['processes'], 'stoppedAtDeadline') |> array_filter(...) |> count(...)];
         $start = $finish = null;
         foreach ($streams as $points) {
             $warm = array_values(array_filter($points, static fn(array $point): bool => $point['output'] >= self::WARM_UP_OUTPUT_SECONDS));
@@ -188,12 +188,19 @@ final class MediaCost
             'speed' => ['minimum' => round(min($speeds), 3), 'median' => round(self::percentile($speeds, .5), 3), 'maximum' => round(max($speeds), 3), 'aggregate' => round(array_sum($speeds), 3)],
             'cpuSecondsPerOutputSecond' => round(array_sum(array_column($figures, 'cpuSecondsPerOutputSecond')) / count($figures), 4),
             'videoEngineShare' => $engine === [] ? null : round(array_sum($engine), 3),
-            'peakRssMiB' => round(max(array_column($figures, 'peakRssMiB')), 1),
+            'peakRssMiB' => self::roundedPeak($figures, 'peakRssMiB'),
             'peakThreads' => max(array_column($figures, 'peakThreads')),
-            'peakProcessVramMiB' => round(max(array_column($figures, 'peakVramMiB')), 1),
+            'peakProcessVramMiB' => self::roundedPeak($figures, 'peakVramMiB'),
             'device' => self::deviceBusy($device),
             'everyStreamAheadOfRealTime' => min($speeds) > 1.0,
         ];
+    }
+
+    /** @param list<array<string,mixed>> $figures */
+    private static function roundedPeak(array $figures, string $figure): float
+    {
+        $values = array_column($figures, $figure);
+        return round(max($values), 1);
     }
 
     /**
@@ -206,10 +213,10 @@ final class MediaCost
     {
         $device = [];
         foreach (['busyPercent', 'vcnBusyPercent', 'memoryBusyPercent'] as $counter) {
-            $values = array_values(array_filter(array_map(static fn(array $sample): mixed => $sample['gpu'][$counter] ?? null, $samples), is_int(...)));
+            $values = array_filter(array_map(static fn(array $sample): mixed => $sample['gpu'][$counter] ?? null, $samples), is_int(...)) |> array_values(...);
             $device[$counter] = $values === [] ? null : ['mean' => round(array_sum($values) / count($values), 1), 'p95' => self::percentile($values, .95)];
         }
-        $vram = array_values(array_filter(array_map(static fn(array $sample): mixed => $sample['gpu']['vramUsedBytes'] ?? null, $samples), is_int(...)));
+        $vram = array_filter(array_map(static fn(array $sample): mixed => $sample['gpu']['vramUsedBytes'] ?? null, $samples), is_int(...)) |> array_values(...);
         $device['peakVramUsedMiB'] = $vram === [] ? null : round(max($vram) / 1048576, 1);
         return $device;
     }

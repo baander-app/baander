@@ -409,7 +409,7 @@ final class BackendCoordinatorTest extends TestCase
             file_put_contents($this->directory . '/cleanup-started', 'ready');
             self::assertFalse($runtime->cleanup());
             self::assertSame('Original qualification failure', $runtime->cleanupErrors[0]);
-            $identityChecks = array_values(array_filter(array_slice($this->commands(), $before), static fn(array $arguments): bool => in_array('info', $arguments, true)));
+            $identityChecks = array_filter(array_slice($this->commands(), $before), static fn(array $arguments): bool => in_array('info', $arguments, true)) |> array_values(...);
             self::assertLessThanOrEqual(1, count($identityChecks), 'Later owners must not receive fresh cleanup budgets after the first expires.');
             self::assertCount(2, glob($this->directory . '/*.ownership.json'));
             self::assertFileExists($this->directory . '/ownership.json');

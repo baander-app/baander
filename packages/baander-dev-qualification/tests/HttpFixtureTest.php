@@ -333,7 +333,8 @@ final class HttpFixtureTest extends TestCase
             fflush(STDOUT);
             $libc->kill(getmypid(), 9);
             PHP_SUBJECT;
-        file_put_contents($subject, str_replace('MARKER_PATH', var_export($marker, true), $program));
+        $markerLiteral = var_export($marker, true);
+        file_put_contents($subject, str_replace('MARKER_PATH', $markerLiteral, $program));
         $process = $this->runner->start(new ProcessSpec(
             argv: [
                 PHP_BINARY,

@@ -973,10 +973,11 @@ final class HttpContract
         );
         [$port, $process] = $this->graceful(3000, 'default-budget', null, null);
         $this->change(['delay' => 2.5, 'arrivals' => 0]);
+        $uncertainRegistration = array_replace($registration, ['publicId' => 'default-timeout-uncertain']);
         $result = $this->request(
             'POST',
             '/api/servers/register',
-            self::json(array_replace($registration, ['publicId' => 'default-timeout-uncertain'])),
+            self::json($uncertainRegistration),
             $port,
         );
         self::check(HttpProxy::state($this->statePath)['arrivals'] > 0, 'Default timeout never reached database.');
@@ -990,7 +991,7 @@ final class HttpContract
         $this->change(['delay' => 0.25, 'arrivals' => 0]);
         $writes = [];
         for ($number = 0; $number < 2; ++$number) {
-            $writes[] = $this->async(self::json(array_replace($registration, ['publicId' => 'capacity-' . $number])));
+            $writes[] = array_replace($registration, ['publicId' => 'capacity-' . $number]) |> self::json(...) |> $this->async(...);
         }
         $this->waitState(static fn(array $state): bool => $state['arrivals'] >= 2);
         $result = $this->request('GET', '/api/servers/server-one');
@@ -1009,10 +1010,11 @@ final class HttpContract
         [$port, $process] = $this->graceful(500, 'deadline', 100);
         $this->change(['delay' => 0.3, 'arrivals' => 0]);
         $start = microtime(true);
+        $expiredRegistration = array_replace($registration, ['publicId' => 'expired-unacknowledged']);
         $result = $this->request(
             'POST',
             '/api/servers/register',
-            self::json(array_replace($registration, ['publicId' => 'expired-unacknowledged'])),
+            self::json($expiredRegistration),
             $port,
         );
         self::check(
@@ -1031,7 +1033,8 @@ final class HttpContract
         self::check($process->wait(2) === 0, 'Deadline instance did not stop.');
         [$port, $process] = $this->graceful(1000, 'drain');
         $this->change(['delay' => 0.25, 'arrivals' => 0]);
-        $write = $this->async(self::json(array_replace($registration, ['publicId' => 'drained-commit'])), $port);
+        $drainedRegistration = array_replace($registration, ['publicId' => 'drained-commit']);
+        $write = $this->async(self::json($drainedRegistration), $port);
         $this->waitState(static fn(array $state): bool => $state['arrivals'] > 0);
         $process->signal(SIGTERM);
         self::check($this->await($write)[0] === 200, 'Graceful drain lost committed response.');
@@ -1040,7 +1043,8 @@ final class HttpContract
         self::check($this->request('GET', '/api/servers/drained-commit')[0] === 200, 'Drained commit unavailable.');
         [$port, $process] = $this->graceful(50, 'forced-drain');
         $this->change(['delay' => 0.8, 'arrivals' => 0]);
-        $write = $this->async(self::json(array_replace($registration, ['publicId' => 'forced-unacknowledged'])), $port);
+        $forcedRegistration = array_replace($registration, ['publicId' => 'forced-unacknowledged']);
+        $write = $this->async(self::json($forcedRegistration), $port);
         $this->waitState(static fn(array $state): bool => $state['arrivals'] > 0);
         $start = microtime(true);
         $process->signal(SIGTERM);

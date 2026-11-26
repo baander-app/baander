@@ -132,7 +132,8 @@ final class ImageLedger
         if (!is_array($tags) || !array_is_list($tags) || !is_array($digests) || !array_is_list($digests)) {
             throw new \RuntimeException('Invalid image reference inventory; shared image preservation cannot be proved.');
         }
-        $owned = array_fill_keys(array_map(self::familiarReference(...), array_keys($this->aliases)), true);
+        $aliasNames = array_keys($this->aliases);
+        $owned = array_fill_keys(array_map(self::familiarReference(...), $aliasNames), true);
         $candidates = [];
         foreach ($tags as $reference) {
             if (!is_string($reference) || $reference === '') {

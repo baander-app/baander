@@ -348,7 +348,8 @@ final class PublicationTest extends TestCase
         $sources = [...glob($site . '/assets/*.css') ?: [], ...glob($site . '/scripts/*.mjs') ?: [], ...glob($site . '/templates/*.php') ?: []];
         self::assertNotEmpty($sources);
         foreach ($sources as $source) {
-            self::assertSame(0, preg_match('/--font-(?:sans|heading)\b/', file_get_contents($source)), $source . ' reads a removed font stack');
+            $sourceText = file_get_contents($source);
+            self::assertSame(0, preg_match('/--font-(?:sans|heading)\b/', $sourceText), $source . ' reads a removed font stack');
         }
     }
 

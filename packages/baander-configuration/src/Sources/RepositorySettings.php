@@ -62,7 +62,7 @@ final class RepositorySettings
      */
     public static function local(CommandExecutor $runner, string $root, array $environment): array
     {
-        if (isset($environment['CI']) && !in_array(strtolower(trim($environment['CI'])), ['', '0', 'false', 'no', 'off'], true)) {
+        if (isset($environment['CI']) && !in_array($environment['CI'] |> trim(...) |> strtolower(...), ['', '0', 'false', 'no', 'off'], true)) {
             return [];
         }
         $path = self::discover($runner, $root);

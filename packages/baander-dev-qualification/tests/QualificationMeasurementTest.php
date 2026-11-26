@@ -53,7 +53,8 @@ final class QualificationMeasurementTest extends TestCase
         self::assertSame(1, $sample['nativeProcessCount']);
         self::assertSame([], $sample['missing']);
         $sampler->append($this->root . '/samples.jsonl', $sample);
-        self::assertSame($sample, json_decode(trim(file_get_contents($this->root . '/samples.jsonl')), true, flags: JSON_THROW_ON_ERROR));
+        $sampleLine = trim(file_get_contents($this->root . '/samples.jsonl'));
+        self::assertSame($sample, json_decode($sampleLine, true, flags: JSON_THROW_ON_ERROR));
     }
 
     public function testHostMemoryReadsTotalMemoryAndSwapFromMeminfo(): void

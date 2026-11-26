@@ -61,12 +61,10 @@ final class LegacySupervisor
         };
         try {
             $runtime->run([...$command, 'prepare']);
+            $configurationTemplate = file_get_contents($root . '/tests/Fixtures/Worker/legacy-supervisord.conf');
             file_put_contents(
                 '/tmp/worker-supervisord.conf',
-                self::configuration(
-                    file_get_contents($root . '/tests/Fixtures/Worker/legacy-supervisord.conf'),
-                    $root,
-                ),
+                self::configuration($configurationTemplate, $root),
             );
             $supervisor = $runtime->start(
                 ['supervisord', '-c', '/tmp/worker-supervisord.conf'],

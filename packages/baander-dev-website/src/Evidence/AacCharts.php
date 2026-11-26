@@ -154,7 +154,8 @@ final class AacCharts
 
     private function format(float $value): string
     {
-        return rtrim(rtrim(number_format($value, 2, '.', ''), '0'), '.');
+        $formatted = number_format($value, 2, '.', '');
+        return rtrim(rtrim($formatted, '0'), '.');
     }
 
     private function escape(string $value): string

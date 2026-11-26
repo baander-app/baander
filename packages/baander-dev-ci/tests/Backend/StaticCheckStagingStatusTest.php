@@ -35,7 +35,8 @@ final class StaticCheckStagingStatusTest extends TestCase
             file_put_contents($directory . '/source/scripts/vendor/autoload.php', '<?php');
             file_put_contents($directory . '/source/composer.lock', '{"packages":[],"packages-dev":[]}');
             file_put_contents($directory . '/source/vendor/composer/installed.json', '{"packages":[]}');
-            file_put_contents($directory . '/source/packages/baander-configuration/resources/application-layout.json', json_encode(ApplicationLayout::load()->toArray()));
+            $layout = ApplicationLayout::load()->toArray();
+            file_put_contents($directory . '/source/packages/baander-configuration/resources/application-layout.json', json_encode($layout));
             file_put_contents($directory . '/bin/rm', "#!/bin/sh\necho 'Controlled staging removal failure' >&2\nexit 23\n");
             chmod($directory . '/bin/rm', 0755);
             $executor->run(new ProcessSpec(['git', 'init', '-b', 'fixture'], cwd: $directory . '/source'));

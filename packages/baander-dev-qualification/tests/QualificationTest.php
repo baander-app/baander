@@ -764,7 +764,8 @@ final class QualificationTest extends TestCase
         $states = Qualification::serviceStates([$web, $redis]);
         self::assertSame(['name' => 'baander-qualification-web-1', 'service' => 'web', 'running' => false, 'exitCode' => 255, 'oomKilled' => true,
             'health' => 'unhealthy'], array_diff_key($states[0], ['healthLog' => true]));
-        self::assertSame(['second', 'third'], array_slice(array_column($states[0]['healthLog'], 'output'), 0, 2));
+        $healthOutputs = array_column($states[0]['healthLog'], 'output');
+        self::assertSame(['second', 'third'], array_slice($healthOutputs, 0, 2));
         self::assertSame(512, strlen($states[0]['healthLog'][2]['output']));
         self::assertNull($states[1]['health']);
         self::assertSame([], $states[1]['healthLog']);

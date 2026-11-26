@@ -45,7 +45,7 @@ class Lifecycle
         $home = $configuration->layout->root;
         $cleanupSeconds = $configuration->cleanupSeconds;
         $environment = $configuration->runtimeEnvironment;
-        $sharedVolumes = array_values(array_unique(array_column($configuration->mediaMounts, 'volume')));
+        $sharedVolumes = array_column($configuration->mediaMounts, 'volume') |> array_unique(...) |> array_values(...);
         if ($configuration->logVolume !== null) {
             $sharedVolumes[] = $configuration->logVolume;
         }

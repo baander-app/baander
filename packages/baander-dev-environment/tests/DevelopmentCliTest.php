@@ -490,9 +490,10 @@ final class DevelopmentCliTest extends TestCase
                 timeout: 10,
             ));
             self::assertSame(0, $result->exitCode, $result->stderr);
+            $hostCapture = file_get_contents($output);
             self::assertSame(
                 [['exec', ...$expected], $payload],
-                json_decode(file_get_contents($output), true, flags: JSON_THROW_ON_ERROR),
+                json_decode($hostCapture, true, flags: JSON_THROW_ON_ERROR),
             );
             self::assertFileDoesNotExist($marker);
         }
@@ -512,9 +513,10 @@ final class DevelopmentCliTest extends TestCase
             timeout: 10,
         ));
         self::assertSame(0, $result->exitCode, $result->stderr);
+        $containerCapture = file_get_contents($output);
         self::assertSame(
             [['quoted value', ';', 'touch', $marker], $payload],
-            json_decode(file_get_contents($output), true, flags: JSON_THROW_ON_ERROR),
+            json_decode($containerCapture, true, flags: JSON_THROW_ON_ERROR),
         );
         self::assertFileDoesNotExist($marker);
     }

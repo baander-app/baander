@@ -26,7 +26,8 @@ try {
         : ExecutionContext::bounded($configuration->budgets->seconds('backend'), $environment);
     $executor = new EngineExecutor($context);
     try {
-        $result = $executor->run(Worker::command(__DIR__ . '/vendor/autoload.php', array_slice($_SERVER['argv'], 1), $environment), new CompletionPolicy(null));
+        $workerArguments = array_slice($_SERVER['argv'], 1);
+        $result = $executor->run(Worker::command(__DIR__ . '/vendor/autoload.php', $workerArguments, $environment), new CompletionPolicy(null));
         fwrite(STDOUT, $result->stdout);
         fwrite(STDERR, $result->stderr);
     } finally {

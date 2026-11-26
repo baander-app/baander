@@ -109,7 +109,8 @@ class WorkerDeployment
                 EnvironmentVariable::STREAM_URL_HMAC_SECRET,
                 EnvironmentVariable::AUTH_TOTP_ENCRYPTION_KEY,
             ];
-            $environment = array_replace(array_intersect_key($environment, array_flip($allowed)), [
+            $allowedKeys = array_flip($allowed);
+            $environment = array_replace(array_intersect_key($environment, $allowedKeys), [
                 EnvironmentVariable::APP_ENV => 'prod', EnvironmentVariable::APP_DEBUG => '0',
                 EnvironmentVariable::APP_URL => 'https://' . $instance['hostname'],
                 EnvironmentVariable::DEFAULT_URI => 'https://' . $instance['hostname'],

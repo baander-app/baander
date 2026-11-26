@@ -9,7 +9,8 @@ $server = stream_socket_server('tls://127.0.0.1:0', $error, $message, STREAM_SER
 if ($server === false) {
     throw new RuntimeException($message);
 }
-file_put_contents($root . '/port', substr(strrchr((string) stream_socket_get_name($server, false), ':'), 1));
+$portSuffix = strrchr((string) stream_socket_get_name($server, false), ':');
+file_put_contents($root . '/port', substr($portSuffix, 1));
 for ($attempt = 0; $attempt < 4; $attempt++) {
     $connection = stream_socket_accept($server, 15);
     if ($connection === false) {

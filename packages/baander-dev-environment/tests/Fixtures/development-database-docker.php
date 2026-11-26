@@ -30,7 +30,8 @@ if ($command === 'info') {
         if (!$file->isFile() || !str_ends_with($file->getFilename(), '.json')) {
             continue;
         }
-        $receipt = json_decode(file_get_contents($file->getPathname()), true);
+        $receiptPath = $file->getPathname();
+        $receipt = json_decode(file_get_contents($receiptPath), true);
         if (($receipt['token'] ?? null) === $token && array_any($receipt['resources'] ?? [], static fn(array $resource): bool => $resource['name'] === $name)) {
             $intended = true;
             break;

@@ -146,7 +146,8 @@ final class WorkerDrillTest extends TestCase
         self::assertFalse(Command::mediaReady('{malformed', $logs, 'baander.app:worker-fixture', 'current'));
         self::assertFalse(Command::mediaReady('{}', $logs, 'baander.app:worker-fixture', 'current'));
         $frame['identity']['generation'] = 2;
-        self::assertFalse(Command::mediaReady('{"media":42}', json_encode($frame, JSON_THROW_ON_ERROR), 'baander.app:worker-fixture', 'current'));
+        $changedLogs = json_encode($frame, JSON_THROW_ON_ERROR);
+        self::assertFalse(Command::mediaReady('{"media":42}', $changedLogs, 'baander.app:worker-fixture', 'current'));
     }
 
     public function testStoppedSummaryAcceptsJsonKeyOrderButRejectsDuplicatesAndWrongCounts(): void

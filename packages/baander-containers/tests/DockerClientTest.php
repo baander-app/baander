@@ -196,7 +196,8 @@ CLI);
             mkdir($this->root . '/builders', 0700);
         }
         $nodes = array_map(static fn(int $index, string $endpoint): string => sprintf("Name:                  %s%d\nEndpoint:              %s\nStatus:                inactive\n", $name, $index, $endpoint), array_keys($endpoints), $endpoints);
-        file_put_contents($this->root . '/builders/' . $name, sprintf("Name:          %s\nDriver:        %s\nLast Activity: 2026-11-05 07:51:10 +0000 UTC\n\nNodes:\n%s", $name, $driver, implode("\n", $nodes)));
+        $nodeSection = implode("\n", $nodes);
+        file_put_contents($this->root . '/builders/' . $name, sprintf("Name:          %s\nDriver:        %s\nLast Activity: 2026-11-05 07:51:10 +0000 UTC\n\nNodes:\n%s", $name, $driver, $nodeSection));
     }
 
     /** @return list<array{list<string>,array<string,string|false>}> */

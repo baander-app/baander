@@ -424,7 +424,8 @@ final readonly class OperatorScenario
             $this->qualification->snapshot('web', $s->webName, 'web-worker-contained');
             $this->qualification->checkpoint('worker-contained');
             $this->qualification->combinedPhase('pause-absent');
-            $this->qualification->boot(bin2hex(random_bytes(16)), true);
+            $bootBytes = random_bytes(16);
+            $this->qualification->boot(bin2hex($bootBytes), true);
             $this->qualification->operator('create', 0);
             $this->qualification->operator('start', 0);
             $this->qualification->awaitCheck('ready-recovered');

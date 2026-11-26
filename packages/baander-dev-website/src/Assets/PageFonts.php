@@ -124,7 +124,8 @@ final readonly class PageFonts
                 }
             }
         }
-        $order = array_flip(array_column(array_merge(...array_values($this->faces)), 'file'));
+        $faceLists = array_values($this->faces);
+        $order = array_column(array_merge(...$faceLists), 'file') |> array_flip(...);
         uksort($selected, static fn(string $left, string $right): int => $order[$left] <=> $order[$right]);
         return array_values($selected);
     }
@@ -214,7 +215,8 @@ final readonly class PageFonts
     /** @return array{int,int} */
     private static function range(string $range): array
     {
-        [$start, $end] = explode('-', substr(trim($range), 2)) + [1 => null];
+        $trimmedRange = trim($range);
+        [$start, $end] = explode('-', substr($trimmedRange, 2)) + [1 => null];
         return [(int) hexdec($start), (int) hexdec($end ?? $start)];
     }
 }

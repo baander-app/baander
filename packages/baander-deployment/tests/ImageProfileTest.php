@@ -128,7 +128,8 @@ final class ImageProfileTest extends TestCase
             $profile = ImageProfile::fromArray($document);
             self::assertSame($capability, $profile->deployment['capability']);
             self::assertSame($expected->webWorkers, $profile->webWorkers);
-            self::assertEquals($expected, DeploymentProfile::fromJson(json_encode($document['deployment'], JSON_THROW_ON_ERROR)));
+            $deploymentJson = json_encode($document['deployment'], JSON_THROW_ON_ERROR);
+            self::assertEquals($expected, DeploymentProfile::fromJson($deploymentJson));
         }
     }
 
@@ -177,7 +178,8 @@ final class ImageProfileTest extends TestCase
         $expected = new DeploymentProfile(hardware: new HardwareEncoder('vaapi', '/dev/dri/renderD128'));
         self::assertSame($vaapi, $hardware->deployment['hardware']);
         self::assertSame($expected->videoEncoderSlots, $hardware->deployment['videoEncoderSlots']);
-        self::assertEquals($expected, DeploymentProfile::fromJson(json_encode($hardware->deployment, JSON_THROW_ON_ERROR)));
+        $deploymentJson = json_encode($hardware->deployment, JSON_THROW_ON_ERROR);
+        self::assertEquals($expected, DeploymentProfile::fromJson($deploymentJson));
         self::assertNotSame(ImageProfile::fromArray($this->runProgram($program, [json_encode(self::transcodeSettings(), JSON_THROW_ON_ERROR), $root]))->fingerprint(), $hardware->fingerprint());
 
         $nvenc = ImageProfile::fromArray($this->runProgram($program, [json_encode(self::transcodeSettings(['videoEncoderSlots' => 4, 'audioEncoderSlots' => 12, 'hardware' => ['accelerator' => 'nvenc', 'device' => null]]), JSON_THROW_ON_ERROR), $root]));

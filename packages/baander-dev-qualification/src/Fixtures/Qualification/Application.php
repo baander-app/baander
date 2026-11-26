@@ -98,7 +98,8 @@ final class Application
                 }
             }
         }
-        $ids = implode(', ', array_map(static fn(array $library): string => self::literal($library['publicId']), array_values($libraries)));
+        $libraryList = array_values($libraries);
+        $ids = implode(', ', array_map(static fn(array $library): string => self::literal($library['publicId']), $libraryList));
         $rows = $this->query("SELECT coalesce(jsonb_agg(jsonb_build_object('id', id, 'publicId', public_id, 'path', path, 'type', type) ORDER BY public_id), '[]'::jsonb) FROM libraries WHERE public_id IN ({$ids})");
         foreach ($libraries as $role => &$library) {
             $matches = array_values(array_filter($rows, static fn(array $row): bool => ($row['publicId'] ?? null) === $library['publicId']));

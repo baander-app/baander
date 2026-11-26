@@ -443,8 +443,9 @@ final class ShutdownWorkflow
         );
         $this->assertDeliveryOnly('web');
         $command = $this->exec('web', ['cat', '/proc/1/cmdline'])->stdout;
+        $commandLine = str_replace("\x00", ' ', $command);
         Runtime::require(
-            str_contains(str_replace("\x00", ' ', $command), 'bin/console app:serve'),
+            str_contains($commandLine, 'bin/console app:serve'),
             'app:serve is not PID 1.',
         );
     }

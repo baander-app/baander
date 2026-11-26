@@ -55,7 +55,8 @@ final class QualificationMetadataTransportTest extends TestCase
         $body = $client->request('GET', $url, ['musicbrainz.org'])->toArray();
         self::assertSame($song['metadata']['id'], $body['recordings'][0]['id']);
         self::assertSame(100, $body['recordings'][0]['score']);
-        self::assertSame('matched', json_decode(trim(file_get_contents($this->directory . '/audit.jsonl')), true, flags: JSON_THROW_ON_ERROR)['outcome']);
+        $auditLog = file_get_contents($this->directory . '/audit.jsonl');
+        self::assertSame('matched', json_decode(trim($auditLog), true, flags: JSON_THROW_ON_ERROR)['outcome']);
         $this->expectException(UnsafeDestinationException::class);
         $client->request('GET', 'https://127.0.0.1/ws/2/recording', ['musicbrainz.org']);
     }
@@ -156,7 +157,8 @@ final class QualificationMetadataTransportTest extends TestCase
         self::assertSame(array_column(array_column($songs, 'metadata'), 'id'), array_column($tracks, 'recordingId'));
         self::assertSame(array_column($songs, 'title'), array_column($tracks, 'title'));
         self::assertSame(range(1, 20), array_column($tracks, 'position'));
-        self::assertCount(20, array_unique(array_column($tracks, 'id')));
+        $trackIds = array_column($tracks, 'id');
+        self::assertCount(20, array_unique($trackIds));
         foreach ($tracks as $index => $track) {
             self::assertLessThanOrEqual(3000, abs((int) $track->lengthMs - $songs[$index]['duration'] * 1000));
             self::assertSame([$plan['artists'][$songs[$index]['artist']]], array_column($track->artistCredit->artists, 'artistId'));

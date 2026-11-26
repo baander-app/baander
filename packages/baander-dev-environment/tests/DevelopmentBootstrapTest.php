@@ -153,7 +153,8 @@ final class DevelopmentBootstrapTest extends DevDataTestCase
         $key = $environment['AUTH_TOTP_ENCRYPTION_KEY'];
         unset($environment['AUTH_TOTP_ENCRYPTION_KEY']);
         self::assertSame($saved, $environment);
-        self::assertSame(32, strlen(base64_decode($key, true)));
+        $decodedKey = base64_decode($key, true);
+        self::assertSame(32, strlen($decodedKey));
         self::assertSame(0600, fileperms($path) & 0777);
 
         $before = file_get_contents($path);
@@ -381,7 +382,8 @@ final class DevelopmentBootstrapTest extends DevDataTestCase
             self::fail('Partial extraction was reset by automatic retry.');
         } catch (WorkflowError $error) {
             self::assertStringContainsString('interrupted', $error->getMessage());
-            self::assertSame($copies, count(array_filter($runner->calls, static fn(array $call): bool => in_array('cp', $call['arguments'], true))));
+            $copyCalls = array_filter($runner->calls, static fn(array $call): bool => in_array('cp', $call['arguments'], true));
+            self::assertSame($copies, count($copyCalls));
         }
     }
 

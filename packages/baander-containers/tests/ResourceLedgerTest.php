@@ -121,7 +121,8 @@ final class ResourceLedgerTest extends TestCase
         self::assertTrue($report->successful(), $report->message());
         self::assertFileDoesNotExist($this->directory . '/resource.json');
         self::assertFileDoesNotExist($this->directory . '/receipt.json');
-        self::assertSame($foreign, json_decode(file_get_contents($this->directory . '/resource-unrelated.json'), true, flags: JSON_THROW_ON_ERROR));
+        $json = file_get_contents($this->directory . '/resource-unrelated.json');
+        self::assertSame($foreign, json_decode($json, true, flags: JSON_THROW_ON_ERROR));
         $calls = array_map(static fn(string $line): array => json_decode($line, true, flags: JSON_THROW_ON_ERROR), file($this->directory . '/calls.jsonl', FILE_IGNORE_NEW_LINES));
         $listings = array_filter($calls, static fn(array $call): bool => array_slice($call, 0, 2) === ['container', 'ls']);
         self::assertNotEmpty($listings);

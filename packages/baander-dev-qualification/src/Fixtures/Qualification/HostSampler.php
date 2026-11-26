@@ -47,7 +47,8 @@ final class HostSampler
                 $path = '/';
             }
             if (str_starts_with($path, rtrim($this->cgroupRoot, '/') . '/')) {
-                $path = substr($path, strlen(rtrim($this->cgroupRoot, '/')));
+                $cgroupPrefix = rtrim($this->cgroupRoot, '/');
+                $path = substr($path, strlen($cgroupPrefix));
             }
             foreach ($paths as $other) {
                 if ($path !== $other && ($path === '/' || $other === '/' || str_starts_with($path, $other . '/') || str_starts_with($other, $path . '/'))) {
@@ -115,7 +116,7 @@ final class HostSampler
         $exitedDuringCapture = [];
         foreach ($processRoles as $pid => $owners) {
             $before = count($this->missing);
-            $process = $this->process($pid, array_values(array_unique($owners)));
+            $process = $this->process($pid, $owners |> array_unique(...) |> array_values(...));
             if (!in_array($pid, $rootPids, true) && (!is_dir(rtrim($this->procRoot, '/') . '/' . $pid) || ($process['exiting'] ?? false))) {
                 $this->missing = array_slice($this->missing, 0, $before);
                 $exitedDuringCapture[] = $pid;
@@ -243,7 +244,7 @@ final class HostSampler
         $executable = @readlink($directory . '/exe');
         $raw = $this->read($directory . '/stat', 'process:' . $pid . '/stat');
         $boundary = $raw === null ? false : strrpos($raw, ') ');
-        $fields = $boundary === false ? [] : preg_split('/\s+/', trim(substr($raw, $boundary + 2)));
+        $fields = $boundary === false ? [] : self::statFields($raw, $boundary);
         if (!isset($fields[19]) || !ctype_digit($fields[19])) {
             $this->missing[] = 'process:' . $pid . '/stat:malformed';
             return null;
@@ -264,5 +265,12 @@ final class HostSampler
         return ['pid' => $pid, 'startTicks' => (int) $fields[19], 'state' => $fields[0], 'exiting' => $exiting, 'roles' => $roles, 'name' => $name,
             'executable' => $executable ?: null, 'threads' => $threads, 'rssBytes' => $rss, 'native' => $native,
             'command' => $command === null ? null : str_replace("\0", ' ', rtrim($command, "\0"))];
+    }
+
+    /** @return list<string>|false */
+    private static function statFields(string $raw, int $boundary): array|false
+    {
+        $afterCommand = substr($raw, $boundary + 2);
+        return preg_split('/\s+/', trim($afterCommand));
     }
 }

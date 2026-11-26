@@ -39,14 +39,13 @@ final class AtomicFileTest extends TestCase
         $reader = fopen($path, 'r');
         AtomicFile::writeJson($path, ['phase' => 'ready']);
         self::assertSame(['phase' => 'ready'], AtomicFile::readJson($path));
-        self::assertSame(
-            ['phase' => 'preparing'],
-            json_decode(stream_get_contents($reader), true, flags: JSON_THROW_ON_ERROR),
-        );
+        $readerJson = stream_get_contents($reader);
+        self::assertSame(['phase' => 'preparing'], json_decode($readerJson, true, flags: JSON_THROW_ON_ERROR));
         fclose($reader);
         self::assertSame(0600, fileperms($path) & 0777);
         self::assertSame(0700, fileperms(dirname($path)) & 0777);
-        self::assertSame(['state.json'], array_values(array_diff(scandir(dirname($path)), ['.', '..'])));
+        $stateEntries = array_diff($path |> dirname(...) |> scandir(...), ['.', '..']);
+        self::assertSame(['state.json'], array_values($stateEntries));
     }
 
     public function testEncodingFailurePreservesExistingRecord(): void
@@ -70,7 +69,8 @@ final class AtomicFileTest extends TestCase
             self::fail('A directory cannot be replaced by a state file.');
         } catch (\RuntimeException) {
             self::assertSame('keep', file_get_contents($this->directory . '/state.json/evidence'));
-            self::assertSame(['state.json'], array_values(array_diff(scandir($this->directory), ['.', '..'])));
+            $remainingEntries = array_diff(scandir($this->directory), ['.', '..']);
+            self::assertSame(['state.json'], array_values($remainingEntries));
         }
     }
 

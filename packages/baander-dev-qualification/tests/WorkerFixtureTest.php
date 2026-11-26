@@ -485,13 +485,11 @@ final class WorkerFixtureTest extends TestCase
             $this->lines('execution-samples.jsonl', [$this->values[0]]);
         }
         if ($case === 'gapped-execution') {
-            $this->lines(
-                'execution-samples.jsonl',
-                array_values(array_filter(
-                    $this->values,
-                    static fn(array $value): bool => $value['monotonic'] < 320 || $value['monotonic'] >= 330,
-                )),
+            $gappedValues = array_filter(
+                $this->values,
+                static fn(array $value): bool => $value['monotonic'] < 320 || $value['monotonic'] >= 330,
             );
+            $this->lines('execution-samples.jsonl', array_values($gappedValues));
         }
         if ($case === 'pressure-boundary') {
             $this->lines('execution-samples.jsonl', array_slice($this->values, 303));

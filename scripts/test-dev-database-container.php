@@ -175,7 +175,8 @@ final class DatabaseDrillExecutor implements CommandExecutor
         $diagnostics = sys_get_temp_dir() . '/baander-dev-database-failure-' . bin2hex(random_bytes(8));
         PrivateDirectory::prepare($diagnostics);
         $log = $diagnostics . '/failure.log';
-        AtomicFile::write($log, $this->redact(substr($error->getMessage() . "\n" . ($result->stdout ?? '') . "\n" . ($result->stderr ?? ''), -20000)));
+        $failureTail = substr($error->getMessage() . "\n" . ($result->stdout ?? '') . "\n" . ($result->stderr ?? ''), -20000);
+        AtomicFile::write($log, $this->redact($failureTail));
         throw new CommandFailure('Disposable database drill command failed; sanitized diagnostic: ' . $log, $error->getCode(), $sanitized);
     }
 
@@ -478,7 +479,8 @@ try {
         $retainedReceipt = false;
         foreach (new RecursiveIteratorIterator(new RecursiveDirectoryIterator($root, FilesystemIterator::SKIP_DOTS)) as $file) {
             if ($file->isFile() && str_ends_with($file->getFilename(), '.json')) {
-                $data = json_decode(file_get_contents($file->getPathname()), true);
+                $receiptPath = $file->getPathname();
+                $data = json_decode(file_get_contents($receiptPath), true);
                 if (is_array($data) && isset($data['token'], $data['resources'], $data['target'])) {
                     $retainedReceipt = true;
                     break;

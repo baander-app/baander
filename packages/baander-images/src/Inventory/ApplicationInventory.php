@@ -348,7 +348,8 @@ final class ApplicationInventory
             $directory = self::rootPath($root, $full);
             $found = [];
             if (is_dir($directory)) {
-                $physical = substr($directory, strlen(rtrim($root, '/')));
+                $rootPrefix = rtrim($root, '/');
+                $physical = substr($directory, strlen($rootPrefix));
                 if ($physical !== $full) {
                     $composerRoots[] = [$physical, $component];
                 }

@@ -159,7 +159,8 @@ final class ImageLedgerTest extends TestCase
         self::assertNotNull($failure);
         self::assertArrayHasKey($digest, $this->state()['images']);
         self::assertFileDoesNotExist($this->directory . '/receipt.json');
-        self::assertSame([], array_values(array_filter($this->state()['calls'], static fn(array $call): bool => array_slice($call, 0, 2) === ['image', 'tag'])));
+        $tagCalls = array_filter($this->state()['calls'], static fn(array $call): bool => array_slice($call, 0, 2) === ['image', 'tag']);
+        self::assertSame([], array_values($tagCalls));
     }
 
     public function testAnotherOwnedAliasCannotQualifyAsAnExternalPreservingReference(): void
@@ -189,7 +190,8 @@ final class ImageLedgerTest extends TestCase
             $failure = $error;
         }
         self::assertNotNull($failure, 'A bare image ID has no preserving reference after alias cleanup');
-        self::assertSame([], array_values(array_filter($this->state()['calls'], static fn(array $call): bool => array_slice($call, 0, 2) === ['image', 'tag'])));
+        $tagCalls = array_filter($this->state()['calls'], static fn(array $call): bool => array_slice($call, 0, 2) === ['image', 'tag']);
+        self::assertSame([], array_values($tagCalls));
         self::assertSame(self::id('a'), $this->state()['dangling'][self::id('a')]['Id']);
         self::assertFileDoesNotExist($this->directory . '/receipt.json');
     }

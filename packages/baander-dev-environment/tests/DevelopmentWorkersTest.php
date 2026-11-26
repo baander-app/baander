@@ -522,7 +522,8 @@ final class DevelopmentWorkersTest extends DevDataTestCase
         } catch (WorkflowError $error) {
             self::assertStringContainsString('source directory changed', $error->getMessage());
         }
-        self::assertSame($creations, count(array_filter($runner->calls, static fn(array $call): bool => in_array('create', $call['arguments'], true))));
+        $createCalls = array_filter($runner->calls, static fn(array $call): bool => in_array('create', $call['arguments'], true));
+        self::assertSame($creations, count($createCalls));
     }
 
     public function testHistoricalRetirementUsesOnlyTheSavedOperatorImageLayout(): void
@@ -611,7 +612,8 @@ final class DevelopmentWorkersTest extends DevDataTestCase
         DeploymentContainerRecipe::verifySourceDirectory($source);
         DeploymentContainerRecipe::verifySourceDirectory(dirname($source));
         self::assertSame($original, $this->recipeFingerprint($recipe));
-        self::assertSame([], array_values(array_diff(scandir($source), ['.', '..'])));
+        $sourceEntries = array_diff(scandir($source), ['.', '..']);
+        self::assertSame([], array_values($sourceEntries));
     }
 
     public function testOversizeCredentialsAreRefusedBeforeOperatorLaunch(): void

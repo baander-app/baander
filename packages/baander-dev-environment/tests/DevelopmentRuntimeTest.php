@@ -334,10 +334,8 @@ final class DevelopmentRuntimeTest extends TestCase
         } catch (WorkflowError $error) {
             self::assertStringContainsString('parent', $error->getMessage());
         }
-        self::assertSame(
-            [],
-            array_values(array_filter($this->runner->calls, static fn(array $args): bool => in_array('create', $args, true))),
-        );
+        $createCalls = array_filter($this->runner->calls, static fn(array $args): bool => in_array('create', $args, true));
+        self::assertSame([], array_values($createCalls));
         self::assertDirectoryDoesNotExist($this->root . '/outside-preview');
     }
 

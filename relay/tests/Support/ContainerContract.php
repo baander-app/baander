@@ -228,13 +228,14 @@ final class ContainerContract
             '-v',
             $this->secretVolumes[$index] . ':/run/secrets/rqlite:ro',
         ];
+        $nodeIndexes = range(0, 4);
         $values = array_replace(
             [
                 'RQLITE_NODE_ID' => "node-{$index}",
                 'RQLITE_PRIVATE_BIND_IP' => '10.42.0.11',
                 'RQLITE_HTTP_ADVERTISE' => "node-{$index}.rqlite.baander.app:4001",
                 'RQLITE_RAFT_ADVERTISE' => "node-{$index}.rqlite.baander.app:4002",
-                'RQLITE_JOIN_ADDRESSES' => implode(',', array_map(static fn(int $i): string => "node-{$i}.rqlite.baander.app:4002", range(0, 4))),
+                'RQLITE_JOIN_ADDRESSES' => implode(',', array_map(static fn(int $i): string => "node-{$i}.rqlite.baander.app:4002", $nodeIndexes)),
                 'RQLITE_START_MODE' => $mode,
             ],
             $extra,

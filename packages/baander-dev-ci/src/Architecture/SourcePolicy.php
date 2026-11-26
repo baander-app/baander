@@ -75,7 +75,8 @@ final class SourcePolicy
             array_push($diagnostics, ...self::analyze($path, $source, $helpers));
         }
         if (isset($sources['packages/baander-dev-ci/src/Architecture/SourceExceptions.php'])) {
-            array_push($diagnostics, ...SourceExceptions::missing(array_keys($sources)));
+            $sourcePaths = array_keys($sources);
+            array_push($diagnostics, ...SourceExceptions::missing($sourcePaths));
         }
         usort($diagnostics, static fn(array $a, array $b): int => [$a['path'], $a['line'], $a['rule']] <=> [$b['path'], $b['line'], $b['rule']]);
         return $diagnostics;

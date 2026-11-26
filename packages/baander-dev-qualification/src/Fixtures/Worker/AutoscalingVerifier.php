@@ -369,7 +369,7 @@ final class AutoscalingVerifier
             $start = Reports::json($root . '/' . $name . '.json')['started'];
             $phase = Reports::window($values, $start, $result['ended']);
             Reports::require(
-                $phase !== [] && max(array_column(array_column($phase, 'admission'), 'target')) === $maximum,
+                $phase !== [] && array_column(array_column($phase, 'admission'), 'target') |> max(...) === $maximum,
                 'I/O burst did not reach admitted maximum',
             );
             Reports::require(

@@ -56,7 +56,7 @@ final class ConsistentOpenApiTagDescriptionRule implements Rule
 
                 $existing = self::$tags[$tagName];
                 if ($existing['description'] !== $description) {
-                    $errors[] = RuleErrorBuilder::message(\sprintf(
+                    $errors[] = (\sprintf(
                         'OA\Tag(name: %s) has conflicting descriptions.%s  Current: %s%s  Previously defined in %s:%d as: %s',
                         $tagName,
                         "\n",
@@ -65,7 +65,7 @@ final class ConsistentOpenApiTagDescriptionRule implements Rule
                         basename($existing['file']),
                         $existing['line'],
                         $existing['description'] ?? '(none)',
-                    ))
+                    ) |> RuleErrorBuilder::message(...))
                         ->identifier('baander.openapiTag.conflictingDescription')
                         ->build();
                 }

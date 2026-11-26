@@ -18,13 +18,18 @@ final class QualificationDatasetTest extends TestCase
         $plan = Dataset::plan('qualification-one');
         self::assertSame($plan, Dataset::plan('qualification-one'));
         self::assertCount(2300, $plan['files']);
-        self::assertSame(['song' => 2000, 'movie' => 50, 'episode' => 250], array_count_values(array_column($plan['files'], 'kind')));
-        self::assertCount(2300, array_unique(array_column($plan['files'], 'path')));
-        self::assertCount(2300, array_unique(array_column($plan['files'], 'title')));
+        $kinds = array_column($plan['files'], 'kind');
+        self::assertSame(['song' => 2000, 'movie' => 50, 'episode' => 250], array_count_values($kinds));
+        $paths = array_column($plan['files'], 'path');
+        self::assertCount(2300, array_unique($paths));
+        $titles = array_column($plan['files'], 'title');
+        self::assertCount(2300, array_unique($titles));
         $episodes = array_filter($plan['files'], static fn(array $file): bool => $file['kind'] === 'episode');
-        self::assertCount(250, array_unique(array_map(static fn(array $file): string => dirname($file['path']), $episodes)));
+        $episodeDirectories = array_map(static fn(array $file): string => dirname($file['path']), $episodes);
+        self::assertCount(250, array_unique($episodeDirectories));
         self::assertSame('movie', $plan['libraries']['episodes']['type']);
-        self::assertSame(5, count(array_filter($plan['files'], static fn(array $file): bool => $file['duration'] >= 1860)));
+        $longFiles = array_filter($plan['files'], static fn(array $file): bool => $file['duration'] >= 1860);
+        self::assertSame(5, count($longFiles));
         self::assertSame(2, count($plan['playback']['originalVideos']));
         self::assertSame(2, count($plan['playback']['copyVideos']));
         foreach ($plan['files'] as $file) {
@@ -46,7 +51,8 @@ final class QualificationDatasetTest extends TestCase
         try {
             $actual = Dataset::prepare($docker, $runtime, 'sha256:' . str_repeat('a', 64), 'owned-source', $directory, 'qualification-one');
             self::assertSame($expected, $actual);
-            self::assertSame($expected, json_decode(file_get_contents($directory . '/dataset.json'), true, flags: JSON_THROW_ON_ERROR));
+            $datasetJson = file_get_contents($directory . '/dataset.json');
+            self::assertSame($expected, json_decode($datasetJson, true, flags: JSON_THROW_ON_ERROR));
             self::assertFileDoesNotExist($directory . '/dataset-container.json');
             self::assertSame([], glob($directory . '/resource-*.json'));
         } finally {

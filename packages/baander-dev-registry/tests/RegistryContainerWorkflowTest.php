@@ -103,7 +103,7 @@ PHP;
         self::assertSame(0, $status, implode("\n", $calls));
         $targets = file($this->root . '/targets', FILE_IGNORE_NEW_LINES) ?: [];
         self::assertNotEmpty($targets);
-        self::assertSame(['unix:///var/run/docker.sock'], array_values(array_unique($targets)));
+        self::assertSame(['unix:///var/run/docker.sock'], $targets |> array_unique(...) |> array_values(...));
         self::assertSame([], glob($this->root . '/output/*-resources.json') ?: []);
         self::assertSame([], glob($this->root . '/output/*-images.json') ?: []);
         $runs = array_values(array_filter($calls, static fn(string $line): bool => str_starts_with($line, 'docker create ')));

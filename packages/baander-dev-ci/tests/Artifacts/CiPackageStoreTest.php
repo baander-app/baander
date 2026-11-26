@@ -264,10 +264,11 @@ final class CiPackageStoreTest extends TestCase
         if (!is_file($log)) {
             return [];
         }
-        return array_values(array_map(
+        $lines = explode("\n", (string) file_get_contents($log));
+        return array_map(
             static fn(string $line): array => json_decode($line, true, flags: JSON_THROW_ON_ERROR),
-            array_filter(explode("\n", (string) file_get_contents($log))),
-        ));
+            array_filter($lines),
+        ) |> array_values(...);
     }
 
     /** @return array<string,string> */

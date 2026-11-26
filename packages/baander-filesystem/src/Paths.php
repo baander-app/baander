@@ -34,7 +34,7 @@ final class Paths
         if ($path === '/') {
             return $path;
         }
-        return rtrim(self::resolvedPath(dirname($path)), '/') . '/' . basename($path);
+        return rtrim($path |> dirname(...) |> self::resolvedPath(...), '/') . '/' . basename($path);
     }
 
 }

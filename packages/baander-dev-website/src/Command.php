@@ -137,7 +137,7 @@ final class Command
         $tokens = json_decode((string) file_get_contents($root . '/ui/design-tokens/tokens/base/type.json'), true, flags: JSON_THROW_ON_ERROR)['text'];
         $roles = [];
         foreach (self::TYPE_ROLES as $role => $entry) {
-            $token = static fn(string $property): array => $tokens[lcfirst(str_replace('-', '', ucwords($role, '-'))) . $property]
+            $token = static fn(string $property): array => $tokens[(str_replace('-', '', ucwords($role, '-')) |> lcfirst(...)) . $property]
                 ?? throw new \RuntimeException('The type role ' . $role . ' has no ' . $property . ' token.');
             $roles[$role] = $entry + [
                 'desktop' => $token('Size')['value'],

@@ -106,7 +106,7 @@ foreach ($plan['files'] as &$file) {
     }
 }
 unset($file);
-if (count(array_unique(array_column($plan['files'], 'hash'))) !== count($plan['files'])) {
+if (array_column($plan['files'], 'hash') |> array_unique(...) |> count(...) !== count($plan['files'])) {
     throw new RuntimeException('Duplicate source hash would collapse scanned records.');
 }
 foreach ($templates as $template) {

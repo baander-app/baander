@@ -363,7 +363,8 @@ final class ApplicationInventoryTest extends TestCase
             ))
             |> array_values(...);
         self::assertCount(2, $notices);
-        self::assertCount(1, array_unique(array_column($notices, 'retained')));
+        $retainedPaths = array_column($notices, 'retained');
+        self::assertCount(1, array_unique($retainedPaths));
     }
     public function testNativeMergedUsrAliasPreservesOwnershipAndOtherGaps(): void
     {

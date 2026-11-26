@@ -92,7 +92,7 @@ final class BackupFixture
 
     public function assertClean(): void
     {
-        Runtime::requireThat(array_values(array_diff(scandir($this->root . '/spool'), ['.', '..'])) === [], 'Backup retained spool artifacts.');
+        Runtime::requireThat(array_diff(scandir($this->root . '/spool'), ['.', '..']) |> array_values(...) === [], 'Backup retained spool artifacts.');
         foreach ($this->calls() as [, $pid]) {
             Runtime::requireThat(!self::isOwnedChild($pid, $this->root), 'Backup retained a child process: ' . $pid);
         }

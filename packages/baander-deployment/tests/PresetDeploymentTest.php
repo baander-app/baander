@@ -197,7 +197,8 @@ final class PresetDeploymentTest extends TestCase
         $compose = Renderer::render($configuration, $this->images(), ApplicationLayout::fromArray(['version' => 1, 'root' => '/srv/baander']), $profile, 'max_connections = 21', 'owner');
         $rendered = json_decode(str_replace('$$', '$', $compose['services']['web']['environment']['BAANDER_DEPLOYMENT_PROFILE']), true, flags: JSON_THROW_ON_ERROR);
         self::assertSame($profile->deployment, $rendered);
-        self::assertEquals($application, DeploymentProfile::fromJson(json_encode($rendered, JSON_THROW_ON_ERROR)));
+        $renderedJson = json_encode($rendered, JSON_THROW_ON_ERROR);
+        self::assertEquals($application, DeploymentProfile::fromJson($renderedJson));
         self::assertSame([2, 0, 0], [$rendered['sharedCopySlots'], $rendered['videoEncoderSlots'], $rendered['audioEncoderSlots']]);
         self::assertSame($rendered, json_decode(Renderer::workerEnvironment($configuration, $profile)['BAANDER_DEPLOYMENT_PROFILE'], true, flags: JSON_THROW_ON_ERROR));
         self::assertSame($before, $profile->toArray());
@@ -487,7 +488,8 @@ final class PresetDeploymentTest extends TestCase
             'runtime' => ['phpHeapMiB' => 256, 'scheduledConsoleMiB' => 320],
         ]);
         $compose = Renderer::render($configuration, $this->images(), ApplicationLayout::fromArray(['version' => 1, 'root' => '/srv/baander']), $profile, 'max_connections = 35', 'owner');
-        self::assertEquals($deployment, DeploymentProfile::fromJson(str_replace('$$', '$', $compose['services']['web']['environment']['BAANDER_DEPLOYMENT_PROFILE'])));
+        $profileJson = str_replace('$$', '$', $compose['services']['web']['environment']['BAANDER_DEPLOYMENT_PROFILE']);
+        self::assertEquals($deployment, DeploymentProfile::fromJson($profileJson));
         self::assertEquals($deployment, DeploymentProfile::fromJson(Renderer::workerEnvironment($configuration, $profile)['BAANDER_DEPLOYMENT_PROFILE']));
         // Only the execution worker, which the worker lifecycle creates, receives the device.
         foreach ($compose['services'] as $name => $service) {
@@ -719,7 +721,8 @@ final class PresetDeploymentTest extends TestCase
         self::assertNotContains($configuration->volumes['secrets'], array_column(Renderer::mediaMounts($configuration, $layout), 'volume'));
         self::assertArrayNotHasKey('DB_PASSWORD', $workerEnvironment);
         self::assertArrayNotHasKey('APP_DOMAIN', $workerEnvironment);
-        self::assertSame($profile->deployment, json_decode(str_replace('$$', '$', $compose['services']['web']['environment']['BAANDER_DEPLOYMENT_PROFILE']), true, flags: JSON_THROW_ON_ERROR));
+        $profileJson = str_replace('$$', '$', $compose['services']['web']['environment']['BAANDER_DEPLOYMENT_PROFILE']);
+        self::assertSame($profile->deployment, json_decode($profileJson, true, flags: JSON_THROW_ON_ERROR));
     }
 
     public function testWebTrustsExactlyTheGatewaysPinnedEdgeAddressInEachFamily(): void
@@ -1063,7 +1066,8 @@ final class PresetDeploymentTest extends TestCase
         self::assertContains(['type' => 'volume', 'source' => 'redis_credentials', 'target' => '/etc/baander-redis', 'read_only' => true], $redis['volumes']);
         self::assertSame(['name' => 'baander-preset-redis-credentials', 'external' => true], $compose['volumes']['redis_credentials']);
         foreach ($compose['services'] as $name => $service) {
-            self::assertSame($name === 'redis', in_array('redis_credentials', array_column($service['volumes'] ?? [], 'source'), true), $name);
+            $volumeSources = array_column($service['volumes'] ?? [], 'source');
+            self::assertSame($name === 'redis', in_array('redis_credentials', $volumeSources, true), $name);
         }
         $url = 'redis://baander:private%40redis%25password@redis:6379';
         $web = $compose['services']['web']['environment'];
@@ -1075,10 +1079,12 @@ final class PresetDeploymentTest extends TestCase
     {
         $acl = RedisCredentials::aclFile(hash('sha256', 'private-redis-secret'));
 
-        self::assertSame([
+        $expectedUsers = [
             'user default reset',
             'user baander on #' . hash('sha256', 'private-redis-secret') . ' ' . RedisCredentials::APPLICATION_RULES,
-        ], explode("\n", trim($acl)));
+        ];
+        $aclText = trim($acl);
+        self::assertSame($expectedUsers, explode("\n", $aclText));
         self::assertSame('~* resetchannels -@all +@read +@write -@dangerous +eval +time +ping +select +info', RedisCredentials::APPLICATION_RULES);
         // The functional suite's Redis grants the application user the same commands.
         self::assertStringContainsString('--user baander on >', (string) file_get_contents(dirname(__DIR__, 3) . '/compose.test.yaml'));
@@ -1143,7 +1149,8 @@ final class PresetDeploymentTest extends TestCase
         self::assertContains(['type' => 'volume', 'source' => 'postgres_socket', 'target' => '/var/run/postgresql'], $postgres['volumes']);
         self::assertSame(['name' => 'baander-preset-postgres-socket', 'external' => true], $compose['volumes']['postgres_socket']);
         foreach ($compose['services'] as $name => $service) {
-            self::assertSame($name === 'postgres', in_array('postgres_socket', array_column($service['volumes'] ?? [], 'source'), true), $name);
+            $volumeSources = array_column($service['volumes'] ?? [], 'source');
+            self::assertSame($name === 'postgres', in_array('postgres_socket', $volumeSources, true), $name);
         }
         $url = 'postgresql://baander:private-database-secret@pooler:6432/baander?serverVersion=18&charset=utf8';
         self::assertSame($url, $compose['services']['web']['environment']['DATABASE_URL']);
@@ -1333,7 +1340,7 @@ final class PresetDeploymentTest extends TestCase
         $executor->method('run')->willReturnCallback(static function (ProcessSpec $command) use ($networks): ProcessResult {
             $arguments = array_slice($command->argv, 3);
             $output = match (array_slice($arguments, 0, 2)) {
-                ['network', 'ls'] => implode("\n", array_map(static fn(int $index): string => 'network-' . $index, array_keys($networks))) . "\n",
+                ['network', 'ls'] => self::networkNames($networks) . "\n",
                 ['network', 'inspect'] => json_encode($networks, JSON_THROW_ON_ERROR),
                 default => throw new \LogicException('Unexpected Docker command: ' . implode(' ', $arguments)),
             };
@@ -1347,6 +1354,13 @@ final class PresetDeploymentTest extends TestCase
         } finally {
             Collector::remove($directory);
         }
+    }
+
+    /** @param list<array<string,mixed>> $networks */
+    private static function networkNames(array $networks): string
+    {
+        $indexes = array_keys($networks);
+        return implode("\n", array_map(static fn(int $index): string => 'network-' . $index, $indexes));
     }
 
     /**

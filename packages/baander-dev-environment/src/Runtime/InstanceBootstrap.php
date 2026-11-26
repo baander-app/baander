@@ -125,7 +125,10 @@ class InstanceBootstrap
             ) {
                 throw new WorkflowError('Cannot generate the instance VAPID identity.');
             }
-            $encode = static fn(string $value): string => rtrim(strtr(base64_encode($value), '+/', '-_'), '=');
+            $encode = static function (string $value): string {
+                $encoded = base64_encode($value);
+                return rtrim(strtr($encoded, '+/', '-_'), '=');
+            };
             return [
                 EnvironmentVariable::VAPID_PRIVATE_KEY => $encode($private),
                 EnvironmentVariable::VAPID_PUBLIC_KEY => $encode($public),
@@ -245,7 +248,8 @@ class InstanceBootstrap
                 throw new WorkflowError('Adoption inventory lacks an exact writable mount for ' . $target);
             }
             $mount = $matches[0];
-            $suffix = ltrim(substr($target, strlen($mount['Destination'])), '/');
+            $destinationLength = strlen($mount['Destination']);
+            $suffix = ltrim(substr($target, $destinationLength), '/');
             if ($suffix !== '' && $mount['Type'] === 'volume') {
                 throw new WorkflowError('Nested writable volume adoption requires an explicit copy after quiescence.');
             }

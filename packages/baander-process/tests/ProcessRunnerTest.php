@@ -165,7 +165,8 @@ final class ProcessRunnerTest extends TestCase
         self::assertSame(0, $result->exitCode, $result->stderr);
         self::assertStringStartsWith('interactive input', $result->stdout);
         self::assertSame('terminal', $result->stderr);
-        $reported = json_decode(substr($result->stdout, strlen('interactive input')), true, flags: JSON_THROW_ON_ERROR);
+        $prefixLength = strlen('interactive input');
+        $reported = json_decode(substr($result->stdout, $prefixLength), true, flags: JSON_THROW_ON_ERROR);
         self::assertSame('', $reported['result']['stdout']);
         self::assertSame('', $reported['result']['stderr']);
     }

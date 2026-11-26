@@ -340,7 +340,8 @@ final class AssetPublication
     private static function localFaceRule(string $family, array $face, string $range): string
     {
         $sources = implode(', ', array_map(static fn(string $name): string => 'local("' . $name . '")', $face['local']));
-        $metrics = implode('', array_map(static fn(string $metric, string $value): string => "  {$metric}: {$value};\n", array_keys($face['metrics']), $face['metrics']));
+        $metricNames = array_keys($face['metrics']);
+        $metrics = implode('', array_map(static fn(string $metric, string $value): string => "  {$metric}: {$value};\n", $metricNames, $face['metrics']));
         return "@font-face {\n  font-family: \"{$family}\";\n  font-weight: {$face['weight']};\n  src: {$sources};\n{$metrics}  unicode-range: {$range};\n}\n";
     }
 

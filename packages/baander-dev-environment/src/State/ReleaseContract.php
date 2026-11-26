@@ -59,7 +59,7 @@ final readonly class ReleaseContract
         }
         if (!str_starts_with($data['source'], '/') || $data['sourceIdentity'] === []
             || !is_string($data['sourceDigest'] ?? null)
-            || !hash_equals(hash('sha256', json_encode($data['sourceIdentity'], JSON_THROW_ON_ERROR)), $data['sourceDigest'])
+            || !hash_equals(self::sourceDigest($data['sourceIdentity']), $data['sourceDigest'])
             || !is_string($data['environmentFile'] ?? null) || !isset($data['inputs'][$data['environmentFile']])) {
             throw new WorkflowError('Prepared release has an incomplete materialized-source or private-input inventory.');
         }
@@ -230,5 +230,11 @@ final readonly class ReleaseContract
     public function toArray(): array
     {
         return $this->data;
+    }
+
+    /** @param array<mixed> $sourceIdentity */
+    private static function sourceDigest(array $sourceIdentity): string
+    {
+        return hash('sha256', json_encode($sourceIdentity, JSON_THROW_ON_ERROR));
     }
 }

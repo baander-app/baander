@@ -221,7 +221,8 @@ final class WorkerOperatorBuildTest extends TestCase
             self::assertSame($appHome, $manifest->appHome);
             $written = AtomicFile::readJson($directory . '/work/manifest.json');
             self::assertSame(9, $written['version']);
-            self::assertSame([], preg_grep('/(MemoryMiB|NanoCpus|PidsLimit|CpuSet)\z/', array_keys($written)));
+            $manifestKeys = array_keys($written);
+            self::assertSame([], preg_grep('/(MemoryMiB|NanoCpus|PidsLimit|CpuSet)\z/', $manifestKeys));
             new \ReflectionMethod($provisioning, 'prepareMediaAndApplication')->invoke($provisioning);
             $fake = AtomicFile::readJson($directory . '/state.json');
             $creates = array_values(array_filter($fake['calls'], static fn(array $call): bool => $call[0] === 'create'));

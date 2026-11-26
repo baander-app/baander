@@ -593,12 +593,14 @@ final class WebsiteBuilder
             throw new RuntimeException('Manual image must be a supported book asset: ' . $source . ': ' . $url);
         }
         $browser = preg_replace('~/(tree|blob)/~', is_dir($absolute) ? '/tree/' : '/blob/', $this->revisionUrl);
-        return $browser . '/' . implode('/', array_map(rawurlencode(...), explode('/', substr($absolute, strlen($this->root) + 1)))) . $suffix;
+        $segments = explode('/', substr($absolute, strlen($this->root) + 1));
+        return $browser . '/' . implode('/', array_map(rawurlencode(...), $segments)) . $suffix;
     }
 
     private function isAsset(string $path): bool
     {
-        return in_array(strtolower(pathinfo($path, PATHINFO_EXTENSION)), ['png', 'jpg', 'jpeg', 'webp', 'gif', 'svg', 'avif', 'pdf'], true);
+        $extension = pathinfo($path, PATHINFO_EXTENSION);
+        return in_array(strtolower($extension), ['png', 'jpg', 'jpeg', 'webp', 'gif', 'svg', 'avif', 'pdf'], true);
     }
 
     private function buildNavigation(): void

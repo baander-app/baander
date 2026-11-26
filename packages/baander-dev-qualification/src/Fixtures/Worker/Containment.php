@@ -78,19 +78,16 @@ final class Containment
                     'Containment unit was OOM killed',
                 );
                 if ($scenario === 'term') {
+                    $logLines = explode(
+                        "\n",
+                        $docker->run([
+                            'logs',
+                            $container,
+                        ])->stdout
+                            |> trim(...),
+                    );
                     Runtime::require(
-                        in_array(
-                            'supervisor_direct_children_drained',
-                            explode(
-                                "\n",
-                                $docker->run([
-                                    'logs',
-                                    $container,
-                                ])->stdout
-                                    |> trim(...),
-                            ),
-                            true,
-                        ),
+                        in_array('supervisor_direct_children_drained', $logLines, true),
                         'Missing direct-child drain evidence',
                     );
                 }

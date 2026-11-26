@@ -45,10 +45,9 @@ final class DevelopmentAcceptanceTest extends TestCase
         self::assertSame(['typ' => 'dpop+jwt', 'alg' => 'ES256', 'jwk' => $client->jwk], $decodedHeader);
         self::assertSame('POST', $decodedClaims['htm']);
         self::assertSame('https://media.baander.app/api/song', $decodedClaims['htu']);
-        self::assertSame(
-            rtrim(strtr(base64_encode(hash('sha256', 'private-test-token', true)), '+/', '-_'), '='),
-            $decodedClaims['ath'],
-        );
+        $tokenDigest = base64_encode(hash('sha256', 'private-test-token', true));
+        $expectedAth = rtrim(strtr($tokenDigest, '+/', '-_'), '=');
+        self::assertSame($expectedAth, $decodedClaims['ath']);
         self::assertLessThanOrEqual(1, abs(time() - $decodedClaims['iat']));
         $point = "\x04" . $this->decode($client->jwk['x']) . $this->decode($client->jwk['y']);
         $public = hex2bin('3059301306072a8648ce3d020106082a8648ce3d030107034200') . $point;
@@ -179,7 +178,8 @@ final class DevelopmentAcceptanceTest extends TestCase
             new MediaProbe($this->executor, $this->executor->context)->qualify(['workspace' => $this->root, 'state-root' => $this->root . '/state', 'instance' => 'persistent']);
             self::fail('Symlinked source fixture was accepted.');
         } catch (\RuntimeException $error) {
-            self::assertStringContainsString('symlink', strtolower($error->getMessage()));
+            $message = $error->getMessage();
+            self::assertStringContainsString('symlink', strtolower($message));
             self::assertSame('unchanged', file_get_contents($this->root . '/outside.flac'));
         }
     }

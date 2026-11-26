@@ -89,9 +89,11 @@ final class ToolingSourcePolicyTest extends TestCase
             self::assertSame([], SourcePolicy::violations($path, $source));
             $extra = "\nrequire \$unapprovedHelper;";
             self::assertContains('manual-loader', array_column(SourcePolicy::violations($path, $source . $extra), 'rule'));
-            self::assertContains('stale-exception', array_column(SourcePolicy::violations($path, str_replace('require ', 'include ', $source)), 'rule'));
+            $includeSource = str_replace('require ', 'include ', $source);
+            self::assertContains('stale-exception', array_column(SourcePolicy::violations($path, $includeSource), 'rule'));
             if (str_ends_with($path, 'Test.php')) {
-                self::assertContains('stale-exception', array_column(SourcePolicy::violations($path, str_replace('/vendor/autoload.php', '/helper.php', $source)), 'rule'));
+                $helperSource = str_replace('/vendor/autoload.php', '/helper.php', $source);
+                self::assertContains('stale-exception', array_column(SourcePolicy::violations($path, $helperSource), 'rule'));
             }
         }
     }
@@ -121,7 +123,8 @@ final class ToolingSourcePolicyTest extends TestCase
     {
         $path = 'packages/baander-process/src/Execution/RunningProcess.php';
         $source = (string) file_get_contents(dirname(__DIR__, 4) . '/' . $path);
-        self::assertContains('stale-exception', array_column(SourcePolicy::violations($path, str_replace('proc_open(', 'approvedExecutor(', $source)), 'rule'));
+        $movedSource = str_replace('proc_open(', 'approvedExecutor(', $source);
+        self::assertContains('stale-exception', array_column(SourcePolicy::violations($path, $movedSource), 'rule'));
         self::assertContains('process-engine', array_column(SourcePolicy::violations('packages/baander-process/src/Execution/NewEngine.php', $source), 'rule'));
     }
 
@@ -163,7 +166,8 @@ final class ToolingSourcePolicyTest extends TestCase
             self::assertCount(4, $violations);
             self::assertSame($packageSource . '/New/Added.php', $violations[0]['path']);
             self::assertSame('process-engine', $violations[0]['rule']);
-            self::assertSame(['composition-helper', 'composition-helper', 'composition-helper'], array_column(array_slice($violations, 1), 'rule'));
+            $helperViolations = array_slice($violations, 1);
+            self::assertSame(['composition-helper', 'composition-helper', 'composition-helper'], array_column($helperViolations, 'rule'));
         } finally {
             unlink($directory . '/Linked.php');
             unlink($directory . '/Added.php');

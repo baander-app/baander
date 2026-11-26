@@ -280,7 +280,8 @@ class Updater
             return false;
         }
         $docker = $this->connections->client($instance['docker']);
-        return array_all(array_unique(array_column($release['images'] ?? [], 'resolvedId')), $docker->holdsImage(...));
+        $imageIds = array_column($release['images'] ?? [], 'resolvedId');
+        return array_all(array_unique($imageIds), $docker->holdsImage(...));
     }
 
     /** @return array<string,mixed> */

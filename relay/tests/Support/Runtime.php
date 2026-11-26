@@ -175,10 +175,12 @@ final class Runtime
         for ($i = 1; $i < count($argv); ++$i) {
             $argument = $argv[$i];
             if ($argument === '--help' || $argument === '-h') {
-                echo 'Options: ' . implode(' ', array_map(static fn(string $name): string => '--' . $name, array_keys($allowed))) . "\n";
+                $optionNames = array_keys($allowed);
+                echo 'Options: ' . implode(' ', array_map(static fn(string $name): string => '--' . $name, $optionNames)) . "\n";
                 exit(0);
             }
-            [$name, $assigned] = array_pad(explode('=', substr($argument, 2), 2), 2, null);
+            $nameAndValue = substr($argument, 2);
+            [$name, $assigned] = array_pad(explode('=', $nameAndValue, 2), 2, null);
             self::requireThat(
                 str_starts_with($argv[$i], '--') && isset($allowed[$name]),
                 'Unknown argument: ' . $argv[$i],

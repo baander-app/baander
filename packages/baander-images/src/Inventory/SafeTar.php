@@ -145,7 +145,8 @@ final class SafeTar
                 throw new InventoryError('Truncated tar header');
             }
             $check = self::number(substr($header, 148, 8));
-            $sum = array_sum(unpack('C*', substr_replace($header, str_repeat(' ', 8), 148, 8)) ?: []);
+            $blankChecksum = str_repeat(' ', 8);
+            $sum = array_sum(unpack('C*', substr_replace($header, $blankChecksum, 148, 8)) ?: []);
             if ($check !== $sum) {
                 throw new InventoryError('Invalid tar checksum');
             }

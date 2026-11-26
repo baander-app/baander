@@ -199,7 +199,7 @@ final class DevelopmentUpdatesTest extends TestCase
         }
         // Every image of the saved release was looked up in the daemon before it was reused.
         self::assertEqualsCanonicalizing(
-            array_values(array_unique(array_column($this->instance['release']['images'], 'resolvedId'))),
+            array_column($this->instance['release']['images'], 'resolvedId') |> array_unique(...) |> array_values(...),
             $this->daemon->inspected,
         );
     }

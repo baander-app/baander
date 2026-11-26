@@ -55,7 +55,8 @@ if ($arguments[0] === 'info') {
     foreach ($images as $name => $image) {
         $filter = array_search('--filter', $arguments, true);
         if ($filter !== false) {
-            [$key, $value] = explode('=', substr($arguments[$filter + 1], strlen('label=')), 2);
+            $prefixLength = strlen('label=');
+            [$key, $value] = explode('=', substr($arguments[$filter + 1], $prefixLength), 2);
             if (($image['Config']['Labels'][$key] ?? null) !== $value) {
                 continue;
             }

@@ -100,7 +100,8 @@ final class Cli
                 $options['help'] = true;
                 continue;
             }
-            [$name, $inline] = array_pad(explode('=', substr($argument, 2), 2), 2, null);
+            $nameAndValue = substr($argument, 2);
+            [$name, $inline] = array_pad(explode('=', $nameAndValue, 2), 2, null);
             if (str_starts_with($argument, '--') && in_array($name, $flags, true) && $inline === null) {
                 $options[$name] = true;
             } elseif (str_starts_with($argument, '--') && in_array($name, $values, true)) {

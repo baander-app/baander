@@ -103,7 +103,7 @@ final class ReferencePages
             }
         }
         $errors = array_map(
-            static fn(string $path): string => self::PRESETS . '/' . basename($path) . ': not one of the six example presets, ' . implode(', ', array_map(basename(...), array_keys($expected))),
+            static fn(string $path): string => self::PRESETS . '/' . basename($path) . ': not one of the six example presets, ' . self::presetNames($expected),
             array_filter(
                 glob($root . '/' . self::PRESETS . '/*.json') ?: [],
                 static fn(string $path): bool => !isset($expected[self::PRESETS . '/' . basename($path)]),
@@ -164,6 +164,14 @@ final class ReferencePages
             $errors[] = $path . ': size.' . $unknown . ': unknown key';
         }
 
-        return [array_filter(array_intersect_key($size, array_flip($known)), is_int(...)), array_values(array_filter($errors, is_string(...)))];
+        $knownKeys = array_flip($known);
+        return [array_filter(array_intersect_key($size, $knownKeys), is_int(...)), array_values(array_filter($errors, is_string(...)))];
+    }
+
+    /** @param array<string,array{gigabytes:int,capability:string}> $expected */
+    private static function presetNames(array $expected): string
+    {
+        $presetPaths = array_keys($expected);
+        return implode(', ', array_map(basename(...), $presetPaths));
     }
 }

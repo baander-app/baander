@@ -51,7 +51,8 @@ final class EnrollmentIssuerContract
             }
             foreach ([31, 4097, 6000] as $length) {
                 file_put_contents($key, str_repeat('secret', (int) ceil($length / 6)));
-                file_put_contents($key, substr(file_get_contents($key), 0, $length));
+                $keyContents = file_get_contents($key);
+                file_put_contents($key, substr($keyContents, 0, $length));
                 $result = Runtime::run($command);
                 $check(
                     $result['code'] !== 0 && $result['stdout'] === '' && !str_contains($result['stderr'], 'secret'),

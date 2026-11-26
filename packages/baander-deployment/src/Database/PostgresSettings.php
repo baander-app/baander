@@ -46,7 +46,8 @@ final class PostgresSettings
 
     public function verificationSql(): string
     {
-        $names = implode(', ', array_map(static fn(string $name): string => "('" . $name . "')", array_keys($this->settings)));
+        $settingNames = array_keys($this->settings);
+        $names = implode(', ', array_map(static fn(string $name): string => "('" . $name . "')", $settingNames));
         return <<<SQL
 BEGIN READ ONLY;
 -- A superuser runs this in the database the application role owns, and an owner may set the

@@ -59,7 +59,7 @@ final class Dataset
                 'path' => sprintf('%s/%s/%s/source.%s', $run, $episode ? 'episodes' : 'movies', $title, $extension),
                 'template' => $template, 'duration' => $index <= 4 ? $playbackSeconds : 60,
                 'videoCodec' => 'h264', 'audioCodec' => $index === 5 ? null : ($index === 8 ? 'ac3' : 'aac'),
-                'metadata' => ['id' => self::identifier($run . ':video:' . $index), 'tmdbId' => 700000000 + (hexdec(substr(hash('sha256', $run), 0, 5)) % 1000000) * 1000 + $index],
+                'metadata' => ['id' => self::identifier($run . ':video:' . $index), 'tmdbId' => 700000000 + ((substr(hash('sha256', $run), 0, 5) |> hexdec(...)) % 1000000) * 1000 + $index],
             ];
         }
         return [
@@ -101,7 +101,8 @@ final class Dataset
         if ($source === false) {
             throw new RuntimeException('Qualification generation resource is missing.');
         }
-        return str_replace("'QUALIFICATION_PLAN_BASE64'", var_export(base64_encode(json_encode($plan, JSON_THROW_ON_ERROR)), true), $source);
+        $encodedPlan = base64_encode(json_encode($plan, JSON_THROW_ON_ERROR));
+        return str_replace("'QUALIFICATION_PLAN_BASE64'", var_export($encodedPlan, true), $source);
     }
 
     /** @return array<string,mixed> */

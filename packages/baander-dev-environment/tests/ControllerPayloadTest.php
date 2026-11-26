@@ -184,7 +184,7 @@ CODE);
     public function testRetirementRejectsEscapingAndMisplacedPackageLinks(string $directory, string $target): void
     {
         $this->payload->publish($this->root . '/source');
-        $retired = $this->generation(bin2hex(random_bytes(16)));
+        $retired = random_bytes(16) |> bin2hex(...) |> $this->generation(...);
         mkdir($retired . '/' . $directory, 0700, true);
         $link = $retired . '/' . $directory . '/retired';
         symlink($target, $link);
@@ -272,7 +272,7 @@ CODE);
             $this->payload->publish($this->root . '/source');
             self::fail('A directory selector was accepted.');
         } catch (\RuntimeException) {
-            $generations = array_values(array_diff(scandir($this->root . '/state/controller/generations'), ['.', '..']));
+            $generations = array_diff(scandir($this->root . '/state/controller/generations'), ['.', '..']) |> array_values(...);
             self::assertCount(2, $generations);
             foreach ($generations as $generation) {
                 self::assertFileExists($this->generation($generation) . '/scripts/dev-environment.php');
@@ -280,7 +280,8 @@ CODE);
             rmdir($this->root . '/state/controller/selected.json');
             AtomicFile::writeJson($this->root . '/state/controller/selected.json', ['generation' => $old]);
             $this->payload->retireUnused();
-            self::assertSame([$old], array_values(array_diff(scandir($this->root . '/state/controller/generations'), ['.', '..'])));
+            $remainingGenerations = array_diff(scandir($this->root . '/state/controller/generations'), ['.', '..']);
+            self::assertSame([$old], array_values($remainingGenerations));
         }
     }
 

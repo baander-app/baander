@@ -271,7 +271,8 @@ PHP);
         $log = $matches[1];
         try {
             self::assertStringContainsString('qualification build failure', file_get_contents($log));
-            self::assertSame(['build.log'], array_values(array_diff(scandir(dirname($log)), ['.', '..'])));
+            $logEntries = array_diff($log |> dirname(...) |> scandir(...), ['.', '..']);
+            self::assertSame(['build.log'], array_values($logEntries));
         } finally {
             unlink($log);
             rmdir(dirname($log));

@@ -196,7 +196,8 @@ final class MetadataTransport
             return self::releaseSearch($query['query'], $releases);
         }
         if (str_starts_with($path, '/ws/2/release/') && ($query['inc'] ?? null) === self::RELEASE_INCLUDES && array_diff(array_keys($query), ['fmt', 'inc']) === []) {
-            return self::releaseLookup(substr($path, strlen('/ws/2/release/')), $releases);
+            $prefixLength = strlen('/ws/2/release/');
+            return self::releaseLookup(substr($path, $prefixLength), $releases);
         }
         if (($query['inc'] ?? null) === self::ARTIST_INCLUDES && array_diff(array_keys($query), ['fmt', 'inc']) === []
             && preg_match('#\A/ws/2/artist/([^/]+)\z#', $path, $segment) === 1) {

@@ -111,7 +111,7 @@ final class ToolingConfigurationTest extends TestCase
             'checkpoints' => ['controlCapacity' => '/tmp/baander.app-checkpoint'],
         ])->toArray();
         unset($snapshot['images']['mailpit'], $snapshot['budgets']['webRuntime']);
-        $saved = ToolingConfiguration::fromArray(json_decode(json_encode($snapshot, JSON_THROW_ON_ERROR), true, flags: JSON_THROW_ON_ERROR));
+        $saved = json_decode(json_encode($snapshot, JSON_THROW_ON_ERROR), true, flags: JSON_THROW_ON_ERROR) |> ToolingConfiguration::fromArray(...);
         self::assertEquals($snapshot, $saved->toArray());
         self::assertSame(37.0, $saved->budgets->seconds('backend'));
         $this->expectException(\InvalidArgumentException::class);

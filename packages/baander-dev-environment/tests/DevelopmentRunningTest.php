@@ -93,7 +93,7 @@ final class DevelopmentRunningTest extends TestCase
     public function testRunningContainersAreNotRestartedForUnhealthyFunctionalStatus(): void
     {
         self::assertTrue($this->observe($this->containers(), 'preview'));
-        self::assertTrue($this->observe(array_slice($this->containers(), 0, 5)));
+        array_slice($this->containers(), 0, 5) |> $this->observe(...) |> self::assertTrue(...);
     }
 
     public function testMissingOrStoppedContainersAreObserved(): void

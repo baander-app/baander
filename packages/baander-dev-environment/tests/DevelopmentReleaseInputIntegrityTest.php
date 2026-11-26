@@ -75,7 +75,8 @@ final class DevelopmentReleaseInputIntegrityTest extends TestCase
         self::assertSame(hash_file('sha256', $environment), $data['inputs'][$environment]);
         self::assertEquals(['type' => 'file', 'digest' => hash('sha256', '<?php // original migration'), 'mode' => 0600], $data['sourceIdentity']['migrations/Version20261029000000.php']);
         self::assertEquals(['type' => 'link', 'digest' => hash('sha256', '../bin/console'), 'mode' => 0777], $data['sourceIdentity']['src/console-link']);
-        self::assertSame(hash('sha256', json_encode($data['sourceIdentity'], JSON_THROW_ON_ERROR)), $data['sourceDigest']);
+        $identityJson = json_encode($data['sourceIdentity'], JSON_THROW_ON_ERROR);
+        self::assertSame(hash('sha256', $identityJson), $data['sourceDigest']);
         $contract->validateInputs($this->instance);
         self::assertDirectoryDoesNotExist($this->root . '/missing-media');
     }

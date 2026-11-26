@@ -69,7 +69,8 @@ final class Commands
                 if (($inventory['schema'] ?? null) !== ApplicationInventory::SCHEMA) {
                     throw new InventoryError('unsupported inventory schema');
                 }
-                $identity = ApplicationInventory::imageIdentity(Json::read($required('image-inspect')), $inventory['identity']['target']);
+                $inspectionPath = $required('image-inspect');
+                $identity = ApplicationInventory::imageIdentity(Json::read($inspectionPath), $inventory['identity']['target']);
                 $result = ApplicationInventory::verify($required('root'), $required('inventory'), $required('revision'), $identity);
             } else {
                 throw new InventoryError('Unknown command: ' . $command);

@@ -46,7 +46,8 @@ SOURCE,
         ];
         foreach ($sources as $source) {
             $html = new CodeHighlighter()->highlight($source);
-            self::assertSame($source, html_entity_decode(strip_tags($html), ENT_QUOTES | ENT_HTML5, 'UTF-8'));
+            $plainText = strip_tags($html);
+            self::assertSame($source, html_entity_decode($plainText, ENT_QUOTES | ENT_HTML5, 'UTF-8'));
             self::assertDoesNotMatchRegularExpression('/<(?!\/?span(?: |>)|$)/', $html);
         }
     }
@@ -89,7 +90,8 @@ SOURCE;
             self::assertStringContainsString('<span class="tok-' . $role . '">' . $text . '</span>', $html, $text . ' should be ' . $role);
         }
         self::assertStringNotContainsString('<span class="tok-function">Track</span>', $html, 'Instantiation names a type, not a function call');
-        self::assertSame($source, html_entity_decode(strip_tags($html), ENT_QUOTES | ENT_HTML5, 'UTF-8'));
+        $plainText = strip_tags($html);
+        self::assertSame($source, html_entity_decode($plainText, ENT_QUOTES | ENT_HTML5, 'UTF-8'));
     }
 
     public function testEscapesInlineHtmlWithoutIntroducingMarkup(): void
@@ -98,6 +100,7 @@ SOURCE;
         $html = new CodeHighlighter()->highlight($source);
         self::assertStringNotContainsString('<script', $html);
         self::assertStringNotContainsString('<img', $html);
-        self::assertSame($source, html_entity_decode(strip_tags($html), ENT_QUOTES | ENT_HTML5, 'UTF-8'));
+        $plainText = strip_tags($html);
+        self::assertSame($source, html_entity_decode($plainText, ENT_QUOTES | ENT_HTML5, 'UTF-8'));
     }
 }

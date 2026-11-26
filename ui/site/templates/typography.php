@@ -15,7 +15,7 @@ $scripts = static function (string $text): string {
         'burmese' => $burmese,
         'burmese-only' => $burmese && preg_match('/^[\p{Myanmar}\p{N}\p{P}\p{Z}\s\x{200B}-\x{200D}]*$/u', $text) === 1,
     ];
-    return implode(' ', array_keys(array_filter($markers)));
+    return implode(' ', $markers |> array_filter(...) |> array_keys(...));
 };
 $sample = static function (string $role, string $lang, string $text, string $class = '') use ($escape, $scripts): string {
     $markers = $scripts($text);
@@ -82,7 +82,7 @@ $rules = [
               <?= $sample($role, $lang, $text) ?>
             <?php endforeach; ?>
           </div>
-          <p class="typography-roles">Set in <?= $escape(implode(', ', array_column($specimen['samples'], 0))) ?>.</p>
+          <p class="typography-roles">Set in <?= implode(', ', array_column($specimen['samples'], 0)) |> $escape(...) ?>.</p>
         </article>
       <?php endforeach; ?>
     </div>
@@ -98,7 +98,7 @@ $rules = [
       <?php foreach ($type['forms'] as $form): ?>
         <figure class="typography-form">
           <figcaption><?= $escape($form['language']) ?><span><?= $escape($form['family']) ?> · lang="<?= $escape($form['lang']) ?>"</span></figcaption>
-          <p class="typography-glyphs" lang="<?= $escape($form['lang']) ?>" data-script="<?= $scripts($type['han']) ?>"><?= $escape(implode(' ', mb_str_split($type['han']))) ?></p>
+          <p class="typography-glyphs" lang="<?= $escape($form['lang']) ?>" data-script="<?= $scripts($type['han']) ?>"><?= implode(' ', mb_str_split($type['han'])) |> $escape(...) ?></p>
         </figure>
       <?php endforeach; ?>
     </div>
