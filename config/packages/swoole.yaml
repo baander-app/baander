@@ -28,8 +28,10 @@ swoole:
             strategy: 'advanced' # "advanced" uses sendfile + mmap for zero-copy static file serving
             public_dir: '%kernel.project_dir%/public'
 
-            # File extensions to mime types map.
-            mime_types: [ ]
+            # File extensions to mime types map, merged over the bundle's defaults.
+            # WebAssembly.compileStreaming() refuses a module served without application/wasm.
+            mime_types:
+                wasm: application/wasm
         exception_handler:
             type: auto # One of "json"; "production"; "symfony"; "custom"; "auto"
             verbosity: auto # One of "trace"; "verbose"; "default"; "auto"

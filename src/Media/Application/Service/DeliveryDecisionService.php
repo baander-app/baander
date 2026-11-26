@@ -73,7 +73,13 @@ final readonly class DeliveryDecisionService implements DeliveryDecisionPortInte
             return new DeliveryDecision(DeliveryKind::Incompatible, 'audio_stream_unavailable');
         }
         $media = new DeliverySource(
-            $this->container(MediaKind::Video, $source->containerFormat, $source->filename),
+            $this->container(
+                MediaKind::Video,
+                $source->containerFormat,
+                $source->filename,
+                $source->videoCodec,
+                array_map(static fn(array $stream): ?string => is_string($stream['codec'] ?? null) ? $stream['codec'] : null, $source->audioStreams),
+            ),
             $source->videoCodec,
             $source->videoStreamIndex,
             is_string($selected['codec'] ?? null) ? $selected['codec'] : null,
@@ -203,12 +209,15 @@ final readonly class DeliveryDecisionService implements DeliveryDecisionPortInte
 
     /**
      * The name a destination lists for the source's container: the demuxer's name, except
-     * inside a family one demuxer reads, where the file extension picks the member. A probed
-     * format that no container of the kind is read by has no name, so it is never an original.
+     * inside a family one demuxer reads, where the file extension and the codecs pick the
+     * member. A probed format that no container of the kind is read by has no name, so it is
+     * never an original.
+     *
+     * @param list<?string> $audioCodecs
      */
-    private function container(MediaKind $kind, ?string $format, string $filename): ?string
+    private function container(MediaKind $kind, ?string $format, string $filename, ?string $videoCodec = null, array $audioCodecs = []): ?string
     {
-        $container = MediaContainer::identify($kind, $format, pathinfo($filename, PATHINFO_EXTENSION));
+        $container = MediaContainer::identify($kind, $format, pathinfo($filename, PATHINFO_EXTENSION), $videoCodec, $audioCodecs);
 
         return match ($container) {
             null => null,

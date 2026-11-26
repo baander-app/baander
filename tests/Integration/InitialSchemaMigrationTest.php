@@ -114,7 +114,7 @@ final class InitialSchemaMigrationTest extends TestCase
         );
         $factory = $this->factory();
         $factory->getMetadataStorage()->ensureInitialized();
-        self::assertCount(49, $factory->getMigrationRepository()->getMigrations());
+        self::assertCount(50, $factory->getMigrationRepository()->getMigrations());
         self::assertSame(0, $this->migrate($factory));
         self::assertSame([
             'DoctrineMigrations\\Version20261017000000',
@@ -166,6 +166,7 @@ final class InitialSchemaMigrationTest extends TestCase
             'DoctrineMigrations\\Version20261125151723',
             'DoctrineMigrations\\Version20261126212434',
             'DoctrineMigrations\\Version20261126213944',
+            'DoctrineMigrations\\Version20261126220235',
         ], $this->connection->fetchFirstColumn('SELECT version FROM doctrine_migration_versions ORDER BY version'));
         self::assertSame(108, (int) $this->connection->fetchOne("SELECT count(*) FROM pg_tables WHERE schemaname = 'public' AND tablename <> 'doctrine_migration_versions'"));
         self::assertSame(['TimeZone=UTC'], $this->databaseSettings($this->connection));
@@ -186,7 +187,7 @@ final class InitialSchemaMigrationTest extends TestCase
         self::assertSame($history, $this->connection->fetchAllAssociative('SELECT * FROM doctrine_migration_versions'));
 
         self::assertSame(0, $this->migrate($this->factory(true)));
-        self::assertSame(50, (int) $this->connection->fetchOne('SELECT count(*) FROM doctrine_migration_versions'));
+        self::assertSame(51, (int) $this->connection->fetchOne('SELECT count(*) FROM doctrine_migration_versions'));
         self::assertSame('future_migration_probe', $this->connection->fetchOne("SELECT to_regclass('future_migration_probe')::text"));
     }
 

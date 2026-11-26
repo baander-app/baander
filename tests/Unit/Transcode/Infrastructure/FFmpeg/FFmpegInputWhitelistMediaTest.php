@@ -6,6 +6,7 @@ namespace App\Tests\Unit\Transcode\Infrastructure\FFmpeg;
 
 use App\Shared\Domain\ValueObject\MediaContainer;
 use App\Shared\Domain\ValueObject\MediaKind;
+use App\Transcode\Domain\ValueObject\AudioStreamInfo;
 use App\Transcode\Domain\ValueObject\PresentationSelection;
 use App\Transcode\Domain\ValueObject\VideoProbeResult;
 use App\Transcode\Infrastructure\FFmpeg\CopySegmentArguments;
@@ -117,12 +118,20 @@ final class FFmpegInputWhitelistMediaTest extends TestCase
         self::assertSame(0, $probe->getExitCode(), $probe->getErrorOutput());
         $format = json_decode($probe->getOutput(), true, 512, JSON_THROW_ON_ERROR)['format']['format_name'] ?? null;
         self::assertIsString($format);
-        self::assertSame($container, MediaContainer::identify($container->kind(), $format, $extension));
-        if ($video) {
+        if (!$video) {
+            self::assertSame($container, MediaContainer::identify($container->kind(), $format, $extension));
+        } else {
             $reference = $this->runMedia(['/usr/bin/ffprobe', '-threads', '2', '-v', 'quiet', '-print_format', 'json',
                 '-show_format', '-show_streams', '-show_chapters', '-show_packets', '-read_intervals', '%+#128',
                 '-show_entries', 'packet=stream_index,pts_time,flags', $path]);
             $result = VideoProbeResult::fromProbeOutput(json_decode($probe->getOutput(), true, 512, JSON_THROW_ON_ERROR));
+            self::assertSame($container, MediaContainer::identify(
+                $container->kind(),
+                $format,
+                $extension,
+                $result->videoCodec,
+                array_map(static fn (AudioStreamInfo $stream): string => $stream->codec, $result->audioStreams),
+            ));
             $referenceProbe = json_decode($reference, true, 512, JSON_THROW_ON_ERROR);
             self::assertEquals(VideoProbeResult::fromProbeOutput($referenceProbe), $result);
             if ($container === MediaContainer::Matroska) {

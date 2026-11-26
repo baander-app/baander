@@ -58,6 +58,34 @@ All endpoints are prefixed with `/api`.
 
 A library file is served with the media type that the container table (`MediaContainer` in the Shared kernel) gives for its probed format and file extension, never a type read from its bytes. Catalog's `VideoService` types a video and `StreamService` types a track. A row with no probed format is typed by its extension. A probed format that no container of the file's kind is read by, or an unlisted extension on an unprobed row, goes out as `application/octet-stream`. `DeliveryDecisionService` names the source's container through the same lookup, so a format the table does not list is never offered as an original. Every file response of `/api/stream/video`, `/api/stream/original/track` and `/api/stream/track`, completed renditions included, carries `Content-Disposition: attachment`, `Content-Security-Policy: default-src 'none'; sandbox` and `nosniff`. The disposition names no file, because Symfony refuses a non-ASCII or `%` fallback name and library files have such names. The disposition and the policy act only on navigation: a signed URL opened as a page downloads the file and runs nothing, while `<video>`, `<audio>`, Media Source Extensions and `fetch` read the body as before. The progressive response of a rendition still being encoded carries the default policy that `SecurityHeadersListener` gives every non-HTML response.
 
+### Media types of originals
+
+An original file is served with the `Content-Type` that `MediaContainer::mediaType()` gives its container. A player, the planned native iOS and Android apps included, receives one of these values:
+
+| Container | Extensions | Media type |
+|-----------|------------|------------|
+| MP3 | `mp3` | `audio/mpeg` |
+| FLAC | `flac` | `audio/flac` |
+| Ogg | `ogg`, `oga` | `audio/ogg` |
+| Ogg Opus | `opus` | `audio/ogg` |
+| WAV | `wav`, `wave` | `audio/wav` |
+| AAC (ADTS) | `aac` | `audio/aac` |
+| MPEG-4 audio | `m4a`, `mp4a`, `m4b` | `audio/mp4` |
+| WMA | `wma` | `audio/x-ms-wma` |
+| AIFF | `aif`, `aiff`, `aifc` | `audio/aiff` |
+| MPEG-4 | `mp4`, `m4v` | `video/mp4` |
+| QuickTime | `mov` | `video/quicktime` |
+| Matroska | `mkv` | `video/x-matroska` |
+| WebM | `webm` | `video/webm` |
+| AVI | `avi` | `video/x-msvideo` |
+| WMV | `wmv` | `video/x-ms-wmv` |
+
+An Ogg Opus file goes out as `audio/ogg`, the type RFC 7845 registers for it.
+
+WebM is the profile of Matroska that holds only VP8, VP9 or AV1 video with Vorbis or Opus audio, and one demuxer reads both. A probed `.webm` file is therefore WebM only when its video codec and the codec of every audio stream are among those. Otherwise it is Matroska: it goes out as `video/x-matroska`, and delivery offers it as the original only to a destination that lists `matroska`. A row without a probed format is typed by its extension alone.
+
+A completed audio rendition goes out as `audio/ogg` for Opus, `audio/aac` for AAC and `audio/mpeg` for MP3, and an AAC stream copy as `audio/mp4`.
+
 ## Infrastructure
 
 | Component | Purpose |

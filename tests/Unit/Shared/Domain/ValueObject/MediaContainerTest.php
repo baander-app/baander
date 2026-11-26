@@ -70,7 +70,8 @@ final class MediaContainerTest extends TestCase
         yield 'MP4 film' => [MediaKind::Video, $mp4, 'mp4', MediaContainer::Mpeg4];
         yield 'QuickTime film' => [MediaKind::Video, $mp4, 'MOV', MediaContainer::QuickTime];
         yield 'M4A song' => [MediaKind::Audio, $mp4, 'm4a', MediaContainer::Mpeg4Audio];
-        yield 'Matroska named WebM' => [MediaKind::Video, 'matroska,webm', 'webm', MediaContainer::WebM];
+        yield 'Matroska named WebM, codecs unknown' => [MediaKind::Video, 'matroska,webm', 'webm', MediaContainer::Matroska];
+        yield 'unprobed WebM' => [MediaKind::Video, null, 'webm', MediaContainer::WebM];
         yield 'Matroska named AVI' => [MediaKind::Video, 'matroska,webm', 'avi', MediaContainer::Matroska];
         yield 'Opus in Ogg' => [MediaKind::Audio, 'ogg', 'opus', MediaContainer::Opus];
         yield 'WMV' => [MediaKind::Video, 'asf', 'wmv', MediaContainer::Wmv];
@@ -81,5 +82,29 @@ final class MediaContainerTest extends TestCase
         yield 'Matroska probed for a song' => [MediaKind::Audio, 'matroska,webm', 'mp3', null];
         yield 'no probed format, known extension' => [MediaKind::Audio, null, 'flac', MediaContainer::Flac];
         yield 'no probed format, extension of the other kind' => [MediaKind::Audio, null, 'mkv', null];
+    }
+
+    /** @param list<?string> $audioCodecs */
+    #[DataProvider('filesNamedWebM')]
+    public function testAFileTheMatroskaDemuxerReadsIsWebMOnlyWithWebMCodecs(?string $videoCodec, array $audioCodecs, MediaContainer $expected): void
+    {
+        self::assertSame($expected, MediaContainer::identify(MediaKind::Video, 'matroska,webm', 'webm', $videoCodec, $audioCodecs));
+    }
+
+    /** @return iterable<string, array{?string, list<?string>, MediaContainer}> */
+    public static function filesNamedWebM(): iterable
+    {
+        yield 'VP9 with Opus' => ['vp9', ['opus'], MediaContainer::WebM];
+        yield 'VP8 with Vorbis' => ['vp8', ['vorbis'], MediaContainer::WebM];
+        yield 'AV1 without audio' => ['av1', [], MediaContainer::WebM];
+        yield 'H.264 with AAC' => ['h264', ['aac'], MediaContainer::Matroska];
+        yield 'VP9 with an AAC stream beside Opus' => ['vp9', ['opus', 'aac'], MediaContainer::Matroska];
+        yield 'VP9 with an audio stream of unknown codec' => ['vp9', [null], MediaContainer::Matroska];
+        yield 'unknown video codec with Opus' => [null, ['opus'], MediaContainer::Matroska];
+    }
+
+    public function testAnOggOpusFileHasTheTypeRegisteredForOgg(): void
+    {
+        self::assertSame('audio/ogg', MediaContainer::identify(MediaKind::Audio, 'ogg', 'opus')?->mediaType());
     }
 }

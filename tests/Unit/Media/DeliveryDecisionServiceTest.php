@@ -83,25 +83,42 @@ final class DeliveryDecisionServiceTest extends TestCase
         );
     }
 
-    /** @return iterable<string, array{string, string, string}> */
+    /** @return iterable<string, array{string, string, string, string, string}> */
     public static function originalContainers(): iterable
     {
-        yield 'mp4' => ['movie.mp4', 'mov,mp4,m4a,3gp,3g2,mj2', 'mp4'];
-        yield 'mov' => ['movie.mov', 'mov,mp4,m4a,3gp,3g2,mj2', 'mov'];
-        yield 'matroska' => ['movie.mkv', 'matroska,webm', 'matroska'];
-        yield 'webm' => ['movie.webm', 'matroska,webm', 'webm'];
+        yield 'mp4' => ['movie.mp4', 'mov,mp4,m4a,3gp,3g2,mj2', 'mp4', 'h264', 'aac'];
+        yield 'mov' => ['movie.mov', 'mov,mp4,m4a,3gp,3g2,mj2', 'mov', 'h264', 'aac'];
+        yield 'matroska' => ['movie.mkv', 'matroska,webm', 'matroska', 'h264', 'aac'];
+        yield 'webm' => ['movie.webm', 'matroska,webm', 'webm', 'vp9', 'opus'];
+        yield 'matroska named webm' => ['movie.webm', 'matroska,webm', 'matroska', 'h264', 'aac'];
     }
 
     #[DataProvider('originalContainers')]
-    public function testTheContainerIsNamedFromTheProbeAndTheExtensionNotTheServedType(string $filename, string $format, string $container): void
-    {
-        $decision = $this->service(videos: $this->video($filename, $format))->video(
+    public function testTheContainerIsNamedFromTheProbeAndTheExtensionNotTheServedType(
+        string $filename,
+        string $format,
+        string $container,
+        string $videoCodec,
+        string $audioCodec,
+    ): void {
+        $decision = $this->service(videos: $this->video($filename, $format, $videoCodec, $audioCodec))->video(
             new Uuid(),
             new PublicId(),
-            new DeliveryDestination([$container], ['h264'], ['aac']),
+            new DeliveryDestination([$container], [$videoCodec], [$audioCodec]),
         );
 
         self::assertSame(DeliveryKind::Original, $decision->kind);
+    }
+
+    public function testAnH264FileNamedWebMIsNotOfferedAsTheOriginalToADestinationThatPlaysOnlyWebM(): void
+    {
+        $decision = $this->service(videos: $this->video('clip.webm', 'matroska,webm'))->video(
+            new Uuid(),
+            new PublicId(),
+            new DeliveryDestination(['webm'], ['h264'], ['aac']),
+        );
+
+        self::assertNotSame(DeliveryKind::Original, $decision->kind);
     }
 
     public function testAFormatNoVideoContainerIsReadByIsNeverOfferedAsTheOriginal(): void
@@ -720,7 +737,7 @@ final class DeliveryDecisionServiceTest extends TestCase
     }
 
     /** A source whose served type is unknown, so only its probe and extension can name the container. */
-    private function video(string $filename, string $format): VideoPortInterface
+    private function video(string $filename, string $format, string $videoCodec = 'h264', string $audioCodec = 'aac'): VideoPortInterface
     {
         $videos = $this->createStub(VideoPortInterface::class);
         $videos->method('getSourceMetadata')->willReturn(new VideoSourceMetadata(
@@ -732,9 +749,9 @@ final class DeliveryDecisionServiceTest extends TestCase
             'application/octet-stream',
             'hash',
             $format,
-            'h264',
+            $videoCodec,
             0,
-            [['codec' => 'aac', 'channels' => 2, 'streamIndex' => 1, 'isDefault' => true]],
+            [['codec' => $audioCodec, 'channels' => 2, 'streamIndex' => 1, 'isDefault' => true]],
             1920,
             1080,
             24.0,

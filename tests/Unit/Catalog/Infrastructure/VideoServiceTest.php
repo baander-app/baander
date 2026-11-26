@@ -44,19 +44,30 @@ final class VideoServiceTest extends TestCase
         self::assertNull(new VideoService($videos, $files)->getSourceMetadata($video->getPublicId(), LibraryReadScope::restricted([$library])));
     }
 
-    /** @return iterable<string, array{string, ?string, string}> */
+    /** @return iterable<string, array{string, array<string, mixed>, string}> */
     public static function servedTypes(): iterable
     {
-        yield 'matroska probe' => ['/catalog/Amélie (2001).mkv', 'matroska,webm', 'video/x-matroska'];
-        yield 'webm member of the matroska family' => ['/catalog/clip.webm', 'matroska,webm', 'video/webm'];
-        yield 'quicktime member of the mp4 family' => ['/catalog/clip.mov', 'mov,mp4,m4a,3gp,3g2,mj2', 'video/quicktime'];
-        yield 'unprobed row typed by its extension' => ['/catalog/clip.mp4', null, 'video/mp4'];
-        yield 'format of no video container' => ['/catalog/clip.mkv', 'mpegts', 'application/octet-stream'];
-        yield 'extension of no video container' => ['/catalog/clip.xml', null, 'application/octet-stream'];
+        $matroska = 'matroska,webm';
+        yield 'matroska probe' => ['/catalog/Amélie (2001).mkv', ['containerFormat' => $matroska], 'video/x-matroska'];
+        yield 'webm member of the matroska family' => [
+            '/catalog/clip.webm',
+            ['containerFormat' => $matroska, 'videoCodec' => 'vp9', 'audioStreams' => [['codec' => 'opus']]],
+            'video/webm',
+        ];
+        yield 'matroska named webm' => [
+            '/catalog/clip.webm',
+            ['containerFormat' => $matroska, 'videoCodec' => 'h264', 'audioStreams' => [['codec' => 'aac']]],
+            'video/x-matroska',
+        ];
+        yield 'quicktime member of the mp4 family' => ['/catalog/clip.mov', ['containerFormat' => 'mov,mp4,m4a,3gp,3g2,mj2'], 'video/quicktime'];
+        yield 'unprobed row typed by its extension' => ['/catalog/clip.mp4', [], 'video/mp4'];
+        yield 'format of no video container' => ['/catalog/clip.mkv', ['containerFormat' => 'mpegts'], 'application/octet-stream'];
+        yield 'extension of no video container' => ['/catalog/clip.xml', [], 'application/octet-stream'];
     }
 
+    /** @param array<string, mixed> $probe */
     #[DataProvider('servedTypes')]
-    public function testTheServedTypeComesFromTheContainerTableNeverFromTheBytes(string $catalogPath, ?string $containerFormat, string $type): void
+    public function testTheServedTypeComesFromTheContainerTableNeverFromTheBytes(string $catalogPath, array $probe, string $type): void
     {
         $path = tempnam(sys_get_temp_dir(), 'video-source-');
         self::assertNotFalse($path);
@@ -65,8 +76,8 @@ final class VideoServiceTest extends TestCase
             $videos = $this->createStub(VideoRepositoryInterface::class);
             $files = $this->createStub(LibraryMediaFileResolverInterface::class);
             $video = Video::create($catalogPath, 'source-hash');
-            if ($containerFormat !== null) {
-                $video->updateProbe(['containerFormat' => $containerFormat]);
+            if ($probe !== []) {
+                $video->updateProbe($probe);
             }
             $videos->method('getLibraryIdsByPublicId')->willReturn([new Uuid()]);
             $videos->method('findByPublicId')->willReturn($video);

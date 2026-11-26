@@ -12,6 +12,7 @@ use Swoole\Http\{Request, Response};
 use SwooleBundle\SwooleBundle\Server\HttpServerConfiguration;
 use SwooleBundle\SwooleBundle\Server\RequestHandler\{AdvancedStaticFilesServer, RequestHandler};
 use Symfony\Component\Filesystem\Filesystem;
+use Symfony\Component\Yaml\Yaml;
 
 final class AdvancedStaticFilesServerTest extends TestCase
 {
@@ -133,6 +134,20 @@ final class AdvancedStaticFilesServerTest extends TestCase
         self::assertSame($type, $headers['Content-Type'] ?? null);
     }
 
+    public function testTheConfiguredTypesServeTheDspModulesAsWebAssembly(): void
+    {
+        $configuration = Yaml::parseFile(dirname(__DIR__, 5) . '/config/packages/swoole.yaml', Yaml::PARSE_CUSTOM_TAGS);
+        new Filesystem()->dumpFile($this->public . '/dsp/loudness_r128.wasm', 'asset');
+        $response = $this->createMock(Response::class);
+        $headers = $this->recordHeaders($response);
+        $response->expects(self::once())->method('sendfile')->with($this->public . '/dsp/loudness_r128.wasm')->willReturn(true);
+
+        $this->server($this->neverReached(), $configuration['swoole']['http_server']['static']['mime_types'])
+            ->handle(self::get('/dsp/loudness_r128.wasm'), $response);
+
+        self::assertSame('application/wasm', $headers['Content-Type'] ?? null);
+    }
+
     public function testAnAssetPathThatResolvesOutsideThePublicDirectoryIsRefused(): void
     {
         $fallback = $this->createMock(RequestHandler::class);
@@ -144,12 +159,13 @@ final class AdvancedStaticFilesServerTest extends TestCase
         $this->server($fallback)->handle(self::get('/assets/../../secret.txt'), $response);
     }
 
-    private function server(RequestHandler $fallback): AdvancedStaticFilesServer
+    /** @param array<string, string> $mimeTypes */
+    private function server(RequestHandler $fallback, array $mimeTypes = []): AdvancedStaticFilesServer
     {
         $configuration = $this->createStub(HttpServerConfiguration::class);
         $configuration->method('hasPublicDir')->willReturn(true);
         $configuration->method('getPublicDir')->willReturn($this->public);
-        $server = new AdvancedStaticFilesServer($fallback, $configuration);
+        $server = new AdvancedStaticFilesServer($fallback, $configuration, $mimeTypes);
         $server->boot();
 
         return $server;

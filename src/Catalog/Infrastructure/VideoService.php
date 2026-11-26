@@ -51,8 +51,13 @@ final readonly class VideoService implements VideoPortInterface
                 filePath: $path,
                 filename: $filename,
                 size: $size === false ? 0 : $size,
-                mimeType: MediaContainer::identify(MediaKind::Video, $containerFormat, pathinfo($filename, PATHINFO_EXTENSION))?->mediaType()
-                    ?? 'application/octet-stream',
+                mimeType: MediaContainer::identify(
+                    MediaKind::Video,
+                    $containerFormat,
+                    pathinfo($filename, PATHINFO_EXTENSION),
+                    $probe['videoCodec'] ?? null,
+                    array_map(static fn(array $stream): ?string => is_string($stream['codec'] ?? null) ? $stream['codec'] : null, $probe['audioStreams'] ?? []),
+                )?->mediaType() ?? 'application/octet-stream',
                 hash: $video->getHash(),
                 containerFormat: $containerFormat,
                 videoCodec: $probe['videoCodec'] ?? null,
