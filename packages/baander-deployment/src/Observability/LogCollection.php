@@ -98,7 +98,8 @@ http {
     }
     server {
         listen unix:@SOCKET@;
-        location ~ "^(/v1\.[0-9]+)?/(info|containers/json|events|containers/[A-Za-z0-9][A-Za-z0-9_.-]*/(json|logs))$" {
+        # \z, because PCRE's $ also matches before a final newline and proxy_pass sends the decoded $uri.
+        location ~ "^(/v1\.[0-9]+)?/(info|containers/json|events|containers/[A-Za-z0-9][A-Za-z0-9_.-]*/(json|logs))\z" {
             limit_except GET {
                 deny all;
             }

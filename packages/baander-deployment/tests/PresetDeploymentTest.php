@@ -109,6 +109,9 @@ final class PresetDeploymentTest extends TestCase
         $nginx = Renderer::configurationFiles($configuration, 'max_connections = 21')['docker_proxy_configuration'];
         self::assertSame('nginx.conf', $nginx['name']);
         self::assertStringContainsString("limit_except GET {\n                deny all;", $nginx['content']);
+        // PCRE's $ also matches before a final newline, and proxy_pass sends the decoded $uri.
+        self::assertSame(1, preg_match_all('#^\s*location ~ "\^[^"\n]*\\\\z" \{$#m', $nginx['content']));
+        self::assertStringContainsString('proxy_pass http://docker$uri$is_args$args;', $nginx['content']);
         self::assertStringContainsString('server unix:/run/baander-log-docker.sock;', $nginx['content']);
         self::assertStringContainsString('listen unix:/run/baander-docker-proxy/docker.sock;', $nginx['content']);
         self::assertStringContainsString("location / {\n            return 403;", $nginx['content']);

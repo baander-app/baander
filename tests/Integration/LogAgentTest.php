@@ -645,8 +645,24 @@ final class LogAgentTest extends TestCase
                 'GET /v1.45/containers/'.$id.'/archive?path=/',
                 'GET /v1.45/images/json',
                 'GET /v1.45/containers/'.$id.'%2Fexport%3F/json',
+                // proxy_pass sends the decoded $uri, so a control character would reach the
+                // daemon's request line.
+                'GET /v1.45/containers/'.$id.'/json%0A',
+                'GET /v1.45/info%0A',
+                'GET /v1.45/containers/'.$id.'/logs%0D%0A',
+                'GET /v1.45/containers/'.$id.'/%2e%2e/%2e%2e/images/json',
+                'GET /v1.45/containers/json/%2E%2E/%2E%2E/%2E%2E/_ping',
+                'GET /v1.45/containers/'.$id.'/json/%2e%2e%2f%2e%2e%2fexport',
             ] as $call) {
                 self::assertSame('403', $this->proxyStatus($proxy, $call), $call);
+            }
+            // nginx rejects a decoded NUL and a dot segment above the root while parsing the URI.
+            foreach ([
+                'GET /v1.45/containers/'.$id.'/json%00',
+                'GET /v1.45/events%00',
+                'GET /v1.45/%2e%2e/%2e%2e/info',
+            ] as $call) {
+                self::assertSame('400', $this->proxyStatus($proxy, $call), $call);
             }
             // nginx matches and forwards the normalized path, so an encoded segment cannot
             // reach a path other than the one the allow list matched.
