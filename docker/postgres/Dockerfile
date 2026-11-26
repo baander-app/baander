@@ -1,4 +1,4 @@
-FROM postgres:18-trixie@sha256:c699303802144847d238196173655dbbecf7a96aeca1565f2b02eb671a1f0b6b AS postgres-dist
+FROM postgres:18-trixie@sha256:64c8b0d31e4ab6ea665e8426ea406a94bf52de3c05b3a4a8bf713704eefa9328 AS postgres-dist
 
 # Builds the launcher that starts PostgreSQL with transparent huge pages
 # disabled; see postgres/thp-disabled-exec.c.
