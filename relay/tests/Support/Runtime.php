@@ -22,6 +22,19 @@ final class Runtime
             'Registry harnesses require PHP 8.5+ with Swoole.',
         );
     }
+    /**
+     * An active Xdebug mode segfaults the process in its observer end handlers at request
+     * shutdown once Swoole coroutines have run. XDEBUG_MODE overrides the ini setting, so only
+     * xdebug_info() reports the active modes.
+     */
+    private static function requireXdebugOff(): void
+    {
+        $modes = extension_loaded('xdebug') ? xdebug_info('mode') : [];
+        self::requireThat(
+            $modes === [],
+            'Registry harnesses cannot run with Xdebug active (mode ' . implode(',', $modes) . '); set XDEBUG_MODE=off.',
+        );
+    }
     public static function requireThat(bool $condition, string $message = 'Contract assertion failed.'): void
     {
         if (!$condition) {
@@ -311,14 +324,17 @@ final class Runtime
     public static function main(callable $run): void
     {
         $exitCode = 0;
+        $signals = false;
         try {
             self::baseline();
+            self::requireXdebugOff();
             self::$interruptedSignal = null;
             $receive = static function (int $signal): void {
                 self::$interruptedSignal ??= $signal;
             };
             SwooleProcess::signal(2, $receive);
             SwooleProcess::signal(15, $receive);
+            $signals = true;
             $run();
             self::throwIfInterrupted();
         } catch (Throwable $failure) {
@@ -326,7 +342,7 @@ final class Runtime
             $exitCode = $failure instanceof Interrupted ? 128 + $failure->signal
                 : ($failure->getCode() > 0 && $failure->getCode() <= 255 ? $failure->getCode() : 1);
         } finally {
-            if (extension_loaded('swoole')) {
+            if ($signals) {
                 SwooleProcess::signal(2, null);
                 SwooleProcess::signal(15, null);
                 if (Timer::stats()['num'] === 0) {

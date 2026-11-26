@@ -57,6 +57,12 @@ if(CMAKE_BUILD_TYPE STREQUAL "Release" AND NOT REGISTRY_SANITIZERS AND NOT REGIS
     -U_FORTIFY_SOURCE -D_FORTIFY_SOURCE=3 -D_GLIBCXX_ASSERTIONS)
   target_link_options(registry_boost_url PUBLIC LINKER:-z,relro LINKER:-z,now)
 endif()
+# GCC 16 reports -Warray-bounds on the memcpy in Asio's basic_resolver_results::create:
+# resize() bounds ai_addrlen by sockaddr_storage, not by the 28-byte endpoint, but getaddrinfo
+# gives the sockaddr_in or sockaddr_in6 length for the two families copied. It stays a warning.
+if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU" AND CMAKE_CXX_COMPILER_VERSION VERSION_GREATER_EQUAL 16)
+  target_compile_options(registry_boost_url PUBLIC -Wno-error=array-bounds)
+endif()
 include(CTest)
 if(BUILD_TESTING)
   find_program(REGISTRY_PHP_EXECUTABLE NAMES php REQUIRED)

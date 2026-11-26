@@ -61,8 +61,10 @@ metadata; revision, update and heartbeat milliseconds make the new lifecycle exp
 ## Local checks
 
 The qualification drivers require PHP 8.5 or newer with Swoole, OpenSSL and
-sockets. Restore contracts also require PDO SQLite; full static analysis requires
-ext-yaml. The `--pins-notices-only` check does not run the YAML-based analysis.
+sockets. They refuse to start while an Xdebug mode is active, because a PHP process
+that has run Swoole coroutines then segfaults in Xdebug as it exits; in an image
+that loads Xdebug, set `XDEBUG_MODE=off`. Restore contracts also require PDO
+SQLite; full static analysis requires ext-yaml. The `--pins-notices-only` check does not run the YAML-based analysis.
 Install the standalone workflow and registry autoloaders from the repository root
 before running the commands below:
 
@@ -128,7 +130,10 @@ protection, control-flow protection (`-fcf-protection=full`),
 `relay/CMakeLists.txt` sets these flags, so the release contracts test the binary
 the image ships, and the image build refuses a link command that lacks one of
 them. The `-O0` and sanitizer builds omit them: `_FORTIFY_SOURCE` needs
-optimization, and sanitizers replace these checks.
+optimization, and sanitizers replace these checks. GCC 16 reports a false
+`-Warray-bounds` in Asio's resolver under `_FORTIFY_SOURCE=3`, so on GCC 16 and
+later the build keeps that one diagnostic a warning; `-Werror` still covers every
+other warning.
 The `sanitize` mode instruments first-party targets with ASan/LSan and UBSan.
 The separate `thread` mode uses Clang, `RelWithDebInfo` and ThreadSanitizer with
 `TSAN_OPTIONS=halt_on_error=1:exitcode=66`. CI installs `clang-19` and its matching
