@@ -34,7 +34,7 @@ Verification checkpoint:
 Open:
 
 - GitHub CI's Chromium media-ownership step failed with "Combined phase failed: absent" before this regression hid it, and may fail again now that the outbox check passes.
-- The "Public website" workflow has failed on every completed run since `1ab64d3c6` (2026-11-25), in the same five browser tests: static code highlighting (light and dark), manual sidebar focus rings (1440 and 390 px), and the manual without JavaScript.
+- GitHub CI's "Public website" workflow failed from `eac10e7ab` (2026-11-25) on, in five browser tests made stale by `5232d0e44`: that commit renamed the "Source Installation" page to "Installation" and moved the security page's `.env` template to the developer guide's compose-stack page, but updated only one of the tests that use them. Fixed in `eb10d354e` by following the new link name and checking `env` highlighting on the compose-stack page. With the same change, the full website suite passed locally (221 tests); the six affected tests pass on `eb10d354e`.
 
 ## Pipe-operator inspection check, 2026-11-26
 
