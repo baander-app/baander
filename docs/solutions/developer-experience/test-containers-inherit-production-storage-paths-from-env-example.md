@@ -1,6 +1,7 @@
 ---
 title: Test containers inherit production storage paths from .env.example
 date: 2026-11-22
+last_updated: 2026-11-26
 category: developer-experience
 module: Backend test coordinator and the test environment (.env.test, packages/baander-dev-ci)
 problem_type: test_failure
@@ -20,6 +21,8 @@ tags: [env-test, env-example, test-container, convert-storage-path, qol, server-
 ## Problem
 
 Since the backend test runner stopped using a committed `.env` (2026-11-21, "fix(build): keep local environment files out of source and image builds"), every test container gets a copy of `.env.example`, so tests inherit the production storage paths `/storage/media` and `/storage/conversions`. The test user cannot create them, and any test whose request builds the server control graph fails while a handler is being constructed, with an error that points far away from the cause.
+
+The same commit makes the production image copy `.env.example` as its `.env` (`Dockerfile:631`), so its defaults reach production workers as well. [An eager WebPush client dead-letters every push message without VAPID keys](../runtime-errors/eager-webpush-client-dead-letters-push-without-vapid-keys.md) records that side of the same failure class.
 
 ## Symptoms
 
@@ -52,11 +55,13 @@ The storage path matters to requests that have nothing to do with media because 
 
 ## Prevention
 
-- Keep every storage root that `.env.example` sets to a production path overridden in `.env.test`. A unit test could hold this rule: parse both files and fail when a `*_STORAGE_PATH` value in `.env.example` has no `.env.test` override.
+- Keep every storage root that `.env.example` sets to a production path overridden in `.env.test`. A storage root is required configuration whose production default the test user cannot use. A unit test could hold this rule: parse both files and fail when a `*_STORAGE_PATH` value in `.env.example` has no `.env.test` override.
+- Do not extend that rule to optional values whose empty default is a legitimate production state, such as the VAPID keys. An override in `.env.test` hides a production defect there instead of preventing it; the code has to tolerate the empty value.
 - Commit an `.env.test` change before verifying it in the container runner; a working-tree edit to it did not reach the container.
 - When a functional test fails with an exception from an unrelated context's constructor, read the full stack trace of the innermost exception (switch the kernel browser to `catchExceptions(false)` in a throwaway edit) before suspecting the code under test.
-- Not done here, and worth doing: the same chain means a broken conversions volume in production would also break token refresh, sign-out and user disabling. Creating the QoL state directory on first write, and building server control operations lazily, would remove that coupling.
+- Not done here, and worth doing: the same chain means a broken conversions volume in production would also break token refresh, sign-out and user disabling. Creating the QoL state directory on first write, and building server control operations lazily, would remove that coupling. `WebPushDelivery` shows the lazy form: `#[Autowire(lazy: true)]` on the constructor argument.
 
 ## Related Issues
 
 - [Coverage runs push the stack lanes past the backend budget](coverage-runs-push-the-stack-lanes-past-the-backend-budget.md): other behavior of the same test coordinator.
+- [An eager WebPush client dead-letters every push message without VAPID keys](../runtime-errors/eager-webpush-client-dead-letters-push-without-vapid-keys.md): the second instance of this failure class, in the production image.
