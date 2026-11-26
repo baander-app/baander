@@ -8,7 +8,9 @@ use App\Catalog\Domain\Model\Song;
 use App\Catalog\Domain\Repository\SongRepositoryInterface;
 use App\Media\Application\Port\StreamPortInterface;
 use App\Media\Domain\Model\TrackStreamMetadata;
+use App\Library\Application\Port\LibraryMediaFileRefusedException;
 use App\Library\Application\Port\LibraryMediaFileResolverInterface;
+use App\Shared\Application\Exception\ConflictException;
 use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
 use App\Shared\Domain\ValueObject\MediaContainer;
@@ -30,7 +32,11 @@ final class StreamService implements StreamPortInterface
             throw new \InvalidArgumentException('Track library not found.');
         }
 
-        return $this->mediaFiles->resolve($libraryId, $song->getPath());
+        try {
+            return $this->mediaFiles->resolve($libraryId, $song->getPath());
+        } catch (LibraryMediaFileRefusedException $refusal) {
+            throw new ConflictException('Playback media is unavailable.', ['reason' => 'media_unavailable'], $refusal);
+        }
     }
 
     public function getTrackMetadata(PublicId $trackId): TrackStreamMetadata

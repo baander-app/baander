@@ -11,7 +11,8 @@ interface LibraryMediaFileResolverInterface
     /**
      * Resolves an absolute catalog path to an existing file inside its owning library.
      *
-     * @throws \InvalidArgumentException when the library or file is unavailable or the path escapes its root
+     * @throws LibraryMediaFileRefusedException when the path, or a symlink on it, leads outside the library's root
+     * @throws \InvalidArgumentException when the library or file is unavailable
      */
     public function resolve(Uuid $libraryId, string $absolutePath): string;
 

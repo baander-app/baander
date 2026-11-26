@@ -155,7 +155,7 @@ final readonly class OriginalMediaController
     )]
     #[OA\Response(
         response: 409,
-        description: 'Completed rendition unavailable or the selected audio cannot be copied; negotiate delivery again. The error details carry the reason.',
+        description: 'The track file, or a symlink on its path, leads outside its library (reason `media_unavailable`), or the completed rendition is unavailable or the selected audio cannot be copied; negotiate delivery again. The error details carry the reason.',
         content: new OA\MediaType\Json(
             schema: new OA\Schema(ref: ApiError::class),
         ),
@@ -186,9 +186,13 @@ final readonly class OriginalMediaController
         try {
             $id = PublicId::fromString($request->query->getString('id'));
             $this->access->assertTrackAccess($owner, $id);
+        } catch (\InvalidArgumentException|ConflictException) {
+            return $this->forbidden('Playback media is unavailable.');
+        }
+        try {
             $path = $this->tracks->resolveTrackPath($id);
             $metadata = $this->tracks->getTrackMetadata($id);
-        } catch (\InvalidArgumentException|ConflictException) {
+        } catch (\InvalidArgumentException) {
             return $this->forbidden('Playback media is unavailable.');
         }
         $mode = $request->query->getString('mode');

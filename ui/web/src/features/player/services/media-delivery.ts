@@ -1,3 +1,4 @@
+import { isAxiosError } from 'axios'
 import i18n from 'i18next'
 import {
   postStreamDelivery,
@@ -59,6 +60,27 @@ export class MediaCompatibilityError extends Error {
     this.name = 'MediaCompatibilityError'
     this.reason = key
   }
+}
+
+/** The 409 reasons that end playback of the item, which the player explains instead of retrying. */
+const REFUSAL_REASONS = new Set(['media_unavailable'])
+
+interface ApiErrorBody {
+  error?: {
+    details?: {
+      reason?: unknown
+    }
+  }
+}
+
+/** A delivery answer that refuses the item, as the compatibility error the player explains. */
+function deliveryRefusal(error: unknown): MediaCompatibilityError | null {
+  if (!isAxiosError(error) || error.response?.status !== 409) return null
+  const body = error.response.data as ApiErrorBody | null
+  const reason = body?.error?.details?.reason
+  return typeof reason === 'string' && REFUSAL_REASONS.has(reason)
+    ? new MediaCompatibilityError(reason)
+    : null
 }
 
 const audioFormats = [
@@ -189,7 +211,9 @@ export async function negotiateMediaDelivery(
       ...(input.requestId ? { requestId: input.requestId } : {})
     },
     { signal }
-  )
+  ).catch((error: unknown) => {
+    throw deliveryRefusal(error) ?? error
+  })
   signal.throwIfAborted()
   if (
     !response ||

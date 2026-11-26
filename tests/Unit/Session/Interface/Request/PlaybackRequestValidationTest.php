@@ -39,6 +39,7 @@ final class PlaybackRequestValidationTest extends TestCase
         $accepted = new AcknowledgePlaybackRequest($id, $id, 1, $id, 1, 'rejected', rejectionReason: 'video_codec_unsupported');
         self::assertCount(0, $validator->validate($accepted));
         self::assertSame('video_codec_unsupported', $accepted->toArray()['rejectionReason']);
+        self::assertCount(0, $validator->validate(new AcknowledgePlaybackRequest($id, $id, 1, $id, 1, 'rejected', rejectionReason: 'media_unavailable')));
         self::assertNotCount(0, $validator->validate(new AcknowledgePlaybackRequest($id, $id, 1, $id, 1, 'rejected', rejectionReason: 'raw error message')));
         self::assertNotCount(0, $validator->validate(new AcknowledgePlaybackRequest($id, $id, 1, $id, 1, 'prepared', rejectionReason: 'unknown')));
     }

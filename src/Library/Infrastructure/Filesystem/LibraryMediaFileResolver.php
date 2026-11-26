@@ -4,10 +4,12 @@ declare(strict_types=1);
 
 namespace App\Library\Infrastructure\Filesystem;
 
+use App\Library\Application\Port\LibraryMediaFileRefusedException;
 use App\Library\Application\Port\LibraryMediaFileResolverInterface;
 use App\Library\Domain\Model\Library;
 use App\Library\Domain\Repository\LibraryRepositoryInterface;
 use App\Shared\Domain\Model\Uuid;
+use App\Shared\Infrastructure\Filesystem\PathOutsideBaseException;
 use App\Shared\Infrastructure\Filesystem\StoragePathBoundary;
 
 final readonly class LibraryMediaFileResolver implements LibraryMediaFileResolverInterface
@@ -64,6 +66,10 @@ final readonly class LibraryMediaFileResolver implements LibraryMediaFileResolve
 
     private static function resolveIn(Library $library, string $absolutePath): string
     {
-        return StoragePathBoundary::resolve($library->getPath()->toString(), $absolutePath);
+        try {
+            return StoragePathBoundary::resolve($library->getPath()->toString(), $absolutePath);
+        } catch (PathOutsideBaseException $outside) {
+            throw new LibraryMediaFileRefusedException('Media file lies outside its library.', previous: $outside);
+        }
     }
 }

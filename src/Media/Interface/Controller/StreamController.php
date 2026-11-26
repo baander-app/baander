@@ -110,6 +110,13 @@ final class StreamController
                 ),
             ),
             new OA\Response(
+                response: '409',
+                description: 'The track cannot be served; `error.details.reason` names why: `media_unavailable` when the track file or a symlink on its path leads outside its library, `source_stream_metadata_unavailable` or `copy_failed` when the selected audio cannot be copied, `encoding_prohibited` when the deployment runs no slots for the encoding or stream copy',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: ApiError::class),
+                ),
+            ),
+            new OA\Response(
                 response: '500',
                 description: 'Transcoding failed',
                 content: new OA\MediaType\Json(

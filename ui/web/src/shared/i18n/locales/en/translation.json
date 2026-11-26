@@ -168,7 +168,8 @@
       "container_unsupported": "This item’s container cannot be played or remuxed for this device.",
       "audio_stream_selection_requires_remux": "The selected audio track needs remuxing into a format this device can play.",
       "audio_stream_unavailable": "The selected audio track is no longer available.",
-      "audio_transcoding_disabled": "This audio needs re-encoding, which is disabled in the server’s settings."
+      "audio_transcoding_disabled": "This audio needs re-encoding, which is disabled in the server’s settings.",
+      "media_unavailable": "This item’s file is no longer inside its library on the server, so it cannot play."
     }
   },
   "catalog": {

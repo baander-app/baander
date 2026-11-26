@@ -13,7 +13,8 @@ import { toast } from 'sonner'
 import { PLAYBACK_CONNECTION_KEY, PLAYBACK_SESSION_KEY } from '@/features/session/services/playback-session-coordinator'
 import { PlayerProgress } from '@/features/layout/components/PlayerProgress'
 import { ProgressBar } from '../../components/ProgressBar'
-import { negotiateMediaDelivery } from '../../services/media-delivery'
+import { MediaCompatibilityError, negotiateMediaDelivery } from '../../services/media-delivery'
+import translations from '@/shared/i18n/locales/en/translation.json'
 import { getPlaybackAdapter, registerPlaybackIntentHandler } from '@/features/session/services/playback-execution'
 import { PlaybackCommandRunner } from '@/features/session/services/playback-command-runner'
 
@@ -1957,6 +1958,26 @@ describe('useAudioPlayback', () => {
       expect(activityService.recordPlay).toHaveBeenCalledOnce()
       expect(processorMock.instance.resetProgramme).not.toHaveBeenCalled()
       expect(toast.error).not.toHaveBeenCalled()
+    })
+
+    it('stops with the explanation, without retrying, when the server no longer serves the track', async () => {
+      const { a } = await playAtPosition()
+      answerLiveness('unreachable', 200)
+      const refusal = new MediaCompatibilityError(translations.player.compatibility.media_unavailable)
+      vi.mocked(negotiateMediaDelivery).mockRejectedValueOnce(refusal)
+      await act(async () => { errorMedia(a, 2) })
+      await elapse(1000)
+      expect(negotiateMediaDelivery).toHaveBeenCalledTimes(2)
+
+      expect(usePlayerStore.getState().isPlaying).toBe(false)
+      expect(usePlayerStore.getState().playbackRecovery).toBe('none')
+      expect(toast.error).toHaveBeenCalledExactlyOnceWith(refusal.message, { id: 'player-playback-failure' })
+
+      await elapse(120_000)
+      expect(liveness.get).toHaveBeenCalledTimes(2)
+      expect(negotiateMediaDelivery).toHaveBeenCalledTimes(2)
+      expect(a.load).not.toHaveBeenCalled()
+      expect(toast.error).toHaveBeenCalledOnce()
     })
 
     it('keeps waiting while a draining server still answers, and resumes once it stops draining', async () => {

@@ -14,6 +14,7 @@ use App\Library\Domain\ValueObject\LibraryType;
 use App\Library\Infrastructure\Filesystem\LibraryMediaFileResolver;
 use App\Library\Infrastructure\Scanner\DirectoryScanner;
 use App\Media\Infrastructure\Service\StreamService;
+use App\Shared\Application\Exception\ConflictException;
 use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
 use App\Shared\Domain\ValueObject\FilesystemType;
@@ -80,8 +81,24 @@ final class StreamServiceTest extends TestCase
         self::assertSame($this->source, $this->service->resolveTrackPath($this->trackId));
     }
 
+    #[DataProvider('pathsOutsideTheLibrary')]
+    public function testRefusesSourcesOutsideTheOwningLibraryAsUnavailableMedia(string $suffix): void
+    {
+        $this->song = $this->songAt($this->directory . $suffix);
+
+        $this->assertRefusedAsUnavailableMedia();
+    }
+
+    /** @return iterable<string, array{string}> */
+    public static function pathsOutsideTheLibrary(): iterable
+    {
+        yield 'outside absolute path' => ['/outside.flac'];
+        yield 'sibling with shared prefix' => ['/library-other/track.flac'];
+        yield 'parent traversal escape' => ['/library/../outside.flac'];
+    }
+
     #[DataProvider('rejectedPaths')]
-    public function testRejectsSourcesOutsideTheOwningLibrary(string $suffix): void
+    public function testRejectsSourcesThatAreNoFileInsideTheOwningLibrary(string $suffix): void
     {
         $this->song = $this->songAt($this->directory . $suffix);
 
@@ -93,9 +110,6 @@ final class StreamServiceTest extends TestCase
     /** @return iterable<string, array{string}> */
     public static function rejectedPaths(): iterable
     {
-        yield 'outside absolute path' => ['/outside.flac'];
-        yield 'sibling with shared prefix' => ['/library-other/track.flac'];
-        yield 'parent traversal escape' => ['/library/../outside.flac'];
         yield 'null byte' => ["/library/album/track.flac\0"];
         yield 'missing source' => ['/library/album/missing.flac'];
         yield 'missing source parent' => ['/library/missing/track.flac'];
@@ -113,14 +127,12 @@ final class StreamServiceTest extends TestCase
     }
 
     #[DataProvider('escapingLinks')]
-    public function testRejectsSymlinkEscapes(string $target, string $pathSuffix): void
+    public function testRefusesSymlinkEscapesAsUnavailableMedia(string $target, string $pathSuffix): void
     {
         self::assertTrue(symlink($this->directory . $target, $this->root . '/link'));
         $this->song = $this->songAt($this->root . '/link' . $pathSuffix);
 
-        $this->expectException(\InvalidArgumentException::class);
-
-        $this->service->resolveTrackPath($this->trackId);
+        $this->assertRefusedAsUnavailableMedia();
     }
 
     /** @return iterable<string, array{string, string}> */
@@ -128,7 +140,16 @@ final class StreamServiceTest extends TestCase
     {
         yield 'file link' => ['/outside.flac', ''];
         yield 'directory link' => ['/library-other', '/track.flac'];
-        yield 'dangling link' => ['/not-created', '/track.flac'];
+    }
+
+    public function testRejectsADanglingLinkAsAMissingSource(): void
+    {
+        self::assertTrue(symlink($this->directory . '/not-created', $this->root . '/link'));
+        $this->song = $this->songAt($this->root . '/link/track.flac');
+
+        $this->expectException(\InvalidArgumentException::class);
+
+        $this->service->resolveTrackPath($this->trackId);
     }
 
     public function testRechecksASymlinkAfterItsTargetChanges(): void
@@ -140,9 +161,7 @@ final class StreamServiceTest extends TestCase
         self::assertTrue(unlink($link));
         self::assertTrue(symlink($this->directory . '/outside.flac', $link));
 
-        $this->expectException(\InvalidArgumentException::class);
-
-        $this->service->resolveTrackPath($this->trackId);
+        $this->assertRefusedAsUnavailableMedia();
     }
 
     public function testResolvesSourcesWhenTheConfiguredLibraryRootIsASymlink(): void
@@ -196,6 +215,17 @@ final class StreamServiceTest extends TestCase
         $this->expectException(\InvalidArgumentException::class);
 
         $this->service->resolveTrackPath($this->trackId);
+    }
+
+    private function assertRefusedAsUnavailableMedia(): void
+    {
+        try {
+            $this->service->resolveTrackPath($this->trackId);
+            self::fail('A source outside its library does not resolve.');
+        } catch (ConflictException $refusal) {
+            self::assertSame('Playback media is unavailable.', $refusal->getMessage());
+            self::assertSame(['reason' => 'media_unavailable'], $refusal->details);
+        }
     }
 
     private function libraryAt(string $path): Library

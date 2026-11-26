@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Tests\Integration;
 
 use App\Auth\Infrastructure\Doctrine\Entity\UserEntity;
+use App\Session\Application\DTO\PlaybackRejectionReason;
 use App\Session\Domain\Model\Device\Device;
 use App\Session\Domain\Model\Playback\PlaybackMedia;
 use App\Session\Domain\Model\Playback\PlaybackState;
@@ -833,6 +834,18 @@ final class PlaybackStoreContractTest extends TestCase
 
         self::assertSame($first, $this->observer->fetchAssociative('SELECT outcome,rejection_reason,acknowledged_at FROM playback_commands WHERE id=?', [$command['id']]));
         self::assertNull($this->observer->fetchOne('SELECT settled_revision FROM playback_commands WHERE id=?', [$command['id']]));
+    }
+
+    public function testEveryReasonAnAcknowledgementAcceptsIsStored(): void
+    {
+        $account = $this->account();
+        foreach (PlaybackRejectionReason::VALUES as $reason) {
+            $command = $this->command($account, ['type' => 'play']);
+            $this->store->insertCommand($command);
+            $this->store->acknowledgeCommand($command['id'], 'rejected', $reason);
+
+            self::assertSame($reason, $this->observer->fetchOne('SELECT rejection_reason FROM playback_commands WHERE id=?', [$command['id']]));
+        }
     }
 
     public function testClosingAnAttemptsCommandsLeavesItsAnsweredOnesAndOtherAttemptsAlone(): void

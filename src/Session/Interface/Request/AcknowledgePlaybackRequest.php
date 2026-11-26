@@ -60,6 +60,7 @@ use Symfony\Component\Validator\Constraints as Assert;
                 'destination_media_unsupported',
                 'subtitle_delivery_unsupported',
                 'browser_rejected_source',
+                'media_unavailable',
                 'unknown',
                 null,
             ],

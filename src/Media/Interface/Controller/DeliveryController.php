@@ -56,7 +56,7 @@ final readonly class DeliveryController
             new OA\Response(response: '401', description: 'Authentication required'),
             new OA\Response(
                 response: '409',
-                description: 'Playback cannot start: the video file no longer resolves inside one of its libraries, or the stream copy the destination needs would leave the account holding more transcode sessions than the server allows and too few have been silent for two minutes to give way (`error.details.reason` is `transcode_session_limit` and `error.details.limit` the limit)',
+                description: 'Playback cannot start: the video file no longer resolves inside one of its libraries, the track file or a symlink on its path leads outside its library (`error.details.reason` is `media_unavailable`), or the stream copy the destination needs would leave the account holding more transcode sessions than the server allows and too few have been silent for two minutes to give way (`error.details.reason` is `transcode_session_limit` and `error.details.limit` the limit)',
                 content: new OA\MediaType\Json(
                     schema: new OA\Schema(ref: ApiError::class),
                 ),

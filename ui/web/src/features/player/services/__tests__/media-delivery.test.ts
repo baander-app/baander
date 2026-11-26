@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { DeliveryResource } from '@/shared/api-client/gen/endpoints'
+import translations from '@/shared/i18n/locales/en/translation.json'
 import {
   detectDestinationCapabilities,
   MediaCompatibilityError,
@@ -29,6 +30,23 @@ const selection = {
   transport: 'hls',
   videoStreamIndex: 0,
   audioStreamIndex: 1
+}
+
+/** The error the API client rejects with for an error answer carrying `error.details.reason`. */
+function refused(status: number, reason: string) {
+  return Object.assign(new Error(`Request failed with status code ${status}`), {
+    isAxiosError: true,
+    response: {
+      status,
+      data: {
+        error: {
+          message: 'Playback media is unavailable.',
+          code: status,
+          details: { reason }
+        }
+      }
+    }
+  })
 }
 
 function element(kind: 'audio' | 'video', accepted: string[]) {
@@ -316,6 +334,35 @@ describe('media delivery negotiation', () => {
     controller.abort()
     resolve({ kind: 'original', url: '/file', requestId })
     await expect(pending).rejects.toMatchObject({ name: 'AbortError' })
+  })
+
+  it('explains a track the server refuses as unavailable media instead of failing the request', async () => {
+    deliver.mockRejectedValue(refused(409, 'media_unavailable'))
+
+    const error: unknown = await negotiateMediaDelivery(
+      { kind: 'track', id: 'song', capabilities },
+      new AbortController().signal
+    ).catch((rejection: unknown) => rejection)
+
+    expect(error).toBeInstanceOf(MediaCompatibilityError)
+    expect(error).toMatchObject({
+      reason: 'media_unavailable',
+      message: translations.player.compatibility.media_unavailable
+    })
+  })
+
+  it.each([
+    ['another conflict', refused(409, 'transcode_session_limit')],
+    ['the same reason on another status', refused(403, 'media_unavailable')]
+  ])('passes %s through as the request failure', async (_label, failure) => {
+    deliver.mockRejectedValue(failure)
+
+    await expect(
+      negotiateMediaDelivery(
+        { kind: 'track', id: 'song', capabilities },
+        new AbortController().signal
+      )
+    ).rejects.toBe(failure)
   })
 
   it('presents compatibility errors as readable explanations while retaining the reason', () => {

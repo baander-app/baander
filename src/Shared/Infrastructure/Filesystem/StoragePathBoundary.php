@@ -16,7 +16,7 @@ final class StoragePathBoundary
         $base = self::canonicalPath($basePath);
         $path = self::canonicalPath($candidate);
         if ($path !== $base && !str_starts_with($path, rtrim($base, '/') . '/')) {
-            throw new InvalidArgumentException('Path escapes filesystem base path: ' . $candidate);
+            throw new PathOutsideBaseException('Path escapes filesystem base path: ' . $candidate);
         }
 
         return $path;

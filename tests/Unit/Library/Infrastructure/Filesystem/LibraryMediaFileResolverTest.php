@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Library\Infrastructure\Filesystem;
 
+use App\Library\Application\Port\LibraryMediaFileRefusedException;
 use App\Library\Domain\Model\Library;
 use App\Library\Domain\Repository\LibraryRepositoryInterface;
 use App\Library\Domain\ValueObject\LibraryPath;
@@ -18,6 +19,7 @@ use PHPUnit\Framework\TestCase;
 final class LibraryMediaFileResolverTest extends TestCase
 {
     private string $directory;
+    private Library $music;
     private LibraryMediaFileResolver $resolver;
 
     protected function setUp(): void
@@ -32,11 +34,13 @@ final class LibraryMediaFileResolverTest extends TestCase
         self::assertTrue(symlink($this->directory . '/films/film.mkv', $this->directory . '/music/film.mkv'));
         self::assertTrue(symlink($this->directory . '/gone.flac', $this->directory . '/music/dangling.flac'));
 
+        $this->music = $this->libraryAt('/music', 'music');
         $libraries = self::createStub(LibraryRepositoryInterface::class);
         $libraries->method('findAllOrdered')->willReturn([
-            $this->libraryAt('/music', 'music'),
+            $this->music,
             $this->libraryAt('/films', 'films'),
         ]);
+        $libraries->method('findByUuid')->willReturn($this->music);
         $this->resolver = new LibraryMediaFileResolver($libraries);
     }
 
@@ -78,6 +82,41 @@ final class LibraryMediaFileResolverTest extends TestCase
         yield 'missing file' => ['{dir}/music/album/missing.flac'];
         yield 'directory' => ['{dir}/music/album'];
         yield 'parent segments that leave the root' => ['{dir}/music/../outside.flac'];
+    }
+
+    #[DataProvider('pathsOutsideTheMusicLibrary')]
+    public function testAPathLeadingOutsideItsLibraryIsRefusedAsOutsideIt(string $path): void
+    {
+        $this->expectException(LibraryMediaFileRefusedException::class);
+
+        $this->resolver->resolve($this->music->getId(), str_replace('{dir}', $this->directory, $path));
+    }
+
+    /** @return iterable<string, array{string}> */
+    public static function pathsOutsideTheMusicLibrary(): iterable
+    {
+        yield 'link to a file outside every library' => ['{dir}/music/out.flac'];
+        yield 'link to a file in another library' => ['{dir}/music/film.mkv'];
+        yield 'parent segments that leave the root' => ['{dir}/music/../outside.flac'];
+    }
+
+    #[DataProvider('pathsWithoutAFile')]
+    public function testAPathInsideItsLibraryWithoutAFileIsNotRefusedAsOutsideIt(string $path): void
+    {
+        try {
+            $this->resolver->resolve($this->music->getId(), str_replace('{dir}', $this->directory, $path));
+            self::fail('A path without a file does not resolve.');
+        } catch (\InvalidArgumentException $failure) {
+            self::assertNotInstanceOf(LibraryMediaFileRefusedException::class, $failure);
+        }
+    }
+
+    /** @return iterable<string, array{string}> */
+    public static function pathsWithoutAFile(): iterable
+    {
+        yield 'missing file' => ['{dir}/music/album/missing.flac'];
+        yield 'dangling link' => ['{dir}/music/dangling.flac'];
+        yield 'directory' => ['{dir}/music/album'];
     }
 
     #[DataProvider('pathsThatAreNotAbsolute')]
