@@ -1396,8 +1396,32 @@
                                             "items": {
                                                 "$ref": "#/components/schemas/ActivityResource"
                                             }
+                                        },
+                                        "meta": {
+                                            "type": "object",
+                                            "properties": {
+                                                "total": {
+                                                    "type": "integer",
+                                                    "description": "Activities the user has"
+                                                },
+                                                "limit": {
+                                                    "type": "integer"
+                                                },
+                                                "offset": {
+                                                    "type": "integer"
+                                                }
+                                            },
+                                            "required": [
+                                                "total",
+                                                "limit",
+                                                "offset"
+                                            ]
                                         }
-                                    }
+                                    },
+                                    "required": [
+                                        "data",
+                                        "meta"
+                                    ]
                                 }
                             }
                         }

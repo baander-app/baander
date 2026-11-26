@@ -5518,8 +5518,16 @@ export type GetActivityHistoryParams = {
   offset?: number;
 };
 
+export type GetActivityHistory200Meta = {
+  /** Activities the user has */
+  total: number;
+  limit: number;
+  offset: number;
+};
+
 export type GetActivityHistory200 = {
-  data?: ActivityResource[];
+  data: ActivityResource[];
+  meta: GetActivityHistory200Meta;
 };
 
 export type PostActivityPlayBody = {
