@@ -99,7 +99,7 @@ the configured retry policy; they do not impose an unconditional execution cap.
 | `VAPID_PUBLIC_KEY` | — | VAPID public key for browser push notifications. Generate with `php bin/console app:generate-vapid-keys`. |
 | `VAPID_PRIVATE_KEY` | — | VAPID private key. Keep this secret. With `APP_ENV=prod`, Baander refuses to boot with a private key the repository has ever committed, because anyone can read those keys from its history; generate a pair of your own. |
 
-Browser push needs both keys. Without them, notifications are still created and the workers skip each browser push, logging a `notification.push` entry that says no VAPID key pair is configured.
+Browser push needs both keys. When either is missing, notifications are still created, and the workers skip each browser push with a `notification.push` log entry saying that no VAPID key pair is configured.
 
 ## Mail
 

@@ -28,7 +28,7 @@ Verification checkpoint:
 
 - The kernel test failed before the fix with `[VAPID] Public key should be 65 bytes long when decoded.` and passes after it.
 - Notification unit tests: 279 passed. Push kernel, integration and functional tests: 21 passed across both stack lanes.
-- Whole-tree application PHPStan, `check:imports`, and Deptrac with 0 violations.
+- Whole-tree application PHPStan, `check:imports` and Deptrac (0 violations) pass.
 - The production worker drill (`scripts/test-worker-production-container.php`) passed against a worker image built from `f98d8012e`. On `f78a945ec` it fails at the same outbox check as CI.
 
 Open:
