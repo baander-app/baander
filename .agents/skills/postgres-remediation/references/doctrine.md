@@ -138,6 +138,20 @@ every partial index unsupported or add unrelated objects to the exclusion list.
 Check SchemaTool's actual unique-index deduplication when indexes share columns.
 See [extension checks](extensions.md) before accepting index deletion/recreation.
 
+A generic plan is made without the parameters' values, so it uses a partial index only
+when the query states the index predicate with constants. A custom plan is made with
+the values and can use the index for a parameter too. PostgreSQL chooses between the
+two per prepared statement (`plan_cache_mode`), and PL/pgSQL caches its statements'
+plans, so a query meant for a partial index writes the predicate's constant into its
+SQL, as [RecommendationRepository](../../../../src/Recommendation/Infrastructure/Doctrine/Repository/RecommendationRepository.php)
+`countWrittenByMember()` does with the origin.
+[RecommendationOriginMigrationTest](../../../../tests/Integration/RecommendationOriginMigrationTest.php)
+asserts that this count uses `idx_recommendations_user_id_member` under a forced generic
+plan. In a disposable PostgreSQL 18.7 session on 2026-11-26, the same count with the
+origin as a second parameter scanned `uniq_recommendations_source_target_name_user_id`
+and filtered on the origin under a generic plan, and used the partial index under a
+custom plan.
+
 DBAL 4.6.0 does not model generated columns either: its `Schema/Column.php` has no
 generated-column property (read 2026-11-24). PostgreSQL stores their expressions
 in `pg_attrdef`, which DBAL would read as column defaults, so the platform's
@@ -182,6 +196,24 @@ Never use `schema:update --force` as a deployment shortcut. Test all migrations
 on a fresh extension-capable instance, repeat to prove no pending reexecution,
 and test refusal of existing objects and data. SchemaTool can create focused
 fixtures but does not test migration order, extension setup or hand-written SQL.
+
+A `CHECK` added `NOT VALID` skips only the scan of the rows already stored; every new
+row version is checked against it. An update of any column of a row over the bound
+fails with 23514, and so do an `ON DELETE SET NULL` cascade into that row and a bulk
+`UPDATE` that touches it, which fail the parent delete or the whole merge. Repair the
+stored rows and validate the constraint instead of leaving it `NOT VALID`. Measure a
+bound by the value alone: `pg_column_size()` reads a stored jsonb value's compressed or
+TOASTed size but a new value's raw size, so a stored row can pass `VALIDATE CONSTRAINT`
+and fail every rewrite. The length of the text form does not depend on storage, but
+jsonb prints a numeric with every decimal of its scale (`5.0e-324` prints as 327
+characters), so derive such a bound from the largest value validation accepts.
+[Version20261126212434](../../../../migrations/Version20261126212434.php) does both for
+the member-input bounds. On PostgreSQL 18.7 (2026-11-26)
+[MemberInputBoundRepairMigrationTest](../../../../tests/Integration/MemberInputBoundRepairMigrationTest.php)
+shows an artist delete cascading into an activity, an album merge over a playlist and a
+playback session rewrite refused on rows stored before the bounds and succeeding after
+the repair, and a queue that prints as 300000 bytes passing `VALIDATE` of a 262144-byte
+`pg_column_size()` bound while its rewrite is refused.
 
 ## Unit of Work, transactions and proxies
 

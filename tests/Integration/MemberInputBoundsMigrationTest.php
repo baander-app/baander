@@ -4,7 +4,11 @@ declare(strict_types=1);
 
 namespace App\Tests\Integration;
 
+use App\Playlist\Interface\Request\CreatePlaylistRequest;
 use App\Tests\Support\FinalSchemaBootstrap;
+use App\UserPreference\Domain\Model\SidebarItem;
+use App\UserPreference\Interface\Request\UpdateEqDeviceProfileRequest;
+use App\UserPreference\Interface\Request\UpdateSidebarSectionsRequest;
 use Doctrine\DBAL\ArrayParameterType;
 use Doctrine\DBAL\Connection;
 use Doctrine\DBAL\DriverManager;
@@ -16,13 +20,14 @@ use DoctrineMigrations\Version20261125141000;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
+use Symfony\Component\Validator\Validation;
 
 require_once dirname(__DIR__, 2) . '/migrations/Version20261125141000.php';
 
 /**
  * The member input checks on disposable PostgreSQL: they apply over rows that already exceed
- * them, leave those rows readable, refuse new values over a bound, and admit the largest
- * values the request validation accepts.
+ * them, leave those rows readable, refuse new values over a bound, measure jsonb by its text
+ * form, and admit the largest values the request validation accepts.
  */
 final class MemberInputBoundsMigrationTest extends TestCase
 {
@@ -96,12 +101,16 @@ final class MemberInputBoundsMigrationTest extends TestCase
     {
         yield 'playlist name' => ["INSERT INTO playlists (id, public_id, user_id, name, created_at, updated_at) VALUES (gen_random_uuid(), 'bounds0000000playlist', ?, ?, now(), now())", [str_repeat('n', 256)]];
         yield 'playlist description' => ["INSERT INTO playlists (id, public_id, user_id, name, description, created_at, updated_at) VALUES (gen_random_uuid(), 'bounds0000000playlist', ?, 'Name', ?, now(), now())", [str_repeat('d', 2001)]];
-        yield 'smart rules' => ["INSERT INTO playlists (id, public_id, user_id, name, smart_rules, created_at, updated_at) VALUES (gen_random_uuid(), 'bounds0000000playlist', ?, 'Name', ?::jsonb, now(), now())", [self::json(['value' => self::incompressible(65536)])]];
+        yield 'smart rules' => ["INSERT INTO playlists (id, public_id, user_id, name, smart_rules, created_at, updated_at) VALUES (gen_random_uuid(), 'bounds0000000playlist', ?, 'Name', ?::jsonb, now(), now())", [self::json(['value' => self::incompressible(81920)])]];
+        // jsonb stores a control character in one byte and prints it as a six-character escape.
+        yield 'smart rules printed over the bound' => ["INSERT INTO playlists (id, public_id, user_id, name, smart_rules, created_at, updated_at) VALUES (gen_random_uuid(), 'bounds0000000playlist', ?, 'Name', ?::jsonb, now(), now())", [self::json([['field' => 'genre', 'operator' => 'contains', 'value' => str_repeat("\u{1}", 14_000)]])]];
         yield 'activity platform' => ["INSERT INTO media_activities (id, public_id, user_id, activity_type, last_platform, created_at, updated_at) VALUES (gen_random_uuid(), 'bounds000000activity2', ?, 'song', ?, now(), now())", [str_repeat('p', 65)]];
         yield 'activity player' => ["INSERT INTO media_activities (id, public_id, user_id, activity_type, last_player, created_at, updated_at) VALUES (gen_random_uuid(), 'bounds000000activity3', ?, 'song', ?, now(), now())", [str_repeat('p', 65)]];
         yield 'eq device id' => ["INSERT INTO eq_device_profiles (id, public_id, user_id, name, device_id) VALUES (gen_random_uuid(), 'bounds00000000000eqp1', ?, 'Name', ?)", [str_repeat('i', 256)]];
-        yield 'eq payload' => ["INSERT INTO eq_device_profiles (id, public_id, user_id, name, payload) VALUES (gen_random_uuid(), 'bounds00000000000eqp2', ?, 'Name', ?::jsonb)", [self::json(['bands' => self::incompressible(131072)])]];
-        yield 'sidebar items' => ["INSERT INTO user_sidebar_configs (id, user_id, media_type, items, created_at, updated_at) VALUES (gen_random_uuid(), ?, 'music', ?::jsonb, now(), now())", [self::json([self::incompressible(131072)])]];
+        yield 'eq payload' => ["INSERT INTO eq_device_profiles (id, public_id, user_id, name, payload) VALUES (gen_random_uuid(), 'bounds00000000000eqp2', ?, 'Name', ?::jsonb)", [self::json(['bands' => self::incompressible(655360)])]];
+        // jsonb stores 5.0e-324 as a numeric of a few bytes and prints all of its 325 decimals.
+        yield 'eq payload printed over the bound' => ["INSERT INTO eq_device_profiles (id, public_id, user_id, name, payload) VALUES (gen_random_uuid(), 'bounds00000000000eqp3', ?, 'Name', ?::jsonb)", [self::json(array_fill(0, 2000, 5.0E-324))]];
+        yield 'sidebar items' => ["INSERT INTO user_sidebar_configs (id, user_id, media_type, items, created_at, updated_at) VALUES (gen_random_uuid(), ?, 'music', ?::jsonb, now(), now())", [self::json([self::incompressible(655360)])]];
         yield 'radio stream url' => ["INSERT INTO radio_sessions (id, user_id, active_stream_url, created_at, updated_at) VALUES (gen_random_uuid(), ?, ?, now(), now())", ['https://radio.baander.app/' . str_repeat('s', 2048)]];
         yield 'session queue' => ["INSERT INTO listening_sessions (id, public_id, user_id, queue, created_at, updated_at) VALUES (gen_random_uuid(), 'bounds0000000session1', ?, ?::jsonb, now(), now())", [array_fill(0, 12_500, str_repeat('q', 21)) |> self::json(...)]];
     }
@@ -143,6 +152,42 @@ final class MemberInputBoundsMigrationTest extends TestCase
 
         self::assertSame(1, (int) $this->connection->fetchOne('SELECT count(*) FROM listening_sessions'));
         self::assertSame(10_000, (int) $this->connection->fetchOne('SELECT jsonb_array_length(queue) FROM listening_sessions'));
+    }
+
+    public function testTheLongestTextFormsValidationAcceptsAreStored(): void
+    {
+        $validator = Validation::createValidatorBuilder()->enableAttributeMapping()->getValidator();
+        // Control characters print as six-character escapes: 79800 bytes of text.
+        $rules = array_fill(0, 50, ['field' => 'date_added', 'operator' => 'is_not_empty', 'value' => str_repeat("\u{1}", 255)]);
+        self::assertCount(0, $validator->validate(new CreatePlaylistRequest(name: 'Longest', smartRules: $rules)));
+        // 5.0e-324 prints with all of its 325 decimals: 16381 bytes of compact JSON print as 598780.
+        $payload = array_fill(0, 1820, 5.0E-324);
+        self::assertCount(0, $validator->validate(new UpdateEqDeviceProfileRequest(payload: $payload)));
+        $sections = [['items' => [['id' => '', 'type' => 'page_link', 'label' => '', 'icon' => '', 'config' => array_fill(0, 1812, 5.0E-324)]]]];
+        self::assertCount(0, $validator->validate(new UpdateSidebarSectionsRequest(sections: $sections)));
+        // The sidebar stores the submitted items as its domain model writes them.
+        $items = array_map(static fn (array $item): array => SidebarItem::fromArray($item)->toArray(), $sections[0]['items']);
+
+        $this->connection->executeStatement(
+            "INSERT INTO playlists (id, public_id, user_id, name, smart_rules, created_at, updated_at) VALUES (gen_random_uuid(), 'bounds000000longtext1', ?, 'Longest', ?::jsonb, now(), now())",
+            [self::USER, self::json($rules)],
+        );
+        $this->connection->executeStatement(
+            "INSERT INTO eq_device_profiles (id, public_id, user_id, name, payload) VALUES (gen_random_uuid(), 'bounds000000longtext1', ?, 'Longest', ?::jsonb)",
+            [self::USER, self::json($payload)],
+        );
+        $this->connection->executeStatement(
+            "INSERT INTO user_sidebar_configs (id, user_id, media_type, items, created_at, updated_at) VALUES (gen_random_uuid(), ?, 'music', ?::jsonb, now(), now())",
+            [self::USER, self::json($items)],
+        );
+
+        self::assertSame(
+            [79_800, 598_780],
+            [
+                (int) $this->connection->fetchOne('SELECT octet_length(smart_rules::text) FROM playlists'),
+                (int) $this->connection->fetchOne('SELECT octet_length(payload::text) FROM eq_device_profiles'),
+            ],
+        );
     }
 
     private function insertPlaylist(string $name, string $description): void
