@@ -61,7 +61,8 @@ final class FrameworkIsolationPipelineTest extends TestCase
         self::assertTrue($container->getDefinition('http_client.uri_template.inner')->hasTag('kernel.reset'));
         self::assertSame(['reset'], $this->poolResetter($container, 'traced')->getArgument(0));
         $poolGroups = $container->getDefinition(ServicePoolContainer::class)->getArgument(0);
-        $poolIds = array_map(strval(...), array_merge(...array_values($poolGroups)));
+        $groups = array_values($poolGroups);
+        $poolIds = array_map(strval(...), array_merge(...$groups));
         self::assertCount(4, $poolIds);
         self::assertCount(4, array_unique($poolIds));
     }

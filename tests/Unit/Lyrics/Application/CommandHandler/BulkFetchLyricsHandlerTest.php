@@ -72,10 +72,10 @@ final class BulkFetchLyricsHandlerTest extends TestCase
             [end($firstPage)->toString(), 50],
             [end($secondPage)->toString(), 50],
         ], $calls);
-        $expected = array_values(array_filter(
+        $expected = array_filter(
             array_map(static fn (Uuid $id): string => $id->toString(), [...$firstPage, ...$secondPage]),
             static fn (string $id): bool => $id !== $cached->toString(),
-        ));
+        ) |> array_values(...);
         self::assertSame($expected, $this->queuedSongIds());
     }
 
@@ -353,10 +353,10 @@ final class BulkFetchLyricsHandlerTest extends TestCase
 
         self::assertEquals(new BulkFetchLyricsResult(queued: 48, skippedNoArtist: 1, skippedNoLength: 0), $result);
         $notQueued = array_map(static fn (Uuid $id): string => $id->toString(), [...$withLyrics, $pages[0][5]]);
-        $expected = array_values(array_filter(
+        $expected = array_filter(
             array_map(static fn (Uuid $id): string => $id->toString(), [...$pages[0], ...$pages[1]]),
             static fn (string $id): bool => !in_array($id, $notQueued, true),
-        ));
+        ) |> array_values(...);
         self::assertSame($expected, $this->queuedSongIds());
         self::assertSame(
             array_map(static fn (array $page): array => array_map(static fn (Uuid $id): string => $id->toString(), $page), $pages),
@@ -364,10 +364,10 @@ final class BulkFetchLyricsHandlerTest extends TestCase
         );
         $withLyricsIds = array_map(static fn (Uuid $id): string => $id->toString(), $withLyrics);
         self::assertSame(
-            array_map(static fn (array $page): array => array_values(array_filter(
+            array_map(static fn (array $page): array => array_filter(
                 array_map(static fn (Uuid $id): string => $id->toString(), $page),
                 static fn (string $id): bool => !in_array($id, $withLyricsIds, true),
-            )), $pages),
+            ) |> array_values(...), $pages),
             $this->signatureLookups,
             'Signatures are read only for the songs without lyrics.',
         );

@@ -38,7 +38,8 @@ final class CaptureCoverageTest extends TestCase
                 continue;
             }
             $declared = array_merge($source['relevant_columns'], $source['excluded_columns']);
-            self::assertCount(count(array_unique($declared)), $declared, $table . ' has overlapping column dispositions.');
+            $distinctColumns = array_unique($declared);
+            self::assertCount(count($distinctColumns), $declared, $table . ' has overlapping column dispositions.');
             sort($declared);
             $columns = $mapping['columns'];
             sort($columns);
@@ -65,7 +66,8 @@ final class CaptureCoverageTest extends TestCase
             self::assertSame(['INSERT', 'UPDATE', 'DELETE'], $source['operations'], $source['table']);
             self::assertNotEmpty($source['relevant_columns'], $source['table']);
             self::assertNotEmpty($source['families'], $source['table']);
-            self::assertSame([], array_values(array_diff($source['families'], $families)), $source['table']);
+            $unknownFamilies = array_diff($source['families'], $families);
+            self::assertSame([], array_values($unknownFamilies), $source['table']);
             self::assertNotEmpty($source['scope_routes'], $source['table']);
             foreach ($source['scope_routes'] as $route) {
                 self::assertArrayHasKey($route, $manifest['scope_routes'], $source['table']);
@@ -79,7 +81,8 @@ final class CaptureCoverageTest extends TestCase
             }
         }
         foreach (array_merge($manifest['dependency_rules'], $manifest['sampled_sources']) as $dependency) {
-            self::assertSame([], array_values(array_diff($dependency['families'], $families)));
+            $unknownDependencyFamilies = array_diff($dependency['families'], $families);
+            self::assertSame([], array_values($unknownDependencyFamilies));
             self::assertFileExists($this->root() . '/' . $dependency['reader']);
             foreach ($dependency['source_tables'] ?? [] as $table) {
                 self::assertContains($table, array_column($manifest['sources'], 'table'));

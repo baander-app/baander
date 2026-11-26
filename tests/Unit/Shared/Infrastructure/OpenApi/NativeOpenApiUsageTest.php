@@ -29,7 +29,7 @@ final class NativeOpenApiUsageTest extends TestCase
                 if ($file->getExtension() !== 'php') {
                     continue;
                 }
-                foreach (token_get_all(file_get_contents($file->getPathname())) as $token) {
+                foreach ($file->getPathname() |> file_get_contents(...) |> token_get_all(...) as $token) {
                     if (!is_array($token) || !in_array($token[0], [T_NAME_QUALIFIED, T_NAME_FULLY_QUALIFIED], true)) {
                         continue;
                     }

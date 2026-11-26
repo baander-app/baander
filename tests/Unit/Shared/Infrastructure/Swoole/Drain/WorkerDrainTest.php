@@ -254,15 +254,18 @@ final class WorkerDrainTest extends TestCase
         $drain = $this->drain();
 
         $drain->onWorkerStarted(new WorkerStartedEvent($taskWorker, 2));
-        self::assertSame([], iterator_to_array(Timer::list()));
+        $timersAfterTaskWorker = iterator_to_array(Timer::list());
+        self::assertSame([], $timersAfterTaskWorker);
 
         $drain->onWorkerStarted(new WorkerStartedEvent($eventWorker, 0));
         $drain->onWorkerStarted(new WorkerStartedEvent($eventWorker, 0));
-        self::assertCount(1, iterator_to_array(Timer::list()));
+        $timersAfterEventWorker = iterator_to_array(Timer::list());
+        self::assertCount(1, $timersAfterEventWorker);
 
         $drain->stop();
         $drain->stop();
-        self::assertSame([], iterator_to_array(Timer::list()));
+        $timersAfterStop = iterator_to_array(Timer::list());
+        self::assertSame([], $timersAfterStop);
     }
 
     /**
@@ -277,14 +280,17 @@ final class WorkerDrainTest extends TestCase
         $this->state->begin($this->nowNs);
         $drain = $this->drain();
         $drain->onWorkerStarted(new WorkerStartedEvent(new Server('127.0.0.1', 0), 0));
-        self::assertCount(1, iterator_to_array(Timer::list()));
+        $timersAfterStart = iterator_to_array(Timer::list());
+        self::assertCount(1, $timersAfterStart);
 
         $drain->poll($this->server);
 
         self::assertTrue($this->state->allWorkersDrained(1));
-        self::assertCount(1, iterator_to_array(Timer::list()), 'A request can still reach the worker after its report.');
+        $timersAfterReport = iterator_to_array(Timer::list());
+        self::assertCount(1, $timersAfterReport, 'A request can still reach the worker after its report.');
         $drain->stop();
-        self::assertSame([], iterator_to_array(Timer::list()));
+        $timersAfterStop = iterator_to_array(Timer::list());
+        self::assertSame([], $timersAfterStop);
     }
 
     /**

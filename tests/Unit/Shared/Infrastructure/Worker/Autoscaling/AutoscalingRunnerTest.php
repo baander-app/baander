@@ -61,7 +61,7 @@ final class AutoscalingRunnerTest extends TestCase
         $this->ledger->received($identity, $request, 10);
         $this->ledger->publishDecision(0, 'park', [], 14);
         $this->heartbeat(14);
-        self::assertFalse($this->ledger->acquire(new WorkerLaunchIdentity('worker.baander.app', $this->boot, 'consumer-1', 1), 1, str_repeat('c', 32), 14));
+        $this->ledger->acquire(new WorkerLaunchIdentity('worker.baander.app', $this->boot, 'consumer-1', 1), 1, str_repeat('c', 32), 14) |> self::assertFalse(...);
         $this->channel->publish(new ResourceObservation('known', 14, 0.2, 0.01, 0.3, 0.4));
         $decision = $this->tick(14);
         self::assertSame(1, $decision->evidence['occupied']);
@@ -72,13 +72,14 @@ final class AutoscalingRunnerTest extends TestCase
         $evidence = $this->ledger->snapshot(14)['evidence'];
         self::assertArrayHasKey('confidence', $evidence);
         self::assertArrayHasKey('cooldownRemainingSeconds', $evidence);
-        self::assertLessThanOrEqual(2048, strlen(json_encode($evidence, JSON_THROW_ON_ERROR)));
+        $evidenceJson = json_encode($evidence, JSON_THROW_ON_ERROR);
+        self::assertLessThanOrEqual(2048, strlen($evidenceJson));
     }
 
     public function testAuthorityLossPublishesZeroWithoutReleasingHeldWork(): void
     {
         $this->ledger->publishDecision(1, 'startup', [], 10);
-        self::assertTrue($this->ledger->acquire(new WorkerLaunchIdentity('worker.baander.app', $this->boot, 'consumer-0', 1), 1, str_repeat('b', 32), 10));
+        $this->ledger->acquire(new WorkerLaunchIdentity('worker.baander.app', $this->boot, 'consumer-0', 1), 1, str_repeat('b', 32), 10) |> self::assertTrue(...);
         $decision = $this->tick(12);
         self::assertSame(0, $decision->target);
         self::assertSame('authority_unavailable', $decision->reason);

@@ -271,8 +271,9 @@ final class SegmentEncoderMediaTest extends TestCase
             if ($hdr) {
                 self::assertTrue($probe->isHdr());
                 self::assertStringContainsString('tonemap=tonemap=hable', $filters);
-                self::assertGreaterThan(10, max(array_map(static fn (int $value, int $encoded): int => abs($value - $encoded),
-                    $reference, $actual)), 'HDR samples must pass through the tone mapper.');
+                $differences = array_map(static fn (int $value, int $encoded): int => abs($value - $encoded),
+                    $reference, $actual);
+                self::assertGreaterThan(10, max($differences), 'HDR samples must pass through the tone mapper.');
             } else {
                 foreach ($reference as $index => $value) {
                     self::assertEqualsWithDelta($value, $actual[$index], 3,

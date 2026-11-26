@@ -33,7 +33,8 @@ final class ImageConversionAdapterTest extends TestCase
         $this->assertSame($this->tmpDir . '/source.webp', $output);
         $this->assertFileExists($output);
         $this->assertSame('image/webp', getimagesize($output)['mime']);
-        $this->assertSame([100, 100], array_slice(getimagesize($output), 0, 2));
+        $imageSize = getimagesize($output);
+        $this->assertSame([100, 100], array_slice($imageSize, 0, 2));
         $this->assertNoTempFilesRemain();
     }
 
@@ -47,7 +48,8 @@ final class ImageConversionAdapterTest extends TestCase
         $this->assertSame($this->tmpDir . '/source_small.webp', $output);
         $this->assertFileExists($output);
         $this->assertSame('image/webp', getimagesize($output)['mime']);
-        $this->assertSame([300, 225], array_slice(getimagesize($output), 0, 2));
+        $imageSize = getimagesize($output);
+        $this->assertSame([300, 225], array_slice($imageSize, 0, 2));
         $this->assertNoTempFilesRemain();
     }
 
@@ -59,7 +61,8 @@ final class ImageConversionAdapterTest extends TestCase
         $output = $converter->convertPreset($source, $this->tmpDir, 'thumb');
 
         $this->assertSame($this->tmpDir . '/small_thumb.webp', $output);
-        $this->assertSame([32, 16], array_slice(getimagesize($output), 0, 2));
+        $imageSize = getimagesize($output);
+        $this->assertSame([32, 16], array_slice($imageSize, 0, 2));
         $this->assertNoTempFilesRemain();
     }
 

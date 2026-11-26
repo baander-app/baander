@@ -377,7 +377,8 @@ final class AdaptiveDeliveryTest extends TestCase
         $jobs = array_values($this->jobs);
         $primary = $this->runtimes[$jobs[0]->getId()->toString()];
         $path = $this->runtimes[$jobs[1]->getId()->toString()]->outputDirectory.'/manifest.mpd';
-        file_put_contents($path, str_replace('<Period>', '<Period start="PT6S">', file_get_contents($path)));
+        $manifest = file_get_contents($path);
+        file_put_contents($path, str_replace('<Period>', '<Period start="PT6S">', $manifest));
         $before = $this->sign(true);
         self::assertSame(2, substr_count($this->master($before['url']), '#EXT-X-STREAM-INF:'));
         $this->runtimes[$jobs[0]->getId()->toString()] = new TranscodeRuntimeSnapshot($primary->jobId, $primary->sessionId, $primary->requestId, $primary->desired, 1, 0, $primary->generation, 'accepted', null, null, true);
@@ -682,7 +683,7 @@ final class AdaptiveDeliveryTest extends TestCase
         if ($refresh) {
             $payload['jobIds'] = $this->connection->fetchFirstColumn('SELECT public_id FROM transcode_jobs WHERE owner_user_id = ?', [$this->actor->toString()]);
         }
-        $response = $this->signing->sign(Request::create('/api/stream/sign', 'POST', content: json_encode($payload, JSON_THROW_ON_ERROR)));
+        $response = Request::create('/api/stream/sign', 'POST', content: json_encode($payload, JSON_THROW_ON_ERROR)) |> $this->signing->sign(...);
         self::assertSame(200, $response->getStatusCode());
         return json_decode($response->getContent(), true, flags: JSON_THROW_ON_ERROR);
     }

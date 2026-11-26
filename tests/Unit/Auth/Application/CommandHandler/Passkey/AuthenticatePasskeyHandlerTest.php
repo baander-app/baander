@@ -113,6 +113,11 @@ final class AuthenticatePasskeyHandlerTest extends TestCase
         );
     }
 
+    private function createLoginOptions(): PublicKeyCredentialRequestOptions
+    {
+        return PublicKeyCredentialRequestOptions::create(random_bytes(32), 'baander.app');
+    }
+
     /**
      * Sets up mocks for the full verification flow (consumeLoginChallenge + credentialRecordFromArray + verify).
      * Must be called after setting up ofCredentialId on passkeyRepository.
@@ -340,7 +345,8 @@ final class AuthenticatePasskeyHandlerTest extends TestCase
         ];
 
         // The id field uses the same canonical Base64url bytes as rawId.
-        $credentialId = rtrim(strtr(base64_encode('fallback-id'), '+/', '-_'), '=');
+        $base64Id = base64_encode('fallback-id');
+        $credentialId = rtrim(strtr($base64Id, '+/', '-_'), '=');
 
         $passkey = $this->createPasskey($credentialId, 5);
         $updatedCredential = $this->createUpdatedCredential(10);
@@ -423,7 +429,7 @@ final class AuthenticatePasskeyHandlerTest extends TestCase
         $this->passkeyRepository->method('ofCredentialId')->willReturn($passkey);
         $this->passkeyRepository->method('userIdForCredentialId')->willReturn(Uuid::fromString(self::OWNER_ID));
         $this->passkeyRepository->expects(self::never())->method('markUsed');
-        $this->passkeyVerifier->method('consumeLoginChallenge')->willReturn(PublicKeyCredentialRequestOptions::create(random_bytes(32), 'baander.app'));
+        $this->passkeyVerifier->method('consumeLoginChallenge')->willReturn($this->createLoginOptions());
         $this->passkeyVerifier->method('credentialRecordFromArray')->willReturn($stored);
         $this->passkeyVerifier->method('verifyAuthenticationResponse')->willReturn($this->createUpdatedCredential());
 

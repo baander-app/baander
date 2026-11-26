@@ -72,9 +72,10 @@ final class ApiResponsesTraitTest extends TestCase
         $translator->setFallbackLocales(['en']);
         $translator->addLoader('yaml', new YamlFileLoader());
         foreach (['en', 'da'] as $locale) {
+            $projectDir = dirname(__DIR__, 5);
             $translator->addResource(
                 'yaml',
-                sprintf('%s/translations/messages+intl-icu.%s.yaml', dirname(__DIR__, 5), $locale),
+                sprintf('%s/translations/messages+intl-icu.%s.yaml', $projectDir, $locale),
                 $locale,
                 'messages+intl-icu',
             );

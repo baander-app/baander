@@ -40,7 +40,8 @@ final class MediaControlObservationTest extends TestCase
         $outside['jobId'] = 'aaaaaaaa-1234-1234-1234-123456789abc';
         $outside['outputDirectory'] = $root;
         $records[] = $outside;
-        file_put_contents($storage . '/two-command/native-launches.jsonl', implode('', array_map(static fn(array $value): string => json_encode($value, JSON_THROW_ON_ERROR) . "\n", $records)));
+        $lines = array_map(static fn(array $value): string => json_encode($value, JSON_THROW_ON_ERROR) . "\n", $records);
+        file_put_contents($storage . '/two-command/native-launches.jsonl', implode('', $lines));
         file_put_contents($directory . '/manifest.mpd', str_repeat('m', 262_145));
         file_put_contents($directory . '/generation.json', '{"generation":3,"startTime":12}');
         file_put_contents($directory . '/init-0.mp4', 'binary-media-must-not-be-copied');

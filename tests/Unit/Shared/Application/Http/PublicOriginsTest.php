@@ -43,7 +43,9 @@ final class PublicOriginsTest extends TestCase
             'HTTP_X_FORWARDED_HOST' => $host,
         ]);
 
-        self::assertSame('https://192.168.1.20:8443', $origins->forRequest($forwarded('192.168.1.20:8443')));
-        self::assertSame('https://baander.app', $origins->forRequest($forwarded('other.baander.app')));
+        $lanOrigin = $origins->forRequest($forwarded('192.168.1.20:8443'));
+        self::assertSame('https://192.168.1.20:8443', $lanOrigin);
+        $subdomainOrigin = $origins->forRequest($forwarded('other.baander.app'));
+        self::assertSame('https://baander.app', $subdomainOrigin);
     }
 }

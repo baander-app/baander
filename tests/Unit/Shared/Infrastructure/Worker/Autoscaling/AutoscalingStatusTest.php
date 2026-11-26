@@ -89,20 +89,20 @@ final class AutoscalingStatusTest extends TestCase
     {
         $this->ledger->publishDecision(2, 'startup', [], 10);
         $identity = new WorkerLaunchIdentity('worker.baander.app', $this->boot, 'consumer-0', 1);
-        self::assertTrue($this->ledger->acquire($identity, 1, str_repeat('b', 32), 10.001));
+        $this->ledger->acquire($identity, 1, str_repeat('b', 32), 10.001) |> self::assertTrue(...);
         $held = AutoscalingStatus::slotSummary($this->ledger->snapshot(10), $this->profile, 10, true);
         self::assertEquals(0, $held['maxInFlight']);
         $this->ledger->complete($identity, str_repeat('b', 32), 10.001);
         foreach ([10.001, 10.25] as $time) {
             if ($time > 10.001) {
-                self::assertTrue($this->ledger->acquire($identity, 2, str_repeat('c', 32), $time));
+                $this->ledger->acquire($identity, 2, str_repeat('c', 32), $time) |> self::assertTrue(...);
                 $this->ledger->complete($identity, str_repeat('c', 32), $time);
             }
             $status = $this->probe()->snapshot(10);
             self::assertSame(1, $status['idle']);
             self::assertSame(0, $status['disconnected']);
         }
-        self::assertTrue($this->ledger->acquire($identity, 3, str_repeat('d', 32), 10.251));
+        $this->ledger->acquire($identity, 3, str_repeat('d', 32), 10.251) |> self::assertTrue(...);
         $this->ledger->complete($identity, str_repeat('d', 32), 10.251);
         $status = $this->probe()->snapshot(10);
         self::assertSame(0, $status['idle']);

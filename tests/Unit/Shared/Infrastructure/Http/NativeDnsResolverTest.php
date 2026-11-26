@@ -33,7 +33,8 @@ final class NativeDnsResolverTest extends TestCase
             self::assertSame('DNS lookup deadline exceeded.', $failure->getMessage());
         }
         self::assertLessThan(0.8, hrtime(true) / 1e9 - $started);
-        self::assertSame('', trim(file_get_contents('/proc/self/task/' . getmypid() . '/children')));
+        $children = file_get_contents('/proc/self/task/' . getmypid() . '/children');
+        self::assertSame('', trim($children));
         self::assertCount(3, $this->resolver()->resolve('complete.baander.app', hrtime(true) / 1e9 + 2));
     }
 
@@ -59,7 +60,8 @@ final class NativeDnsResolverTest extends TestCase
         } catch (\RuntimeException $failure) {
             self::assertSame('DNS lookup reply exceeded its limit.', $failure->getMessage());
         }
-        self::assertSame('', trim(file_get_contents('/proc/self/task/' . getmypid() . '/children')));
+        $children = file_get_contents('/proc/self/task/' . getmypid() . '/children');
+        self::assertSame('', trim($children));
         self::assertCount(3, $this->resolver()->resolve('complete.baander.app', hrtime(true) / 1e9 + 2));
     }
 
@@ -147,7 +149,8 @@ final class NativeDnsResolverTest extends TestCase
             self::assertTrue(Coroutine::cancel($cid));
             Coroutine::sleep(0.1);
             self::assertTrue($cancelled);
-            self::assertSame('', trim(file_get_contents('/proc/self/task/' . getmypid() . '/children')));
+            $children = file_get_contents('/proc/self/task/' . getmypid() . '/children');
+            self::assertSame('', trim($children));
             self::assertCount(3, $this->resolver()->resolve('complete.baander.app', hrtime(true) / 1e9 + 2));
         });
     }

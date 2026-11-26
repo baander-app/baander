@@ -232,7 +232,8 @@ namespace App\Scheduler\Infrastructure\Process {
 }
 namespace { require __AUTOLOAD__; }
 PHP;
-        file_put_contents($directory . '/vendor/autoload.php', str_replace('__AUTOLOAD__', var_export($project . '/vendor/autoload.php', true), $stub));
+        $autoloadLiteral = var_export($project . '/vendor/autoload.php', true);
+        file_put_contents($directory . '/vendor/autoload.php', str_replace('__AUTOLOAD__', $autoloadLiteral, $stub));
         try {
             foreach (['success', 'runner failure', 'wrong role'] as $scenario) {
                 $stdout = tmpfile();

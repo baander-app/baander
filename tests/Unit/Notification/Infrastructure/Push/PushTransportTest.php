@@ -41,7 +41,8 @@ final class PushTransportTest extends TestCase
             self::assertStringNotContainsString('confidential-payload', (string) $request->getBody());
             self::assertMatchesRegularExpression('/^vapid t=([^,]+), k=/', $request->getHeaderLine('Authorization'));
             preg_match('/^vapid t=([^,]+),/', $request->getHeaderLine('Authorization'), $match);
-            $claims = json_decode(base64_decode(strtr(explode('.', $match[1])[1], '-_', '+/'), true), true, flags: JSON_THROW_ON_ERROR);
+            $base64Payload = strtr(explode('.', $match[1])[1], '-_', '+/');
+            $claims = json_decode(base64_decode($base64Payload, true), true, flags: JSON_THROW_ON_ERROR);
             self::assertSame('https://push.baander.app', $claims['aud']);
             self::assertSame(['push.baander.app:443:1.1.1.1'], $options['curl'][CURLOPT_RESOLVE]);
             self::assertSame('', $options['proxy']);
@@ -260,9 +261,12 @@ final class PushTransportTest extends TestCase
 
     private function subscription(string $endpoint = self::ENDPOINT): Subscription
     {
+        $keys = self::keys();
+        $authBase64 = base64_encode(str_repeat('a', 16));
+
         return Subscription::create([
             'endpoint' => $endpoint,
-            'keys' => ['p256dh' => self::keys()['publicKey'], 'auth' => rtrim(strtr(base64_encode(str_repeat('a', 16)), '+/', '-_'), '=')],
+            'keys' => ['p256dh' => $keys['publicKey'], 'auth' => rtrim(strtr($authBase64, '+/', '-_'), '=')],
             'contentEncoding' => 'aes128gcm',
         ]);
     }

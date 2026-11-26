@@ -89,7 +89,7 @@ final class DeploymentContainerRecipeTest extends TestCase
         $recipe = $this->recipe(['runtimeEnvironment' => $environment, 'deploymentProfile' => $profile]);
         $environment->withFile(function (string $path) use ($recipe, $profile): void {
             $arguments = $recipe->createArguments($path);
-            $entries = array_filter(explode("\n", file_get_contents($path)));
+            $entries = explode("\n", file_get_contents($path)) |> array_filter(...);
             foreach ($arguments as $index => $argument) {
                 if ($argument === '--env') {
                     $entries[] = $arguments[$index + 1];
@@ -166,7 +166,8 @@ final class DeploymentContainerRecipeTest extends TestCase
             $position = array_search('--oom-score-adj', $arguments, true);
             self::assertNotFalse($position);
             self::assertSame($score, $arguments[$position + 1]);
-            self::assertSame([], array_values(array_intersect($arguments, ['--memory', '--memory-swap', '--cpus', '--cpuset-cpus', '--cpu-shares', '--pids-limit'])));
+            $limits = array_intersect($arguments, ['--memory', '--memory-swap', '--cpus', '--cpuset-cpus', '--cpu-shares', '--pids-limit']);
+            self::assertSame([], array_values($limits));
         }
     }
 
@@ -175,7 +176,8 @@ final class DeploymentContainerRecipeTest extends TestCase
     public function testInspectionMatchesOnlyAnUnlimitedContainerWithTheUnitScore(array $overrides, bool $matches): void
     {
         $unlimited = ['memory' => 0, 'memorySwap' => 0, 'nanoCpus' => 0, 'cpuQuota' => 0, 'cpuShares' => 0, 'pidsLimit' => null, 'cpuSet' => '', 'oomScoreAdj' => -500];
-        self::assertSame($matches, $this->recipe()->matchesResources(array_replace($unlimited, $overrides)));
+        $matched = $this->recipe()->matchesResources(array_replace($unlimited, $overrides));
+        self::assertSame($matches, $matched);
     }
 
     /** @return iterable<string,array{array<string,mixed>,bool}> */
@@ -199,7 +201,8 @@ final class DeploymentContainerRecipeTest extends TestCase
         $minimum = $this->recipe(['command' => ['/x']]);
         self::assertSame(['/x'], $minimum->command);
         $maximum = $this->recipe(['command' => ['/' . str_repeat('x', 4095), str_repeat('x', 4096), str_repeat('x', 4096), str_repeat('x', 4096)]]);
-        self::assertSame(16384, array_sum(array_map(strlen(...), $maximum->command)));
+        $lengths = array_map(strlen(...), $maximum->command);
+        self::assertSame(16384, array_sum($lengths));
         self::assertCount(64, $this->recipe(['command' => ['/x', ...array_fill(0, 63, 'x')]])->command);
         self::assertSame(str_repeat('n', 128), $this->recipe(['network' => str_repeat('n', 128)])->network);
     }

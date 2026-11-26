@@ -31,7 +31,8 @@ final class TranscodeRenditionSetTest extends TestCase
         yield 'duplicate job' => [$a.'.1,'.$a.'.2'];
         yield 'noncanonical ordering' => [$b.'.1,'.$a.'.1'];
         yield 'trailing comma' => [$a.'.1,'];
-        yield 'more than three pairs' => [implode(',', array_map(static fn () => (new PublicId()).'.1', range(1, 4)))];
+        $pairNumbers = range(1, 4);
+        yield 'more than three pairs' => [implode(',', array_map(static fn () => (new PublicId()).'.1', $pairNumbers))];
     }
 
     public function testCanonicalSetPreservesEachGeneration(): void

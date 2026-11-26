@@ -72,7 +72,8 @@ final class CgroupResourceSamplerTest extends TestCase
         self::assertSame(2.0, $second->cpuQuotaCores);
         self::assertSame(2600000, $second->cpuUsageUsec);
         self::assertSame(11.0, $second->sampledAt);
-        self::assertEquals($second, ResourceObservation::fromArray(json_decode(json_encode($second, JSON_THROW_ON_ERROR), true, flags: JSON_THROW_ON_ERROR)));
+        $roundTripped = json_decode(json_encode($second, JSON_THROW_ON_ERROR), true, flags: JSON_THROW_ON_ERROR);
+        self::assertEquals($second, ResourceObservation::fromArray($roundTripped));
     }
 
     public function testUnlimitedCgroupIsMeasuredAgainstTheHost(): void
@@ -93,7 +94,8 @@ final class CgroupResourceSamplerTest extends TestCase
         self::assertTrue($second->isKnown());
         self::assertSame(0.5, $second->cpuUtilization, 'Two CPU seconds over one second on four host CPUs.');
         self::assertSame(0.0, $second->cpuThrottledRatio);
-        self::assertEquals($second, ResourceObservation::fromArray(json_decode(json_encode($second, JSON_THROW_ON_ERROR), true, flags: JSON_THROW_ON_ERROR)));
+        $roundTripped = json_decode(json_encode($second, JSON_THROW_ON_ERROR), true, flags: JSON_THROW_ON_ERROR);
+        self::assertEquals($second, ResourceObservation::fromArray($roundTripped));
     }
 
     public function testEachUnlimitedResourceFallsBackToTheHostIndependently(): void

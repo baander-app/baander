@@ -33,7 +33,8 @@ final class WorkerCommandTest extends TestCase
     {
         $runner = new RecordingWorkerRunner();
         $tester = new CommandTester(new WorkerCommand($runner));
-        self::assertSame(7, $tester->execute(array_replace($this->options(), ['--scheduled-console-mib' => '320'])));
+        $options = array_replace($this->options(), ['--scheduled-console-mib' => '320']);
+        self::assertSame(7, $tester->execute($options));
         self::assertNotNull($runner->configuration);
         self::assertSame(320 * 1024 * 1024, $runner->configuration->scheduledConsoleReservationBytes);
     }

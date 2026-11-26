@@ -62,7 +62,8 @@ final class QueueArtistSyncsHandlerTest extends TestCase
         $this->identify(1_001);
 
         self::assertSame(1_001, $this->handler()(new SyncArtistsMessage()));
-        self::assertCount(1_001, array_unique(array_map(static fn (Envelope $sent): string => $sent->getMessage()->artistId->toString(), $this->sent)));
+        $artistIds = array_map(static fn (Envelope $sent): string => $sent->getMessage()->artistId->toString(), $this->sent);
+        self::assertCount(1_001, array_unique($artistIds));
     }
 
     public function testAnArtistWithAQueuedMarkOrAnAnswerMarkForItsIdIsNotQueued(): void

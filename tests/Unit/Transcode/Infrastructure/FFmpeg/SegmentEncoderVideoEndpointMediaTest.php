@@ -209,7 +209,8 @@ final class SegmentEncoderVideoEndpointMediaTest extends TestCase
                     $localStart = ($segment->start - $track->presentationTimeOffset) / $track->timescale;
                     $delay = max(0.0, $expectedDelay - $localStart);
                     if ($delay > 0.2) {
-                        self::assertLessThan(0.0005, $this->rms($pcm, 0, min($seconds, $delay - 0.1)));
+                        $silentSeconds = min($seconds, $delay - 0.1);
+                        self::assertLessThan(0.0005, $this->rms($pcm, 0, $silentSeconds));
                     }
                     if ($delay + 0.6 < $seconds) {
                         $position = $delay + 0.2;

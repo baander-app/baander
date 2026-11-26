@@ -380,10 +380,10 @@ final class FilesDiscoveredGapFillTest extends TestCase
         $songs->method('findCreditedSongIds')->willReturnCallback(static function (array $songIds) use ($state, $transaction): array {
             self::assertTrue($transaction->active, 'Existing credits are read inside the transaction that adds one.');
 
-            return array_values(array_filter(
+            return array_filter(
                 array_map(static fn (Uuid $id): string => $id->toString(), $songIds),
                 static fn (string $id): bool => ($state->credits[$id] ?? []) !== [],
-            ));
+            ) |> array_values(...);
         });
         $songs->method('addArtistCredit')->willReturnCallback(static function (Uuid $songId, Uuid $artistId, string $role, string $creditedName) use ($state): void {
             foreach ($state->credits[$songId->toString()] ?? [] as [$creditedArtist, $creditedRole]) {

@@ -318,7 +318,7 @@ final class MediaFileGuardTest extends TestCase
     private function file(string $path): string
     {
         if (!is_dir(dirname($path))) {
-            self::assertTrue(mkdir(dirname($path), 0777, true));
+            mkdir(dirname($path), 0777, true) |> self::assertTrue(...);
         }
         self::assertNotFalse(file_put_contents($path, 'audio'));
 

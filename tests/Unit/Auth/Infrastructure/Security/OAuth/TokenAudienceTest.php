@@ -28,7 +28,11 @@ final class TokenAudienceTest extends TestCase
         if ($audience !== null) {
             $claims['aud'] = $audience;
         }
-        $encode = static fn (string $value): string => rtrim(strtr(base64_encode($value), '+/', '-_'), '=');
+        $encode = static function (string $value): string {
+            $base64 = base64_encode($value);
+
+            return rtrim(strtr($base64, '+/', '-_'), '=');
+        };
         $body = $encode(json_encode(['alg' => 'RS256', 'typ' => 'JWT'], JSON_THROW_ON_ERROR)).'.'
             .$encode(json_encode($claims, JSON_THROW_ON_ERROR));
         self::assertTrue(openssl_sign($body, $signature, $key, OPENSSL_ALGO_SHA256));

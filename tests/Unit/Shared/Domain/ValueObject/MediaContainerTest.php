@@ -23,7 +23,8 @@ final class MediaContainerTest extends TestCase
         foreach (MediaContainer::cases() as $container) {
             foreach ($container->extensions() as $extension) {
                 self::assertSame($container, MediaContainer::forExtension($extension));
-                self::assertSame($container, MediaContainer::forExtension(strtoupper($extension)));
+                $upperExtension = strtoupper($extension);
+                self::assertSame($container, MediaContainer::forExtension($upperExtension));
             }
         }
     }

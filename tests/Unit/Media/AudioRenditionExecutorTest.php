@@ -118,7 +118,8 @@ final class AudioRenditionExecutorTest extends TestCase
         $runtime->expects(self::never())->method('fail');
         ProcessExecutor::configureNativeExecution($client);
         new AudioRenditionExecutor(new MediaExecutionPolicy(new DeploymentProfile()), $runtime, new NullLogger(), $this->settings(), new StubAacImplementationProbe(), '/usr/bin/ffmpeg')->run($this->claim, static fn (): bool => false);
-        self::assertSame('remote audio', file_get_contents($this->final()));
+        $finalPath = $this->final();
+        self::assertSame('remote audio', file_get_contents($finalPath));
     }
 
     public function testRemuxCopiesVerifiedSelectedAacIntoCompletedMp4(): void
@@ -159,7 +160,8 @@ final class AudioRenditionExecutorTest extends TestCase
         self::assertContains('0:3', $commands[1]);
         self::assertContains('copy', $commands[1]);
         self::assertNotContains('-b:a', $commands[1]);
-        self::assertSame('copied AAC', file_get_contents($this->final()));
+        $finalPath = $this->final();
+        self::assertSame('copied AAC', file_get_contents($finalPath));
     }
 
     public function testChangedCopySourceFailsBeforeAnyNativeAdmission(): void
@@ -254,7 +256,8 @@ final class AudioRenditionExecutorTest extends TestCase
             return true;
         });
         $runtime->expects(self::once())->method('complete')->willReturnCallback(function (): bool {
-            self::assertSame('encoded', file_get_contents($this->final()));
+            $finalPath = $this->final();
+            self::assertSame('encoded', file_get_contents($finalPath));
             return true;
         });
         $runtime->expects(self::never())->method('fail');
@@ -476,7 +479,8 @@ final class AudioRenditionExecutorTest extends TestCase
         $copyClient->method('release')->willReturn(true);
         ProcessExecutor::configureNativeExecution($copyClient);
         new AudioRenditionExecutor(new MediaExecutionPolicy(new DeploymentProfile()), $runtime, new NullLogger(), $this->settings(), $probe, '/usr/bin/ffmpeg')->run($this->claim, static fn (): bool => false);
-        self::assertSame('copied AAC', file_get_contents($this->final()));
+        $finalPath = $this->final();
+        self::assertSame('copied AAC', file_get_contents($finalPath));
     }
 
     private function settings(string $implementation = 'bac'): SystemSettingsPortInterface

@@ -35,7 +35,8 @@ final class ClientFingerprintTest extends TestCase
     {
         $fp = ClientFingerprint::generate('data1', 'data2');
 
-        $this->assertSame(64, strlen($fp->toString()));
+        $fingerprint = $fp->toString();
+        $this->assertSame(64, strlen($fingerprint));
     }
 
     public function testGenerateDeterministic(): void

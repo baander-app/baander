@@ -137,7 +137,8 @@ final class ArtistIdentityIndexTest extends TestCase
             range(1, 14),
         );
 
-        self::assertCount(1, array_unique(array_map(static fn (Uuid $id): string => $id->toString(), $resolved)));
+        $resolvedIds = array_map(static fn (Uuid $id): string => $id->toString(), $resolved);
+        self::assertCount(1, array_unique($resolvedIds));
         self::assertCount(1, $index->artists());
         self::assertSame('Disturbed', $index->artists()[0]->name);
     }

@@ -109,7 +109,8 @@ final class DeploymentProfileTest extends TestCase
         $profile = new DeploymentProfile(videoEncoderSlots: 0, audioEncoderSlots: 4);
 
         self::assertSame([], $profile->mediaClientIds('video'));
-        self::assertSame([], array_filter(array_keys($profile->nativeClientCommandCaps()), static fn (string $client): bool => str_starts_with($client, 'media-video-')));
+        $clients = array_keys($profile->nativeClientCommandCaps());
+        self::assertSame([], array_filter($clients, static fn (string $client): bool => str_starts_with($client, 'media-video-')));
         self::assertSame([5, 12, 6], [$profile->nativeCommandLimit(), $profile->nativeResultLimit(), $profile->nativeClientLimit()]);
     }
 

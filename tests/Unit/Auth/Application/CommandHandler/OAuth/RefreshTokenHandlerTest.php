@@ -1220,7 +1220,8 @@ final class RefreshTokenHandlerTest extends TestCase
             $this->logs,
             static fn (array $record): bool => ($record['context']['reason'] ?? null) === $reason,
         ));
-        self::assertCount(1, $matching, sprintf('Expected one "%s" record, got: %s', $reason, json_encode($this->logs, JSON_THROW_ON_ERROR)));
+        $logsJson = json_encode($this->logs, JSON_THROW_ON_ERROR);
+        self::assertCount(1, $matching, sprintf('Expected one "%s" record, got: %s', $reason, $logsJson));
         self::assertSame($level, $matching[0]['level']);
         self::assertSame($chainId->toString(), $matching[0]['context']['chain_id'] ?? null);
         $serialized = json_encode($this->logs, JSON_THROW_ON_ERROR);

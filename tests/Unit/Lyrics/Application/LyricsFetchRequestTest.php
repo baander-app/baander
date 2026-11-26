@@ -103,7 +103,8 @@ final class LyricsFetchRequestTest extends TestCase
     private function requester(array $storedValues, array &$envelopes, ?MockClock $clock = null): LyricsFetchRequester
     {
         $store = $this->createMock(SystemSettingStoreInterface::class);
-        $store->expects($this->exactly(count($storedValues)))->method('find')
+        $expectedCalls = count($storedValues);
+        $store->expects($this->exactly($expectedCalls))->method('find')
             ->with(LyricsSettingDefinitions::AUTO_FETCH)
             ->willReturnOnConsecutiveCalls(...$storedValues);
         $settings = new SystemSettings(new SettingDefinitionRegistry([new LyricsSettingDefinitions()]), $store);

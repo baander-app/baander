@@ -106,7 +106,7 @@ final class DeploymentOperatorCredentialsTest extends TestCase
 
     public function testRejectsOversizedAndEmptyFiles(): void
     {
-        $this->assertRejected($this->write(str_repeat('x', 8193)));
+        str_repeat('x', 8193) |> $this->write(...) |> $this->assertRejected(...);
         $this->assertRejected($this->write(''));
     }
 

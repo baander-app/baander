@@ -54,7 +54,7 @@ function readBytes($socket, int $length): string
     while (strlen($data) < $length) {
         $chunk = fread($socket, $length - strlen($data));
         if ($chunk === false || $chunk === '') {
-            probeFail(sprintf('connection ended after %d of %d bytes', strlen($data), $length));
+            sprintf('connection ended after %d of %d bytes', strlen($data), $length) |> probeFail(...);
         }
         $data .= $chunk;
     }
@@ -132,7 +132,7 @@ function assertClosedByServer(array $connection, string $what): void
 {
     $frame = readFrame($connection['socket']);
     if ($frame['opcode'] !== 0x8 || unpack('n', substr($frame['payload'], 0, 2))[1] !== 1008) {
-        probeFail(sprintf('%s: expected a 1008 close frame, got opcode %d payload %s', $what, $frame['opcode'], bin2hex($frame['payload'])));
+        sprintf('%s: expected a 1008 close frame, got opcode %d payload %s', $what, $frame['opcode'], bin2hex($frame['payload'])) |> probeFail(...);
     }
     $rest = fread($connection['socket'], 1);
     if ($rest !== '' && $rest !== false) {
@@ -178,7 +178,8 @@ $liveConnections = new SwooleLiveConnections(new ServerControl($coordinator, $cl
 $pipeMessages = new ControlPipeMessageHandler($coordinator);
 
 $listener = stream_socket_server('tcp://127.0.0.1:0');
-$port = (int) substr(strrchr(stream_socket_get_name($listener, false), ':'), 1);
+$listenerAddress = stream_socket_get_name($listener, false);
+$port = (int) substr(strrchr($listenerAddress, ':'), 1);
 fclose($listener);
 
 $disabledByCli = Uuid::generate()->toString();
@@ -220,7 +221,7 @@ if ($child === 0) {
 
     // 2. The user's connections live on more than one worker, so whichever worker
     // takes the control request must close connections another worker owns.
-    if (count(array_unique(array_column($cliUser, 'worker'))) < 2) {
+    if ((array_column($cliUser, 'worker') |> array_unique(...) |> count(...)) < 2) {
         probeFail('connections did not spread over workers: ' . json_encode(array_column($cliUser, 'worker')));
     }
 
@@ -277,7 +278,8 @@ $server->on('Handshake', static function (Request $request, Response $response) 
     $key = $request->header['sec-websocket-key'] ?? '';
     $response->header('Upgrade', 'websocket');
     $response->header('Connection', 'Upgrade');
-    $response->header('Sec-WebSocket-Accept', base64_encode(sha1($key . '258EAFA5-E914-47DA-95CA-C5AB0DC85B11', true)));
+    $keyDigest = sha1($key . '258EAFA5-E914-47DA-95CA-C5AB0DC85B11', true);
+    $response->header('Sec-WebSocket-Accept', base64_encode($keyDigest));
     $response->status(101);
     $response->end();
     $fd = (int) $request->fd;

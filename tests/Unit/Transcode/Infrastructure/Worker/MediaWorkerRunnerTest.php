@@ -68,10 +68,13 @@ final class MediaWorkerRunnerTest extends TestCase
             $clientIds = array_column($launches, 3);
             sort($clientIds);
             self::assertSame($expectedIds, $clientIds);
-            self::assertSame(['1'], array_values(array_unique(array_column($launches, 4))));
-            self::assertCount($count, array_unique(array_column($launches, 1)));
-            self::assertSame($videoCount, count(array_filter($launches, static fn(array $launch): bool => $launch[0] === 'video')));
-            self::assertSame(1, count(array_filter($launches, static fn(array $launch): bool => $launch[0] === 'audio')));
+            self::assertSame(['1'], array_column($launches, 4) |> array_unique(...) |> array_values(...));
+            $jobKeys = array_column($launches, 1);
+            self::assertCount($count, array_unique($jobKeys));
+            $videoLaunches = array_filter($launches, static fn(array $launch): bool => $launch[0] === 'video');
+            self::assertSame($videoCount, count($videoLaunches));
+            $audioLaunches = array_filter($launches, static fn(array $launch): bool => $launch[0] === 'audio');
+            self::assertSame(1, count($audioLaunches));
             foreach ($launches as $launch) {
                 self::assertDirectoryDoesNotExist('/proc/' . $launch[2], 'A drained child must be reaped.');
             }
@@ -119,8 +122,9 @@ final class MediaWorkerRunnerTest extends TestCase
             $launches = array_map(static fn(string $line): array => json_decode($line, true, flags: JSON_THROW_ON_ERROR), file($log));
             $clientIds = array_column($launches, 1);
             sort($clientIds, SORT_NATURAL);
-            self::assertSame(array_map(static fn(int $index): string => 'media-video-' . $index, range(0, 7)), $clientIds);
-            self::assertSame(['video'], array_values(array_unique(array_column($launches, 0))));
+            $indexes = range(0, 7);
+            self::assertSame(array_map(static fn(int $index): string => 'media-video-' . $index, $indexes), $clientIds);
+            self::assertSame(['video'], array_column($launches, 0) |> array_unique(...) |> array_values(...));
         } finally {
             @unlink($log);
             unlink($script);
@@ -261,7 +265,7 @@ PHP);
             });
             $launches = array_map(static fn(string $line): array => json_decode($line, true, flags: JSON_THROW_ON_ERROR), file($log));
             self::assertCount(65, $launches);
-            self::assertSame(['media-audio-0'], array_values(array_unique(array_column($launches, 0))));
+            self::assertSame(['media-audio-0'], array_column($launches, 0) |> array_unique(...) |> array_values(...));
             self::assertSame(array_map(strval(...), range(1, 65)), array_column($launches, 1));
         } finally {
             @unlink($log);

@@ -150,7 +150,8 @@ final class PasskeyServiceTest extends TestCase
         $this->assertNotEmpty($result['options']['challenge']);
         $this->assertSame('localhost', $result['options']['rp']['id']);
         $this->assertSame('Bånder', $result['options']['rp']['name']);
-        $this->assertSame('sssssssssssssssssssss', base64_decode(strtr($result['options']['user']['id'], '-_', '+/'), true));
+        $userIdBase64 = strtr($result['options']['user']['id'], '-_', '+/');
+        $this->assertSame('sssssssssssssssssssss', base64_decode($userIdBase64, true));
     }
 
     public function testRegistrationOptionsAndAccountSignalsRejectUuidHandles(): void
@@ -374,7 +375,9 @@ final class PasskeyServiceTest extends TestCase
         $this->assertArrayHasKey('rpId', $data);
         $this->assertArrayHasKey('allAcceptedCredentialIds', $data);
         $this->assertSame('localhost', $data['rpId']);
-        $this->assertSame(rtrim(strtr(base64_encode('sssssssssssssssssssss'), '+/', '-_'), '='), $data['userId']);
+        $userIdBase64 = base64_encode('sssssssssssssssssssss');
+        $expectedUserId = rtrim(strtr($userIdBase64, '+/', '-_'), '=');
+        $this->assertSame($expectedUserId, $data['userId']);
         $this->assertCount(1, $data['allAcceptedCredentialIds']);
     }
 
@@ -402,7 +405,9 @@ final class PasskeyServiceTest extends TestCase
         $data = json_decode($signal, true, 512, JSON_THROW_ON_ERROR);
 
         $this->assertSame('localhost', $data['rpId']);
-        $this->assertSame(rtrim(strtr(base64_encode('sssssssssssssssssssss'), '+/', '-_'), '='), $data['userId']);
+        $userIdBase64 = base64_encode('sssssssssssssssssssss');
+        $expectedUserId = rtrim(strtr($userIdBase64, '+/', '-_'), '=');
+        $this->assertSame($expectedUserId, $data['userId']);
         $this->assertSame('user@baander.app', $data['name']);
         $this->assertSame('Test User', $data['displayName']);
     }

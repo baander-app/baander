@@ -260,7 +260,8 @@ final class AudioRenditionCacheTest extends TestCase
         });
         $rendition = $this->cache(startTimeoutSeconds: 5)->open('track', $this->source, AudioRenditionFormat::Mp3, 192000);
         self::assertFalse($rendition->isComplete());
-        self::assertSame('encoded', implode('', iterator_to_array($rendition->chunks(), false)));
+        $chunks = iterator_to_array($rendition->chunks(), false);
+        self::assertSame('encoded', implode('', $chunks));
     }
 
     public function testSourceChangesSelectAnotherDurableIdentity(): void
@@ -479,8 +480,9 @@ final class AudioRenditionCacheTest extends TestCase
 
     private function write(string $bytes, bool $partial = false): void
     {
-        if (!is_dir(dirname($this->path()))) {
-            mkdir(dirname($this->path()), 0700, true);
+        $directory = dirname($this->path());
+        if (!is_dir($directory)) {
+            mkdir($directory, 0700, true);
         }
         file_put_contents($this->path() . ($partial ? '.part' : ''), $bytes);
     }

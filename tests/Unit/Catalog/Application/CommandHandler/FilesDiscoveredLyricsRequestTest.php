@@ -265,10 +265,10 @@ final class FilesDiscoveredLyricsRequestTest extends TestCase
             $state->visibleSongs,
             static fn (Song $song): bool => $song->getId()->equals($id),
         ));
-        $songs->method('findCreditedSongIds')->willReturnCallback(static fn (array $songIds): array => array_values(array_intersect(
+        $songs->method('findCreditedSongIds')->willReturnCallback(static fn (array $songIds): array => array_intersect(
             array_map(static fn (Uuid $id): string => $id->toString(), $songIds),
             $state->creditedSongs,
-        )));
+        ) |> array_values(...));
         $songs->method('persist')->willReturnCallback(static function (Song $song) use ($state): void {
             $failure = $state->persistFailures[$song->getHash()] ?? null;
             if ($failure !== null) {

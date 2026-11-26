@@ -52,7 +52,8 @@ final class RadioAdminCommandsTest extends TestCase
 
     public function testStationListWithAllReadsEveryPage(): void
     {
-        $all = array_map(self::station(...), array_map(strval(...), range(1, 501)));
+        $numbers = range(1, 501);
+        $all = array_map(self::station(...), array_map(strval(...), $numbers));
         $stations = $this->createMock(RadioStationPortInterface::class);
         $stations->expects(self::exactly(2))
             ->method('listStations')

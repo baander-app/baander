@@ -54,7 +54,8 @@ final class SwooleLivePartyRoomsTest extends TestCase
         $this->registry->addConnection(4, self::LEAVER, 0, 'token-4');
         $this->registry->addConnection(5, self::MEMBER, 1, 'token-5');
         // party.join builds the room from the client's string, which may be upper case.
-        $this->registry->joinRoom(WebSocketRooms::party(strtoupper(self::SESSION)), 1);
+        $upperCaseSession = strtoupper(self::SESSION);
+        $this->registry->joinRoom(WebSocketRooms::party($upperCaseSession), 1);
         $this->registry->joinRoom(WebSocketRooms::party(self::SESSION), 2);
         $this->registry->joinRoom(WebSocketRooms::party(self::SESSION), 3);
         $this->registry->joinRoom(WebSocketRooms::party(self::OTHER_SESSION), 5);

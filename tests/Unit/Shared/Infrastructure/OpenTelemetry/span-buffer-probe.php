@@ -79,7 +79,7 @@ function probeSpans(ServerControl $serverControl, int $expected): array
         usleep(20_000);
     } while (microtime(true) < $deadline);
 
-    probeFail(sprintf('expected %d spans: %s', $expected, json_encode($answer)));
+    sprintf('expected %d spans: %s', $expected, json_encode($answer)) |> probeFail(...);
 }
 
 /** @return array{int, string} worker ID and body of one HTTP request on a fresh connection */

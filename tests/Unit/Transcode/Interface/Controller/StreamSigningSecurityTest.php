@@ -122,7 +122,7 @@ final class StreamSigningSecurityTest extends TestCase
             ->willThrowException(new AccessDeniedException());
         $controller = new StreamSigningController($auth, $playback, $this->videos($video), $this->streaming());
         $this->expectException(AccessDeniedException::class);
-        $controller->sign(Request::create(
+        Request::create(
             '/',
             'POST',
             content: json_encode(
@@ -132,7 +132,7 @@ final class StreamSigningSecurityTest extends TestCase
                 ],
                 JSON_THROW_ON_ERROR,
             ),
-        ));
+        ) |> $controller->sign(...);
     }
 
     public function testSigningDefaultsTo24Hours(): void
@@ -150,18 +150,19 @@ final class StreamSigningSecurityTest extends TestCase
         $auth->expects($this->once())->method('signUrl')->with($path . '?set=0123456789abABCD_-xyz.3', 86400)
             ->willReturn(['url' => $path . '?sig=s&exp=1', 'sig' => 's', 'exp' => 1]);
         $controller = new StreamSigningController($auth, $playback, $this->videos($video), $this->streaming());
+        $body = json_encode(
+            [
+                'requestId' => self::REQUEST_ID,
+                'path' => $path,
+            ],
+            JSON_THROW_ON_ERROR,
+        );
         self::assertSame(
             200,
             $controller->sign(Request::create(
                 '/',
                 'POST',
-                content: json_encode(
-                    [
-                        'requestId' => self::REQUEST_ID,
-                        'path' => $path,
-                    ],
-                    JSON_THROW_ON_ERROR,
-                ),
+                content: $body,
             ))->getStatusCode(),
         );
     }
@@ -184,13 +185,13 @@ final class StreamSigningSecurityTest extends TestCase
             $this->videos($video),
             $this->streaming(),
         );
-        $response = $controller->sign(Request::create('/', 'POST', content: json_encode([
+        $response = Request::create('/', 'POST', content: json_encode([
             'path' => '/api/transcode/' . $video->getPublicId() . '/master.m3u8',
             'requestId' => self::REQUEST_ID,
             'audioStreamIndex' => 7,
             'audioOffsetMs' => -750,
             'qualityTier' => '2160p',
-        ], JSON_THROW_ON_ERROR)));
+        ], JSON_THROW_ON_ERROR)) |> $controller->sign(...);
         self::assertSame(200, $response->getStatusCode());
     }
 
@@ -204,11 +205,11 @@ final class StreamSigningSecurityTest extends TestCase
             $this->createStub(TranscodePublicViewInterface::class),
             $this->createStub(TranscodeStreamingPortInterface::class),
         );
-        $response = $controller->sign(Request::create('/', 'POST', content: json_encode([
+        $response = Request::create('/', 'POST', content: json_encode([
             'path' => '/api/transcode/0123456789abABCD_-xyz/master.m3u8',
             'requestId' => self::REQUEST_ID,
             'qualityTier' => '800p',
-        ], JSON_THROW_ON_ERROR)));
+        ], JSON_THROW_ON_ERROR)) |> $controller->sign(...);
 
         self::assertSame(400, $response->getStatusCode());
     }
@@ -229,7 +230,7 @@ final class StreamSigningSecurityTest extends TestCase
         $auth = $this->createStub(StreamAuthPortInterface::class);
         $auth->method('signUrl')->willReturn(['url' => '/signed', 'sig' => 's', 'exp' => 1]);
         $controller = new StreamSigningController($auth, $playback, $this->videos($video), $this->streaming());
-        $response = $controller->sign(Request::create(
+        $response = Request::create(
             '/',
             'POST',
             content: json_encode(
@@ -241,7 +242,7 @@ final class StreamSigningSecurityTest extends TestCase
                 ],
                 JSON_THROW_ON_ERROR,
             ),
-        ));
+        ) |> $controller->sign(...);
         $body = json_decode($response->getContent(), true, flags: JSON_THROW_ON_ERROR);
         self::assertSame(self::REQUEST_ID, $body['requestId']);
         self::assertSame(['0123456789abABCD_-xyz'], $body['jobIds']);
@@ -277,8 +278,8 @@ final class StreamSigningSecurityTest extends TestCase
             $this->videos($video),
             $streaming,
         );
-        $response = $controller->sign(Request::create('/', 'POST', content: json_encode(['requestId' => self::REQUEST_ID, 'path' => '/api/transcode/' . $video->getPublicId() . '/master.m3u8',
-            'refresh' => true, 'jobIds' => [$owned], 'attachedSet' => $owned . '.3,' . $foreign . '.9'], JSON_THROW_ON_ERROR)));
+        $response = Request::create('/', 'POST', content: json_encode(['requestId' => self::REQUEST_ID, 'path' => '/api/transcode/' . $video->getPublicId() . '/master.m3u8',
+            'refresh' => true, 'jobIds' => [$owned], 'attachedSet' => $owned . '.3,' . $foreign . '.9'], JSON_THROW_ON_ERROR)) |> $controller->sign(...);
         self::assertSame(200, $response->getStatusCode());
     }
 
@@ -308,7 +309,7 @@ final class StreamSigningSecurityTest extends TestCase
             $this->videos($video),
             $streaming,
         );
-        $response = $controller->sign(Request::create(
+        $response = Request::create(
             '/',
             'POST',
             content: json_encode(
@@ -320,7 +321,7 @@ final class StreamSigningSecurityTest extends TestCase
                 ],
                 JSON_THROW_ON_ERROR,
             ),
-        ));
+        ) |> $controller->sign(...);
         // A definite answer: nothing invites the client to retry the same sessions.
         self::assertSame(410, $response->getStatusCode());
         self::assertFalse($response->headers->has('Retry-After'));
@@ -346,7 +347,7 @@ final class StreamSigningSecurityTest extends TestCase
             $this->videos($video),
             $streaming,
         );
-        $response = $controller->sign(Request::create(
+        $response = Request::create(
             '/',
             'POST',
             content: json_encode(
@@ -356,7 +357,7 @@ final class StreamSigningSecurityTest extends TestCase
                 ],
                 JSON_THROW_ON_ERROR,
             ),
-        ));
+        ) |> $controller->sign(...);
         self::assertSame(503, $response->getStatusCode());
         self::assertSame('2', $response->headers->get('Retry-After'));
     }

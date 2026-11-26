@@ -82,7 +82,8 @@ final class CursorCodecTest extends TestCase
     public function testDecodeJsonMissingDirectionKeyReturnsNull(): void
     {
         $json = json_encode(['values' => ['sort' => 'Title']]);
-        $cursor = rtrim(strtr(base64_encode($json), '+/', '-_'), '=');
+        $base64 = base64_encode($json);
+        $cursor = rtrim(strtr($base64, '+/', '-_'), '=');
 
         $result = $this->codec->decode($cursor);
 
@@ -92,7 +93,8 @@ final class CursorCodecTest extends TestCase
     public function testDecodeJsonMissingValuesKeyReturnsNull(): void
     {
         $json = json_encode(['direction' => 'next']);
-        $cursor = rtrim(strtr(base64_encode($json), '+/', '-_'), '=');
+        $base64 = base64_encode($json);
+        $cursor = rtrim(strtr($base64, '+/', '-_'), '=');
 
         $result = $this->codec->decode($cursor);
 
@@ -122,7 +124,8 @@ final class CursorCodecTest extends TestCase
     public function testDecodeInvalidDirectionValueReturnsNull(): void
     {
         $json = json_encode(['direction' => 'invalid', 'values' => []]);
-        $cursor = rtrim(strtr(base64_encode($json), '+/', '-_'), '=');
+        $base64 = base64_encode($json);
+        $cursor = rtrim(strtr($base64, '+/', '-_'), '=');
 
         $result = $this->codec->decode($cursor);
 

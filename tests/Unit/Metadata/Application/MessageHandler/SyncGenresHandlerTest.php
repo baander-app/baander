@@ -47,8 +47,10 @@ final class SyncGenresHandlerTest extends TestCase
         );
 
         self::assertSame(5, $queued);
-        self::assertSame(2, count(array_keys($dispatched, SyncAlbumMessage::class, true)));
-        self::assertSame(3, count(array_keys($dispatched, SyncSongMessage::class, true)));
+        $albumSyncs = array_keys($dispatched, SyncAlbumMessage::class, true);
+        self::assertSame(2, count($albumSyncs));
+        $songSyncs = array_keys($dispatched, SyncSongMessage::class, true);
+        self::assertSame(3, count($songSyncs));
     }
 
     public function testACancelledJobStopsBeforeItsNextAlbum(): void

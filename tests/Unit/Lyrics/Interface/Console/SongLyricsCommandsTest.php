@@ -79,10 +79,10 @@ final class SongLyricsCommandsTest extends TestCase
 
             public function songIdsWithLyrics(array $songIds): array
             {
-                return array_fill_keys(array_keys(array_intersect_key(
-                    $this->bySong,
-                    array_flip(array_map(static fn (Uuid $id): string => $id->toString(), $songIds)),
-                )), true);
+                $requestedIds = array_map(static fn (Uuid $id): string => $id->toString(), $songIds);
+                $requestedLyrics = array_intersect_key($this->bySong, array_flip($requestedIds));
+
+                return array_fill_keys(array_keys($requestedLyrics), true);
             }
 
             public function delete(Lyrics $lyrics): void

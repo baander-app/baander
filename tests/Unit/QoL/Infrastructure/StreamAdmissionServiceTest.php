@@ -154,8 +154,10 @@ final class StreamAdmissionServiceTest extends TestCase
         $service->admit(new Uuid(), '1080p', 5_000_000, 1080, false);
 
         $decisions = array_values(array_filter($logger->records, static fn (array $record): bool => $record['message'] === 'StreamAdmission: allocated stream'));
-        self::assertSame(['learning', 'active'], array_column(array_column($decisions, 'context'), 'governorState'));
-        self::assertSame([0, LearningModel::MIN_SAMPLES], array_column(array_column($decisions, 'context'), 'learningSamples'));
+        $governorStates = array_column(array_column($decisions, 'context'), 'governorState');
+        self::assertSame(['learning', 'active'], $governorStates);
+        $learningSamples = array_column(array_column($decisions, 'context'), 'learningSamples');
+        self::assertSame([0, LearningModel::MIN_SAMPLES], $learningSamples);
         self::assertSame('1080p', $decisions[1]['context']['allowedTier']);
     }
 

@@ -160,10 +160,7 @@ final class CopyPresentationServiceTest extends TestCase
         $input = $this->input();
         [$job] = $this->copyOf($input);
         $share = $this->createStub(TranscodeSessionSharePort::class);
-        $share->method('heldBy')->willReturn(array_map(
-            static fn (int $index): HeldTranscodeSession => new HeldTranscodeSession(Uuid::generate(), Uuid::generate(), Uuid::generate(), 'other-' . $index, '720p', new \DateTimeImmutable(), true),
-            range(1, 6),
-        ));
+        $share->method('heldBy')->willReturn($this->otherHeldSessions());
         $ownership = $this->createMock(TranscodeExecutionOwnershipPort::class);
         $ownership->expects(self::never())->method('admit');
         $sessions = $this->createMock(TranscodeSessionPortInterface::class);
@@ -206,6 +203,15 @@ final class CopyPresentationServiceTest extends TestCase
         $job = TranscodeJob::createCopy($input->video, '/tmp/copy', $input->owner, $selection, $input->width, $input->height, $input->requestId);
 
         return [$job, TranscodeSession::create($input->owner, $job->getId(), $input->video, AudioProfile::streamingStereo())];
+    }
+
+    /** @return list<HeldTranscodeSession> */
+    private function otherHeldSessions(): array
+    {
+        return array_map(
+            static fn (int $index): HeldTranscodeSession => new HeldTranscodeSession(Uuid::generate(), Uuid::generate(), Uuid::generate(), 'other-' . $index, '720p', new \DateTimeImmutable(), true),
+            range(1, 6),
+        );
     }
 
     private function runtime(TranscodeJob $job, TranscodeSession $session, CopyPresentationInput $input, string $outcome): TranscodeRuntimeSnapshot

@@ -75,7 +75,9 @@ final class ExchangeRefreshTokenHandlerTest extends TestCase
         $refreshTokens->method('findByTokenId')->willReturn(null);
 
         try {
-            ($this->handler($refreshTokens))($this->command(str_repeat('u', 80)));
+            $handler = $this->handler($refreshTokens);
+            $unknownToken = str_repeat('u', 80);
+            $handler($this->command($unknownToken));
             self::fail('An unknown refresh token must be refused.');
         } catch (OAuthProtocolException) {
         }
@@ -101,7 +103,9 @@ final class ExchangeRefreshTokenHandlerTest extends TestCase
         $refreshTokens->method('findByTokenId')->willThrowException($fault);
 
         try {
-            ($this->handler($refreshTokens))($this->command(str_repeat('r', 80)));
+            $handler = $this->handler($refreshTokens);
+            $refreshToken = str_repeat('r', 80);
+            $handler($this->command($refreshToken));
             self::fail('The server fault must propagate.');
         } catch (\Throwable $exception) {
             self::assertSame($fault, $exception);

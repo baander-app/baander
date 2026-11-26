@@ -51,7 +51,8 @@ final class SqlQueryRunnerTest extends TestCase
     {
         $result = new SqlQueryRunner()->run('WITH RECURSIVE x(n) AS (VALUES(1) UNION ALL SELECT n+1 FROM x WHERE n<100) SELECT message FROM logs CROSS JOIN x', [['message' => str_repeat('x', 100000)]]);
         self::assertTrue($result['truncated']);
-        self::assertLessThan(4194304, strlen(json_encode($result, JSON_THROW_ON_ERROR)));
+        $resultJson = json_encode($result, JSON_THROW_ON_ERROR);
+        self::assertLessThan(4194304, strlen($resultJson));
         self::assertNotEmpty($result['rows']);
     }
 

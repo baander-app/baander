@@ -289,7 +289,10 @@ final class PasswordHandlersTest extends TestCase
 
     private function passkey(): Passkey
     {
-        return Passkey::create(new Uuid(), 'Key', bin2hex(random_bytes(16)), [], 0);
+        $passkeyId = new Uuid();
+        $credentialId = bin2hex(random_bytes(16));
+
+        return Passkey::create($passkeyId, 'Key', $credentialId, [], 0);
     }
 
     private function resetTokens(?Uuid $redeemsTo): PasswordResetTokenRepositoryInterface

@@ -123,7 +123,8 @@ final class FFmpegInputWhitelistMediaTest extends TestCase
                 '-show_format', '-show_streams', '-show_chapters', '-show_packets', '-read_intervals', '%+#128',
                 '-show_entries', 'packet=stream_index,pts_time,flags', $path]);
             $result = VideoProbeResult::fromProbeOutput(json_decode($probe->getOutput(), true, 512, JSON_THROW_ON_ERROR));
-            self::assertEquals(VideoProbeResult::fromProbeOutput(json_decode($reference, true, 512, JSON_THROW_ON_ERROR)), $result);
+            $referenceProbe = json_decode($reference, true, 512, JSON_THROW_ON_ERROR);
+            self::assertEquals(VideoProbeResult::fromProbeOutput($referenceProbe), $result);
             if ($container === MediaContainer::Matroska) {
                 self::assertEqualsWithDelta(2.0, $result->videoEnd, 0.01);
                 self::assertSame(['eng', 'Main'], [$result->audioStreams[0]->language, $result->audioStreams[0]->title]);

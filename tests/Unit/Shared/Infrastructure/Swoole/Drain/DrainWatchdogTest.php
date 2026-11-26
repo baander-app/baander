@@ -126,7 +126,8 @@ final class DrainWatchdogTest extends TestCase
         $process->setTimeout(20);
         $process->run();
         self::assertTrue($process->isSuccessful(), $process->getOutput() . $process->getErrorOutput());
+        $output = $process->getOutput();
 
-        return [json_decode(trim($process->getOutput()), true, 512, JSON_THROW_ON_ERROR), $process->getErrorOutput()];
+        return [json_decode(trim($output), true, 512, JSON_THROW_ON_ERROR), $process->getErrorOutput()];
     }
 }

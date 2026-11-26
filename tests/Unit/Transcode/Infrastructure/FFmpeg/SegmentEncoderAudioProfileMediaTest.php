@@ -124,7 +124,7 @@ final class SegmentEncoderAudioProfileMediaTest extends TestCase
             self::assertEqualsWithDelta($expectedDuration, $track->end(), 0.1);
         }
         self::assertCount((int) ($expectedDuration * 10), $frames);
-        self::assertGreaterThan(20, count(array_unique(array_column($frames, 'hash'))));
+        self::assertGreaterThan(20, array_column($frames, 'hash') |> array_unique(...) |> count(...));
         $wrongMarkers = 0;
         foreach ($frames as $index => $frame) {
             $sourceTime = $start * 6 + $index / 10;

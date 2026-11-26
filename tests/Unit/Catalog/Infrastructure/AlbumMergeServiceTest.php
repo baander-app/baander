@@ -168,12 +168,13 @@ final class AlbumMergeServiceTest extends TestCase
 
         $this->merge();
 
+        $sequence = array_filter(
+            array_slice($this->calls, array_search('move Something', $this->calls, true) ?: 0),
+            static fn (string $call): bool => !str_starts_with($call, 'fold '),
+        ) |> array_values(...);
         self::assertSame(
             ['move Something', 'flush songs', 'delete Come Together (Remaster)', 'move favorites of source to target', 'move plays of source to target', 'delete source', 'save target', 'commit'],
-            array_slice(array_values(array_filter(
-                array_slice($this->calls, array_search('move Something', $this->calls, true) ?: 0),
-                static fn (string $call): bool => !str_starts_with($call, 'fold '),
-            )), 0, 8),
+            array_slice($sequence, 0, 8),
         );
     }
 
@@ -219,7 +220,8 @@ final class AlbumMergeServiceTest extends TestCase
 
         $this->merge();
 
-        self::assertSame([], array_values(array_filter($this->calls, static fn (string $call): bool => str_starts_with($call, 'fold '))));
+        $folds = array_filter($this->calls, static fn (string $call): bool => str_starts_with($call, 'fold '));
+        self::assertSame([], array_values($folds));
     }
 
     public function testAnAlbumGoneByTheTimeTheMergeHoldsItsLocksIsNotFoundAndNothingIsWritten(): void
@@ -234,7 +236,8 @@ final class AlbumMergeServiceTest extends TestCase
             self::assertSame('Source album not found.', $notFound->getMessage());
         }
 
-        self::assertSame(['lock albums'], array_values(array_diff($this->calls, ['begin'])));
+        $callsWithoutBegin = array_diff($this->calls, ['begin']);
+        self::assertSame(['lock albums'], array_values($callsWithoutBegin));
     }
 
     public function testAFailedMatchRequestIsLoggedAndTheMergeCompletes(): void

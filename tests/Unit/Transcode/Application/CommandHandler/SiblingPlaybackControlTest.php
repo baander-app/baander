@@ -193,7 +193,7 @@ final class SiblingPlaybackControlTest extends TestCase
         $request = Uuid::generate()->toString();
         $this->dispatch($action, $request);
         self::assertCount(3, $this->controls);
-        self::assertSame([$request], array_values(array_unique(array_column($this->controls, 'request'))));
+        self::assertSame([$request], array_column($this->controls, 'request') |> array_unique(...) |> array_values(...));
         foreach (array_slice($this->sessions, 0, 3) as $session) {
             $runtime = $this->runtimes[$session->getJobId()->toString()];
             self::assertSame(match ($action) {

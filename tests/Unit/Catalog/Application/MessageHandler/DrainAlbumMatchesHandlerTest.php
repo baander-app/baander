@@ -205,7 +205,8 @@ final class DrainAlbumMatchesHandlerTest extends TestCase
             'No claim holds the album any more: the queue counts it from its due time.',
         );
         self::assertEquals($queued, $this->queued);
-        self::assertSame(array_fill(0, count($queued), null), $this->queuedChains);
+        $queuedCount = count($queued);
+        self::assertSame(array_fill(0, $queuedCount, null), $this->queuedChains);
     }
 
     /** @return iterable<string, array{?string, AutomaticMatchOutcome, ?string, string, list<array{int, int}>}> */
@@ -251,7 +252,8 @@ final class DrainAlbumMatchesHandlerTest extends TestCase
 
         self::assertEquals($this->request($album, AlbumMatchSource::Ingest, '+1 hour'), $this->states->stateOf($album));
         self::assertEquals($queued, $this->queued);
-        self::assertSame(array_fill(0, count($queued), null), $this->queuedChains);
+        $queuedCount = count($queued);
+        self::assertSame(array_fill(0, $queuedCount, null), $this->queuedChains);
     }
 
     /** @return iterable<string, array{?string, list<array{int, int}>}> */

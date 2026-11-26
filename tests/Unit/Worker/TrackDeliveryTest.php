@@ -109,7 +109,8 @@ PHP);
         }
         $requests = $this->requests();
         self::assertCount(10, $requests);
-        self::assertSame([false, false, false, false], array_column(array_slice($requests, 0, 4), 'tampered'));
+        $firstRequests = array_slice($requests, 0, 4);
+        self::assertSame([false, false, false, false], array_column($firstRequests, 'tampered'));
         self::assertGreaterThanOrEqual($requests[3]['completedAt'], $delivery['availableAt']);
         self::assertLessThan($requests[4]['completedAt'], $delivery['availableAt']);
     }

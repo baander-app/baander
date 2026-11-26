@@ -127,7 +127,8 @@ final class LogIndexTest extends TestCase
             $reader->exec('BEGIN');
             $reader->querySingle('SELECT COUNT(*) FROM logs');
             try {
-                $index->append('a', 'boot', 2, (new LogNormalizer())->normalize(str_repeat('long log entry ', 10000)));
+                $longRecord = (new LogNormalizer())->normalize(str_repeat('long log entry ', 10000));
+                $index->append('a', 'boot', 2, $longRecord);
                 self::fail('Blocked reclamation must reject ingestion.');
             } catch (LogStorageLimitException $exception) {
                 self::assertStringContainsString('ingestion is suspended', $exception->getMessage());
@@ -228,7 +229,9 @@ final class LogIndexTest extends TestCase
         try {
             $writer = new LogIndex($path, maxStorageBytes: 16777216);
             for ($sequence = 0; $sequence < 400; ++$sequence) {
-                $writer->append('a', 'boot', $sequence, (new LogNormalizer())->normalize(str_repeat(sprintf('entry-%04d ', $sequence), 200)));
+                $normalizer = new LogNormalizer();
+                $entry = str_repeat(sprintf('entry-%04d ', $sequence), 200);
+                $writer->append('a', 'boot', $sequence, $normalizer->normalize($entry));
             }
             unset($writer);
             $index = new LogIndex($path, maxStorageBytes: 262144);

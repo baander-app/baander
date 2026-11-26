@@ -31,7 +31,8 @@ final class AutoscalingPolicyTest extends TestCase
         self::assertSame(0.0, $decision->evidence['oldestDueAgeSeconds']);
         self::assertSame(10.0, $decision->evidence['durationSeconds']);
         self::assertLessThanOrEqual(30, count($decision->evidence));
-        self::assertLessThan(1900, strlen(json_encode($decision->evidence, JSON_THROW_ON_ERROR)));
+        $evidenceJson = json_encode($decision->evidence, JSON_THROW_ON_ERROR);
+        self::assertLessThan(1900, strlen($evidenceJson));
         $firstIdle = $this->tick($policy, 21, unread: 0, busy: 0);
         self::assertSame(4, $firstIdle->target);
         for ($time = 22; $time <= 51; ++$time) {

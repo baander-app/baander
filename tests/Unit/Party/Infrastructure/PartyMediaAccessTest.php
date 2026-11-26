@@ -62,7 +62,7 @@ final class PartyMediaAccessTest extends TestCase
     public function testUpperCaseIdentifiersMatchTheStoredJobVideo(): void
     {
         $this->expectNotToPerformAssertions();
-        $this->access()->assertHostCanPlay($this->host, Uuid::fromString(strtoupper($this->video->toString())), $this->job);
+        $this->access()->assertHostCanPlay($this->host, $this->video->toString() |> strtoupper(...) |> Uuid::fromString(...), $this->job);
     }
 
     public function testAMissingOrInaccessibleVideoIsNotFound(): void
@@ -123,7 +123,8 @@ final class PartyMediaAccessTest extends TestCase
         ];
         $playback = $this->createStub(PlaybackAccessInterface::class);
         $playback->method('assertAccess')->willReturnCallback(static function (Uuid $videoId) use ($playable): void {
-            if (!in_array(strtolower($videoId->toString()), $playable, true)) {
+            $videoIdString = $videoId->toString();
+            if (!in_array(strtolower($videoIdString), $playable, true)) {
                 throw new AccessDeniedException('Video is not accessible.');
             }
         });

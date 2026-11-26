@@ -31,9 +31,12 @@ final class DeploymentHardwareEncoderTest extends TestCase
 
         self::assertSame(['--device', self::DEVICE . ':' . self::DEVICE . ':rwm'], self::option($execution, '--device'));
         self::assertSame(['--group-add', '485'], self::option($execution, '--group-add'));
-        self::assertSame([], array_values(array_intersect($execution, ['--gpus', '--privileged', '--cap-add'])));
-        self::assertSame([], array_values(array_intersect($control, ['--device', '--group-add', '--gpus'])));
-        self::assertSame([], array_values(array_intersect($execution, ['--memory', '--memory-swap', '--cpus', '--cpuset-cpus', '--cpu-shares', '--pids-limit'])));
+        $escalations = array_intersect($execution, ['--gpus', '--privileged', '--cap-add']);
+        self::assertSame([], array_values($escalations));
+        $controlDevices = array_intersect($control, ['--device', '--group-add', '--gpus']);
+        self::assertSame([], array_values($controlDevices));
+        $executionLimits = array_intersect($execution, ['--memory', '--memory-swap', '--cpus', '--cpuset-cpus', '--cpu-shares', '--pids-limit']);
+        self::assertSame([], array_values($executionLimits));
     }
 
     public function testNvencRequestsTheNvidiaGpusWithoutADeviceOrGroup(): void
@@ -42,8 +45,10 @@ final class DeploymentHardwareEncoderTest extends TestCase
         $arguments = $recipe->createArguments();
 
         self::assertSame(['--gpus', 'all,"capabilities=compute,utility,video"'], self::option($arguments, '--gpus'));
-        self::assertSame([], array_values(array_intersect($arguments, ['--device', '--group-add'])));
-        self::assertSame([], array_values(array_intersect($this->recipe(DeploymentUnit::Control, new DeploymentProfile(videoEncoderSlots: 8, audioEncoderSlots: 12, hardware: new HardwareEncoder('nvenc')))->createArguments(), ['--gpus'])));
+        $deviceOptions = array_intersect($arguments, ['--device', '--group-add']);
+        self::assertSame([], array_values($deviceOptions));
+        $controlGpus = array_intersect($this->recipe(DeploymentUnit::Control, new DeploymentProfile(videoEncoderSlots: 8, audioEncoderSlots: 12, hardware: new HardwareEncoder('nvenc')))->createArguments(), ['--gpus']);
+        self::assertSame([], array_values($controlGpus));
     }
 
     public function testDeviceWithoutItsGroupIsRejectedForExecution(): void
@@ -74,7 +79,8 @@ final class DeploymentHardwareEncoderTest extends TestCase
             default => self::vaapi(),
         };
         $recipe = $this->recipe($unit, $profile, $accelerator === 'vaapi' ? 485 : null);
-        self::assertSame($matches, $recipe->matchesDevices(array_replace(['devices' => null, 'groupAdd' => null, 'deviceRequests' => null], $inspection)));
+        $deviceInspection = array_replace(['devices' => null, 'groupAdd' => null, 'deviceRequests' => null], $inspection);
+        self::assertSame($matches, $recipe->matchesDevices($deviceInspection));
     }
 
     /** @return iterable<string,array{DeploymentUnit,?string,array<string,mixed>,bool}> */

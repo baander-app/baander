@@ -119,7 +119,8 @@ final class QoLCommandsTest extends TestCase
         self::assertSame(Command::SUCCESS, $tester->execute(['profile' => 'aggressive', '--json' => true]));
 
         $report = json_decode($tester->getDisplay(), true, flags: JSON_THROW_ON_ERROR);
-        self::assertSame(json_decode(json_encode($this->qol->getStatus(), JSON_THROW_ON_ERROR), true, flags: JSON_THROW_ON_ERROR), $report);
+        $statusJson = json_encode($this->qol->getStatus(), JSON_THROW_ON_ERROR);
+        self::assertSame(json_decode($statusJson, true, flags: JSON_THROW_ON_ERROR), $report);
         self::assertSame(['aggressive', 'aggressive', 'aggressive'], array_column($report['workers'], 'profile'));
     }
 

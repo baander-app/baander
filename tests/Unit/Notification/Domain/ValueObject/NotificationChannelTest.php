@@ -11,7 +11,8 @@ final class NotificationChannelTest extends TestCase
 {
     public function testAllChannelsExist(): void
     {
-        $this->assertSame(4, count(NotificationChannel::cases()));
+        $channels = NotificationChannel::cases();
+        $this->assertSame(4, count($channels));
     }
 
     public function testInAppValue(): void

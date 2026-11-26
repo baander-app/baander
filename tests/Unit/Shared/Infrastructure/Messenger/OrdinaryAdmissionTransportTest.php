@@ -62,12 +62,14 @@ final class OrdinaryAdmissionTransportTest extends TestCase
         }
         $this->ledger->publishDecision(1, 'test-shrink', [], hrtime(true) / 1e9);
         $transports[0]->ack($envelopes[0]);
-        self::assertSame([], iterator_to_array($transports[0]->get()));
+        $receivedWhileShrinking = iterator_to_array($transports[0]->get());
+        self::assertSame([], $receivedWhileShrinking);
         self::assertSame(1, $inners[0]->receives);
         for ($slot = 1; $slot < 4; ++$slot) {
             $transports[$slot]->ack($envelopes[$slot]);
         }
-        self::assertCount(1, iterator_to_array($transports[0]->get()));
+        $receivedAfterRelease = iterator_to_array($transports[0]->get());
+        self::assertCount(1, $receivedAfterRelease);
         self::assertSame(2, $inners[0]->receives);
     }
 
@@ -91,7 +93,8 @@ final class OrdinaryAdmissionTransportTest extends TestCase
     {
         $inner = new AdmissionTestTransport();
         $inner->empty = true;
-        self::assertSame([], iterator_to_array($this->transport(0, $inner)->get()));
+        $received = iterator_to_array($this->transport(0, $inner)->get());
+        self::assertSame([], $received);
         $snapshot = $this->ledger->snapshot(hrtime(true) / 1e9);
         self::assertSame(0, $snapshot['completed']);
         self::assertNull($snapshot['slots']['consumer-0']['requestId']);
@@ -106,7 +109,8 @@ final class OrdinaryAdmissionTransportTest extends TestCase
         $inner->onGet = function () use (&$holder): void {
             $holder = $this->holdLock(0.2);
         };
-        self::assertSame([], iterator_to_array($this->transport(0, $inner)->get()));
+        $received = iterator_to_array($this->transport(0, $inner)->get());
+        self::assertSame([], $received);
         proc_close($holder);
         $snapshot = $this->ledger->snapshot(hrtime(true) / 1e9);
         self::assertFalse($snapshot['fatal']);

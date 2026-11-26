@@ -18,13 +18,13 @@ final class AuthRequestBodyLimitListenerTest extends TestCase
     {
         $this->expectNotToPerformAssertions();
 
-        $this->dispatch($this->request(RateLimitListener::LOGIN_ROUTE, str_repeat('a', 65536)));
+        $this->request(RateLimitListener::LOGIN_ROUTE, str_repeat('a', 65536)) |> $this->dispatch(...);
     }
 
     public function testOneByteMoreIsRefusedWith413(): void
     {
         try {
-            $this->dispatch($this->request(RateLimitListener::LOGIN_ROUTE, str_repeat('a', 65537)));
+            $this->request(RateLimitListener::LOGIN_ROUTE, str_repeat('a', 65537)) |> $this->dispatch(...);
             self::fail('A body over 64 KiB must be refused.');
         } catch (HttpException $exception) {
             self::assertSame(413, $exception->getStatusCode());

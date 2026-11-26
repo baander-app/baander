@@ -20,7 +20,8 @@ final class PublicIdTest extends TestCase
     {
         $id = new PublicId();
 
-        $this->assertSame(21, strlen($id->toString()));
+        $idString = $id->toString();
+        $this->assertSame(21, strlen($idString));
         $this->assertMatchesRegularExpression('/^[0-9a-zA-Z_-]+$/', $id->toString());
     }
 

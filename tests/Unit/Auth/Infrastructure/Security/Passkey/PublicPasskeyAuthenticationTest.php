@@ -57,10 +57,12 @@ final class PublicPasskeyAuthenticationTest extends TestCase
         $options = $service->createAuthenticationOptions();
         $assertion = $credential->assert($options['options']['challenge'], 'https://baander.app');
         if ($kind === 'foreign-assertion') {
-            $assertion['response']['userHandle'] = rtrim(strtr(base64_encode((new PublicId())->toString()), '+/', '-_'), '=');
+            $foreignIdBase64 = base64_encode((new PublicId())->toString());
+            $assertion['response']['userHandle'] = rtrim(strtr($foreignIdBase64, '+/', '-_'), '=');
         }
         if ($kind === 'invalid-signature') {
-            $assertion['response']['signature'] = rtrim(strtr(base64_encode(str_repeat('x', 64)), '+/', '-_'), '=');
+            $signatureBase64 = base64_encode(str_repeat('x', 64));
+            $assertion['response']['signature'] = rtrim(strtr($signatureBase64, '+/', '-_'), '=');
         }
         $repository = $this->createMock(PasskeyRepositoryInterface::class);
         $repository->method('ofCredentialId')->willReturn($passkey);

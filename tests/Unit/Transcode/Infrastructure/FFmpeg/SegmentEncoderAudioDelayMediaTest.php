@@ -165,10 +165,12 @@ final class SegmentEncoderAudioDelayMediaTest extends TestCase
                     array_push($markers, ...$decoded);
                     $clock = $this->videoClock($output . '/' . $segment->file);
                     self::assertCount(count($decoded), $clock);
-                    self::assertSame($segment->start - $track->presentationTimeOffset, min(array_column($clock, 'pts')));
+                    $sampleStarts = array_column($clock, 'pts');
+                    self::assertSame($segment->start - $track->presentationTimeOffset, min($sampleStarts));
+                    $sampleEnds = array_map(static fn(array $sample): int => $sample['pts'] + $sample['duration'], $clock);
                     self::assertSame(
                         $segment->start + $segment->duration - $track->presentationTimeOffset,
-                        max(array_map(static fn(array $sample): int => $sample['pts'] + $sample['duration'], $clock)),
+                        max($sampleEnds),
                     );
                     $ffprobeShift = max(0, -min(array_column($clock, 'cto'))) / $track->timescale;
                     $unexplainedShifts = [];
@@ -377,7 +379,8 @@ final class SegmentEncoderAudioDelayMediaTest extends TestCase
     private function assertUnshiftedVideoEdit(string $path, int $timescale): void
     {
         $data = $this->mp4Bytes($path);
-        $moov = $this->onlyBox($this->boxes($data, 0, strlen($data)), 'moov');
+        $dataLength = strlen($data);
+        $moov = $this->onlyBox($this->boxes($data, 0, $dataLength), 'moov');
         $trak = $this->onlyBox($this->boxes($data, $moov['start'], $moov['end']), 'trak');
         $children = $this->boxes($data, $trak['start'], $trak['end']);
         $mdia = $this->onlyBox($children, 'mdia');
@@ -414,7 +417,8 @@ final class SegmentEncoderAudioDelayMediaTest extends TestCase
     private function videoClock(string $path): array
     {
         $data = $this->mp4Bytes($path);
-        $moof = $this->onlyBox($this->boxes($data, 0, strlen($data)), 'moof');
+        $dataLength = strlen($data);
+        $moof = $this->onlyBox($this->boxes($data, 0, $dataLength), 'moof');
         $traf = $this->onlyBox($this->boxes($data, $moof['start'], $moof['end']), 'traf');
         $boxes = $this->boxes($data, $traf['start'], $traf['end']);
         $tfhd = $this->onlyBox($boxes, 'tfhd');

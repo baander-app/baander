@@ -66,14 +66,16 @@ final class ArchiveReaderTest extends TestCase
     public function testCorruptGzipIsExplicit(): void
     {
         $path = $this->path('.gz');
-        file_put_contents($path, substr(gzencode('a log'), 0, -5));
+        $archive = gzencode('a log');
+        file_put_contents($path, substr($archive, 0, -5));
         $this->expectException(\RuntimeException::class);
         iterator_to_array((new ArchiveReader())->records($path));
     }
     public function testExpansionIsBounded(): void
     {
         $path = $this->path('.gz');
-        file_put_contents($path, gzencode(str_repeat('x', 10000)));
+        $log = str_repeat('x', 10000);
+        file_put_contents($path, gzencode($log));
         $this->expectException(\RuntimeException::class);
         iterator_to_array((new ArchiveReader(100))->records($path));
     }

@@ -142,6 +142,7 @@ final class ManifestGeneratorTest extends TestCase
         self::assertStringContainsString('FORCED=YES', $manifest);
         self::assertStringContainsString('BANDWIDTH=4300000', $manifest);
         self::assertStringNotContainsString("\n#EXT-X-ENDLIST", $manifest);
-        self::assertSame(7, count(explode("\n", $manifest)));
+        $lines = explode("\n", $manifest);
+        self::assertSame(7, count($lines));
     }
 }

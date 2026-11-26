@@ -65,8 +65,8 @@ final class WebSocketTicketsTest extends TestCase
         $tokens->expects($this->never())->method('expiresAt');
         $service = $this->service($store, $tokens);
         self::assertNull($service->redeem('invalid', self::ORIGIN, '/api/ws'));
-        self::assertNull($service->redeem(str_repeat('a', 64), 'https://foreign.baander.app', '/api/ws'));
-        self::assertNull($service->redeem(str_repeat('a', 64), self::ORIGIN, '/api/other'));
+        $service->redeem(str_repeat('a', 64), 'https://foreign.baander.app', '/api/ws') |> self::assertNull(...);
+        $service->redeem(str_repeat('a', 64), self::ORIGIN, '/api/other') |> self::assertNull(...);
     }
 
     public function testRedemptionRechecksAuthorizationInsteadOfTrustingStoredIdentity(): void
@@ -77,7 +77,7 @@ final class WebSocketTicketsTest extends TestCase
         $store->method('consume')->willReturn(new StoredWebSocketTicket($identity, self::ORIGIN, '/api/ws', $now->modify('+30 seconds')));
         $tokens = $this->createMock(WebSocketTokenStatusInterface::class);
         $tokens->expects($this->once())->method('expiresAt')->with('user', 'token')->willReturn(null);
-        self::assertNull($this->service($store, $tokens, $now)->redeem(str_repeat('a', 64), self::ORIGIN, '/api/ws'));
+        $this->service($store, $tokens, $now)->redeem(str_repeat('a', 64), self::ORIGIN, '/api/ws') |> self::assertNull(...);
     }
 
     public function testExpiredRecordIsRejectedEvenIfStorageReturnsIt(): void
@@ -87,7 +87,7 @@ final class WebSocketTicketsTest extends TestCase
         $store->method('consume')->willReturn(new StoredWebSocketTicket(new WebSocketIdentity('user', 'token'), self::ORIGIN, '/api/ws', $now));
         $tokens = $this->createMock(WebSocketTokenStatusInterface::class);
         $tokens->expects($this->never())->method('expiresAt');
-        self::assertNull($this->service($store, $tokens, $now)->redeem(str_repeat('a', 64), self::ORIGIN, '/api/ws'));
+        $this->service($store, $tokens, $now)->redeem(str_repeat('a', 64), self::ORIGIN, '/api/ws') |> self::assertNull(...);
     }
 
     private function service(WebSocketTicketStoreInterface $store, WebSocketTokenStatusInterface $tokens, ?\DateTimeImmutable $now = null): WebSocketTickets

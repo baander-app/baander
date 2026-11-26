@@ -240,7 +240,8 @@ final class FilesDiscoveredArtistCreditTest extends TestCase
 
         self::assertSame([['Suspekt', null]], $this->resolvedIdentities());
         self::assertSame(['01 Named', '02 Untagged', '03 Blank'], $this->state->persisted);
-        self::assertSame(['01 Named'], array_keys($this->creditsBySong()));
+        $creditsBySong = $this->creditsBySong();
+        self::assertSame(['01 Named'], array_keys($creditsBySong));
     }
 
     public function testAFileReplacedSinceItsTagsWereReadResolvesNoArtist(): void
@@ -251,7 +252,8 @@ final class FilesDiscoveredArtistCreditTest extends TestCase
 
         self::assertSame([['Disturbed', null]], $this->resolvedIdentities());
         self::assertSame(['01 Kept'], $this->state->persisted);
-        self::assertSame(['01 Kept'], array_keys($this->creditsBySong()));
+        $creditsBySong = $this->creditsBySong();
+        self::assertSame(['01 Kept'], array_keys($creditsBySong));
     }
 
     public function testABatchThatFailsOneFileStillCommitsTheOthersWithTheirCredits(): void

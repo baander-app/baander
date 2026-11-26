@@ -248,7 +248,8 @@ final class SegmentEncoderDefaultAudioMediaTest extends TestCase
                     $localStart = ($segment->start - $track->presentationTimeOffset) / $track->timescale;
                     $localDelay = max(0.0, $expectedDelay - $localStart);
                     if ($localDelay > 0.2) {
-                        self::assertLessThan(0.0005, $this->rms($pcm, 0, min($seconds, $localDelay - 0.1)));
+                        $silentSeconds = min($seconds, $localDelay - 0.1);
+                        self::assertLessThan(0.0005, $this->rms($pcm, 0, $silentSeconds));
                     }
                     if ($localDelay + 0.6 < $seconds) {
                         $this->assertTone($pcm, $localDelay + 0.2, $frequency);

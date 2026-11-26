@@ -15,7 +15,8 @@ final class WorkerAutoscalingProfileTest extends TestCase
     {
         foreach ([1, 2, 4] as $maximum) {
             $profile = new WorkerAutoscalingProfile(maximumConcurrency: $maximum);
-            self::assertCount($maximum, array_unique($profile->consumerIds()));
+            $consumerIds = $profile->consumerIds();
+            self::assertCount($maximum, array_unique($consumerIds));
         }
     }
 

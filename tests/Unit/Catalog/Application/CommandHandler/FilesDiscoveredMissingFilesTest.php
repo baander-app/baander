@@ -212,7 +212,8 @@ final class FilesDiscoveredMissingFilesTest extends TestCase
 
         $this->handler($mediaFiles, songs: $songs, bus: $bus, transaction: $transaction)($message);
 
-        self::assertSame(array_map(static fn (DiscoveredFile $file): string => $file->absolutePath, array_slice($files, 0, 50)), $persisted);
+        $firstBatch = array_slice($files, 0, 50);
+        self::assertSame(array_map(static fn (DiscoveredFile $file): string => $file->absolutePath, $firstBatch), $persisted);
         self::assertCount(1, $dispatched, 'Only the requeue is dispatched; the cover waits for the import to finish.');
         [$requeued, $stamps] = $dispatched[0];
         self::assertEquals(new FilesDiscovered($message->libraryId, 'music', '/music/Album', array_slice($files, 50)), $requeued);

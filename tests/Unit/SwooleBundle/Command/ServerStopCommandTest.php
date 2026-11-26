@@ -100,8 +100,9 @@ final class ServerStopCommandTest extends TestCase
         );
         $process->run();
         self::assertTrue($process->isSuccessful(), $process->getOutput() . $process->getErrorOutput());
+        $output = $process->getOutput();
         /** @var array{exitCode: int, display: string} $result */
-        $result = json_decode(trim($process->getOutput()), true, flags: JSON_THROW_ON_ERROR);
+        $result = json_decode(trim($output), true, flags: JSON_THROW_ON_ERROR);
 
         return [$result['exitCode'], (string) preg_replace('/\s+/', ' ', $result['display'])];
     }

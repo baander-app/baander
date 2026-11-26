@@ -84,7 +84,8 @@ final class UuidTest extends TestCase
     {
         $uuid = Uuid::generate();
 
-        $this->assertSame(16, strlen($uuid->toBinary()));
+        $binary = $uuid->toBinary();
+        $this->assertSame(16, strlen($binary));
     }
 
     public function testToDateTimeOnV7UuidReturnsValidDateTimeImmutable(): void

@@ -84,9 +84,10 @@ final class PushTransportTlsTest extends TestCase
         $transport = new PushTransport(new PublicDestinationPolicy(static fn(): array => ['1.1.1.1']), ['baander.app'], $handler);
         $keys = VAPID::createVapidKeys();
         $webPush = ExpectedWebPushConstruction::create(new WebPushFactory($transport), ['VAPID' => ['subject' => 'mailto:push@baander.app', ...$keys]]);
+        $authBase64 = base64_encode(str_repeat('a', 16));
         $subscription = Subscription::create([
             'endpoint' => $url,
-            'keys' => ['p256dh' => $keys['publicKey'], 'auth' => rtrim(strtr(base64_encode(str_repeat('a', 16)), '+/', '-_'), '=')],
+            'keys' => ['p256dh' => $keys['publicKey'], 'auth' => rtrim(strtr($authBase64, '+/', '-_'), '=')],
             'contentEncoding' => 'aes128gcm',
         ]);
 

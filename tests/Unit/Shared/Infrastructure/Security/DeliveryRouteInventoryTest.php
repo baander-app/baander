@@ -74,7 +74,8 @@ final class DeliveryRouteInventoryTest extends TestCase
 
         self::assertNotSame([], $inventory);
         self::assertEqualsCanonicalizing($inventory, DpopBindingListener::SIGNED_DELIVERY_ROUTES);
-        self::assertSame([], array_values(array_diff($inventory, ApiRateLimitListener::EXEMPT_ROUTES)));
+        $rateLimited = array_diff($inventory, ApiRateLimitListener::EXEMPT_ROUTES);
+        self::assertSame([], array_values($rateLimited));
     }
 
     public function testFixturePathsResolveToEveryPublicDeliveryRoute(): void
@@ -124,8 +125,10 @@ final class DeliveryRouteInventoryTest extends TestCase
 
         self::assertEqualsCanonicalizing(['stream_original_video', 'stream_original_track'], $inventory);
         self::assertEqualsCanonicalizing($inventory, $this->publicDeliveryRoutes('/api/stream/', 'HEAD'));
-        self::assertSame([], array_values(array_diff($inventory, ApiRateLimitListener::EXEMPT_ROUTES)));
-        self::assertSame([], array_values(array_intersect($inventory, DpopBindingListener::SIGNED_DELIVERY_ROUTES)));
+        $rateLimited = array_diff($inventory, ApiRateLimitListener::EXEMPT_ROUTES);
+        self::assertSame([], array_values($rateLimited));
+        $dpopSigned = array_intersect($inventory, DpopBindingListener::SIGNED_DELIVERY_ROUTES);
+        self::assertSame([], array_values($dpopSigned));
     }
 
     /**

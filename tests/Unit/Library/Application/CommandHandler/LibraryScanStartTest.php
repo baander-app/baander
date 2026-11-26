@@ -152,7 +152,7 @@ final class LibraryScanStartTest extends TestCase
 
     private function library(string $slug): Library
     {
-        return $this->libraries->add(Library::create(ucfirst($slug), new LibrarySlug($slug), new LibraryPath('/media/' . $slug), LibraryType::Music, FilesystemType::Local));
+        return Library::create(ucfirst($slug), new LibrarySlug($slug), new LibraryPath('/media/' . $slug), LibraryType::Music, FilesystemType::Local) |> $this->libraries->add(...);
     }
 
     private function claims(): LibraryScanClaims

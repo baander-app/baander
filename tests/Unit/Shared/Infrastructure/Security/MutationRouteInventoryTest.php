@@ -143,16 +143,20 @@ final class MutationRouteInventoryTest extends TestCase
         $excluded = array_merge(...array_values(self::EXCLUDED));
         $covered = self::coveredRoutes();
 
-        self::assertSame([], array_values(array_diff($excluded, array_keys($mutations))), 'An exclusion names a route the router no longer has.');
-        self::assertSame([], array_values(array_intersect($excluded, $covered)), 'A route is both excluded and covered by a matrix.');
-        self::assertSame($excluded, array_values(array_unique($excluded)), 'A route is excluded twice.');
+        $unknownExclusions = array_diff($excluded, array_keys($mutations));
+        self::assertSame([], array_values($unknownExclusions), 'An exclusion names a route the router no longer has.');
+        $excludedAndCovered = array_intersect($excluded, $covered);
+        self::assertSame([], array_values($excludedAndCovered), 'A route is both excluded and covered by a matrix.');
+        $uniqueExclusions = array_unique($excluded);
+        self::assertSame($excluded, array_values($uniqueExclusions), 'A route is excluded twice.');
         foreach ($covered as $name) {
             self::assertNotNull(self::$routes->get($name), 'The matrix key "' . $name . '" is not a route.');
         }
 
-        $remainder = array_values(array_diff(array_keys($mutations), $excluded));
+        $remainder = array_diff(array_keys($mutations), $excluded) |> array_values(...);
+        $coveredMutations = array_intersect($covered, array_keys($mutations));
         self::assertEqualsCanonicalizing(
-            array_values(array_intersect($covered, array_keys($mutations))),
+            array_values($coveredMutations),
             $remainder,
             'A mutation route is neither excluded here nor covered by the catalog or playlist matrix.',
         );
@@ -182,7 +186,8 @@ final class MutationRouteInventoryTest extends TestCase
         $constants = array_filter([self::PLAYLIST_SUITE . '::ROUTE_KEYS'], defined(...));
         self::assertNotSame([], $constants, 'The playlist mutation suite must expose its route keys as the public constant ROUTE_KEYS.');
         $covered = [...CatalogMutationFirewallTest::ROUTE_KEYS, ...PlaylistMutationFirewallTest::ROUTE_KEYS];
-        self::assertSame($covered, array_values(array_unique($covered)), 'A route key is listed twice across the matrices.');
+        $uniqueCovered = array_unique($covered);
+        self::assertSame($covered, array_values($uniqueCovered), 'A route key is listed twice across the matrices.');
 
         return $covered;
     }

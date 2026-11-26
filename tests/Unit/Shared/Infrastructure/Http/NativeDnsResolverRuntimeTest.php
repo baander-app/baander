@@ -75,7 +75,8 @@ final class NativeDnsResolverRuntimeTest extends TestCase
                     self::assertSame(4, $cancelled);
                     self::assertSame(4, $timedOut);
                     self::assertSame('', $this->children(), 'Cleanup must reap even canceled callers\' children.');
-                    self::assertSame($descriptors, count(glob('/proc/self/fd/*')),
+                    $openDescriptors = glob('/proc/self/fd/*');
+                    self::assertSame($descriptors, count($openDescriptors),
                         'Output descriptors must not accumulate: ' . json_encode([$baselineDescriptors, $this->descriptors()]));
                     self::assertCount(3, (new NativeDnsResolver(dirname(__DIR__, 4) . '/Fixtures/Http/dns-helper.php'))
                         ->resolve('complete.baander.app', hrtime(true) / 1e9 + 2));

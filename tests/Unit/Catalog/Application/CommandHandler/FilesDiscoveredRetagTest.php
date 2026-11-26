@@ -348,10 +348,10 @@ final class FilesDiscoveredRetagTest extends TestCase
                 'songs' => array_map(static fn (Uuid $id): string => $id->toString(), $songIds),
             ];
         });
-        $songs->method('findCreditedSongIds')->willReturnCallback(static fn (array $songIds): array => array_values(array_filter(
+        $songs->method('findCreditedSongIds')->willReturnCallback(static fn (array $songIds): array => array_filter(
             array_map(static fn (Uuid $id): string => $id->toString(), $songIds),
             static fn (string $id): bool => ($state->credits[$id] ?? []) !== [],
-        )));
+        ) |> array_values(...));
         $songs->method('removeArtistCredits')->willReturnCallback(static function (Uuid $songId) use ($state, $transaction): void {
             self::assertTrue($transaction->active, 'Credits are replaced inside the transaction that updates the song.');
             unset($state->credits[$songId->toString()]);

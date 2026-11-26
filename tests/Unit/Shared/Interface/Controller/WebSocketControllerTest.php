@@ -217,7 +217,8 @@ final class WebSocketControllerTest extends TestCase
         $bus->expects(self::never())->method('dispatch');
         $controller = new WebSocketController($this->registry, $this->pusher, $bus, new JsonEncoder(), $this->listeningSessions, $this->identities, $this->createStub(LiveSubscriptions::class));
         $controller->onOpen(1, Uuid::generate()->toString(), 'token-1');
-        $controller->onMessage(1, json_encode(array_replace(['type' => 'transcode.position', 'sessionId' => str_repeat('s', 21), 'position' => 12.5], $fields), JSON_THROW_ON_ERROR));
+        $message = array_replace(['type' => 'transcode.position', 'sessionId' => str_repeat('s', 21), 'position' => 12.5], $fields);
+        $controller->onMessage(1, json_encode($message, JSON_THROW_ON_ERROR));
         self::assertSame('error', $this->lastPushedPayload()['type']);
     }
 
@@ -278,7 +279,8 @@ final class WebSocketControllerTest extends TestCase
             $this->assertLastPushMatches(1, 'error', ['message' => 'Identity lookup unavailable']);
             $controller->onMessage(1, '{"type":"ping"}');
             $this->assertLastPushMatches(1, 'pong');
-            self::assertSame(['connected', 'error', 'pong'], array_column(array_column($this->allPushedPayloads(), 'payload'), 'type'));
+            $payloads = array_column($this->allPushedPayloads(), 'payload');
+            self::assertSame(['connected', 'error', 'pong'], array_column($payloads, 'type'));
             $controller->onClose(1);
         }
     }

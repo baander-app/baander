@@ -74,9 +74,10 @@ final class PublicationWorkflowTest extends TestCase
         foreach ($jobs as $jobName => $job) {
             foreach ($job['steps'] as $step) {
                 if (preg_match_all('~--revision\s+("[^"]*"|\S+)~', $step['run'] ?? '', $revisions) > 0) {
+                    $revisionCount = count($revisions[1]);
                     // A pull request image carries the head commit it qualified, not the merge commit.
                     self::assertSame(
-                        array_fill(0, count($revisions[1]), '"${{ github.event.pull_request.head.sha || github.sha }}"'),
+                        array_fill(0, $revisionCount, '"${{ github.event.pull_request.head.sha || github.sha }}"'),
                         $revisions[1],
                         $jobName . ' ' . $step['name'],
                     );
@@ -648,7 +649,8 @@ SH;
 
     public function testForkPullRequestsRunGatesOnGitHubOnlyAndSkipEveryWriteStep(): void
     {
-        $pullRequestWorkflows = array_filter(self::documents(dirname(__DIR__, 5)), static fn(array $entry, string $path): bool => str_starts_with($path, '.github/workflows/') && isset($entry['document']['on']['pull_request']), ARRAY_FILTER_USE_BOTH) |> array_keys(...);
+        $projectDir = dirname(__DIR__, 5);
+        $pullRequestWorkflows = array_filter(self::documents($projectDir), static fn(array $entry, string $path): bool => str_starts_with($path, '.github/workflows/') && isset($entry['document']['on']['pull_request']), ARRAY_FILTER_USE_BOTH) |> array_keys(...);
         self::assertSame(['.github/workflows/audio-core.yml', '.github/workflows/ci.yaml', '.github/workflows/dsp-analysis.yaml', '.github/workflows/frontend.yaml', '.github/workflows/website.yaml'], $pullRequestWorkflows);
         foreach ($pullRequestWorkflows as $path) {
             foreach ($this->workflow(basename($path))['jobs'] as $jobName => $job) {

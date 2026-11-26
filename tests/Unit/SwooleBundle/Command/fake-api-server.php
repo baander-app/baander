@@ -41,7 +41,8 @@ while (microtime(true) < $giveUpAt) {
         [$method, $path] = explode(' ', $head, 3) + ['', '', ''];
         if ($method === 'GET' && $path === '/api/server') {
             $body = json_encode(['server' => ['processes' => ['master' => ['pid' => $masterPid]]]], JSON_THROW_ON_ERROR);
-            fwrite($connection, sprintf("HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: %d\r\n\r\n%s", strlen($body), $body));
+            $contentLength = strlen($body);
+            fwrite($connection, sprintf("HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: %d\r\n\r\n%s", $contentLength, $body));
         } elseif ($method === 'DELETE' && $path === '/api/server') {
             fwrite($connection, "HTTP/1.1 204 No Content\r\n\r\n");
             fclose($connection);

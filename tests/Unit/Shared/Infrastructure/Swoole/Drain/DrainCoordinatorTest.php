@@ -275,7 +275,8 @@ final class DrainCoordinatorTest extends TestCase
             $process->run();
             self::assertTrue($process->isSuccessful(), $process->getOutput() . $process->getErrorOutput());
             $events = [];
-            foreach (explode("\n", trim($process->getOutput())) as $line) {
+            $output = $process->getOutput();
+            foreach (explode("\n", trim($output)) as $line) {
                 // Swoole writes its own reports, such as a worker killed with a sleeping coroutine, to stdout.
                 if (!str_starts_with($line, '{"event":')) {
                     continue;

@@ -110,7 +110,11 @@ final class DpopAwareBearerTokenValidatorTest extends TestCase
         self::assertNotFalse($key);
         $details = openssl_pkey_get_details($key);
         self::assertNotFalse($details);
-        $encode = static fn (string $value): string => rtrim(strtr(base64_encode($value), '+/', '-_'), '=');
+        $encode = static function (string $value): string {
+            $base64 = base64_encode($value);
+
+            return rtrim(strtr($base64, '+/', '-_'), '=');
+        };
         $claims = [
             'jti' => 'test-token-id', 'sub' => 'user-uuid', 'aud' => $audience,
             'client_id' => 'client-uuid', 'scopes' => ['profile'],

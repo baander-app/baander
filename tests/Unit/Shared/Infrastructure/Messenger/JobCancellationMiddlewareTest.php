@@ -64,7 +64,8 @@ final class JobCancellationMiddlewareTest extends TestCase
             $this->bus($failure, cancel: false)->dispatch(new \stdClass(), [new JobIdStamp(new PublicId()), new ReceivedStamp('async')]);
             self::fail('A handler failure must reach the transport.');
         } catch (HandlerFailedException $exception) {
-            self::assertSame([$failure], array_values($exception->getWrappedExceptions()));
+            $wrapped = $exception->getWrappedExceptions();
+            self::assertSame([$failure], array_values($wrapped));
         }
 
         self::assertSame([], $this->updates);

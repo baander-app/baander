@@ -106,7 +106,8 @@ final class UnverifiedAccountListenerTest extends TestCase
         $translator = new Translator(SupportedLanguages::FALLBACK, new MessageFormatter());
         $translator->addLoader('yaml', new YamlFileLoader());
         foreach (SupportedLanguages::codes() as $locale) {
-            $translator->addResource('yaml', sprintf('%s/translations/auth+intl-icu.%s.yaml', dirname(__DIR__, 5), $locale), $locale, 'auth+intl-icu');
+            $projectDir = dirname(__DIR__, 5);
+            $translator->addResource('yaml', sprintf('%s/translations/auth+intl-icu.%s.yaml', $projectDir, $locale), $locale, 'auth+intl-icu');
         }
 
         return $translator;

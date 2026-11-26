@@ -106,9 +106,10 @@ final class TrackPairingTest extends TestCase
 
         $pairs = new TrackPairing()->pair($local, $release);
 
+        $pairRows = array_map(static fn (TrackPair $pair): array => [$pair->local->id, self::key($pair->release)], $pairs->pairs);
         self::assertSame(
             ['song-1-1' => '1-1', 'song-1-2' => '1-2', 'song-1-3' => '1-3'],
-            array_column(array_map(static fn (TrackPair $pair): array => [$pair->local->id, self::key($pair->release)], $pairs->pairs), 1, 0),
+            array_column($pairRows, 1, 0),
         );
     }
 

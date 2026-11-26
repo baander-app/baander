@@ -135,7 +135,8 @@ final class ScheduledGenerationTest extends TestCase
         self::assertSame('pending', $result->status);
         self::assertSame('async', $result->execution);
         self::assertCount(1, $queued);
-        self::assertSame(['jobId'], array_keys(get_object_vars($queued[0])));
+        $properties = get_object_vars($queued[0]);
+        self::assertSame(['jobId'], array_keys($properties));
         self::assertSame($result->jobId, $queued[0]->jobId->toString());
     }
 

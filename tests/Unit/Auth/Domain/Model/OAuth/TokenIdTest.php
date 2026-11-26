@@ -34,9 +34,10 @@ final class TokenIdTest extends TestCase
      */
     public function testAGeneratedIdFitsTheWebSocketConnectionTableExactly(): void
     {
+        $tokenId = TokenId::generate()->toString();
         self::assertSame(
             WebSocketConnectionRegistry::ACCESS_TOKEN_ID_BYTES,
-            strlen(TokenId::generate()->toString()),
+            strlen($tokenId),
         );
     }
 

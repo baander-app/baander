@@ -77,7 +77,8 @@ final class SchedulerOccurrenceTest extends TestCase
     public function testExactCommandJsonAndNestingLimitsAreAccepted(): void
     {
         self::assertSame(512, strlen($this->occurrence(command: str_repeat('c', 512))->command));
-        self::assertSame(16384, strlen($this->occurrence(parameters: [str_repeat('x', 16380)])->parametersJson()));
+        $parametersJson = $this->occurrence(parameters: [str_repeat('x', 16380)])->parametersJson();
+        self::assertSame(16384, strlen($parametersJson));
         $nested = ['leaf'];
         for ($level = 1; $level < 8; ++$level) {
             $nested = [$nested];

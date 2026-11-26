@@ -318,8 +318,9 @@ final class MusicBrainzAdapterTest extends TestCase
     #[DataProvider('errorStatuses')]
     public function testErrorStatusesAreToldApartAndNeverReadAsAnEmptyList(string $method, int $status, ?string $expected): void
     {
+        $attempts = range(1, 3);
         // A 503 from MusicBrainz's rate limit carries an HTML body, not JSON.
-        $this->respond(...array_map(static fn(): MockResponse => new MockResponse('<html>busy</html>', ['http_code' => $status]), range(1, 3)));
+        $this->respond(...array_map(static fn(): MockResponse => new MockResponse('<html>busy</html>', ['http_code' => $status]), $attempts));
 
         $result = self::call($this->adapter(), $method);
 
@@ -407,7 +408,8 @@ final class MusicBrainzAdapterTest extends TestCase
 
     public function testRetriesWaitTheirBackOffsBeforeTheThirdAnswerOf503IsUnavailable(): void
     {
-        $this->respond(...array_map(static fn(): MockResponse => new MockResponse('<html>busy</html>', ['http_code' => 503]), range(1, 3)));
+        $attempts = range(1, 3);
+        $this->respond(...array_map(static fn(): MockResponse => new MockResponse('<html>busy</html>', ['http_code' => 503]), $attempts));
         $started = hrtime(true);
 
         $result = $this->adapter($this->spyLimiter(), [0.05, 0.1])->fetchRelease(self::RELEASE_ID, MusicBrainzSlotWait::Unbounded);

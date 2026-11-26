@@ -49,7 +49,8 @@ final class OAuthControllerTokenFaultTest extends TestCase
             self::fail('A server fault is not an OAuth error and must not be answered as one.');
         } catch (ServiceUnavailableHttpException $exception) {
             self::assertSame(503, $exception->getStatusCode());
-            self::assertEqualsCanonicalizing(['retry-after' => '5', 'cache-control' => 'no-store'], array_change_key_case(array_map(strval(...), $exception->getHeaders()), CASE_LOWER));
+            $headers = array_map(strval(...), $exception->getHeaders());
+            self::assertEqualsCanonicalizing(['retry-after' => '5', 'cache-control' => 'no-store'], array_change_key_case($headers, CASE_LOWER));
             self::assertSame($fault, $exception->getPrevious());
         }
     }
@@ -141,7 +142,8 @@ final class OAuthControllerTokenFaultTest extends TestCase
             self::fail('A chain that was not revoked still exists; the client must retry.');
         } catch (ServiceUnavailableHttpException $exception) {
             self::assertSame(503, $exception->getStatusCode());
-            self::assertEqualsCanonicalizing(['retry-after' => '5', 'cache-control' => 'no-store'], array_change_key_case(array_map(strval(...), $exception->getHeaders()), CASE_LOWER));
+            $headers = array_map(strval(...), $exception->getHeaders());
+            self::assertEqualsCanonicalizing(['retry-after' => '5', 'cache-control' => 'no-store'], array_change_key_case($headers, CASE_LOWER));
             self::assertSame($fault, $exception->getPrevious());
         }
     }

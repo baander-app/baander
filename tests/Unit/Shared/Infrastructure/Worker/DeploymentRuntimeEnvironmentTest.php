@@ -203,6 +203,7 @@ final class DeploymentRuntimeEnvironmentTest extends TestCase
         yield 'per-value oversized' => [['APP_SECRET' => 'private-input' . str_repeat('x', 2048)]];
         yield 'nonproduction' => [['APP_ENV' => 'private-input']];
         yield 'debug enabled' => [['APP_DEBUG' => '1']];
-        yield 'too many entries' => [array_fill_keys(array_map(static fn(int $index): string => 'KEY_' . $index, range(1, 33)), 'private-input')];
+        $indexes = range(1, 33);
+        yield 'too many entries' => [array_fill_keys(array_map(static fn(int $index): string => 'KEY_' . $index, $indexes), 'private-input')];
     }
 }

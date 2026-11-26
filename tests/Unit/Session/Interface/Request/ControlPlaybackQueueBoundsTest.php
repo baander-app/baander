@@ -16,12 +16,12 @@ final class ControlPlaybackQueueBoundsTest extends TestCase
 
     public function testAQueueOf10000PublicIdsIsAccepted(): void
     {
-        self::assertSame([], $this->paths($this->queue(array_fill(0, 10_000, self::SONG))));
+        self::assertSame([], array_fill(0, 10_000, self::SONG) |> $this->queue(...) |> $this->paths(...));
     }
 
     public function testALongerQueueIsRefused(): void
     {
-        self::assertSame(['queue'], $this->paths($this->queue(array_fill(0, 10_001, self::SONG))));
+        self::assertSame(['queue'], array_fill(0, 10_001, self::SONG) |> $this->queue(...) |> $this->paths(...));
     }
 
     public function testAQueueSentAsAnObjectIsRefused(): void

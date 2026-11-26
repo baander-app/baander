@@ -262,9 +262,10 @@ final class HealthCheckServiceTest extends TestCase
             array_map(static fn (HealthCheckResult $result): HealthStatus => $result->status, $results),
         );
 
+        $readiness = $statuses($service->checkReadiness());
         self::assertSame(
             ['postgresql' => HealthStatus::Healthy, 'redis' => HealthStatus::Healthy],
-            $statuses($service->checkReadiness()),
+            $readiness,
         );
         self::assertSame(HealthStatus::Unhealthy, $statuses($service->check())['messenger']);
         self::assertSame(HealthStatus::Unhealthy, $statuses($service->check())['memory']);

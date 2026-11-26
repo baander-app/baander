@@ -46,7 +46,8 @@ final class SegmentEncoderSourceSelectionMediaTest extends TestCase
         $source = $this->createSource($coverFirst);
         $raw = $this->probe($source);
         self::assertSame(['video', 'video'], array_column($raw['streams'], 'codec_type'));
-        self::assertSame($coverFirst ? [1, 0] : [0, 1], array_column(array_column($raw['streams'], 'disposition'), 'attached_pic'));
+        $dispositions = array_column($raw['streams'], 'disposition');
+        self::assertSame($coverFirst ? [1, 0] : [0, 1], array_column($dispositions, 'attached_pic'));
         $probe = VideoProbeResult::fromProbeOutput($raw);
         $encoder = $this->encoder();
         $output = $this->directory.'/output';
@@ -98,7 +99,8 @@ final class SegmentEncoderSourceSelectionMediaTest extends TestCase
         }
         self::assertEqualsWithDelta($expectedDuration, $duration, 0.1);
         self::assertEqualsWithDelta($expectedDuration * 10, $frames, 1);
-        self::assertGreaterThan(20, count(array_unique($hashes)), 'Moving movie frames must replace the static red artwork.');
+        $distinctHashes = array_unique($hashes);
+        self::assertGreaterThan(20, count($distinctHashes), 'Moving movie frames must replace the static red artwork.');
     }
 
     public function testAttachedArtworkAloneCannotPublishMovieFragments(): void
@@ -148,12 +150,14 @@ final class SegmentEncoderSourceSelectionMediaTest extends TestCase
         if ($coverFirst) {
             $data = file_get_contents($source);
             self::assertNotFalse($data);
-            $moov = array_values(array_filter($this->boxes($data, 0, strlen($data)), static fn (array $box): bool => $box['type'] === 'moov'));
+            $boxes = $this->boxes($data, 0, strlen($data));
+            $moov = array_values(array_filter($boxes, static fn (array $box): bool => $box['type'] === 'moov'));
             self::assertCount(1, $moov);
             $children = $this->boxes($data, $moov[0]['start'] + 8, $moov[0]['end']);
             $metadata = array_values(array_filter($children, static fn (array $box): bool => $box['type'] === 'udta'));
             self::assertCount(1, $metadata);
-            $children = array_merge($metadata, array_values(array_filter($children, static fn (array $box): bool => $box['type'] !== 'udta')));
+            $keptChildren = array_filter($children, static fn (array $box): bool => $box['type'] !== 'udta');
+            $children = array_merge($metadata, array_values($keptChildren));
             $reordered = '';
             foreach ($children as $child) {
                 $reordered .= substr($data, $child['start'], $child['end'] - $child['start']);

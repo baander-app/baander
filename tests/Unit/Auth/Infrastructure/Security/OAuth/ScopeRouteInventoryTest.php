@@ -129,10 +129,11 @@ final class ScopeRouteInventoryTest extends TestCase
     private static function unverifiedRouteViolations(RouteCollection $routes, array $allowed): array
     {
         $violations = [];
-        foreach (array_keys(array_filter(array_count_values($allowed), static fn (int $count): bool => $count > 1)) as $name) {
+        foreach (array_filter(array_count_values($allowed), static fn (int $count): bool => $count > 1) |> array_keys(...) as $name) {
             $violations[] = sprintf('Route "%s" is listed more than once for unverified accounts.', $name);
         }
-        foreach (array_diff($allowed, array_keys($routes->all())) as $name) {
+        $routeNames = array_keys($routes->all());
+        foreach (array_diff($allowed, $routeNames) as $name) {
             $violations[] = sprintf('Route "%s" for unverified accounts does not exist.', $name);
         }
 
@@ -157,10 +158,11 @@ final class ScopeRouteInventoryTest extends TestCase
         }
 
         $classified = [...$public, ...$firstParty, ...array_keys($scoped)];
-        foreach (array_keys(array_filter(array_count_values($classified), static fn (int $count): bool => $count > 1)) as $name) {
+        foreach (array_filter(array_count_values($classified), static fn (int $count): bool => $count > 1) |> array_keys(...) as $name) {
             $violations[] = sprintf('Route "%s" is classified more than once.', $name);
         }
-        foreach (array_diff($classified, array_keys($routes->all())) as $name) {
+        $routeNames = array_keys($routes->all());
+        foreach (array_diff($classified, $routeNames) as $name) {
             $violations[] = sprintf('Classified route "%s" does not exist.', $name);
         }
 

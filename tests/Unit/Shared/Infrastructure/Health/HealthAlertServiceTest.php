@@ -289,9 +289,9 @@ final class RecordingHealthLogger extends AbstractLogger
     /** @return list<string> */
     public function lines(string $level): array
     {
-        return array_values(array_map(
+        return array_map(
             static fn(array $record): string => $record[1],
             array_filter($this->records, static fn(array $record): bool => $record[0] === $level),
-        ));
+        ) |> array_values(...);
     }
 }

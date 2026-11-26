@@ -203,10 +203,11 @@ final class MatchConfidenceTest extends TestCase
     private function decide(LocalAlbum $album, MusicBrainzRelease ...$releases): MatchDecision
     {
         $scorer = new CandidateScorer(new TrackPairing());
+        $releaseList = array_values($releases);
 
         return new MatchConfidence()->decide(array_map(
             static fn (MusicBrainzRelease $release) => $scorer->scoreRelease($release, $album),
-            array_values($releases),
+            $releaseList,
         ));
     }
 

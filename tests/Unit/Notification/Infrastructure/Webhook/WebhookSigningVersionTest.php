@@ -46,7 +46,8 @@ final class WebhookSigningVersionTest extends TestCase
             $expected = 'sha256=' . hash_hmac('sha256', $timestamp . '.' . $options['body'], $secret);
             self::assertSame('X-Baander-Webhook-Signature: ' . $expected, $headers['x-baander-webhook-signature'][0]);
             self::assertNotSame('X-Baander-Webhook-Signature: sha256=' . hash_hmac('sha256', $timestamp . '.' . $options['body'], hash('sha256', $secret)), $headers['x-baander-webhook-signature'][0]);
-            self::assertFalse((new HmacSigner())->verify($timestamp . '.' . $options['body'], substr($headers['x-baander-webhook-signature'][0], strlen('X-Baander-Webhook-Signature: ')), $previousSecret));
+            $signature = substr($headers['x-baander-webhook-signature'][0], strlen('X-Baander-Webhook-Signature: '));
+            self::assertFalse((new HmacSigner())->verify($timestamp . '.' . $options['body'], $signature, $previousSecret));
             return new MockResponse('', ['http_code' => 200]);
         });
         $service = new WebhookDeliveryService($em, $client, new HmacSigner(), new NullLogger(), new WebhookDestinationPolicy(), $codec);

@@ -48,7 +48,7 @@ final class SettingsDefinitionsCommandTest extends TestCase
         $listed = json_decode($this->tester->getDisplay(), true, 32, JSON_THROW_ON_ERROR);
         self::assertIsArray($listed);
         self::assertSame([LanguageSettingDefinitions::LANGUAGE], array_column($listed, 'key'));
-        self::assertSame(['user'], array_values(array_unique(array_column($listed, 'scope'))));
+        self::assertSame(['user'], array_column($listed, 'scope') |> array_unique(...) |> array_values(...));
     }
 
     public function testUserScopeTableShowsOnlyUserDefinitions(): void

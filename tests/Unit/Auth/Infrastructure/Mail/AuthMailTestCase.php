@@ -51,7 +51,8 @@ abstract class AuthMailTestCase extends TestCase
         $this->translator = new Translator('en', new MessageFormatter());
         $this->translator->addLoader('yaml', new YamlFileLoader());
         foreach (['en', 'da', 'th'] as $locale) {
-            $this->translator->addResource('yaml', sprintf('%s/translations/auth+intl-icu.%s.yaml', dirname(__DIR__, 5), $locale), $locale, 'auth+intl-icu');
+            $projectDir = dirname(__DIR__, 5);
+            $this->translator->addResource('yaml', sprintf('%s/translations/auth+intl-icu.%s.yaml', $projectDir, $locale), $locale, 'auth+intl-icu');
         }
         $this->requestStack = new RequestStack();
         $this->logs = new TestHandler();

@@ -320,7 +320,8 @@ final class AlbumTest extends TestCase
         $album->unlockField('title');
 
         $this->assertSame(['type'], $album->getLockedFields());
-        $this->assertSame([0], array_keys($album->getLockedFields()));
+        $lockedFields = $album->getLockedFields();
+        $this->assertSame([0], array_keys($lockedFields));
     }
 
     public function testUnlockFieldSetsUpdatedAt(): void

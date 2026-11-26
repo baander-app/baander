@@ -92,7 +92,8 @@ final class PasskeyAuthenticatorTest extends TestCase
             self::fail('The outage must not be reported as an authentication failure.');
         } catch (ServiceUnavailableHttpException $exception) {
             self::assertSame(503, $exception->getStatusCode());
-            self::assertEqualsCanonicalizing(['retry-after' => '5', 'cache-control' => 'no-store'], array_change_key_case(array_map(strval(...), $exception->getHeaders()), CASE_LOWER));
+            $headers = array_map(strval(...), $exception->getHeaders());
+            self::assertEqualsCanonicalizing(['retry-after' => '5', 'cache-control' => 'no-store'], array_change_key_case($headers, CASE_LOWER));
             self::assertInstanceOf(DpopStoreUnavailableException::class, $exception->getPrevious());
         }
     }
@@ -114,7 +115,8 @@ final class PasskeyAuthenticatorTest extends TestCase
             $authenticator->authenticate($request);
             self::fail('The outage must not be reported as an authentication failure.');
         } catch (ServiceUnavailableHttpException $exception) {
-            self::assertEqualsCanonicalizing(['retry-after' => '1', 'cache-control' => 'no-store'], array_change_key_case(array_map(strval(...), $exception->getHeaders()), CASE_LOWER));
+            $headers = array_map(strval(...), $exception->getHeaders());
+            self::assertEqualsCanonicalizing(['retry-after' => '1', 'cache-control' => 'no-store'], array_change_key_case($headers, CASE_LOWER));
             self::assertSame($outage, $exception->getPrevious());
         }
     }

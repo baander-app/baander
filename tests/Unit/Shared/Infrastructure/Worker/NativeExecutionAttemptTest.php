@@ -31,9 +31,10 @@ final class NativeExecutionAttemptTest extends TestCase
     {
         $attempt = $this->newAttempt();
 
-        self::assertFalse($attempt->collect(1, str_repeat('o', NativeExecutionProtocol::OUTPUT_BYTES)));
+        $attempt->collect(1, str_repeat('o', NativeExecutionProtocol::OUTPUT_BYTES)) |> self::assertFalse(...);
         self::assertTrue($attempt->collect(1, 'o'));
-        self::assertFalse($attempt->collect(1, str_repeat('o', 65_536)), 'Draining after the stop discards output.');
+        $lateOutput = str_repeat('o', 65_536);
+        self::assertFalse($attempt->collect(1, $lateOutput), 'Draining after the stop discards output.');
         $attempt->exit(137);
 
         self::assertSame(

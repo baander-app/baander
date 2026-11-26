@@ -72,7 +72,8 @@ final class LibraryErrorTranslationTest extends TestCase
         $translator->setFallbackLocales(['en']);
         $translator->addLoader('yaml', new YamlFileLoader());
         foreach (['en', 'da', 'th'] as $locale) {
-            $translator->addResource('yaml', sprintf('%s/translations/library+intl-icu.%s.yaml', dirname(__DIR__, 5), $locale), $locale, 'library+intl-icu');
+            $projectDir = dirname(__DIR__, 5);
+            $translator->addResource('yaml', sprintf('%s/translations/library+intl-icu.%s.yaml', $projectDir, $locale), $locale, 'library+intl-icu');
         }
 
         return $translator;

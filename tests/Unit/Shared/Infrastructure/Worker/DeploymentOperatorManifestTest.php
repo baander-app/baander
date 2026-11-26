@@ -33,8 +33,9 @@ final class DeploymentOperatorManifestTest extends TestCase
             foreach (['--memory', '--memory-swap', '--cpus', '--cpuset-cpus', '--cpu-shares', '--pids-limit'] as $limit) {
                 self::assertNotContains($limit, $arguments);
             }
-            self::assertSame([], array_values(array_filter($recipe->command, static fn (string $argument): bool => str_starts_with($argument, '--memory-mib')
-                || str_starts_with($argument, '--pids-limit'))));
+            $limits = array_filter($recipe->command, static fn (string $argument): bool => str_starts_with($argument, '--memory-mib')
+                || str_starts_with($argument, '--pids-limit'));
+            self::assertSame([], array_values($limits));
         }
     }
 
@@ -201,7 +202,8 @@ final class DeploymentOperatorManifestTest extends TestCase
                 $rejected[] = $field;
             }
         }
-        self::assertSame(array_keys(self::fields()), $rejected);
+        $allFields = self::fields();
+        self::assertSame(array_keys($allFields), $rejected);
     }
 
     #[DataProvider('invalidFields')]

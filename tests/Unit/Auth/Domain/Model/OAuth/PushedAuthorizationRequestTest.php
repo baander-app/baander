@@ -37,7 +37,8 @@ final class PushedAuthorizationRequestTest extends TestCase
         $request = $this->request();
 
         self::assertSame('urn:ietf:params:oauth:request_uri:' . $request->getRequestId()->toString(), $request->requestUri());
-        self::assertSame(80, strlen($request->getRequestId()->toString()), 'An unguessable token identifier.');
+        $requestId = $request->getRequestId()->toString();
+        self::assertSame(80, strlen($requestId), 'An unguessable token identifier.');
     }
 
     public function testTheRequestKeepsThePushedParameters(): void

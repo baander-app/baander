@@ -47,7 +47,7 @@ final class PathSecurityServiceTest extends TestCase
         } finally {
             rmdir($subDir);
             rmdir(dirname($subDir));
-            rmdir(dirname(dirname($subDir)));
+            dirname($subDir) |> dirname(...) |> rmdir(...);
         }
     }
 

@@ -127,8 +127,10 @@ final class PasswordChangerTest extends TestCase
         $user = User::register(new Email('owner@baander.app'), 'old-hash', 'Owner');
 
         $changer = $this->changer();
-        $first = $changer->change($user, $changer->hash(str_repeat('æ', 8)));
-        $second = $changer->change($user, $changer->hash(str_repeat('æ', 255)));
+        $shortestPassword = str_repeat('æ', 8);
+        $first = $changer->change($user, $changer->hash($shortestPassword));
+        $longestPassword = str_repeat('æ', 255);
+        $second = $changer->change($user, $changer->hash($longestPassword));
 
         self::assertSame('hashed:' . str_repeat('æ', 255), $user->getPassword());
         self::assertTrue($first->userId->equals($second->userId));

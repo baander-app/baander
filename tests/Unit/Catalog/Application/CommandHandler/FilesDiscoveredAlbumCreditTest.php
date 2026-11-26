@@ -226,9 +226,10 @@ final class FilesDiscoveredAlbumCreditTest extends TestCase
         ]));
 
         self::assertSame([[$disturbed->toString(), 'primary', 'Disturbed']], $this->state->albumCredits);
+        $reportedEvents = array_intersect($this->state->events, ['album credited', 'import requeued']);
         self::assertSame(
             ['album credited', 'import requeued'],
-            array_values(array_intersect($this->state->events, ['album credited', 'import requeued'])),
+            array_values($reportedEvents),
         );
     }
 

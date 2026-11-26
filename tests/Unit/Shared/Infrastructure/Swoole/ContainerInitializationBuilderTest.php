@@ -69,7 +69,9 @@ final class ContainerInitializationBuilderTest extends TestCase
         $builder->overrideGeneratedContainer($reflection, $this->directory . '/stale-alias', false);
         $builder->overrideGeneratedContainerGetters($reflection, $this->directory . '/stale-alias');
 
-        self::assertStringContainsString('extends ' . $reflection->getShortName() . '_Overridden', file_get_contents($reflection->getFileName()));
+        $overrideDeclaration = 'extends ' . $reflection->getShortName() . '_Overridden';
+        $containerFile = $reflection->getFileName();
+        self::assertStringContainsString($overrideDeclaration, file_get_contents($containerFile));
         self::assertStringContainsString('extends ' . basename($factory, '.php') . '__Overridden', file_get_contents($factory));
         self::assertSame('an incomplete Filesystem::dumpFile temporary', file_get_contents($temporary));
 
@@ -104,7 +106,9 @@ final class ContainerInitializationBuilderTest extends TestCase
 
         Modifier::modifyContainer($container, $this->directory, false);
 
-        self::assertStringContainsString('extends ' . $reflection->getShortName() . '_Overridden', file_get_contents($reflection->getFileName()));
+        $overrideDeclaration = 'extends ' . $reflection->getShortName() . '_Overridden';
+        $containerFile = $reflection->getFileName();
+        self::assertStringContainsString($overrideDeclaration, file_get_contents($containerFile));
         self::assertStringContainsString('extends ' . basename($factory, '.php') . '__Overridden', file_get_contents($factory));
     }
 

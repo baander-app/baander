@@ -89,7 +89,8 @@ final class SegmentEncoderShortAudioMediaTest extends TestCase
         $input = array_search('-i', $arguments, true);
         self::assertIsInt($input);
         array_splice($arguments, $input, 0, ['-re']);
-        self::assertSame(2, count(array_keys($arguments, '-i', true)));
+        $inputs = array_keys($arguments, '-i', true);
+        self::assertSame(2, count($inputs));
         file_put_contents($this->directory.'/commands.jsonl', json_encode($arguments, JSON_THROW_ON_ERROR)."\n", FILE_APPEND);
         $process = new Process($arguments);
         $process->setTimeout(35);
