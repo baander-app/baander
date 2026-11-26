@@ -36,6 +36,34 @@ final class ApplicationBuildContractTest extends TestCase
         self::assertStringContainsString('packages/baander-dev-* packages/baander-*/tests', $production);
     }
 
+    public function testNodeReachesTheDevelopmentTargetsButNotTheDeployedImages(): void
+    {
+        $stages = self::stages(dirname(__DIR__, 3) . '/Dockerfile');
+        foreach (['worker', 'dev-operator'] as $target) {
+            for ($stage = $target; isset($stages[$stage]); $stage = $stages[$stage]['parent']) {
+                self::assertStringNotContainsString('node-dist', $stages[$stage]['body'], $target . ' inherits Node from ' . $stage);
+                self::assertStringNotContainsString('corepack', $stages[$stage]['body'], $target . ' inherits corepack from ' . $stage);
+            }
+        }
+        self::assertSame('runtime', $stages['dev']['parent']);
+        self::assertStringContainsString('COPY --from=node-dist /usr/local/bin/node /usr/bin/node', $stages['dev']['body']);
+        self::assertStringContainsString('corepack enable', $stages['dev']['body']);
+        self::assertSame('dev', $stages['ci']['parent']);
+        self::assertSame('dev', $stages['dev-runtime']['parent']);
+    }
+
+    /** @return array<string, array{parent: string, body: string}> */
+    private static function stages(string $dockerfile): array
+    {
+        $parts = preg_split('/^FROM\s+(\S+)\s+AS\s+(\S+)\s*$/m', (string) file_get_contents($dockerfile), flags: PREG_SPLIT_DELIM_CAPTURE);
+        $stages = [];
+        for ($index = 1; $index + 2 < count($parts); $index += 3) {
+            $stages[$parts[$index + 1]] = ['parent' => $parts[$index], 'body' => $parts[$index + 2]];
+        }
+
+        return $stages;
+    }
+
     protected function setUp(): void
     {
         $this->source = sys_get_temp_dir() . '/baander.app-build-contract-' . bin2hex(random_bytes(8));

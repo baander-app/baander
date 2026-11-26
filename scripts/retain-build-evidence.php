@@ -177,15 +177,14 @@ function collectPhar(array $options): void
         throw new RuntimeException('PHAR archive does not exist.');
     }
     // Load only the archive index. Never include the archive or its PHP metadata.
-    // These archives bind their names in the PHAR manifest; a replacement alias is rejected.
-    $alias = in_array($component['id'], ['composer', 'pie'], true)
+    // Composer's archive binds its name in the PHAR manifest; a replacement alias is rejected.
+    $alias = $component['id'] === 'composer'
         ? $component['id'] . '.phar'
         : 'baander-evidence-' . $component['id'] . '.phar';
     Phar::loadPhar($archive, $alias);
     $prefix = 'phar://' . $alias . '/';
     $versionSource = match ($component['id']) {
         'composer' => ['src/Composer/Composer.php', 'public', 'VERSION'],
-        'pie' => ['src/Util/PieVersion.php', 'private', 'PIE_VERSION'],
         default => null,
     };
     $component['metadata']['own_notices'] = [];

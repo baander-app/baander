@@ -86,5 +86,7 @@ before the paired deployment change. Retain image identity, phase, containment a
 cleanup evidence with the runner's artifacts before claiming a result for a newer
 deployment.
 The production recipes select PHP 8.5.13 and Composer 2.11.1 on the Debian 13
-(trixie) PHP ZTS base. Native Swoole is pinned to Composer's required 6.2.4. PIE
-installation failures fail the image build.
+(trixie) PHP ZTS base. Native Swoole is pinned to Composer's required 6.2.4 and
+built from its PECL release archive, which the build checks against a pinned
+SHA-256. A download failure, checksum mismatch or compile error fails the image
+build.

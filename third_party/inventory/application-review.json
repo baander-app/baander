@@ -44,6 +44,13 @@
       "target": "worker"
     }
   },
+  "later_changes": [
+    {
+      "change": "PIE left both images. Its native component entry, archive notice gap and supplemental notice describe the 2026-10-20 images only; the supplemental notice left the source tree.",
+      "date": "2026-11-26",
+      "revision": "944605d1ec2e283f62116471fe62090c115e01e6"
+    }
+  ],
   "native_components": [
     {
       "artifacts": 1,

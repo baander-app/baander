@@ -161,9 +161,9 @@ final class RetainBuildEvidenceTest extends TestCase
     {
         $cases = [
             ['composer', 'src/Composer/Composer.php', "public const VERSION = '2.10.3';", '2.10.3'],
-            ['pie', 'src/Util/PieVersion.php', 'private const PIE_VERSION = "1.5.2";', '1.5.2'],
+            ['composer', 'src/Composer/Composer.php', 'public const VERSION = "2.10.3";', '2.10.3'],
             ['composer', 'src/Composer/Composer.php', "public const VERSION = '@package_version@';", null],
-            ['pie', 'src/Other.php', "private const PIE_VERSION = '1.5.2';", null],
+            ['composer', 'src/Other.php', "public const VERSION = '2.10.3';", null],
         ];
         foreach ($cases as $index => [$identity, $sourcePath, $literal, $expected]) {
             $archive = $this->root . '/' . $index . '.phar';

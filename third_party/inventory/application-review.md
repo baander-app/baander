@@ -4,6 +4,13 @@ The initial inventory covers the root Dockerfile's `production` and `worker` tar
 Linux amd64, built from commit `1066d203`. It records packaged contents and
 licensing evidence on 2026-10-20; redistribution qualification remains open.
 
+Note of 2026-11-26: commit `944605d1e` removed PIE from both images, and Swoole now
+builds from its PECL release archive. The PIE component, its archive notice gap,
+and its supplemental notice in this record describe the 2026-10-20 images only. The
+supplemental notice and its source record were removed from the source tree
+together with this note; revision `1066d203` still holds them under
+`third_party/inventory/pie-1.5.2/`.
+
 The [collection procedure](../../dev-docs/application-packaged-inventory.md)
 describes the commands and bundle format.
 [THIRD_PARTY.md](../../THIRD_PARTY.md) defines the repository licensing boundaries.
@@ -69,8 +76,8 @@ these raw observations.
 
 Three supplemental notices were included in the measured source tree and images:
 
-- [PIE 1.5.2](pie-1.5.2/LICENSE.md), with its pinned
-  [upstream source record](pie-1.5.2/source.json).
+- PIE 1.5.2, with its pinned upstream source record. Both were removed from the
+  source tree after PIE left the images; see the note at the top.
 - [cweagans/composer-patches](composer-notices/cweagans/composer-patches/LICENSE.md)
   and [hidehalo/nanoid-php](composer-notices/hidehalo/nanoid-php/LICENSE.md),
   retrieved at the installed source revisions recorded in the
@@ -294,7 +301,7 @@ The remaining gate concerns these observed contents:
   common-license references above does not settle those declarations or
   package-wide redistribution obligations.
 - **Embedded dependencies:** PHP, liburing, eight PECL extensions, Swoole, TSDuck,
-  Composer, and PIE have retained source/tool evidence and bound output hashes.
+  and Composer have retained source/tool evidence and bound output hashes.
   Their embedded dependency and distribution obligations remain unreviewed.
   A top-level notice alone does not settle those obligations.
 - **Copied assets and sources:** review provenance for the actual copied

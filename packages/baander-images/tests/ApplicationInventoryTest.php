@@ -369,16 +369,16 @@ final class ApplicationInventoryTest extends TestCase
     public function testNativeMergedUsrAliasPreservesOwnershipAndOtherGaps(): void
     {
         symlink('/usr/bin', $this->root . '/bin');
-        $this->put('/usr/bin/pie', "#!/usr/bin/env php\npie fixture");
+        $this->put('/usr/bin/composer', "#!/usr/bin/env php\ncomposer fixture");
         $this->put('/usr/bin/unknown', "\x7fELFunknown");
         $this->native([
-            'id' => 'pie',
-            'artifacts' => [['path' => '/bin/pie', 'sha256' => hash('sha256', "#!/usr/bin/env php\npie fixture")]],
+            'id' => 'composer',
+            'artifacts' => [['path' => '/bin/composer', 'sha256' => hash('sha256', "#!/usr/bin/env php\ncomposer fixture")]],
         ]);
         $inventory = $this->generate();
-        self::assertSame('native-build', $this->entry($inventory, '/usr/bin/pie')['group']);
-        self::assertSame(['pie'], $this->entry($inventory, '/usr/bin/pie')['owners']);
-        self::assertNotContains('/usr/bin/pie', array_column($inventory['review_gaps'], 'path'));
+        self::assertSame('native-build', $this->entry($inventory, '/usr/bin/composer')['group']);
+        self::assertSame(['composer'], $this->entry($inventory, '/usr/bin/composer')['owners']);
+        self::assertNotContains('/usr/bin/composer', array_column($inventory['review_gaps'], 'path'));
         self::assertContains('/usr/bin/unknown', array_column($inventory['review_gaps'], 'path'));
         self::assertContains(
             'embedded native dependency coverage requires review',

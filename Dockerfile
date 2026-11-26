@@ -8,7 +8,7 @@
 
 # -----------------------------------------------------------------------------
 # Stage 1: base
-# System dependencies and Node.js.
+# System dependencies.
 # Provides the common foundation for both builder and runtime.
 # FFmpeg comes from the project's static image (docker/ffmpeg/Dockerfile),
 # selected through the FFMPEG_IMAGE build argument that the tooling fills
@@ -26,16 +26,6 @@ FROM node:24.22.2-trixie-slim@sha256:0820eaa85e07d0490446dd01d14707e17e6108a3698
 FROM php:8.5.13-zts-trixie@sha256:67cc0f9b705a1c9f2352162be2d0cf6e5c05028f12fd62e89d1b069429426055 AS base
 
 ARG TARGETPLATFORM
-
-# Node.js keeps the layout of Debian's nodejs package, so /usr/bin/node and the
-# global npm and corepack under /usr/lib/node_modules stay where tooling expects them.
-COPY --from=node-dist /usr/local/bin/node /usr/bin/node
-COPY --from=node-dist /usr/local/lib/node_modules /usr/lib/node_modules
-COPY --from=node-dist /usr/local/include/node /usr/include/node
-RUN ln -s ../lib/node_modules/npm/bin/npm-cli.js /usr/bin/npm && \
-    ln -s ../lib/node_modules/npm/bin/npx-cli.js /usr/bin/npx && \
-    ln -s ../lib/node_modules/corepack/dist/corepack.js /usr/bin/corepack && \
-    node --version
 
 # Install system dependencies.
 # --mount=type=cache caches APT indices and packages across rebuilds.
@@ -86,8 +76,7 @@ RUN set -xe && \
         redis-tools \
         jq \
         tree \
-        zlib1g-dev && \
-    corepack enable
+        zlib1g-dev
 
 # TSDuck build dependencies (needed by builder stages)
 RUN set -xe && \
@@ -539,7 +528,7 @@ CMD ["/usr/local/bin/start-web.sh"]
 
 # -----------------------------------------------------------------------------
 # Stage 5: dev
-# Development target. Adds Xdebug, CA certificates, and debug aliases.
+# Development target. Adds Node.js, Xdebug, CA certificates, and debug aliases.
 # Designed for use with docker-compose volume mount workflow.
 # -----------------------------------------------------------------------------
 FROM runtime AS dev
@@ -557,6 +546,19 @@ ENV XDEBUG_CONFIG=$XDEBUG_CONFIG \
 
 # Switch to root for setup
 USER root
+
+# Nothing in the production or worker images runs Node.js, so only this target and
+# the ci and dev-runtime targets built on it carry it. It keeps the layout of
+# Debian's nodejs package, so /usr/bin/node and the global npm and corepack under
+# /usr/lib/node_modules stay where tooling expects them.
+COPY --from=node-dist /usr/local/bin/node /usr/bin/node
+COPY --from=node-dist /usr/local/lib/node_modules /usr/lib/node_modules
+COPY --from=node-dist /usr/local/include/node /usr/include/node
+RUN ln -s ../lib/node_modules/npm/bin/npm-cli.js /usr/bin/npm && \
+    ln -s ../lib/node_modules/npm/bin/npx-cli.js /usr/bin/npx && \
+    ln -s ../lib/node_modules/corepack/dist/corepack.js /usr/bin/corepack && \
+    node --version && \
+    corepack enable
 
 # Copy Composer from builder
 COPY --from=builder /usr/bin/composer /usr/bin/composer
