@@ -12624,7 +12624,7 @@
                         "description": "Authentication required"
                     },
                     "409": {
-                        "description": "Playback cannot start: the video file no longer resolves inside one of its libraries, or the stream copy the destination needs would leave the account holding more transcode sessions than the server allows and too few have been silent for two minutes to give way (`error.details.reason` is `transcode_session_limit` and `error.details.limit` the limit)",
+                        "description": "Playback cannot start: the video file no longer resolves inside one of its libraries, the track file or a symlink on its path leads outside its library (`error.details.reason` is `media_unavailable`), or the stream copy the destination needs would leave the account holding more transcode sessions than the server allows and too few have been silent for two minutes to give way (`error.details.reason` is `transcode_session_limit` and `error.details.limit` the limit)",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -13180,7 +13180,7 @@
                         }
                     },
                     "409": {
-                        "description": "Completed rendition unavailable or the selected audio cannot be copied; negotiate delivery again. The error details carry the reason.",
+                        "description": "The track file, or a symlink on its path, leads outside its library (reason `media_unavailable`), or the completed rendition is unavailable or the selected audio cannot be copied; negotiate delivery again. The error details carry the reason.",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -13264,7 +13264,7 @@
                         }
                     },
                     "409": {
-                        "description": "Completed rendition unavailable or the selected audio cannot be copied; negotiate delivery again. The error details carry the reason.",
+                        "description": "The track file, or a symlink on its path, leads outside its library (reason `media_unavailable`), or the completed rendition is unavailable or the selected audio cannot be copied; negotiate delivery again. The error details carry the reason.",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -13370,6 +13370,16 @@
                     },
                     "404": {
                         "description": "Track not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "The track cannot be served; `error.details.reason` names why: `media_unavailable` when the track file or a symlink on its path leads outside its library, `source_stream_metadata_unavailable` or `copy_failed` when the selected audio cannot be copied, `encoding_prohibited` when the deployment runs no slots for the encoding or stream copy",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -28809,6 +28819,7 @@
                             "destination_media_unsupported",
                             "subtitle_delivery_unsupported",
                             "browser_rejected_source",
+                            "media_unavailable",
                             "unknown",
                             null
                         ],

@@ -1358,6 +1358,7 @@ export const AcknowledgePlaybackRequestRejectionReason = {
   destination_media_unsupported: 'destination_media_unsupported',
   subtitle_delivery_unsupported: 'subtitle_delivery_unsupported',
   browser_rejected_source: 'browser_rejected_source',
+  media_unavailable: 'media_unavailable',
   unknown: 'unknown',
 } as const;
 
