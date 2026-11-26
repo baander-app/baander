@@ -146,6 +146,15 @@ final class ClientRepository implements ClientRepositoryInterface
         );
     }
 
+    public function deleteRevokedPersonalAccessClients(): int
+    {
+        // The client table is small, so the daily purge scans it rather than keep an index
+        // for it. ON DELETE CASCADE removes the tokens, codes and pushed requests.
+        return (int) $this->entityManager->getConnection()->executeStatement(
+            'DELETE FROM oauth_clients WHERE personal_access_client AND revoked',
+        );
+    }
+
     public function findAllExceptPersonalAccess(): array
     {
         $entities = $this->entityManager

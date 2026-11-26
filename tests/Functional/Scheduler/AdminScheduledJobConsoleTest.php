@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Tests\Functional\Scheduler;
 
 use App\Auth\Application\Command\OAuth\PurgeExpiredOAuthCodesCommand;
+use App\Auth\Application\Command\OAuth\PurgeRevokedPersonalAccessClientsCommand;
 use App\Auth\Domain\Model\User;
 use App\Scheduler\Application\Port\ScheduledJobPortInterface;
 use App\Scheduler\Domain\Model\ScheduledJob;
@@ -119,6 +120,7 @@ final class AdminScheduledJobConsoleTest extends TestCase
         self::assertSame(Command::SUCCESS, $commands->execute(['--json' => true], ['capture_stderr_separately' => true]));
         self::assertSame($catalog, json_decode($commands->getDisplay(), true, 64, JSON_THROW_ON_ERROR));
         self::assertArrayHasKey(PurgeExpiredOAuthCodesCommand::class, $catalog['messenger']);
+        self::assertArrayHasKey(PurgeRevokedPersonalAccessClientsCommand::class, $catalog['messenger']);
     }
 
     public function testConsoleCommandsManageAJobThroughTheSamePort(): void

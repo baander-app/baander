@@ -77,6 +77,7 @@ Commands and handlers are organized into feature namespaces under `Application/C
 | `ReplaceClientKeysCommand` | `ReplaceClientKeysHandler` | Replace a `private_key_jwt` client's inline JWK Set or `jwks_uri` for the admin API and `app:oauth:client:replace-keys` (OAuth/) |
 | `RevokeRegisteredClientCommand` | `RevokeRegisteredClientHandler` | Revoke a device, public or confidential client and its tokens for the admin API and `app:oauth:client:revoke` (OAuth/) |
 | `PurgeExpiredOAuthCodesCommand` | `PurgeExpiredOAuthCodesHandler` | Delete authorization codes, device codes and pushed authorization requests expired more than one hour ago (`app:oauth:purge-codes` and daily schedule; OAuth/) |
+| `PurgeRevokedPersonalAccessClientsCommand` | `PurgeRevokedPersonalAccessClientsHandler` | Delete revoked personal access clients; their tokens and codes cascade (`app:oauth:client:purge-revoked` and daily schedule; OAuth/) |
 | `RegisterPasskeyCommand` | `RegisterPasskeyHandler` | Add a WebAuthn passkey; every other session ends (Passkey/) |
 | `DeletePasskeyCommand` | `DeletePasskeyHandler` | Remove one of the user's passkeys after step-up and record `PasskeyDeleted`; every other session ends (Passkey/) |
 | `AuthenticatePasskeyCommand` | `AuthenticatePasskeyHandler` | Verify a WebAuthn assertion during passkey login and for the passkey check endpoint (Passkey/) |

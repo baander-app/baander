@@ -34,6 +34,7 @@ Application console commands run inside `web`. The control and execution worker 
 | [app:login-block:list](app-login-block-list.md) | List the login honeypot's blocks, newest first |
 | [app:oauth:client:create](app-oauth-client-create.md) | Register a device, public or confidential OAuth client |
 | [app:oauth:client:list](app-oauth-client-list.md) | List OAuth clients other than personal access clients |
+| [app:oauth:client:purge-revoked](app-oauth-client-purge-revoked.md) | Delete revoked personal access clients and the tokens issued to them |
 | [app:oauth:client:replace-keys](app-oauth-client-replace-keys.md) | Replace the public keys of an OAuth client that authenticates with `private_key_jwt` |
 | [app:oauth:client:revoke](app-oauth-client-revoke.md) | Revoke an OAuth client and every token issued to it |
 | [app:oauth:client:rotate-secret](app-oauth-client-rotate-secret.md) | Give an OAuth client that authenticates with a secret a new one |

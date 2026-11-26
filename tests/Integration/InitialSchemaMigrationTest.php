@@ -114,7 +114,7 @@ final class InitialSchemaMigrationTest extends TestCase
         );
         $factory = $this->factory();
         $factory->getMetadataStorage()->ensureInitialized();
-        self::assertCount(50, $factory->getMigrationRepository()->getMigrations());
+        self::assertCount(51, $factory->getMigrationRepository()->getMigrations());
         self::assertSame(0, $this->migrate($factory));
         self::assertSame([
             'DoctrineMigrations\\Version20261017000000',
@@ -164,6 +164,7 @@ final class InitialSchemaMigrationTest extends TestCase
             'DoctrineMigrations\\Version20261125141000',
             'DoctrineMigrations\\Version20261125142000',
             'DoctrineMigrations\\Version20261125151723',
+            'DoctrineMigrations\\Version20261126211000',
             'DoctrineMigrations\\Version20261126212434',
             'DoctrineMigrations\\Version20261126213944',
             'DoctrineMigrations\\Version20261126220235',
@@ -187,7 +188,7 @@ final class InitialSchemaMigrationTest extends TestCase
         self::assertSame($history, $this->connection->fetchAllAssociative('SELECT * FROM doctrine_migration_versions'));
 
         self::assertSame(0, $this->migrate($this->factory(true)));
-        self::assertSame(51, (int) $this->connection->fetchOne('SELECT count(*) FROM doctrine_migration_versions'));
+        self::assertSame(52, (int) $this->connection->fetchOne('SELECT count(*) FROM doctrine_migration_versions'));
         self::assertSame('future_migration_probe', $this->connection->fetchOne("SELECT to_regclass('future_migration_probe')::text"));
     }
 
@@ -643,14 +644,16 @@ SQL, [$jobs[0], $runtimeSession, $desired, str_repeat('a', 32)]);
     private function assertSchedules(): void
     {
         $jobs = $this->connection->fetchAllAssociative('SELECT * FROM scheduled_jobs ORDER BY id');
-        self::assertCount(3, $jobs);
+        self::assertCount(4, $jobs);
+        // The last field says whether the initial schema seeded the job.
         $expected = [
-            ['0199bf3c-8a00-7000-8000-0a07c0de9e01', '30 3 * * *', 'App\\Auth\\Application\\Command\\OAuth\\PurgeExpiredOAuthCodesCommand', [], '03:30:00'],
-            ['0199bf3c-8a00-7000-8000-0a07c0de9e02', '0 4 * * *', 'App\\Recommendation\\Application\\Command\\GenerateRecommendationsCommand', ['mode' => 'incremental', 'automatic' => true], '04:00:00'],
-            ['0199bf3c-8a00-7000-8000-0a07c0de9e04', '*/10 * * * *', 'App\\Catalog\\Application\\Command\\RecoverAlbumMatchQueueCommand', [], null],
+            ['0199bf3c-8a00-7000-8000-0a07c0de9e01', '30 3 * * *', 'App\\Auth\\Application\\Command\\OAuth\\PurgeExpiredOAuthCodesCommand', [], '03:30:00', true],
+            ['0199bf3c-8a00-7000-8000-0a07c0de9e02', '0 4 * * *', 'App\\Recommendation\\Application\\Command\\GenerateRecommendationsCommand', ['mode' => 'incremental', 'automatic' => true], '04:00:00', true],
+            ['0199bf3c-8a00-7000-8000-0a07c0de9e04', '*/10 * * * *', 'App\\Catalog\\Application\\Command\\RecoverAlbumMatchQueueCommand', [], null, false],
+            ['0199bf3c-8a00-7000-8000-0a07c0de9e06', '45 3 * * *', 'App\\Auth\\Application\\Command\\OAuth\\PurgeRevokedPersonalAccessClientsCommand', [], '03:45:00', false],
         ];
         foreach ($jobs as $index => $job) {
-            [$id, $expression, $command, $parameters, $time] = $expected[$index];
+            [$id, $expression, $command, $parameters, $time, $initial] = $expected[$index];
             self::assertSame($id, $job['id']);
             self::assertSame($expression, $job['expression']);
             self::assertSame($command, $job['command']);
@@ -673,14 +676,16 @@ SQL, [$jobs[0], $runtimeSession, $desired, str_repeat('a', 32)]);
                 self::assertLessThanOrEqual($sample->modify('+10 minutes'), $next);
                 continue;
             }
-            // The initial schema seeds its schedules from one clock sample.
-            self::assertSame($jobs[0]['created_at'], $job['created_at']);
+            if ($initial) {
+                // The initial schema seeds its schedules from one clock sample.
+                self::assertSame($jobs[0]['created_at'], $job['created_at']);
+            }
             self::assertSame($time, $next->setTimezone(new \DateTimeZone('UTC'))->format('H:i:s'));
             self::assertLessThanOrEqual($sample->modify('+1 day'), $next);
         }
-        self::assertSame(3, array_column($jobs, 'public_id') |> array_unique(...) |> count(...));
-        self::assertSame(3, array_column($jobs, 'revision') |> array_unique(...) |> count(...));
-        // The recovery job's seed turns the capture trigger off for its insert only.
+        self::assertSame(4, array_column($jobs, 'public_id') |> array_unique(...) |> count(...));
+        self::assertSame(4, array_column($jobs, 'revision') |> array_unique(...) |> count(...));
+        // The migrations that seed a schedule later turn the capture trigger off for their insert only.
         self::assertSame('O', $this->connection->fetchOne("SELECT tgenabled FROM pg_trigger WHERE tgrelid = 'scheduled_jobs'::regclass AND tgname = 'query_capture_insert'"));
     }
 

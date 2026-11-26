@@ -13,9 +13,13 @@ use App\Auth\Domain\Repository\OAuth\ClientRepositoryInterface;
 use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
 use App\Tests\Functional\TestCase;
+use Doctrine\DBAL\ArrayParameterType;
 use League\OAuth2\Server\Exception\OAuthServerException;
 use League\OAuth2\Server\ResourceServer;
 use Nyholm\Psr7\ServerRequest;
+use Symfony\Bundle\FrameworkBundle\Console\Application;
+use Symfony\Component\Console\Command\Command;
+use Symfony\Component\Console\Tester\CommandTester;
 use Symfony\Component\Messenger\Exception\HandlerFailedException;
 use Symfony\Component\Messenger\MessageBusInterface;
 use Symfony\Component\Messenger\Stamp\HandledStamp;
@@ -158,6 +162,44 @@ final class PersonalAccessClientTest extends TestCase
         self::assertSame($owner->getPublicId()->toString(), $this->authenticatedUserId($otherTokens->getAccessToken()));
     }
 
+    public function testThePurgeDeletesRevokedClientsWithTheirTokensAndKeepsActiveOnes(): void
+    {
+        $owner = $this->createTestUser();
+        $revoked = $this->createPersonalAccessClient($owner, 'Old CLI');
+        $alsoRevoked = $this->createPersonalAccessClient($owner, 'Old scripts');
+        $active = $this->createPersonalAccessClient($owner, 'Current CLI');
+        $tokens = $this->issueTokens($owner, $revoked['publicId']);
+        $accessTokenIds = $this->accessTokenIdsOf($this->clientId($revoked['publicId']));
+        self::assertNotSame([], $accessTokenIds);
+        $this->assertJsonResponse($this->authenticatedRequest('DELETE', '/api/oauth/clients/' . $revoked['publicId'], $owner), 200);
+        $this->assertJsonResponse($this->authenticatedRequest('DELETE', '/api/oauth/clients/' . $alsoRevoked['publicId'], $owner), 200);
+
+        $purge = new CommandTester((new Application($this->client->getKernel()))->find('app:oauth:client:purge-revoked'));
+
+        self::assertSame(Command::SUCCESS, $purge->execute([]), $purge->getDisplay());
+        self::assertStringContainsString('Deleted 2 revoked personal access client(s).', preg_replace('/\s+/', ' ', $purge->getDisplay()) ?? '');
+        self::assertSame([$active['publicId']], $this->storedClientPublicIds([$revoked['publicId'], $alsoRevoked['publicId'], $active['publicId']]));
+        self::assertSame([$active['publicId']], array_column($this->listClients($owner), 'publicId'));
+        $connection = $this->entityManager->getConnection();
+        self::assertSame(0, (int) $connection->fetchOne(
+            'SELECT count(*) FROM oauth_access_tokens WHERE id IN (?)',
+            [$accessTokenIds],
+            [ArrayParameterType::STRING],
+        ));
+        self::assertSame(0, (int) $connection->fetchOne(
+            'SELECT count(*) FROM oauth_refresh_tokens WHERE access_token_id IN (?)',
+            [$accessTokenIds],
+            [ArrayParameterType::STRING],
+        ));
+
+        try {
+            $this->authenticatedUserId($tokens->getAccessToken());
+            self::fail('An access token of a purged client must not authenticate.');
+        } catch (OAuthServerException $exception) {
+            self::assertSame('access_denied', $exception->getErrorType());
+        }
+    }
+
     /** @return array<string, mixed> */
     private function createPersonalAccessClient(User $user, string $name): array
     {
@@ -185,6 +227,32 @@ final class PersonalAccessClientTest extends TestCase
         self::assertNotNull($client);
 
         return $client->getId();
+    }
+
+    /** @return list<string> */
+    private function accessTokenIdsOf(Uuid $clientId): array
+    {
+        /** @var list<string> */
+        return $this->entityManager->getConnection()->fetchFirstColumn(
+            'SELECT id FROM oauth_access_tokens WHERE client_id = ?',
+            [$clientId->toString()],
+        );
+    }
+
+    /**
+     * @param list<string> $publicIds
+     *
+     * @return list<string> those still stored, in the given order
+     */
+    private function storedClientPublicIds(array $publicIds): array
+    {
+        $stored = $this->entityManager->getConnection()->fetchFirstColumn(
+            'SELECT public_id FROM oauth_clients WHERE public_id IN (?)',
+            [$publicIds],
+            [ArrayParameterType::STRING],
+        );
+
+        return array_values(array_intersect($publicIds, $stored));
     }
 
     private function issueTokens(User $user, string $clientPublicId): TokenResponseDTO

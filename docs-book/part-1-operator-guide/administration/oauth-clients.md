@@ -18,7 +18,7 @@ Registration alone grants nothing: a signed-in user still has to approve the app
 | `confidential` | Server-side applications that can keep a secret; uses the authorization code grant with PKCE and authenticates with a client secret or with its own signing keys | An administrator |
 | `personal_access` | A user's own scripts and tools | The user |
 
-Administrators manage device, public and confidential clients. The first-party client and personal access clients are outside their reach: the commands and admin endpoints below list the first-party client but refuse to change it, and they do not show personal access clients at all. Users list and revoke their own personal access clients.
+Administrators manage device, public and confidential clients. The first-party client and personal access clients are outside their reach: the commands and admin endpoints below list the first-party client but refuse to change it, and they do not show personal access clients at all. Users list and revoke their own personal access clients. A scheduled job, **Purge revoked personal access clients**, deletes the revoked ones and their tokens every day at 03:45 UTC; [`app:oauth:client:purge-revoked`](../commands/app-oauth-client-purge-revoked.md) runs the same purge on demand.
 
 ### Who can manage clients
 

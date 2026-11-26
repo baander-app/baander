@@ -51,6 +51,14 @@ interface ClientRepositoryInterface
     public function countPersonalAccessClientsOf(Uuid $userId): int;
 
     /**
+     * Deletes every revoked personal access client; their tokens, codes and pushed
+     * authorization requests go with them.
+     *
+     * @return int how many clients were deleted
+     */
+    public function deleteRevokedPersonalAccessClients(): int;
+
+    /**
      * Every client except personal access clients, revoked ones included, newest first.
      *
      * @return Client[]
