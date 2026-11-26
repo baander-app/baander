@@ -12,6 +12,9 @@ use Baander\Process\Execution\ProcessSpec;
 
 final readonly class ComposerEvidence
 {
+    /** The notice quotes the package name, which the transport-failure pattern must not read: `redis-rate-limiter` matches `rate.limit`. */
+    private const string ROOT_VERSION_NOTICE = '/^Composer could not detect the root package \(.+\) version, defaulting to .*$/m';
+
     /**
      * @param array<string,string> $environment
      */
@@ -144,7 +147,8 @@ final readonly class ComposerEvidence
             processGroup: true,
             replaceEnvironment: true,
         ), new CompletionPolicy(null));
-        if (preg_match('/cache.*(stale|out.?of.?date)|using.*cached|could not.*(download|resolve)|failed to (download|open)|SSL.*(error|fail)|rate.limit|HTTP[^\n]*(429|50[0-9])/i', $result->stderr)) {
+        $diagnostics = preg_replace(self::ROOT_VERSION_NOTICE, '', $result->stderr) ?? $result->stderr;
+        if (preg_match('/cache.*(stale|out.?of.?date)|using.*cached|could not.*(download|resolve)|failed to (download|open)|SSL.*(error|fail)|rate.limit|HTTP[^\n]*(429|50[0-9])/i', $diagnostics)) {
             throw new \RuntimeException('Composer reported unavailable or stale source evidence.');
         }
         return $result;

@@ -66,13 +66,41 @@ PHP_STUB;
             self::assertSame($before, [hash_file('sha256', $root . '/project/composer.json'), hash_file('sha256', $root . '/project/composer.lock')]);
         } finally {
             $executor->close();
-            $iterator = new \RecursiveIteratorIterator(new \RecursiveDirectoryIterator($root, \FilesystemIterator::SKIP_DOTS), \RecursiveIteratorIterator::CHILD_FIRST);
-            foreach ($iterator as $entry) {
-                $entry->isDir() ? rmdir($entry->getPathname()) : unlink($entry->getPathname());
-            }
-            rmdir($root);
+            self::removeTree($root);
         }
     }
+
+    public function testTheRootVersionNoticeIsNotReadAsATransportFailure(): void
+    {
+        $root = sys_get_temp_dir() . '/baander dependencies ' . bin2hex(random_bytes(8));
+        mkdir($root, 0700);
+        mkdir($root . '/bin');
+        mkdir($root . '/home');
+        mkdir($root . '/project');
+        file_put_contents($root . '/project/composer.json', '{"name":"baander/redis-rate-limiter"}');
+        $stub = <<<'PHP_STUB'
+<?php
+fwrite(STDERR, (string) file_get_contents(dirname(__DIR__) . '/stderr.txt'));
+echo "./composer.json is valid\n";
+PHP_STUB;
+        file_put_contents($root . '/bin/composer', '#!' . PHP_BINARY . "\n" . $stub);
+        chmod($root . '/bin/composer', 0700);
+        $environment = ['PATH' => $root . '/bin:' . (getenv('PATH') ?: ''), 'HOME' => $root];
+        $executor = new EngineExecutor(ExecutionContext::bounded(10, $environment));
+        try {
+            $composer = new ComposerEvidence($executor, 2, $environment, $root . '/home');
+            file_put_contents($root . '/stderr.txt', "Composer could not detect the root package (baander/redis-rate-limiter) version, defaulting to '1.0.0'. See https://getcomposer.org/root-version\n");
+            self::assertSame(0, $composer->validate($root . '/project', false)->exitCode);
+
+            file_put_contents($root . '/stderr.txt', "GitHub API rate limit exceeded\n");
+            $this->expectExceptionMessage('Composer reported unavailable or stale source evidence.');
+            $composer->validate($root . '/project', false);
+        } finally {
+            $executor->close();
+            self::removeTree($root);
+        }
+    }
+
     public function testLocalCollectionValidatesAllSevenManifestsAndFourLocksWithNoOnlineCommands(): void
     {
         $root = sys_get_temp_dir() . '/baander-dependency-projects-' . bin2hex(random_bytes(8));
@@ -123,12 +151,16 @@ PHP_STUB;
             }
         } finally {
             $executor->close();
-            $iterator = new \RecursiveIteratorIterator(new \RecursiveDirectoryIterator($root, \FilesystemIterator::SKIP_DOTS), \RecursiveIteratorIterator::CHILD_FIRST);
-            foreach ($iterator as $entry) {
-                $entry->isDir() ? rmdir($entry->getPathname()) : unlink($entry->getPathname());
-            }
-            rmdir($root);
+            self::removeTree($root);
         }
     }
 
+    private static function removeTree(string $root): void
+    {
+        $iterator = new \RecursiveIteratorIterator(new \RecursiveDirectoryIterator($root, \FilesystemIterator::SKIP_DOTS), \RecursiveIteratorIterator::CHILD_FIRST);
+        foreach ($iterator as $entry) {
+            $entry->isDir() ? rmdir($entry->getPathname()) : unlink($entry->getPathname());
+        }
+        rmdir($root);
+    }
 }
