@@ -90,7 +90,7 @@ final class JobMonitorControllerTest extends TestCase
         $rows = $this->entityManager->getConnection()->fetchAllKeyValue(
             "SELECT job_id, audit_log FROM job_monitors WHERE job_id IN ('retry-from-web', 'retry-from-cli') AND retried",
         );
-        self::assertSame($admin->getEmail(), json_decode($rows['retry-from-web'], true, flags: JSON_THROW_ON_ERROR)[0]['userId']);
+        self::assertSame($admin->getId()->toString(), json_decode($rows['retry-from-web'], true, flags: JSON_THROW_ON_ERROR)[0]['userId']);
         $cliAudit = json_decode($rows['retry-from-cli'], true, flags: JSON_THROW_ON_ERROR);
         self::assertSame('cli', $cliAudit[0]['userId']);
         self::assertSame($newJobIds[1], $cliAudit[0]['newJobId']);

@@ -13,6 +13,7 @@ use App\Recommendation\Application\Query\GetRecommendationJobQuery;
 use App\Recommendation\Application\Query\ListRecommendationJobsQuery;
 use App\Recommendation\Interface\Resource\RecommendationGenerationResource;
 use App\Recommendation\Interface\Resource\RecommendationJobResource;
+use App\Shared\Application\Port\SignedInUserInterface;
 use App\Shared\Interface\Attribute\CliCounterpart;
 use App\Shared\Interface\Controller\ApiResponsesTrait;
 use App\Shared\Interface\DTO\ApiError;
@@ -22,8 +23,6 @@ use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\Messenger\MessageBusInterface;
 use Symfony\Component\Messenger\Stamp\HandledStamp;
 use Symfony\Component\Routing\Attribute\Route;
-use Symfony\Component\Security\Core\User\UserInterface;
-use Symfony\Component\Security\Http\Attribute\CurrentUser;
 use Symfony\Component\Security\Http\Attribute\IsGranted;
 
 /**
@@ -40,6 +39,7 @@ final class RecommendationAdminController
     public function __construct(
         private readonly RecommendationInsightsPortInterface $insights,
         private readonly MessageBusInterface $commandBus,
+        private readonly SignedInUserInterface $signedInUser,
     ) {
     }
 
@@ -244,13 +244,13 @@ final class RecommendationAdminController
     )]
     #[CliCounterpart('app:recommendation:generate')]
     #[Route('/generate', name: 'generate', methods: ['POST'])]
-    public function generate(Request $request, #[CurrentUser] UserInterface $user): JsonResponse
+    public function generate(Request $request): JsonResponse
     {
         $mode = $request->getPayload()->get('mode', GenerateRecommendationsCommand::MODE_FULL);
 
         $result = $this->dispatch(new GenerateRecommendationsCommand(
             mode: (string) $mode,
-            actor: $user->getUserIdentifier(),
+            actor: $this->signedInUser->id() ?? throw new \LogicException('No user is signed in.'),
         ));
         assert($result instanceof RecommendationGenerationResult);
 
@@ -372,9 +372,12 @@ final class RecommendationAdminController
     )]
     #[CliCounterpart('app:recommendation:job:requeue')]
     #[Route('/jobs/{publicId}/requeue', name: 'job_requeue', methods: ['POST'])]
-    public function requeueJob(string $publicId, #[CurrentUser] UserInterface $user): JsonResponse
+    public function requeueJob(string $publicId): JsonResponse
     {
-        $result = $this->dispatch(new RequeueRecommendationJobCommand($publicId, $user->getUserIdentifier()));
+        $result = $this->dispatch(new RequeueRecommendationJobCommand(
+            $publicId,
+            $this->signedInUser->id() ?? throw new \LogicException('No user is signed in.'),
+        ));
         assert($result instanceof RecommendationGenerationResult);
 
         return $this->successResponse(RecommendationGenerationResource::from($result), 201);

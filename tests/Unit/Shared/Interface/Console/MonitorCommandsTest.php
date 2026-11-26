@@ -16,6 +16,7 @@ use App\Shared\Application\Exception\ConflictException;
 use App\Shared\Application\Exception\InvalidInputException;
 use App\Shared\Application\Exception\NotFoundException;
 use App\Shared\Application\Port\JobMonitorAdministrationInterface;
+use App\Shared\Application\Port\SignedInUserInterface;
 use App\Shared\Domain\Model\JobStatus;
 use App\Shared\Interface\Console\MonitorAnalyticsCommand;
 use App\Shared\Interface\Console\MonitorJobCancelCommand;
@@ -32,7 +33,6 @@ use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Tester\CommandTester;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
-use Symfony\Component\Security\Core\User\InMemoryUser;
 
 final class MonitorCommandsTest extends TestCase
 {
@@ -175,12 +175,14 @@ final class MonitorCommandsTest extends TestCase
 
     public function testRetryAndCancelJsonPrintTheDataTheEndpointsReturn(): void
     {
-        $controller = new JobMonitorController($this->monitor);
+        $admin = $this->createStub(SignedInUserInterface::class);
+        $admin->method('id')->willReturn('0199bf3c-8a00-7000-8000-0000000000a1');
+        $controller = new JobMonitorController($this->monitor, $admin);
 
         $retry = new CommandTester(new MonitorJobRetryCommand($this->monitor));
         self::assertSame(Command::SUCCESS, $retry->execute(['jobId' => 'job-failed', '--json' => true]));
         self::assertSame(
-            self::data($controller->retry('job-failed', new InMemoryUser('admin@baander.app', null))),
+            self::data($controller->retry('job-failed')),
             json_decode($retry->getDisplay(), true, flags: JSON_THROW_ON_ERROR),
         );
 
@@ -191,7 +193,7 @@ final class MonitorCommandsTest extends TestCase
 
     public function testPruneJsonHasTheFieldsOfTheEndpointsData(): void
     {
-        $endpoint = self::data((new JobMonitorController($this->monitor))->prune(Request::create('/', 'POST', content: '{"days":3}')));
+        $endpoint = self::data((new JobMonitorController($this->monitor, $this->createStub(SignedInUserInterface::class)))->prune(Request::create('/', 'POST', content: '{"days":3}')));
 
         $tester = new CommandTester(new PruneJobMonitorsCommand($this->monitor));
         self::assertSame(Command::SUCCESS, $tester->execute(['--days' => '3', '--json' => true]));

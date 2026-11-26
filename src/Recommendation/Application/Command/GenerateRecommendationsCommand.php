@@ -32,7 +32,7 @@ final readonly class GenerateRecommendationsCommand implements SchedulableComman
     ) {
     }
 
-    /** Who asked for the run: the admin's user identifier or Actor::CLI; null for the scheduler. */
+    /** Who asked for the run: the admin's user ID or Actor::CLI; null for the scheduler. */
     public function getActor(): ?string
     {
         return $this->actor;

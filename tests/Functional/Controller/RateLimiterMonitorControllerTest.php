@@ -126,8 +126,8 @@ final class RateLimiterMonitorControllerTest extends TestCase
         $this->assertJsonResponse($all, 200);
         $records = $this->clearRecords($logs);
         self::assertCount(2, $records);
-        self::assertSame(['actor' => $superAdmin->getEmail(), 'limiters' => ['batch_cover_extract']], $records[0]);
-        self::assertSame($superAdmin->getEmail(), $records[1]['actor']);
+        self::assertSame(['actor' => $superAdmin->getId()->toString(), 'limiters' => ['batch_cover_extract']], $records[0]);
+        self::assertSame($superAdmin->getId()->toString(), $records[1]['actor']);
         self::assertEqualsCanonicalizing($this->configuredLimiterNames(), $records[1]['limiters']);
     }
 

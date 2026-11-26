@@ -49,7 +49,7 @@ interface JobMonitorAdministrationInterface
      * was received from, and records the retry with the actor in the job's audit log. A job
      * is retried at most once.
      *
-     * @param string $actor the admin's user identifier, or Actor::CLI
+     * @param string $actor the admin's user ID, or Actor::CLI
      *
      * @return string the new job ID
      *

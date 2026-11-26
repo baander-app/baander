@@ -11,7 +11,7 @@ namespace App\Recommendation\Application\Command;
 final readonly class RequeueRecommendationJobCommand
 {
     /**
-     * @param string $actor the admin's user identifier, or Actor::CLI
+     * @param string $actor the admin's user ID, or Actor::CLI
      */
     public function __construct(
         public string $publicId,

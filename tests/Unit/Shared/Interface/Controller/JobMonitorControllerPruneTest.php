@@ -7,6 +7,7 @@ namespace App\Tests\Unit\Shared\Interface\Controller;
 use App\Shared\Application\DTO\JobMonitorPruneResult;
 use App\Shared\Application\Exception\InvalidInputException;
 use App\Shared\Application\Port\JobMonitorAdministrationInterface;
+use App\Shared\Application\Port\SignedInUserInterface;
 use App\Shared\Interface\Controller\JobMonitorController;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
@@ -33,7 +34,7 @@ final class JobMonitorControllerPruneTest extends TestCase
         $monitor->expects(self::never())->method('prune');
 
         try {
-            new JobMonitorController($monitor)->prune(self::post(['days' => $days]));
+            new JobMonitorController($monitor, $this->createStub(SignedInUserInterface::class))->prune(self::post(['days' => $days]));
             self::fail('The days value must be refused.');
         } catch (InvalidInputException $refused) {
             self::assertSame('Days must be an integer.', $refused->getMessage());
@@ -59,7 +60,7 @@ final class JobMonitorControllerPruneTest extends TestCase
             ->with($days, false)
             ->willReturn(new JobMonitorPruneResult(3, new \DateTimeImmutable('2026-11-10T10:00:00+00:00')));
 
-        $response = new JobMonitorController($monitor)->prune(self::request($body));
+        $response = new JobMonitorController($monitor, $this->createStub(SignedInUserInterface::class))->prune(self::request($body));
 
         self::assertSame(200, $response->getStatusCode());
         self::assertSame(

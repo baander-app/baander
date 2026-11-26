@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Shared\Interface\Controller;
 
+use App\Shared\Application\Port\SignedInUserInterface;
 use App\Shared\Application\Service\RateLimiterClearer;
 use App\Shared\Interface\Attribute\CliCounterpart;
 use App\Shared\Interface\DTO\ApiError;
@@ -16,8 +17,6 @@ use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Attribute\Route;
-use Symfony\Component\Security\Core\User\UserInterface;
-use Symfony\Component\Security\Http\Attribute\CurrentUser;
 use Symfony\Component\Security\Http\Attribute\IsGranted;
 
 #[IsGranted('ROLE_ADMIN')]
@@ -30,6 +29,7 @@ final class RateLimiterMonitorController
     public function __construct(
         private readonly RateLimiterAdministrationInterface $rateLimiters,
         private readonly RateLimiterClearer $clearer,
+        private readonly SignedInUserInterface $signedInUser,
     ) {
     }
 
@@ -172,14 +172,14 @@ final class RateLimiterMonitorController
     #[Route('/clear', name: 'clear_all', methods: ['DELETE'])]
     #[IsGranted('ROLE_SUPER_ADMIN')]
     #[CliCounterpart('app:rate-limiter:clear')]
-    public function clearAll(Request $request, #[CurrentUser] UserInterface $user): JsonResponse
+    public function clearAll(Request $request): JsonResponse
     {
         if (!$this->isConfirmed($request)) {
             return $this->missingConfirmation();
         }
 
         try {
-            $cleared = $this->clearer->clearAll($user->getUserIdentifier());
+            $cleared = $this->clearer->clearAll($this->signedInUser->id() ?? throw new \LogicException('No user is signed in.'));
         } catch (RateLimiterClearFailedException $e) {
             return $this->clearFailed($e);
         }
@@ -270,14 +270,14 @@ final class RateLimiterMonitorController
     #[Route('/{name}/clear', name: 'clear', methods: ['DELETE'])]
     #[IsGranted('ROLE_SUPER_ADMIN')]
     #[CliCounterpart('app:rate-limiter:clear')]
-    public function clear(Request $request, string $name, #[CurrentUser] UserInterface $user): JsonResponse
+    public function clear(Request $request, string $name): JsonResponse
     {
         if (!$this->isConfirmed($request)) {
             return $this->missingConfirmation();
         }
 
         try {
-            $this->clearer->clear($user->getUserIdentifier(), $name);
+            $this->clearer->clear($this->signedInUser->id() ?? throw new \LogicException('No user is signed in.'), $name);
         } catch (UnknownRateLimiterException $e) {
             return $this->errorResponse($e->getMessage(), Response::HTTP_NOT_FOUND);
         } catch (RateLimiterClearFailedException $e) {

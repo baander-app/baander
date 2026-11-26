@@ -62,8 +62,8 @@ The command clears immediately and does not ask for confirmation. The admin API 
 
 Every clear writes a `Rate limiter state cleared.` record to the application log at
 notice level, with `actor` and the cleared `limiters` in its context. The command's
-actor is `cli`; a clear through the admin API names the super admin's user identifier,
-their email address. A `--all` run that fails for some limiters logs a warning with its
+actor is `cli`; a clear through the admin API names the super admin by user ID, not by
+email address. A `--all` run that fails for some limiters logs a warning with its
 actor instead, because the others stay cleared.
 
 With `--all`, the command tries every configured namespace sequentially, including

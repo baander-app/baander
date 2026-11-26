@@ -35,7 +35,7 @@ make exec cmd="php bin/console app:monitor:job:retry <jobId> --json"
 
 The message goes to the transport the job was received from. A job that a console command ran inline has no transport, so its message goes through its normal routing. The new job appears in [app:monitor:jobs](app-monitor-jobs.md) once a worker starts it; the command prints its ID.
 
-A job is retried at most once. The original job is marked as retried, and its audit log records the new job ID, the time and the actor `cli`. A retry from the admin panel records the admin's email address instead.
+A job is retried at most once. The original job is marked as retried, and its audit log records the new job ID, the time and the actor `cli`. A retry from the admin panel records the admin's user ID instead.
 
 The command refuses a job that has not failed, one that was already retried, and one whose message was not stored or cannot be read. When two retries of the same job run at once, only one dispatches the message. If the dispatch itself fails, the job stays retriable.
 

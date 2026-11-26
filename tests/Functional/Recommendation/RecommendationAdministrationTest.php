@@ -45,6 +45,19 @@ final class RecommendationAdministrationTest extends TestCase
         self::assertSame('finished', $record->status->value);
     }
 
+    public function testAJobAnAdminStartsOverHttpRecordsTheAdminsUserId(): void
+    {
+        $admin = $this->createAdminUser();
+
+        $started = $this->assertJsonResponse(
+            $this->authenticatedRequest('POST', self::PATH . '/generate', $admin, ['mode' => 'incremental']),
+            202,
+            'data',
+        )['data'];
+
+        self::assertSame($admin->getId()->toString(), $this->storedMetadata((string) $started['public_id'])['triggered_by']);
+    }
+
     public function testARequeuedJobIsDispatchedAndReachesATerminalStatusOnBothPaths(): void
     {
         $admin = $this->createAdminUser();
@@ -58,6 +71,7 @@ final class RecommendationAdministrationTest extends TestCase
         $show = $this->assertJsonResponse($this->authenticatedRequest('GET', self::PATH . '/jobs/' . $requeued['public_id'], $admin), 200, 'data')['data'];
         self::assertSame('pending', $show['status']);
         self::assertSame($failed, $show['metadata']['requeued_from']);
+        self::assertSame($admin->getId()->toString(), $this->storedMetadata((string) $requeued['public_id'])['requeued_by']);
 
         $cancelled = $this->cancelledJob();
         $cli = $this->command('app:recommendation:job:requeue');
@@ -179,6 +193,20 @@ final class RecommendationAdministrationTest extends TestCase
         self::assertInstanceOf(RecommendationJob::class, $job);
 
         return $job->getStatus()->value;
+    }
+
+    /**
+     * The job's metadata as stored; the API redacts internal IDs in it.
+     *
+     * @return array<string, mixed>
+     */
+    private function storedMetadata(string $publicId): array
+    {
+        $this->entityManager->clear();
+        $job = $this->jobs()->getByPublicId(PublicId::fromString($publicId));
+        self::assertInstanceOf(RecommendationJob::class, $job);
+
+        return $job->getMetadata();
     }
 
     /**

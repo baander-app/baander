@@ -7,6 +7,7 @@ namespace App\Shared\Interface\Controller;
 use App\Shared\Application\DTO\JobMonitorQuery;
 use App\Shared\Application\Exception\InvalidInputException;
 use App\Shared\Application\Port\JobMonitorAdministrationInterface;
+use App\Shared\Application\Port\SignedInUserInterface;
 use App\Shared\Interface\Attribute\CliCounterpart;
 use App\Shared\Interface\DTO\ApiError;
 use App\Shared\Interface\Resource\JobMonitorResource;
@@ -14,8 +15,6 @@ use OpenApi\Spec as OA;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\Routing\Attribute\Route;
-use Symfony\Component\Security\Core\User\UserInterface;
-use Symfony\Component\Security\Http\Attribute\CurrentUser;
 use Symfony\Component\Security\Http\Attribute\IsGranted;
 
 #[IsGranted('ROLE_ADMIN')]
@@ -27,6 +26,7 @@ final class JobMonitorController
 
     public function __construct(
         private readonly JobMonitorAdministrationInterface $jobMonitor,
+        private readonly SignedInUserInterface $signedInUser,
     ) {
     }
 
@@ -494,10 +494,10 @@ final class JobMonitorController
     )]
     #[CliCounterpart('app:monitor:job:retry')]
     #[Route('/jobs/{jobId}/retry', name: 'jobs_retry', methods: ['POST'])]
-    public function retry(string $jobId, #[CurrentUser] UserInterface $user): JsonResponse
+    public function retry(string $jobId): JsonResponse
     {
         return $this->successResponse([
-            'newJobId' => $this->jobMonitor->retry($jobId, $user->getUserIdentifier()),
+            'newJobId' => $this->jobMonitor->retry($jobId, $this->signedInUser->id() ?? throw new \LogicException('No user is signed in.')),
         ]);
     }
 

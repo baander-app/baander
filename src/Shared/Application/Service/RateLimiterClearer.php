@@ -23,7 +23,7 @@ final readonly class RateLimiterClearer
     }
 
     /**
-     * @param string $actor the signed-in super admin's user identifier, or {@see Actor::CLI}
+     * @param string $actor the signed-in super admin's user ID, or {@see Actor::CLI}
      *
      * @throws UnknownRateLimiterException
      * @throws RateLimiterClearFailedException
@@ -35,7 +35,7 @@ final readonly class RateLimiterClearer
     }
 
     /**
-     * @param string $actor the signed-in super admin's user identifier, or {@see Actor::CLI}
+     * @param string $actor the signed-in super admin's user ID, or {@see Actor::CLI}
      *
      * @return list<string> names of the cleared limiters
      *
