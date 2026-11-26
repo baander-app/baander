@@ -253,11 +253,7 @@ final class PlaylistControllerTest extends TestCase
         $user = $this->createTestUser();
         $publicId = $this->createPlaylist($user, 'Stored earlier');
         $description = str_repeat('d', 5000);
-        $connection = $this->entityManager->getConnection();
-        // Recreates the state the migration leaves: a row over the bound under a NOT VALID check.
-        $connection->executeStatement('ALTER TABLE playlists DROP CONSTRAINT chk_playlists_description_length');
-        $connection->executeStatement('UPDATE playlists SET description = ? WHERE public_id = ?', [$description, $publicId]);
-        $connection->executeStatement('ALTER TABLE playlists ADD CONSTRAINT chk_playlists_description_length CHECK (char_length(description) <= 2000) NOT VALID');
+        $this->storeDescriptionOverTheBound($publicId, $description);
 
         $show = $this->assertJsonResponse($this->authenticatedRequest('GET', '/api/playlists/' . $publicId, $user), 200, 'data');
         $this->assertSame($description, $show['data']['description']);
@@ -266,6 +262,30 @@ final class PlaylistControllerTest extends TestCase
 
         $this->assertSame(204, $this->authenticatedRequest('DELETE', '/api/playlists/' . $publicId, $user)->getStatusCode());
         $this->assertSame(0, $this->ownedPlaylists($user->getId()));
+    }
+
+    public function testRenamingAPlaylistStoredOverItsBoundIsAConflictThatChangesNothing(): void
+    {
+        $user = $this->createTestUser();
+        $publicId = $this->createPlaylist($user, 'Stored earlier');
+        $description = str_repeat('d', 5000);
+        $this->storeDescriptionOverTheBound($publicId, $description);
+
+        $response = $this->authenticatedRequest('PATCH', '/api/playlists/' . $publicId, $user, ['name' => 'Renamed']);
+
+        $error = $this->assertJsonResponse($response, 409, 'error');
+        $this->assertSame(['reason' => 'member_input_bound'], $error['error']['details']);
+        $show = $this->assertJsonResponse($this->authenticatedRequest('GET', '/api/playlists/' . $publicId, $user), 200, 'data');
+        $this->assertSame(['Stored earlier', $description], [$show['data']['name'], $show['data']['description']]);
+    }
+
+    /** Recreates a row stored before the bound existed: a description over it, under a NOT VALID check. */
+    private function storeDescriptionOverTheBound(string $publicId, string $description): void
+    {
+        $connection = $this->entityManager->getConnection();
+        $connection->executeStatement('ALTER TABLE playlists DROP CONSTRAINT chk_playlists_description_length');
+        $connection->executeStatement('UPDATE playlists SET description = ? WHERE public_id = ?', [$description, $publicId]);
+        $connection->executeStatement('ALTER TABLE playlists ADD CONSTRAINT chk_playlists_description_length CHECK (char_length(description) <= 2000) NOT VALID');
     }
 
     private function createPlaylist(User $user, string $name): string

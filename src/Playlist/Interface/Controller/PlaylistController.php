@@ -518,6 +518,13 @@ final class PlaylistController
                 ),
             ),
             new OA\Response(
+                response: '409',
+                description: 'The playlist changed meanwhile, or the stored playlist holds a value over its size limit (reason member_input_bound)',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: ApiError::class),
+                ),
+            ),
+            new OA\Response(
                 response: '422',
                 description: 'Validation error',
                 content: new OA\MediaType\Json(

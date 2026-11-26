@@ -37,7 +37,13 @@ Check `getSQLState()` and the installed converter when classifying database erro
 Application code needs no DBAL exception type for a deadlock: the transaction port's
 [DoctrineTransaction](../../../../src/Shared/Infrastructure/Doctrine/DoctrineTransaction.php)
 rethrows a `DeadlockException` as the Shared `TransactionDeadlockException`, with the
-DBAL error as the previous exception, and passes every other error through unchanged.
+DBAL error as the previous exception. It rethrows a check violation of one of the
+member-input bounds that
+[MemberInputBoundViolation](../../../../src/Shared/Infrastructure/Doctrine/MemberInputBoundViolation.php)
+lists as the Shared `MemberInputBoundException`, a 409 with reason `member_input_bound`;
+the constraint is matched by name on the message's first line, because pdo_pgsql
+reports it only in the message and the next line holds the failing row. Every other
+error passes through unchanged.
 
 [doctrine.yaml](../../../../config/packages/doctrine.yaml) maps attributes under
 `src`, uses the underscore naming strategy, and excludes `domain_event_outbox`

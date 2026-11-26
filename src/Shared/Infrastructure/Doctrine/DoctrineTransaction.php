@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Shared\Infrastructure\Doctrine;
 
+use App\Shared\Application\Exception\MemberInputBoundException;
 use App\Shared\Application\Exception\TransactionDeadlockException;
 use App\Shared\Application\Port\TransactionPortInterface;
 use Doctrine\DBAL\Exception\DeadlockException;
@@ -46,8 +47,14 @@ final readonly class DoctrineTransaction implements TransactionPortInterface
             } else {
                 $this->doctrine->resetManager();
             }
-            // DBAL raises PostgreSQL's deadlock (40P01) and serialization failure (40001) as DeadlockException.
-            throw $error instanceof DeadlockException ? new TransactionDeadlockException($error) : $error;
+            // DBAL raises PostgreSQL's deadlock (40P01) and serialization failure (40001) as
+            // DeadlockException, and a check violation (23514) as a plain DriverException. Both are
+            // converted after the rollback, whether a statement of the operation or its flush failed.
+            throw match (true) {
+                $error instanceof DeadlockException => new TransactionDeadlockException($error),
+                MemberInputBoundViolation::matches($error) => new MemberInputBoundException($error),
+                default => $error,
+            };
         }
     }
 }
