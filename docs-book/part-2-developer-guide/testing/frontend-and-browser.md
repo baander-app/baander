@@ -19,6 +19,16 @@ yarn test:watch        # Watch mode
 yarn test:coverage     # With coverage
 ```
 
+In a development build, styled-components appends each rule to its `<style>`
+element as a text node, and jsdom reparses the whole element after every
+insertion. A first render therefore costs time quadratic in its rule count: on
+CI the app shell's first render took about 4.5 seconds under coverage, close to
+the 5-second test timeout. `vite.config.ts` sets `SC_DISABLE_SPEEDY=false` for
+Vitest, so styled-components inserts each rule through the CSSOM, as production
+builds do. The text of its `<style>` element is therefore empty in tests: read
+injected rules from `document.styleSheets`, or render through `renderWithCss` in
+`src/shared/theme/__tests__/css-text.tsx`.
+
 For application browser tests, start this worktree's isolated preview and supply
 its URL explicitly:
 

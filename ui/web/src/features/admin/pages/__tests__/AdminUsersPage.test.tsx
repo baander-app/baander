@@ -80,7 +80,10 @@ describe('admin user pagination', () => {
     mount()
     const name = (await screen.findAllByText('User 0'))[0]
     const created = screen.getAllByText(new Date('2026-10-01T00:00:00Z').toLocaleDateString())[0]
-    const cssText = [...document.querySelectorAll('style')].map(style => style.textContent).join('')
+    const cssText = [...document.styleSheets]
+      .flatMap(sheet => [...sheet.cssRules])
+      .map(rule => rule.cssText)
+      .join('\n')
     const createdRules = rulesForElement(created, cssText)
 
     expect(createdRules.map(rule => declaration(rule, 'font-family'))).toContain('var(--font-mono)')

@@ -94,6 +94,13 @@ export default defineConfig({
     },
     globals: true,
     environment: 'jsdom',
+    env: {
+      // Outside production builds styled-components appends each rule to its <style> element as a
+      // text node, and jsdom reparses the whole element on every insertion, so a first render
+      // costs time quadratic in its rule count. Production's CSSOM injection inserts one rule per
+      // CSSStyleSheet.insertRule call instead.
+      SC_DISABLE_SPEEDY: 'false',
+    },
     setupFiles: ['./tests/setup.ts'],
   },
 });
