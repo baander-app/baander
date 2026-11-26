@@ -527,7 +527,9 @@ The last recorded source-time cursor retained for interrupted playback, bound to
 
 ### Push subscription
 
-One browser endpoint a user registered for Web Push. A user keeps at most 20; registering another evicts the one registered longest ago, under a per-user lock. A notification reaches each subscription as its own Messenger message, so a failing endpoint retries alone, and an answer of `404` or `410` removes the subscription.
+One browser endpoint a user registered for Web Push. A user keeps a fixed maximum number of them; registering another past that limit evicts the one registered longest ago, under a per-user lock. A notification reaches each subscription as its own Messenger message, so a failing endpoint retries alone, and an answer of `404` or `410` removes the subscription.
+
+The server pushes to subscriptions only while push is turned on and the server holds a VAPID key pair. Otherwise the notification is still created and its push is skipped without a retry; the step that fans a notification out to its subscriptions logs the skip.
 
 ## Audio playback
 
