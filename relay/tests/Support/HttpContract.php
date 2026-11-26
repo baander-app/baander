@@ -398,6 +398,8 @@ final class HttpContract
             $this->statePath,
             self::json([
                 'delay' => 0,
+                'hangSchema' => false,
+                'readinessDelay' => 0,
                 'malformedReadiness' => false,
                 'closeReadiness' => false,
                 'arrivals' => 0,
@@ -582,7 +584,7 @@ final class HttpContract
         echo "PASS: native TLS API enrollment, owner replay, concurrent ownership, malformed JSON/wire types, "
             . "unchanged snapshots, secret exclusion, bounds, rate/pool limits, uncertain commits, transient readiness "
             . "failures that keep lookups open, schema recovery without a readiness request, "
-            . "outage, deadlines and graceful/forced shutdown.\n";
+            . "outage, deadlines, shutdown during a schema write or readiness probe, and graceful/forced shutdown.\n";
     }
 
     /**
@@ -929,6 +931,7 @@ final class HttpContract
         );
         $this->change(['closeReadiness' => false]);
         self::check($this->request('GET', '/ready')[0] === 200, 'Readiness did not return after a transport failure.');
+        $this->stopsDuringReadinessWork();
         [$latchedPort, $latched] = $this->graceful(3000, 'latched', log: 'latched.log');
         [$lost, $restored] = [$this->logCount('Readiness lost: '), $this->logCount('Readiness restored.')];
         $this->change(['malformedReadiness' => true]);
@@ -1076,5 +1079,39 @@ final class HttpContract
         stream_set_timeout($pending, 1);
         self::check(fread($pending, 1) === '' && feof($pending), 'Shutdown retained incomplete session.');
         fclose($pending);
+    }
+
+    /**
+     * SIGTERM reaches the readiness coroutine while its database request is held. The 5 s
+     * database deadline outlasts the 1 s bound, so only stop() can end the request in time.
+     */
+    private function stopsDuringReadinessWork(): void
+    {
+        [$port, $probing] = $this->graceful(3000, 'probe-stop', databaseDeadline: 5000, log: 'probe-stop.log');
+        $this->change(['malformedReadiness' => true]);
+        self::check($this->request('GET', '/ready', port: $port)[0] === 503, 'Malformed readiness accepted.');
+        $this->change(['malformedReadiness' => false, 'readinessDelay' => 5, 'arrivals' => 0]);
+        $this->waitState(static fn(array $state): bool => $state['arrivals'] > 0, 3);
+        $start = microtime(true);
+        $probing->signal(SIGTERM);
+        self::check(
+            $probing->wait(2) === 0 && microtime(true) - $start < 1,
+            'Registry probing lost readiness took a second or more to stop.',
+        );
+        $this->change(['readinessDelay' => 0]);
+
+        $config = $this->config;
+        $config['api']['port'] = Runtime::port();
+        $config['database']['deadlineMs'] = 5000;
+        $this->change(['hangSchema' => true, 'arrivals' => 0]);
+        $starting = $this->launch($config, 'startup-stop', 'startup-stop.log');
+        $this->waitState(static fn(array $state): bool => $state['arrivals'] > 0, 5);
+        $start = microtime(true);
+        $starting->signal(SIGTERM);
+        self::check(
+            $starting->wait(2) === 0 && microtime(true) - $start < 1,
+            'Registry writing its schema took a second or more to stop.',
+        );
+        $this->change(['hangSchema' => false]);
     }
 }

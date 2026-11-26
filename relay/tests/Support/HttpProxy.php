@@ -54,10 +54,15 @@ final class HttpProxy
             'request',
             static function ($request, $response) use ($config): void {
                 $body = $request->rawContent();
+                $schema = str_contains($body, 'INSERT INTO schema_migrations');
+                $readiness = str_contains($body, 'FROM registries WHERE 0');
                 $drop = false;
                 $state = self::state(
                     $config['state'],
-                    static function (array &$state) use ($body, &$drop): void {
+                    static function (array &$state) use ($body, $schema, $readiness, &$drop): void {
+                        if (($schema && $state['hangSchema']) || ($readiness && $state['readinessDelay'] > 0)) {
+                            ++$state['arrivals'];
+                        }
                         if (!str_contains($body, 'INSERT INTO registries')) {
                             return;
                         }
@@ -75,7 +80,18 @@ final class HttpProxy
                 if (str_contains($body, 'INSERT INTO registries') && $state['delay'] > 0) {
                     usleep((int) ($state['delay'] * 1000000));
                 }
-                if ($state['closeReadiness'] && str_contains($body, 'FROM registries WHERE 0')) {
+                if ($schema && $state['hangSchema']) {
+                    // Held until the contract releases it, then dropped unanswered.
+                    while (self::state($config['state'])['hangSchema']) {
+                        usleep(10000);
+                    }
+                    $response->close();
+                    return;
+                }
+                if ($readiness && $state['readinessDelay'] > 0) {
+                    usleep((int) ($state['readinessDelay'] * 1000000));
+                }
+                if ($state['closeReadiness'] && $readiness) {
                     $response->close();
                     return;
                 }
@@ -122,7 +138,7 @@ final class HttpProxy
                         $response->close();
                         return;
                     }
-                    if ($state['malformedReadiness'] && str_contains($body, 'FROM registries WHERE 0')) {
+                    if ($state['malformedReadiness'] && $readiness) {
                         $corrupted = json_decode($payload, true, 64, JSON_THROW_ON_ERROR);
                         $corrupted['results'][1] = ['types' => ['public_id' => 'text']];
                         $payload = json_encode($corrupted, JSON_THROW_ON_ERROR);
