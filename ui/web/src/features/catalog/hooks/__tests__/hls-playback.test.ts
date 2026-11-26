@@ -23,7 +23,14 @@ const hls = vi.hoisted(() => {
       { width: 1920, height: 1080, bitrate: 4000000 }
     ]
     currentLevel = 0
-    nextLevel = -1
+    manualLevel = -1
+    // hls.js answers every nextLevel assignment, even one naming the current choice,
+    // with a level switch that flushes the forward and back buffers.
+    readonly levelSwitches: number[] = []
+    set nextLevel(level: number) {
+      this.manualLevel = level
+      this.levelSwitches.push(level)
+    }
     static latest: FakeHlsPlayer
 
     constructor(config: Record<string, unknown>) {
@@ -143,21 +150,57 @@ describe('rendition preferences', () => {
     await settled()
     hls.listeners.get('manifestParsed')?.forEach((handler) => handler())
     const instance = hls.FakeHlsPlayer.latest
-    expect(instance.nextLevel).toBe(1)
+    expect(instance.manualLevel).toBe(1)
     const preferred = instance.levels[1]!
     instance.levels = [instance.levels[0]!]
     hls.listeners.get('levelsUpdated')?.forEach((handler) => handler())
-    expect(instance.nextLevel).toBe(-1)
+    expect(instance.manualLevel).toBe(-1)
     instance.levels = [preferred, ...instance.levels]
     hls.listeners.get('levelsUpdated')?.forEach((handler) => handler())
-    expect(instance.nextLevel).toBe(0)
+    expect(instance.manualLevel).toBe(0)
     preference = 'auto'
     hls.listeners.get('levelsUpdated')?.forEach((handler) => handler())
-    expect(instance.nextLevel).toBe(-1)
+    expect(instance.manualLevel).toBe(-1)
+    expect(instance.levelSwitches).toEqual([1, -1, 0, -1])
     expect(choices).toHaveBeenCalledWith(expect.any(Array), '1080p')
     dispose()
     choices.mockClear()
     hls.listeners.get('levelsUpdated')?.forEach((handler) => handler())
     expect(choices).not.toHaveBeenCalled()
+  })
+
+  it('reports adaptive rendition switches without requesting a buffer-flushing level switch', async () => {
+    let preference = 'auto'
+    let setQuality: ((id: string) => void) | undefined
+    const choices = vi.fn()
+    const dispose = attachHlsPlayback({
+      video: stubVideo(),
+      url: 'https://media.baander.app/master.m3u8',
+      position: 0,
+      onError: vi.fn(),
+      onReady: vi.fn(),
+      getQualityPreference: () => preference,
+      onQualityChoices: choices,
+      onPresentationControls: (controls) => {
+        setQuality = controls.setQuality
+      }
+    })
+    await settled()
+    hls.listeners.get('manifestParsed')?.forEach((handler) => handler())
+    const instance = hls.FakeHlsPlayer.latest
+    instance.currentLevel = 1
+    hls.listeners.get('levelSwitched')?.forEach((handler) => handler())
+    instance.currentLevel = 0
+    hls.listeners.get('levelSwitched')?.forEach((handler) => handler())
+    hls.listeners.get('levelsUpdated')?.forEach((handler) => handler())
+    expect(instance.levelSwitches).toEqual([])
+    expect(choices).toHaveBeenNthCalledWith(2, expect.any(Array), '1080p')
+    expect(choices).toHaveBeenLastCalledWith(expect.any(Array), '720p')
+    preference = '1920x1080:4000000'
+    setQuality?.(preference)
+    instance.currentLevel = 1
+    hls.listeners.get('levelSwitched')?.forEach((handler) => handler())
+    expect(instance.levelSwitches).toEqual([1])
+    dispose()
   })
 })

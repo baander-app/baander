@@ -125,7 +125,11 @@ export function attachHlsPlayback({
           (level) => levelKey(level) === preference
         )
         // An unavailable rendition falls back to Auto without losing the viewer's preference.
-        instance.nextLevel = preference === 'auto' ? -1 : selected
+        const target = preference === 'auto' ? -1 : selected
+        // hls.js answers every nextLevel assignment, even one naming the current choice,
+        // with a level switch that flushes buffered media around the playing fragment; the
+        // back-buffer part also removes the native subtitle cues that end before it.
+        if (instance.manualLevel !== target) instance.nextLevel = target
         const choices = levels.map((level) => ({
           id: levelKey(level),
           label: level.height
