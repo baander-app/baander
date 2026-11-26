@@ -72,8 +72,8 @@ final class SongController
             new OA\Parameter(
                 name: 'limit',
                 in: 'query',
-                description: 'Items per page (max 100)',
-                schema: new OA\Schema(type: 'integer', default: 50),
+                description: 'Items per page',
+                schema: new OA\Schema(type: 'integer', minimum: 1, maximum: 100, default: 50),
             ),
             new OA\Parameter(
                 name: 'q',
@@ -146,7 +146,7 @@ final class SongController
             ),
             new OA\Response(
                 response: '400',
-                description: 'Unsupported sort field or order, or a cursor issued for another sort field or order',
+                description: 'A limit outside its range, an unsupported sort field or order, or a cursor issued for another sort field or order',
                 content: new OA\MediaType\Json(
                     schema: new OA\Schema(ref: ApiError::class),
                 ),
@@ -157,7 +157,7 @@ final class SongController
     public function index(Request $request): JsonResponse
     {
         $scope = $this->libraryReadScopeProvider->current();
-        $limit = min(100, max(1, (int) $request->query->get('limit', 50)));
+        $limit = QueryParameters::integer($request->query, 'limit', 50, 1, 100);
         $query = (string) $request->query->get('q', '');
 
         $cursor = null;

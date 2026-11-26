@@ -15,7 +15,7 @@ vi.mock('@/features/catalog/components/WorkPeople', () => ({
 const mockNavigate = vi.fn()
 const mockSetSelectedItem = vi.fn()
 const mockPlayTrack = vi.fn()
-const mockGet = vi.fn()
+const mockGetSongIndex = vi.fn()
 
 const mockArtistData = {
   name: 'Radiohead',
@@ -62,6 +62,7 @@ vi.mock('@/shared/api-client/gen/endpoints', () => ({
     isError: false,
     error: null,
   }),
+  getSongIndex: (...args: unknown[]) => mockGetSongIndex(...args),
 }))
 
 vi.mock('react-router-dom', () => ({
@@ -139,12 +140,6 @@ vi.mock('@/features/player/stores/player-store', () => ({
     }),
 }))
 
-vi.mock('@/shared/api-client/axios-instance', () => ({
-  AXIOS_INSTANCE: {
-    get: (...args: unknown[]) => mockGet(...args),
-  },
-}))
-
 vi.mock('@/features/playlist/components/AddToPlaylistDialog', () => ({
   AddToPlaylistDialog: () => null,
 }))
@@ -219,18 +214,22 @@ describe('ArtistDetailPage', () => {
     expect(screen.getByLabelText('Shuffle all')).toBeInTheDocument()
   })
 
-  it.each(['Play all', 'Shuffle all'])('starts playable artist songs through %s using the canonical collection', async (action) => {
-    mockGet.mockImplementation(async (url: string) => {
-      if (url !== '/api/songs/') throw new Error('Collection route requires its canonical path')
-      return { data: { data: [{ publicId: 'song', title: 'Song', available: true },
-        { publicId: 'missing', title: 'Missing', available: false }] } }
+  it.each(['Play all', 'Shuffle all'])('starts the available songs of the artist through %s', async (action) => {
+    mockGetSongIndex.mockResolvedValue({
+      data: [
+        { publicId: 'song', title: 'Song', available: true },
+        { publicId: 'missing', title: 'Missing', available: false },
+      ],
+      meta: { next_cursor: null, has_next_page: false },
     })
     const user = userEvent.setup()
     render(<SCTypedThemeProvider theme={testTheme}><ArtistDetailPage /></SCTypedThemeProvider>)
     await user.click(screen.getByLabelText(action))
     await waitFor(() => expect(mockPlayTrack).toHaveBeenCalledWith(
-      expect.objectContaining({ publicId: 'song' }), [expect.objectContaining({ publicId: 'song' })],
+      expect.objectContaining({ publicId: 'song', artistName: 'Radiohead' }),
+      [expect.objectContaining({ publicId: 'song' })],
     ))
+    expect(mockGetSongIndex).toHaveBeenCalledWith({ artistId: 'artist-1', limit: 100 })
   })
 
   it('sets context panel selected item on mount', () => {

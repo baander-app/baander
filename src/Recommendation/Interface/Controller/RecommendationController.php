@@ -20,6 +20,7 @@ use App\Shared\Domain\Model\Uuid;
 use App\Shared\Interface\Controller\ApiResponsesTrait;
 use App\Shared\Interface\DTO\ApiError;
 use App\Shared\Interface\DTO\ValidationError;
+use App\Shared\Interface\Request\QueryParameters;
 use OpenApi\Spec as OA;
 use Symfony\Bundle\SecurityBundle\Security;
 use Symfony\Component\HttpFoundation\JsonResponse;
@@ -53,8 +54,8 @@ final class RecommendationController
             new OA\Parameter(
                 name: 'limit',
                 in: 'query',
-                description: 'Max recommendations (max 200)',
-                schema: new OA\Schema(type: 'integer', default: 50),
+                description: 'Maximum number of recommendations',
+                schema: new OA\Schema(type: 'integer', minimum: 1, maximum: 200, default: 50),
             ),
         ],
         responses: [
@@ -74,6 +75,13 @@ final class RecommendationController
                 ),
             ),
             new OA\Response(
+                response: '400',
+                description: 'A limit outside its range',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: ApiError::class),
+                ),
+            ),
+            new OA\Response(
                 response: '401',
                 description: 'Not authenticated',
                 content: new OA\MediaType\Json(
@@ -90,7 +98,7 @@ final class RecommendationController
             return $this->unauthorized();
         }
 
-        $limit = min(200, max(1, (int) $request->query->get('limit', 50)));
+        $limit = QueryParameters::integer($request->query, 'limit', 50, 1, 200);
 
         $recommendations = $this->bus->dispatch(new GetRecommendationsForUserQuery(
             userId: Uuid::fromString($user->getId()),
@@ -112,8 +120,8 @@ final class RecommendationController
             new OA\Parameter(
                 name: 'limit',
                 in: 'query',
-                description: 'Max recommendations (max 100)',
-                schema: new OA\Schema(type: 'integer', default: 50),
+                description: 'Maximum number of recommendations',
+                schema: new OA\Schema(type: 'integer', minimum: 1, maximum: 100, default: 50),
             ),
         ],
         responses: [
@@ -156,6 +164,13 @@ final class RecommendationController
                 ),
             ),
             new OA\Response(
+                response: '400',
+                description: 'A limit outside its range',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: ApiError::class),
+                ),
+            ),
+            new OA\Response(
                 response: '401',
                 description: 'Not authenticated',
                 content: new OA\MediaType\Json(
@@ -172,7 +187,7 @@ final class RecommendationController
             return $this->unauthorized();
         }
 
-        $limit = min(100, max(1, (int) $request->query->get('limit', 50)));
+        $limit = QueryParameters::integer($request->query, 'limit', 50, 1, 100);
 
         $recommendations = $this->bus->dispatch(new GetPersonalizedRecommendationsQuery(
             userId: Uuid::fromString($user->getId()),
@@ -211,8 +226,8 @@ final class RecommendationController
             new OA\Parameter(
                 name: 'limit',
                 in: 'query',
-                description: 'Max recommendations (max 100)',
-                schema: new OA\Schema(type: 'integer', default: 100),
+                description: 'Maximum number of recommendations',
+                schema: new OA\Schema(type: 'integer', minimum: 1, maximum: 100, default: 100),
             ),
         ],
         responses: [
@@ -231,12 +246,19 @@ final class RecommendationController
                     ),
                 ),
             ),
+            new OA\Response(
+                response: '400',
+                description: 'A limit outside its range',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: ApiError::class),
+                ),
+            ),
         ],
     )]
     #[Route('/source/{sourceType}/{sourceId}', name: 'by_source', methods: ['GET'])]
     public function bySource(string $sourceType, string $sourceId, Request $request): JsonResponse
     {
-        $limit = min(100, max(1, (int) $request->query->get('limit', 100)));
+        $limit = QueryParameters::integer($request->query, 'limit', 100, 1, 100);
         $viewerId = $this->actorId();
         $administrator = $this->security->isGranted('ROLE_ADMIN');
 
@@ -281,8 +303,8 @@ final class RecommendationController
             new OA\Parameter(
                 name: 'limit',
                 in: 'query',
-                description: 'Max recommendations (max 100)',
-                schema: new OA\Schema(type: 'integer', default: 100),
+                description: 'Maximum number of recommendations',
+                schema: new OA\Schema(type: 'integer', minimum: 1, maximum: 100, default: 100),
             ),
         ],
         responses: [
@@ -301,12 +323,19 @@ final class RecommendationController
                     ),
                 ),
             ),
+            new OA\Response(
+                response: '400',
+                description: 'A limit outside its range',
+                content: new OA\MediaType\Json(
+                    schema: new OA\Schema(ref: ApiError::class),
+                ),
+            ),
         ],
     )]
     #[Route('/targeting/{targetType}/{targetId}', name: 'targeting', methods: ['GET'])]
     public function targeting(string $targetType, string $targetId, Request $request): JsonResponse
     {
-        $limit = min(100, max(1, (int) $request->query->get('limit', 100)));
+        $limit = QueryParameters::integer($request->query, 'limit', 100, 1, 100);
         $viewerId = $this->actorId();
         $administrator = $this->security->isGranted('ROLE_ADMIN');
 

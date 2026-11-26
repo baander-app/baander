@@ -314,17 +314,15 @@ export const catalogLiveCoverage = [
       'user_library_access'
     ],
     deploymentTables: [],
-    sources: ['[ `/api/albums/${publicId}` ]', "'/api/songs/'"],
+    sources: ['[ `/api/albums/${publicId}` ]', '[ `/api/songs/`, ...(params ? [params] : []) ]'],
     keyVariants: [],
     dependentFamilies: [],
     mirrors: [],
     responseCaches: ['authoritative-read'],
     consumers: [
       'src/features/catalog/components/menus/AlbumContextMenu.tsx#getAlbumShow:generated',
-      "src/features/catalog/components/menus/ArtistContextMenu.tsx#AXIOS_INSTANCE.get:'/api/songs/'",
       'src/features/catalog/hooks/use-play-album.ts#getAlbumShow:generated',
-      "src/features/catalog/hooks/use-play-artist.ts#AXIOS_INSTANCE.get:'/api/songs/'",
-      "src/features/catalog/pages/ArtistDetailPage.tsx#AXIOS_INSTANCE.get:'/api/songs/'"
+      'src/features/catalog/hooks/use-play-artist.tsx#getSongIndex:generated'
     ],
     coverageVerification: ['tests/live-updates/coverage.test.ts'],
     behaviorVerification: {

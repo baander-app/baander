@@ -1,4 +1,3 @@
-import { captureOwnership, isCurrentOwnership } from '@/shared/live/ownership'
 import { useEffect, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { ArrowLeft, Play, Shuffle } from 'lucide-react'
@@ -7,10 +6,9 @@ import { Button } from '@/shared/components/ui/button'
 import { Skeleton } from '@/shared/components/ui/skeleton'
 import { useBlurhashAccent } from '../hooks/use-blurhash-accent'
 import { useArtistDetail } from '../hooks/use-artist-detail'
+import { usePlayArtist } from '../hooks/use-play-artist'
 import { ArtistDiscography } from '../components/ArtistDiscography'
 import { useContextPanelStore } from '@/features/layout/stores/context-panel-store'
-import { usePlayerStore, type Track } from '@/features/player/stores/player-store'
-import { AXIOS_INSTANCE } from '@/shared/api-client/axios-instance'
 import { textRole } from '@/shared/theme'
 import { ArtistPersonLink } from '../components/WorkPeople'
 import { ContentText } from '@/shared/typography'
@@ -144,49 +142,7 @@ export function ArtistDetailPage() {
   const artistBlurhash: string | null | undefined = typeof coverImage?.blurhash === 'string' ? coverImage.blurhash : null
   useBlurhashAccent(artistBlurhash, containerRef)
 
-  const playTrack = usePlayerStore((s) => s.playTrack)
-
-  const fetchArtistSongs = async (): Promise<Track[]> => {
-    const res = await AXIOS_INSTANCE.get('/api/songs/', {
-      params: { artistId: publicId, limit: 1000 },
-    })
-    const body = res.data as Record<string, unknown>
-    const items = (Array.isArray(body?.data) ? body.data : []) as Record<string, unknown>[]
-    return items.filter((s) => s.available === true).map((s) => ({
-      publicId: String(s.publicId ?? ''),
-      available: s.available === true,
-      title: String(s.title ?? ''),
-      artistName: artistName || undefined,
-      albumName: s.albumName ? String(s.albumName) : undefined,
-      albumLanguage: typeof s.albumLanguage === 'string' ? s.albumLanguage : undefined,
-      albumPublicId: typeof s.albumId === 'string' ? s.albumId : undefined,
-      duration: typeof s.length === 'number' ? s.length : undefined,
-    }))
-  }
-
-  const handlePlay = async () => {
-    const owner = captureOwnership()
-    try {
-      const tracks = await fetchArtistSongs()
-      if (!isCurrentOwnership(owner)) return
-      if (tracks.length > 0) playTrack(tracks[0], tracks)
-    } catch {
-      // Silently fail
-    }
-  }
-
-  const handleShuffle = async () => {
-    const owner = captureOwnership()
-    try {
-      const tracks = await fetchArtistSongs()
-      if (!isCurrentOwnership(owner)) return
-      if (tracks.length === 0) return
-      const shuffled = [...tracks].sort(() => Math.random() - 0.5)
-      if (shuffled.length > 0) playTrack(shuffled[0], shuffled)
-    } catch {
-      // Silently fail
-    }
-  }
+  const { playArtist } = usePlayArtist()
 
   if (isPending || !publicId) {
     return (
@@ -259,7 +215,7 @@ export function ArtistDetailPage() {
             variant="ghost"
             size="sm"
             aria-label="Play all"
-            onClick={handlePlay}
+            onClick={() => playArtist(publicId, artistName)}
           >
             <Play size={14} fill="currentColor" />
             Play
@@ -268,7 +224,7 @@ export function ArtistDetailPage() {
             variant="ghost"
             size="sm"
             aria-label="Shuffle all"
-            onClick={handleShuffle}
+            onClick={() => playArtist(publicId, artistName, { shuffle: true })}
           >
             <Shuffle size={14} />
             Shuffle

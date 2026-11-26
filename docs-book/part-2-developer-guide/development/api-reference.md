@@ -79,6 +79,8 @@ Each paginated endpoint uses one of three strategies.
 | `cursor` | `string`, optional | Opaque cursor from a previous response. Omit to fetch the first page. |
 | `limit` | `int`, optional | Items per page. Defaults vary by endpoint. |
 
+The song list accepts a `limit` from 1 to 100, the range the OpenAPI document states; a value outside it answers `400` and is not clamped. To read the whole list, a client follows `meta.next_cursor` while `meta.has_next_page` is true and stops at the first empty page. The web client's `readAllCursorPages()` reads a list this way and stops at a row limit its caller sets; an artist's Play and Shuffle actions set it to 10,000, the most a session queue holds.
+
 **Page-number pagination** is used for the searchable catalog lists (albums, artists, movies, directors, people, TV), favorites and the failed-message list. Pass `page` and `limit` as query parameters. `QueryParameters::page()` reads both and computes the offset.
 
 | Parameter | Type | Description |
@@ -89,6 +91,8 @@ Each paginated endpoint uses one of three strategies.
 A `page` below 1, a `page` that is not an integer, a `page` for which page × limit exceeds 2⁶³ − 1, the largest signed 64-bit integer, and a `limit` outside the range the OpenAPI document states answer `400`. A page past the last one returns an empty `data` array.
 
 **Limit and offset** is used for lists a client reads to the end, such as the playlist list (`GET /api/playlists/`) and the radio station list (`GET /api/radio/stations`, up to 500 stations a page), and for the activity history and the admin user and login-block lists. Pass `limit` and `offset`, the number of rows to skip, as query parameters; `QueryParameters::pagination()` reads them and answers `400` for a negative offset or a `limit` outside the endpoint's range. Each of these lists except the activity history answers with a `meta` object that holds `total`, `limit` and `offset`. A client that needs the whole list requests the next offset until it has read `total` rows.
+
+The recommendation lists (`GET /api/recommendations/`, `/api/recommendations/for-you`, `/api/recommendations/source/{sourceType}/{sourceId}` and `/api/recommendations/targeting/{targetType}/{targetId}`) take no page or cursor. Each returns at most `limit` recommendations, highest score first. `limit` runs from 1 to 200 on the first list and from 1 to 100 on the others; a value outside that range answers `400`.
 
 ## Response Types
 

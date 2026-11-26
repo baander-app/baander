@@ -26,6 +26,16 @@ describe('readAllPages', () => {
     expect(readPage).toHaveBeenCalledTimes(2)
   })
 
+  it('stops on an empty page even when the reported total promises more', async () => {
+    const readPage = vi.fn(async (offset: number) => ({
+      data: offset === 0 ? [0, 1] : [],
+      meta: { total: 10 },
+    }))
+
+    await expect(readAllPages(readPage, 2)).resolves.toEqual([0, 1])
+    expect(readPage.mock.calls).toEqual([[0, 2], [2, 2]])
+  })
+
   it('stops at a short page when the server reports no total', async () => {
     const readPage = vi.fn(async () => ({ data: [7] }))
 
