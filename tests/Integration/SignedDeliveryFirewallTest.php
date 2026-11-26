@@ -26,11 +26,13 @@ use App\Tests\Fixtures\Auth\SignedDpopProof;
 use App\Tests\Fixtures\Shared\SignedDeliveryRoutes;
 use App\Transcode\Application\Port\SegmentAvailabilityInterface;
 use App\Transcode\Application\Port\CompletedVideoDeliveryPort;
+use App\Transcode\Application\Port\EncodePresentationPort;
 use App\Transcode\Application\Command\CreateTranscodeSessionCommand;
 use App\Transcode\Application\DTO\MediaTrack;
 use App\Transcode\Domain\Model\TranscodeSession;
 use App\Transcode\Application\DTO\DesiredTranscodeState;
 use App\Transcode\Domain\ValueObject\AudioProfile;
+use App\Transcode\Domain\ValueObject\PresentationSelection;
 use App\Transcode\Infrastructure\Doctrine\TranscodeRuntimeState;
 use App\Transcode\Infrastructure\Doctrine\Entity\TranscodeJobEntity;
 use App\Transcode\Infrastructure\Doctrine\Entity\TranscodeSessionEntity;
@@ -194,6 +196,10 @@ final class SignedDeliveryFirewallTest extends TestCase
         $container->set(TranscodeStreamingPortInterface::class, $this->streaming);
         $container->set(SegmentAvailabilityInterface::class, $availability);
         $container->set('messenger.bus.default', $this->bus);
+        // The bus admits the fixture's sessions, so every tier selects a fixed presentation first.
+        $presentations = $this->createStub(EncodePresentationPort::class);
+        $presentations->method('select')->willReturn(new PresentationSelection('encode', 'source', 0, 1, 'mp4', 'configuration'));
+        $container->set(EncodePresentationPort::class, $presentations);
         $this->signer = new HmacStreamAuthAdapter('disposable-stream-secret', 'https://baander.app');
         $this->proof = new SignedDpopProof();
         $this->jobId = new PublicId();
@@ -1104,7 +1110,7 @@ final class SignedDeliveryKernel extends ProductionOAuthKernel
         $container->addCompilerPass(new class implements CompilerPassInterface {
             public function process(ContainerBuilder $container): void
             {
-                foreach ([CompletedVideoDeliveryPort::class, TranscodeStreamingPortInterface::class, SegmentAvailabilityInterface::class, 'messenger.bus.default'] as $id) {
+                foreach ([CompletedVideoDeliveryPort::class, TranscodeStreamingPortInterface::class, SegmentAvailabilityInterface::class, EncodePresentationPort::class, 'messenger.bus.default'] as $id) {
                     $container->removeAlias($id);
                     $container->setDefinition($id, (new Definition())->setSynthetic(true)->setPublic(true));
                 }

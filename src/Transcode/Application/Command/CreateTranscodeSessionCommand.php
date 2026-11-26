@@ -6,6 +6,7 @@ namespace App\Transcode\Application\Command;
 
 use App\Shared\Domain\Model\Uuid;
 use App\Transcode\Domain\ValueObject\AudioProfile;
+use App\Transcode\Domain\ValueObject\PresentationSelection;
 use App\Transcode\Domain\ValueObject\QualityTier;
 use App\Transcode\Domain\ValueObject\SessionPriority;
 
@@ -26,6 +27,8 @@ final readonly class CreateTranscodeSessionCommand
         ?string $requestId = null,
         public ?int $audioStreamIndex = null,
         public int $audioOffsetMs = 0,
+        /** The presentation selected for this start before it was dispatched; the handler selects it otherwise. */
+        public ?PresentationSelection $presentation = null,
     ) {
         if (($audioStreamIndex !== null && $audioStreamIndex < 0) || $audioOffsetMs < -10000 || $audioOffsetMs > 10000) {
             throw new \InvalidArgumentException('Invalid source audio selection.');
@@ -58,5 +61,10 @@ final readonly class CreateTranscodeSessionCommand
     public function getAudioLanguages(): array
     {
         return $this->audioLanguages;
+    }
+
+    public function withPresentation(PresentationSelection $presentation): self
+    {
+        return clone($this, ['presentation' => $presentation]);
     }
 }

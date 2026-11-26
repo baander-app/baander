@@ -148,6 +148,86 @@ final class TranscodeSessionSharePersistenceTest extends TestCase
         self::assertSame(1, $this->held($connection, $first));
     }
 
+    /** @return iterable<string, array{bool}> */
+    public static function startPaths(): iterable
+    {
+        yield 'a signed start' => [false];
+        yield 'a copy start' => [true];
+    }
+
+    #[DataProvider('startPaths')]
+    public function testAnAdmissionPastItsDeadlineNoLongerCountsTowardTheUsersShare(bool $copy): void
+    {
+        $connection = $this->isolate();
+        $user = Uuid::generate();
+        $stack = $this->stack($user, 8);
+        // Its web worker stopped while the start waited, so no worker took the execution and the start never expired it.
+        $abandoned = $this->seed($stack, $user, $this->video(), 'abandoned', '360p', '10 seconds', 'pending');
+        $this->passDeadline($connection, $abandoned);
+        $playing = [];
+        foreach (range(1, 5) as $index) {
+            $playing[] = $this->seed($stack, $user, $this->video(), 'playing-' . $index, '360p', '10 seconds');
+        }
+
+        if ($copy) {
+            $this->copy($stack, $user, $this->video());
+        } else {
+            self::assertCount(1, $stack['playback']->start($this->video(), Uuid::generate()->toString(), qualityTier: '360p'));
+        }
+
+        foreach ($playing as $session) {
+            self::assertSame('active', $this->sessionState($connection, $session));
+        }
+        self::assertSame('refused', $this->outcome($connection, $abandoned), 'The worker refuses the execution its start no longer waits for.');
+        self::assertSame(6, $this->held($connection, $user));
+    }
+
+    public function testAStartThatFindsNoFreeVideoSlotPassesOverAnAdmissionPastItsDeadline(): void
+    {
+        $connection = $this->isolate();
+        $stack = $this->stack(Uuid::generate(), 1);
+        $lost = $this->seed($stack, Uuid::generate(), $this->video(), 'lost', '720p', '80 minutes', 'pending');
+        $this->passDeadline($connection, $lost);
+        $abandoned = $this->seed($stack, Uuid::generate(), $this->video(), 'abandoned', '720p', '71 minutes');
+
+        self::assertCount(1, $stack['playback']->start($this->video(), Uuid::generate()->toString(), qualityTier: '360p'));
+
+        self::assertSame('cancelled', $this->sessionState($connection, $abandoned));
+        self::assertSame('cancelled', $this->outcome($connection, $abandoned), 'The worker reads the cancellation and gives up the slot.');
+    }
+
+    public function testAStartWhoseSecondTierIsRefusedForItsMediaEndsNoneOfTheUsersSessions(): void
+    {
+        $connection = $this->isolate();
+        $user = Uuid::generate();
+        $selections = 0;
+        $presentations = $this->createStub(EncodePresentationPort::class);
+        // The film's link is retargeted outside its library between the two tiers.
+        $presentations->method('select')->willReturnCallback(static function () use (&$selections): PresentationSelection {
+            return ++$selections === 1
+                ? new PresentationSelection('encode', 'source', 0, 1, 'mp4', 'configuration')
+                : throw new ConflictException('Playback media is unavailable.');
+        });
+        $stack = $this->stack($user, 8, presentations: $presentations);
+        $silent = [];
+        foreach (range(1, 2) as $index) {
+            $silent[] = $this->seed($stack, $user, $this->video(), 'silent-' . $index, '360p', '5 minutes');
+        }
+        foreach (range(1, 4) as $index) {
+            $this->seed($stack, $user, $this->video(), 'playing-' . $index, '360p', '5 seconds');
+        }
+        $film = $this->video();
+
+        $refusal = $this->refusal(fn () => $stack['playback']->start($film, Uuid::generate()->toString()));
+
+        self::assertSame('Playback media is unavailable.', $refusal->getMessage());
+        foreach ($silent as $session) {
+            self::assertSame('active', $this->sessionState($connection, $session));
+        }
+        self::assertSame(0, (int) $connection->fetchOne('SELECT count(*) FROM transcode_sessions WHERE video_id = ?', [$film->toString()]));
+        self::assertSame(6, $this->held($connection, $user));
+    }
+
     public function testSessionsOfOneClientCountOneByOne(): void
     {
         $connection = $this->isolate();
@@ -304,6 +384,79 @@ final class TranscodeSessionSharePersistenceTest extends TestCase
                 $writer->commit();
             }
             self::assertSame(6, $this->held($observer, $user));
+        } finally {
+            if (is_resource($process)) {
+                proc_terminate($process, 9);
+                proc_close($process);
+            }
+            fclose($output);
+            if ($writer->isTransactionActive()) {
+                $writer->rollBack();
+            }
+            $writer->executeStatement('DROP SCHEMA IF EXISTS ' . $schema . ' CASCADE');
+            $writer->close();
+            $observer->close();
+        }
+    }
+
+    /**
+     * A playback report on a second connection renews the user's longest silent session while a start
+     * of that user, in a separate process, waits for the session's lock: the start ends the user's
+     * next silent session instead.
+     */
+    public function testAStartWhoseLongestSilentSessionReportsPlaybackMeanwhileEndsTheNextSilentOne(): void
+    {
+        $writer = CopyStartRace::connect();
+        $observer = CopyStartRace::connect();
+        $schema = 'transcode_share_renewal_' . (random_bytes(6) |> bin2hex(...));
+        $process = null;
+        $output = tmpfile();
+        self::assertIsResource($output);
+        try {
+            $writer->executeStatement('CREATE SCHEMA ' . $schema);
+            foreach (self::TABLES as $table) {
+                $writer->executeStatement(sprintf('CREATE TABLE %1$s.%2$s (LIKE public.%2$s INCLUDING ALL)', $schema, $table));
+            }
+            foreach ([$writer, $observer] as $connection) {
+                $connection->executeStatement(sprintf('SET search_path TO %s, public', $schema));
+            }
+            $user = Uuid::generate();
+            $stack = ['connection' => $writer, 'runtime' => new TranscodeRuntimeState($writer, self::transaction($writer))];
+            $woke = $this->seed($stack, $user, Uuid::generate(), 'woke', '360p', '10 minutes');
+            $silent = $this->seed($stack, $user, Uuid::generate(), 'silent', '360p', '5 minutes');
+            foreach (range(1, 4) as $index) {
+                $this->seed($stack, $user, Uuid::generate(), 'playing-' . $index, '360p', '5 seconds');
+            }
+
+            // The report holds the session's row until it commits.
+            $writer->beginTransaction();
+            $writer->executeStatement('UPDATE transcode_sessions SET updated_at = clock_timestamp() WHERE id = ?', [$woke->toString()]);
+            $applicationName = 'transcode_share_renewal_' . (random_bytes(6) |> bin2hex(...));
+            $process = proc_open(
+                [PHP_BINARY, '-r', self::CONTENDER, '--', dirname(__DIR__, 2) . '/vendor/autoload.php', $schema, $applicationName, $user->toString()],
+                [0 => ['file', '/dev/null', 'r'], 1 => $output, 2 => $output],
+                $pipes,
+            );
+            self::assertIsResource($process);
+            $deadline = microtime(true) + 8;
+            do {
+                $waiting = (int) $observer->fetchOne("SELECT count(*) FROM pg_stat_activity WHERE application_name = :name AND wait_event_type = 'Lock' AND wait_event IN ('transactionid', 'tuple')", ['name' => $applicationName]);
+                if ($waiting === 1) {
+                    break;
+                }
+                usleep(1000);
+            } while (microtime(true) < $deadline);
+            self::assertSame(1, $waiting, 'The start must wait for the reporting session\'s row.');
+            $writer->commit();
+            $status = proc_close($process);
+            $process = null;
+            rewind($output);
+            $result = (string) stream_get_contents($output);
+
+            self::assertSame(0, $status, $result);
+            self::assertSame('admitted', $result);
+            self::assertSame('active', $this->sessionState($observer, $woke));
+            self::assertSame('cancelled', $this->sessionState($observer, $silent));
         } finally {
             if (is_resource($process)) {
                 proc_terminate($process, 9);
@@ -612,9 +765,10 @@ PHP;
      * shared copy slots.
      *
      * @param (\Closure(): void)|null $whileWaiting runs each time a start waits for its worker
+     * @param EncodePresentationPort|null $presentations selects each tier's presentation, the same one for every tier by default
      * @return array{connection: Connection, runtime: TranscodeRuntimeState, playback: AuthorizedPlayback, controller: TranscodeSessionController, copy: CopyPresentationService}
      */
-    private function stack(Uuid $user, int $slots, ?\Closure $whileWaiting = null, bool $remux = false): array
+    private function stack(Uuid $user, int $slots, ?\Closure $whileWaiting = null, bool $remux = false, ?EncodePresentationPort $presentations = null): array
     {
         $connection = $this->manager->getConnection();
         $transaction = self::transaction($connection);
@@ -637,8 +791,10 @@ PHP;
                 self::assertTrue($runtime->observe($claim, 'accepted'));
             }
         });
-        $presentations = $this->createStub(EncodePresentationPort::class);
-        $presentations->method('select')->willReturn(new PresentationSelection('encode', 'source', 0, 1, 'mp4', 'configuration'));
+        if ($presentations === null) {
+            $presentations = $this->createStub(EncodePresentationPort::class);
+            $presentations->method('select')->willReturn(new PresentationSelection('encode', 'source', 0, 1, 'mp4', 'configuration'));
+        }
         $profile = $remux ? new DeploymentProfile('remux', 2, 4, 1, sharedCopySlots: $slots) : new DeploymentProfile(videoEncoderSlots: $slots);
         $share = self::share($connection, $runtime, $profile);
         $handler = new CreateTranscodeSessionHandler(new MediaExecutionPolicy($profile), $jobs, $sessions, $storage, $runtime, $transaction, $sleeper, $presentations, self::settings(), $share);
@@ -648,7 +804,7 @@ PHP;
         $security->method('isGranted')->willReturn(true);
         $tiers = $this->createStub(AllowedQualityTiersPortInterface::class);
         $tiers->method('qualifiedTierNames')->willReturn(['360p', '480p', '720p', '1080p', '1440p', '4K']);
-        $playback = new AuthorizedPlayback($security, $connection, $bus, new NativeClock(), $tiers, $share, $profile);
+        $playback = new AuthorizedPlayback($security, $connection, $bus, new NativeClock(), $tiers, $share, $presentations, new MediaExecutionPolicy($profile), $profile);
         $publicView = $this->createStub(TranscodePublicViewInterface::class);
         $publicView->method('videoId')->willReturnCallback(static function (PublicId $video) use ($connection): ?Uuid {
             $id = $connection->fetchOne('SELECT id FROM videos WHERE public_id = ?', [$video->toString()]);
@@ -752,6 +908,12 @@ PHP;
     private function sessionId(Connection $connection, PublicId $session): Uuid
     {
         return Uuid::fromString((string) $connection->fetchOne('SELECT id FROM transcode_sessions WHERE public_id = ?', [$session->toString()]));
+    }
+
+    /** Moves the session's pending admission past its deadline. */
+    private function passDeadline(Connection $connection, Uuid $session): void
+    {
+        $connection->executeStatement("UPDATE transcode_runtime_state SET admission_deadline = clock_timestamp() - interval '1 hour' WHERE session_id = ?", [$session->toString()]);
     }
 
     private function silence(Connection $connection, Uuid $session, string $silentFor): void

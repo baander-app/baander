@@ -24,6 +24,7 @@ use App\Transcode\Application\DTO\MediaWorkerIdentity;
 use App\Transcode\Application\DTO\PlaybackEndReason;
 use App\Transcode\Application\DTO\TranscodeExecutionClaim;
 use App\Transcode\Application\Port\EncodePresentationPort;
+use App\Transcode\Application\Port\MediaExecutionPolicyInterface;
 use App\Transcode\Application\Port\TranscodeStoragePortInterface;
 use App\Transcode\Application\Service\MediaExecutionPolicy;
 use App\Transcode\Application\Service\StaleTranscodeSessionExpiry;
@@ -166,6 +167,8 @@ final class TranscodeSessionOwnershipPersistenceTest extends TestCase
             new NativeClock(),
             $this->createStub(AllowedQualityTiersPortInterface::class),
             $this->freeSessionShare(),
+            $this->createStub(EncodePresentationPort::class),
+            $this->createStub(MediaExecutionPolicyInterface::class),
         );
         foreach ($expected as $request => $sessions) {
             self::assertSame($sessions, array_map(static fn (PublicId $id): string => $id->toString(), $playback->findSessions($video, $request, [PublicId::fromString(array_key_first($sessions))])));
@@ -311,6 +314,8 @@ final class TranscodeSessionOwnershipPersistenceTest extends TestCase
             new NativeClock(),
             $this->createStub(AllowedQualityTiersPortInterface::class),
             $this->freeSessionShare(),
+            $this->createStub(EncodePresentationPort::class),
+            $this->createStub(MediaExecutionPolicyInterface::class),
         );
         $playback->touchSessions([$ids['paused'][2]]);
         self::assertTrue((bool) $connection->fetchOne("SELECT updated_at > clock_timestamp() - interval '1 minute' FROM transcode_sessions WHERE id = ?", [$ids['paused'][1]->toString()]));
@@ -394,6 +399,8 @@ final class TranscodeSessionOwnershipPersistenceTest extends TestCase
             new NativeClock(),
             $this->createStub(AllowedQualityTiersPortInterface::class),
             $this->freeSessionShare(),
+            $this->createStub(EncodePresentationPort::class),
+            $this->createStub(MediaExecutionPolicyInterface::class),
         );
         self::assertSame([], $playback->findSessions($video, 'held-client', [$job->getPublicId()]));
         self::assertSame(PlaybackEndReason::Expired, $playback->endReason($video, 'held-client', [$job->getPublicId()]));
@@ -540,6 +547,8 @@ final class TranscodeSessionOwnershipPersistenceTest extends TestCase
             new NativeClock(),
             $qualityPolicy,
             $share,
+            $presentations,
+            new MediaExecutionPolicy(new DeploymentProfile()),
         );
         $endPresentation = function (PublicId $session) use (
             $connection,

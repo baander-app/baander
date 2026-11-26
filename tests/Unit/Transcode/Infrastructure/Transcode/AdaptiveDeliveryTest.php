@@ -15,7 +15,9 @@ use App\Transcode\Application\Command\CreateTranscodeSessionCommand;
 use App\Transcode\Application\DTO\DesiredTranscodeState;
 use App\Transcode\Application\DTO\MediaTrack;
 use App\Transcode\Application\DTO\TranscodeRuntimeSnapshot;
+use App\Transcode\Application\Port\EncodePresentationPort;
 use App\Transcode\Application\Port\LiveDeliveryAccessPort;
+use App\Transcode\Application\Port\MediaExecutionPolicyInterface;
 use App\Transcode\Application\Port\TranscodeExecutionOwnershipPort;
 use App\Transcode\Application\Port\TranscodePublicViewInterface;
 use App\Transcode\Application\Port\TranscodeStoragePortInterface;
@@ -132,6 +134,8 @@ final class AdaptiveDeliveryTest extends TestCase
             }
             return new Envelope($message, [new HandledStamp($this->sessions[$job->getId()->toString()], 'fixture')]);
         });
+        $presentations = $this->createStub(EncodePresentationPort::class);
+        $presentations->method('select')->willReturn(new PresentationSelection('encode', 'source', 0, 1, 'mp4', 'configuration'));
         $playback = new AuthorizedPlayback(
             $security,
             $this->connection,
@@ -139,6 +143,8 @@ final class AdaptiveDeliveryTest extends TestCase
             new MockClock(),
             $this->createStub(AllowedQualityTiersPortInterface::class),
             $this->freeSessionShare(),
+            $presentations,
+            $this->createStub(MediaExecutionPolicyInterface::class),
         );
         $jobs = $this->createMock(TranscodeJobRepositoryInterface::class);
         $jobs->expects(self::never())->method('findActiveByVideo');

@@ -10,9 +10,12 @@ use App\QoL\Application\Port\AllowedQualityTiersPortInterface;
 use App\Shared\Application\Exception\HandlerFailure;
 use App\Shared\Domain\Model\PublicId;
 use App\Transcode\Application\Command\CreateTranscodeSessionCommand;
+use App\Transcode\Application\DTO\MediaOperation;
 use App\Transcode\Application\DTO\PlaybackEndReason;
 use App\Transcode\Application\Exception\TranscodeSessionLimitException;
 use App\Transcode\Application\Exception\TranscodeStartupUnavailableException;
+use App\Transcode\Application\Port\EncodePresentationPort;
+use App\Transcode\Application\Port\MediaExecutionPolicyInterface;
 use App\Transcode\Application\Port\PlaybackPortInterface;
 use App\Transcode\Application\Service\TranscodeSessionShare;
 use App\Transcode\Domain\Model\TranscodeSession;
@@ -45,6 +48,8 @@ final readonly class AuthorizedPlayback implements PlaybackPortInterface
         private ClockInterface $clock,
         private AllowedQualityTiersPortInterface $qualityTiers,
         private TranscodeSessionShare $share,
+        private EncodePresentationPort $presentations,
+        private MediaExecutionPolicyInterface $executionPolicy,
         private DeploymentProfile $deploymentProfile = new DeploymentProfile(),
     ) {}
 
@@ -201,21 +206,26 @@ final readonly class AuthorizedPlayback implements PlaybackPortInterface
         $userId = Uuid::fromString($user->getId());
         // Each tier is admitted in a transaction of its own, so the whole start must fit before the first.
         $held = $this->share->assertRoomFor($userId, $videoId, $requestId, array_map(static fn (QualityTier $tier): string => $tier->name, $tiers));
+        $commands = array_map(static fn (QualityTier $tier): CreateTranscodeSessionCommand => new CreateTranscodeSessionCommand(
+            userId: $userId,
+            videoId: $videoId,
+            qualityTier: $tier,
+            audioProfile: AudioProfile::streamingStereo(),
+            priority: SessionPriority::Normal,
+            audioLanguages: [],
+            requestId: $requestId,
+            audioStreamIndex: $audioStreamIndex,
+            audioOffsetMs: $audioOffsetMs,
+        ), $tiers);
+        // Every tier selects its presentation, after the policy check the handler makes first, before the
+        // first tier makes room: a start refused for its library confinement or its probe ends no session.
+        $this->executionPolicy->assertAllowed(MediaOperation::VideoEncode);
+        $commands = array_map(fn (CreateTranscodeSessionCommand $command): CreateTranscodeSessionCommand => $command->withPresentation($this->presentations->select($command)), $commands);
         $jobIds = [];
         $created = [];
-        foreach ($tiers as $tier) {
+        foreach ($commands as $command) {
             try {
-                $envelope = $this->commandBus->dispatch(new CreateTranscodeSessionCommand(
-                    userId: $userId,
-                    videoId: $videoId,
-                    qualityTier: $tier,
-                    audioProfile: AudioProfile::streamingStereo(),
-                    priority: SessionPriority::Normal,
-                    audioLanguages: [],
-                    requestId: $requestId,
-                    audioStreamIndex: $audioStreamIndex,
-                    audioOffsetMs: $audioOffsetMs,
-                ));
+                $envelope = $this->commandBus->dispatch($command);
             } catch (\Throwable $failure) {
                 if (HandlerFailure::cause($failure) instanceof TranscodeSessionLimitException) {
                     // Another start of the user took the room after the check; the tiers this start created end too.

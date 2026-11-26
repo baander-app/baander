@@ -106,6 +106,42 @@ final class TranscodeSessionShareTest extends TestCase
         }
     }
 
+    public function testWhenTheOldestSilentSessionReportsPlaybackOnLockTheStartEndsTheNextSilentOne(): void
+    {
+        $woke = $this->hold($this->user, '-10 minutes');
+        $silent = $this->hold($this->user, '-5 minutes');
+        foreach (range(1, 4) as $ignored) {
+            $this->hold($this->user, '-5 seconds');
+        }
+        $this->store->renewOnLock[$woke->sessionId->toString()] = $this->at('-1 second');
+
+        $this->share()->makeRoom($this->user, $this->video, 'new-client');
+
+        self::assertSame([$silent->sessionId->toString()], $this->store->ended);
+        $candidates = [$woke->sessionId->toString(), $silent->sessionId->toString()];
+        sort($candidates);
+        self::assertSame($candidates, $this->store->locked, 'Every silent session is locked, in session id order.');
+    }
+
+    public function testAFinishedSessionThatGivesWayInsteadOfARenewedOneFreesNoSlot(): void
+    {
+        $woke = $this->hold($this->user, '-10 minutes');
+        $finished = $this->hold($this->user, '-5 minutes', complete: true);
+        foreach (range(1, 4) as $ignored) {
+            $this->hold($this->user, '-5 seconds');
+        }
+        $abandoned = $this->hold(Uuid::generate(), '-2 hours');
+        $this->store->occupied = 8;
+        $this->store->renewOnLock[$woke->sessionId->toString()] = $this->at('-1 second');
+
+        $this->share()->makeRoom($this->user, $this->video, 'new-client');
+
+        $ended = [$finished->sessionId->toString(), $abandoned->sessionId->toString()];
+        sort($ended);
+        self::assertSame($ended, $this->store->ended);
+        self::assertSame([$abandoned->sessionId->toString()], $this->cancelled);
+    }
+
     public function testWhileAVideoSlotIsFreeOtherUsersSessionsAreUntouched(): void
     {
         $this->hold(Uuid::generate(), '-3 hours');

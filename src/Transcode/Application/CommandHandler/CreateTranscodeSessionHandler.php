@@ -46,7 +46,7 @@ final readonly class CreateTranscodeSessionHandler
     public function __invoke(CreateTranscodeSessionCommand $command): TranscodeSession
     {
         $this->executionPolicy->assertAllowed(MediaOperation::VideoEncode);
-        $selection = $this->presentations->select($command);
+        $selection = $command->presentation ?? $this->presentations->select($command);
         $outputDirectory = $this->storagePort->resolveJobDirectory($command->getVideoId(), $command->getQualityTier());
         $session = $this->transaction->run(function () use ($command, $outputDirectory, $selection): TranscodeSession {
             // The user's lock comes before any row lock, so one user's starts count their sessions in turn.

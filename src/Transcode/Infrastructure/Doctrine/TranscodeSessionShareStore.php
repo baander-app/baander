@@ -19,11 +19,19 @@ final readonly class TranscodeSessionShareStore implements TranscodeSessionShare
     /** Session states that hold a job; matches stale session expiry. */
     private const string HOLDING = "s.state IN ('pending', 'preparing', 'active', 'paused')";
 
-    /** Execution outcomes a session holds: running, waiting for a slot or finished. */
-    private const string HELD = "r.outcome IN ('pending', 'accepted', 'ready', 'complete')";
+    /**
+     * An execution that runs in a video slot, or waits for one while its start still waits for it: a
+     * pending execution past its admission deadline has no start waiting, and a worker refuses it.
+     * transaction_timestamp() rather than clock_timestamp(), so every statement of one start's
+     * decision compares the deadline with the same instant.
+     */
+    private const string OCCUPIES_SLOT = "(r.outcome IN ('accepted', 'ready') OR (r.outcome = 'pending' AND r.admission_deadline > transaction_timestamp()))";
+
+    /** Executions a session holds: those that occupy a slot, and finished ones. */
+    private const string HELD = '(' . self::OCCUPIES_SLOT . " OR r.outcome = 'complete')";
 
     private const string SELECT_HELD = 'SELECT s.id, s.job_id, s.video_id, j.request_id, j.quality_tier_name, s.updated_at,'
-        . " r.outcome IN ('pending', 'accepted', 'ready') AS holds_slot"
+        . ' ' . self::OCCUPIES_SLOT . ' AS holds_slot'
         . ' FROM transcode_sessions s'
         . ' JOIN transcode_runtime_state r ON r.job_id = s.job_id AND r.session_id = s.id'
         . ' JOIN transcode_jobs j ON j.id = s.job_id';
@@ -56,17 +64,13 @@ final readonly class TranscodeSessionShareStore implements TranscodeSessionShare
 
     public function occupiedVideoSlots(): int
     {
-        // A pending execution past its admission deadline has no start waiting for it; a worker refuses it.
-        return (int) $this->connection->fetchOne(
-            "SELECT count(*) FROM transcode_runtime_state WHERE outcome IN ('accepted', 'ready')"
-            . " OR (outcome = 'pending' AND admission_deadline > clock_timestamp())",
-        );
+        return (int) $this->connection->fetchOne('SELECT count(*) FROM transcode_runtime_state r WHERE ' . self::OCCUPIES_SLOT);
     }
 
     public function oldestSlotHolder(DateTimeImmutable $silentSince, array $excluding): ?HeldTranscodeSession
     {
         $row = $this->connection->fetchAssociative(
-            self::SELECT_HELD . ' WHERE ' . self::HOLDING . " AND r.outcome IN ('pending', 'accepted', 'ready')"
+            self::SELECT_HELD . ' WHERE ' . self::HOLDING . ' AND ' . self::OCCUPIES_SLOT
             . ' AND s.updated_at <= :silent_since AND s.id <> ALL (CAST(:excluding AS uuid[]))'
             . ' ORDER BY s.updated_at, s.id LIMIT 1',
             ['silent_since' => $silentSince, 'excluding' => self::uuidArray($excluding)],
