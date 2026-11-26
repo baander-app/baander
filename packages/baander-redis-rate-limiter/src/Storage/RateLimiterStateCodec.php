@@ -98,10 +98,11 @@ final readonly class RateLimiterStateCodec
             }
             $counts = unpack('Nhits/Ninterval', $keys[1]);
         } elseif ($state instanceof SlidingWindow) {
+            // The limiter sets the window's size to its limit before every save; the size sits under the empty key.
             $data = $state->__serialize();
             $key = array_key_first($data);
-            if (count($data) !== 1 || !is_string($key) || strlen($key) !== 12 + strlen($this->id)
-                || !$this->validTime($data[$key])
+            if (count($data) !== 2 || !is_string($key) || strlen($key) !== 12 + strlen($this->id)
+                || !$this->validTime($data[$key]) || ($data[''] ?? null) !== $this->limit
             ) {
                 throw new RateLimiterUnavailableException();
             }

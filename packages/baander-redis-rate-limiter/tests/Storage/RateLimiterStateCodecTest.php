@@ -11,6 +11,8 @@ use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\RateLimiter\Policy\SlidingWindow;
 use Symfony\Component\RateLimiter\Policy\Window;
+use Symfony\Component\RateLimiter\RateLimiterFactory;
+use Symfony\Component\RateLimiter\Storage\InMemoryStorage;
 
 final class RateLimiterStateCodecTest extends TestCase
 {
@@ -54,6 +56,39 @@ final class RateLimiterStateCodecTest extends TestCase
         (new RateLimiterStateCodec($config, 'test-subject'))->decode($kind === 'malformed' ? '{' : $payload);
     }
 
+    public function testSlidingWindowRoundTripKeepsTheStateItsLimiterSaved(): void
+    {
+        $config = $this->config('sliding_window');
+        $storage = new InMemoryStorage();
+        new RateLimiterFactory($config, $storage)->create('subject')->consume(2);
+        $state = $storage->fetch('test-subject');
+        self::assertInstanceOf(SlidingWindow::class, $state);
+
+        $codec = new RateLimiterStateCodec($config, 'test-subject');
+
+        self::assertEquals($state, $codec->decode($codec->encode($state)));
+    }
+
+    /** @return iterable<string, array{?int}> */
+    public static function slidingWindowSizes(): iterable
+    {
+        yield 'a size other than the limit' => [4];
+        yield 'no size' => [null];
+    }
+
+    #[DataProvider('slidingWindowSizes')]
+    public function testSlidingWindowWithoutTheLimitAsItsSizeIsCorrupt(?int $size): void
+    {
+        $state = new SlidingWindow('test-subject', 60);
+        if ($size !== null) {
+            $state->configure($size);
+        }
+        $config = $this->config('sliding_window');
+        $payload = json_encode(['config' => hash('sha256', serialize($config)), 'state' => base64_encode(serialize($state))], JSON_THROW_ON_ERROR);
+        $this->expectException(RateLimiterUnavailableException::class);
+        new RateLimiterStateCodec($config, 'test-subject')->decode($payload);
+    }
+
     public function testTokenBucketRoundTripKeepsItsRefillMomentAndOutlivesIt(): void
     {
         $codec = new RateLimiterStateCodec($this->tokenBucketConfig(), 'test-subject');
@@ -94,8 +129,8 @@ final class RateLimiterStateCodecTest extends TestCase
     }
 
     /** @return array{id: string, policy: string, limit: int, interval: string} */
-    private function config(): array
+    private function config(string $policy = 'fixed_window'): array
     {
-        return ['id' => 'test', 'policy' => 'fixed_window', 'limit' => 3, 'interval' => '60 seconds'];
+        return ['id' => 'test', 'policy' => $policy, 'limit' => 3, 'interval' => '60 seconds'];
     }
 }

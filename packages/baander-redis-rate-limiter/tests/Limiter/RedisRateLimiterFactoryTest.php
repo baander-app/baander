@@ -169,7 +169,7 @@ final class RedisRateLimiterFactoryTest extends TestCase
             }
             $state = new SlidingWindow($id, 60);
             $end = $now + match ($kind) { 'active' => 30.5, 'rollover' => -15.3, default => -121 };
-            $state->__unserialize([pack('NNN', 2, 1, 60) . $id => $end]);
+            $state->__unserialize([pack('NNN', 2, 1, 60) . $id => $end, '' => 3]);
 
             return $state;
         };

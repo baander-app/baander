@@ -62,13 +62,13 @@ final class RedisRateLimiterRefundTest extends TestCase
         }];
         yield 'sliding window that ended during the interval before' => ['sliding_window', static function (string $id, float $now): LimiterStateInterface {
             $window = new SlidingWindow($id, 60);
-            $window->__unserialize([pack('NNN', 1, 0, 60) . $id => $now - 15]);
+            $window->__unserialize([pack('NNN', 1, 0, 60) . $id => $now - 15, '' => 3]);
 
             return $window;
         }];
         yield 'sliding window that ended over an interval ago' => ['sliding_window', static function (string $id, float $now): LimiterStateInterface {
             $window = new SlidingWindow($id, 60);
-            $window->__unserialize([pack('NNN', 1, 0, 60) . $id => $now - 121]);
+            $window->__unserialize([pack('NNN', 1, 0, 60) . $id => $now - 121, '' => 3]);
 
             return $window;
         }];
