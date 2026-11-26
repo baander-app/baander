@@ -286,6 +286,16 @@ when its content is unchanged. This observation does not diagnose a failed mount
 or guarantee that the file is still reachable at playback time. A catalog track
 without an index observation is unavailable until a scan confirms its source.
 
+### Library confinement
+
+The rule that a media file is read only when its resolved path stays inside the library that owns it. Links that escape the library are skipped at scan time, and a playback, transcode or metadata read of an escaping path is refused rather than served; a refusal is distinct from a file that is simply missing.
+
+## Member input
+
+### Member-input bound
+
+A size limit on a value a member writes, enforced both when the request is validated and by a database check on the stored row. The check measures the value as a write produces it, so a stored row that passes the bound also passes when it is rewritten.
+
 ## Catalog
 
 ### Person
