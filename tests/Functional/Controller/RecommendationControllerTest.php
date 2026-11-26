@@ -55,8 +55,10 @@ final class RecommendationControllerTest extends TestCase
         $payload = ['source_type' => 'song', 'source_id' => $sourcePublic, 'target_type' => 'song', 'target_id' => $targetPublic, 'score' => 0.9];
         $this->assertJsonResponse($this->authenticatedRequest('POST', '/api/recommendations/', $user, $payload), 201);
         self::assertCount(1, $this->recommendations->findBySource('song', $source, null));
-        $this->assertJsonResponse($this->authenticatedRequest('POST', '/api/recommendations/', $user, array_replace($payload, ['source_id' => $source])), 404);
-        $this->assertJsonResponse($this->authenticatedRequest('POST', '/api/recommendations/', $user, array_replace($payload, ['target_id' => $target])), 404);
+        $withInternalSource = array_replace($payload, ['source_id' => $source]);
+        $this->assertJsonResponse($this->authenticatedRequest('POST', '/api/recommendations/', $user, $withInternalSource), 404);
+        $withInternalTarget = array_replace($payload, ['target_id' => $target]);
+        $this->assertJsonResponse($this->authenticatedRequest('POST', '/api/recommendations/', $user, $withInternalTarget), 404);
         self::assertCount(1, $this->recommendations->findBySource('song', $source, null));
     }
 
@@ -88,7 +90,8 @@ final class RecommendationControllerTest extends TestCase
         [$source, $sourcePublic] = $this->song($user);
         [, $targetPublic] = $this->song($user);
         $fields = ['source_type' => '"song"', 'source_id' => '"' . $sourcePublic . '"', 'target_type' => '"song"', 'target_id' => '"' . $targetPublic . '"', 'score' => '0.5', $field => $json];
-        $body = '{' . implode(',', array_map(static fn (string $key, string $value): string => '"' . $key . '":' . $value, array_keys($fields), $fields)) . '}';
+        $keys = array_keys($fields);
+        $body = '{' . implode(',', array_map(static fn (string $key, string $value): string => '"' . $key . '":' . $value, $keys, $fields)) . '}';
 
         $details = $this->assertJsonResponse($this->postJson($user, $body), 422, 'error')['error']['details'] ?? [];
 
@@ -141,7 +144,8 @@ final class RecommendationControllerTest extends TestCase
         $payload = ['source_type' => 'song', 'source_id' => $sourcePublic, 'target_type' => 'song', 'target_id' => $targetPublic, 'score' => 0.5];
 
         $this->assertJsonResponse($this->authenticatedRequest('POST', '/api/recommendations/', $user, $payload), 201);
-        $error = $this->assertJsonResponse($this->authenticatedRequest('POST', '/api/recommendations/', $user, array_replace($payload, ['name' => 'over the cap'])), 409, 'error')['error'];
+        $overTheCap = array_replace($payload, ['name' => 'over the cap']);
+        $error = $this->assertJsonResponse($this->authenticatedRequest('POST', '/api/recommendations/', $user, $overTheCap), 409, 'error')['error'];
 
         self::assertSame(['reason' => 'recommendation_limit', 'limit' => 1000], $error['details'] ?? null);
         self::assertSame(1000, $this->storedRows($user));
@@ -157,7 +161,8 @@ final class RecommendationControllerTest extends TestCase
         ));
 
         self::assertSame(1001, $this->storedRows($user));
-        $this->assertJsonResponse($this->authenticatedRequest('POST', '/api/recommendations/', $user, array_replace($payload, ['name' => 'still over the cap'])), 409);
+        $stillOverTheCap = array_replace($payload, ['name' => 'still over the cap']);
+        $this->assertJsonResponse($this->authenticatedRequest('POST', '/api/recommendations/', $user, $stillOverTheCap), 409);
     }
 
     public function testAnotherMembersRowsDoNotCrowdTheViewersListings(): void

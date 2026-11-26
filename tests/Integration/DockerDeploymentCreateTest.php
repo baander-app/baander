@@ -164,7 +164,8 @@ final class DockerDeploymentCreateTest extends TestCase
         $this->reserve($recipe);
         self::assertTrue($inventory->claimCreate($recipe->namespace, $recipe->bootId, $recipe->unit));
         self::assertEquals($this->binding(), $this->creator($recipe)->reconcile($recipe));
-        $targets = array_map(static fn (array $command): string => $command[array_key_last($command)], array_values(array_filter($this->commands, static fn (array $command): bool => $command[0] === 'container' && $command[1] === 'inspect')));
+        $inspectCommands = array_filter($this->commands, static fn (array $command): bool => $command[0] === 'container' && $command[1] === 'inspect');
+        $targets = array_map(static fn (array $command): string => $command[array_key_last($command)], array_values($inspectCommands));
         self::assertSame([RegisteredDeploymentStart::containerName($recipe->namespace, $recipe->bootId, $recipe->unit), $this->containerId()], $targets);
         self::assertSame(0, $this->createCount());
         self::assertSame(0, $this->startCount());

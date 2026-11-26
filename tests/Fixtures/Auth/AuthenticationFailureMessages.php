@@ -19,7 +19,8 @@ final class AuthenticationFailureMessages
         $translator = new Translator(SupportedLanguages::FALLBACK, new MessageFormatter());
         $translator->addLoader('yaml', new YamlFileLoader());
         foreach (SupportedLanguages::codes() as $locale) {
-            $translator->addResource('yaml', sprintf('%s/translations/auth+intl-icu.%s.yaml', dirname(__DIR__, 3), $locale), $locale, 'auth+intl-icu');
+            $projectDirectory = dirname(__DIR__, 3);
+            $translator->addResource('yaml', sprintf('%s/translations/auth+intl-icu.%s.yaml', $projectDirectory, $locale), $locale, 'auth+intl-icu');
         }
 
         return new AuthenticationFailureMessage($translator, new AcceptLanguageMatcher());

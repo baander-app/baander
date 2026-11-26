@@ -167,7 +167,7 @@ $phase('concurrent-slots', static function () use ($owners, $encode, $cancel, $l
         }
         $occupancy[] = ['t' => $now(), 'claimedVideo' => (int) $db->fetchOne('SELECT count(*) FROM transcode_runtime_state WHERE claim_token IS NOT NULL'),
             'runningAudio' => (int) $db->fetchOne("SELECT count(*) FROM audio_rendition_runtime WHERE state='running'"),
-            'fourthLaunches' => count(MediaControlObservation::launchesForJob($jobUuid($extra['job']))),
+            'fourthLaunches' => $jobUuid($extra['job']) |> MediaControlObservation::launchesForJob(...) |> count(...),
             'fourth' => $job($extra['job'])];
         usleep(500_000);
     }
@@ -196,7 +196,8 @@ $phase('concurrent-copies', static function () use ($owners, $copy, $copied, $re
     $copyOwners = [];
     $jobs = [];
     $refused = [];
-    foreach (HttpExchange::completeAll(array_map($copy, array_slice($owners, 4, 4)), 60) as $index => $response) {
+    $freshOwners = array_slice($owners, 4, 4);
+    foreach (HttpExchange::completeAll(array_map($copy, $freshOwners), 60) as $index => $response) {
         if ($response->status() === 200) {
             $copyOwners[] = $owners[4 + $index];
             $jobs[] = $copied($response);

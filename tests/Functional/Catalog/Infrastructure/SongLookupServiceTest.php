@@ -89,7 +89,8 @@ final class SongLookupServiceTest extends TestCase
         $sorted = $walked;
         sort($sorted);
         self::assertSame($sorted, $walked);
-        self::assertSame(array_values(array_unique($walked)), $walked);
+        $distinctWalked = array_values(array_unique($walked));
+        self::assertSame($distinctWalked, $walked);
         self::assertContains($this->allowedSong->getId()->toString(), $walked);
         self::assertContains($this->deniedSong->getId()->toString(), $walked);
         self::assertSame(

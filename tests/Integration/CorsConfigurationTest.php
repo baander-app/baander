@@ -327,7 +327,9 @@ final class CorsConfigurationTest extends TestCase
     /** @return list<string> */
     private function headerList(Response $response, string $header): array
     {
-        return array_map(strtolower(...), array_map(trim(...), explode(',', $response->headers->get($header) ?? '')));
+        $entries = explode(',', $response->headers->get($header) ?? '');
+
+        return array_map(strtolower(...), array_map(trim(...), $entries));
     }
 }
 

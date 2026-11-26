@@ -86,7 +86,8 @@ final class MusicBrainzMatchCliParityTest extends TestCase
         $this->musicBrainz->releases[$release->id] = $release;
         $publicId = $album->getPublicId()->toString();
 
-        $api = $this->assertJsonResponse($this->get(sprintf('/api/admin/metadata/match/album/%s/candidates', $publicId)), 200, 'data')['data'];
+        $candidatesUri = sprintf('/api/admin/metadata/match/album/%s/candidates', $publicId);
+        $api = $this->assertJsonResponse($this->get($candidatesUri), 200, 'data')['data'];
 
         $search = $this->command('app:metadata:match:search');
         self::assertSame(Command::SUCCESS, $search->execute(['type' => 'album', 'public-id' => $publicId, '--json' => true]), $search->getDisplay());
@@ -121,7 +122,8 @@ final class MusicBrainzMatchCliParityTest extends TestCase
         $recording = new MusicBrainzRecording(self::recordingId(1, 2), 'Track 1-2', 0, 157_000, null, self::credit(self::ALBUM_ARTIST, 'Luke Combs'), []);
         $this->musicBrainz->recordings[$recording->id] = $recording;
 
-        $api = $this->assertJsonResponse($this->get(sprintf('/api/admin/metadata/match/song/%s/comparison?candidate=%s', $duet, $recording->id)), 200, 'data')['data'];
+        $comparisonUri = sprintf('/api/admin/metadata/match/song/%s/comparison?candidate=%s', $duet, $recording->id);
+        $api = $this->assertJsonResponse($this->get($comparisonUri), 200, 'data')['data'];
 
         $compare = $this->command('app:metadata:match:compare');
         self::assertSame(Command::SUCCESS, $compare->execute(['type' => 'song', 'public-id' => $duet, 'candidate' => $recording->id, '--json' => true]), $compare->getDisplay());

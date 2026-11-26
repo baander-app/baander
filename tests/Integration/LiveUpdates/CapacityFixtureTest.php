@@ -73,7 +73,8 @@ final class CapacityFixtureTest extends TestCase
             $migration->up(new Schema());
             $this->writer->transactional(static function (Connection $connection) use ($migration): void {
                 foreach ($migration->getSql() as $query) {
-                    if (preg_match('/\ACREATE EXTENSION\b/i', ltrim($query->getStatement())) !== 1) {
+                    $sql = $query->getStatement();
+                    if (preg_match('/\ACREATE EXTENSION\b/i', ltrim($sql)) !== 1) {
                         $connection->executeStatement($query->getStatement(), $query->getParameters(), $query->getTypes());
                     }
                 }

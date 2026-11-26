@@ -640,7 +640,8 @@ final class OpenApiSpecTest extends KernelTestCase
             $payload = new ApiError('Invalid query parameters.', 400, $details)->toArray();
             self::assertSame(array_keys($apiError['properties']), array_keys($payload));
             self::assertSame([], array_diff(array_keys($payload['error']), array_keys($error['properties'])));
-            self::assertSame([], array_diff($error['required'], array_keys($payload['error'])));
+            $missingRequired = array_diff($error['required'], array_keys($payload['error']));
+            self::assertSame([], $missingRequired);
             self::assertSame($details !== [], array_key_exists('details', $payload['error']));
         }
     }

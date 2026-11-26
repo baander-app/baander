@@ -32,7 +32,8 @@ final class FinalSchemaBootstrap
                 $migration = new $class($connection, new NullLogger());
                 $migration->up(new Schema());
                 foreach ($migration->getSql() as $query) {
-                    if (preg_match('/\ACREATE EXTENSION\b/i', ltrim($query->getStatement())) === 1) {
+                    $sql = $query->getStatement();
+                    if (preg_match('/\ACREATE EXTENSION\b/i', ltrim($sql)) === 1) {
                         continue;
                     }
                     $connection->executeStatement($query->getStatement(), $query->getParameters(), $query->getTypes());

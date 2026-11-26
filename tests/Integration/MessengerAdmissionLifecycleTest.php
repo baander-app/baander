@@ -284,7 +284,8 @@ final class MessengerAdmissionLifecycleTest extends TestCase
         self::assertNotEmpty($this->redis->xRange($this->stream, $retryId, $retryId));
 
         $this->publishTarget($target);
-        self::assertSame([], iterator_to_array($transport->get()));
+        $deliveries = iterator_to_array($transport->get());
+        self::assertSame([], $deliveries);
         self::assertSame('parked', $this->snapshot()['slots']['consumer-0']['state']);
         self::assertSame(0, $this->redis->xPending($this->stream, 'test')[0]);
         self::assertSame(1, $this->redis->xLen($this->stream));

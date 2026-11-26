@@ -200,7 +200,8 @@ final class AlbumMatchClaimMigrationTest extends TestCase
     private function execute(AbstractMigration $migration): void
     {
         foreach ($migration->getSql() as $query) {
-            if (preg_match('/\ACREATE EXTENSION\b/i', ltrim($query->getStatement())) === 1) {
+            $sql = $query->getStatement();
+            if (preg_match('/\ACREATE EXTENSION\b/i', ltrim($sql)) === 1) {
                 continue;
             }
             $this->connection->executeStatement($query->getStatement(), $query->getParameters(), $query->getTypes());

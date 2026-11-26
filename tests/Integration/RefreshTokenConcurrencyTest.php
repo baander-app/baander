@@ -651,7 +651,8 @@ final class RefreshTokenConcurrencyTest extends TestCase
         while (!IssuanceFaults::isSet($directory, $flag)) {
             if (microtime(true) > $deadline || !proc_get_status($child['process'])['running']) {
                 rewind($child['output']);
-                self::fail(sprintf('The child must reach the %s flag: %s', $flag, stream_get_contents($child['output'])));
+                $childOutput = stream_get_contents($child['output']);
+                self::fail(sprintf('The child must reach the %s flag: %s', $flag, $childOutput));
             }
             usleep(5000);
         }

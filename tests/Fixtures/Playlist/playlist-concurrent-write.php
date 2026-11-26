@@ -174,7 +174,7 @@ if (realpath($_SERVER['SCRIPT_FILENAME'] ?? '') === __FILE__) {
                 if ($action === 'collaborator') {
                     $playlist->addCollaborator(Uuid::fromString($target));
                 } elseif ($action === 'reorder') {
-                    $playlist->reorderSongs(array_map(Uuid::fromString(...), explode(',', $target)));
+                    array_map(Uuid::fromString(...), explode(',', $target)) |> $playlist->reorderSongs(...);
                 } else {
                     $playlist->updateMetadata('Child', null, false, true);
                 }

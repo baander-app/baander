@@ -171,9 +171,10 @@ abstract class AudioStreamTestCase extends TestCase
         self::assertIsString($file);
         try {
             self::assertNotFalse(file_put_contents($file, $audio));
+            $quotedFile = escapeshellarg($file);
             exec(sprintf(
                 'ffprobe -v error -select_streams a:0 -show_entries stream=codec_name,bit_rate:format=bit_rate -of json %s 2>&1',
-                escapeshellarg($file),
+                $quotedFile,
             ), $output, $code);
             self::assertSame(0, $code, implode("\n", $output));
             $probe = json_decode(implode("\n", $output), true, 512, JSON_THROW_ON_ERROR);

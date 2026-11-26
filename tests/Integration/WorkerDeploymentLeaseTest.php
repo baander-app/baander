@@ -54,7 +54,8 @@ final class WorkerDeploymentLeaseTest extends TestCase
         self::assertSame(1, $lease->epoch);
         self::assertSame(0, $this->first->getTransactionNestingLevel());
         self::assertSame('active', $this->second->fetchOne('SELECT state FROM worker_deployment_leases'));
-        self::assertNull($second->acquire($lease->namespace, str_repeat('b', 32), 60));
+        $otherBootId = str_repeat('b', 32);
+        self::assertNull($second->acquire($lease->namespace, $otherBootId, 60));
         self::assertNull($second->acquire($lease->namespace, $lease->bootId, 60), 'Duplicate same-boot calls do not grant admission.');
         self::assertTrue($first->renew($lease, 120));
         self::assertFalse($second->renew(new DeploymentLease($lease->namespace, str_repeat('b', 32), 1), 60));
@@ -72,7 +73,8 @@ final class WorkerDeploymentLeaseTest extends TestCase
         self::assertNotNull($lease);
         self::assertEquals($lease, $observer->observe($lease->namespace, $lease->bootId, 3));
         self::assertNull($observer->observe($lease->namespace, $lease->bootId, 120), 'A lease that ends within the window is not observed.');
-        self::assertNull($observer->observe($lease->namespace, str_repeat('b', 32), 3));
+        $otherBootId = str_repeat('b', 32);
+        self::assertNull($observer->observe($lease->namespace, $otherBootId, 3));
         self::assertTrue($observer->renew($lease, 60));
         self::assertSame($before, $session(), 'Observation and renewal leave no timeout on the session a pooler hands to other clients.');
 
@@ -240,7 +242,8 @@ PHP;
         self::assertNull($acknowledged);
         self::assertFalse($connection->isConnected(), 'Uncertain commit acknowledgment discards the connection even at nesting zero.');
         $controller = new DoctrineDeploymentLease($this->second);
-        self::assertNull($controller->acquire('deployment', str_repeat('a', 32), 60));
+        $sameBootId = str_repeat('a', 32);
+        self::assertNull($controller->acquire('deployment', $sameBootId, 60));
         $reserved = $controller->findForContainment('deployment');
         self::assertNotNull($reserved);
         self::assertSame(1, $reserved->epoch);

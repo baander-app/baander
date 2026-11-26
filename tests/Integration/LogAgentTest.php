@@ -152,11 +152,13 @@ final class LogAgentTest extends TestCase
             file_put_contents($payloadFile, "\x01\0\0\0".pack('N', strlen($rotatedPayload)).$rotatedPayload);
             $collector->tick();
             self::assertCount(6, $index->query(new LogQuery())['items']);
-            self::assertStringContainsString('boundary is missing', implode(' ', array_merge(...array_column($index->sources()['items'], 'issues'))));
+            $issuesAfterRotation = array_merge(...array_column($index->sources()['items'], 'issues'));
+            self::assertStringContainsString('boundary is missing', implode(' ', $issuesAfterRotation));
             $wrongDaemon = new AgentConfiguration(array_replace($config->values, ['expectedDaemonId' => 'other-daemon']));
             new Collector($wrongDaemon, $index)->tick();
             self::assertCount(6, $index->query(new LogQuery())['items']);
-            self::assertStringContainsString('identity mismatch', implode(' ', array_merge(...array_column($index->sources()['items'], 'issues'))));
+            $issuesAfterMismatch = array_merge(...array_column($index->sources()['items'], 'issues'));
+            self::assertStringContainsString('identity mismatch', implode(' ', $issuesAfterMismatch));
 
             $largePayload = '';
             for ($number = 0; $number < 140; ++$number) {
@@ -180,7 +182,8 @@ final class LogAgentTest extends TestCase
             self::assertTrue($session->collect($consume, seconds: 10));
             self::assertSame(140, $collected);
             self::assertSame(140, $index->checkpoint($sourceId)['sequence']);
-            self::assertSame(array_map(static fn (int $number): string => 'backlog-'.$number, range(0, 139)), $received);
+            $expectedBacklog = array_map(static fn (int $number): string => 'backlog-'.$number, range(0, 139));
+            self::assertSame($expectedBacklog, $received);
             new Collector($config, $index)->tick($id, microtime(true) + 10);
             $containerSource = LogIndex::sourceId('local:container:'.$id);
             self::assertSame(146, $index->checkpoint($containerSource)['sequence']);
@@ -272,7 +275,8 @@ final class LogAgentTest extends TestCase
             self::markTestSkipped('Swoole runtime required.');
         }
         $reservation = stream_socket_server('tcp://127.0.0.1:0', $errno, $error);
-        $port = (int) substr(strrchr(stream_socket_get_name($reservation, false), ':'), 1);
+        $address = stream_socket_get_name($reservation, false);
+        $port = (int) substr(strrchr($address, ':'), 1);
         fclose($reservation);
         $configuration = array_replace($this->config()->values, ['listenHost' => '127.0.0.1', 'listenPort' => $port]);
         $target = new Target('/usr/bin/docker', 'unix:///var/run/docker.sock', 'fixture-daemon', null, null);
@@ -306,7 +310,8 @@ final class LogAgentTest extends TestCase
     public function testCheckpointCommandExitsNonZeroWhenNoAgentListens(): void
     {
         $reservation = stream_socket_server('tcp://127.0.0.1:0', $errno, $error);
-        $port = (int) substr(strrchr(stream_socket_get_name($reservation, false), ':'), 1);
+        $address = stream_socket_get_name($reservation, false);
+        $port = (int) substr(strrchr($address, ':'), 1);
         fclose($reservation);
         $configuration = json_encode(array_replace($this->config()->values, ['listenPort' => $port]), JSON_THROW_ON_ERROR);
         $checkpoint = new Process([PHP_BINARY, dirname(__DIR__, 2).'/bin/log-agent.php', '--checkpoint', 'abcdef123456', '--timeout=1'], env: [EnvironmentVariable::BAANDER_LOG_AGENT_CONFIG => $configuration], timeout: 10);

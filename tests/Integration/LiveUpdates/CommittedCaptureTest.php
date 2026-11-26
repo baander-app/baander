@@ -53,7 +53,8 @@ final class CommittedCaptureTest extends TestCase
             $migration->up(new Schema());
             $this->writer->transactional(static function (Connection $connection) use ($migration): void {
                 foreach ($migration->getSql() as $query) {
-                    if (preg_match('/\ACREATE EXTENSION\b/i', ltrim($query->getStatement())) !== 1) {
+                    $sql = $query->getStatement();
+                    if (preg_match('/\ACREATE EXTENSION\b/i', ltrim($sql)) !== 1) {
                         $connection->executeStatement($query->getStatement(), $query->getParameters(), $query->getTypes());
                     }
                 }
@@ -102,7 +103,8 @@ final class CommittedCaptureTest extends TestCase
             if ($source['classification'] !== 'capture') {
                 continue;
             }
-            $installed = implode(' ', array_column(array_filter($definitions, static fn(array $row): bool => $row['relname'] === $source['table']), 'definition'));
+            $tableTriggers = array_filter($definitions, static fn(array $row): bool => $row['relname'] === $source['table']);
+            $installed = implode(' ', array_column($tableTriggers, 'definition'));
             self::assertStringContainsString('{' . implode(',', $source['relevant_columns']) . '}', $installed, $source['table'] . ' relevant fields drifted from capture review.');
             self::assertStringContainsString('{' . implode(',', $source['families']) . '}', $installed, $source['table'] . ' families drifted from capture review.');
             self::assertStringContainsString('{' . implode(',', $source['scope_routes']) . '}', $installed, $source['table'] . ' scope routes drifted from capture review.');

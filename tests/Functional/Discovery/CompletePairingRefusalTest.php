@@ -59,9 +59,10 @@ final class CompletePairingRefusalTest extends TestCase
         ));
         self::assertSame(array_fill_keys(array_keys($statuses), Response::HTTP_NOT_FOUND), $statuses, json_encode($bodies, JSON_THROW_ON_ERROR));
         self::assertCount(1, array_unique($bodies), json_encode($bodies, JSON_THROW_ON_ERROR));
+        $refusal = json_decode(array_first($bodies), true, 512, JSON_THROW_ON_ERROR);
         self::assertSame(
             ['error' => ['message' => 'Pairing code not found or expired.', 'code' => Response::HTTP_NOT_FOUND]],
-            json_decode(array_first($bodies), true, 512, JSON_THROW_ON_ERROR),
+            $refusal,
         );
     }
 

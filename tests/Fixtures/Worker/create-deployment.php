@@ -186,7 +186,8 @@ try {
     }
     $observed = trim($command->execute(['container', 'exec', $control->containerId, '/usr/local/bin/php', '-r',
         'echo hash("sha256", json_encode(array_map(getenv(...), ["APP_DEBUG", "APP_ENV", "APP_SECRET", "DATABASE_URL"]), JSON_THROW_ON_ERROR));']));
-    if (!hash_equals(hash('sha256', json_encode(array_values($runtime->variables), JSON_THROW_ON_ERROR)), $observed)) {
+    $variablesJson = json_encode(array_values($runtime->variables), JSON_THROW_ON_ERROR);
+    if (!hash_equals(hash('sha256', $variablesJson), $observed)) {
         throw new RuntimeException('Runtime configuration was not preserved literally.');
     }
     $lease = $leases->acquire($namespace, $boot, 60);

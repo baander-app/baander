@@ -460,7 +460,11 @@ final class PlaybackStoreContractTest extends TestCase
         $this->store->saveTransfer($this->transfer($account, ['position' => 12.0]));
         // Each map names the PHP type of a value the coordinator or the browser receives. The comparison
         // is by key, because the order of a row's keys is not part of what the store promises.
-        $types = static fn(array $row, array $keys): array => array_map(get_debug_type(...), array_intersect_key($row, array_flip($keys)));
+        $types = static function (array $row, array $keys): array {
+            $selected = array_intersect_key($row, array_flip($keys));
+
+            return array_map(get_debug_type(...), $selected);
+        };
 
         $unobserved = $this->store->endpoint($account['owner'], $account['incarnation']);
         self::assertEquals(
@@ -1078,7 +1082,8 @@ final class PlaybackStoreContractTest extends TestCase
             if (!$token->is(T_STRING) || $token->text !== 'connection' || $tokens[$at - 1]->is(T_FUNCTION)) {
                 continue;
             }
-            $written = implode('', array_map(static fn(\PhpToken $part): string => $part->text, array_slice($tokens, $at - 2, 8)));
+            $window = array_slice($tokens, $at - 2, 8);
+            $written = implode('', array_map(static fn(\PhpToken $part): string => $part->text, $window));
             $uses[] = preg_match('/^\$this->connection\(\)->(\w+)\($/', $written, $called) === 1 ? $called[1] : 'held: ' . $written;
         }
         self::assertSame(
@@ -1086,13 +1091,14 @@ final class PlaybackStoreContractTest extends TestCase
             $uses,
             'Each use of the connection is a call on it where it is obtained.',
         );
-        $names = array_count_values(array_map(
+        $names = array_map(
             static fn(\PhpToken $token): string => $token->text,
             array_filter($tokens, static fn(\PhpToken $token): bool => $token->is(T_STRING)),
-        ));
+        ) |> array_count_values(...);
         self::assertSame(1, $names['getConnection'] ?? 0, 'Only connection() asks the entity manager for the connection.');
         self::assertSame(1, $names['Connection'] ?? 0, 'Only the return type of connection() names the connection type.');
-        self::assertSame([], array_keys(array_intersect_key($names, array_flip(['createNativeQuery', 'getNativeConnection', 'getWrappedConnection']))));
+        $nativeCalls = array_intersect_key($names, array_flip(['createNativeQuery', 'getNativeConnection', 'getWrappedConnection'])) |> array_keys(...);
+        self::assertSame([], $nativeCalls);
         preg_match_all('/connection\(\)\s*->\s*(executeStatement|executeQuery|fetch\w+)\(\s*(?:<<<\'SQL\'\s*)?[\'"]?\s*([A-Z ]+?[a-z_]+)/', $source, $calls, PREG_SET_ORDER);
 
         self::assertSame([

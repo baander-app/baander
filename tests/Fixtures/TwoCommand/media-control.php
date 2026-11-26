@@ -62,7 +62,8 @@ function mediaSocket(StreamClient $auth, array $payload): void
             $socket->set(['timeout' => 2]);
             $socket->setHeaders(['Origin' => BASE]);
             ensure($socket->upgrade('/api/ws?ticket=' . $ticket), 'Ticketed control socket upgrade failed.');
-            ensure($socket->push(json_encode(['type' => 'transcode.position', ...$payload], JSON_THROW_ON_ERROR)), 'Socket control send failed.');
+            $positionJson = json_encode(['type' => 'transcode.position', ...$payload], JSON_THROW_ON_ERROR);
+            ensure($socket->push($positionJson), 'Socket control send failed.');
             $deadline = microtime(true) + 2;
             do {
                 $frame = $socket->recv(max(.01, $deadline - microtime(true)));
@@ -107,7 +108,7 @@ foreach (range(0, $slots['video'] - 1) as $index) {
     ], JSON_THROW_ON_ERROR));
     $sessions[] = jsonBody($response);
 }
-ensure(count(array_unique(array_column($sessions, 'jobId'))) === $slots['video'], 'Expected an independent capacity job per video slot.');
+ensure(array_column($sessions, 'jobId') |> array_unique(...) |> count(...) === $slots['video'], 'Expected an independent capacity job per video slot.');
 $state['job'] = $sessions[0]['jobId']; $state['session'] = $sessions[0]['publicId']; save($state);
 $oldOutput = decodeVideo($auth, $state);
 $initialRuntime = row($db, $state);

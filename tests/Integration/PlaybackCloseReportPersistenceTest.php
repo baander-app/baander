@@ -57,7 +57,8 @@ final class PlaybackCloseReportPersistenceTest extends TestCase
         self::assertArrayNotHasKey('endpoint', $closed);
         self::assertArrayNotHasKey('requestResult', $closed);
         // The destination is unavailable at once: nobody waits for its registration to lapse.
-        self::assertSame([false], array_column(array_filter($closed['destinations'], static fn(array $destination): bool => $destination['incarnationId'] === $runner['incarnationId']), 'available'));
+        $runnerAvailability = array_column(array_filter($closed['destinations'], static fn(array $destination): bool => $destination['incarnationId'] === $runner['incarnationId']), 'available');
+        self::assertSame([false], $runnerAvailability);
         self::assertSame(['observed_state' => 'stopped', 'position' => 97.25, 'retired' => true, 'available' => false], $this->incarnation($runner['incarnationId']));
 
         // A tab opened afterwards is shown no runner, and its Play starts through the ordinary path.

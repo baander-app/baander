@@ -290,10 +290,10 @@ final class RetaggedFileScanTest extends KernelTestCase
 
         static::getContainer()->get(RelayOutboxHandler::class)(new RelayOutboxCommand());
 
-        return array_values(array_filter(
+        return array_filter(
             array_map(static fn (Envelope $envelope): object => $envelope->getMessage(), $async->getSent()),
             static fn (object $message): bool => $message instanceof FilesDiscovered && $message->libraryId->equals($library->getId()),
-        ));
+        ) |> array_values(...);
     }
 
     /** Scans, then hands the album directory's discovery to the ingest handler. */
@@ -388,9 +388,14 @@ final class RetaggedFileScanTest extends KernelTestCase
         foreach ($entries as $entry) {
             $tags .= pack('V', strlen($entry)) . $entry;
         }
-        $block = static fn (int $type, string $data, bool $last): string => chr(($last ? 0x80 : 0x00) | $type) . substr(pack('N', strlen($data)), 1) . $data;
+        $block = static fn (int $type, string $data, bool $last): string => chr(($last ? 0x80 : 0x00) | $type) . self::uint24(strlen($data)) . $data;
 
         return 'fLaC' . $block(0, $streamInfo, false) . $block(4, $tags, true);
+    }
+
+    private static function uint24(int $value): string
+    {
+        return substr(pack('N', $value), 1);
     }
 
     private function isolateSchema(): void

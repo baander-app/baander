@@ -51,7 +51,8 @@ if ($mode === 'consumer-pid') {
         }
     }
     if (count($pids) !== 1) {
-        fwrite(STDERR, sprintf("Expected one Messenger consumer, found %d.\n", count($pids)));
+        $consumerCount = count($pids);
+        fwrite(STDERR, sprintf("Expected one Messenger consumer, found %d.\n", $consumerCount));
         exit(1);
     }
     echo $pids[0];

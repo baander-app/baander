@@ -482,7 +482,7 @@ final class ReferentialIntegrityTest extends TestCase
     {
         return $this->insert('oauth_device_codes', [
             'device_code' => bin2hex(random_bytes(16)),
-            'user_code' => strtoupper(bin2hex(random_bytes(4))),
+            'user_code' => random_bytes(4) |> bin2hex(...) |> strtoupper(...),
             'client_id' => $client->toString(),
             'verification_uri' => 'https://app.baander.app/device',
             'user_id' => $user?->toString(),

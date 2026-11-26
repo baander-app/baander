@@ -374,7 +374,8 @@ final class RegisteredDeploymentRecoveryTest extends TestCase
     {
         $leases = new DoctrineDeploymentLease($this->second);
         self::assertEquals($lease, $leases->findForContainment(self::NAMESPACE));
-        self::assertNull($leases->acquire(self::NAMESPACE, str_repeat('b', 32), 60));
+        $otherBootId = str_repeat('b', 32);
+        self::assertNull($leases->acquire(self::NAMESPACE, $otherBootId, 60));
         self::assertFalse((new DoctrineDeploymentInventory($this->second))->findBoot(self::NAMESPACE, self::BOOT)->retired);
     }
 

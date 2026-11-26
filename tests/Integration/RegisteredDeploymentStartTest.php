@@ -189,7 +189,8 @@ final class RegisteredDeploymentStartTest extends TestCase
         if ($inventory->findBoot('baander.app:startup', str_repeat('a', 32)) === null) {
             self::assertTrue($inventory->reserveBoot('baander.app:startup', str_repeat('a', 32), str_repeat('f', 64), str_repeat('d', 64), 'baander.app-daemon', $this->recipe(DeploymentUnit::Control)->fingerprint(), $this->recipe(DeploymentUnit::Execution)->fingerprint()));
             foreach (DeploymentUnit::cases() as $unit) {
-                self::assertTrue($inventory->claimCreate('baander.app:startup', str_repeat('a', 32), $unit));
+                $claimed = $inventory->claimCreate('baander.app:startup', str_repeat('a', 32), $unit);
+                self::assertTrue($claimed);
             }
             self::assertTrue($inventory->register(new DeploymentContainer('baander.app:startup', str_repeat('a', 32), 'baander.app-daemon', str_repeat('e', 64), DeploymentUnit::Execution)));
         }

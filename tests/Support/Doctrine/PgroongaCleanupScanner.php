@@ -177,6 +177,8 @@ final class PgroongaCleanupScanner
 
     private static function lineAt(int $line, string $text, int $offset): int
     {
-        return $line + substr_count($text, "\n", 0, max(0, min($offset, strlen($text))));
+        $boundedOffset = min($offset, strlen($text));
+
+        return $line + substr_count($text, "\n", 0, max(0, $boundedOffset));
     }
 }

@@ -129,7 +129,8 @@ final class AuthEndpointRateLimitTest extends RateLimitTestCase
         $this->requestFrom('198.51.100.67', 'POST', '/api/auth/refresh', content: ['refreshToken' => $token]);
 
         $remaining = fn (string $key): int => $this->limiter('auth_refresh_client')->create($key)->consume(0)->getRemainingTokens();
-        self::assertSame(9999, $remaining(hash('sha256', $token)));
+        $remainingForHash = $remaining(hash('sha256', $token));
+        self::assertSame(9999, $remainingForHash);
         self::assertSame(10000, $remaining($token), 'No bucket is keyed on the raw token.');
     }
 

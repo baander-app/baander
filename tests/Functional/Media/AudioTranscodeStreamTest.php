@@ -94,7 +94,8 @@ final class AudioTranscodeStreamTest extends AudioStreamTestCase
 
     public function testFailedEncodeReturnsAnErrorAndLeavesNoPartialRendition(): void
     {
-        self::assertNotFalse(file_put_contents($this->sourceFile, str_repeat('not audio', 64)));
+        $written = file_put_contents($this->sourceFile, str_repeat('not audio', 64));
+        self::assertNotFalse($written);
         $admin = $this->createAdminUser();
 
         $failed = $this->request($admin, 'format=mp3&bitrate=192000');
@@ -103,10 +104,11 @@ final class AudioTranscodeStreamTest extends AudioStreamTestCase
         $error = json_decode($failed->getContent(), true, 512, JSON_THROW_ON_ERROR);
         self::assertIsArray($error);
         self::assertSame('Audio transcoding failed.', $error['error']['message'] ?? null);
-        self::assertSame([], array_values(array_filter(
+        $renditionFiles = array_values(array_filter(
             $this->cachedFiles(),
             static fn (string $file): bool => !str_ends_with($file, '.lock'),
-        )));
+        ));
+        self::assertSame([], $renditionFiles);
     }
 
     public function testUnsupportedFormatAndBitrateWithoutFormatAreRejected(): void

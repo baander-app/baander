@@ -432,7 +432,8 @@ final class LibraryScanClaimTest extends TestCase
                 $connection->executeStatement('SAVEPOINT claim_check');
                 try {
                     $connection->executeStatement('UPDATE libraries SET ' . $assignments . ' WHERE id = ?', [$id]);
-                    self::fail(sprintf('%s must violate chk_libraries_claim.', ucfirst($case)));
+                    $caseLabel = ucfirst($case);
+                    self::fail(sprintf('%s must violate chk_libraries_claim.', $caseLabel));
                 } catch (DriverException $violation) {
                     self::assertSame('23514', $violation->getSQLState(), $case);
                     self::assertStringContainsString('chk_libraries_claim', $violation->getMessage(), $case);
@@ -472,7 +473,8 @@ final class LibraryScanClaimTest extends TestCase
                 $names[] = $index->getName();
             }
         }
-        $pattern = '/\b(' . implode('|', array_map(static fn (string $name): string => preg_quote($name, '/'), array_unique($names))) . ')\b/i';
+        $distinctNames = array_unique($names);
+        $pattern = '/\b(' . implode('|', array_map(static fn (string $name): string => preg_quote($name, '/'), $distinctNames)) . ')\b/i';
 
         // The disposable schema of the other tests holds a SchemaTool copy of the table; skip it.
         $schema = $this->schema;

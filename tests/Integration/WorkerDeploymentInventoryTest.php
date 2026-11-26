@@ -71,11 +71,15 @@ final class WorkerDeploymentInventoryTest extends TestCase
         $inventory = new DoctrineDeploymentInventory($this->first);
         self::assertFalse($inventory->claimCreate(self::NAMESPACE, self::BOOT, DeploymentUnit::Control));
         self::assertTrue($this->reserve($inventory));
-        self::assertFalse($inventory->matchesCreate(self::NAMESPACE, self::BOOT, DeploymentUnit::Control, 'baander.app:daemon', str_repeat('1', 64)));
+        $matchesBeforeClaim = $inventory->matchesCreate(self::NAMESPACE, self::BOOT, DeploymentUnit::Control, 'baander.app:daemon', str_repeat('1', 64));
+        self::assertFalse($matchesBeforeClaim);
         self::assertTrue($inventory->claimCreate(self::NAMESPACE, self::BOOT, DeploymentUnit::Control));
-        self::assertTrue($inventory->matchesCreate(self::NAMESPACE, self::BOOT, DeploymentUnit::Control, 'baander.app:daemon', str_repeat('1', 64)));
-        self::assertFalse($inventory->matchesCreate(self::NAMESPACE, self::BOOT, DeploymentUnit::Execution, 'baander.app:daemon', str_repeat('1', 64)));
-        self::assertFalse($inventory->matchesCreate(self::NAMESPACE, self::BOOT, DeploymentUnit::Control, 'baander.app:foreign', str_repeat('1', 64)));
+        $matchesAfterClaim = $inventory->matchesCreate(self::NAMESPACE, self::BOOT, DeploymentUnit::Control, 'baander.app:daemon', str_repeat('1', 64));
+        self::assertTrue($matchesAfterClaim);
+        $matchesOtherUnit = $inventory->matchesCreate(self::NAMESPACE, self::BOOT, DeploymentUnit::Execution, 'baander.app:daemon', str_repeat('1', 64));
+        self::assertFalse($matchesOtherUnit);
+        $matchesForeignImage = $inventory->matchesCreate(self::NAMESPACE, self::BOOT, DeploymentUnit::Control, 'baander.app:foreign', str_repeat('1', 64));
+        self::assertFalse($matchesForeignImage);
         self::assertFalse($inventory->claimCreate(self::NAMESPACE, self::BOOT, DeploymentUnit::Control));
         self::assertTrue($inventory->claimCreate(self::NAMESPACE, self::BOOT, DeploymentUnit::Execution));
     }

@@ -100,7 +100,8 @@ final class ProgressiveMediaPublicationTest extends TestCase
             $request['consumer'] === 'dash-live-prefix' && str_ends_with($request['path'], '/manifest.mpd') && !$request['complete']));
         self::assertGreaterThanOrEqual(2, count($dynamicMpd));
         self::assertLessThanOrEqual(18, count($dynamicMpd));
-        self::assertGreaterThan(1, count(array_unique(array_column($dynamicMpd, 'segments'))));
+        $distinctSegmentCounts = array_column($dynamicMpd, 'segments') |> array_unique(...) |> count(...);
+        self::assertGreaterThan(1, $distinctSegmentCounts);
         self::assertNotEmpty(array_filter($requests, static fn (array $request): bool =>
             $request['consumer'] === 'dash-live-prefix' && str_ends_with($request['path'], '/segment.m4s')
             && $request['index'] !== null && $request['index'] > 0 && !$request['complete']));
@@ -120,7 +121,7 @@ final class ProgressiveMediaPublicationTest extends TestCase
             'dashLivePrefixDecoded' => $prefixCounts,
             'dashStaticDecoded' => $staticDashCounts,
             'dynamicMpdRequests' => count($dynamicMpd),
-            'dynamicSegmentCounts' => array_values(array_unique(array_column($dynamicMpd, 'segments'))),
+            'dynamicSegmentCounts' => array_column($dynamicMpd, 'segments') |> array_unique(...) |> array_values(...),
             'dynamicOutput' => $dynamicOutput,
             'httpRequests' => count($requests),
             'hlsFullOutputEqualsCompletedBaseline' => true,
@@ -200,8 +201,10 @@ final class ProgressiveMediaPublicationTest extends TestCase
         }
         $this->assertSucceeded($producer);
         foreach ($observed as $format => $snapshots) {
-            self::assertGreaterThan(1, count(array_unique(array_column($snapshots, 'gray'))), $format . ' must decode growing video during publication.');
-            self::assertGreaterThan(1, count(array_unique(array_column($snapshots, 'pcm'))), $format . ' must decode growing audio during publication.');
+            $distinctGray = array_column($snapshots, 'gray') |> array_unique(...) |> count(...);
+            self::assertGreaterThan(1, $distinctGray, $format . ' must decode growing video during publication.');
+            $distinctPcm = array_column($snapshots, 'pcm') |> array_unique(...) |> count(...);
+            self::assertGreaterThan(1, $distinctPcm, $format . ' must decode growing audio during publication.');
         }
         return $observed;
     }

@@ -103,7 +103,7 @@ final class MemberInputBoundsMigrationTest extends TestCase
         yield 'eq payload' => ["INSERT INTO eq_device_profiles (id, public_id, user_id, name, payload) VALUES (gen_random_uuid(), 'bounds00000000000eqp2', ?, 'Name', ?::jsonb)", [self::json(['bands' => self::incompressible(131072)])]];
         yield 'sidebar items' => ["INSERT INTO user_sidebar_configs (id, user_id, media_type, items, created_at, updated_at) VALUES (gen_random_uuid(), ?, 'music', ?::jsonb, now(), now())", [self::json([self::incompressible(131072)])]];
         yield 'radio stream url' => ["INSERT INTO radio_sessions (id, user_id, active_stream_url, created_at, updated_at) VALUES (gen_random_uuid(), ?, ?, now(), now())", ['https://radio.baander.app/' . str_repeat('s', 2048)]];
-        yield 'session queue' => ["INSERT INTO listening_sessions (id, public_id, user_id, queue, created_at, updated_at) VALUES (gen_random_uuid(), 'bounds0000000session1', ?, ?::jsonb, now(), now())", [self::json(array_fill(0, 12_500, str_repeat('q', 21)))]];
+        yield 'session queue' => ["INSERT INTO listening_sessions (id, public_id, user_id, queue, created_at, updated_at) VALUES (gen_random_uuid(), 'bounds0000000session1', ?, ?::jsonb, now(), now())", [array_fill(0, 12_500, str_repeat('q', 21)) |> self::json(...)]];
     }
 
     /** @param list<mixed> $parameters */

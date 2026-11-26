@@ -111,7 +111,7 @@ final class AacImplementationValueMigrationTest extends TestCase
         $all = $this->runtime()->findGroup($former);
         self::assertCount(count($former), $all);
         self::assertSame(['bac'], self::implementations($all));
-        $outcomes = array_values(array_unique(array_map(static fn (TranscodeRuntimeSnapshot $row): string => $row->outcome, $all)));
+        $outcomes = array_map(static fn (TranscodeRuntimeSnapshot $row): string => $row->outcome, $all) |> array_unique(...) |> array_values(...);
         self::assertEqualsCanonicalizing([...self::ACTIVE_OUTCOMES, ...self::TERMINAL_OUTCOMES], $outcomes);
 
         foreach (self::FORMER_RENDITIONS as $key) {
@@ -300,7 +300,8 @@ SQL, [$seeded]);
     private function execute(AbstractMigration $migration): void
     {
         foreach ($migration->getSql() as $query) {
-            if (preg_match('/\ACREATE EXTENSION\b/i', ltrim($query->getStatement())) === 1) {
+            $sql = $query->getStatement();
+            if (preg_match('/\ACREATE EXTENSION\b/i', ltrim($sql)) === 1) {
                 continue;
             }
             $this->connection->executeStatement($query->getStatement(), $query->getParameters(), $query->getTypes());
@@ -489,6 +490,6 @@ SQL, [
      */
     private static function implementations(array $snapshots): array
     {
-        return array_values(array_unique(array_map(static fn (TranscodeRuntimeSnapshot $row): string => $row->desired->aacImplementation->value ?? 'none', $snapshots)));
+        return array_map(static fn (TranscodeRuntimeSnapshot $row): string => $row->desired->aacImplementation->value ?? 'none', $snapshots) |> array_unique(...) |> array_values(...);
     }
 }

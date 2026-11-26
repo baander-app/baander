@@ -144,7 +144,8 @@ final class LogoutTest extends TestCase
         $tokens = $this->issueTokens($user, $client);
         $chainId = $this->chainIdOf($tokens);
         [$header, $claims] = explode('.', $tokens->getAccessToken());
-        $forged = $header . '.' . $claims . '.' . rtrim(strtr(base64_encode(random_bytes(256)), '+/', '-_'), '=');
+        $randomSignature = base64_encode(random_bytes(256));
+        $forged = $header . '.' . $claims . '.' . rtrim(strtr($randomSignature, '+/', '-_'), '=');
 
         $response = $this->authenticatedRequest('POST', '/api/oauth/revoke', $user, ['token' => $forged]);
 

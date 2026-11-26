@@ -157,7 +157,8 @@ final class MessengerDelayedPromotionTest extends TestCase
         $original = $this->delayedEnvelope();
         $transport->send($original);
         $member = $this->onlyMember();
-        self::assertSame([], iterator_to_array($transport->get()));
+        $deliveries = iterator_to_array($transport->get());
+        self::assertSame([], $deliveries);
         self::assertSame([$member], $this->members());
         self::assertSame(0, $this->redis->xLen($this->stream));
         $this->makeDue($member);

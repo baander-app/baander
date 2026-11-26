@@ -63,7 +63,7 @@ if ($command === 'info') {
     }
 } elseif ($command === 'image' && $verb === 'tag') {
     [$source, $reference] = array_slice($arguments, 2);
-    $receipt = json_decode(file_get_contents(getenv('IMAGE_LEDGER_RECEIPT')), true, flags: JSON_THROW_ON_ERROR);
+    $receipt = getenv('IMAGE_LEDGER_RECEIPT') |> file_get_contents(...) |> (static fn(string $json): mixed => json_decode($json, true, flags: JSON_THROW_ON_ERROR));
     if (($receipt['aliases'][$reference] ?? null) !== $source) {
         $fail('Alias intention must be durable before tagging', 81);
     }

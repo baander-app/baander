@@ -135,7 +135,7 @@ final class TaggedAudioFixture
         $metadata = '';
         $last = array_key_last($blocks);
         foreach ($blocks as $index => [$type, $data]) {
-            $metadata .= chr(($index === $last ? self::LAST_BLOCK : 0) | $type) . substr(pack('N', strlen($data)), 1) . $data;
+            $metadata .= chr(($index === $last ? self::LAST_BLOCK : 0) | $type) . self::uint24(strlen($data)) . $data;
         }
 
         return self::FLAC_SIGNATURE . $metadata . substr($flac, $offset);
@@ -165,6 +165,11 @@ final class TaggedAudioFixture
         }
 
         return "ID3\x03\x00\x00" . self::syncsafe(strlen($body)) . $body;
+    }
+
+    private static function uint24(int $value): string
+    {
+        return substr(pack('N', $value), 1);
     }
 
     private static function syncsafe(int $size): string

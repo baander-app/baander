@@ -50,7 +50,8 @@ final class ScheduledConsoleWorkerStopTest extends TestCase
         self::assertSame($unknown ? 1 : 2, $handled);
         self::assertCount(1, $transport->getRejected());
         self::assertCount($unknown ? 0 : 1, $transport->getAcknowledged());
-        self::assertCount($unknown ? 1 : 0, iterator_to_array($transport->get()));
+        $pending = iterator_to_array($transport->get());
+        self::assertCount($unknown ? 1 : 0, $pending);
     }
 
     public function testUncertainScheduledDeliveryLeavesOrdinaryConsumerAvailable(): void
@@ -66,8 +67,10 @@ final class ScheduledConsoleWorkerStopTest extends TestCase
             \stdClass::class => [static function (): void { throw new ScheduledConsoleCompletionUnknown('Scheduled child completion unknown.'); }],
         ]))]);
         (new Worker(['scheduler' => $scheduled], $scheduledBus, $scheduledEvents))->run(['sleep' => 0]);
-        self::assertCount(1, iterator_to_array($async->get()));
-        self::assertCount(1, iterator_to_array($scheduled->get()));
+        $asyncPending = iterator_to_array($async->get());
+        self::assertCount(1, $asyncPending);
+        $scheduledPending = iterator_to_array($scheduled->get());
+        self::assertCount(1, $scheduledPending);
         $asyncEvents = new EventDispatcher();
         $asyncEvents->addSubscriber(new StopWorkerOnMessageLimitListener(1));
         $handled = 0;
@@ -77,7 +80,8 @@ final class ScheduledConsoleWorkerStopTest extends TestCase
         (new Worker(['async' => $async], $asyncBus, $asyncEvents))->run(['sleep' => 0]);
         self::assertSame(1, $handled);
         self::assertCount(1, $async->getAcknowledged());
-        self::assertCount(1, iterator_to_array($scheduled->get()));
+        $scheduledStillPending = iterator_to_array($scheduled->get());
+        self::assertCount(1, $scheduledStillPending);
     }
 
     /** @return iterable<string, array{bool, bool}> */

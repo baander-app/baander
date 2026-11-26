@@ -66,7 +66,8 @@ while (hrtime(true) < $deadline) {
         if ($stat === null || $status === null || ($close = strrpos($stat, ')')) === false) {
             continue; // The process exited while /proc was being enumerated.
         }
-        $fields = explode(' ', trim(substr($stat, $close + 2)));
+        $afterCommand = substr($stat, $close + 2);
+        $fields = explode(' ', trim($afterCommand));
         $identity = $pid . ':' . $fields[19];
         if (!isset($described[$identity])) {
             $arguments = $read($path . '/cmdline', 65_536);
@@ -99,7 +100,8 @@ while (hrtime(true) < $deadline) {
             foreach (glob($path . '/task/[0-9]*/stat') ?: [] as $task) {
                 $taskStat = $read($task, 4096);
                 if ($taskStat !== null && ($taskClose = strrpos($taskStat, ')')) !== false) {
-                    $taskFields = explode(' ', trim(substr($taskStat, $taskClose + 2)));
+                    $taskAfterCommand = substr($taskStat, $taskClose + 2);
+                    $taskFields = explode(' ', trim($taskAfterCommand));
                     $process['threadTicks'][basename(dirname($task))] = (int) $taskFields[11] + (int) $taskFields[12];
                 }
             }

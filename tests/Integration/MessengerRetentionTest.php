@@ -118,7 +118,8 @@ final class MessengerRetentionTest extends TestCase
         $this->agePending($id);
         $owner->keepalive($pending, 1);
         $peer = $this->transport('healthy-peer', ['redeliver_timeout' => 1, 'claim_interval' => 1]);
-        self::assertSame([], iterator_to_array($peer->get()), 'A peer must not reclaim a kept-alive delivery.');
+        $peerDeliveries = iterator_to_array($peer->get());
+        self::assertSame([], $peerDeliveries, 'A peer must not reclaim a kept-alive delivery.');
         self::assertSame('original', $this->redis->xPending($this->stream, $this->group, '-', '+', 1)[0][1]);
 
         $this->agePending($id);

@@ -192,7 +192,8 @@ final readonly class ScanFixture
         $events = $this->connection->fetchAllAssociative("SELECT id, event_name, payload, relayed_at, dead_lettered_at, lease_token FROM domain_event_outbox WHERE (event_name IN ('library.directory_indexed', 'library.scan_completed') AND payload->>'library_id' = ?) OR (event_name = 'album.created' AND payload->>'album_id' IN (?)) ORDER BY id", [$library, $knownAlbums], [1 => ArrayParameterType::STRING]);
         $deliveries = $knownNotifications === [] ? [] : $this->connection->fetchAllAssociative('SELECT id, channel, notification_id, relayed_at, dead_lettered_at, lease_token FROM domain_event_outbox_delivery WHERE notification_id IN (?) ORDER BY id', [$knownNotifications], [ArrayParameterType::STRING]);
         $tokens = [$library, $manifest['library']['slug'], ...$knownAlbums, ...$knownNotifications];
-        $where = implode(' OR ', array_fill(0, count($tokens), 'data LIKE ?'));
+        $tokenCount = count($tokens);
+        $where = implode(' OR ', array_fill(0, $tokenCount, 'data LIKE ?'));
         $jobs = [];
         $unreadable = [];
         foreach ($this->connection->fetchAllAssociative('SELECT id, job_id, data, status, attempt FROM job_monitors WHERE ' . $where, array_map(static fn(string $token): string => '%' . $token . '%', $tokens)) as $row) {

@@ -65,7 +65,8 @@ final class MovieMetadataSyncTest extends TestCase
         self::assertFalse($messages[0]->forceUpdate);
         $codec = new MetadataMessagePayloadCodec();
         $payload = array_combine($codec->fields('metadata.sync_movie'), $codec->encode($messages[0]));
-        $decoded = $codec->decode('metadata.sync_movie', json_decode(json_encode($payload, JSON_THROW_ON_ERROR), true, flags: JSON_THROW_ON_ERROR));
+        $payloadJson = json_encode($payload, JSON_THROW_ON_ERROR);
+        $decoded = $codec->decode('metadata.sync_movie', json_decode($payloadJson, true, flags: JSON_THROW_ON_ERROR));
         self::assertInstanceOf(SyncMovieMessage::class, $decoded);
         $calls = 0;
         $http = new MockHttpClient(static function (string $method, string $url) use (&$calls): MockResponse {

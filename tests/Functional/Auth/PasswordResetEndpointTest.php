@@ -74,7 +74,8 @@ final class PasswordResetEndpointTest extends TestCase
         $this->tokens()->issue($user->getId(), 'policy-token', new \DateTimeImmutable('+1 hour'));
 
         $this->assertJsonResponse($this->reset('policy-token', 'short'), 422);
-        $this->assertJsonResponse($this->reset('policy-token', str_repeat('a', 256)), 422);
+        $tooLongPassword = str_repeat('a', 256);
+        $this->assertJsonResponse($this->reset('policy-token', $tooLongPassword), 422);
 
         $this->assertJsonResponse($this->reset('policy-token', 'long-enough'), 200);
     }

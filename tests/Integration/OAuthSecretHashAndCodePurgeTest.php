@@ -81,6 +81,7 @@ final class OAuthSecretHashAndCodePurgeTest extends TestCase
         self::loadMigration();
         $job = $this->scheduledPurge();
         self::assertIsArray($job);
+        $scheduledFields = array_intersect_key($job, array_flip(['name', 'expression', 'job_type', 'command', 'status', 'parameters', 'evaluated_through']));
         self::assertSame([
             'name' => 'Purge expired OAuth codes',
             'expression' => '30 3 * * *',
@@ -89,7 +90,7 @@ final class OAuthSecretHashAndCodePurgeTest extends TestCase
             'status' => 'active',
             'parameters' => '[]',
             'evaluated_through' => null,
-        ], array_intersect_key($job, array_flip(['name', 'expression', 'job_type', 'command', 'status', 'parameters', 'evaluated_through'])));
+        ], $scheduledFields);
         self::assertTrue((bool) $this->manager->getConnection()->fetchOne(
             "SELECT next_run_at > clock_timestamp() - INTERVAL '1 day' AND to_char(next_run_at AT TIME ZONE 'UTC', 'HH24:MI:SS') = '03:30:00' FROM scheduled_jobs WHERE id = ?",
             [Version20261017000000::PURGE_JOB_ID],
@@ -221,7 +222,7 @@ final class OAuthSecretHashAndCodePurgeTest extends TestCase
         $this->manager->getConnection()->insert('oauth_device_codes', [
             'id' => $id->toString(),
             'device_code' => bin2hex(random_bytes(16)),
-            'user_code' => strtoupper(bin2hex(random_bytes(6))),
+            'user_code' => random_bytes(6) |> bin2hex(...) |> strtoupper(...),
             'client_id' => $client->toString(),
             'verification_uri' => 'https://app.baander.app/device',
             'expires_at' => '2026-10-07 12:15:00+00',

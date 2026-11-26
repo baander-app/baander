@@ -11,7 +11,7 @@ foreach (glob($procRoot . '/[0-9]*/stat') ?: [] as $file) {
     }
     $fields = explode(' ', $match[3]);
     $pid = (int) $match[1];
-    $arguments = array_values(array_filter(explode("\0", (string) @file_get_contents($procRoot . '/' . $pid . '/cmdline')), static fn (string $value): bool => $value !== ''));
+    $arguments = array_filter(explode("\0", (string) @file_get_contents($procRoot . '/' . $pid . '/cmdline')), static fn (string $value): bool => $value !== '') |> array_values(...);
     $processes[$pid] = ['pid' => $pid, 'ppid' => (int) $fields[1], 'state' => $fields[0], 'startTicks' => (int) $fields[19], 'rssPages' => (int) $fields[21], 'arguments' => $arguments];
 }
 $encoders = [];

@@ -99,7 +99,8 @@ $probe = static function (string $name, string $wire, array $allowed, ?float $de
         $started = hrtime(true);
         $answer = exchange($wire);
         $seconds = (hrtime(true) - $started) / 1e9;
-        check(in_array(status($answer), $allowed, true), $name . ' answered ' . status($answer));
+        $answerStatus = status($answer);
+        check(in_array($answerStatus, $allowed, true), $name . ' answered ' . status($answer));
         check($deadline === null || $seconds < $deadline, sprintf('%s was answered after %.2f seconds', $name, $seconds));
         check($error === null || str_contains($answer, '"' . $error . '"'), $name . ' was not refused as ' . $error);
         check(!str_contains($answer, 'security-runtime-secret-canary'), $name . ' reflected a credential');

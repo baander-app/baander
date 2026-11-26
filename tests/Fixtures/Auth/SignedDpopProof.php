@@ -76,7 +76,9 @@ final readonly class SignedDpopProof
 
     public static function encode(string $value): string
     {
-        return rtrim(strtr(base64_encode($value), '+/', '-_'), '=');
+        $base64 = base64_encode($value);
+
+        return rtrim(strtr($base64, '+/', '-_'), '=');
     }
 
     /**

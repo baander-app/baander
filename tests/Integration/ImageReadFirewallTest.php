@@ -423,7 +423,8 @@ final class ImageReadFirewallTest extends TestCase
     {
         $storageRoot = self::$directory . '/storage-root-' . bin2hex(random_bytes(8));
         $originalPath = $storageRoot . '/' . $image->getPath();
-        self::assertTrue(mkdir(dirname($originalPath), 0700, true));
+        $created = mkdir(dirname($originalPath), 0700, true);
+        self::assertTrue($created);
         $contents = file_get_contents(self::$directory . '/image.gif');
         self::assertNotFalse($contents);
         self::assertSame(strlen($contents), file_put_contents($originalPath, $contents));

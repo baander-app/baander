@@ -22,7 +22,8 @@ const HOLD_MS = 3000;
 function record(string $event, string $detail = ''): void
 {
     // One write per line keeps the lines of different processes apart.
-    fwrite(STDOUT, sprintf("probe %.6f %s %s\n", microtime(true), $event, $detail));
+    $timestamp = microtime(true);
+    fwrite(STDOUT, sprintf("probe %.6f %s %s\n", $timestamp, $event, $detail));
 }
 
 // Shared by the master and every forked process, so it is created before start().

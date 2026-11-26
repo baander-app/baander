@@ -41,7 +41,8 @@ require $project . '/vendor/autoload.php';
 spl_autoload_register(static function (string $class) use ($project): void {
     $prefix = 'App\\Tests\\';
     if (str_starts_with($class, $prefix)) {
-        $path = $project . '/tests/' . str_replace('\\', '/', substr($class, strlen($prefix))) . '.php';
+        $prefixLength = strlen($prefix);
+        $path = $project . '/tests/' . str_replace('\\', '/', substr($class, $prefixLength)) . '.php';
         if (is_file($path)) {
             require_once $path;
         }
@@ -588,10 +589,18 @@ function hostLoad(): array
     $pressure = $read('/proc/pressure/cpu');
 
     return [
-        'loadavg' => $load === null ? null : implode(' ', array_slice(explode(' ', trim($load)), 0, 3)),
+        'loadavg' => $load === null ? null : loadAverages($load),
         // The first line counts the time some task waited for a CPU; its total is in microseconds.
         'cpuPressure' => $pressure === null ? null : substr(explode("\n", $pressure)[0], strlen('some ')),
     ];
+}
+
+/** The 1, 5 and 15 minute load averages, the first three fields of /proc/loadavg. */
+function loadAverages(string $loadavg): string
+{
+    $fields = explode(' ', trim($loadavg));
+
+    return implode(' ', array_slice($fields, 0, 3));
 }
 $mode = $argv[1] ?? '';
 $started = microtime(true);

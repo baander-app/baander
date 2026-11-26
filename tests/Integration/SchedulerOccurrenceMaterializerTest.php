@@ -86,7 +86,8 @@ final class SchedulerOccurrenceMaterializerTest extends TestCase
         self::assertSame(1, $this->materializer()->materialize($job->getId(), 1));
         $rows = $this->occurrences($job);
         self::assertCount(5, $rows);
-        self::assertSame($firstIds, array_slice(array_column($rows, 'id'), 0, 2));
+        $leadingIds = array_slice(array_column($rows, 'id'), 0, 2);
+        self::assertSame($firstIds, $leadingIds);
         foreach ($rows as $offset => $row) {
             self::assertSame($base->modify('+' . ($offset + 1) . ' minutes')->format(DATE_ATOM), $row['minute']);
             self::assertSame('app:materializer-fixture', $row['command']);
@@ -485,7 +486,8 @@ final class SchedulerOccurrenceMaterializerTest extends TestCase
             self::assertSame(2, $this->materializer()->materialize($job->getId(), 2));
             $rows = $this->occurrences($job);
             self::assertCount($afterCommit ? 4 : 2, $rows);
-            self::assertSame($committed, array_slice($rows, 0, count($committed)));
+            $leadingRows = array_slice($rows, 0, count($committed));
+            self::assertSame($committed, $leadingRows);
             foreach ($rows as $offset => $row) {
                 self::assertSame($base->modify('+' . ($offset + 1) . ' minutes')->format(DATE_ATOM), $row['minute']);
             }

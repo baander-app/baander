@@ -634,11 +634,8 @@ final class TranscodeSessionOwnershipPersistenceTest extends TestCase
             $other = $playback->start($video, $otherRequest, qualityTier: '720p');
             $endPresentation($fourth[$jobPublicId->toString()]);
             self::assertSame([], $playback->findSessions($video, $request, [$jobPublicId]));
-            self::assertEquals($other, $playback->findSessions(
-                $video,
-                $otherRequest,
-                array_map(PublicId::fromString(...), array_keys($other)),
-            ));
+            $otherJobs = array_map(PublicId::fromString(...), array_keys($other));
+            self::assertEquals($other, $playback->findSessions($video, $otherRequest, $otherJobs));
 
             $replacement = $playback->start($video, $request, qualityTier: '480p');
             self::assertCount(1, $replacement);
@@ -648,11 +645,8 @@ final class TranscodeSessionOwnershipPersistenceTest extends TestCase
                 'SELECT quality_tier_name FROM transcode_jobs WHERE public_id = ?',
                 [$replacementJob->toString()],
             ));
-            self::assertEquals($other, $playback->findSessions(
-                $video,
-                $otherRequest,
-                array_map(PublicId::fromString(...), array_keys($other)),
-            ));
+            $otherJobsAfterReplacement = array_map(PublicId::fromString(...), array_keys($other));
+            self::assertEquals($other, $playback->findSessions($video, $otherRequest, $otherJobsAfterReplacement));
 
             $endPresentation($replacement[$replacementJob->toString()]);
             $restored = $playback->start($video, $request, qualityTier: '720p');
@@ -660,11 +654,8 @@ final class TranscodeSessionOwnershipPersistenceTest extends TestCase
             self::assertFalse($restored[$jobPublicId->toString()]->equals($fourth[$jobPublicId->toString()]));
             self::assertSame([], $playback->findSessions($video, $request, [$replacementJob]));
             self::assertEquals($restored, $playback->findSessions($video, $request, [$jobPublicId]));
-            self::assertEquals($other, $playback->findSessions(
-                $video,
-                $otherRequest,
-                array_map(PublicId::fromString(...), array_keys($other)),
-            ));
+            $otherJobsAfterRestore = array_map(PublicId::fromString(...), array_keys($other));
+            self::assertEquals($other, $playback->findSessions($video, $otherRequest, $otherJobsAfterRestore));
         }
     }
 
@@ -912,9 +903,11 @@ final class TranscodeSessionOwnershipPersistenceTest extends TestCase
         self::assertSame($expected($firstShared, $firstOwn), $ids($repository->findActiveSessions($first)));
         self::assertSame($expected($firstShared, $secondShared), $ids($repository->findByJob($shared)));
         $created = $ids([$firstShared, $secondShared, $firstOwn, $firstDone]);
+        $expectedActive = $expected($firstShared, $secondShared, $firstOwn);
+        $activeIds = $ids($repository->findAllActiveSessions());
         self::assertSame(
-            $expected($firstShared, $secondShared, $firstOwn),
-            array_intersect($ids($repository->findAllActiveSessions()), $created) |> array_values(...),
+            $expectedActive,
+            array_intersect($activeIds, $created) |> array_values(...),
         );
 
         foreach ($repository->findByJob($own) as $session) {

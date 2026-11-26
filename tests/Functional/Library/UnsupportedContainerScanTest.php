@@ -133,6 +133,7 @@ final class UnsupportedContainerScanTest extends TestCase
 
     private function manifest(string $path, string $target, string $mimeType, string $codecs): string
     {
+        $escapedTarget = htmlspecialchars($target, ENT_XML1);
         file_put_contents($path, sprintf(
             '<?xml version="1.0" encoding="utf-8"?>' . "\n"
             . '<MPD xmlns="urn:mpeg:dash:schema:mpd:2011" profiles="urn:mpeg:dash:profile:isoff-on-demand:2011" type="static"'
@@ -141,7 +142,7 @@ final class UnsupportedContainerScanTest extends TestCase
             . '</Representation></AdaptationSet></Period></MPD>' . "\n",
             $mimeType,
             $codecs,
-            htmlspecialchars($target, ENT_XML1),
+            $escapedTarget,
         ));
 
         return $path;

@@ -78,7 +78,7 @@ final class OAuthPurgeCodesCommandTest extends TestCase
         $this->entityManager->getConnection()->insert('oauth_device_codes', [
             'id' => $id->toString(),
             'device_code' => bin2hex(random_bytes(16)),
-            'user_code' => strtoupper(bin2hex(random_bytes(6))),
+            'user_code' => random_bytes(6) |> bin2hex(...) |> strtoupper(...),
             'client_id' => $client->toString(),
             'verification_uri' => 'https://app.baander.app/device',
             'expires_at' => (new \DateTimeImmutable($expiresIn))->format('Y-m-d H:i:s.uP'),

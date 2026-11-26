@@ -60,7 +60,8 @@ final class IdentifiedArtistsMissingDetailsTest extends TestCase
 
         $walked = array_keys($this->walk(2));
 
-        self::assertSame($ids, array_values(array_intersect($walked, $ids)));
+        $walkedStored = array_values(array_intersect($walked, $ids));
+        self::assertSame($ids, $walkedStored);
         $sorted = $walked;
         sort($sorted);
         self::assertSame($sorted, $walked);

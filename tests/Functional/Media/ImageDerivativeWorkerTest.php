@@ -98,7 +98,8 @@ final class ImageDerivativeWorkerTest extends TestCase
             self::assertFileDoesNotExist($directory . '/source_thumb.webp');
             $handler($message);
             self::assertSame('image/webp', getimagesize($directory . '/source_thumb.webp')['mime']);
-            self::assertSame([32, 16], array_slice(getimagesize($directory . '/source_thumb.webp'), 0, 2));
+            $thumbnailSize = array_slice(getimagesize($directory . '/source_thumb.webp'), 0, 2);
+            self::assertSame([32, 16], $thumbnailSize);
             $published = file_get_contents($directory . '/source_thumb.webp');
             // Removing the original proves duplicate delivery uses the published derivative.
             unlink($directory . '/source.png');

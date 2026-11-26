@@ -33,7 +33,7 @@ final class ActivityHistoryPaginationTest extends TestCase
             self::assertArrayNotHasKey('uuid', $item);
         }
         self::assertStringNotContainsString($user->getId()->toString(), json_encode($all, JSON_THROW_ON_ERROR));
-        self::assertSame([$user->getPublicId()->toString()], array_values(array_unique(array_column($all, 'userId'))));
+        self::assertSame([$user->getPublicId()->toString()], array_column($all, 'userId') |> array_unique(...) |> array_values(...));
 
         $pageIds = [];
         foreach ([0, 2, 4, 6] as $offset) {

@@ -12,8 +12,10 @@ $http = stream_socket_server('tcp://127.0.0.1:0', $errorCode, $errorMessage);
 if ($tls === false || $http === false) {
     exit(1);
 }
-$tlsPort = (int) substr(strrchr(stream_socket_get_name($tls, false), ':'), 1);
-$httpPort = (int) substr(strrchr(stream_socket_get_name($http, false), ':'), 1);
+$tlsAddress = stream_socket_get_name($tls, false);
+$tlsPort = (int) substr(strrchr($tlsAddress, ':'), 1);
+$httpAddress = stream_socket_get_name($http, false);
+$httpPort = (int) substr(strrchr($httpAddress, ':'), 1);
 fwrite(STDOUT, json_encode(['tls' => $tlsPort, 'http' => $httpPort], JSON_THROW_ON_ERROR) . "\n");
 fflush(STDOUT);
 $deadline = microtime(true) + 30;
@@ -43,7 +45,7 @@ while (microtime(true) < $deadline) {
         $authorization = '';
         while (($header = fgets($connection)) !== false && trim($header) !== '') {
             if (str_starts_with(strtolower($header), 'authorization:')) {
-                $authorization = ' authorization=' . trim(substr($header, strlen('authorization:')));
+                $authorization = ' authorization=' . (substr($header, strlen('authorization:')) |> trim(...));
             }
         }
         file_put_contents($directory . '/requests', ($isTls ? 'https ' : 'http ') . $path . $authorization . "\n", FILE_APPEND);

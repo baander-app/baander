@@ -99,7 +99,7 @@ final class GenreCommandsTest extends TestCase
         // No genre has library media, so only the unrestricted scope can see them.
         $tree = $this->command('app:genre:list');
         self::assertSame(Command::SUCCESS, $tree->execute(['--tree' => true]));
-        $lines = array_values(array_filter(array_map('rtrim', explode("\n", $tree->getDisplay()))));
+        $lines = array_map('rtrim', explode("\n", $tree->getDisplay())) |> array_filter(...) |> array_values(...);
         self::assertSame(['Jazz (jazz)', 'Rock (rock)', '  Hard Rock (hard-rock)'], $lines);
 
         $json = $this->command('app:genre:list');

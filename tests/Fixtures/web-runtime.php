@@ -129,7 +129,9 @@ if ($mode === 'prepare') {
             static fn (array $message): bool => in_array(MAIL_USER, array_column($message['To'] ?? [], 'Address'), true),
         ));
     }
-    check(count($messages) === 1, sprintf('Expected one email to %s, got %d.', MAIL_USER, count($messages)));
+    $oneEmail = count($messages) === 1;
+    $emailCount = count($messages);
+    check($oneEmail, sprintf('Expected one email to %s, got %d.', MAIL_USER, $emailCount));
     $message = mailpit('/message/' . $messages[0]['ID']);
     check($message['Subject'] === DANISH_RESET_SUBJECT, sprintf('Expected the subject "%s", got "%s".', DANISH_RESET_SUBJECT, $message['Subject']));
     check(preg_match('/<html[^>]*\slang="da"/', (string) $message['HTML']) === 1, 'The email HTML is not marked lang="da".');
@@ -208,7 +210,8 @@ if ($mode === 'prepare') {
     echo implode("\n", $transcript);
 } elseif ($mode === 'alert') {
     $arguments = array_slice($argv ?? [], 2);
-    [$stoppedAt, $reloadedAt, $startedAt] = array_map(intval(...), array_pad(array_slice($arguments, 0, 3), 3, 0));
+    $timestampArguments = array_slice($arguments, 0, 3);
+    [$stoppedAt, $reloadedAt, $startedAt] = array_map(intval(...), array_pad($timestampArguments, 3, 0));
     $wait = ($arguments[3] ?? '') === 'wait';
     check($stoppedAt > 0 && $reloadedAt >= $stoppedAt && $startedAt >= $reloadedAt, 'Usage: alert <stopped> <reloaded> <started> [wait]');
     $interval = (int) getenv('HEALTH_MONITOR_INTERVAL_SECONDS');
@@ -246,9 +249,11 @@ if ($mode === 'prepare') {
             'The outage began at %s, not between the stop (%s) and the reload (%s).',
             $window[1], gmdate('H:i:s', $stoppedAt), gmdate('H:i:s', $reloadedAt),
         ));
-        check($until >= $startedAt && $until <= time(), sprintf(
+        $endedInWindow = $until >= $startedAt && $until <= time();
+        $postgresStart = gmdate('H:i:s', $startedAt);
+        check($endedInWindow, sprintf(
             'The outage ended at %s, not between the start of PostgreSQL (%s) and now.',
-            $window[2], gmdate('H:i:s', $startedAt),
+            $window[2], $postgresStart,
         ));
     }
     echo sprintf("Each administrator has one PostgreSQL alert, naming the outage: %s\n", $rows[0]['body']);

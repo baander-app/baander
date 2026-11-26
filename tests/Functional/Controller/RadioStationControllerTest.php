@@ -62,7 +62,8 @@ final class RadioStationControllerTest extends TestCase
     public function testMalformedOrTooManyPublicIdsAreRefused(): void
     {
         $user = $this->createTestUser();
-        $tooMany = implode(',', array_map(static fn (): string => new PublicId()->toString(), range(1, 101)));
+        $overLimit = range(1, 101);
+        $tooMany = implode(',', array_map(static fn (): string => new PublicId()->toString(), $overLimit));
 
         foreach (['not-a-public-id', $tooMany] as $publicIds) {
             $error = $this->assertJsonResponse($this->authenticatedRequest('GET', '/api/radio/stations?publicIds=' . $publicIds, $user), 400, 'error');

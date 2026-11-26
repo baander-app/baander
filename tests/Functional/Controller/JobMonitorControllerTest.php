@@ -165,7 +165,8 @@ final class JobMonitorControllerTest extends TestCase
         self::assertEquals($api, $cli);
         self::assertCount(5, $cli['items']);
         self::assertTrue($cli['has_next_page']);
-        self::assertSame(['failed'], array_values(array_unique(array_column($cli['items'], 'status'))));
+        $statuses = array_column($cli['items'], 'status') |> array_unique(...) |> array_values(...);
+        self::assertSame(['failed'], $statuses);
 
         $apiNext = $this->assertJsonResponse(
             $this->authenticatedRequest('GET', '/api/monitor/jobs?status=failed&limit=5&cursor=' . urlencode((string) $api['next_cursor']), $admin),

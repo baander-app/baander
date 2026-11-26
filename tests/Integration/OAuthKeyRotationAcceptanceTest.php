@@ -84,11 +84,11 @@ final class OAuthKeyRotationAcceptanceTest extends TestCase
         $container = $this->kernel->getContainer();
         $users = $container->get('oauth.acceptance.users');
         self::assertInstanceOf(UserRepositoryInterface::class, $users);
-        $users->save(User::register(
+        User::register(
             new Email($this->email),
             password_hash(self::PASSWORD, PASSWORD_ARGON2ID, ['memory_cost' => 65536, 'time_cost' => 4]),
             'OAuth key rotation user',
-        ));
+        ) |> $users->save(...);
         FirstPartyOAuthClient::entity($container, $this->manager);
 
         $originalJwk = $this->jwk();

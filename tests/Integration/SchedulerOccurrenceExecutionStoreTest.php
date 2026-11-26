@@ -462,7 +462,8 @@ final class SchedulerOccurrenceExecutionStoreTest extends TestCase
         self::assertNotNull($store->begin($running->id, $attempt));
         $this->second->executeStatement("UPDATE worker_deployment_leases SET expires_at = clock_timestamp() - INTERVAL '1 second'");
         $leaseStore = new DoctrineDeploymentLease($this->second);
-        self::assertNull($leaseStore->acquire($this->authority->namespace, str_repeat('b', 32), 3600));
+        $otherBootId = str_repeat('b', 32);
+        self::assertNull($leaseStore->acquire($this->authority->namespace, $otherBootId, 3600));
         self::assertTrue(DeploymentJournalFixture::retire($this->second, $this->authority->namespace, $this->authority->bootId));
         DeploymentJournalFixture::ready($this->second, $this->authority->namespace, str_repeat('b', 32));
         $replacement = $leaseStore->acquire($this->authority->namespace, str_repeat('b', 32), 3600);

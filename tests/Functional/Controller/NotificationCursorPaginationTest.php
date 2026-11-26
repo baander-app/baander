@@ -119,7 +119,8 @@ final class NotificationCursorPaginationTest extends TestCase
             }
         }
         $this->assertCount(count($notifications), $seen);
-        $this->assertSame($seen, array_values(array_unique($seen)), 'Cursor pages must not repeat notifications.');
+        $distinctSeen = array_values(array_unique($seen));
+        $this->assertSame($seen, $distinctSeen, 'Cursor pages must not repeat notifications.');
     }
 
     /**

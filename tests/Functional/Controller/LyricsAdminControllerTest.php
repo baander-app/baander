@@ -146,10 +146,11 @@ final class LyricsAdminControllerTest extends TestCase
         $this->assertSame(Command::SUCCESS, $tester->execute(['--limit' => '10']), $tester->getDisplay());
 
         $this->assertSame($web, $this->queuedFetches());
-        $this->assertSame([0, 3000, 6000], array_slice(array_map(
+        $firstDelays = array_slice(array_map(
             static fn (Envelope $envelope): ?int => $envelope->last(DelayStamp::class)?->getDelay(),
             $this->asyncTransport()->getSent(),
-        ), 0, 3));
+        ), 0, 3);
+        $this->assertSame([0, 3000, 6000], $firstDelays);
         $this->assertSame(1, preg_match('/Job ID: (\S+)/', $tester->getDisplay(), $match));
         $this->assertSame(
             ['name' => 'BulkFetchLyricsCommand', 'status' => 'finished'],
@@ -272,9 +273,10 @@ final class LyricsAdminControllerTest extends TestCase
         $status = $this->assertJsonResponse($this->authenticatedRequest('GET', '/api/admin/lyrics/sync-status', $admin), 200, 'data')['data'];
         $tally = $status['latestRun'];
         $this->assertSame($this->latestBulkFetchJob(), $tally['jobId']);
+        $counts = array_intersect_key($tally, array_flip(['queued', 'found', 'noMatch', 'skippedNoArtist', 'skippedNoLength', 'rejected', 'unavailable']));
         $this->assertSame(
             ['queued' => 1, 'found' => 1, 'noMatch' => 0, 'skippedNoArtist' => $uncredited, 'skippedNoLength' => 0, 'rejected' => 0, 'unavailable' => 0],
-            array_intersect_key($tally, array_flip(['queued', 'found', 'noMatch', 'skippedNoArtist', 'skippedNoLength', 'rejected', 'unavailable'])),
+            $counts,
         );
 
         $tester = new CommandTester(new Application(static::$kernel)->find('app:lyrics:status'));

@@ -105,7 +105,8 @@ final class ScheduledJobParameterPersistenceTest extends TestCase
         });
         $bus = $this->createMock(MessageBusInterface::class);
         $bus->expects(self::once())->method('dispatch')->willReturnCallback(function (PersistedSchedulerParametersMessage $message) use ($encoded): Envelope {
-            self::assertSame($encoded, json_encode(get_object_vars($message), JSON_THROW_ON_ERROR | JSON_PRESERVE_ZERO_FRACTION));
+            $messageJson = json_encode(get_object_vars($message), JSON_THROW_ON_ERROR | JSON_PRESERVE_ZERO_FRACTION);
+            self::assertSame($encoded, $messageJson);
             return new Envelope($message);
         });
         $console = $this->createMock(ScheduledConsoleExecutorInterface::class);

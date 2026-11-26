@@ -104,8 +104,10 @@ final class PartySessionAccessTest extends TestCase
             $members = $this->assertJsonResponse($this->authenticatedRequest('GET', $this->membersUri($this->party), $user), 200, 'data')['data'];
 
             self::assertSame($this->party, $session['publicId']);
-            self::assertSame($expected, $this->sorted(array_column($session['members'], 'userId')));
-            self::assertSame($expected, $this->sorted(array_column($members, 'userId')));
+            $sessionMemberIds = $this->sorted(array_column($session['members'], 'userId'));
+            self::assertSame($expected, $sessionMemberIds);
+            $listedMemberIds = $this->sorted(array_column($members, 'userId'));
+            self::assertSame($expected, $listedMemberIds);
         }
     }
 
@@ -516,7 +518,7 @@ final class PartySessionAccessTest extends TestCase
     /** @return list<string> the users' public IDs, sorted */
     private function publicIds(User ...$users): array
     {
-        return $this->sorted(array_map(static fn (User $user): string => $user->getPublicId()->toString(), array_values($users)));
+        return array_map(static fn (User $user): string => $user->getPublicId()->toString(), array_values($users)) |> $this->sorted(...);
     }
 
     /** @return list<string> */

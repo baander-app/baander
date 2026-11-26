@@ -865,7 +865,8 @@ final class CatalogMutationFirewallTest extends TestCase
             case 'library_validate_path':
                 self::assertSame($before, $after, 'A path check changes nothing.');
                 self::assertTrue($data['valid'] ?? null);
-                self::assertSame(realpath($this->createdDirectory()), $data['resolvedPath'] ?? null);
+                $createdPath = realpath($this->createdDirectory());
+                self::assertSame($createdPath, $data['resolvedPath'] ?? null);
                 $this->assertNothingQueued();
                 break;
             default:
@@ -1177,7 +1178,8 @@ final class CatalogMutationFirewallTest extends TestCase
     private function pixel(): UploadedFile
     {
         $path = self::$directory . '/pixel-' . bin2hex(random_bytes(4)) . '.png';
-        self::assertSame(68, file_put_contents($path, base64_decode(self::PIXEL_PNG, true)));
+        $written = file_put_contents($path, base64_decode(self::PIXEL_PNG, true));
+        self::assertSame(68, $written);
         $this->scratch[] = $path;
 
         return new UploadedFile($path, 'cover.png', 'image/png', null, true);

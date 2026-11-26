@@ -249,7 +249,8 @@ final class InitialSchemaMigrationTest extends TestCase
 
         self::assertSame($before, $snapshot(), 'Replacing capture functions preserves data, pending changes and revision tombstones.');
         $afterHistory = $this->connection->fetchAllAssociative('SELECT * FROM doctrine_migration_versions ORDER BY version');
-        self::assertSame($history, array_slice($afterHistory, 0, count($history)));
+        $leadingHistory = array_slice($afterHistory, 0, count($history));
+        self::assertSame($history, $leadingHistory);
         self::assertSame('DoctrineMigrations\\Version20261031120000', $afterHistory[count($history)]['version']);
         $afterCatalog = $this->catalog('public');
         self::assertSame($catalog['relations'], $afterCatalog['relations'], 'Replacing capture functions preserves every relation OID and file node.');

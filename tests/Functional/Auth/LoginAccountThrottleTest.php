@@ -30,7 +30,8 @@ final class LoginAccountThrottleTest extends RateLimitTestCase
 
         // A new address with the right password, and a case variant of the address, wait too.
         $this->assertTooManyRequests($this->login('198.18.10.21', $user->getEmail(), 'right-password-1'));
-        $this->assertTooManyRequests($this->login('198.18.10.22', strtoupper($user->getEmail()), 'right-password-1'));
+        $upperCaseEmail = strtoupper($user->getEmail());
+        $this->assertTooManyRequests($this->login('198.18.10.22', $upperCaseEmail, 'right-password-1'));
     }
 
     public function testASuccessfulLoginIsNotCharged(): void

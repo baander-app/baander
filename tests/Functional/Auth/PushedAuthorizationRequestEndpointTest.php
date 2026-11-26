@@ -110,7 +110,8 @@ final class PushedAuthorizationRequestEndpointTest extends RateLimitTestCase
 
         $this->assertOAuthError('unauthorized_client', $this->push([...$request, 'client_id' => $device->getPublicId()->toString()]));
         $this->assertOAuthError('invalid_request', $this->push([...$request, 'code_challenge_method' => 'plain']));
-        $this->assertOAuthError('invalid_request', $this->push(array_diff_key($request, ['code_challenge' => true])));
+        $withoutChallenge = array_diff_key($request, ['code_challenge' => true]);
+        $this->assertOAuthError('invalid_request', $this->push($withoutChallenge));
         $this->assertOAuthError('invalid_request', $this->push([...$request, 'redirect_uri' => 'https://evil.baander.app/callback']));
     }
 

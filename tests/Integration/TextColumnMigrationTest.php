@@ -49,10 +49,12 @@ final class TextColumnMigrationTest extends TestCase
         self::assertSame(array_fill_keys($this->convertedColumns(), 'text'), $this->columnTypes());
         self::assertSame([], $this->varcharDefaults());
         foreach ($rows as $table => [$key, $keyValue, $values]) {
-            self::assertSame($values, $connection->fetchAssociative(
-                sprintf('SELECT %s FROM %s WHERE %s = :key', implode(', ', array_keys($values)), $table, $key),
+            $columns = implode(', ', array_keys($values));
+            $stored = $connection->fetchAssociative(
+                sprintf('SELECT %s FROM %s WHERE %s = :key', $columns, $table, $key),
                 ['key' => $keyValue],
-            ), $table);
+            );
+            self::assertSame($values, $stored, $table);
         }
 
         // Former VARCHAR(255) rejected this; TMDB taglines are not bounded by the application.

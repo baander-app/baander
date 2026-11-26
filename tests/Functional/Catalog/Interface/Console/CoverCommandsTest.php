@@ -141,9 +141,10 @@ final class CoverCommandsTest extends TestCase
     /** @return array<string, mixed> */
     private function uploadOverHttp(User $admin, string $collection, string $publicId, string $file, int $status): array
     {
+        $encodedId = rawurlencode($publicId);
         $this->client->request(
             'POST',
-            sprintf('/api/%s/%s/cover', $collection, rawurlencode($publicId)),
+            sprintf('/api/%s/%s/cover', $collection, $encodedId),
             [],
             ['cover' => new UploadedFile($file, 'cover.jpg', 'image/jpeg', null, true)],
             [BaanderHeader::TestUserId->serverKey() => $admin->getId()->toString()],

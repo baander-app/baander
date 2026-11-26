@@ -42,12 +42,18 @@ final class MediaControlObservation
             return null;
         }
         $close = strrpos($stat, ')');
-        $fields = $close === false ? [] : explode(' ', trim(substr($stat, $close + 1)));
+        $fields = $close === false ? [] : self::statFields(substr($stat, $close + 1));
         $namespace = @readlink('/proc/' . $pid . '/ns/pid');
         if (!isset($fields[19]) || !ctype_digit($fields[19]) || $namespace === false) {
             throw new RuntimeException('Native process identity could not be observed.');
         }
         return ['pid' => $pid, 'startTicks' => $fields[19], 'pidNamespace' => $namespace, 'hostname' => (string) gethostname()];
+    }
+
+    /** @return list<string> the fields of /proc/<pid>/stat that follow the command name */
+    private static function statFields(string $afterCommand): array
+    {
+        return explode(' ', trim($afterCommand));
     }
 
     /** @param array{pid:int,startTicks:string,pidNamespace:string,hostname:string} $identity */

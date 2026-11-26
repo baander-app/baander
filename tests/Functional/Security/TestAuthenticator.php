@@ -82,7 +82,7 @@ final class TestAuthenticator extends AbstractAuthenticator
     {
         $value = (string) $request->headers->get(BaanderHeader::TestClientScopes->value, '');
 
-        return array_values(array_filter(explode(' ', $value), static fn (string $scope): bool => $scope !== ''));
+        return array_filter(explode(' ', $value), static fn (string $scope): bool => $scope !== '') |> array_values(...);
     }
 
     public function onAuthenticationSuccess(Request $request, TokenInterface $token, string $firewallName): ?Response

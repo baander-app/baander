@@ -232,7 +232,7 @@ final class OAuthClientPersistenceTest extends TestCase
             'code_challenge' => 'E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM', 'code_challenge_method' => 'S256',
             'dpop_jkt' => '0ZcOCORZNYy-DWpqq30jZyJGHTN0d2HglBV3uiguA4I', 'credential_epoch' => 0, ...$times]);
         $this->writer->insert('oauth_device_codes', ['id' => $deviceCode, 'device_code' => bin2hex(random_bytes(16)),
-            'user_code' => strtoupper(bin2hex(random_bytes(6))), 'client_id' => $client->toString(),
+            'user_code' => random_bytes(6) |> bin2hex(...) |> strtoupper(...), 'client_id' => $client->toString(),
             'verification_uri' => 'https://app.baander.app/device', 'expires_at' => '2026-11-19 12:15:00+00', ...$times]);
         $this->writer->insert('oauth_access_tokens', ['id' => $access, 'token_id' => $tokens['access token'],
             'client_id' => $client->toString(), 'user_id' => $user, 'grant_type' => 'authorization_code', 'credential_epoch' => 0, ...$times]);

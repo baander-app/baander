@@ -20,7 +20,8 @@ use function Swoole\Coroutine\run;
 
 function record(string $event, string $detail = ''): void
 {
-    fwrite(STDOUT, sprintf("client %.6f %s %s\n", microtime(true), $event, $detail));
+    $timestamp = microtime(true);
+    fwrite(STDOUT, sprintf("client %.6f %s %s\n", $timestamp, $event, $detail));
 }
 
 $host = $argv[1] ?? '127.0.0.1';

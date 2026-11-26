@@ -438,10 +438,10 @@ final class ScannedArtistCreditsTest extends TestCase
         $this->console('app:library:scan', ['library' => $this->library->getSlug()->toString(), '--rescan' => $rescan]);
         static::getContainer()->get(RelayOutboxHandler::class)(new RelayOutboxCommand());
 
-        $discoveries = array_values(array_filter(
+        $discoveries = array_filter(
             array_map(static fn (Envelope $envelope): object => $envelope->getMessage(), $transport->getSent()),
             fn (object $message): bool => $message instanceof FilesDiscovered && $message->libraryId->equals($this->library->getId()),
-        ));
+        ) |> array_values(...);
         self::assertNotSame([], $discoveries, 'The scan queued the library\'s files for import.');
         foreach ($discoveries as $discovery) {
             $this->entityManager->clear();

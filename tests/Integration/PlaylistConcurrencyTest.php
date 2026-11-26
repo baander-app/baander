@@ -319,7 +319,8 @@ final class PlaylistConcurrencyTest extends TestCase
         $playlist = $this->load($repository);
         $playlist->addSong($this->songIds[1], 1);
         $repository->save($playlist);
-        $child = $this->startChild('reorder', implode(',', array_map(static fn(Uuid $id): string => $id->toString(), $this->songIds)));
+        $songIdStrings = array_map(static fn(Uuid $id): string => $id->toString(), $this->songIds);
+        $child = $this->startChild('reorder', implode(',', $songIdStrings));
         $manager->getConnection()->beginTransaction();
         $playlist->reorderSongs(array_reverse($this->songIds));
         $repository->save($playlist);
@@ -394,7 +395,8 @@ final class PlaylistConcurrencyTest extends TestCase
         $playlist->addSong($this->songIds[1], 1);
         $repository->save($playlist);
         $expectedRevision = $playlist->getRevision();
-        $child = $this->startChild('handler-reorder', implode(',', array_map(static fn(Uuid $id): string => $id->toString(), $this->songIds)));
+        $songIdStrings = array_map(static fn(Uuid $id): string => $id->toString(), $this->songIds);
+        $child = $this->startChild('handler-reorder', implode(',', $songIdStrings));
         $connection = $manager->getConnection();
         $connection->beginTransaction();
         $winnerRevision = (new ReorderSongsHandler($repository))(new ReorderSongsCommand($this->playlistId, $this->ownerId, array_reverse($this->songIds), $expectedRevision));

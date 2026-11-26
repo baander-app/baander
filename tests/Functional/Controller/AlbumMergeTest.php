@@ -299,10 +299,11 @@ final class AlbumMergeTest extends TestCase
                 ],
                 'play' => $this->playAlbumOf($play) === $targetAlbumId->toString() ? 'target' : $this->playAlbumOf($play),
                 'copyOfASong' => [
-                    'entries' => $this->entriesOf($playlist) |> (static fn (array $entries): array => array_combine(
-                        array_map(static fn (string $song): string => $songNames[$song] ?? $song, array_keys($entries)),
-                        $entries,
-                    )),
+                    'entries' => $this->entriesOf($playlist) |> (static function (array $entries) use ($songNames): array {
+                        $songIds = array_keys($entries);
+
+                        return array_combine(array_map(static fn (string $song): string => $songNames[$song] ?? $song, $songIds), $entries);
+                    }),
                     'lyrics' => array_map(
                         static fn (string $song): string => $songNames[$song] ?? $song,
                         $this->entityManager->getConnection()->fetchFirstColumn("SELECT song_id FROM lyrics WHERE plain_lyrics = 'Here come old flat-top' AND song_id IN (?, ?)", [$kept->toString(), $duplicate->toString()]),

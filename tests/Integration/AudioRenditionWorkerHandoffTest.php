@@ -118,7 +118,8 @@ final class AudioRenditionWorkerHandoffTest extends TestCase
 
         $this->startWorker(.1);
         $rendition = $this->cache()->open('track', $this->source, AudioRenditionFormat::Mp3, 192000);
-        self::assertNotSame('', implode('', iterator_to_array($rendition->chunks(), false)));
+        $renditionBytes = implode('', iterator_to_array($rendition->chunks(), false));
+        self::assertNotSame('', $renditionBytes);
         self::assertSame(0, $this->workerProcess->wait(), $this->workerProcess->getErrorOutput());
         self::assertSame(1, (int) $this->first->fetchOne('SELECT count(*) FROM audio_rendition_runtime'));
         self::assertSame('complete', $this->first->fetchOne('SELECT state FROM audio_rendition_runtime'));
@@ -150,7 +151,8 @@ final class AudioRenditionWorkerHandoffTest extends TestCase
             usleep(10_000);
         }
         $recovered = $this->cache()->open('track', $this->source, AudioRenditionFormat::Mp3, 192000);
-        self::assertNotSame('', implode('', iterator_to_array($recovered->chunks(), false)));
+        $recoveredBytes = implode('', iterator_to_array($recovered->chunks(), false));
+        self::assertNotSame('', $recoveredBytes);
         self::assertSame(0, $this->workerProcess->wait(), $this->workerProcess->getErrorOutput());
         self::assertSame(2, (int) $this->first->fetchOne('SELECT generation FROM audio_rendition_runtime'));
     }

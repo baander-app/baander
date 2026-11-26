@@ -33,7 +33,7 @@ final class CoveredIndexPersistenceTest extends TestCase
 
     public function testSchemaComparisonIsCleanForTheAffectedTables(): void
     {
-        $this->assertSchemaComparisonIsClean(array_values(array_unique([...array_column(self::COVERED, 0), 'transcode_jobs'])));
+        array_unique([...array_column(self::COVERED, 0), 'transcode_jobs']) |> array_values(...) |> $this->assertSchemaComparisonIsClean(...);
     }
 
     public function testTheWiderIndexesAloneServeTheDroppedIndexLookups(): void
@@ -66,10 +66,8 @@ final class CoveredIndexPersistenceTest extends TestCase
                 static fn (string $name): bool => str_contains($predicate, ':' . $name),
                 ARRAY_FILTER_USE_KEY,
             );
-            $plan = implode("\n", $connection->fetchFirstColumn(
-                sprintf('EXPLAIN (COSTS OFF) SELECT 1 FROM %s WHERE %s', $table, $predicate),
-                $parameters,
-            ));
+            $explain = sprintf('EXPLAIN (COSTS OFF) SELECT 1 FROM %s WHERE %s', $table, $predicate);
+            $plan = implode("\n", $connection->fetchFirstColumn($explain, $parameters));
             self::assertStringContainsString('Index Scan using ' . $covering . ' on ' . $table, $plan, $dropped);
             self::assertStringContainsString('Index Cond:', $plan, $dropped);
         }
@@ -121,7 +119,7 @@ final class CoveredIndexPersistenceTest extends TestCase
     /** @return array<string, string> index name => definition, for the affected tables */
     private function indexes(): array
     {
-        $tables = array_values(array_unique(array_column(self::COVERED, 0)));
+        $tables = array_column(self::COVERED, 0) |> array_unique(...) |> array_values(...);
 
         $indexes = $this->manager->getConnection()->fetchAllKeyValue(
             'SELECT indexname, indexdef FROM pg_indexes WHERE schemaname = current_schema() AND tablename = ANY (:tables::text[])',

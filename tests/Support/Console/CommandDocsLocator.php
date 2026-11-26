@@ -81,11 +81,11 @@ final readonly class CommandDocsLocator
         preg_match_all('/^#{1,6}\s+(.+?)\s*#*\s*$/m', $markdown, $headings);
 
         return array_map(
-            static fn (string $heading): string => str_replace(
-                ' ',
-                '-',
-                (string) preg_replace('/[^\p{L}\p{N}\s_-]/u', '', mb_strtolower(trim($heading))),
-            ),
+            static function (string $heading): string {
+                $lowercase = mb_strtolower(trim($heading));
+
+                return str_replace(' ', '-', (string) preg_replace('/[^\p{L}\p{N}\s_-]/u', '', $lowercase));
+            },
             $headings[1],
         );
     }

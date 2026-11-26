@@ -41,7 +41,8 @@ while (hrtime(true) < $deadline) {
         if ($stat === null || ($close = strrpos($stat, ')')) === false) {
             continue;
         }
-        $startTicks = (int) explode(' ', trim(substr($stat, $close + 2)))[19];
+        $afterCommand = substr($stat, $close + 2);
+        $startTicks = (int) explode(' ', trim($afterCommand))[19];
         $arguments = explode("\0", rtrim((string) $read('/proc/' . $pid . '/cmdline'), "\0"));
         if (array_any($arguments, static fn (string $argument): bool => str_ends_with($argument, '/bin/worker-lease-agent.php'))) {
             $request = json_decode((string) base64_decode((string) end($arguments), true), true);

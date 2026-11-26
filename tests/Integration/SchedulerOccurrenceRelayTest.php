@@ -194,7 +194,8 @@ final class SchedulerOccurrenceRelayTest extends TestCase
             $message = $sent[0]->getMessage();
             self::assertInstanceOf(ExecuteScheduledOccurrenceCommand::class, $message);
             self::assertTrue($id->equals($message->occurrenceId));
-            self::assertSame(['occurrenceId'], array_keys(get_object_vars($message)));
+            $messageFields = array_keys(get_object_vars($message));
+            self::assertSame(['occurrenceId'], $messageFields);
             self::assertCount(0, $genericAsync->getSent());
         } finally {
             $kernel->shutdown();
@@ -226,7 +227,8 @@ final class SchedulerOccurrenceRelayTest extends TestCase
         $message = $envelope->getMessage();
         self::assertInstanceOf(ExecuteScheduledOccurrenceCommand::class, $message);
         self::assertTrue($message->occurrenceId->equals($occurrence->id));
-        self::assertSame(['occurrenceId'], array_keys(get_object_vars($message)));
+        $messageFields = array_keys(get_object_vars($message));
+        self::assertSame(['occurrenceId'], $messageFields);
         self::assertSame(0, $this->writer->getTransactionNestingLevel());
         $row = $this->row($occurrence);
         self::assertNotNull($row['dispatch_token'], 'Independent observer must see committed reservation before transport send.');

@@ -153,15 +153,16 @@ final class PlaybackSchemaMappingTest extends TestCase
                AND t.relname = ANY (string_to_array(:tables, ','))
             SQL, ['tables' => implode(',', array_keys(self::TABLES))]);
 
+        $partialIndexes = $this->sortedByKey(array_map(static function (array $index): array {
+            self::assertTrue((bool) $index['is_valid']);
+
+            return [(string) $index['table_name'], (bool) $index['is_unique'], (string) $index['predicate']];
+        }, $indexes));
         self::assertSame([
             'idx_playback_commands_pending_controls' => ['playback_commands', false, "((acknowledged_at IS NULL) AND (type = ANY (ARRAY['play'::text, 'pause'::text, 'seek'::text, 'load'::text, 'stop'::text, 'volume'::text, 'queue'::text])))"],
             'idx_playback_commands_replay' => ['playback_commands', false, '(acknowledged_at IS NULL)'],
             'uniq_playback_transfers_current' => ['playback_transfers', true, "(state <> ALL (ARRAY['committed'::text, 'failed'::text]))"],
-        ], $this->sortedByKey(array_map(static function (array $index): array {
-            self::assertTrue((bool) $index['is_valid']);
-
-            return [(string) $index['table_name'], (bool) $index['is_unique'], (string) $index['predicate']];
-        }, $indexes)));
+        ], $partialIndexes);
 
         // The mapping states the same uniqueness and predicate, so a created schema fences the same rows.
         $mapped = (new SchemaTool($this->manager))->getSchemaFromMetadata($this->manager->getMetadataFactory()->getAllMetadata());

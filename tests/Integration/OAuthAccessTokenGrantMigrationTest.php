@@ -58,9 +58,11 @@ final class OAuthAccessTokenGrantMigrationTest extends TestCase
         $user = $this->insertUser();
         $client = $this->insertClient();
         $access = $this->insertAccessToken($client, $user);
+        $refreshId = Uuid::generate()->toString();
+        $refreshSecret = bin2hex(random_bytes(40));
         $this->connection->insert('oauth_refresh_tokens', [
-            'id' => Uuid::generate()->toString(),
-            'token_id' => hash('sha256', bin2hex(random_bytes(40))),
+            'id' => $refreshId,
+            'token_id' => hash('sha256', $refreshSecret),
             'access_token_id' => $access,
             'credential_epoch' => 0,
             'chain_expires_at' => '2027-01-01 00:00:00+00',
@@ -105,7 +107,8 @@ final class OAuthAccessTokenGrantMigrationTest extends TestCase
                 self::assertInstanceOf(AbstractMigration::class, $migration);
                 $migration->up(new Schema());
                 foreach ($migration->getSql() as $query) {
-                    if (preg_match('/\ACREATE EXTENSION\b/i', ltrim($query->getStatement())) === 1) {
+                    $sql = $query->getStatement();
+                    if (preg_match('/\ACREATE EXTENSION\b/i', ltrim($sql)) === 1) {
                         continue;
                     }
                     $this->connection->executeStatement($query->getStatement(), $query->getParameters(), $query->getTypes());

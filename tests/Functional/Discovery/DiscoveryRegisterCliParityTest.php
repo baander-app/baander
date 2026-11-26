@@ -37,7 +37,8 @@ final class DiscoveryRegisterCliParityTest extends TestCase
         foreach ([self::URL . '/api' => $viaApi, self::URL . '/cli' => $first] as $url => $printed) {
             $server = $this->serverPort()->findByServerUrl($url);
             self::assertNotNull($server);
-            self::assertSame(64, strlen($server->getApiKey()));
+            $apiKeyLength = strlen($server->getApiKey());
+            self::assertSame(64, $apiKeyLength);
             self::assertStringNotContainsString($server->getApiKey(), json_encode($printed, JSON_THROW_ON_ERROR));
             self::assertSame($printed['publicId'], $server->getPublicId()->toString());
         }

@@ -28,7 +28,8 @@ if (preg_match('/^MemAvailable:\s+(\d+) kB$/m', (string) file_get_contents('/pro
     throw new RuntimeException('Cannot read the available host memory.');
 }
 $available = (int) $match[1] * 1024;
-$count = max(1, min($requested, intdiv($available - 4096 * 1048576, $perEncoderMiB * 1048576)));
+$encodersThatFit = intdiv($available - 4096 * 1048576, $perEncoderMiB * 1048576);
+$count = max(1, min($requested, $encodersThatFit));
 $root = dirname(__DIR__, 3) . '/storage/two-command/cost-replay';
 $processes = [];
 $startedAt = hrtime(true) / 1e9;

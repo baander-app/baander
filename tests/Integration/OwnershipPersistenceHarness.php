@@ -114,17 +114,19 @@ trait OwnershipPersistenceHarness
                 }
             }
         }
-        $pattern = '/\b(' . implode('|', array_map(static fn (string $name): string => preg_quote($name, '/'), array_unique($names))) . ')\b/i';
+        $distinctNames = array_unique($names);
+        $pattern = '/\b(' . implode('|', array_map(static fn (string $name): string => preg_quote($name, '/'), $distinctNames)) . ')\b/i';
 
         $statements = array_values(array_filter(
             $tool->getUpdateSchemaSql($metadata),
             static fn (string $sql): bool => preg_match($pattern, $sql) === 1,
         ));
 
-        self::assertSame([], array_values(array_filter(
+        $dropStatements = array_values(array_filter(
             $statements,
             static fn (string $sql): bool => preg_match('/\bDROP\s+(CONSTRAINT|INDEX)\b/i', $sql) === 1,
-        )));
+        ));
+        self::assertSame([], $dropStatements);
         self::assertSame([], $statements);
     }
 

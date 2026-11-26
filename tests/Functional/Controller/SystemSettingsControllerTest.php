@@ -62,10 +62,11 @@ final class SystemSettingsControllerTest extends TestCase
         $response = $this->authenticatedRequest('GET', '/api/admin/settings/definitions', $admin);
         $definitions = $this->assertJsonResponse($response, 200, 'data')['data'];
 
-        $this->assertSame([], array_column(
+        $unenforcedKeys = array_column(
             array_filter($definitions, static fn (array $definition): bool => $definition['enforced'] !== true),
             'key',
-        ));
+        );
+        $this->assertSame([], $unenforcedKeys);
     }
 
     public function testPatchStoresTypedValuesAndReturnsTheSettings(): void

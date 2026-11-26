@@ -225,7 +225,8 @@ foreach (['starts', 'drained', 'draining', 'releases-0', 'releases-1', 'assigned
     $results->set($key, ['value' => 0]);
 }
 $listener = stream_socket_server('tcp://127.0.0.1:0');
-$port = (int) substr(strrchr(stream_socket_get_name($listener, false), ':'), 1);
+$address = stream_socket_get_name($listener, false);
+$port = (int) substr(strrchr($address, ':'), 1);
 fclose($listener);
 $master = getmypid();
 $principal = Uuid::generate();
@@ -238,7 +239,7 @@ if ($child === 0) {
         bridgeAwait(static fn(): bool => (int) $database->fetchOne('SELECT count(*) FROM query_scope_revision') === 1, 'Worker zero did not project with no clients.');
         $bridgeStage = 'initial subscription ready';
         $clients = [bridgeConnect($port), bridgeConnect($port)];
-        if (count(array_unique(array_column($clients, 'worker'))) !== 2) {
+        if (array_column($clients, 'worker') |> array_unique(...) |> count(...) !== 2) {
             bridgeFail('Subscriptions did not span both HTTP workers.');
         }
         $database->beginTransaction();
@@ -299,7 +300,7 @@ if ($child === 0) {
         bridgeAwait(static fn(): bool => $results->get('starts', 'value') >= 4, 'Workers did not reload.');
         $bridgeStage = 'subscription ready after reload';
         $reconnected = [bridgeConnect($port), bridgeConnect($port)];
-        if (count(array_unique(array_column($reconnected, 'worker'))) !== 2) {
+        if (array_column($reconnected, 'worker') |> array_unique(...) |> count(...) !== 2) {
             bridgeFail('Reloaded subscriptions did not span both HTTP workers.');
         }
         if (array_intersect(array_column($clients, 'subscription'), array_column($reconnected, 'subscription')) !== []) {

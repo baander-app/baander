@@ -205,10 +205,8 @@ final class CatalogDeleteCommandsTest extends TestCase
         self::assertSame(Command::SUCCESS, $albumCli->execute(['public-id' => $fixture['album'], '--dry-run' => true, '--delete-files' => true, '--json' => true]));
         self::assertSame($albumApi, $this->decode($albumCli->getDisplay()));
         self::assertFalse($albumApi['fileDeletion']['allowed']);
-        self::assertSame(
-            ['deletable', 'deletable', 'outside_root'],
-            $this->sorted(array_column($albumApi['fileDeletion']['files'], 'verdict')),
-        );
+        $verdicts = $this->sorted(array_column($albumApi['fileDeletion']['files'], 'verdict'));
+        self::assertSame(['deletable', 'deletable', 'outside_root'], $verdicts);
 
         $songApi = $this->assertJsonResponse(
             $this->authenticatedRequest('GET', '/api/admin/songs/' . $song . '/delete-preview?deleteFile=true', $admin),
@@ -322,8 +320,10 @@ final class CatalogDeleteCommandsTest extends TestCase
         $unknown = (new PublicId())->toString();
 
         foreach (['albums', 'songs', 'movies', 'artists'] as $collection) {
-            $this->assertJsonResponse($this->authenticatedRequest('DELETE', sprintf('/api/%s/not-a-public-id', $collection), $admin), 422);
-            $this->assertJsonResponse($this->authenticatedRequest('DELETE', sprintf('/api/%s/%s', $collection, $unknown), $admin), 404);
+            $malformedUri = sprintf('/api/%s/not-a-public-id', $collection);
+            $this->assertJsonResponse($this->authenticatedRequest('DELETE', $malformedUri, $admin), 422);
+            $unknownUri = sprintf('/api/%s/%s', $collection, $unknown);
+            $this->assertJsonResponse($this->authenticatedRequest('DELETE', $unknownUri, $admin), 404);
         }
         $this->assertJsonResponse($this->authenticatedRequest('GET', '/api/admin/albums/not-a-public-id/delete-preview', $admin), 422);
         $this->assertJsonResponse($this->authenticatedRequest('GET', '/api/admin/songs/' . $unknown . '/delete-preview', $admin), 404);
@@ -351,7 +351,7 @@ final class CatalogDeleteCommandsTest extends TestCase
         for ($i = 1; $i <= $songs + $outsideRoot; ++$i) {
             $path = $i <= $songs
                 ? sprintf('%s/Artist/Album/%02d.flac', $root, $i)
-                : sprintf('%s/elsewhere/%s.flac', $this->base, bin2hex(random_bytes(4)));
+                : $this->outsideRootPath();
             if ($withFiles) {
                 file_put_contents($path, 'audio ' . $i);
                 $paths[] = $path;
@@ -384,6 +384,13 @@ final class CatalogDeleteCommandsTest extends TestCase
 
         /** @var array{scan_status: ?string, last_scan: ?string, claim_id: ?string} $row */
         return $row;
+    }
+
+    private function outsideRootPath(): string
+    {
+        $name = bin2hex(random_bytes(4));
+
+        return sprintf('%s/elsewhere/%s.flac', $this->base, $name);
     }
 
     private function library(): LibraryEntity

@@ -49,7 +49,8 @@ require $projectDir . '/vendor/autoload.php';
 
 function record(string $event, string $detail = ''): void
 {
-    fwrite(STDOUT, sprintf("client %.6f %s %s\n", microtime(true), $event, $detail));
+    $timestamp = microtime(true);
+    fwrite(STDOUT, sprintf("client %.6f %s %s\n", $timestamp, $event, $detail));
 }
 
 /**
@@ -239,10 +240,11 @@ if ($mode === 'ws') {
     } catch (RuntimeException) {
         // A cut response: curl's result code says how.
     }
+    $bodyLength = strlen($exchange->body);
     record('ended', sprintf(
         'result=%d bytes=%d complete=%s',
         $exchange->result,
-        strlen($exchange->body),
+        $bodyLength,
         $exchange->body === $held->written ? 'yes' : 'no',
     ));
 } else {

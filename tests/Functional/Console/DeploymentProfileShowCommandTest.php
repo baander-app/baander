@@ -59,7 +59,9 @@ final class DeploymentProfileShowCommandTest extends KernelTestCase
         self::assertSame(Command::SUCCESS, $this->command->execute(['--capability' => 'remux', '--web-workers' => '2', '--database-slots' => '4', '--ordinary-consumers' => '1', '--copy-slots' => '2', '--json' => true]));
         $document = json_decode($this->command->getDisplay(), true, flags: JSON_THROW_ON_ERROR);
 
-        self::assertEquals(new DeploymentProfile('remux', 2, 4, 1, sharedCopySlots: 2), DeploymentProfile::fromJson(json_encode($document['profile'], JSON_THROW_ON_ERROR)));
+        $expected = new DeploymentProfile('remux', 2, 4, 1, sharedCopySlots: 2);
+        $profileJson = json_encode($document['profile'], JSON_THROW_ON_ERROR);
+        self::assertEquals($expected, DeploymentProfile::fromJson($profileJson));
         self::assertSame([0, 0, 2, null, null, 5, 12, 4], [
             $document['limits']['videoSlots'], $document['limits']['audioSlots'], $document['limits']['sharedCopySlots'],
             $document['limits']['maximumVideoSlots'], $document['limits']['maximumAudioSlots'],
