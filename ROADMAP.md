@@ -16,6 +16,26 @@ Read [AGENTS.md](AGENTS.md) for workflow, [CONCEPTS.md](CONCEPTS.md) for shared 
 and the [testing guide](docs-book/part-2-developer-guide/testing/README.md) for current
 runners and verification boundaries. Historical suite counts apply to their own trees.
 
+## Push without VAPID keys, 2026-11-26
+
+Since `cd1b02c05` (2026-11-21) removed the tracked `.env`, the production image has run with the empty VAPID keys of `.env.example`. The WebPush client rejects an empty key pair in its constructor and was built eagerly, so every `SendPushCommand` failed while its handler was constructed, was retried three times and was dead-lettered, even with push turned off. GitHub CI's "Production worker lifecycle and dependencies" step failed its outbox check on every run that reached it from `227948b34` on; the tracked `.env`'s development key pair had hidden the defect since the first commit.
+
+Owner decision: build the client lazily, and have both push handlers skip with a `notification.push` log entry when the port reports that no key pair is configured.
+
+Delivered in `f98d8012e`: `PushDeliveryPortInterface::isConfigured()`, a lazy `WebPush` argument in `WebPushDelivery`, the skip in `SendPushHandler` and `SendPushToSubscriptionHandler`, a kernel test that boots with empty keys, and a note on the operator environment-variable page.
+
+Verification checkpoint:
+
+- The kernel test failed before the fix with `[VAPID] Public key should be 65 bytes long when decoded.` and passes after it.
+- Notification unit tests: 279 passed. Push kernel, integration and functional tests: 21 passed across both stack lanes.
+- Whole-tree application PHPStan, `check:imports`, and Deptrac with 0 violations.
+- The production worker drill (`scripts/test-worker-production-container.php`) passed against a worker image built from `f98d8012e`. On `f78a945ec` it fails at the same outbox check as CI.
+
+Open:
+
+- GitHub CI's Chromium media-ownership step failed with "Combined phase failed: absent" before this regression hid it, and may fail again now that the outbox check passes.
+- The "Public website" workflow has failed on every completed run since `1ab64d3c6` (2026-11-25), in the same five browser tests: static code highlighting (light and dark), manual sidebar focus rings (1440 and 390 px), and the manual without JavaScript.
+
 ## Pipe-operator inspection check, 2026-11-26
 
 PHPStan now reports what PhpStorm 2026.3's pipe-operator inspection reports, and the tree has none of those findings left. Two rules in `packages/baander-phpstan-rules` mirror the inspection's two messages: nested call chains of three to ten levels, and three to ten consecutive assignments to one variable. Both PHPStan configurations load them, so `make phpstan`, `composer analyse:tooling`, `make ci` and CI fail on a new finding. The [plan](docs/plans/2026-11-25-2138-refactor-pipe-operator-inspection-check-plan.md) records the design; the developer guide's [Pipe Operator](docs-book/part-2-developer-guide/development/coding-conventions.md#pipe-operator) section gives the house fix and the parity check.
