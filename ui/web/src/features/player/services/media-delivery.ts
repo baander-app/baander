@@ -2,6 +2,7 @@ import { isAxiosError } from 'axios'
 import i18n from 'i18next'
 import {
   postStreamDelivery,
+  type ApiError,
   type DeliveryRequest
 } from '@/shared/api-client/gen/endpoints'
 import translations from '@/shared/i18n/locales/en/translation.json'
@@ -80,6 +81,31 @@ function deliveryRefusal(error: unknown): MediaCompatibilityError | null {
   const reason = body?.error?.details?.reason
   return typeof reason === 'string' && REFUSAL_REASONS.has(reason)
     ? new MediaCompatibilityError(reason)
+    : null
+}
+
+/** A start the server refused because the account already holds every transcode session it allows. */
+export class TranscodeSessionLimitError extends Error {
+  readonly limit: number
+
+  constructor(limit: number) {
+    super(i18n.t('player.sessionLimit', { count: limit }))
+    this.name = 'TranscodeSessionLimitError'
+    this.limit = limit
+  }
+}
+
+/** The session-limit refusal a failed start answered with, or null for any other failure. */
+export function transcodeSessionLimitError(
+  error: unknown
+): TranscodeSessionLimitError | null {
+  if (!isAxiosError<ApiError>(error) || error.response?.status !== 409) {
+    return null
+  }
+  const details = error.response.data?.error?.details
+  return details?.reason === 'transcode_session_limit' &&
+    typeof details.limit === 'number'
+    ? new TranscodeSessionLimitError(details.limit)
     : null
 }
 

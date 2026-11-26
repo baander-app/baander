@@ -28,14 +28,17 @@ const { post, attachments, loader, clientIdentity, negotiate, detect } =
     loader: { ready: true },
     attachments: [] as TestAttachment[]
   }))
-vi.mock('@/features/player/services/media-delivery', () => ({
+vi.mock('@/features/player/services/media-delivery', async (importOriginal) => ({
   detectDestinationCapabilities: detect,
   negotiateMediaDelivery: negotiate,
   MediaCompatibilityError: class extends Error {
     constructor(readonly reason: string) {
       super(reason)
     }
-  }
+  },
+  transcodeSessionLimitError: (
+    await importOriginal<typeof import('@/features/player/services/media-delivery')>()
+  ).transcodeSessionLimitError
 }))
 vi.mock('@/features/session/services/playback-session-coordinator', () => ({
   getPlaybackClientRequestId: clientIdentity

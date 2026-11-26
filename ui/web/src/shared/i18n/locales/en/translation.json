@@ -150,6 +150,8 @@
     "volume": "Volume",
     "queue": "Queue",
     "nowPlaying": "Now playing",
+    "sessionLimit_one": "This account already holds the {{count}} video session the server allows, and it is in use. Stop playback on another device and try again.",
+    "sessionLimit_other": "This account already holds the {{count}} video sessions the server allows, and they are in use. Stop playback on another device and try again.",
     "compatibility": {
       "unknown": "This item cannot play on this device with the server’s current playback settings.",
       "destination_media_unsupported": "This device does not report support for a playable media format.",

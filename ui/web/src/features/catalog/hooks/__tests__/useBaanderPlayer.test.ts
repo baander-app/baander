@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { act, renderHook, waitFor } from '@testing-library/react'
+import '@/shared/i18n'
 import { AXIOS_INSTANCE } from '@/shared/api-client/axios-instance'
 import { negotiateMediaDelivery } from '@/features/player/services/media-delivery'
 import { attachHlsPlayback } from '../hls-playback'
@@ -16,14 +17,20 @@ vi.mock('@/shared/api-client/axios-instance', () => ({
 vi.mock('@/features/session/services/playback-session-coordinator', () => ({
   getPlaybackClientRequestId: vi.fn(async () => 'client-request')
 }))
-vi.mock('@/features/player/services/media-delivery', () => ({
-  detectDestinationCapabilities: vi.fn(async () => []),
-  negotiateMediaDelivery: vi.fn(async () => ({
-    kind: 'encoded',
-    jobId: 'job-1'
-  })),
-  MediaCompatibilityError: class MediaCompatibilityError extends Error {}
-}))
+vi.mock('@/features/player/services/media-delivery', async (importOriginal) => {
+  const actual = await importOriginal<
+    typeof import('@/features/player/services/media-delivery')
+  >()
+  return {
+    detectDestinationCapabilities: vi.fn(async () => []),
+    negotiateMediaDelivery: vi.fn(async () => ({
+      kind: 'encoded',
+      jobId: 'job-1'
+    })),
+    MediaCompatibilityError: class MediaCompatibilityError extends Error {},
+    transcodeSessionLimitError: actual.transcodeSessionLimitError
+  }
+})
 vi.mock('../native-playback', () => ({
   attachNativePlayback: vi.fn((options: { onReady: () => void }) => {
     options.onReady()
@@ -200,6 +207,26 @@ function unavailable() {
     response: { status: 503, data: {} }
   })
 }
+
+// The server's English message differs from the player's text, which comes from its own translations.
+function limited(limit: number) {
+  return Object.assign(new Error('Request failed with status code 409'), {
+    isAxiosError: true,
+    response: {
+      status: 409,
+      data: {
+        error: {
+          message: 'The account holds too many video sessions.',
+          code: 409,
+          details: { reason: 'transcode_session_limit', limit }
+        }
+      }
+    }
+  })
+}
+
+const sessionLimitMessage =
+  'This account already holds the 6 video sessions the server allows, and they are in use. Stop playback on another device and try again.'
 
 describe('useBaanderPlayer sessions and source end', () => {
   let container: HTMLDivElement
@@ -1141,6 +1168,51 @@ describe('useBaanderPlayer sessions and source end', () => {
       expect(rendered.result.current.state).toBe('error')
       expect(signs.filter((body) => body.refresh !== true)).toHaveLength(1)
       expect(vi.mocked(negotiateMediaDelivery)).toHaveBeenCalledTimes(1)
+    }
+  )
+
+  it('names the session limit when the first start is refused for it', async () => {
+    sign = () => {
+      throw limited(6)
+    }
+    const { rendered } = await mount()
+
+    await waitFor(() => {
+      expect(rendered.result.current.error).toBe(sessionLimitMessage)
+    })
+    expect(rendered.result.current.state).toBe('error')
+    expect(signs).toHaveLength(1)
+  })
+
+  it.each([
+    ['delivery negotiation', 'negotiate'],
+    ['stream signing', 'sign']
+  ] as const)(
+    'names the session limit when %s refuses a quality change for it',
+    async (_refusal, refusedBy) => {
+      const { rendered } = await mount()
+      if (refusedBy === 'negotiate') {
+        vi.mocked(negotiateMediaDelivery).mockRejectedValueOnce(limited(6))
+      } else {
+        sign = (body) => {
+          if (body.refresh !== true) throw limited(6)
+          return server
+        }
+      }
+
+      await act(async () => {
+        await rendered.result.current.presentationCommands
+          .setQuality('480p')
+          .catch(() => {})
+      })
+
+      await waitFor(() => {
+        expect(rendered.result.current.error).toBe(sessionLimitMessage)
+      })
+      expect(rendered.result.current.settings).toMatchObject({
+        quality: 'auto',
+        pendingQuality: null
+      })
     }
   )
 

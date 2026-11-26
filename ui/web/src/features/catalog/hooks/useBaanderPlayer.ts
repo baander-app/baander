@@ -21,6 +21,7 @@ import {
   detectDestinationCapabilities,
   negotiateMediaDelivery,
   MediaCompatibilityError,
+  transcodeSessionLimitError,
   type NegotiatedDelivery
 } from '@/features/player/services/media-delivery'
 import { getPlaybackClientRequestId } from '@/features/session/services/playback-session-coordinator'
@@ -959,9 +960,13 @@ export function useBaanderPlayer({
         }
       } catch (error) {
         if (superseded()) return
-        if (error instanceof MediaCompatibilityError && active()) {
-          terminalError = error
-          setError(error.message)
+        const refusal =
+          error instanceof MediaCompatibilityError
+            ? error
+            : transcodeSessionLimitError(error)
+        if (refusal && active()) {
+          terminalError = refusal
+          setError(refusal.message)
         }
         const status = isAxiosError(error) ? error.response?.status : undefined
         if (status === 410 && snapshot?.sessionId) {
@@ -2202,9 +2207,10 @@ export function useBaanderPlayer({
               pendingQuality: null
             }))
             if (owned()) {
+              const failure = transcodeSessionLimitError(error) ?? error
               setError(
-                error instanceof Error
-                  ? error.message
+                failure instanceof Error
+                  ? failure.message
                   : 'Presentation selection failed.'
               )
               if (restore) {
