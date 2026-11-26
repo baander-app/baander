@@ -95,6 +95,11 @@ final class Chains
         return array_merge(array_values(array_unique($a)), array_keys($b));
     }
 
+    public function threeLevelsBesideAnotherCallArgument(string $x): string
+    {
+        return sprintf('%d%s', time(), strtoupper(trim(substr($x, 1))));
+    }
+
     public function newOwnsTheTopArgumentList(array $values): ArrayObject
     {
         return new ArrayObject(array_values(array_unique(array_keys($values))));

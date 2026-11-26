@@ -25,9 +25,9 @@ use SplObjectStorage;
  * A walk starts at a function call, variable callables included, whose arguments are not empty
  * and hold no call that takes arguments. Its depth starts at 2 when the only argument is an
  * argument-less call, otherwise at 1. It climbs while the current call is an argument of a
- * function, method or static call whose argument list holds no other call, and reports the
- * outermost call when the depth is 3 to 10. An argument list owned by `new` or an attribute ends
- * the walk without a report.
+ * function, method or static call. An argument list that holds another call, or one owned by
+ * `new` or an attribute, ends the walk without a report; a walk that leaves the argument lists
+ * reports the outermost call when the depth is 3 to 10.
  *
  * Neither a first-class callable nor a pipe is a call: neither starts a walk, counts as a level
  * or counts as a call argument, and the walk above a pipe argument keeps its depth. The

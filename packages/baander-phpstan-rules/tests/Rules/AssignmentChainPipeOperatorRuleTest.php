@@ -23,7 +23,7 @@ final class AssignmentChainPipeOperatorRuleTest extends RuleTestCase
     {
         $this->analyse(
             [__DIR__ . '/data/assignment-chain-pipe-operator.php'],
-            self::errorsAt([13, 27, 36, 53, 86, 97, 108, 119, 135]),
+            self::errorsAt([13, 27, 36, 53, 86, 97, 108, 119, 135, 205]),
         );
     }
 

@@ -200,6 +200,15 @@ final class Chains
         return $s;
     }
 
+    public function compoundContinuationsKeepTheChain(string $raw): string
+    {
+        $s = trim($raw);
+        $s .= strtoupper($s);
+        $s .= strtolower($s);
+
+        return $s;
+    }
+
     private function fold(string $s): string
     {
         return $s;
