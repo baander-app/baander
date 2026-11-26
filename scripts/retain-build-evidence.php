@@ -145,10 +145,12 @@ function collect(array $options): void
         }
         $tree[$relative] = hash_file('sha256', $file->getPathname());
         if (noticeName($file->getFilename())) {
-            $component['notices'][] = retain($output, $component['id'], 'source/' . $relative, readFileChecked($file->getPathname()));
+            $noticePath = $file->getPathname();
+            $component['notices'][] = retain($output, $component['id'], 'source/' . $relative, readFileChecked($noticePath));
         }
         if (in_array($relative, ['config.nice', 'package.xml', 'package2.xml'], true)) {
-            $component['metadata']['retained_metadata'][] = retain($output, $component['id'], 'source/' . $relative, readFileChecked($file->getPathname()));
+            $metadataPath = $file->getPathname();
+            $component['metadata']['retained_metadata'][] = retain($output, $component['id'], 'source/' . $relative, readFileChecked($metadataPath));
         }
     }
     ksort($tree);
@@ -194,7 +196,8 @@ function collectPhar(array $options): void
         }
         $relative = safeRelative(substr($file->getPathname(), strlen($prefix)));
         if (noticeName($file->getFilename())) {
-            $notice = retain($output, $component['id'], 'archive/' . $relative, readFileChecked($file->getPathname()));
+            $noticePath = $file->getPathname();
+            $notice = retain($output, $component['id'], 'archive/' . $relative, readFileChecked($noticePath));
             $component['notices'][] = $notice;
             if (!str_contains($relative, '/')) {
                 $component['metadata']['own_notices'][] = $notice;
@@ -212,7 +215,8 @@ function collectPhar(array $options): void
             }
         }
         if (in_array($file->getFilename(), ['composer.json', 'installed.json', 'installed.php'], true)) {
-            $component['metadata']['retained_metadata'][] = retain($output, $component['id'], 'archive/' . $relative, readFileChecked($file->getPathname()));
+            $metadataPath = $file->getPathname();
+            $component['metadata']['retained_metadata'][] = retain($output, $component['id'], 'archive/' . $relative, readFileChecked($metadataPath));
         }
     }
     $component['source']['sha256'] = hash_file('sha256', $archive);
@@ -244,7 +248,7 @@ function finalize(array $options): void
                 if (!str_starts_with($path, $prefix)) {
                     throw new RuntimeException("Invalid evidence reference: {$path}");
                 }
-                $relative = safeRelative(substr($path, strlen($prefix)));
+                $relative = substr($path, strlen($prefix)) |> safeRelative(...);
                 writeFile($output . '/' . $relative, readFileChecked($input . '/' . $relative));
             }
             $artifacts = [];
