@@ -1,0 +1,45 @@
+--- a/build-ffmpeg
++++ b/build-ffmpeg
+@@ -156,39 +156,10 @@
+   fi
+ 
+   if [ ! -f "$DOWNLOAD_PATH/$DOWNLOAD_FILE" ] || [ ! -s "$DOWNLOAD_PATH/$DOWNLOAD_FILE" ]; then
+-    echo "Downloading $1 as $DOWNLOAD_FILE"
+-
+-    MAX_RETRIES=2
+-    RETRY_COUNT=0
+-    SUCCESS=false
+-
+-    while [ $RETRY_COUNT -le $MAX_RETRIES ]; do
+-      if [ $RETRY_COUNT -gt 0 ]; then
+-        echo "Retrying download (attempt $((RETRY_COUNT + 1))/$((MAX_RETRIES + 1))) in 10 seconds..."
+-        sleep 10
+-      fi
+-
+-      curl -L --silent -o "$DOWNLOAD_PATH/$DOWNLOAD_FILE" "$1"
+-      EXITCODE=$?
+-
+-      if [ $EXITCODE -eq 0 ] && [ -s "$DOWNLOAD_PATH/$DOWNLOAD_FILE" ]; then
+-        SUCCESS=true
+-        break
+-      fi
+-
+-      echo "Failed to download $1 (Exitcode $EXITCODE or empty file)"
+-      RETRY_COUNT=$((RETRY_COUNT + 1))
+-    done
+-
+-    if [ "$SUCCESS" = false ]; then
+-      echo "Failed to download $1 after $((MAX_RETRIES + 1)) attempts."
+-      exit 1
+-    fi
+-
+-    echo "... Done"
+-  else
+-    echo "$DOWNLOAD_FILE has already been downloaded and is not empty."
++    echo "Refusing to download $1: $DOWNLOAD_FILE was not pre-seeded from the source manifest."
++    exit 1
+   fi
++  echo "$DOWNLOAD_FILE was pre-seeded from the source manifest."
+ 
+   make_dir "$DOWNLOAD_PATH/$TARGETDIR"
+ 

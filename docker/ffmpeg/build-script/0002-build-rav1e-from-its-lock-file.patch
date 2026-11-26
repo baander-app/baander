@@ -1,0 +1,14 @@
+--- a/build-ffmpeg
++++ b/build-ffmpeg
+@@ -640,10 +640,9 @@
+   if [[ ! "$SKIPRAV1E" == "yes" ]]; then
+     if build "rav1e" "0.8.1"; then
+       echo "if you get the message 'cannot be built because it requires rustc x.xx or newer, try to run 'rustup update'"
+-      execute cargo install cargo-c
+       download "https://github.com/xiph/rav1e/archive/refs/tags/v$CURRENT_PACKAGE_VERSION.tar.gz"
+       export RUSTFLAGS="-C target-cpu=native"  
+-      execute cargo cinstall --prefix="${WORKSPACE}" --libdir=lib --library-type=staticlib --crt-static --release
++      execute cargo cinstall --prefix="${WORKSPACE}" --libdir=lib --library-type=staticlib --crt-static --release --locked
+       build_done "rav1e" $CURRENT_PACKAGE_VERSION
+     fi
+     CONFIGURE_OPTIONS+=("--enable-librav1e")

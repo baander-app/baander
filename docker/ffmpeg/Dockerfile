@@ -38,11 +38,27 @@ ENV PKG_CONFIG_PATH=/dist/lib/pkgconfig:/usr/local/lib/x86_64-linux-gnu/pkgconfi
 # Stage: Run ffmpeg-build-script to produce the base workspace
 FROM base-builder AS ffmpeg-base
 
+# The patches, each checked before it is applied, make the script refuse every download,
+# build rav1e from its lock file, build rav1e and zix for the x86-64 baseline instead of
+# the build machine's CPU, and unpack the dependency trees libjxl and glslang would fetch
+# from the packages directory.
 WORKDIR /usr/src
+COPY docker/ffmpeg/build-script /usr/src/build-script
 RUN git clone --depth 1 --branch v1.59 https://github.com/markus-perl/ffmpeg-build-script.git \
     && test "$(git -C ffmpeg-build-script rev-parse HEAD)" = d22553c89e1d403c058ebbb9060d2b848f83b36d \
     && cd ffmpeg-build-script \
-    && ./build-ffmpeg --build --enable-gpl-and-non-free --skip-install
+    && for patch in /usr/src/build-script/*.patch; do git apply --check -p1 "$patch" && git apply -p1 "$patch" || exit 1; done
+
+# Sources come from the manifest and crates from lock files, cargo-c at a reviewed
+# version, so the script runs without network.
+WORKDIR /usr/src/ffmpeg-build-script
+RUN /usr/src/build-script/fetch-sources.sh /usr/src/build-script/sources.txt packages \
+    && cargo install cargo-c --version =0.10.26 --locked \
+    && mkdir /tmp/rav1e \
+    && tar -xzf packages/v0.8.1.tar.gz -C /tmp/rav1e --strip-components 1 \
+    && cargo fetch --locked --manifest-path /tmp/rav1e/Cargo.toml \
+    && rm -rf /tmp/rav1e
+RUN --network=none CARGO_NET_OFFLINE=true ./build-ffmpeg --build --enable-gpl-and-non-free --skip-install
 
 # ============================================================
 # Parallel library stages (BuildKit builds these concurrently)

@@ -1,0 +1,82 @@
+# Every source ffmpeg-build-script v1.59 builds from in this image, in the order the
+# script uses them. fetch-sources.sh places each file in the script's packages
+# directory before the script runs, and the patched script refuses to download a
+# file that is missing here.
+#
+#   <file> sha256:<hash> <url>          downloaded, then checked against the SHA-256
+#   <file> git:<commit> <repository>    fetched at the commit and archived under one
+#                                       top-level directory, or none with "flat"
+#
+# Archives that a forge generates on request (GitLab, Gitiles, Bitbucket) are not
+# byte-stable, so those sources are pinned by commit, as are the dependency trees
+# that libjxl's deps.sh and glslang's update_glslang_sources.py would fetch at build
+# time. After a script bump, list its download calls for the enabled components
+# again and take each new archive's SHA-256 and each new commit.
+
+giflib-5.2.2.tar.gz sha256:be7ffbd057cadebe2aa144542fd90c6838c6a083b5e8a9048b8ee3b66b29d5fb https://sf-eu-introserv-1.dl.sourceforge.net/project/giflib/giflib-5.x/giflib-5.2.2.tar.gz
+pkg-config-0.29.2.tar.gz sha256:6fc69c01688c9458a57eb9a1664c9aba372ccda420a02bf4429fe610e7e7d591 https://pkgconfig.freedesktop.org/releases/pkg-config-0.29.2.tar.gz
+yasm-1.3.0.tar.gz sha256:3dce6601b495f5b3d45b59f7d2492a340ee7e84b5beca17e48f862502bd5603f https://github.com/yasm/yasm/releases/download/v1.3.0/yasm-1.3.0.tar.gz
+nasm-3.01.tar.xz sha256:b7324cbe86e767b65f26f467ed8b12ad80e124e3ccb89076855c98e43a9eddd4 https://www.nasm.us/pub/nasm/releasebuilds/3.01/nasm-3.01.tar.xz
+zlib-1.3.2.tar.gz sha256:bb329a0a2cd0274d05519d61c667c062e06990d72e125ee2dfa8de64f0119d16 https://github.com/madler/zlib/releases/download/v1.3.2/zlib-1.3.2.tar.gz
+m4-1.4.20.tar.gz sha256:6ac4fc31ce440debe63987c2ebbf9d7b6634e67a7c3279257dc7361de8bdb3ef https://ftpmirror.gnu.org/gnu/m4/m4-1.4.20.tar.gz
+autoconf-2.72.tar.gz sha256:afb181a76e1ee72832f6581c0eddf8df032b83e2e0239ef79ebedc4467d92d6e https://ftpmirror.gnu.org/gnu/autoconf/autoconf-2.72.tar.gz
+automake-1.18.1.tar.gz sha256:63e585246d0fc8772dffdee0724f2f988146d1a3f1c756a3dc5cfbefa3c01915 https://ftpmirror.gnu.org/gnu/automake/automake-1.18.1.tar.gz
+libtool-2.5.4.tar.gz sha256:da8ebb2ce4dcf46b90098daf962cffa68f4b4f62ea60f798d0ef12929ede6adf https://ftpmirror.gnu.org/libtool/libtool-2.5.4.tar.gz
+gettext-1.0.tar.gz sha256:85d99b79c981a404874c02e0342176cf75c7698e2b51fe41031cf6526d974f1a https://ftpmirror.gnu.org/gettext/gettext-1.0.tar.gz
+openssl-3.6.1.tar.gz sha256:f68e6e3a19902c0487d684a4122d4127bc649b4f8f51c15324bb36e0e4dc0bfa https://github.com/openssl/openssl/archive/refs/tags/openssl-3.6.1.tar.gz
+cmake-4.2.3.tar.gz sha256:7efaccde8c5a6b2968bad6ce0fe60e19b6e10701a12fce948c2bf79bac8a11e9 https://github.com/Kitware/CMake/releases/download/v4.2.3/cmake-4.2.3.tar.gz
+dav1d-1.5.3.tar.gz git:b546257f770768b2c88258c533da38b91a06f737 https://code.videolan.org/videolan/dav1d.git
+svtav1-4.0.1.tar.gz git:4ae9272b588a05ee6e77a43e8dfdac05f54c4ff0 https://gitlab.com/AOMediaCodec/SVT-AV1.git
+v0.8.1.tar.gz sha256:06d1523955fb6ed9cf9992eace772121067cca7e8926988a1ee16492febbe01e https://github.com/xiph/rav1e/archive/refs/tags/v0.8.1.tar.gz
+x264-0480cb05.tar.gz git:0480cb05fa188d37ae87e8f4fd8f1aea3711f7ee https://code.videolan.org/videolan/x264.git
+x265-8be7dbf.tar.gz git:8be7dbf8159ddfceea4115675a6d48e1611b8baa https://bitbucket.org/multicoreware/x265_git.git
+libvpx-1.16.0.tar.gz sha256:7a479a3c66b9f5d5542a4c6a1b7d3768a983b1e5c14c60a9396edc9b649e015c https://github.com/webmproject/libvpx/archive/refs/tags/v1.16.0.tar.gz
+xvidcore-1.3.7.tar.gz sha256:abbdcbd39555691dd1c9b4d08f0a031376a3b211652c0d8b3b8aa9be1303ce2d https://downloads.xvid.com/downloads/xvidcore-1.3.7.tar.gz
+vid.stab-1.1.1.tar.gz sha256:9001b6df73933555e56deac19a0f225aae152abbc0e97dc70034814a1943f3d4 https://github.com/georgmartius/vid.stab/archive/v1.1.1.tar.gz
+av1-3.12.0.tar.gz git:3b624af45b86646a20b11a9ff803aeae588cdee6 https://aomedia.googlesource.com/aom flat
+zimg-3.0.6.tar.gz sha256:be89390f13a5c9b2388ce0f44a5e89364a20c1c57ce46d382b1fcc3967057577 https://github.com/sekrit-twc/zimg/archive/refs/tags/release-3.0.6.tar.gz
+lv2-1.18.10.tar.xz sha256:78c51bcf21b54e58bb6329accbb4dae03b2ed79b520f9a01e734bd9de530953f https://lv2plug.in/spec/lv2-1.18.10.tar.xz
+autowaf.tar.gz git:b600c928b221a001faeab7bd92786d0b25714bc8 https://gitlab.com/drobilla/autowaf.git
+serd-v0.32.8.tar.gz git:24474530f8acef5c6cdcefa00b0049367e5d3079 https://gitlab.com/drobilla/serd.git
+pcre-8.45.tar.gz sha256:4e6ce03e0336e8b4a3d6c2b70b1c5e18590a5673a98186da90d4f33c23defc09 https://altushost-swe.dl.sourceforge.net/project/pcre/pcre/8.45/pcre-8.45.tar.gz
+zix-v0.8.0.tar.gz git:dfa757a80c51e50deb375fd4f1d05948c95dfe0f https://gitlab.com/drobilla/zix.git
+sord-v0.16.22.tar.gz git:5ab719fdae9b6db1204974f749dc64e62d2029af https://gitlab.com/drobilla/sord.git
+sratom-v0.6.22.tar.gz git:68bd465f0de009d58ae39e89eb029c728e74751f https://gitlab.com/lv2/sratom.git
+lilv-v0.26.4.tar.gz git:87ee12b45dc1cb0fc3fe683ca3242a04022a1b22 https://gitlab.com/lv2/lilv.git
+opencore-amr-0.1.6.tar.gz sha256:483eb4061088e2b34b358e47540b5d495a96cd468e361050fae615b1809dc4a1 https://deac-ams.dl.sourceforge.net/project/opencore-amr/opencore-amr/opencore-amr-0.1.6.tar.gz
+lame-3.100.tar.gz sha256:ddfe36cab873794038ae2c1210557ad34857a4b6bdc515785d1da9e175b1da1e https://sourceforge.net/projects/lame/files/lame/3.100/lame-3.100.tar.gz/download?use_mirror=gigenet
+opus-1.6.1.tar.gz sha256:6ffcb593207be92584df15b32466ed64bbec99109f007c82205f0194572411a1 https://downloads.xiph.org/releases/opus/opus-1.6.1.tar.gz
+libogg-1.3.6.tar.xz sha256:5c8253428e181840cd20d41f3ca16557a9cc04bad4a3d04cce84808677fa1061 https://ftp.osuosl.org/pub/xiph/releases/ogg/libogg-1.3.6.tar.xz
+libvorbis-1.3.7.tar.gz sha256:0e982409a9c3fc82ee06e08205b1355e5c6aa4c36bca58146ef399621b0ce5ab https://ftp.osuosl.org/pub/xiph/releases/vorbis/libvorbis-1.3.7.tar.gz
+libtheora-1.2.0.tar.gz sha256:279327339903b544c28a92aeada7d0dcfd0397b59c2f368cc698ac56f515906e https://ftp.osuosl.org/pub/xiph/releases/theora/libtheora-1.2.0.tar.gz
+fdk-aac-2.0.3.tar.gz sha256:829b6b89eef382409cda6857fd82af84fabb63417b08ede9ea7a553f811cb79e https://sourceforge.net/projects/opencore-amr/files/fdk-aac/fdk-aac-2.0.3.tar.gz/download?use_mirror=gigenet
+soxr-0.1.3.tar.xz sha256:b111c15fdc8c029989330ff559184198c161100a59312f5dc19ddeb9b5a15889 https://sourceforge.net/projects/soxr/files/soxr-0.1.3-Source.tar.xz/download?use_mirror=gigenet
+tiff-4.7.1.tar.xz sha256:b92017489bdc1db3a4c97191aa4b75366673cb746de0dce5d7a749d5954681ba https://download.osgeo.org/libtiff/tiff-4.7.1.tar.xz
+libpng-1.6.55.tar.gz sha256:4b0abab6d219e95690ebe4db7fc9aa95f4006c83baaa022373c0c8442271283d https://sourceforge.net/projects/libpng/files/libpng16/1.6.55/libpng-1.6.55.tar.gz
+lcms2-2.18.tar.gz sha256:ee67be3566f459362c1ee094fde2c159d33fa0390aa4ed5f5af676f9e5004347 https://github.com/mm2/Little-CMS/releases/download/lcms2.18/lcms2-2.18.tar.gz
+libjxl-0.11.2.tar.gz sha256:ab38928f7f6248e2a98cc184956021acb927b16a0dee71b4d260dc040a4320ea https://github.com/libjxl/libjxl/archive/refs/tags/v0.11.2.tar.gz
+libjxl-0.11.2-testdata.tar.gz git:873045a9c42ed60721756e26e2a6b32e17415205 https://github.com/libjxl/testdata.git
+libjxl-0.11.2-brotli.tar.gz git:36533a866ed1ca4b75cf049f4521e4ec5fe24727 https://github.com/google/brotli.git
+libjxl-0.11.2-googletest.tar.gz git:6910c9d9165801d8827d628cb72eb7ea9dd538c5 https://github.com/google/googletest.git
+libjxl-0.11.2-highway.tar.gz git:457c891775a7397bdb0376bb1031e6e027af1c48 https://github.com/google/highway.git
+libjxl-0.11.2-sjpeg.tar.gz git:94e0df6d0f8b44228de5be0ff35efb9f946a13c9 https://github.com/webmproject/sjpeg.git
+libjxl-0.11.2-skcms.tar.gz git:b2e692629c1fb19342517d7fb61f1cf83d075492 https://skia.googlesource.com/skcms
+libjxl-0.11.2-zlib.tar.gz git:51b7f2abdade71cd9bb0e7a373ef2610ec6f9daf https://github.com/madler/zlib.git
+libjxl-0.11.2-libpng.tar.gz git:872555f4ba910252783af1507f9e7fe1653be252 https://github.com/glennrp/libpng.git
+libjxl-0.11.2-libjpeg-turbo.tar.gz git:8ecba3647edb6dd940463fedf38ca33a8e2a73d1 https://github.com/libjpeg-turbo/libjpeg-turbo.git
+libwebp-1.6.0.tar.gz sha256:e4ab7009bf0629fd11982d4c2aa83964cf244cffba7347ecd39019a9e38c4564 https://storage.googleapis.com/downloads.webmproject.org/releases/webp/libwebp-1.6.0.tar.gz
+SDL2-2.30.12.tar.gz sha256:ac356ea55e8b9dd0b2d1fa27da40ef7e238267ccf9324704850d5d47375b48ea https://github.com/libsdl-org/SDL/releases/download/release-2.30.12/SDL2-2.30.12.tar.gz
+freetype-2.14.2.tar.xz sha256:4b62dcab4c920a1a860369933221814362e699e26f55792516d671e6ff55b5e1 https://downloads.sourceforge.net/freetype/freetype-2.14.2.tar.xz
+R73.tar.gz sha256:1bb8ffe31348eaf46d8f541b138f0136d10edaef0c130c1e5a13aa4a4b057280 https://github.com/vapoursynth/vapoursynth/archive/R73.tar.gz
+srt-1.5.4.tar.gz sha256:d0a8b600fe1b4eaaf6277530e3cfc8f15b8ce4035f16af4a5eb5d4b123640cdd https://github.com/Haivision/srt/archive/v1.5.4.tar.gz
+zvbi-0.2.44.tar.gz sha256:bca620ab670328ad732d161e4ce8d9d9fc832533cb7440e98c50e112b805ac5e https://github.com/zapping-vbi/zvbi/archive/refs/tags/v0.2.44.tar.gz
+zeromq-4.3.5.tar.gz sha256:6653ef5910f17954861fe72332e68b03ca6e4d9c7160eb3a8de5a5a913bfab43 https://github.com/zeromq/libzmq/releases/download/v4.3.5/zeromq-4.3.5.tar.gz
+Vulkan-Headers-1.4.341.0.tar.gz sha256:d73bc5036b6556b741f6985ff600ca720308c5f2850e4a43ceb498bd3de069e7 https://github.com/KhronosGroup/Vulkan-Headers/archive/refs/tags/vulkan-sdk-1.4.341.0.tar.gz
+glslang-16.2.0.tar.gz sha256:01985335785c97906a91afe3cb5ee015997696181ec6c125bab5555602ba08e2 https://github.com/KhronosGroup/glslang/archive/refs/tags/16.2.0.tar.gz
+glslang-16.2.0-spirv-tools.tar.gz git:fbe4f3ad913c44fe8700545f8ffe35d1382b7093 https://github.com/KhronosGroup/SPIRV-Tools.git
+glslang-16.2.0-spirv-headers.tar.gz git:04f10f650d514df88b76d25e83db360142c7b174 https://github.com/KhronosGroup/SPIRV-Headers.git
+glslang-16.2.0-googletest.tar.gz git:f8d7d77c06936315286eb55f8de22cd23c188571 https://github.com/google/googletest.git
+AMF-1.5.0.tar.gz sha256:bf80ee4a77a731c5a2351b4dd74f524a18806a70099ba66a8058d91aac1150b5 https://github.com/GPUOpen-LibrariesAndSDKs/AMF/archive/refs/tags/v1.5.0.tar.gz
+OpenCL-Headers-2025.07.22.tar.gz sha256:98f0a3ea26b4aec051e533cb1750db2998ab8e82eda97269ed6efe66ec94a240 https://github.com/KhronosGroup/OpenCL-Headers/archive/refs/tags/v2025.07.22.tar.gz
+OpenCL-ICD-Loader-2025.07.22.tar.gz sha256:dff7a0b11ad5b63a669358e3476e3dc889a4a361674e5b69b267b944d0794142 https://github.com/KhronosGroup/OpenCL-ICD-Loader/archive/refs/tags/v2025.07.22.tar.gz
+FFmpeg-release-8.1.tar.gz sha256:dd308201bb1239a1b73185f80c6b4121f4efdfa424a009ce544fd00bf736bb2e https://github.com/FFmpeg/FFmpeg/archive/refs/tags/n8.1.tar.gz

@@ -65,9 +65,11 @@ packages from the inventory. Local output explicitly excludes online currency,
 advisories and registry image metadata.
 
 Local and online mode also check the build inputs: every Dockerfile in the
-repository and the image catalog
-(`packages/baander-configuration/resources/tooling-defaults.json`). Each of these
-is a finding at its file and line:
+repository, the image catalog
+(`packages/baander-configuration/resources/tooling-defaults.json`) and the source
+manifest the FFmpeg image's fetch script reads
+(`docker/ffmpeg/build-script/sources.txt`). Each of these is a finding at its file
+and line:
 
 - an external image in `FROM`, `COPY --from` or a catalog role without an
   `@sha256:` digest;
@@ -75,13 +77,16 @@ is a finding at its file and line:
 - a `curl` or `wget` download whose `RUN` instruction has no `sha256sum -c` per
   download, or no SHA-256 value written in the file;
 - a `git clone` or `git fetch` whose `RUN` instruction names no 40-character commit;
-- a PECL or PIE package fetched by name, and an `ADD` of a URL without `--checksum`.
+- a PECL or PIE package fetched by name, and an `ADD` of a URL without `--checksum`;
+- a source manifest entry whose pin is neither `sha256:` followed by a SHA-256 nor
+  `git:` followed by a 40-character commit.
 
 The check expands `ARG` defaults before it reads an instruction. A `FROM` that names
 a build argument passes when the argument defaults to `scratch`, a digest or a project
 image named `baander…`, because the build tooling fills it from the catalog. The
-`buildInputs` section of the dependency policy names the catalog and the roles the
-tooling builds itself (`application`, `postgres` and `proxy`), which need no digest.
+`buildInputs` section of the dependency policy names the catalog, the source
+manifests and the roles the tooling builds itself (`application`, `postgres` and
+`proxy`), which need no digest.
 
 Image-drift mode resolves the tag of every digest pin in the Dockerfiles, the catalog
 and the workflow files with `docker buildx imagetools inspect`, and reports a pin

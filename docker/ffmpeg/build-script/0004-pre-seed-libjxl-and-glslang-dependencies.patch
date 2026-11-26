@@ -1,0 +1,28 @@
+--- a/build-ffmpeg
++++ b/build-ffmpeg
+@@ -1024,7 +1024,11 @@
+   sed 's/set(JPEGXL_REQUIRES_TYPE "Requires")/set(JPEGXL_REQUIRES_TYPE "Requires")\'$'\n''  set(JPEGXL_THREADS_PUBLIC_LIBS "-lm ${PKGCONFIG_CXX_LIB}")/g' lib/jxl_threads.cmake >lib/jxl_threads.cmake.patched
+   rm lib/jxl_threads.cmake
+   mv lib/jxl_threads.cmake.patched lib/jxl_threads.cmake
+-  execute ./deps.sh
++  # The trees deps.sh downloads, pre-seeded at the commits it names.
++  for dependency in testdata third_party/brotli third_party/googletest third_party/highway third_party/sjpeg third_party/skcms third_party/zlib third_party/libpng third_party/libjpeg-turbo; do
++    execute mkdir -p "$dependency"
++    execute tar -xzf "$PACKAGES/libjxl-$CURRENT_PACKAGE_VERSION-${dependency##*/}.tar.gz" -C "$dependency" --strip-components 1
++  done
+   execute cmake -DBUILD_SHARED_LIBS=OFF -DCMAKE_INSTALL_PREFIX="${WORKSPACE}" -DCMAKE_INSTALL_LIBDIR=lib -DCMAKE_INSTALL_BINDIR=bin -DCMAKE_INSTALL_INCLUDEDIR=include -DENABLE_SHARED=off -DENABLE_STATIC=ON -DCMAKE_BUILD_TYPE=Release -DJPEGXL_ENABLE_BENCHMARK=OFF -DJPEGXL_ENABLE_DOXYGEN=OFF -DJPEGXL_ENABLE_MANPAGES=OFF -DJPEGXL_ENABLE_JPEGLI_LIBJPEG=OFF -DJPEGXL_ENABLE_JPEGLI=ON -DJPEGXL_TEST_TOOLS=OFF -DJPEGXL_ENABLE_JNI=OFF -DBUILD_TESTING=OFF -DJPEGXL_ENABLE_SKCMS=OFF .
+   execute make -j "$MJOBS"
+   execute make install
+@@ -1145,7 +1149,11 @@
+ if command_exists "python3"; then
+   if build "glslang" "16.2.0"; then
+     download "https://github.com/KhronosGroup/glslang/archive/refs/tags/$CURRENT_PACKAGE_VERSION.tar.gz" "glslang-$CURRENT_PACKAGE_VERSION.tar.gz"
+-    execute ./update_glslang_sources.py
++    # The repositories update_glslang_sources.py clones, pre-seeded at the commits known_good.json names.
++    for dependency in spirv-tools spirv-tools/external/spirv-headers googletest; do
++      execute mkdir -p "External/$dependency"
++      execute tar -xzf "$PACKAGES/glslang-$CURRENT_PACKAGE_VERSION-${dependency##*/}.tar.gz" -C "External/$dependency" --strip-components 1
++    done
+     execute cmake -DCMAKE_BUILD_TYPE=Release -DENABLE_SHARED=OFF -DBUILD_SHARED_LIBS=OFF -DCMAKE_INSTALL_PREFIX="${WORKSPACE}" .
+     execute make -j "$MJOBS"
+     execute make install

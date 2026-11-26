@@ -48,6 +48,7 @@ final class BuildInputsTest extends TestCase
         foreach (['Dockerfile', 'docker/ffmpeg/Dockerfile', 'docker/nginx/Dockerfile.test', 'docker/postgres/Dockerfile', 'docker/runner/Dockerfile', 'docker/runner/tooling-test.Dockerfile', 'relay/docker/rqlite.Dockerfile'] as $path) {
             self::assertContains($path, $inventory->dockerfiles);
         }
+        self::assertContains('docker/ffmpeg/build-script/sources.txt', $inventory->policy['buildInputs']['sourceManifests'] ?? [], 'The FFmpeg build script fetches its sources from a manifest the Dockerfile scan cannot see.');
         $scan = BuildInputs::scan($root, $inventory->dockerfiles, $inventory->policy['buildInputs'] ?? []);
         self::assertSame([], $scan['violations'], json_encode($scan['violations'], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR));
         $references = array_column($scan['images'], 'reference');
@@ -135,6 +136,30 @@ final class BuildInputsTest extends TestCase
 
         $this->expectExceptionMessage('catalog');
         BuildInputs::scan($this->root, [], ['catalog' => 'catalog/missing.json', 'locallyBuiltRoles' => []]);
+    }
+
+    public function testSourceManifestEntriesNeedAHashOrACommit(): void
+    {
+        $this->root = sys_get_temp_dir() . '/baander-build-inputs-' . (random_bytes(8) |> bin2hex(...));
+        mkdir($this->root . '/build', 0700, true);
+        file_put_contents($this->root . '/build/sources.txt', implode("\n", [
+            '# <file> <pin> <source>',
+            '',
+            'tool-1.0.tar.gz sha256:' . str_repeat('c', 64) . ' https://downloads.baander.app/tool-1.0.tar.gz',
+            'tree.tar.gz git:' . str_repeat('d', 40) . ' https://git.baander.app/tree.git flat',
+            'unchecked-1.0.tar.gz https://downloads.baander.app/unchecked-1.0.tar.gz',
+            'tagged.tar.gz git:v1.0 https://git.baander.app/tagged.git',
+            'short.tar.gz sha256:' . str_repeat('c', 63) . ' https://downloads.baander.app/short.tar.gz',
+        ]) . "\n");
+        $scan = BuildInputs::scan($this->root, [], ['sourceManifests' => ['build/sources.txt']]);
+        self::assertSame([
+            ['build/sources.txt', 5, 'source-pin', 'unchecked-1.0.tar.gz https://downloads.baander.app/unchecked-1.0.tar.gz'],
+            ['build/sources.txt', 6, 'source-pin', 'tagged.tar.gz git:v1.0 https://git.baander.app/tagged.git'],
+            ['build/sources.txt', 7, 'source-pin', 'short.tar.gz sha256:' . str_repeat('c', 63) . ' https://downloads.baander.app/short.tar.gz'],
+        ], array_map(static fn(array $violation): array => [$violation['path'], $violation['line'], $violation['rule'], $violation['instruction']], $scan['violations']));
+
+        $this->expectExceptionMessage('build/missing.txt');
+        BuildInputs::scan($this->root, [], ['sourceManifests' => ['build/missing.txt']]);
     }
 
     public function testLocalEvidenceReportsAnUnpinnedInputAsAFindingAtItsLine(): void

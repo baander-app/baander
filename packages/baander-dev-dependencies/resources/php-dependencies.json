@@ -13,7 +13,10 @@
             "postgres": "A project image built from docker/postgres and passed as BAANDER_TEST_POSTGRES_IMAGE; the default names no published image.",
             "proxy": "A project test image passed as BAANDER_TEST_PROXY_IMAGE; the default names no published image."
         },
-        "workflows": ".github/workflows"
+        "workflows": ".github/workflows",
+        "sourceManifests": [
+            "docker/ffmpeg/build-script/sources.txt"
+        ]
     },
     "projects": {
         "composer.json": {

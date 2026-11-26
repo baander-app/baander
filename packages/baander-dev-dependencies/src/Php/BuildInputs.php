@@ -7,7 +7,8 @@ namespace Baander\DevDependencies\Php;
 /**
  * Finds build inputs whose content the repository does not fix: an external image without a
  * digest, a fetched script piped into a shell, a download without a pinned SHA-256 check, a Git
- * fetch without a commit, and a PECL or PIE package fetched by name.
+ * fetch without a commit, a PECL or PIE package fetched by name, and a source manifest entry
+ * without a SHA-256 or commit.
  *
  * Dockerfile instructions are read with their ARG defaults expanded. A check counts only inside
  * the RUN instruction that fetches, so no later layer can build on an unchecked file. An image
@@ -26,6 +27,7 @@ final class BuildInputs
         'download-checksum' => 'A download is not checked against a SHA-256 pinned in the same instruction.',
         'git-commit' => 'A Git fetch is not pinned to a commit in the same instruction.',
         'package-fetch' => 'PECL or PIE fetches a package by name without a checksum; download its archive and check it.',
+        'source-pin' => 'A source manifest entry is pinned by neither a SHA-256 nor a 40-character commit.',
     ];
 
     private const string DIGESTED = '~^[^\s@]+@sha256:[0-9a-f]{64}$~D';
@@ -55,6 +57,9 @@ final class BuildInputs
         }
         if (isset($policy['workflows'])) {
             array_push($images, ...self::workflowImages($root, (string) $policy['workflows']));
+        }
+        foreach ($policy['sourceManifests'] ?? [] as $manifest) {
+            array_push($violations, ...self::sourceManifest($root, (string) $manifest));
         }
         return ['violations' => $violations, 'images' => $images];
     }
@@ -270,6 +275,29 @@ final class BuildInputs
             }
         }
         return ['violations' => $violations, 'images' => $images];
+    }
+
+    /**
+     * Entries of a manifest that a Dockerfile hands to a fetch script, which the instruction scan
+     * cannot see: each line names a file, a `sha256:<hash>` or `git:<commit>` pin and its source.
+     *
+     * @return list<Violation>
+     */
+    private static function sourceManifest(string $root, string $path): array
+    {
+        Inventory::path($path);
+        $violations = [];
+        foreach (preg_split('/\R/', self::read($root, $path, 'source manifest')) ?: [] as $index => $line) {
+            $entry = trim($line);
+            if ($entry === '' || str_starts_with($entry, '#')) {
+                continue;
+            }
+            $pin = (preg_split('/\s+/', $entry) ?: [])[1] ?? '';
+            if (preg_match('/^(?:sha256:[0-9a-f]{64}|git:[0-9a-f]{40})$/D', $pin) !== 1) {
+                $violations[] = ['path' => $path, 'line' => $index + 1, 'rule' => 'source-pin', 'reason' => self::REASONS['source-pin'], 'instruction' => self::excerpt($entry)];
+            }
+        }
+        return $violations;
     }
 
     /**
