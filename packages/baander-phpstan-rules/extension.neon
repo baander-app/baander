@@ -3,3 +3,7 @@ services:
     tags: [ phpstan.rules.rule ]
   - class: Baander\PHPStan\Rules\ConsistentOpenApiTagDescriptionRule
     tags: [ phpstan.rules.rule ]
+  - class: Baander\PHPStan\Rules\NestedCallPipeOperatorRule
+    tags: [ phpstan.rules.rule ]
+  - class: Baander\PHPStan\Rules\AssignmentChainPipeOperatorRule
+    tags: [ phpstan.rules.rule ]

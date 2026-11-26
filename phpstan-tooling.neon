@@ -1,5 +1,12 @@
+includes:
+    - vendor/baander/phpstan-rules/extension.neon
+
 parameters:
     level: 6
+    # Per checkout, and apart from the application configuration's cache: the default system
+    # temp directory is shared by every worktree, and a cache written by another checkout
+    # points at that checkout's PHPStan and fails here.
+    tmpDir: var/cache/phpstan-tooling
     paths:
         - packages/baander-configuration/src
         - packages/baander-configuration/tests
