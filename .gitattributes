@@ -19,3 +19,4 @@ CHANGELOG.md export-ignore
 relay/third_party/inventory/*/licenses/** -text -whitespace
 relay/third_party/inventory/go/*.buildinfo.txt -text -whitespace
 relay/third_party/inventory/native/licenses/openssl/AUTHORS.md conflict-marker-size=32
+docker/ffmpeg/build-script/*.patch whitespace=-blank-at-eol,-blank-at-eof
