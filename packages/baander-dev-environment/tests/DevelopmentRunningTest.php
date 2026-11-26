@@ -4,12 +4,14 @@ declare(strict_types=1);
 
 namespace Baander\DevEnvironment\Tests;
 
+use Baander\Deployment\Observability\LogCollection;
 use Baander\DevEnvironment\Runtime\ComposeRuntime;
 use Baander\DevEnvironment\State\InstanceStateStore;
 use Baander\DevEnvironment\WorkflowError;
 use Baander\Process\Execution\ProcessResult;
 use Baander\Tests\Tooling\Support\DevelopmentCommandExecutor;
 use PHPUnit\Framework\Assert;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
 final class DevelopmentRunningTest extends TestCase
@@ -36,7 +38,7 @@ final class DevelopmentRunningTest extends TestCase
             }
         };
         $compose = tempnam(sys_get_temp_dir(), 'baander-running-');
-        file_put_contents($compose, json_encode(['services' => ['log-agent' => ['image' => 'owned']]], JSON_THROW_ON_ERROR));
+        file_put_contents($compose, json_encode(['services' => ['log-agent' => ['image' => 'owned'], LogCollection::PROXY_SERVICE => ['image' => 'owned']]], JSON_THROW_ON_ERROR));
         try {
             return new ComposeRuntime(new InstanceStateStore('/tmp/baander-unused'), $runner)->running([
                 'project' => 'owned',
@@ -57,11 +59,19 @@ final class DevelopmentRunningTest extends TestCase
                 'Config' => ['Labels' => ['com.docker.compose.project' => 'owned', 'com.docker.compose.service' => $role]],
                 'State' => ['Running' => true, 'Health' => ['Status' => 'unhealthy']],
             ],
-            ['app', 'nginx', 'postgres', 'redis', 'log-agent', 'vite'],
+            ['app', 'nginx', 'postgres', 'redis', 'log-agent', LogCollection::PROXY_SERVICE, 'vite'],
         );
     }
 
-    public function testSavedComposeWithoutCollectorRequestsReactivationBeforeSelectingNewService(): void
+    /** @return iterable<string, array{string}> */
+    public static function staleTopologies(): iterable
+    {
+        yield 'no collector' => ['{"services":{"app":{"image":"retained-application"}}}'];
+        yield 'collector without its Docker proxy' => ['{"services":{"app":{"image":"retained-application"},"log-agent":{"image":"retained-collector"}}}'];
+    }
+
+    #[DataProvider('staleTopologies')]
+    public function testSavedComposeWithoutCollectorRequestsReactivationBeforeSelectingNewService(string $topology): void
     {
         $runner = new class extends DevelopmentCommandExecutor {
             public function execute(
@@ -79,7 +89,7 @@ final class DevelopmentRunningTest extends TestCase
             }
         };
         $compose = tempnam(sys_get_temp_dir(), 'baander-running-');
-        file_put_contents($compose, '{"services":{"app":{"image":"retained-application"}}}');
+        file_put_contents($compose, $topology);
         try {
             self::assertFalse(new ComposeRuntime(new InstanceStateStore('/tmp/baander-unused'), $runner)->running([
                 'project' => 'owned', 'kind' => 'preview',
@@ -93,7 +103,7 @@ final class DevelopmentRunningTest extends TestCase
     public function testRunningContainersAreNotRestartedForUnhealthyFunctionalStatus(): void
     {
         self::assertTrue($this->observe($this->containers(), 'preview'));
-        array_slice($this->containers(), 0, 5) |> $this->observe(...) |> self::assertTrue(...);
+        array_slice($this->containers(), 0, 6) |> $this->observe(...) |> self::assertTrue(...);
     }
 
     public function testMissingOrStoppedContainersAreObserved(): void

@@ -322,6 +322,9 @@ class ComposeRuntime
             );
         }
         unset($service);
+        // The agent's only way to Docker; it joins no network, so web and workers cannot reach it.
+        $services[LogCollection::PROXY_SERVICE] = $this->dockerProxy($instance, $release, $target);
+        $services['log-agent']['depends_on'][LogCollection::PROXY_SERVICE] = ['condition' => 'service_started'];
         $volumes = [];
         foreach ([
             'database',
@@ -338,6 +341,7 @@ class ComposeRuntime
             'pooler_credentials',
             'logs',
             'log_index',
+            'docker_proxy',
         ] as $key) {
             $volumes[$key] = ['name' => $instance['volumes'][$key] ?? $project . '-' . $key];
             if (isset($instance['volumes'][$key])) {
@@ -356,6 +360,56 @@ class ComposeRuntime
             ],
             'volumes' => $volumes,
         ];
+    }
+
+    /**
+     * The preset's proxy, but with its configuration bound from the instance state directory:
+     * `dependencies()` starts the agent and with it the proxy before `prepare()` seeds volumes,
+     * while `write()` renders the file before any start. The label follows the configuration,
+     * so Compose recreates a running proxy when a release changes what it admits.
+     *
+     * @param array<string,mixed> $instance
+     * @param array<string,mixed> $release
+     * @return array<string,mixed>
+     */
+    private function dockerProxy(array $instance, array $release, Target $target): array
+    {
+        $proxy = LogCollection::proxyService($release['images']['nginx_image']['resolvedId'], $target, 'docker_proxy_configuration');
+        $directory = $this->proxyConfigurationDirectory($instance);
+        $proxy['volumes'] = array_map(
+            static fn(array $mount): array => $mount['source'] === 'docker_proxy_configuration' ? self::bind($directory, $mount['target']) : $mount,
+            $proxy['volumes'],
+        );
+        $proxy['labels'] = ['io.baander.docker-proxy.configuration' => hash('sha256', LogCollection::proxyConfiguration())];
+
+        return $proxy;
+    }
+
+    /** @param array<string,mixed> $instance */
+    private function proxyConfigurationDirectory(array $instance): string
+    {
+        return $this->store->directory($instance['id']) . '/docker-proxy';
+    }
+
+    /**
+     * The proxy runs as root without capabilities, so it reads its configuration with the
+     * permissions any other user has.
+     *
+     * @param array<string,mixed> $instance
+     */
+    private function writeProxyConfiguration(array $instance): string
+    {
+        $directory = $this->proxyConfigurationDirectory($instance);
+        if (is_link($directory)) {
+            throw new WorkflowError('Refusing symlink Docker proxy configuration directory.');
+        }
+        if ((!is_dir($directory) && !mkdir($directory, 0755)) || !chmod($directory, 0755)) {
+            throw new WorkflowError('Cannot prepare the Docker proxy configuration directory.');
+        }
+        $path = $directory . '/' . basename(LogCollection::PROXY_CONFIGURATION);
+        AtomicFile::write($path, LogCollection::proxyConfiguration(), 0644);
+
+        return $path;
     }
 
     /** @param array<string,string> $environment
@@ -526,10 +580,11 @@ class ComposeRuntime
             $directory . '/frontend.conf.template',
             str_replace('include /etc/nginx/preview.conf;', $preview, $content),
         );
+        $proxyConfiguration = $this->writeProxyConfiguration($instance);
         $instance['log_boot_id'] = random_bytes(16) |> bin2hex(...);
         AtomicFile::writeJson($directory . '/compose.json', $this->config($instance, $release));
         $files = [];
-        foreach ([$directory . '/compose.json', $directory . '/frontend.conf.template'] as $path) {
+        foreach ([$directory . '/compose.json', $directory . '/frontend.conf.template', $proxyConfiguration] as $path) {
             $digest = hash_file('sha256', $path);
             if ($digest === false) {
                 throw new WorkflowError('Cannot identify generated runtime input: ' . $path);
@@ -548,10 +603,10 @@ class ComposeRuntime
         $docker = $this->connections->client($instance['docker']);
         $docker->validateIdentity();
         // A generated topology change needs reactivation before selecting its new services.
-        if (!self::hasService($instance, 'log-agent')) {
+        if (!self::hasService($instance, 'log-agent') || !self::hasService($instance, LogCollection::PROXY_SERVICE)) {
             return false;
         }
-        $services = ['app', 'nginx', 'postgres', 'redis', 'log-agent'];
+        $services = ['app', 'nginx', 'postgres', 'redis', 'log-agent', LogCollection::PROXY_SERVICE];
         if (self::hasPooler($instance)) {
             $services[] = Pooler::SERVICE;
         }
@@ -739,7 +794,7 @@ class ComposeRuntime
         $docker->compose(
             $instance['project'],
             $instance['compose_file'],
-            ['up', '-d', '--no-deps', 'log-agent', 'app', ...($instance['kind'] === 'preview' ? ['vite'] : [])],
+            ['up', '-d', '--no-deps', LogCollection::PROXY_SERVICE, 'log-agent', 'app', ...($instance['kind'] === 'preview' ? ['vite'] : [])],
         );
     }
 

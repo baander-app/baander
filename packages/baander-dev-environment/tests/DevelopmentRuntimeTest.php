@@ -6,6 +6,7 @@ namespace Baander\DevEnvironment\Tests;
 
 use Baander\Configuration\ApplicationLayout;
 use Baander\Containers\Resources\ResourceLedger;
+use Baander\Deployment\Observability\LogCollection;
 use Baander\DevEnvironment\Host\ProcessEnvironment;
 use Baander\DevEnvironment\Runtime\ComposeRuntime;
 use Baander\DevEnvironment\State\InstanceStateStore;
@@ -109,6 +110,69 @@ final class DevelopmentRuntimeTest extends TestCase
         self::assertNotContains('/run/baander-log-agent', array_column($web['volumes'], 'target'));
         self::assertArrayHasKey('logs', $config['volumes']);
         self::assertArrayHasKey('log_index', $config['volumes']);
+    }
+
+    public function testEveryMountedVolumeIsDeclaredAndTheAgentReachesDockerOnlyThroughTheProxy(): void
+    {
+        $preview = array_replace($this->instance, ['kind' => 'preview', 'worktree' => $this->release['source']]);
+        foreach ([$this->instance, $preview] as $instance) {
+            $config = $this->runtime->config($instance, $this->release);
+            foreach ($config['services'] as $name => $service) {
+                foreach ($service['volumes'] ?? [] as $mount) {
+                    if ($mount['type'] === 'volume') {
+                        self::assertArrayHasKey($mount['source'], $config['volumes'], $instance['kind'] . ' ' . $name . ' mounts ' . $mount['source']);
+                    }
+                }
+            }
+
+            $agent = $config['services']['log-agent'];
+            self::assertContains(['type' => 'volume', 'source' => 'docker_proxy', 'target' => LogCollection::PROXY_DIRECTORY, 'read_only' => true], $agent['volumes']);
+            self::assertNotContains('/var/run/docker.sock', array_column($agent['volumes'], 'source'));
+            self::assertSame(LogCollection::PROXY_SOCKET, json_decode($agent['environment']['BAANDER_LOG_AGENT_CONFIG'], true, flags: JSON_THROW_ON_ERROR)['dockerSocket']);
+            self::assertSame(['condition' => 'service_started'], $agent['depends_on'][LogCollection::PROXY_SERVICE] ?? null);
+
+            $proxy = $config['services'][LogCollection::PROXY_SERVICE] ?? null;
+            self::assertIsArray($proxy, $instance['kind'] . ' renders the Docker proxy');
+            self::assertSame($this->release['images']['nginx_image']['resolvedId'], $proxy['image']);
+            self::assertSame('none', $proxy['network_mode']);
+            self::assertArrayNotHasKey('networks', $proxy);
+            self::assertArrayNotHasKey('ports', $proxy);
+            self::assertTrue($proxy['read_only']);
+            self::assertSame(['ALL'], $proxy['cap_drop']);
+            self::assertArrayNotHasKey('cap_add', $proxy);
+            self::assertContains('no-new-privileges:true', $proxy['security_opt']);
+            self::assertArrayNotHasKey('depends_on', $proxy);
+            $socket = array_find($proxy['volumes'], static fn(array $mount): bool => $mount['source'] === '/var/run/docker.sock');
+            self::assertTrue($socket['read_only'] ?? false, 'the proxy alone binds the daemon socket, read-only');
+            self::assertContains(['type' => 'volume', 'source' => 'docker_proxy', 'target' => LogCollection::PROXY_DIRECTORY], $proxy['volumes']);
+            $configuration = array_find($proxy['volumes'], static fn(array $mount): bool => $mount['target'] === dirname(LogCollection::PROXY_CONFIGURATION));
+            self::assertTrue($configuration['read_only'] ?? false, 'the proxy reads its configuration read-only');
+            foreach ($config['services'] as $name => $service) {
+                if ($name !== LogCollection::PROXY_SERVICE) {
+                    self::assertNotContains('/var/run/docker.sock', array_column($service['volumes'] ?? [], 'source'), $name);
+                }
+            }
+        }
+    }
+
+    public function testWriteRendersTheProxyConfigurationTheProxyReadsWithoutCapabilities(): void
+    {
+        $instance = $this->runtime->write($this->instance, $this->release);
+        $compose = json_decode(file_get_contents($instance['compose_file']), true, flags: JSON_THROW_ON_ERROR);
+        $mount = array_find(
+            $compose['services'][LogCollection::PROXY_SERVICE]['volumes'],
+            static fn(array $mount): bool => $mount['target'] === dirname(LogCollection::PROXY_CONFIGURATION),
+        );
+        $file = $mount['source'] . '/' . basename(LogCollection::PROXY_CONFIGURATION);
+        self::assertSame(LogCollection::proxyConfiguration(), file_get_contents($file));
+        self::assertSame(0644, fileperms($file) & 0777);
+        self::assertSame(0755, fileperms($mount['source']) & 0777);
+        self::assertSame(hash_file('sha256', $file), $instance['generated_inputs']['files'][$file]);
+        self::assertSame(
+            hash('sha256', LogCollection::proxyConfiguration()),
+            $compose['services'][LogCollection::PROXY_SERVICE]['labels']['io.baander.docker-proxy.configuration'],
+            'a changed configuration changes the service, so Compose recreates the proxy',
+        );
     }
 
     public function testComposePreservesStorageNetworkMapsAndEscapedEnvironment(): void
@@ -266,6 +330,7 @@ final class DevelopmentRuntimeTest extends TestCase
         self::assertSame(hash_file('sha256', $instance['compose_file']), $instance['generated_inputs']['files'][$instance['compose_file']]);
         $starts = array_values(array_filter($this->runner->calls, static fn(array $args): bool => in_array('up', $args, true)));
         self::assertSame(['nginx', 'app'], array_map(static fn(array $args): string => $args[array_key_last($args)], $starts));
+        self::assertSame(['up', '-d', '--no-deps', LogCollection::PROXY_SERVICE, 'log-agent', 'app'], array_slice($starts[1], -6));
         $this->runtime->down($instance);
         $command = $this->runner->calls[array_key_last($this->runner->calls)];
         self::assertSame([$this->docker, '--host', 'unix:///var/run/docker.sock', 'compose'], array_slice($command, 0, 4));
