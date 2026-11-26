@@ -16,6 +16,23 @@ Read [AGENTS.md](AGENTS.md) for workflow, [CONCEPTS.md](CONCEPTS.md) for shared 
 and the [testing guide](docs-book/part-2-developer-guide/testing/README.md) for current
 runners and verification boundaries. Historical suite counts apply to their own trees.
 
+## Symfony 8.1.12 and the media ownership drill, 2026-11-26
+
+The scheduled advisory check reported 19 Symfony advisories published on 2026-11-25 against the locked 8.1.10 and 8.1.11 components. `69dad984a` is a full `composer update` inside the existing constraints: 41 Symfony components move to 8.1.12, eleven other packages take minor or patch releases, and the scripts lock moves `league/commonmark` to 2.10.10. The Redis Messenger patch applies unchanged. `a06ba18aa` stops the local dependency check from reading Composer's root-version notice for `baander/redis-rate-limiter` as a fetch failure.
+
+`c4297b363` fixes GitHub CI's media ownership steps, which had failed on every run that reached them since `43e0bb7cd` (2026-11-20). Since `d790a24e2`, a token carries its user's roles only when the first-party client issued it from a password or passkey sign-in. The two-command drill signed its administrators in through clients of their own, so the absent-worker phase got 403 instead of the 503 it checks for. The drills now sign in through the first-party client.
+
+Verification checkpoint:
+
+- In the CI image with the updated vendor tree, these pass: the online advisory check (no advisory on any owned lock), `composer validate` and `normalize`, application and tooling PHPStan, Deptrac (0 violations), `check:imports`, `check:tooling-architecture`, `check:tooling-format`, the OpenAPI drift check, and the dependency checker's 44 tests. The new checker test fails without the fix.
+- The two-command drill passed end to end, with the Chromium step's environment, against a worker image built from the fix applied to `eb10d354e`.
+- The full backend suite was started on `a06ba18aa` and stopped unfinished at the owner's request. GitHub CI on `c4297b363` is the outstanding check.
+
+Open:
+
+- The movie-endpoint step has not run on `master` since 2026-11-20 and was not run locally.
+- The scheduled advisory run also reported six base images (`composer`, `debian:bookworm-slim`, `docker:cli`, three `nginx` tags) whose tags now resolve to new digests; the pins have not moved.
+
 ## Push without VAPID keys, 2026-11-26
 
 Since `cd1b02c05` (2026-11-21) removed the tracked `.env`, the production image has run with the empty VAPID keys of `.env.example`. The WebPush client rejects an empty key pair in its constructor and was built eagerly, so every `SendPushCommand` failed while its handler was constructed, was retried three times and was dead-lettered, even with push turned off. GitHub CI's "Production worker lifecycle and dependencies" step failed its outbox check on every run that reached it from `227948b34` on; the tracked `.env`'s development key pair had hidden the defect since the first commit.
