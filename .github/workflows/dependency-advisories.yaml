@@ -19,6 +19,9 @@ jobs:
         container:
             image: ${{ github.server_url == 'https://github.com' && 'ghcr.io' || vars.REGISTRY_URL }}/${{ github.server_url == 'https://github.com' && 'baander-app' || vars.REGISTRY_OWNER }}/baander-runner:7491ddcecfa546a1845ff79f85878649e6f79560
             options: --init
+        # A step condition cannot read secrets, so the job tells the login step whether one is set.
+        env:
+            HAS_DOCKERHUB: ${{ secrets.DOCKERHUB_TOKEN != '' }}
         steps:
             -   name: Checkout
                 env:
@@ -46,6 +49,14 @@ jobs:
             -   name: JavaScript lock advisories
                 if: always()
                 run: php scripts/check-js-dependencies.php --advisories-only
+            # Docker Hub limits anonymous manifest reads per address, which hosted runners share.
+            # Without the optional secrets the drift step reads anonymously.
+            -   name: Docker Hub login
+                if: always() && env.HAS_DOCKERHUB == 'true'
+                env:
+                    DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+                    DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
+                run: printf '%s\n' "$DOCKERHUB_TOKEN" | docker login -u "$DOCKERHUB_USERNAME" --password-stdin
             # Exits 1 when a pinned tag now resolves to another digest and 2 when a registry
             # could not be read; it pulls and runs no image.
             -   name: Image digest drift

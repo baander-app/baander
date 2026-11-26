@@ -56,7 +56,21 @@ the workflow that pins it. The
 [PHP dependency page](../getting-started/php-dependencies.md#repeatable-checks)
 describes the build-input check that keeps every image pinned.
 
-The job has no write step and keeps no artifact; the report is the step
+Docker Hub limits how many manifests one address may read without an account, and
+hosted runners share addresses. When Docker Hub answers `429 Too Many Requests`, the
+drift step reads that tag again after 5, 10 and 20 seconds. A tag still refused on the
+fourth read is a gap, so the step exits `2`. Any other refusal, such as `401`, `403`
+or an unknown manifest, is a gap at once. The whole command runs within one
+600-second budget, so the pauses cannot hold the job past its 30-minute timeout.
+
+The Docker Hub login step runs before the drift step when the repository defines the
+optional secret `DOCKERHUB_TOKEN`. It signs in as `DOCKERHUB_USERNAME` with that
+token, and the drift step then reads under that account's limit. Without the token,
+the step is skipped and the drift step reads anonymously. A step condition cannot
+read secrets, so the job sets `HAS_DOCKERHUB` from the token, and the login step
+checks that variable instead.
+
+The job publishes nothing and keeps no artifact; the report is the step
 log. The
 [PHP](../getting-started/php-dependencies.md#repeatable-checks) and
 [JavaScript](contributing.md#javascript-dependency-maintenance) dependency pages
@@ -417,6 +431,10 @@ Forgejo's registry already holds every image, so Forgejo needs no staging.
   secrets as the earlier Forgejo-only workflows, so none needs removing.
 - `BAANDER_TEST_DOCKER_SOCKET_PATH` is optional. The CI quality gate defaults it to
   `/var/run/docker.sock`; set it for a runner whose daemon socket lives elsewhere.
+- The secrets `DOCKERHUB_USERNAME` and `DOCKERHUB_TOKEN` are optional. With them,
+  the image-drift check reads Docker Hub under that account's rate limit (see
+  [Dependency advisories](#dependency-advisories)). A token with the
+  "Public Repo Read-only" scope is enough.
 - Keep a runner registered with the `docker-cli` label.
 - Register no runner with the `fork-pull-request` label. Jobs of pull requests from
   forks resolve to it and wait in the queue, so they never reach the runner that
@@ -436,6 +454,8 @@ Keep these settings in place:
 - **No registry secret.** The repository defines no `REGISTRY_TOKEN` secret. Login
   uses `secrets.REGISTRY_TOKEN || github.token`, so such a secret would replace the
   workflow token.
+- **Optional Docker Hub secrets.** `DOCKERHUB_USERNAME` and `DOCKERHUB_TOKEN` let the
+  image-drift check read Docker Hub under that account's rate limit, as on Forgejo.
 
 ### First bring-up on GitHub
 

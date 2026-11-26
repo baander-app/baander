@@ -5,10 +5,25 @@ declare(strict_types=1);
 namespace Baander\DevDependencies\Php;
 
 use Baander\Containers\Docker\Client;
+use Baander\Process\Execution\CommandFailure;
+use Baander\Process\Execution\ProcessResult;
 
 final readonly class DockerEvidence
 {
-    public function __construct(private Client $client, private float $timeout) {}
+    /** Manifest reads of one tag while its registry answers 429, with a pause before each next read that doubles from the first. */
+    private const int RATE_LIMITED_READS = 4;
+    private const float FIRST_PAUSE_SECONDS = 5.0;
+
+    /** @var \Closure(float): void */
+    private \Closure $pause;
+
+    /** @param (\Closure(float): void)|null $pause waits the given seconds between rate-limited reads */
+    public function __construct(private Client $client, private float $timeout, ?\Closure $pause = null)
+    {
+        $this->pause = $pause ?? static function (float $seconds): void {
+            usleep((int) ($seconds * 1_000_000));
+        };
+    }
 
     /** @return array<string,array{php:string,composer:string}>
      */
@@ -64,7 +79,7 @@ final readonly class DockerEvidence
         if (preg_match('~^[^\s@]+:[A-Za-z0-9_][A-Za-z0-9_.-]{0,127}$~D', $reference) !== 1 || !self::isTagged($reference)) {
             throw new \RuntimeException('A registry digest is read for a tagged reference without a digest.');
         }
-        $result = $this->client->run(['buildx', 'imagetools', 'inspect', $reference, '--format', '{{json .Manifest}}'], timeout: $this->timeout);
+        $result = $this->manifest($reference);
         if ($result->stderr !== '') {
             throw new \RuntimeException('Registry manifest metadata emitted a diagnostic: ' . trim($result->stderr));
         }
@@ -74,5 +89,31 @@ final readonly class DockerEvidence
             throw new \RuntimeException('Registry manifest metadata has no digest.');
         }
         return $digest;
+    }
+
+    /**
+     * A 429 is the registry's pull-rate limit, which lifts with time, so that answer alone is read again; an
+     * authentication refusal or an unknown manifest stays the same on every read and ends the read at once.
+     */
+    private function manifest(string $reference): ProcessResult
+    {
+        for ($read = 1, $pause = self::FIRST_PAUSE_SECONDS; ; ++$read, $pause *= 2) {
+            try {
+                return $this->client->run(['buildx', 'imagetools', 'inspect', $reference, '--format', '{{json .Manifest}}'], timeout: $this->timeout);
+            } catch (CommandFailure $failure) {
+                if (!self::rateLimited($failure)) {
+                    throw $failure;
+                }
+                if ($read === self::RATE_LIMITED_READS) {
+                    throw new \RuntimeException('The registry still answered 429 after ' . self::RATE_LIMITED_READS . ' reads: ' . $failure->getMessage(), previous: $failure);
+                }
+            }
+            ($this->pause)($pause);
+        }
+    }
+
+    private static function rateLimited(CommandFailure $failure): bool
+    {
+        return preg_match('/\b429 Too Many Requests\b|\btoomanyrequests\b/i', $failure->result->stderr ?? '') === 1;
     }
 }

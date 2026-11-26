@@ -204,8 +204,13 @@ final class PublicationWorkflowTest extends TestCase
             $this->step($job, 'Prepare standalone PHP tooling')['run'],
         );
 
+        self::assertSame(
+            ['Checkout', 'Prepare standalone PHP tooling', 'PHP lock advisories', 'JavaScript lock advisories', 'Docker Hub login', 'Image digest drift'],
+            array_column($job['steps'], 'name'),
+        );
         $php = $this->step($job, 'PHP lock advisories');
         $javascript = $this->step($job, 'JavaScript lock advisories');
+        $login = $this->step($job, 'Docker Hub login');
         $drift = $this->step($job, 'Image digest drift');
         // The whole command: nothing after it can replace the checker's exit status.
         self::assertSame('php scripts/check-php-dependencies.php --advisories-only', $php['run']);
@@ -215,9 +220,23 @@ final class PublicationWorkflowTest extends TestCase
         // An open finding in one report must not keep the next one from running.
         self::assertSame('always()', $javascript['if']);
         self::assertSame('always()', $drift['if']);
-        foreach ([$php, $javascript, $drift] as $step) {
+        foreach ([$php, $javascript, $login, $drift] as $step) {
             self::assertArrayNotHasKey('continue-on-error', $step);
         }
+
+        // A step condition cannot read secrets, so the job states whether the token is set.
+        self::assertSame("always() && env.HAS_DOCKERHUB == 'true'", $login['if']);
+        foreach ([self::GITHUB, self::FORGEJO] as $server) {
+            // A forge answers an unset secret with the empty string.
+            foreach (['dockerhub-token' => true, '' => false] as $token => $logsIn) {
+                $context = self::context($server);
+                $context['secrets']['DOCKERHUB_TOKEN'] = (string) $token;
+                $context['env'] = array_map(static fn(mixed $value): string => self::text(self::interpolate($value, $context)), $job['env']);
+                self::assertSame($logsIn, self::runs($login, $context, $job), $server . ($logsIn ? ' with' : ' without') . ' a Docker Hub token');
+            }
+        }
+        self::assertSame(['DOCKERHUB_USERNAME' => '${{ secrets.DOCKERHUB_USERNAME }}', 'DOCKERHUB_TOKEN' => '${{ secrets.DOCKERHUB_TOKEN }}'], $login['env']);
+        self::assertSame('printf \'%s\n\' "$DOCKERHUB_TOKEN" | docker login -u "$DOCKERHUB_USERNAME" --password-stdin', $login['run']);
     }
 
     #[DataProvider('requiredRegistryModeProvider')]

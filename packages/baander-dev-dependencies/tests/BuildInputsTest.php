@@ -188,7 +188,7 @@ final class BuildInputsTest extends TestCase
             $asked[] = $spec->argv[6];
             return isset($answers[$spec->argv[6]])
                 ? new ProcessResult(0, null, false, false, $answers[$spec->argv[6]], '', 0.01)
-                : new ProcessResult(1, null, false, false, '', 'ERROR: 429 Too Many Requests', 0.01);
+                : new ProcessResult(1, null, false, false, '', 'ERROR: unexpected status from HEAD request to https://mirror.baander.app/v2/web/manifests/alpine: 401 Unauthorized', 0.01);
         });
         $registry = new DockerEvidence(new Client($executor, new Target(PHP_BINARY, 'unix:///fixture.sock', 'fixture', null, null), []), 2);
         $report = new Report(false, imageDrift: true);
@@ -212,5 +212,46 @@ final class BuildInputsTest extends TestCase
         ], $records);
         self::assertSame(2, $report->exitCode(), 'An unreadable registry fails the report closed.');
         self::assertSame('image-drift', $report->toArray()['mode']);
+    }
+
+    /**
+     * @param list<array{int,string}> $answers the exit status and diagnostic of each inspect in turn; status 0 answers the pinned digest
+     * @param list<float> $pauses
+     */
+    #[DataProvider('registryAnswerProvider')]
+    public function testDriftReadsARateLimitedTagAgainAfterDoublingPauses(array $answers, string $status, array $pauses): void
+    {
+        $asked = 0;
+        $executor = $this->createStub(CommandExecutor::class);
+        $executor->method('run')->willReturnCallback(static function (ProcessSpec $spec, CompletionPolicy $policy) use ($answers, &$asked): ProcessResult {
+            [$exit, $stderr] = $answers[$asked++] ?? self::fail('The registry was asked again after its last answer.');
+            $manifest = $exit === 0 ? json_encode(['digest' => self::DIGEST], JSON_THROW_ON_ERROR) : '';
+            return $policy->complete(new ProcessResult($exit, null, false, false, $manifest, $stderr, 0.01), $spec);
+        });
+        $paused = [];
+        $pause = static function (float $seconds) use (&$paused): void {
+            $paused[] = $seconds;
+        };
+        $registry = new DockerEvidence(new Client($executor, new Target(PHP_BINARY, 'unix:///fixture.sock', 'fixture', null, null), []), 2, $pause);
+        $report = new Report(false, imageDrift: true);
+        ImageDrift::assess([['path' => 'Dockerfile', 'line' => 1, 'reference' => 'debian:trixie-slim@' . self::DIGEST]], $registry, $report);
+        self::assertSame(count($answers), $asked);
+        self::assertSame($pauses, $paused);
+        $record = $report->toArray()['records'][0];
+        self::assertSame($status, $record['status'], $record['reason']);
+        self::assertSame($status === 'gap' ? 2 : 0, $report->exitCode());
+    }
+
+    /** @return iterable<string, array{list<array{int,string}>, string, list<float>}> */
+    public static function registryAnswerProvider(): iterable
+    {
+        $limited = [1, "ERROR: unexpected status from HEAD request to https://registry-1.docker.io/v2/library/debian/manifests/trixie-slim: 429 Too Many Requests\n"];
+        $pulls = [1, "ERROR: httpReadSeeker: failed open: unexpected status from GET request to https://registry-1.docker.io/v2/library/debian/manifests/" . self::DIGEST . ": 429 Too Many Requests\n"
+            . "toomanyrequests: You have reached your unauthenticated pull rate limit. Sign in for a higher limit: https://www.docker.com/increase-rate-limit\n"];
+        yield 'rate limited twice, then read' => [[$limited, $pulls, [0, '']], 'evidence', [5.0, 10.0]];
+        yield 'rate limited on every read' => [[$limited, $pulls, $limited, $pulls], 'gap', [5.0, 10.0, 20.0]];
+        yield 'unauthorized' => [[[1, "ERROR: unexpected status from HEAD request to https://registry-1.docker.io/v2/library/debian/manifests/trixie-slim: 401 Unauthorized\n"]], 'gap', []];
+        yield 'forbidden' => [[[1, "ERROR: unexpected status from HEAD request to https://mirror.baander.app/v2/debian/manifests/trixie-slim: 403 Forbidden\n"]], 'gap', []];
+        yield 'unknown manifest' => [[[1, "ERROR: failed to fetch registry-1.docker.io/library/debian:trixie-slim: manifest unknown\n"]], 'gap', []];
     }
 }
