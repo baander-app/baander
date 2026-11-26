@@ -26,7 +26,12 @@ export default defineConfig({
     // Headless Chromium on Linux hints fonts to whole-pixel sizes by default, which discards the
     // fractional size-adjust of the metric-matched fallback faces; desktop browsers position glyphs
     // at fractional sizes, so the suite renders text the way they do.
-    launchOptions: { args: ['--host-resolver-rules=MAP website.baander.app 127.0.0.1,MAP * ~NOTFOUND', '--no-proxy-server', '--font-render-hinting=none'] },
+    // The disposable server's certificate is self-signed. Accepted per request, it fails each
+    // request's first TLS handshake and the request restarts on another connection. Amid a page's
+    // burst of parallel requests that churn now and then fails a request with
+    // net::ERR_TOO_MANY_RETRIES before it reaches the server, and the page renders without that
+    // stylesheet. Accepting the certificate in the handshake removes the restarts.
+    launchOptions: { args: ['--host-resolver-rules=MAP website.baander.app 127.0.0.1,MAP * ~NOTFOUND', '--no-proxy-server', '--font-render-hinting=none', '--ignore-certificate-errors'] },
     trace: 'retain-on-failure',
     screenshot: 'only-on-failure',
   },
