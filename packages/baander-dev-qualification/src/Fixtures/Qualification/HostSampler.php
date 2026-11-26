@@ -43,11 +43,11 @@ final class HostSampler
         foreach ($roles as $role => $record) {
             self::validateMapping($role, $record);
             $path = '/' . trim($record['cgroup'], '/');
-            if ($path === rtrim($this->cgroupRoot, '/')) {
+            $cgroupPrefix = rtrim($this->cgroupRoot, '/');
+            if ($path === $cgroupPrefix) {
                 $path = '/';
             }
-            if (str_starts_with($path, rtrim($this->cgroupRoot, '/') . '/')) {
-                $cgroupPrefix = rtrim($this->cgroupRoot, '/');
+            if (str_starts_with($path, $cgroupPrefix . '/')) {
                 $path = substr($path, strlen($cgroupPrefix));
             }
             foreach ($paths as $other) {

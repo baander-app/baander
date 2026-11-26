@@ -129,7 +129,7 @@ final class AuthenticatePasskeyHandlerTest extends TestCase
         CredentialRecord $updatedCredential,
         bool $ownerLookupConfigured = false,
     ): void {
-        $expectedOptions = PublicKeyCredentialRequestOptions::create(random_bytes(32), 'baander.app');
+        $expectedOptions = $this->createLoginOptions();
         $storedCredential = $this->createStoredCredential($passkey->getCounter());
 
         $this->passkeyVerifier->expects($this->once())->method('consumeLoginChallenge')
@@ -215,7 +215,7 @@ final class AuthenticatePasskeyHandlerTest extends TestCase
             ->with(self::CREDENTIAL_ID)
             ->willReturn($passkey);
 
-        $expectedOptions = PublicKeyCredentialRequestOptions::create(random_bytes(32), 'baander.app');
+        $expectedOptions = $this->createLoginOptions();
         $storedCredential = $this->createStoredCredential($passkey->getCounter());
 
         $this->passkeyVerifier->method('consumeLoginChallenge')->willReturn($expectedOptions);

@@ -83,7 +83,7 @@ final readonly class JobMonitorAdministration implements JobMonitorAdministratio
         $result = $this->jobMonitorService->findWithCursor(
             new JobMonitorFilter($query->status, $query->name, $query->queue),
             $query->cursor === null ? null : $this->cursorCodec->decode($query->cursor),
-            self::pageSize($query->limit),
+            self::pageSize($query->limit, JobMonitorQuery::MAX_LIMIT),
             $query->sort,
             $query->direction,
         );
@@ -223,9 +223,7 @@ final readonly class JobMonitorAdministration implements JobMonitorAdministratio
 
     public function analyticsFailures(JobAnalyticsRange $range, int $limit = 50): array
     {
-        $cappedLimit = min($limit, 200);
-
-        return $this->jobMonitorService->getAnalyticsFailures($range->from, $range->to, max(1, $cappedLimit));
+        return $this->jobMonitorService->getAnalyticsFailures($range->from, $range->to, self::pageSize($limit, 200));
     }
 
     public function runInline(object $message): InlineJobRun
@@ -317,9 +315,9 @@ final readonly class JobMonitorAdministration implements JobMonitorAdministratio
         return sprintf('job_cancel:%s', $jobId);
     }
 
-    private static function pageSize(int $limit): int
+    private static function pageSize(int $limit, int $maximum): int
     {
-        return max(1, min($limit, JobMonitorQuery::MAX_LIMIT));
+        return max(1, min($limit, $maximum));
     }
 
     private static function record(JobMonitorEntity $job, bool $cancellable): JobMonitorRecord

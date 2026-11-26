@@ -5,14 +5,10 @@ declare(strict_types=1);
 namespace Baander\PHPStan\Rules;
 
 use PhpParser\Node;
-use PhpParser\Node\Arg;
 use PhpParser\Node\Attribute;
 use PhpParser\Node\Expr;
 use PhpParser\Node\Expr\CallLike;
 use PhpParser\Node\Expr\FuncCall;
-use PhpParser\Node\Expr\MethodCall;
-use PhpParser\Node\Expr\NullsafeMethodCall;
-use PhpParser\Node\Expr\StaticCall;
 use PhpParser\NodeFinder;
 use PHPStan\Analyser\Scope;
 use PHPStan\Node\FileNode;
@@ -48,7 +44,6 @@ final readonly class NestedCallPipeOperatorRule implements Rule
 {
     private const string MESSAGE = 'Nested function calls can be replaced with a pipe operator';
     private const string IDENTIFIER = 'baander.pipeOperator.nestedCalls';
-    private const string TIP = 'See docs-book/part-2-developer-guide/development/coding-conventions.md#pipe-operator for the house fix.';
     private const int MIN_DEPTH = 3;
     private const int MAX_DEPTH = 10;
 
@@ -89,7 +84,7 @@ final readonly class NestedCallPipeOperatorRule implements Rule
             }
 
             $owner = $ownerOf[$current];
-            if (!self::isCall($owner) || self::callArgumentCount($owner) > 1) {
+            if (!PipeOperatorCalls::isCall($owner) || self::callArgumentCount($owner) > 1) {
                 return null;
             }
 
@@ -102,58 +97,31 @@ final readonly class NestedCallPipeOperatorRule implements Rule
 
     private static function startsWalk(FuncCall $call): bool
     {
-        $arguments = self::arguments($call);
+        $arguments = PipeOperatorCalls::arguments($call);
 
         return $arguments !== [] && !array_any($arguments, self::isCallWithArguments(...));
     }
 
     private static function isCallWithArguments(Expr $argument): bool
     {
-        return self::isCall($argument) && self::arguments($argument) !== [];
+        return PipeOperatorCalls::isCall($argument) && PipeOperatorCalls::arguments($argument) !== [];
     }
 
     private static function startDepth(FuncCall $call): int
     {
-        $arguments = self::arguments($call);
+        $arguments = PipeOperatorCalls::arguments($call);
 
-        return count($arguments) === 1 && self::isCall($arguments[0]) ? 2 : 1;
+        return count($arguments) === 1 && PipeOperatorCalls::isCall($arguments[0]) ? 2 : 1;
     }
 
     private static function callArgumentCount(CallLike $call): int
     {
-        return array_filter(self::arguments($call), self::isCall(...)) |> count(...);
-    }
-
-    /** @phpstan-assert-if-true FuncCall|MethodCall|NullsafeMethodCall|StaticCall $node */
-    private static function isCall(Node $node): bool
-    {
-        return ($node instanceof FuncCall
-            || $node instanceof MethodCall
-            || $node instanceof NullsafeMethodCall
-            || $node instanceof StaticCall)
-            && !$node->isFirstClassCallable();
+        return array_filter(PipeOperatorCalls::arguments($call), PipeOperatorCalls::isCall(...)) |> count(...);
     }
 
     private static function ownsArguments(Node $node): bool
     {
         return $node instanceof CallLike || $node instanceof Attribute;
-    }
-
-    /**
-     * The argument values, as PhpStorm's parameter list sees them: a first-class callable has none.
-     *
-     * @return list<Expr>
-     */
-    private static function arguments(CallLike|Attribute $owner): array
-    {
-        $values = [];
-        foreach ($owner instanceof CallLike ? $owner->getRawArgs() : $owner->args as $argument) {
-            if ($argument instanceof Arg) {
-                $values[] = $argument->value;
-            }
-        }
-
-        return $values;
     }
 
     /**
@@ -165,7 +133,7 @@ final readonly class NestedCallPipeOperatorRule implements Rule
         /** @var SplObjectStorage<Expr, CallLike|Attribute> $ownerOf */
         $ownerOf = new SplObjectStorage();
         foreach ($owners as $owner) {
-            foreach (self::arguments($owner) as $value) {
+            foreach (PipeOperatorCalls::arguments($owner) as $value) {
                 $ownerOf[$value] = $owner;
             }
         }
@@ -178,7 +146,7 @@ final readonly class NestedCallPipeOperatorRule implements Rule
         return RuleErrorBuilder::message(self::MESSAGE)
             ->identifier(self::IDENTIFIER)
             ->line($call->getStartLine())
-            ->tip(self::TIP)
+            ->tip(PipeOperatorCalls::TIP)
             ->build();
     }
 }

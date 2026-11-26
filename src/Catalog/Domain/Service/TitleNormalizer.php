@@ -46,8 +46,6 @@ final class TitleNormalizer
      */
     public function normalize(string $title): string
     {
-        // Remove MusicBrainz-style disambiguation ([Label, catalog, country]), transliterate
-        // to ASCII (removes diacritics) and convert to lowercase
         $lowercaseAscii = preg_replace('/\s*\[[^]]*\]\s*$/', '', $title)
             |> self::$transliterator->transliterate(...)
             |> strtolower(...);

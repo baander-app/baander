@@ -7,17 +7,12 @@ namespace Baander\PHPStan\Rules;
 use PhpParser\Comment;
 use PhpParser\Comment\Doc;
 use PhpParser\Node;
-use PhpParser\Node\Arg;
 use PhpParser\Node\Expr;
 use PhpParser\Node\Expr\Array_;
 use PhpParser\Node\Expr\Assign;
 use PhpParser\Node\Expr\AssignOp;
 use PhpParser\Node\Expr\AssignRef;
-use PhpParser\Node\Expr\FuncCall;
 use PhpParser\Node\Expr\List_;
-use PhpParser\Node\Expr\MethodCall;
-use PhpParser\Node\Expr\NullsafeMethodCall;
-use PhpParser\Node\Expr\StaticCall;
 use PhpParser\Node\PropertyHook;
 use PhpParser\Node\Stmt;
 use PhpParser\Node\Stmt\Expression;
@@ -53,7 +48,6 @@ final readonly class AssignmentChainPipeOperatorRule implements Rule
 {
     private const string MESSAGE = 'Chain of assignments can be replaced with a pipe operator';
     private const string IDENTIFIER = 'baander.pipeOperator.assignmentChain';
-    private const string TIP = 'See docs-book/part-2-developer-guide/development/coding-conventions.md#pipe-operator for the house fix.';
     private const int MIN_LENGTH = 3;
     private const int MAX_LENGTH = 10;
 
@@ -93,7 +87,7 @@ final readonly class AssignmentChainPipeOperatorRule implements Rule
     private function chainLength(array $statements, int $start): int
     {
         $first = self::assignmentIn($statements[$start]);
-        if (!$first instanceof Assign) {
+        if (!$first instanceof Assign || !self::continuesWithAssignments($statements, $start)) {
             return 0;
         }
 
@@ -123,6 +117,24 @@ final readonly class AssignmentChainPipeOperatorRule implements Rule
     }
 
     /**
+     * Whether the two statements after the start are assignments not set apart by a docblock, the
+     * least a reportable chain needs; checked before any variable is printed.
+     *
+     * @param list<Stmt> $statements
+     */
+    private static function continuesWithAssignments(array $statements, int $start): bool
+    {
+        foreach ([$start + 1, $start + 2] as $index) {
+            $next = $statements[$index] ?? null;
+            if ($next === null || self::hasDocComment($next) || self::assignmentIn($next) === null) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    /**
      * A statement that carries a docblock has the docblock, not the previous statement, before it.
      *
      * @param list<Stmt> $statements
@@ -141,25 +153,24 @@ final readonly class AssignmentChainPipeOperatorRule implements Rule
 
     private function opensChain(Expr $value, string $variable): bool
     {
-        return !self::isCall($value) || !array_any(
-            self::arguments($value),
-            fn (Expr $argument): bool => self::isCall($argument) || $this->key($argument) === $variable,
+        return !PipeOperatorCalls::isCall($value) || !array_any(
+            PipeOperatorCalls::arguments($value),
+            fn (Expr $argument): bool => PipeOperatorCalls::isCall($argument) || $this->key($argument) === $variable,
         );
     }
 
     private function continuesChain(Expr $value, string $variable): bool
     {
-        if (!self::isCall($value)) {
+        if (!PipeOperatorCalls::isCall($value)) {
             return false;
         }
 
-        $arguments = self::arguments($value);
+        $arguments = PipeOperatorCalls::arguments($value);
 
-        return !array_any($arguments, self::isCall(...))
+        return !array_any($arguments, PipeOperatorCalls::isCall(...))
             && array_any($arguments, fn (Expr $argument): bool => $this->key($argument) === $variable);
     }
 
-    /** Compound and by-reference assignments count as assigning the variable. */
     private static function assignmentIn(Stmt $statement): Assign|AssignOp|AssignRef|null
     {
         $expression = $statement instanceof Expression ? $statement->expr : null;
@@ -184,33 +195,6 @@ final readonly class AssignmentChainPipeOperatorRule implements Rule
     private static function hasDocComment(Stmt $statement): bool
     {
         return array_any($statement->getComments(), static fn (Comment $comment): bool => $comment instanceof Doc);
-    }
-
-    /** @phpstan-assert-if-true FuncCall|MethodCall|NullsafeMethodCall|StaticCall $node */
-    private static function isCall(Node $node): bool
-    {
-        return ($node instanceof FuncCall
-            || $node instanceof MethodCall
-            || $node instanceof NullsafeMethodCall
-            || $node instanceof StaticCall)
-            && !$node->isFirstClassCallable();
-    }
-
-    /**
-     * The argument values, as PhpStorm's parameter list sees them: a first-class callable has none.
-     *
-     * @return list<Expr>
-     */
-    private static function arguments(FuncCall|MethodCall|NullsafeMethodCall|StaticCall $call): array
-    {
-        $values = [];
-        foreach ($call->getRawArgs() as $argument) {
-            if ($argument instanceof Arg) {
-                $values[] = $argument->value;
-            }
-        }
-
-        return $values;
     }
 
     /**
@@ -259,7 +243,7 @@ final readonly class AssignmentChainPipeOperatorRule implements Rule
         return RuleErrorBuilder::message(self::MESSAGE)
             ->identifier(self::IDENTIFIER)
             ->line($statement->getStartLine())
-            ->tip(self::TIP)
+            ->tip(PipeOperatorCalls::TIP)
             ->build();
     }
 }
