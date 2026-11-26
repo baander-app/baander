@@ -6886,7 +6886,11 @@ export type PersonArtist200 = {
 export type GetSongIndexParams = {
   /** Cursor for pagination (base64-encoded) */
   cursor?: string;
-  /** Items per page (max 100) */
+  /**
+   * Items per page
+   * @minimum 1
+   * @maximum 100
+   */
   limit?: number;
   /** Search query */
   q?: string;
@@ -8749,7 +8753,11 @@ export type GetAdminRecommendationsJobsList200 = {
 };
 
 export type GetRecommendationIndexParams = {
-  /** Max recommendations (max 200) */
+  /**
+   * Maximum number of recommendations
+   * @minimum 1
+   * @maximum 200
+   */
   limit?: number;
 };
 
@@ -8762,7 +8770,11 @@ export type PostRecommendationStore201 = {
 };
 
 export type GetRecommendationForYouParams = {
-  /** Max recommendations (max 100) */
+  /**
+   * Maximum number of recommendations
+   * @minimum 1
+   * @maximum 100
+   */
   limit?: number;
 };
 
@@ -8797,7 +8809,11 @@ export type GetRecommendationForYou200 = {
 };
 
 export type GetRecommendationBySourceParams = {
-  /** Max recommendations (max 100) */
+  /**
+   * Maximum number of recommendations
+   * @minimum 1
+   * @maximum 100
+   */
   limit?: number;
 };
 
@@ -8806,7 +8822,11 @@ export type GetRecommendationBySource200 = {
 };
 
 export type GetRecommendationTargetingParams = {
-  /** Max recommendations (max 100) */
+  /**
+   * Maximum number of recommendations
+   * @minimum 1
+   * @maximum 100
+   */
   limit?: number;
 };
 
@@ -32996,7 +33016,7 @@ export const getGetRecommendationBySourceQueryKey = (sourceType: 'song' | 'album
     }
 
 
-export const getGetRecommendationBySourceQueryOptions = <TData = Awaited<ReturnType<typeof getRecommendationBySource>>, TError = ErrorType<unknown>>(sourceType: 'song' | 'album' | 'artist' | 'movie' | 'video',
+export const getGetRecommendationBySourceQueryOptions = <TData = Awaited<ReturnType<typeof getRecommendationBySource>>, TError = ErrorType<ApiError>>(sourceType: 'song' | 'album' | 'artist' | 'movie' | 'video',
     sourceId: string,
     params?: GetRecommendationBySourceParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getRecommendationBySource>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
 ) => {
@@ -33017,11 +33037,11 @@ const {query: queryOptions, request: requestOptions} = options ?? {};
 }
 
 export type GetRecommendationBySourceQueryResult = NonNullable<Awaited<ReturnType<typeof getRecommendationBySource>>>
-export type GetRecommendationBySourceQueryError = ErrorType<unknown>
+export type GetRecommendationBySourceQueryError = ErrorType<ApiError>
 
 
 /** @summary Get recommendations for a source entity */
-export function useGetRecommendationBySource<TData = Awaited<ReturnType<typeof getRecommendationBySource>>, TError = ErrorType<unknown>>(
+export function useGetRecommendationBySource<TData = Awaited<ReturnType<typeof getRecommendationBySource>>, TError = ErrorType<ApiError>>(
  sourceType: 'song' | 'album' | 'artist' | 'movie' | 'video',
     sourceId: string,
     params: undefined |  GetRecommendationBySourceParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getRecommendationBySource>>, TError, TData>> & Pick<
@@ -33034,7 +33054,7 @@ export function useGetRecommendationBySource<TData = Awaited<ReturnType<typeof g
  , queryClient?: QueryClient
   ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 /** @summary Get recommendations for a source entity */
-export function useGetRecommendationBySource<TData = Awaited<ReturnType<typeof getRecommendationBySource>>, TError = ErrorType<unknown>>(
+export function useGetRecommendationBySource<TData = Awaited<ReturnType<typeof getRecommendationBySource>>, TError = ErrorType<ApiError>>(
  sourceType: 'song' | 'album' | 'artist' | 'movie' | 'video',
     sourceId: string,
     params?: GetRecommendationBySourceParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getRecommendationBySource>>, TError, TData>> & Pick<
@@ -33047,14 +33067,14 @@ export function useGetRecommendationBySource<TData = Awaited<ReturnType<typeof g
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 /** @summary Get recommendations for a source entity */
-export function useGetRecommendationBySource<TData = Awaited<ReturnType<typeof getRecommendationBySource>>, TError = ErrorType<unknown>>(
+export function useGetRecommendationBySource<TData = Awaited<ReturnType<typeof getRecommendationBySource>>, TError = ErrorType<ApiError>>(
  sourceType: 'song' | 'album' | 'artist' | 'movie' | 'video',
     sourceId: string,
     params?: GetRecommendationBySourceParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getRecommendationBySource>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 /** @summary Get recommendations for a source entity */
-export function useGetRecommendationBySource<TData = Awaited<ReturnType<typeof getRecommendationBySource>>, TError = ErrorType<unknown>>(
+export function useGetRecommendationBySource<TData = Awaited<ReturnType<typeof getRecommendationBySource>>, TError = ErrorType<ApiError>>(
  sourceType: 'song' | 'album' | 'artist' | 'movie' | 'video',
     sourceId: string,
     params?: GetRecommendationBySourceParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getRecommendationBySource>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
@@ -33194,7 +33214,7 @@ export const getGetRecommendationTargetingQueryKey = (targetType: 'song' | 'albu
     }
 
 
-export const getGetRecommendationTargetingQueryOptions = <TData = Awaited<ReturnType<typeof getRecommendationTargeting>>, TError = ErrorType<unknown>>(targetType: 'song' | 'album' | 'artist' | 'movie' | 'video',
+export const getGetRecommendationTargetingQueryOptions = <TData = Awaited<ReturnType<typeof getRecommendationTargeting>>, TError = ErrorType<ApiError>>(targetType: 'song' | 'album' | 'artist' | 'movie' | 'video',
     targetId: string,
     params?: GetRecommendationTargetingParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getRecommendationTargeting>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
 ) => {
@@ -33215,11 +33235,11 @@ const {query: queryOptions, request: requestOptions} = options ?? {};
 }
 
 export type GetRecommendationTargetingQueryResult = NonNullable<Awaited<ReturnType<typeof getRecommendationTargeting>>>
-export type GetRecommendationTargetingQueryError = ErrorType<unknown>
+export type GetRecommendationTargetingQueryError = ErrorType<ApiError>
 
 
 /** @summary Get recommendations targeting an entity */
-export function useGetRecommendationTargeting<TData = Awaited<ReturnType<typeof getRecommendationTargeting>>, TError = ErrorType<unknown>>(
+export function useGetRecommendationTargeting<TData = Awaited<ReturnType<typeof getRecommendationTargeting>>, TError = ErrorType<ApiError>>(
  targetType: 'song' | 'album' | 'artist' | 'movie' | 'video',
     targetId: string,
     params: undefined |  GetRecommendationTargetingParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getRecommendationTargeting>>, TError, TData>> & Pick<
@@ -33232,7 +33252,7 @@ export function useGetRecommendationTargeting<TData = Awaited<ReturnType<typeof 
  , queryClient?: QueryClient
   ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 /** @summary Get recommendations targeting an entity */
-export function useGetRecommendationTargeting<TData = Awaited<ReturnType<typeof getRecommendationTargeting>>, TError = ErrorType<unknown>>(
+export function useGetRecommendationTargeting<TData = Awaited<ReturnType<typeof getRecommendationTargeting>>, TError = ErrorType<ApiError>>(
  targetType: 'song' | 'album' | 'artist' | 'movie' | 'video',
     targetId: string,
     params?: GetRecommendationTargetingParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getRecommendationTargeting>>, TError, TData>> & Pick<
@@ -33245,14 +33265,14 @@ export function useGetRecommendationTargeting<TData = Awaited<ReturnType<typeof 
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 /** @summary Get recommendations targeting an entity */
-export function useGetRecommendationTargeting<TData = Awaited<ReturnType<typeof getRecommendationTargeting>>, TError = ErrorType<unknown>>(
+export function useGetRecommendationTargeting<TData = Awaited<ReturnType<typeof getRecommendationTargeting>>, TError = ErrorType<ApiError>>(
  targetType: 'song' | 'album' | 'artist' | 'movie' | 'video',
     targetId: string,
     params?: GetRecommendationTargetingParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getRecommendationTargeting>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 /** @summary Get recommendations targeting an entity */
-export function useGetRecommendationTargeting<TData = Awaited<ReturnType<typeof getRecommendationTargeting>>, TError = ErrorType<unknown>>(
+export function useGetRecommendationTargeting<TData = Awaited<ReturnType<typeof getRecommendationTargeting>>, TError = ErrorType<ApiError>>(
  targetType: 'song' | 'album' | 'artist' | 'movie' | 'video',
     targetId: string,
     params?: GetRecommendationTargetingParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getRecommendationTargeting>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
