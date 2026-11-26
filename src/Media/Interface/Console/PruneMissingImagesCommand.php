@@ -8,6 +8,7 @@ use App\Media\Application\Command\PruneMissingImagesCommand as PruneMissingImage
 use App\Media\Application\Port\MediaAdminPortInterface;
 use App\Shared\Application\Port\JobMonitorAdministrationInterface;
 use App\Shared\Interface\Console\AdminCommandSupport;
+use App\Shared\Interface\Console\TerminalText;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputInterface;
@@ -99,13 +100,11 @@ final class PruneMissingImagesCommand extends Command
             return Command::SUCCESS;
         }
 
-        $io->table(
-            ['Image ID', 'Type', 'Path'],
-            array_map(
-                static fn (array $image): array => [$image['publicId'], $image['type'], $image['path']],
-                $report['missingImages'],
-            ),
+        $rows = array_map(
+            static fn (array $image): array => [$image['publicId'], $image['type'], $image['path']],
+            $report['missingImages'],
         );
+        $io->table(['Image ID', 'Type', 'Path'], TerminalText::literalRows($rows));
         $io->warning(sprintf(
             '%d of %d images have missing files. Nothing was deleted; run the command without --dry-run to delete their records.',
             $report['missingCount'],

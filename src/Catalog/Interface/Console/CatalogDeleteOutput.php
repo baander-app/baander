@@ -8,6 +8,7 @@ use App\Catalog\Application\Command\CatalogDeletionResult;
 use App\Catalog\Application\Query\FileDeletionPreview;
 use App\Catalog\Interface\Resource\CatalogDeletionResource;
 use App\Shared\Interface\Console\AdminCommandSupport;
+use App\Shared\Interface\Console\TerminalText;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Input\InputOption;
@@ -88,13 +89,11 @@ final class CatalogDeleteOutput
     /** Prints the file checks of a preview. */
     public static function fileChecks(SymfonyStyle $io, FileDeletionPreview $preview): void
     {
-        $io->table(
-            ['Path', 'Verdict'],
-            array_map(
-                static fn (array $file): array => [$file['path'], $file['directory'] !== null ? sprintf('%s (%s)', $file['verdict'], $file['directory']) : $file['verdict']],
-                $preview->files,
-            ),
+        $rows = array_map(
+            static fn (array $file): array => [$file['path'], $file['directory'] !== null ? sprintf('%s (%s)', $file['verdict'], $file['directory']) : $file['verdict']],
+            $preview->files,
         );
+        $io->table(['Path', 'Verdict'], TerminalText::literalRows($rows));
 
         if ($preview->allowed) {
             $io->text('The files can be deleted.');

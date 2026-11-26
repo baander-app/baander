@@ -14,6 +14,7 @@ use App\Catalog\Application\Query\MusicBrainzMatch\SearchMatchCandidatesQuery;
 use App\Catalog\Interface\Resource\MatchCandidatesResource;
 use App\Shared\Application\Exception\InvalidInputException;
 use App\Shared\Interface\Console\AdminCommandSupport;
+use App\Shared\Interface\Console\TerminalText;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputInterface;
@@ -81,7 +82,8 @@ final class MusicBrainzMatchSearchCommand extends Command
         }
 
         $io->text(self::heading($candidates, $noun));
-        $io->table(...self::table($candidates));
+        [$headers, $rows] = self::table($candidates);
+        $io->table($headers, TerminalText::literalRows($rows));
         $io->text(sprintf('Compare one with: app:metadata:match:compare %s %s <ID>', $candidates->type->value, $candidates->publicId));
 
         return Command::SUCCESS;

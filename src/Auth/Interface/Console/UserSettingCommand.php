@@ -12,6 +12,7 @@ use App\Shared\Application\Exception\InvalidSettingValuesException;
 use App\Shared\Application\Exception\UnknownSettingException;
 use App\Shared\Interface\Console\AdminCommandSupport;
 use App\Shared\Interface\Console\SettingValueFormatter;
+use App\Shared\Interface\Console\TerminalText;
 use App\UserPreference\Application\Port\UserSettingView;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;
@@ -101,18 +102,16 @@ final class UserSettingCommand extends Command
             return AdminCommandSupport::json($io, AdminUserSettingResource::collection($settings));
         }
 
-        $io->table(
-            ['Key', 'Value', 'Source', 'Stored'],
-            array_map(
-                static fn (UserSettingView $setting): array => [
-                    $setting->key,
-                    SettingValueFormatter::format($setting->value),
-                    $setting->source,
-                    self::stored($setting),
-                ],
-                $settings,
-            ),
+        $rows = array_map(
+            static fn (UserSettingView $setting): array => [
+                $setting->key,
+                SettingValueFormatter::format($setting->value),
+                $setting->source,
+                self::stored($setting),
+            ],
+            $settings,
         );
+        $io->table(['Key', 'Value', 'Source', 'Stored'], TerminalText::literalRows($rows));
 
         return Command::SUCCESS;
     }

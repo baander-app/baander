@@ -37,7 +37,7 @@ final class SettingsListCommand extends Command
             ];
         }
 
-        (new SymfonyStyle($input, $output))->table(['Key', 'Value', 'Default', 'Stored', 'Enforced'], $rows);
+        new SymfonyStyle($input, $output)->table(['Key', 'Value', 'Default', 'Stored', 'Enforced'], TerminalText::literalRows($rows));
 
         return Command::SUCCESS;
     }

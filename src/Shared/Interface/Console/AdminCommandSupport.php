@@ -161,6 +161,8 @@ final readonly class AdminCommandSupport
 
     /**
      * Prints a list as a table with one row per item, or with `--json` as the API's `data` array.
+     * String cells go through TerminalText::literalRows(), so stored text prints as written,
+     * without terminal controls or formatter styles.
      *
      * @param list<array<string, mixed>>                     $items   the resource collection the controller returns
      * @param list<string>                                   $headers
@@ -178,7 +180,8 @@ final readonly class AdminCommandSupport
             return Command::SUCCESS;
         }
 
-        $io->table($headers, array_map($row, $items));
+        $rows = array_map($row, $items);
+        $io->table($headers, TerminalText::literalRows($rows));
 
         return Command::SUCCESS;
     }

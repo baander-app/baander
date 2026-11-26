@@ -10,6 +10,7 @@ use App\Shared\Application\LogViewer\LogViewerInterface;
 use App\Shared\Application\LogViewer\TerminalLogGuardInterface;
 use App\Shared\Application\Port\SleeperInterface;
 use App\Shared\Interface\Console\AdminCommandSupport;
+use App\Shared\Interface\Console\TerminalText;
 use Symfony\Component\Console\Output\OutputInterface;
 use Throwable;
 
@@ -74,7 +75,7 @@ final class LogTerminalViewer
                 $lines[] = $status;
                 $lines[] = $prompt !== null ? $prompt.'> '.$value : 'j/k move  Enter detail  / search  s sources  f levels  : SQL  ] next page  F follow  ? help  q quit';
                 $lines = array_slice($lines, 0, $height);
-                $output->write("\033[H\033[2J".implode("\r\n", array_map(static fn (string $line): string => LogTerminalText::clip($line, $width), $lines)), false, OutputInterface::OUTPUT_RAW);
+                $output->write("\033[H\033[2J".implode("\r\n", array_map(static fn (string $line): string => TerminalText::clip($line, $width), $lines)), false, OutputInterface::OUTPUT_RAW);
                 $read = [STDIN];
                 $write = $except = [];
                 $ready = @stream_select($read, $write, $except, 0, 100000);

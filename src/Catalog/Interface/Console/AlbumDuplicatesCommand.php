@@ -7,6 +7,7 @@ namespace App\Catalog\Interface\Console;
 use App\Catalog\Application\Port\AlbumDuplicatePortInterface;
 use App\Catalog\Interface\Resource\DuplicateGroupResource;
 use App\Shared\Interface\Console\AdminCommandSupport;
+use App\Shared\Interface\Console\TerminalText;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Helper\TableSeparator;
@@ -58,9 +59,10 @@ final class AlbumDuplicatesCommand extends Command
             return Command::SUCCESS;
         }
 
+        $rows = self::rows($groups);
         $io->table(
             ['Group', 'Confidence', 'Public ID', 'Title', 'Year', 'Label', 'Artists'],
-            self::rows($groups),
+            TerminalText::literalRows($rows),
         );
 
         return Command::SUCCESS;

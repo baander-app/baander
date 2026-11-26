@@ -11,6 +11,7 @@ use App\Catalog\Interface\Resource\MatchCreditsRowResource;
 use App\Catalog\Interface\Resource\MatchFieldRowResource;
 use App\Catalog\Interface\Resource\MatchTrackResource;
 use App\Shared\Interface\Console\AdminCommandSupport;
+use App\Shared\Interface\Console\TerminalText;
 use Symfony\Component\Console\Style\SymfonyStyle;
 
 /**
@@ -41,10 +42,12 @@ final class MatchComparisonOutput
         ));
         self::rows($io, $data);
         if ($data['tracks'] !== []) {
-            $io->table(['Disc', '#', 'Release track', 'Length', 'Song ID', 'Song', 'Length'], array_map(self::track(...), $data['tracks']));
+            $tracks = array_map(self::track(...), $data['tracks']);
+            $io->table(['Disc', '#', 'Release track', 'Length', 'Song ID', 'Song', 'Length'], TerminalText::literalRows($tracks));
         }
         if ($data['artistActions'] !== []) {
-            $io->table(['Artist ID', 'Artist', 'Action', 'Into', 'Tick', 'Needs ticked'], array_map(self::action(...), $data['artistActions']));
+            $actions = array_map(self::action(...), $data['artistActions']);
+            $io->table(['Artist ID', 'Artist', 'Action', 'Into', 'Tick', 'Needs ticked'], TerminalText::literalRows($actions));
         }
         $io->text('Tick: yes is ticked by default, no is not, locked cannot be ticked, and same would change nothing.');
     }
@@ -73,7 +76,7 @@ final class MatchComparisonOutput
             return;
         }
 
-        $io->table(['Row', 'Current', 'MusicBrainz', 'Tick'], $rows);
+        $io->table(['Row', 'Current', 'MusicBrainz', 'Tick'], TerminalText::literalRows($rows));
     }
 
     /**

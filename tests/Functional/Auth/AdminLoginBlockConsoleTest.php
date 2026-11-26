@@ -35,6 +35,31 @@ final class AdminLoginBlockConsoleTest extends TestCase
         self::assertSame($api, json_decode($list->getDisplay(), true, flags: JSON_THROW_ON_ERROR));
     }
 
+    public function testTheTablePrintsStoredSenderTextLiterallyAndJsonMatchesTheApi(): void
+    {
+        $this->blocks()->save(LoginBlock::create(
+            '192.0.2.51',
+            'bot@baander.app',
+            '<href=https://baander.app>x</>',
+            "\033]8;;https://baander.app\033\\curl/8",
+        ));
+
+        $table = $this->command('app:login-block:list');
+        self::assertSame(Command::SUCCESS, $table->execute([], ['decorated' => true]));
+        self::assertStringContainsString('<href=https://baander.app>x</>', $table->getDisplay());
+        self::assertStringNotContainsString("\033]", $table->getDisplay(), 'An OSC sequence reached the terminal.');
+
+        $api = $this->assertJsonResponse(
+            $this->authenticatedRequest('GET', self::PATH, $this->createAdminUser()),
+            200,
+            'data',
+        )['data'];
+        $json = $this->command('app:login-block:list');
+        self::assertSame(Command::SUCCESS, $json->execute(['--json' => true]));
+        self::assertSame($api, json_decode($json->getDisplay(), true, flags: JSON_THROW_ON_ERROR));
+        self::assertSame("\033]8;;https://baander.app\033\\curl/8", $api[0]['userAgent']);
+    }
+
     public function testDeleteAllWithForceRemovesEveryBlock(): void
     {
         $this->blocks()->save(LoginBlock::create('192.0.2.31', 'bot@baander.app', 'filled', 'curl/8'));

@@ -58,6 +58,24 @@ final class AlbumDuplicateCommandsTest extends TestCase
         self::assertMatchesRegularExpression('/mergedAlbumPublicId02\s+Blue Train \(Remaster\)\s+1957\s+-\s+John Coltrane, Lee Morgan/', $display);
     }
 
+    public function testDuplicatesTablePrintsStoredTitlesLiterally(): void
+    {
+        $albums = [
+            Album::create(Uuid::fromString(self::LIBRARY), "<href=https://baander.app>Blue Train</>\033]0;owned\007", 'album'),
+            Album::create(Uuid::fromString(self::LIBRARY), 'Blue Train', 'album'),
+        ];
+        $data = array_map(static fn (Album $album): array => ['coverImage' => null, 'artists' => []] + AlbumResource::from($album), $albums);
+        $ids = array_map(static fn (Album $album): Uuid => $album->getId(), $albums);
+        $duplicates = $this->createStub(AlbumDuplicatePortInterface::class);
+        $duplicates->method('findDuplicates')->willReturn([new DuplicateGroup($ids, 0.92, $data)]);
+
+        $tester = new CommandTester(new AlbumDuplicatesCommand($duplicates));
+
+        self::assertSame(Command::SUCCESS, $tester->execute(['library' => self::LIBRARY], ['decorated' => true]));
+        self::assertStringContainsString('<href=https://baander.app>Blue Train</>', $tester->getDisplay());
+        self::assertStringNotContainsString("\033]", $tester->getDisplay(), 'An OSC sequence reached the terminal.');
+    }
+
     public function testDuplicatesReportsALibraryWithoutDuplicates(): void
     {
         $duplicates = $this->createStub(AlbumDuplicatePortInterface::class);

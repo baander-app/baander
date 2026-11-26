@@ -49,6 +49,28 @@ final class LoginBlockCommandsTest extends TestCase
         self::assertStringContainsString('Blocks 2-3 of 3.', $table->getDisplay());
     }
 
+    public function testTheTablePrintsSenderTextWithoutEscapesWhileJsonKeepsItAsStored(): void
+    {
+        $block = LoginBlock::create('192.0.2.12', 'bot@baander.app', '<href=https://baander.app>x</>', "\033]8;;https://baander.app\033\\curl/8");
+        $blocks = $this->createStub(LoginBlockRepositoryInterface::class);
+        $blocks->method('findRecent')->willReturn([$block]);
+        $blocks->method('countRecent')->willReturn(1);
+        $command = new LoginBlockListCommand($this->support($blocks));
+
+        $table = new CommandTester($command);
+        self::assertSame(Command::SUCCESS, $table->execute([], ['decorated' => true]));
+        self::assertStringContainsString('<href=https://baander.app>x</>', $table->getDisplay());
+        self::assertStringContainsString('curl/8', $table->getDisplay());
+        self::assertStringNotContainsString("\033]", $table->getDisplay(), 'An OSC sequence reached the terminal.');
+
+        $json = new CommandTester($command);
+        self::assertSame(Command::SUCCESS, $json->execute(['--json' => true]));
+        self::assertSame(
+            LoginBlockResource::collection([$block]),
+            json_decode($json->getDisplay(), true, flags: JSON_THROW_ON_ERROR),
+        );
+    }
+
     public function testListWithNoBlocksSaysSo(): void
     {
         $blocks = $this->createStub(LoginBlockRepositoryInterface::class);

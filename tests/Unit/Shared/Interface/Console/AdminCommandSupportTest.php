@@ -166,6 +166,19 @@ final class AdminCommandSupportTest extends TestCase
         $this->assertSame(1, substr_count($display, 'Kitchen speaker'));
     }
 
+    public function testTheTablePrintsStoredTextLiterallyWithoutTerminalControls(): void
+    {
+        $tester = new CommandTester($this->listCommand([
+            Client::registerDevice("<href=https://baander.app>Living room TV</>\033]52;c;ZXZpbA==\007"),
+        ]));
+
+        $this->assertSame(Command::SUCCESS, $tester->execute([], ['decorated' => true]));
+
+        $display = $tester->getDisplay();
+        $this->assertStringContainsString('<href=https://baander.app>Living room TV</>', $display);
+        $this->assertStringNotContainsString("\033]", $display, 'An OSC sequence reached the terminal.');
+    }
+
     public function testADestructiveCommandWithoutATerminalOrForceDoesNotDispatch(): void
     {
         $tester = new CommandTester($this->command($this->support(null), destructive: true));

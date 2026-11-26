@@ -42,7 +42,10 @@ admin route, an admin page call, or a console command. Read it with the
     terminal, and without one it returns exit 2 unless `--force` is given;
   - `integerOption()`, `stringOption()`, `jsonObjectOption()` and `uuid()` read input
     and throw `InvalidInputException`; do not cast options with `(int)`;
-  - `list()`, `json()`, `yesNo()` and `prettyJson()` render output.
+  - `list()`, `json()`, `yesNo()` and `prettyJson()` render output. `list()` passes
+    every cell through `TerminalText::literalRows()`, which strips terminal control
+    sequences and escapes formatter tags; pass the rows of any other `$io->table()`
+    call that prints stored or external text through it too.
 - Outcomes come from the shared exceptions in `src/Shared/Application/Exception`.
   Throw them from handlers instead of `RuntimeException`, and do not catch them per
   controller:

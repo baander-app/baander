@@ -6,6 +6,7 @@ namespace App\Metadata\Interface\Console;
 
 use App\Metadata\Application\Port\MediaFileMetadataInterface;
 use App\Shared\Interface\Console\AdminCommandSupport;
+use App\Shared\Interface\Console\TerminalText;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputInterface;
@@ -53,14 +54,12 @@ final class MetadataFileExtractCommand extends Command
 
         $io->text(sprintf('Format: %s', $data['format']));
         $tags = array_keys($data['metadata']);
-        $io->table(
-            ['Tag', 'Value'],
-            array_map(
-                static fn (string $tag, mixed $value): array => [$tag, self::value($value)],
-                $tags,
-                $data['metadata'],
-            ),
+        $rows = array_map(
+            static fn (string $tag, mixed $value): array => [$tag, self::value($value)],
+            $tags,
+            $data['metadata'],
         );
+        $io->table(['Tag', 'Value'], TerminalText::literalRows($rows));
 
         return Command::SUCCESS;
     }

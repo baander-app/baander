@@ -6,6 +6,7 @@ namespace App\Shared\Interface\Console\Log;
 
 use App\Shared\Application\LogViewer\LogViewerInterface;
 use App\Shared\Interface\Console\AdminCommandSupport;
+use App\Shared\Interface\Console\TerminalText;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Command\SignalableCommandInterface;
@@ -44,7 +45,7 @@ final class LogViewCommand extends Command implements SignalableCommandInterface
             if (AdminCommandSupport::wantsJson($input)) {
                 return AdminCommandSupport::json($io, $data);
             }
-            $output->writeln(LogTerminalText::clean(AdminCommandSupport::prettyJson($data)), OutputInterface::OUTPUT_RAW);
+            $output->writeln(TerminalText::clean(AdminCommandSupport::prettyJson($data)), OutputInterface::OUTPUT_RAW);
 
             return self::SUCCESS;
         } catch (Throwable $error) {

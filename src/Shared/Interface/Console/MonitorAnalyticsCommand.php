@@ -148,12 +148,10 @@ final class MonitorAnalyticsCommand extends Command
         $io->section('Most frequent errors');
         $io->table(['Error class', 'Failures'], array_map(static fn (array $row): array => [$row['class'], $row['count']], $failures['topExceptionClasses']));
         $io->section('Recent failures');
-        $io->table(
-            ['Job ID', 'Type', 'Error class', 'Message', 'Failed'],
-            array_map(
-                static fn (array $row): array => [$row['jobId'], $row['name'] ?? '-', $row['exceptionClass'] ?? '-', $row['exceptionMessage'] ?? '-', $row['failedAt'] ?? '-'],
-                $failures['recentFailures'],
-            ),
+        $recent = array_map(
+            static fn (array $row): array => [$row['jobId'], $row['name'] ?? '-', $row['exceptionClass'] ?? '-', $row['exceptionMessage'] ?? '-', $row['failedAt'] ?? '-'],
+            $failures['recentFailures'],
         );
+        $io->table(['Job ID', 'Type', 'Error class', 'Message', 'Failed'], TerminalText::literalRows($recent));
     }
 }
