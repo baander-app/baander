@@ -31,6 +31,7 @@ use App\Shared\Infrastructure\Doctrine\Platform\BaanderDriverMiddleware;
 use App\Shared\Infrastructure\Doctrine\Type\CustomTypesRegistrar;
 use App\Transcode\Application\Service\CopyPresentationService;
 use App\Transcode\Application\Service\MediaExecutionPolicy;
+use App\Transcode\Application\Service\TranscodeSessionControl;
 use App\Transcode\Application\Service\TranscodeSessionShare;
 use App\Transcode\Application\Settings\TranscodeSettingDefinitions;
 use App\Transcode\Domain\Model\TranscodeSession;
@@ -777,7 +778,8 @@ PHP;
         $storage->method('forGeneration')->willReturnSelf();
         $storage->method('resolveJobDirectory')->willReturn('/fixture/share/generation-1');
         $jobs = new TranscodeJobService(new TranscodeJobRepository($this->manager), $storage, new EventDispatcher(), $runtime, $transaction, new NullLogger());
-        $sessions = new TranscodeSessionService(new TranscodeSessionRepository($this->manager));
+        $repository = new TranscodeSessionRepository($this->manager);
+        $sessions = new TranscodeSessionService($repository, new TranscodeSessionControl($repository, $runtime, $jobs, $transaction));
         $worker = new MediaWorkerIdentity('baander.app:workers', str_repeat('c', 32), 'media', 1);
         $sleeper = $this->createStub(SleeperInterface::class);
         $sleeper->method('sleep')->willReturnCallback(static function () use ($connection, $runtime, $worker, $slots, $whileWaiting): void {

@@ -14,9 +14,11 @@ use App\Transcode\Application\Port\TranscodeExecutionOwnershipPort;
 use App\Transcode\Application\Port\TranscodeJobPortInterface;
 use App\Transcode\Application\Port\TranscodeSessionPortInterface;
 use App\Transcode\Application\Service\StaleTranscodeSessionExpiry;
+use App\Transcode\Application\Service\TranscodeSessionControl;
 use App\Transcode\Domain\Model\TranscodeJob;
 use App\Transcode\Domain\Model\TranscodeSession;
 use App\Transcode\Domain\Model\TranscodeSessionState;
+use App\Transcode\Domain\Repository\TranscodeSessionRepositoryInterface;
 use App\Transcode\Domain\ValueObject\AudioProfile;
 use App\Transcode\Domain\ValueObject\QualityTier;
 use App\Transcode\Domain\ValueObject\SessionPriority;
@@ -56,8 +58,9 @@ final class StaleTranscodeSessionExpiryTest extends TestCase
         $this->job->markInProgress();
         $sessions = $this->createStub(TranscodeSessionPortInterface::class);
         $sessions->method('findActive')->willReturnCallback(fn (): array => $this->listed);
-        $sessions->method('findByUuid')->willReturnCallback(fn (Uuid $id): ?TranscodeSession => $this->current[$id->toString()] ?? null);
-        $sessions->method('save')->willReturnCallback(function (TranscodeSession $session): void {
+        $repository = $this->createStub(TranscodeSessionRepositoryInterface::class);
+        $repository->method('findByUuid')->willReturnCallback(fn (Uuid $id): ?TranscodeSession => $this->current[$id->toString()] ?? null);
+        $repository->method('save')->willReturnCallback(function (TranscodeSession $session): void {
             if (in_array($session->getId()->toString(), $this->failing, true)) {
                 throw new \RuntimeException('The session could not be saved.');
             }
@@ -83,7 +86,8 @@ final class StaleTranscodeSessionExpiryTest extends TestCase
         });
         $transaction = $this->createStub(TransactionPortInterface::class);
         $transaction->method('run')->willReturnCallback(static fn (callable $operation): mixed => $operation());
-        $this->expiry = new StaleTranscodeSessionExpiry($sessions, $ownership, $jobs, $transaction, new MockClock(new DateTimeImmutable(self::NOW)), $logger);
+        $control = new TranscodeSessionControl($repository, $ownership, $jobs, $transaction);
+        $this->expiry = new StaleTranscodeSessionExpiry($sessions, $control, new MockClock(new DateTimeImmutable(self::NOW)), $logger);
     }
 
     public function testAbandonedSessionCancelsItsHeldExecutionAndReleasesItsJob(): void

@@ -15,6 +15,7 @@ use App\Transcode\Application\Port\TranscodeExecutionOwnershipPort;
 use App\Transcode\Application\Port\TranscodeSessionPortInterface;
 use App\Transcode\Application\Port\TranscodeStoragePortInterface;
 use App\Transcode\Application\Service\TranscodePlaybackControl;
+use App\Transcode\Application\Service\TranscodeSessionControl;
 use App\Transcode\Domain\Model\TranscodeJob;
 use App\Transcode\Domain\Model\TranscodeSession;
 use App\Transcode\Domain\ValueObject\AudioProfile;
@@ -67,8 +68,8 @@ final class TranscodeSiblingControlRollbackTest extends TestCase
         $runtime = new TranscodeRuntimeState($this->first, $transaction);
         $jobs = new TranscodeJobRepository($manager);
         $sessions = new TranscodeSessionRepository($manager);
-        $sessionService = new TranscodeSessionService($sessions);
         $jobService = new TranscodeJobService($jobs, $this->createStub(TranscodeStoragePortInterface::class), new EventDispatcher(), $this->createStub(TranscodeExecutionOwnershipPort::class), $transaction, new NullLogger());
+        $sessionService = new TranscodeSessionService($sessions, new TranscodeSessionControl($sessions, $runtime, $jobService, $transaction));
         $tierSessions = [];
         $clientId = 'start';
         foreach ([QualityTier::p1080(), QualityTier::p360(), QualityTier::p720()] as $index => $tier) {

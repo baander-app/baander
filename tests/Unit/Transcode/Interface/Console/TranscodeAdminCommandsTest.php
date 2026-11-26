@@ -17,7 +17,9 @@ use App\Transcode\Application\Port\TranscodeExecutionOwnershipPort;
 use App\Transcode\Application\Port\TranscodeJobPortInterface;
 use App\Transcode\Application\Port\TranscodeSessionPortInterface;
 use App\Transcode\Application\Service\StaleTranscodeSessionExpiry;
+use App\Transcode\Application\Service\TranscodeSessionControl;
 use App\Transcode\Domain\Model\TranscodeSession;
+use App\Transcode\Domain\Repository\TranscodeSessionRepositoryInterface;
 use App\Transcode\Domain\ValueObject\AudioProfile;
 use App\Transcode\Interface\Console\TranscodeJobCleanupCommand;
 use App\Transcode\Interface\Console\TranscodeSessionListCommand;
@@ -140,9 +142,12 @@ final class TranscodeAdminCommandsTest extends TestCase
         $support = new AdminCommandSupport(new MessageBus([new HandleMessageMiddleware(new HandlersLocator([
             CleanupOrphanedJobsCommand::class => [new CleanupOrphanedJobsHandler($jobs, new StaleTranscodeSessionExpiry(
                 $this->createStub(TranscodeSessionPortInterface::class),
-                $this->createStub(TranscodeExecutionOwnershipPort::class),
-                $jobs,
-                $this->createStub(TransactionPortInterface::class),
+                new TranscodeSessionControl(
+                    $this->createStub(TranscodeSessionRepositoryInterface::class),
+                    $this->createStub(TranscodeExecutionOwnershipPort::class),
+                    $jobs,
+                    $this->createStub(TransactionPortInterface::class),
+                ),
                 new MockClock(),
                 new NullLogger(),
             ), new NullLogger())],

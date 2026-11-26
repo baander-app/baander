@@ -16,6 +16,7 @@ use App\Transcode\Application\DTO\MediaWorkerIdentity;
 use App\Transcode\Application\Exception\TranscodeSessionLimitException;
 use App\Transcode\Application\Service\CopyPresentationService;
 use App\Transcode\Application\Service\MediaExecutionPolicy;
+use App\Transcode\Application\Service\TranscodeSessionControl;
 use App\Transcode\Application\Service\TranscodeSessionShare;
 use App\Transcode\Application\Settings\TranscodeSettingDefinitions;
 use App\Transcode\Infrastructure\Doctrine\Repository\TranscodeJobRepository;
@@ -85,10 +86,13 @@ final class CopyStartRace
         $profile = new DeploymentProfile(videoEncoderSlots: self::VIDEO_SLOTS);
         $share = new TranscodeSessionShare(new TranscodeSessionShareStore($connection), $runtime, $plain, self::settings(), $profile, new NativeClock());
 
+        $jobs = new TranscodeJobService(new TranscodeJobRepository($manager), $storage, new EventDispatcher(), $runtime, $plain, new NullLogger());
+        $sessions = new TranscodeSessionRepository($manager);
+
         return new CopyPresentationService(
             new MediaExecutionPolicy($profile),
-            new TranscodeJobService(new TranscodeJobRepository($manager), $storage, new EventDispatcher(), $runtime, $plain, new NullLogger()),
-            new TranscodeSessionService(new TranscodeSessionRepository($manager)),
+            $jobs,
+            new TranscodeSessionService($sessions, new TranscodeSessionControl($sessions, $runtime, $jobs, $plain)),
             $storage,
             $runtime,
             $transaction ?? $plain,

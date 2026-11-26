@@ -14,7 +14,9 @@ use App\Transcode\Application\Port\TranscodeExecutionOwnershipPort;
 use App\Transcode\Application\Port\TranscodeJobPortInterface;
 use App\Transcode\Application\Port\TranscodeSessionPortInterface;
 use App\Transcode\Application\Service\StaleTranscodeSessionExpiry;
+use App\Transcode\Application\Service\TranscodeSessionControl;
 use App\Transcode\Domain\Model\TranscodeSession;
+use App\Transcode\Domain\Repository\TranscodeSessionRepositoryInterface;
 use App\Transcode\Domain\ValueObject\AudioProfile;
 use App\Transcode\Interface\Console\TranscodeJobCleanupCommand;
 use PHPUnit\Framework\TestCase;
@@ -130,11 +132,13 @@ final class TranscodeJobCleanupCommandTest extends TestCase
         }
         $sessions = $this->createStub(TranscodeSessionPortInterface::class);
         $sessions->method('findActive')->willReturn(array_values($stale));
-        $sessions->method('findByUuid')->willReturnCallback(static fn (Uuid $id): ?TranscodeSession => $stale[$id->toString()] ?? null);
+        $repository = $this->createStub(TranscodeSessionRepositoryInterface::class);
+        $repository->method('findByUuid')->willReturnCallback(static fn (Uuid $id): ?TranscodeSession => $stale[$id->toString()] ?? null);
         $transaction = $this->createStub(TransactionPortInterface::class);
         $transaction->method('run')->willReturnCallback(static fn (callable $operation): mixed => $operation());
+        $control = new TranscodeSessionControl($repository, $this->createStub(TranscodeExecutionOwnershipPort::class),
+            $this->createStub(TranscodeJobPortInterface::class), $transaction);
 
-        return new StaleTranscodeSessionExpiry($sessions, $this->createStub(TranscodeExecutionOwnershipPort::class),
-            $this->createStub(TranscodeJobPortInterface::class), $transaction, new MockClock($now), new NullLogger());
+        return new StaleTranscodeSessionExpiry($sessions, $control, new MockClock($now), new NullLogger());
     }
 }

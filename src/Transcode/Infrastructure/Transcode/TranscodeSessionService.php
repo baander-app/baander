@@ -7,6 +7,7 @@ namespace App\Transcode\Infrastructure\Transcode;
 use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
 use App\Transcode\Application\Port\TranscodeSessionPortInterface;
+use App\Transcode\Application\Service\TranscodeSessionControl;
 use App\Transcode\Domain\Exception\SessionNotFoundException;
 use App\Transcode\Domain\Model\TranscodeSession;
 use App\Transcode\Domain\Repository\TranscodeSessionRepositoryInterface;
@@ -17,6 +18,7 @@ final class TranscodeSessionService implements TranscodeSessionPortInterface
 {
     public function __construct(
         private readonly TranscodeSessionRepositoryInterface $sessionRepository,
+        private readonly TranscodeSessionControl $control,
     ) {
     }
 
@@ -77,35 +79,17 @@ final class TranscodeSessionService implements TranscodeSessionPortInterface
 
     public function cancelSession(Uuid $uuid): void
     {
-        $session = $this->sessionRepository->findByUuid($uuid);
-        if ($session === null) {
-            throw SessionNotFoundException::forId($uuid);
-        }
-
-        $session->markCancelled();
-        $this->sessionRepository->save($session);
+        $this->control->end($this->existing($uuid));
     }
 
     public function pauseSession(Uuid $uuid): void
     {
-        $session = $this->sessionRepository->findByUuid($uuid);
-        if ($session === null) {
-            throw SessionNotFoundException::forId($uuid);
-        }
-
-        $session->markPaused();
-        $this->sessionRepository->save($session);
+        $this->control->pause($this->existing($uuid));
     }
 
     public function resumeSession(Uuid $uuid): void
     {
-        $session = $this->sessionRepository->findByUuid($uuid);
-        if ($session === null) {
-            throw SessionNotFoundException::forId($uuid);
-        }
-
-        $session->markResumed();
-        $this->sessionRepository->save($session);
+        $this->control->resume($this->existing($uuid));
     }
 
     public function updateAudioProfile(Uuid $uuid, AudioProfile $profile): void
@@ -122,5 +106,10 @@ final class TranscodeSessionService implements TranscodeSessionPortInterface
     public function save(TranscodeSession $session): void
     {
         $this->sessionRepository->save($session);
+    }
+
+    private function existing(Uuid $uuid): TranscodeSession
+    {
+        return $this->sessionRepository->findByUuid($uuid) ?? throw SessionNotFoundException::forId($uuid);
     }
 }

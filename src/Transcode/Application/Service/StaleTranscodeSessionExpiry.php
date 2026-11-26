@@ -4,13 +4,8 @@ declare(strict_types=1);
 
 namespace App\Transcode\Application\Service;
 
-use App\Shared\Application\Port\TransactionPortInterface;
-use App\Shared\Domain\Model\Uuid;
-use App\Transcode\Application\Port\TranscodeExecutionOwnershipPort;
-use App\Transcode\Application\Port\TranscodeJobPortInterface;
 use App\Transcode\Application\Port\TranscodeSessionPortInterface;
-use App\Transcode\Domain\ValueObject\SessionState;
-use DateTimeImmutable;
+use App\Transcode\Domain\Model\TranscodeSession;
 use Psr\Clock\ClockInterface;
 use Psr\Log\LoggerInterface;
 use Throwable;
@@ -34,16 +29,9 @@ final readonly class StaleTranscodeSessionExpiry
      */
     public const int IDLE_SECONDS = 86400;
 
-    private const array HOLDING_STATES = [SessionState::Pending, SessionState::Preparing, SessionState::Active, SessionState::Paused];
-
-    /** Execution outcomes a worker still acts on. */
-    private const array RUNNABLE_OUTCOMES = ['pending', 'accepted', 'ready'];
-
     public function __construct(
         private TranscodeSessionPortInterface $sessionPort,
-        private TranscodeExecutionOwnershipPort $ownership,
-        private TranscodeJobPortInterface $jobPort,
-        private TransactionPortInterface $transaction,
+        private TranscodeSessionControl $control,
         private ClockInterface $clock,
         private LoggerInterface $logger,
     ) {}
@@ -58,7 +46,11 @@ final readonly class StaleTranscodeSessionExpiry
                 continue;
             }
             try {
-                if ($this->transaction->run(fn (): bool => $this->expireSession($candidate->getId(), $candidate->getVideoId(), $cutoff))) {
+                // A client that reported or signed since the read keeps its session. A finished
+                // presentation keeps its own: it costs no worker and is not orphaned output, and the
+                // same client resumes it without a new encode.
+                $stays = static fn (TranscodeSession $current, bool $finished): bool => $finished || $current->getUpdatedAt() > $cutoff;
+                if ($this->control->end($candidate, $stays)) {
                     ++$expired;
                 }
             } catch (Throwable $failure) {
@@ -72,39 +64,5 @@ final readonly class StaleTranscodeSessionExpiry
         }
 
         return $expired;
-    }
-
-    private function expireSession(Uuid $sessionId, Uuid $videoId, DateTimeImmutable $cutoff): bool
-    {
-        // The lock order of admission and playback control; a client that
-        // reports or signs first keeps its session.
-        $this->ownership->lockAdmission($videoId);
-        $this->ownership->lockSession($sessionId);
-        $session = $this->sessionPort->findByUuid($sessionId);
-        if ($session === null || !in_array($session->getSessionState(), self::HOLDING_STATES, true) || $session->getUpdatedAt() > $cutoff) {
-            return false;
-        }
-        $runtime = $this->ownership->find($session->getJobId());
-        $owned = $runtime !== null && $runtime->sessionId->equals($sessionId);
-        if ($owned && $runtime->outcome === 'complete') {
-            // A finished presentation costs no worker and is not orphaned output;
-            // its session stays so the same client resumes it without a new encode.
-            return false;
-        }
-        if ($owned && in_array($runtime->outcome, self::RUNNABLE_OUTCOMES, true)) {
-            // The worker reads the cancellation, stops its encoder and gives up the execution.
-            $this->ownership->control($session->getJobId(), $sessionId, new Uuid()->toString(), status: 'cancelled', seek: false);
-        }
-        $session->markCancelled();
-        $this->sessionPort->save($session);
-        // The job is released, not cancelled: without a session it is orphaned,
-        // which is what job cleanup removes.
-        $job = $this->jobPort->findByUuid($session->getJobId());
-        if ($job !== null) {
-            $job->detachSession();
-            $this->jobPort->save($job);
-        }
-
-        return true;
     }
 }

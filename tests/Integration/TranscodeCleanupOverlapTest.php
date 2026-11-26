@@ -11,6 +11,7 @@ use App\Transcode\Application\CommandHandler\CleanupOrphanedJobsHandler;
 use App\Transcode\Application\DTO\DesiredTranscodeState;
 use App\Transcode\Application\Port\TranscodeStoragePortInterface;
 use App\Transcode\Application\Service\StaleTranscodeSessionExpiry;
+use App\Transcode\Application\Service\TranscodeSessionControl;
 use App\Transcode\Domain\Model\TranscodeJob;
 use App\Transcode\Domain\Model\TranscodeSession;
 use App\Transcode\Domain\ValueObject\AudioProfile;
@@ -97,9 +98,10 @@ final class TranscodeCleanupOverlapTest extends TestCase
             }
         };
         $jobService = new TranscodeJobService($jobs, $storage, new EventDispatcher(), $runtime, $transaction, $logger);
+        $control = new TranscodeSessionControl($sessions, $runtime, $jobService, $transaction);
         $handler = new CleanupOrphanedJobsHandler(
             $jobService,
-            new StaleTranscodeSessionExpiry(new TranscodeSessionService($sessions), $runtime, $jobService, $transaction, new NativeClock(), $logger),
+            new StaleTranscodeSessionExpiry(new TranscodeSessionService($sessions, $control), $control, new NativeClock(), $logger),
             $logger,
         );
 

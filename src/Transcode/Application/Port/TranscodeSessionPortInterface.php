@@ -44,10 +44,13 @@ interface TranscodeSessionPortInterface
     /** @return TranscodeSession[] */
     public function findByJob(Uuid $jobId): array;
 
+    /** Ends the session and cancels the execution a worker still acts on, releasing the job as stale session expiry does. */
     public function cancelSession(Uuid $uuid): void;
 
+    /** Pauses the session and the execution a worker still acts on. */
     public function pauseSession(Uuid $uuid): void;
 
+    /** Resumes the session and the execution a worker still acts on. */
     public function resumeSession(Uuid $uuid): void;
 
     public function updateAudioProfile(Uuid $uuid, AudioProfile $profile): void;

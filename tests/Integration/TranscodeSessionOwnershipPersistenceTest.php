@@ -29,6 +29,7 @@ use App\Transcode\Application\Port\TranscodeStoragePortInterface;
 use App\Transcode\Application\Service\MediaExecutionPolicy;
 use App\Transcode\Application\Service\StaleTranscodeSessionExpiry;
 use App\Transcode\Application\Service\TranscodePlaybackControl;
+use App\Transcode\Application\Service\TranscodeSessionControl;
 use App\Transcode\Application\Service\TranscodeSessionShare;
 use App\Transcode\Application\Settings\TranscodeSettingDefinitions;
 use App\Transcode\Domain\Model\TranscodeJob;
@@ -57,6 +58,7 @@ use Doctrine\Persistence\ManagerRegistry;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\AbstractLogger;
+use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
 use SwooleBundle\SwooleBundle\Bridge\Swoole\Swoole;
 use Symfony\Bundle\SecurityBundle\Security;
@@ -189,11 +191,12 @@ final class TranscodeSessionOwnershipPersistenceTest extends TestCase
             public function run(callable $operation): mixed { return $this->connection->transactional(static fn (): mixed => $operation()); }
         };
         $runtime = new TranscodeRuntimeState($connection, $transaction);
+        $jobService = new TranscodeJobService($jobs, $this->createStub(TranscodeStoragePortInterface::class), new EventDispatcher(), $runtime, $transaction, new NullLogger());
         $control = new TranscodePlaybackControl(
-            new TranscodeSessionService($sessions),
+            self::sessionService($sessions, $runtime, $jobService, $transaction),
             $runtime,
             $transaction,
-            new TranscodeJobService($jobs, $this->createStub(TranscodeStoragePortInterface::class), new EventDispatcher(), $runtime, $transaction, new NullLogger()),
+            $jobService,
         );
         $controlled = [];
         $protected = [];
@@ -283,9 +286,7 @@ final class TranscodeSessionOwnershipPersistenceTest extends TestCase
         $runtime = new TranscodeRuntimeState($connection, $transaction);
         $storage = $this->createMock(TranscodeStoragePortInterface::class);
         $jobService = new TranscodeJobService($jobs, $storage, new EventDispatcher(), $runtime, $transaction, new NullLogger());
-        $expiry = new StaleTranscodeSessionExpiry(
-            new TranscodeSessionService($sessions), $runtime, $jobService, $transaction, new NativeClock(), new NullLogger(),
-        );
+        $expiry = self::expiry($sessions, $runtime, $jobService, $transaction, new NullLogger());
         $handler = new CleanupOrphanedJobsHandler($jobService, $expiry, new NullLogger());
         $ids = [];
         foreach (['abandoned' => QualityTier::p360(), 'fresh' => QualityTier::p720(), 'paused' => QualityTier::p1080()] as $name => $tier) {
@@ -357,9 +358,7 @@ final class TranscodeSessionOwnershipPersistenceTest extends TestCase
         $runtime = new TranscodeRuntimeState($connection, $transaction);
         $storage = $this->createMock(TranscodeStoragePortInterface::class);
         $jobService = new TranscodeJobService($jobs, $storage, new EventDispatcher(), $runtime, $transaction, new NullLogger());
-        $handler = new CleanupOrphanedJobsHandler($jobService, new StaleTranscodeSessionExpiry(
-            new TranscodeSessionService($sessions), $runtime, $jobService, $transaction, new NativeClock(), new NullLogger(),
-        ), new NullLogger());
+        $handler = new CleanupOrphanedJobsHandler($jobService, self::expiry($sessions, $runtime, $jobService, $transaction, new NullLogger()), new NullLogger());
         $job = TranscodeJob::create($video, QualityTier::p1080(), '/fixture/held', $owner, requestId: 'held-client');
         $job->attachSession();
         $job->markInProgress();
@@ -451,15 +450,8 @@ final class TranscodeSessionOwnershipPersistenceTest extends TestCase
             $transaction,
             new NullLogger(),
         );
-        $sessionService = new TranscodeSessionService($sessions);
-        $expiry = new StaleTranscodeSessionExpiry(
-            $sessionService,
-            $runtime,
-            $jobService,
-            $transaction,
-            new NativeClock(),
-            new NullLogger(),
-        );
+        $sessionService = self::sessionService($sessions, $runtime, $jobService, $transaction);
+        $expiry = self::expiry($sessions, $runtime, $jobService, $transaction, new NullLogger());
         $request = Uuid::generate()->toString();
         $worker = new MediaWorkerIdentity(
             'baander.app:workers',
@@ -619,11 +611,10 @@ final class TranscodeSessionOwnershipPersistenceTest extends TestCase
 
         // A session ended without its execution being cancelled is not handed back either: the
         // start takes the running execution over for a new session.
-        $endedSessionId = $connection->fetchOne(
-            'SELECT id FROM transcode_sessions WHERE public_id = ?',
+        $connection->executeStatement(
+            "UPDATE transcode_sessions SET state = 'cancelled' WHERE public_id = ?",
             [$third[$jobPublicId->toString()]->toString()],
         );
-        $sessionService->cancelSession(Uuid::fromString((string) $endedSessionId));
         $this->manager->clear();
         self::assertSame('accepted', $runtime->find($jobId)?->outcome);
         self::assertSame([], $playback->findSessions($video, $request, [$jobPublicId]));
@@ -699,9 +690,7 @@ final class TranscodeSessionOwnershipPersistenceTest extends TestCase
             }
         };
         $jobService = new TranscodeJobService($jobs, $storage, new EventDispatcher(), $runtime, $transaction, $logger);
-        $handler = new CleanupOrphanedJobsHandler($jobService, new StaleTranscodeSessionExpiry(
-            new TranscodeSessionService($sessions), $runtime, $jobService, $transaction, new NativeClock(), $logger,
-        ), $logger);
+        $handler = new CleanupOrphanedJobsHandler($jobService, self::expiry($sessions, $runtime, $jobService, $transaction, $logger), $logger);
         $command = new TranscodeJobCleanupCommand(new AdminCommandSupport(
             new MessageBus([new HandleMessageMiddleware(new HandlersLocator([
                 CleanupOrphanedJobsCommand::class => [$handler],
@@ -805,9 +794,7 @@ final class TranscodeSessionOwnershipPersistenceTest extends TestCase
             }
         };
         $jobService = new TranscodeJobService($jobs, $storage, new EventDispatcher(), $runtime, $transaction, $logger);
-        $handler = new CleanupOrphanedJobsHandler($jobService, new StaleTranscodeSessionExpiry(
-            new TranscodeSessionService($sessions), $runtime, $jobService, $transaction, new NativeClock(), $logger,
-        ), $logger);
+        $handler = new CleanupOrphanedJobsHandler($jobService, self::expiry($sessions, $runtime, $jobService, $transaction, $logger), $logger);
         $command = new TranscodeJobCleanupCommand(new AdminCommandSupport(
             new MessageBus([new HandleMessageMiddleware(new HandlersLocator([
                 CleanupOrphanedJobsCommand::class => [$handler],
@@ -863,6 +850,102 @@ final class TranscodeSessionOwnershipPersistenceTest extends TestCase
         self::assertSame(Command::SUCCESS, $tester->execute(['--json' => true]));
         self::assertSame(['expired' => 0, 'cleaned' => 1], json_decode($tester->getDisplay(), true, flags: JSON_THROW_ON_ERROR));
         self::assertNull($jobs->findByUuid($refused));
+    }
+
+    public function testCancellingASessionCancelsTheExecutionAWorkerHoldsAndReleasesItsJobOnce(): void
+    {
+        // The job counts a second session, so a second release would show.
+        ['service' => $service, 'runtime' => $runtime, 'jobs' => $jobs, 'sessions' => $sessions, 'job' => $job, 'session' => $session] = $this->sessionAWorkerHolds(references: 2);
+
+        $service->cancelSession($session);
+        $service->cancelSession($session);
+
+        $this->manager->clear();
+        $cancelled = $runtime->find($job);
+        self::assertNotNull($cancelled);
+        self::assertSame('cancelled', $cancelled->desired->status);
+        self::assertSame('cancelled', $cancelled->outcome);
+        self::assertTrue($cancelled->ownershipLive, 'The worker still holds its lease until it reads the cancellation.');
+        self::assertSame(SessionState::Cancelled, $sessions->findByUuid($session)?->getSessionState());
+        $released = $jobs->findByUuid($job);
+        self::assertNotNull($released);
+        self::assertSame(1, $released->getReferenceCount());
+        self::assertSame('in_progress', $released->getStatus()->value, 'The job is released, not cancelled.');
+    }
+
+    public function testPausingAndResumingASessionReachTheExecutionAWorkerHolds(): void
+    {
+        ['service' => $service, 'runtime' => $runtime, 'sessions' => $sessions, 'job' => $job, 'session' => $session] = $this->sessionAWorkerHolds();
+
+        $service->pauseSession($session);
+
+        $this->manager->clear();
+        self::assertSame('paused', $runtime->find($job)?->desired->status);
+        self::assertSame(SessionState::Paused, $sessions->findByUuid($session)?->getSessionState());
+
+        $service->resumeSession($session);
+
+        $this->manager->clear();
+        self::assertSame('running', $runtime->find($job)?->desired->status);
+        self::assertSame('accepted', $runtime->find($job)?->outcome);
+        self::assertSame(SessionState::Active, $sessions->findByUuid($session)?->getSessionState());
+    }
+
+    /**
+     * A playing session whose execution a worker accepted and holds with a live lease.
+     *
+     * @return array{service: TranscodeSessionService, runtime: TranscodeRuntimeState, jobs: TranscodeJobRepository, sessions: TranscodeSessionRepository, job: Uuid, session: Uuid}
+     */
+    private function sessionAWorkerHolds(int $references = 1): array
+    {
+        $owner = $this->createUser();
+        $video = $this->createVideo();
+        $jobs = new TranscodeJobRepository($this->manager);
+        $sessions = new TranscodeSessionRepository($this->manager);
+        $connection = $this->manager->getConnection();
+        $transaction = new class($connection) implements TransactionPortInterface {
+            public function __construct(private readonly Connection $connection) {}
+            public function run(callable $operation): mixed { return $this->connection->transactional(static fn (): mixed => $operation()); }
+        };
+        $runtime = new TranscodeRuntimeState($connection, $transaction);
+        $job = TranscodeJob::create($video, QualityTier::p720(), '/fixture/controlled', $owner, requestId: 'controlled-client');
+        foreach (range(1, $references) as $ignored) {
+            $job->attachSession();
+        }
+        $job->markInProgress();
+        $jobs->save($job);
+        $session = TranscodeSession::create($owner, $job->getId(), $video, AudioProfile::streamingStereo());
+        $session->markPreparing();
+        $session->markActive();
+        $sessions->save($session);
+        $connection->transactional(static fn () => $runtime->admit($job->getId(), $session->getId(), 'controlled-client', new DesiredTranscodeState(AudioProfile::streamingStereo())));
+        $claim = $runtime->claim($job->getId(), new MediaWorkerIdentity('baander.app:workers', str_repeat('d', 32), 'media', 1));
+        self::assertNotNull($claim);
+        self::assertTrue($runtime->observe($claim, 'accepted'));
+        $this->manager->clear();
+
+        $jobService = new TranscodeJobService($jobs, $this->createStub(TranscodeStoragePortInterface::class), new EventDispatcher(), $runtime, $transaction, new NullLogger());
+
+        return [
+            'service' => self::sessionService($sessions, $runtime, $jobService, $transaction),
+            'runtime' => $runtime,
+            'jobs' => $jobs,
+            'sessions' => $sessions,
+            'job' => $job->getId(),
+            'session' => $session->getId(),
+        ];
+    }
+
+    private static function sessionService(TranscodeSessionRepository $sessions, TranscodeRuntimeState $runtime, TranscodeJobService $jobs, TransactionPortInterface $transaction): TranscodeSessionService
+    {
+        return new TranscodeSessionService($sessions, new TranscodeSessionControl($sessions, $runtime, $jobs, $transaction));
+    }
+
+    private static function expiry(TranscodeSessionRepository $sessions, TranscodeRuntimeState $runtime, TranscodeJobService $jobs, TransactionPortInterface $transaction, LoggerInterface $logger): StaleTranscodeSessionExpiry
+    {
+        $control = new TranscodeSessionControl($sessions, $runtime, $jobs, $transaction);
+
+        return new StaleTranscodeSessionExpiry(new TranscodeSessionService($sessions, $control), $control, new NativeClock(), $logger);
     }
 
     /** @return array<string, mixed> */
