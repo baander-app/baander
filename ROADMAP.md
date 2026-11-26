@@ -16,6 +16,34 @@ Read [AGENTS.md](AGENTS.md) for workflow, [CONCEPTS.md](CONCEPTS.md) for shared 
 and the [testing guide](docs-book/part-2-developer-guide/testing/README.md) for current
 runners and verification boundaries. Historical suite counts apply to their own trees.
 
+## Pipe-operator inspection check, 2026-11-26
+
+PHPStan now reports what PhpStorm 2026.3's pipe-operator inspection reports, and the tree has none of those findings left. Two rules in `packages/baander-phpstan-rules` mirror the inspection's two messages: nested call chains of three to ten levels, and three to ten consecutive assignments to one variable. Both PHPStan configurations load them, so `make phpstan`, `composer analyse:tooling`, `make ci` and CI fail on a new finding. The [plan](docs/plans/2026-11-25-2138-refactor-pipe-operator-inspection-check-plan.md) records the design; the developer guide's [Pipe Operator](docs-book/part-2-developer-guide/development/coding-conventions.md#pipe-operator) section gives the house fix and the parity check.
+
+Owner decisions: the rules match PhpStorm exactly, not the two-level shape the earlier passes converted; they cover the assignment-chain message too; multi-argument steps become named locals or helpers, never PhpStorm's quick fix.
+
+Delivered:
+
+- The two rules, with fixtures for every predicate and for the shapes a headless PhpStorm run settled. That run corrected two predicates read from the bytecode: closures never stop a chain, and a first-class callable is not a call.
+- The conversion of the 643 nested-call findings in 402 files and the one assignment chain, in area commits: application code, unit tests, the other test directories, tooling, and `scripts/retain-build-evidence.php` on its own because it invalidates the native Docker build stages.
+- `phpstan-tooling.neon` now includes the rules extension and keeps its result cache in `var/cache/phpstan-tooling`.
+- Two defects found beside this work, fixed on `master`: four Swoole bundle fork files the PHP 8.5 pass rewrote without updating their reviewed hashes (`b8d9a3dc5`), and a qualification test that searched a fixture for a class name the import pass had shortened (`b5c708887`).
+
+Verification checkpoint:
+
+- Parity: on `d49e4d5c6`, PhpStorm 2026.3.0.1 (build 263.7307.352) run headless with a one-inspection profile reported 643 nested-call findings in 402 files and one assignment chain; the rules reported the same sites. A second probe confirmed that a three-level nest beside another call argument is not reported and that `.=` continuations keep a chain.
+- On the converted tree both rules report zero in both configurations and in the files neither configuration analyses. A planted chain fails each configuration with both identifiers.
+- The conversion matched the base by AST round trip (hoisted locals inlined, pipes folded back) in every file except the reviewed helper restructures each area commit names. No hoist runs ahead of another call or write.
+- Suites: on `8661c86ad` the native lane (1,005), both stack lanes (2,454 and 1,943) and the tooling suite (1,831, 9 skipped) passed. On `3935fa941` the unit lanes passed (ordinary 9,868, native 975), as did the job-monitor functional files and the rule suite (25).
+- Static gates on `3935fa941`: application and tooling PHPStan, Deptrac with 0 violations, `check:imports`, `check:tooling-architecture`, `check:tooling-format`, and `composer validate` and `normalize`.
+- Code review at full depth: correctness, security, project standards, testing and maintainability. It confirmed one finding, a docblock that understated the rule's multi-call stop, which `3935fa941` fixes.
+
+Open:
+
+- No test loads either PHPStan configuration. If the extension include were dropped, the rules would go quiet without a failing check, although PhpStorm would still show the findings.
+- The ordinary unit lane crashed once on `8661c86ad` with random-order seed 138315351: `DiscoveryRegisterCommandTest` reached Symfony Console's `stty` probe while a Swoole runtime hook was active outside a coroutine. The test is not in this diff and the lane passed on rerun; the hook left on by an earlier test is unidentified.
+- After a PhpStorm or PHPStan upgrade, rerun the parity check in the developer guide.
+
 ## README introduction, 2026-11-25
 
 The [README](README.md) now opens with a moment of rediscovery, explains Bånder
