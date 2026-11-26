@@ -104,7 +104,10 @@ final class ServicePoolLifecycleTest extends TestCase
 
     public function testThrowingResetMethodDoesNotSkipLaterMethodsAndFirstFailureDiscardsInstance(): void
     {
-        $pool = $this->resettablePool(['failingReset', 'secondReset', 'laterFailingReset']);
+        $mutex = $this->createMock(Mutex::class);
+        $mutex->method('isAcquired')->willReturn(true);
+        $mutex->expects(self::once())->method('release');
+        $pool = $this->resettablePool(['failingReset', 'secondReset', 'laterFailingReset'], $mutex);
         $service = $pool->get();
 
         $log = $this->captureErrors(fn() => $pool->releaseFromCoroutine($this->cid()));
@@ -114,6 +117,7 @@ final class ServicePoolLifecycleTest extends TestCase
         self::assertStringNotContainsString('later reset failed', $log);
         self::assertSame(0, $pool->getAssignedCount());
         self::assertSame(0, $pool->getFreeCount());
+        self::assertNotSame($service, $pool->get());
     }
 
     public function testStabilityFailureDiscardsAndUnlocksCapacity(): void
@@ -269,9 +273,9 @@ final class ServicePoolLifecycleTest extends TestCase
     }
 
     /** @param list<string> $resetMethods */
-    private function resettablePool(array $resetMethods): ServicePoolLifecycleResettablePool
+    private function resettablePool(array $resetMethods, ?Mutex $mutex = null): ServicePoolLifecycleResettablePool
     {
-        return new ServicePoolLifecycleResettablePool(new Swoole(), $this->createStub(Mutex::class), 50, new SimpleResetter($resetMethods));
+        return new ServicePoolLifecycleResettablePool(new Swoole(), $mutex ?? $this->createStub(Mutex::class), 50, new SimpleResetter($resetMethods));
     }
 }
 
