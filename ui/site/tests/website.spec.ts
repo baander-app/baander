@@ -182,7 +182,7 @@ for (const width of [1440, 390]) {
     await page.goto('/docs/operator-guide/getting-started/');
     const targets = [
       page.getByRole('searchbox', { name: 'Search manuals' }),
-      page.getByRole('navigation', { name: 'Manual chapters' }).getByRole('link', { name: 'Source Installation', exact: true }),
+      page.getByRole('navigation', { name: 'Manual chapters' }).getByRole('link', { name: 'Installation', exact: true }),
     ];
     for (const target of targets) {
       await target.focus();
@@ -356,8 +356,8 @@ test('manual remains readable and navigable with JavaScript disabled', async ({ 
     await expect(page.locator('#manual-search-status')).toBeHidden();
     await expect(page.locator('#manual-search noscript')).toBeVisible();
     expect(await page.locator('#manual-search noscript').evaluate((element) => element.textContent)).toContain('Search needs JavaScript.');
-    await page.getByRole('navigation', { name: 'Manual chapters', exact: true }).getByRole('link', { name: 'Source Installation', exact: true }).click();
-    await expect(page.locator('main h1')).toContainText('Source Installation');
+    await page.getByRole('navigation', { name: 'Manual chapters', exact: true }).getByRole('link', { name: 'Installation', exact: true }).click();
+    await expect(page.locator('main h1')).toContainText('Installation');
   } finally {
     await context.close();
   }

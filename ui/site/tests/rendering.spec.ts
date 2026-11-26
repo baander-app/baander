@@ -444,7 +444,7 @@ const codePages = [
   { chapter: 'developer-guide', directory: 'part-2-developer-guide', slug: 'getting-started/development-environment', languages: ['json'] },
   { chapter: 'developer-guide', directory: 'part-2-developer-guide', slug: 'development/search', languages: ['sql'] },
   { chapter: 'developer-guide', directory: 'part-2-developer-guide', slug: 'architecture/live-updates', languages: ['ts'] },
-  { chapter: 'operator-guide', directory: 'part-1-operator-guide', slug: 'maintenance/security', languages: ['env'] },
+  { chapter: 'developer-guide', directory: 'part-2-developer-guide', slug: 'getting-started/compose-stack', languages: ['env'] },
 ];
 
 test.describe('code without JavaScript', () => {
