@@ -8,7 +8,6 @@ use App\Auth\Application\Port\AuthenticatedUserIdentityInterface;
 use App\Shared\Application\Port\SignedInUserInterface;
 use Symfony\Bundle\SecurityBundle\Security;
 
-/** Reads the signed-in user from the security token of the current request. */
 final readonly class SecuritySignedInUser implements SignedInUserInterface
 {
     public function __construct(

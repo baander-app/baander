@@ -13,6 +13,5 @@ use App\Shared\Application\Actor;
  */
 interface SignedInUserInterface
 {
-    /** The signed-in user's ID, or null when nobody is signed in. */
     public function id(): ?string;
 }

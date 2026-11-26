@@ -3,6 +3,7 @@ import i18n from 'i18next'
 import {
   postStreamDelivery,
   type ApiError,
+  type ApiErrorErrorDetails,
   type DeliveryRequest
 } from '@/shared/api-client/gen/endpoints'
 import translations from '@/shared/i18n/locales/en/translation.json'
@@ -66,19 +67,16 @@ export class MediaCompatibilityError extends Error {
 /** The 409 reasons that end playback of the item, which the player explains instead of retrying. */
 const REFUSAL_REASONS = new Set(['media_unavailable'])
 
-interface ApiErrorBody {
-  error?: {
-    details?: {
-      reason?: unknown
-    }
+function conflictDetails(error: unknown): ApiErrorErrorDetails | undefined {
+  if (!isAxiosError<ApiError | null>(error) || error.response?.status !== 409) {
+    return undefined
   }
+  return error.response.data?.error?.details
 }
 
 /** A delivery answer that refuses the item, as the compatibility error the player explains. */
 function deliveryRefusal(error: unknown): MediaCompatibilityError | null {
-  if (!isAxiosError(error) || error.response?.status !== 409) return null
-  const body = error.response.data as ApiErrorBody | null
-  const reason = body?.error?.details?.reason
+  const reason = conflictDetails(error)?.reason
   return typeof reason === 'string' && REFUSAL_REASONS.has(reason)
     ? new MediaCompatibilityError(reason)
     : null
@@ -99,10 +97,7 @@ export class TranscodeSessionLimitError extends Error {
 export function transcodeSessionLimitError(
   error: unknown
 ): TranscodeSessionLimitError | null {
-  if (!isAxiosError<ApiError>(error) || error.response?.status !== 409) {
-    return null
-  }
-  const details = error.response.data?.error?.details
+  const details = conflictDetails(error)
   return details?.reason === 'transcode_session_limit' &&
     typeof details.limit === 'number'
     ? new TranscodeSessionLimitError(details.limit)
