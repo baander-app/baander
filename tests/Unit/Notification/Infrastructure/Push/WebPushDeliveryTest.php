@@ -14,6 +14,7 @@ use Minishlink\WebPush\SubscriptionInterface;
 use Minishlink\WebPush\WebPush;
 use Nyholm\Psr7\Request;
 use Nyholm\Psr7\Response;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
 final class WebPushDeliveryTest extends TestCase
@@ -72,11 +73,33 @@ final class WebPushDeliveryTest extends TestCase
         );
         $repository->expects(self::once())->method('findByUser')->with($subscription->getUserId())->willReturn([$subscription]);
         $repository->expects(self::once())->method('remove')->with($subscription);
-        $delivery = new WebPushDelivery($repository, $this->createStub(WebPush::class));
+        $delivery = new WebPushDelivery($repository, $this->createStub(WebPush::class), 'vapid-public-key', 'vapid-private-key');
 
         self::assertEquals([$subscription->getId()], $delivery->subscriptionsOf($subscription->getUserId()));
         $delivery->remove($subscription->getId());
         $delivery->remove(Uuid::generate());
+    }
+
+    /** @return iterable<string, array{string, string, bool}> */
+    public static function keyPairs(): iterable
+    {
+        yield 'both keys' => ['vapid-public-key', 'vapid-private-key', true];
+        yield 'no public key' => ['', 'vapid-private-key', false];
+        yield 'no private key' => ['vapid-public-key', '', false];
+        yield 'no keys' => ['', '', false];
+    }
+
+    #[DataProvider('keyPairs')]
+    public function testPushIsConfiguredOnlyWithBothVapidKeys(string $publicKey, string $privateKey, bool $configured): void
+    {
+        $delivery = new WebPushDelivery(
+            $this->createStub(PushSubscriptionRepositoryInterface::class),
+            $this->createStub(WebPush::class),
+            $publicKey,
+            $privateKey,
+        );
+
+        self::assertSame($configured, $delivery->isConfigured());
     }
 
     private function delivery(PushSubscriptionEntity $subscription, WebPush $webPush): WebPushDelivery
@@ -86,6 +109,6 @@ final class WebPushDeliveryTest extends TestCase
             static fn (Uuid $id): ?PushSubscriptionEntity => $id->equals($subscription->getId()) ? $subscription : null,
         );
 
-        return new WebPushDelivery($repository, $webPush);
+        return new WebPushDelivery($repository, $webPush, 'vapid-public-key', 'vapid-private-key');
     }
 }

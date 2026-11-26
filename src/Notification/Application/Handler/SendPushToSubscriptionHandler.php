@@ -42,6 +42,16 @@ final class SendPushToSubscriptionHandler
             return;
         }
 
+        if (!$this->delivery->isConfigured()) {
+            $this->logger->info('Push delivery skipped because no VAPID key pair is configured.', [
+                'channel' => 'notification.push',
+                'notification_id' => $command->notificationPublicId,
+                'subscription_id' => $command->subscriptionId->toString(),
+            ]);
+
+            return;
+        }
+
         // Null: removed meanwhile, by the user or after an earlier expiry answer.
         $report = $this->delivery->send($command->subscriptionId, $command->userId, $this->payload($command));
         if ($report === null || $report->delivered) {

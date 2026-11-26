@@ -10,13 +10,28 @@ use App\Notification\Infrastructure\Doctrine\Entity\PushSubscriptionEntity;
 use App\Shared\Domain\Model\Uuid;
 use Minishlink\WebPush\Subscription;
 use Minishlink\WebPush\WebPush;
+use Symfony\Component\DependencyInjection\Attribute\Autowire;
 
+/**
+ * The WebPush client is built on first send: its constructor rejects an empty VAPID key pair,
+ * and the keys are optional configuration.
+ */
 final readonly class WebPushDelivery implements PushDeliveryPortInterface
 {
     public function __construct(
         private PushSubscriptionRepositoryInterface $subscriptions,
+        #[Autowire(lazy: true)]
         private WebPush $webPush,
+        #[Autowire(env: 'VAPID_PUBLIC_KEY')]
+        private string $vapidPublicKey,
+        #[Autowire(env: 'VAPID_PRIVATE_KEY')]
+        private string $vapidPrivateKey,
     ) {
+    }
+
+    public function isConfigured(): bool
+    {
+        return $this->vapidPublicKey !== '' && $this->vapidPrivateKey !== '';
     }
 
     public function subscriptionsOf(Uuid $userId): array

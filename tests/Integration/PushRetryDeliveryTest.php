@@ -159,7 +159,7 @@ final class PushRetryDeliveryTest extends TestCase
         $preferences->method('isEnabled')->willReturn(true);
         $settings = $this->createStub(SystemSettingsPortInterface::class);
         $settings->method('get')->willReturnMap([[NotificationSettingDefinitions::PUSH_ENABLED, true]]);
-        $delivery = new WebPushDelivery($subscriptions, $webPush);
+        $delivery = new WebPushDelivery($subscriptions, $webPush, 'vapid-public-key', 'vapid-private-key');
         // The bus the fan-out handler dispatches to, set once the bus that runs it exists.
         $dispatcher = new class implements MessageBusInterface {
             public ?MessageBusInterface $bus = null;

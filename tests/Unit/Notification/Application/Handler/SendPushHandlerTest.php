@@ -26,6 +26,7 @@ final class SendPushHandlerTest extends TestCase
         $command = $this->command();
         $subscriptions = [Uuid::generate(), Uuid::generate(), Uuid::generate()];
         $delivery = $this->createMock(PushDeliveryPortInterface::class);
+        $delivery->method('isConfigured')->willReturn(true);
         $delivery->expects(self::once())->method('subscriptionsOf')->with($command->userId)->willReturn($subscriptions);
         $dispatched = [];
         $bus = $this->createMock(MessageBusInterface::class);
@@ -53,6 +54,7 @@ final class SendPushHandlerTest extends TestCase
     {
         $command = $this->command();
         $delivery = $this->createStub(PushDeliveryPortInterface::class);
+        $delivery->method('isConfigured')->willReturn(true);
         $delivery->method('subscriptionsOf')->willReturn([Uuid::generate()]);
         $bus = $this->createStub(MessageBusInterface::class);
         $bus->method('dispatch')->willThrowException(new \RuntimeException('Transport unavailable'));
@@ -65,6 +67,7 @@ final class SendPushHandlerTest extends TestCase
     public function testDisabledPushPreferenceSkipsTheSubscriptions(): void
     {
         $delivery = $this->createMock(PushDeliveryPortInterface::class);
+        $delivery->method('isConfigured')->willReturn(true);
         $delivery->expects(self::never())->method('subscriptionsOf');
         $bus = $this->createMock(MessageBusInterface::class);
         $bus->expects(self::never())->method('dispatch');
@@ -75,6 +78,7 @@ final class SendPushHandlerTest extends TestCase
     public function testServerWidePushToggleOffSkipsDeliveryAndRecordsTheSkip(): void
     {
         $delivery = $this->createMock(PushDeliveryPortInterface::class);
+        $delivery->method('isConfigured')->willReturn(true);
         $delivery->expects(self::never())->method('subscriptionsOf');
         $bus = $this->createMock(MessageBusInterface::class);
         $bus->expects(self::never())->method('dispatch');
@@ -88,10 +92,27 @@ final class SendPushHandlerTest extends TestCase
         $this->handler($delivery, $bus, pushEnabled: false, logger: $logger)($this->command());
     }
 
+    public function testAServerWithoutAVapidKeyPairSkipsDeliveryAndRecordsTheSkip(): void
+    {
+        $delivery = $this->createMock(PushDeliveryPortInterface::class);
+        $delivery->method('isConfigured')->willReturn(false);
+        $delivery->expects(self::never())->method('subscriptionsOf');
+        $bus = $this->createMock(MessageBusInterface::class);
+        $bus->expects(self::never())->method('dispatch');
+        $logger = $this->createMock(LoggerInterface::class);
+        $logger->expects(self::once())->method('info')->with(
+            self::stringContains('no VAPID key pair'),
+            self::callback(static fn (array $context): bool => $context['notification_id'] === 'notification-1'),
+        );
+
+        $this->handler($delivery, $bus, logger: $logger)($this->command());
+    }
+
     public function testServerWidePushToggleIsReadForEveryMessage(): void
     {
         $command = $this->command();
         $delivery = $this->createStub(PushDeliveryPortInterface::class);
+        $delivery->method('isConfigured')->willReturn(true);
         $delivery->method('subscriptionsOf')->willReturn([Uuid::generate()]);
         $bus = $this->createMock(MessageBusInterface::class);
         $bus->expects(self::once())->method('dispatch')->willReturnCallback(static fn (object $message): Envelope => new Envelope($message));
@@ -110,6 +131,7 @@ final class SendPushHandlerTest extends TestCase
     public function testNoSubscriptionsDispatchNothing(): void
     {
         $delivery = $this->createStub(PushDeliveryPortInterface::class);
+        $delivery->method('isConfigured')->willReturn(true);
         $delivery->method('subscriptionsOf')->willReturn([]);
         $bus = $this->createMock(MessageBusInterface::class);
         $bus->expects(self::never())->method('dispatch');

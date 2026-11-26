@@ -47,6 +47,15 @@ final class SendPushHandler
             return;
         }
 
+        if (!$this->delivery->isConfigured()) {
+            $this->logger->info('Push delivery skipped because no VAPID key pair is configured.', [
+                'channel' => 'notification.push',
+                'notification_id' => $command->notificationPublicId,
+            ]);
+
+            return;
+        }
+
         if (!$this->preferenceRepository->isEnabled(
             $command->userId,
             $command->category,

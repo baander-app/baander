@@ -25,6 +25,7 @@ final class SendPushToSubscriptionHandlerTest extends TestCase
     {
         $command = $this->command();
         $delivery = $this->createMock(PushDeliveryPortInterface::class);
+        $delivery->method('isConfigured')->willReturn(true);
         $delivery->expects(self::once())->method('send')->willReturnCallback(
             static function (Uuid $subscription, Uuid $user, string $payload) use ($command): PushSendReport {
                 self::assertTrue($subscription->equals($command->subscriptionId));
@@ -121,15 +122,33 @@ final class SendPushToSubscriptionHandlerTest extends TestCase
     public function testARemovedOrReassignedSubscriptionIsSkipped(): void
     {
         $delivery = $this->createMock(PushDeliveryPortInterface::class);
+        $delivery->method('isConfigured')->willReturn(true);
         $delivery->expects(self::once())->method('send')->willReturn(null);
         $delivery->expects(self::never())->method('remove');
 
         $this->handler($delivery)($this->command());
     }
 
+    public function testAServerWithoutAVapidKeyPairSendsNothingAndRecordsTheSkip(): void
+    {
+        $command = $this->command();
+        $delivery = $this->createMock(PushDeliveryPortInterface::class);
+        $delivery->method('isConfigured')->willReturn(false);
+        $delivery->expects(self::never())->method('send');
+        $delivery->expects(self::never())->method('remove');
+        $logger = $this->createMock(LoggerInterface::class);
+        $logger->expects(self::once())->method('info')->with(
+            self::stringContains('no VAPID key pair'),
+            self::callback(static fn (array $context): bool => $context['subscription_id'] === $command->subscriptionId->toString()),
+        );
+
+        $this->handler($delivery, logger: $logger)($command);
+    }
+
     public function testARetryAfterPushWasTurnedOffSendsNothing(): void
     {
         $delivery = $this->createMock(PushDeliveryPortInterface::class);
+        $delivery->method('isConfigured')->willReturn(true);
         $delivery->expects(self::never())->method('send');
 
         $this->handler($delivery, pushEnabled: false)($this->command());
@@ -149,6 +168,7 @@ final class SendPushToSubscriptionHandlerTest extends TestCase
     private function answering(?int $status): PushDeliveryPortInterface&MockObject
     {
         $delivery = $this->createMock(PushDeliveryPortInterface::class);
+        $delivery->method('isConfigured')->willReturn(true);
         $delivery->method('send')->willReturn(new PushSendReport(false, $status));
 
         return $delivery;

@@ -83,7 +83,7 @@ final class PushSubscriptionRegistrationRepositoryTest extends TestCase
 
             return new Envelope($message);
         });
-        $delivery = new WebPushDelivery($subscriptions, $webPush);
+        $delivery = new WebPushDelivery($subscriptions, $webPush, 'vapid-public-key', 'vapid-private-key');
         (new SendPushHandler($preferences, $delivery, $bus, new NullLogger(), $settings))(
             new SendPushCommand($owner->getId(), NotificationCategory::Security, 'Title', 'Body', 'rotation'),
         );

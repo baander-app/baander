@@ -25,4 +25,7 @@ interface PushDeliveryPortInterface
     public function send(Uuid $subscriptionId, Uuid $userId, string $payload): ?PushSendReport;
 
     public function remove(Uuid $subscriptionId): void;
+
+    /** Whether the server has the VAPID key pair push messages are signed with; without it nothing can be sent. */
+    public function isConfigured(): bool;
 }
