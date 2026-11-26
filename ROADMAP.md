@@ -1,6 +1,6 @@
 # Baander roadmap
 
-Updated 2026-11-25. The roadmap records remaining work, decisions and acceptance
+Updated 2026-11-26. The roadmap records remaining work, decisions and acceptance
 gates. The linked guides describe current operating contracts. Git history
 keeps completed milestones and their verification evidence.
 
@@ -50,7 +50,7 @@ Verification checkpoint:
 
 Open:
 
-- GitHub CI's Chromium media-ownership step failed with "Combined phase failed: absent" before this regression hid it, and may fail again now that the outbox check passes.
+- GitHub CI's Chromium media-ownership step, which this regression had hidden, then failed in its absent-worker phase. The cause was the drill's sign-in, not the outbox; `c4297b363` fixes it (see the Symfony 8.1.12 entry).
 - GitHub CI's "Public website" workflow failed from `eac10e7ab` (2026-11-25) on, in five browser tests made stale by `5232d0e44`: that commit renamed the "Source Installation" page to "Installation" and moved the security page's `.env` template to the developer guide's compose-stack page, but updated only one of the tests that use them. Fixed in `eb10d354e` by following the new link name and checking `env` highlighting on the compose-stack page. With the same change, the full website suite passed locally (221 tests); the six affected tests pass on `eb10d354e`.
 
 ## Pipe-operator inspection check, 2026-11-26
@@ -335,8 +335,10 @@ passed on `1d3c15c0d` plus the two web test fixes in `372dc91da`. The last full 
 run that was read, on `1d3c15c0d`, passed stack lane 1 (2,454 tests); its other failures
 were the stale migration list fixed in `2698fb77e`, the stale test double fixed in
 `372dc91da`, and three timing tests that pass alone. A full backend run and the full
-tooling suite were started on `715da1832` on 2026-11-25 at 19:57 and not yet read; their
-result is open.
+tooling suite were started on `715da1832` on 2026-11-25 at 19:57 and never read. The
+full runs on `8661c86ad` cover this work: the native lane, both stack lanes and the
+tooling suite passed, and the ordinary unit lane passed on `3935fa941` (see the
+pipe-operator entry).
 
 ### Decisions confirmed by the owner
 
@@ -478,8 +480,9 @@ Build and supply chain:
   build of `944605d1e` or later.
 - `docker/nginx/Dockerfile.test` does not build, because Alpine now offers only
   `php85` 8.5.13; the runtime declarations need the same bump.
-- `composer check:php-dependencies:local` exits `2` on the redis-rate-limiter
-  package's "could not detect the root package version" validation gap.
+- Fixed in `a06ba18aa`: `composer check:php-dependencies:local` exited `2` because its
+  stale-source pattern `rate.limit` matched the package name in Composer's
+  "could not detect the root package (baander/redis-rate-limiter) version" notice.
 - Node has no owner in the production inventory (2,114 review gaps): move Node to the
   development stages or add build evidence. PIE is still listed in
   `third_party/inventory/application-review.json`.
