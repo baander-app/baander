@@ -2,10 +2,8 @@
 
 declare(strict_types=1);
 
-use App\Auth\Domain\Model\OAuth\SignInGrant;
-use App\Kernel;
+use App\Auth\Infrastructure\Doctrine\Entity\OAuth\ClientEntity;
 use App\Shared\Domain\Model\Uuid;
-use App\Tests\Fixtures\Auth\FirstPartyOAuthClient;
 use App\Tests\Fixtures\WebRuntime\HttpExchange;
 use App\Tests\Fixtures\WebRuntime\StreamClient;
 use Doctrine\DBAL\Connection;
@@ -15,8 +13,8 @@ use Swoole\WebSocket\Frame;
 
 /**
  * @var string $project
- * @var Kernel $kernel
  * @var Closure(): StreamClient $client
+ * @var Closure(): ClientEntity $firstParty
  * @var EntityManagerInterface $manager
  * @var Connection $db
  */
@@ -86,13 +84,10 @@ function mediaSocket(StreamClient $auth, array $payload): void
 }
 
 $state = state(); $auth = $client(); $sessions = []; $slots = profileSlots();
-$socketAuth = new StreamClient($manager, EMAIL,
-    (string) file_get_contents($project . '/config/secrets/oauth/private.key'), BASE . '/api/stream/track', SignInGrant::Password, audience: BASE,
-    client: FirstPartyOAuthClient::entity($kernel->getContainer(), $manager));
 // One owner per video slot fills every slot; one more owner's 1080p admission waits behind them.
 $owners = [$auth];
 foreach (range(1, $slots['video']) as $index) {
-    $owners[] = drillOwner($manager, $project, 'media-control-' . $index);
+    $owners[] = drillOwner($manager, $project, 'media-control-' . $index, $firstParty());
 }
 $qualities = ['360p', '480p', '720p'];
 foreach (range(0, $slots['video'] - 1) as $index) {
@@ -132,9 +127,9 @@ file_put_contents(ROOT . '/capacity-ready', 'ready');
 await(static fn (): bool => is_file(ROOT . '/capacity-pressure-start'), 'CPU pressure barrier', 60);
 $pressureStart = hrtime(true) / 1e9;
 $timings = []; $attachments = [];
-$control = static function (array $payload, string $status, bool $socket = false) use ($auth, $socketAuth, $db, &$state, &$timings): array {
+$control = static function (array $payload, string $status, bool $socket = false) use ($auth, $db, &$state, &$timings): array {
     $start = hrtime(true);
-    if ($socket) { mediaSocket($socketAuth, ['sessionId' => $state['session'], ...$payload]); }
+    if ($socket) { mediaSocket($auth, ['sessionId' => $state['session'], ...$payload]); }
     else {
         $response = twoCommandExchange($auth, '/api/transcode/sessions/' . $state['session'] . '/position', 'POST', $payload)->complete(3);
         $receipt = jsonBody($response)['data'] ?? [];

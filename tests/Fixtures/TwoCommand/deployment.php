@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use App\Auth\Domain\Event\UserRegistered;
 use App\Auth\Domain\Model\OAuth\SignInGrant;
+use App\Auth\Infrastructure\Doctrine\Entity\OAuth\ClientEntity;
 use App\Auth\Infrastructure\Doctrine\Entity\UserEntity;
 use App\Catalog\Infrastructure\Doctrine\Entity\AlbumEntity;
 use App\Catalog\Infrastructure\Doctrine\Entity\MovieEntity;
@@ -19,6 +20,7 @@ use App\Shared\Domain\Event\Outbox\RelayOutboxCommand;
 use App\Shared\Domain\Model\Email;
 use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
+use App\Tests\Fixtures\Auth\FirstPartyOAuthClient;
 use App\Tests\Fixtures\Messaging\MessageCodecFactory;
 use App\Tests\Fixtures\TwoCommand\LocalOrigin;
 use App\Tests\Fixtures\TwoCommand\TrackDelivery;
@@ -542,15 +544,15 @@ function profileSlots(): array
     $profile = DeploymentProfile::fromEnvironment();
     return ['video' => $profile->videoEncoderSlots, 'audio' => $profile->audioEncoderSlots];
 }
-/** One more signed-in administrator, whose video sessions get jobs of their own. */
-function drillOwner(EntityManagerInterface $manager, string $project, string $name): StreamClient
+/** One more administrator signed in to the web app, whose video sessions get jobs of their own. */
+function drillOwner(EntityManagerInterface $manager, string $project, string $name, ClientEntity $firstParty): StreamClient
 {
     $email = $name . '@baander.app';
     $owner = new UserEntity(new PublicId(), str_replace('-', ' ', $name) |> ucfirst(...), $email, 'unused-password', roles: ['ROLE_ADMIN']);
     $owner->markEmailAsVerified();
     $manager->persist($owner);
     $manager->flush();
-    return new StreamClient($manager, $email, (string) file_get_contents($project . '/config/secrets/oauth/private.key'), BASE . '/api/stream/track', SignInGrant::AuthorizationCode, audience: BASE);
+    return new StreamClient($manager, $email, (string) file_get_contents($project . '/config/secrets/oauth/private.key'), BASE . '/api/stream/track', SignInGrant::Password, audience: BASE, client: $firstParty);
 }
 /**
  * Occupies every audio slot with renditions of one track, each in a distinct format and bitrate,
@@ -614,8 +616,12 @@ $kernel = new Kernel('prod', false);
 $kernel->boot();
 $manager = $kernel->getContainer()->get('doctrine')->getManager();
 $db = $manager->getConnection();
+// The drill's administrators sign in as the web app does: a delegated token authenticates its
+// user with ROLE_USER alone, which needs library membership for playback and reaches no admin route.
+$firstParty = static fn (): ClientEntity => FirstPartyOAuthClient::entity($kernel->getContainer(), $manager);
 $client = static fn (): StreamClient => new StreamClient($manager, EMAIL,
-    (string) file_get_contents($project . '/config/secrets/oauth/private.key'), BASE . '/api/stream/track', SignInGrant::AuthorizationCode, audience: BASE);
+    (string) file_get_contents($project . '/config/secrets/oauth/private.key'), BASE . '/api/stream/track', SignInGrant::Password, audience: BASE,
+    client: $firstParty());
 $result = [];
 if ($mode === 'prepare') {
     ensure(is_dir(ROOT) || mkdir(ROOT, 0750, true), 'Cannot create scratch state.');
@@ -789,7 +795,7 @@ if ($mode === 'prepare') {
     $state = state(); $auth = $client(); $sessions = []; $slots = profileSlots();
     // Three qualities give one owner three jobs; every further slot gets an owner of its own.
     foreach (range(0, $slots['video'] - 1) as $index) {
-        [$owner, $quality] = $index < 3 ? [$auth, ['360p', '480p', '720p'][$index]] : [drillOwner($manager, $project, 'capacity-' . $index), '360p'];
+        [$owner, $quality] = $index < 3 ? [$auth, ['360p', '480p', '720p'][$index]] : [drillOwner($manager, $project, 'capacity-' . $index, $firstParty()), '360p'];
         $response = twoCommandExchange($owner, '/api/transcode/sessions/', 'POST', ['requestId' => $state['requestId'], 'videoId' => $state['video'], 'qualityTier' => $quality])->complete(20);
         ensure($response->status() === 201, 'Capacity video admission failed: ' . $response->body);
         $sessions[] = jsonBody($response);

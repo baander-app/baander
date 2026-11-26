@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Auth\Infrastructure\Doctrine\Entity\OAuth\ClientEntity;
 use App\QoL\Domain\Service\LearningModel;
 use App\Shared\Application\DTO\DeploymentProfile;
 use App\Shared\Domain\Model\Uuid;
@@ -22,6 +23,7 @@ use Doctrine\ORM\EntityManagerInterface;
  *
  * @var string $project
  * @var EntityManagerInterface $manager
+ * @var Closure(): ClientEntity $firstParty
  */
 require_once $project . '/tests/Fixtures/Worker/MediaControlObservation.php';
 
@@ -46,7 +48,7 @@ ensure(mkdir(ROOT . '/cost-progress', 0700) || is_dir(ROOT . '/cost-progress'), 
 /** @var list<StreamClient> $owners */
 $owners = [];
 foreach (range(0, max($videoSlots, $audioSlots) - 1) as $index) {
-    $owners[] = drillOwner($manager, $project, 'media-load-' . $index);
+    $owners[] = drillOwner($manager, $project, 'media-load-' . $index, $firstParty());
 }
 $now = static fn (): float => hrtime(true) / 1e9;
 $clock = ['monotonic' => $now(), 'wall' => microtime(true)];

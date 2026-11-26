@@ -1,6 +1,8 @@
 <?php
 
 declare(strict_types=1);
+
+use App\Auth\Infrastructure\Doctrine\Entity\OAuth\ClientEntity;
 use Doctrine\ORM\EntityManagerInterface;
 
 const LOAD_WEB_CLIENTS = 8;
@@ -13,8 +15,9 @@ const LOAD_WEB_PATH = '/api/albums/?limit=20';
  *
  * @var string $project
  * @var EntityManagerInterface $manager
+ * @var Closure(): ClientEntity $firstParty
  */
-$owner = drillOwner($manager, $project, 'media-load-web');
+$owner = drillOwner($manager, $project, 'media-load-web', $firstParty());
 await(static fn (): bool => is_file(ROOT . '/load-go'), 'load barrier', 1200);
 $log = fopen(ROOT . '/web-latency.jsonl', 'wb') ?: throw new RuntimeException('Cannot record web latency.');
 $multi = curl_multi_init();

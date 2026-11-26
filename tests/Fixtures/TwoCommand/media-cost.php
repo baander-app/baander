@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Auth\Domain\Model\OAuth\SignInGrant;
+use App\Auth\Infrastructure\Doctrine\Entity\OAuth\ClientEntity;
 use App\Auth\Infrastructure\Doctrine\Entity\UserEntity;
 use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
@@ -19,6 +20,7 @@ use Doctrine\ORM\EntityManagerInterface;
  *
  * @var string $project
  * @var EntityManagerInterface $manager
+ * @var Closure(): ClientEntity $firstParty
  * @var Connection $db
  */
 require_once $project . '/tests/Fixtures/Worker/MediaControlObservation.php';
@@ -42,7 +44,8 @@ foreach (range(0, 7) as $index) {
     $manager->persist($owner);
     $manager->flush();
     $owners[] = new StreamClient($manager, $email,
-        (string) file_get_contents($project . '/config/secrets/oauth/private.key'), BASE . '/api/stream/track', SignInGrant::AuthorizationCode, audience: BASE);
+        (string) file_get_contents($project . '/config/secrets/oauth/private.key'), BASE . '/api/stream/track', SignInGrant::Password, audience: BASE,
+        client: $firstParty());
 }
 $phases = [];
 $now = static fn (): float => hrtime(true) / 1e9;
