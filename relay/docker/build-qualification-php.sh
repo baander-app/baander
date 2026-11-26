@@ -1,8 +1,8 @@
 #!/bin/sh
 # SPDX-License-Identifier: Apache-2.0
 set -eu
-php_version=8.5.12
-php_checksum=08bc2eba2a588654ade1357174aa646b761556c862dda0678345ee29ed481209
+php_version=8.5.13
+php_checksum=607602acaf0c3061818e9916ec44a058e8b3d43959a83862b9cd3ec7bf5b785f
 swoole_version=6.2.4
 swoole_checksum=cb41348708cb3a360672cd4ffe84b9a6b4efee61773be7d76a11c39949b95334
 curl --fail --silent --show-error --location --max-time 180 \

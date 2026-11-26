@@ -85,6 +85,6 @@ immutable-image lifecycle and combined Chromium playback/recovery gates passed
 before the paired deployment change. Retain image identity, phase, containment and
 cleanup evidence with the runner's artifacts before claiming a result for a newer
 deployment.
-The production recipes select PHP 8.5.12 and Composer 2.11.1 on the Debian 13
+The production recipes select PHP 8.5.13 and Composer 2.11.1 on the Debian 13
 (trixie) PHP ZTS base. Native Swoole is pinned to Composer's required 6.2.4. PIE
 installation failures fail the image build.

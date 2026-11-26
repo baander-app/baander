@@ -620,9 +620,9 @@ The API image builds C++20 Release code, with the hardening flags described unde
 checksums above. The voter image uses
 a clean build of the rqlite 10.5.1 source commit. Both use the immutable official
 Debian base
-`sha256:3783cc01769c7b2b1b83a5c5ad96c815348e28ed7da68e2e3687004faa906251`.
+`sha256:e67eeead736ff7bbe258ef088bff683635c561b1fcfefad0806c1df4ab49ce0e`.
 The verified amd64 child is
-`sha256:f3034a6ec3c1205360777c4aae76234998866ad18806ae62b63a3f84ccad782b`.
+`sha256:311f7a192fd9a92b165a86b32fa3aae9005b11849bfb1db2d4fd784559ee464f`.
 Only Linux amd64 is qualified here. Debian security packages are installed from
 its package repository; these builds do not claim byte-for-byte reproducibility
 of the operating-system package set. Dependency updates require new verified pins

@@ -3,7 +3,7 @@
 After changing a Composer manifest, lock, runtime recipe or local dependency fix,
 run the dependency checker before deciding that the stack is current. It separates
 source and lock consistency from upstream currency and from runtime qualification.
-The selected stack is PHP 8.5.12, Swoole 6.2.4 and Composer 2.11.1. Recipes retain
+The selected stack is PHP 8.5.13, Swoole 6.2.4 and Composer 2.11.1. Recipes retain
 their intended ZTS or NTS mode; matching version declarations alone does not prove
 that a rebuilt image has the required native behavior.
 

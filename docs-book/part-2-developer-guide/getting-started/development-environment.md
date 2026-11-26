@@ -18,7 +18,7 @@ requires at least two daemon CPUs and 8448 MiB of daemon RAM; allow additional
 resources for web, dependencies and concurrent instances. Use Yarn for `ui/`
 workspaces; never run npm there (`tests/e2e` and `packages/baander-audio-core` use npm).
 
-The selected image stack uses PHP 8.5.12, Swoole 6.2.4 and Composer 2.11.1.
+The selected image stack uses PHP 8.5.13, Swoole 6.2.4 and Composer 2.11.1.
 The PHP ZTS application base, the Node tooling stage, the PostgreSQL 18
 database image and the runner image build on Debian 13 (trixie).
 Dependency maintenance needs PHP 8.5 or newer with the Swoole extension loaded

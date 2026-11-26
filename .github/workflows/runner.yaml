@@ -24,7 +24,7 @@ jobs:
     build:
         runs-on: ${{ github.server_url == 'https://github.com' && 'ubuntu-latest' || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository) && 'fork-pull-request' || 'docker-cli' }}
         container:
-            image: docker:cli@sha256:6e26c5a09acc481245d6b50836f1f713c609e51ebc88735c08f5aa4b3c91e15a
+            image: docker:cli@sha256:4e60c31615e83523afbb59773b25d055c0da9edcd5f80a4c6a6eebad49de1a25
         permissions:
             contents: read
             packages: write

@@ -4,8 +4,8 @@ FROM node:24.22.2-trixie-slim@sha256:0820eaa85e07d0490446dd01d14707e17e6108a3698
 
 FROM debian-dist AS tooling-build
 
-ARG PHP_VERSION=8.5.12
-ARG PHP_SHA256=08bc2eba2a588654ade1357174aa646b761556c862dda0678345ee29ed481209
+ARG PHP_VERSION=8.5.13
+ARG PHP_SHA256=607602acaf0c3061818e9916ec44a058e8b3d43959a83862b9cd3ec7bf5b785f
 ARG SWOOLE_VERSION=6.2.4
 ARG SWOOLE_SHA256=cb41348708cb3a360672cd4ffe84b9a6b4efee61773be7d76a11c39949b95334
 ARG YAML_VERSION=2.3.0
@@ -69,7 +69,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 COPY --from=tooling-build /opt/php /opt/php
-COPY --from=composer:2.11.1@sha256:537fb03057ed901ae06bde7ef25af348903485ae1acc7fc789b80d8bac666f35 /usr/bin/composer /usr/local/bin/composer
+COPY --from=composer:2.11.1@sha256:8de2184c6de224f4689e8f80ed5f5edaf0030b6b8b7839a22a2bcb6722ac87d0 /usr/bin/composer /usr/local/bin/composer
 ENV PATH="/opt/php/bin:${PATH}"
 
 RUN php -v && php --ri swoole && php --ri yaml \

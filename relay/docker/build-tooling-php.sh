@@ -1,8 +1,8 @@
 #!/bin/sh
 # SPDX-License-Identifier: Apache-2.0
 set -eu
-version=8.5.12
-checksum=08bc2eba2a588654ade1357174aa646b761556c862dda0678345ee29ed481209
+version=8.5.13
+checksum=607602acaf0c3061818e9916ec44a058e8b3d43959a83862b9cd3ec7bf5b785f
 curl --fail --silent --show-error --location --max-time 180 \
     "https://www.php.net/distributions/php-${version}.tar.xz" -o /tmp/php.tar.xz
 printf '%s  /tmp/php.tar.xz\n' "$checksum" | sha256sum -c -

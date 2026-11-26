@@ -204,7 +204,7 @@ a fresh worker pair. Build inputs and cache settings are described in the
 
 PHP dependency updates also require a clean Composer installation from the reviewed
 locks, including retained patches, and new images for each affected role. The
-selected stack uses PHP 8.5.12, Swoole 6.2.4 and Composer 2.11.1. An updated checkout
+selected stack uses PHP 8.5.13, Swoole 6.2.4 and Composer 2.11.1. An updated checkout
 does not change the runtime or dependencies already loaded by a worker. Replace
 the deployment with `start`, as in the [standard update](#standard-update), to
 load the new images. Maintainers can

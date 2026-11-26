@@ -23,7 +23,7 @@ FROM ${FFMPEG_IMAGE} AS ffmpeg-dist
 
 FROM node:24.22.2-trixie-slim@sha256:0820eaa85e07d0490446dd01d14707e17e6108a36988cf374899cd057eb3812d AS node-dist
 
-FROM php:8.5.12-zts-trixie@sha256:2ffa2b7471a9826f8a28f722ff21f83bc560367c0135372d88697f6c0666b5eb AS base
+FROM php:8.5.13-zts-trixie@sha256:67cc0f9b705a1c9f2352162be2d0cf6e5c05028f12fd62e89d1b069429426055 AS base
 
 ARG TARGETPLATFORM
 
@@ -258,7 +258,7 @@ RUN set -xe && \
     docker-php-source delete
 
 # Install Composer from official image
-COPY --from=composer:2.11.1@sha256:537fb03057ed901ae06bde7ef25af348903485ae1acc7fc789b80d8bac666f35 /usr/bin/composer /usr/bin/composer
+COPY --from=composer:2.11.1@sha256:8de2184c6de224f4689e8f80ed5f5edaf0030b6b8b7839a22a2bcb6722ac87d0 /usr/bin/composer /usr/bin/composer
 RUN chmod +x /usr/bin/composer
 
 # -----------------------------------------------------------------------------

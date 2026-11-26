@@ -1,19 +1,19 @@
 # SPDX-License-Identifier: Apache-2.0
-FROM debian:bookworm-slim@sha256:3783cc01769c7b2b1b83a5c5ad96c815348e28ed7da68e2e3687004faa906251 AS inventory-php
+FROM debian:bookworm-slim@sha256:e67eeead736ff7bbe258ef088bff683635c561b1fcfefad0806c1df4ab49ce0e AS inventory-php
 RUN apt-get update && apt-get install -y --no-install-recommends \
     autoconf build-essential ca-certificates curl pkg-config xz-utils \
     && rm -rf /var/lib/apt/lists/*
 COPY docker/build-tooling-php.sh /tmp/build-tooling-php.sh
 RUN sh /tmp/build-tooling-php.sh
 
-FROM composer:2.11.1@sha256:537fb03057ed901ae06bde7ef25af348903485ae1acc7fc789b80d8bac666f35 AS inventory-loader
+FROM composer:2.11.1@sha256:8de2184c6de224f4689e8f80ed5f5edaf0030b6b8b7839a22a2bcb6722ac87d0 AS inventory-loader
 WORKDIR /tooling
 COPY composer.json composer.lock ./
 COPY tools ./tools
 COPY tests/Support ./tests/Support
 RUN composer install --no-dev --no-interaction --no-scripts --no-plugins --classmap-authoritative --ignore-platform-req=php
 
-FROM debian:bookworm-slim@sha256:3783cc01769c7b2b1b83a5c5ad96c815348e28ed7da68e2e3687004faa906251 AS fetch
+FROM debian:bookworm-slim@sha256:e67eeead736ff7bbe258ef088bff683635c561b1fcfefad0806c1df4ab49ce0e AS fetch
 ARG TARGETARCH
 RUN test "$TARGETARCH" = amd64
 RUN apt-get update && apt-get install -y --no-install-recommends curl ca-certificates git \
@@ -34,7 +34,7 @@ RUN git init && git remote add origin https://github.com/rclone/rclone.git \
     && test "$(git rev-parse HEAD)" = 84a85367111c84061c959e01e0c320618e492dc6
 RUN CGO_ENABLED=0 GOTOOLCHAIN=local /usr/local/go/bin/go build -p=2 -mod=readonly -trimpath -tags=cmount \
     -ldflags '-s -X github.com/rclone/rclone/fs.Version=v1.71.2' -o /out/rclone .
-FROM debian:bookworm-slim@sha256:3783cc01769c7b2b1b83a5c5ad96c815348e28ed7da68e2e3687004faa906251 AS runtime-base
+FROM debian:bookworm-slim@sha256:e67eeead736ff7bbe258ef088bff683635c561b1fcfefad0806c1df4ab49ce0e AS runtime-base
 RUN apt-get update && apt-get install -y --no-install-recommends python3 curl ca-certificates \
     && rm -rf /var/lib/apt/lists/* \
     && groupadd --gid 10001 registry && useradd --uid 10001 --gid 10001 --no-create-home registry \
@@ -52,7 +52,7 @@ STOPSIGNAL SIGTERM
 ENTRYPOINT ["python3", "/usr/local/bin/registry-backup"]
 CMD ["run", "--config", "/etc/baander-registry-backup/backup.json"]
 
-FROM debian:bookworm-slim@sha256:3783cc01769c7b2b1b83a5c5ad96c815348e28ed7da68e2e3687004faa906251 AS inventory
+FROM debian:bookworm-slim@sha256:e67eeead736ff7bbe258ef088bff683635c561b1fcfefad0806c1df4ab49ce0e AS inventory
 COPY --from=inventory-php /opt/php/bin/php /usr/local/bin/php
 COPY --from=inventory-loader /tooling /tooling
 COPY third_party/inventory /resolutions
