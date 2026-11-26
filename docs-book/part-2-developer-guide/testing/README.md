@@ -30,7 +30,8 @@ bash scripts/test-backend-container.sh --testsuite Unit,StaticAnalysisRules
 # Run a single functional or integration test file
 bash scripts/test-functional-container.sh tests/Functional/Controller/FavoritesControllerTest.php
 
-# Run Composer validation, a normalization dry run, PHPStan, Deptrac, then all backend suites with coverage
+# Run Composer validation, a normalization dry run, PHPStan, Deptrac, the import check,
+# the tooling architecture, format and PHPStan checks, then all backend suites with coverage
 make ci
 
 # Run the standalone tooling test suite and architecture gates

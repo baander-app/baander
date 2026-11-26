@@ -235,6 +235,29 @@ Every action on the admin pages has a console command counterpart, and CLI execu
 - **JSON columns**: Always `JSONB`
 - **Foreign keys and indexes**: Index every foreign key column and follow [Database Naming](database-naming.md)
 
+## Pipe Operator
+
+Two project rules make PHPStan report what PhpStorm 2026.3's pipe-operator inspection reports, so `make phpstan`, `composer analyse:tooling`, `make ci` and CI fail on the code the IDE highlights:
+
+- `baander.pipeOperator.nestedCalls` reports a chain of three to ten nested calls, such as `array_values(array_unique(array_column($rows, 'k')))` or `$this->assertSame(1, json_decode(file_get_contents($path), true))`. A two-level call such as `bin2hex(random_bytes(4))` is not reported.
+- `baander.pipeOperator.assignmentChain` reports three to ten consecutive assignments to one variable, each a call that takes the variable as an argument.
+
+Fix a finding in this order:
+
+1. Turn every single-argument level into a pipe stage with a first-class callable: `array_column($rows, 'k') |> array_unique(...) |> array_values(...)`.
+2. Keep a two-level head nested when its outer call takes several arguments, and pipe the single-argument levels after it: `implode(', ', array_column($rows, 'k')) |> $escape(...)`.
+3. When a chain still has three levels, hoist values into locals before the statement, from the innermost outward, and name each for what it holds: `$json = file_get_contents($path);` followed by `$this->assertSame(1, json_decode($json, true));`.
+4. Do not write a one-stage pipe in an argument position only to break the chain.
+5. When a local would change whether or when a value is computed, use a named private helper or a closure with a statement body. A typed `static fn` pipe step is the last resort.
+
+A hoisted local must run exactly once, unconditionally, and before any other call or write in the statement, so the statement computes the same values in the same order. It cannot come out of a loop condition, an `elseif` condition, an arrow function, a ternary branch, the right side of `&&`, `||` or `??`, or a `match` arm. A pipe inside concatenation, under `!`, a cast or array access needs parentheses, because `.` binds tighter than `|>`.
+
+Do not apply PhpStorm's quick fix to a chain with multi-argument steps; fix it in the order above. The quick fix wraps each such step in an untyped, non-static `fn($x) => …`, swallows an enclosing assertion into the pipe, and can drop a by-reference write such as the first argument of `array_push()`. A `/** */` docblock between assignments hides a chain from both tools without changing the code.
+
+Production runs with `zend.assertions=-1`, which removes an `assert()` call and its operand. A pipe or a local evaluates the operand there, so hoist an `assert` chain only when its operand is cheap and pure; otherwise replace the assertion with an explicit check that throws.
+
+After a PhpStorm or PHPStan upgrade, check that the two still agree. Run `inspect.sh` from the PhpStorm installation with a profile that enables only `PhpPipeOperatorCanBeUsedInspection`, and compare its findings with PHPStan's JSON output filtered by the two identifiers. Give each headless run a fresh system directory, because a reused one serves file contents cached by an earlier run. Keep `node` and `npm` off `PATH` for the run, because PhpStorm's Node.js project configurator otherwise runs `npm install` in every `package.json` of the project, `ui/rn` included.
+
 ## See Also
 
 - [Glossary](../architecture/glossary.md) — definitions of DDD terms used on this page
