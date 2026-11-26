@@ -16686,6 +16686,16 @@
                             }
                         }
                     },
+                    "409": {
+                        "description": "The playlist changed meanwhile, or the stored playlist holds a value over its size limit (reason member_input_bound)",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    },
                     "422": {
                         "description": "Validation error",
                         "content": {
