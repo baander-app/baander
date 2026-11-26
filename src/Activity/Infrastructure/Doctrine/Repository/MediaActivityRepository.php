@@ -72,6 +72,17 @@ final class MediaActivityRepository implements MediaActivityRepositoryInterface
         return array_map(fn (MediaActivityEntity $entity) => $this->toDomain($entity), $entities);
     }
 
+    public function countByUser(Uuid $userId): int
+    {
+        return (int) $this->entityManager->createQueryBuilder()
+            ->select('COUNT(a.id)')
+            ->from(MediaActivityEntity::class, 'a')
+            ->where('a.user = :userId')
+            ->setParameter('userId', $userId)
+            ->getQuery()
+            ->getSingleScalarResult();
+    }
+
     public function findForSong(Uuid $userId, Uuid $songId): ?MediaActivity
     {
         $entity = $this->entityManager

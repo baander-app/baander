@@ -20,9 +20,27 @@ function makeEntry(publicId: string, playCount = 1) {
     love: false, createdAt: timestamp, lastPlayedAt: timestamp, songTitle: `Song ${publicId}` }
 }
 
+type Entry = ReturnType<typeof makeEntry>
+
+interface HistoryPage {
+  data: Entry[]
+  meta: { total: number, limit: number, offset: number }
+}
+
+function page(data: Entry[], total: number, offset = 0, limit = 2): HistoryPage {
+  return {
+    data,
+    meta: {
+      total,
+      limit,
+      offset,
+    },
+  }
+}
+
 function deferredPage() {
-  let resolve: (value: [number, { data: ReturnType<typeof makeEntry>[] }]) => void = () => {}
-  const promise = new Promise<[number, { data: ReturnType<typeof makeEntry>[] }]>(done => { resolve = done })
+  let resolve: (value: [number, HistoryPage]) => void = () => {}
+  const promise = new Promise<[number, HistoryPage]>(done => { resolve = done })
   return { promise, resolve }
 }
 
@@ -41,21 +59,42 @@ describe('useActivityViewModel with the generated API client', () => {
   beforeEach(() => { api = new MockAdapter(AXIOS_INSTANCE, { onNoMatch: 'throwException' }) })
   afterEach(() => { cleanup(); api.restore() })
 
-  it.each([{ terminal: [] }, { terminal: [makeEntry('c')] }])('stops after a terminal page and retains previous rows: $terminal', async ({ terminal }) => {
-    api.onGet(firstUrl).reply(200, { data: [makeEntry('a'), makeEntry('b')] })
-    api.onGet(nextUrl).reply(200, { data: terminal })
+  it('stops paging once it has read the total and retains previous rows', async () => {
+    api.onGet(firstUrl).reply(200, page([makeEntry('a'), makeEntry('b')], 3))
+    api.onGet(nextUrl).reply(200, page([makeEntry('c')], 3, 2))
     const { result } = renderHook(() => useActivityViewModel({ limit: 2 }), { wrapper: createWrapper() })
     await waitFor(() => expect(result.current.hasMore).toBe(true))
     act(() => result.current.loadMore())
     await waitFor(() => expect(result.current.hasMore).toBe(false))
-    expect(result.current.groups.flatMap(group => group.items)).toHaveLength(2 + terminal.length)
+    expect(result.current.groups.flatMap(group => group.items)).toHaveLength(3)
     act(() => result.current.loadMore())
     expect(api.history.get).toHaveLength(2)
   })
 
-  it('deduplicates within and across pages while updating existing entries and using raw page counts', async () => {
-    api.onGet(firstUrl).reply(200, { data: [makeEntry('a'), makeEntry('a', 2)] })
-    api.onGet(nextUrl).reply(200, { data: [makeEntry('a', 3)] })
+  it('keeps paging after a short page while the total reports more rows', async () => {
+    api.onGet(firstUrl).reply(200, page([makeEntry('a')], 3))
+    api.onGet(nextUrl).reply(200, page([makeEntry('c')], 3, 2))
+    const { result } = renderHook(() => useActivityViewModel({ limit: 2 }), { wrapper: createWrapper() })
+    await waitFor(() => expect(result.current.groups).toHaveLength(1))
+    expect(result.current.hasMore).toBe(true)
+    act(() => result.current.loadMore())
+    await waitFor(() => expect(result.current.hasMore).toBe(false))
+    expect(result.current.groups.flatMap(group => group.items).map(entry => entry.publicId)).toEqual(['a', 'c'])
+  })
+
+  it('stops at an empty page whose total no longer reaches its offset', async () => {
+    api.onGet(firstUrl).reply(200, page([makeEntry('a'), makeEntry('b')], 4))
+    api.onGet(nextUrl).reply(200, page([], 2, 2))
+    const { result } = renderHook(() => useActivityViewModel({ limit: 2 }), { wrapper: createWrapper() })
+    await waitFor(() => expect(result.current.hasMore).toBe(true))
+    act(() => result.current.loadMore())
+    await waitFor(() => expect(result.current.hasMore).toBe(false))
+    expect(result.current.groups.flatMap(group => group.items)).toHaveLength(2)
+  })
+
+  it('deduplicates within and across pages while updating existing entries', async () => {
+    api.onGet(firstUrl).reply(200, page([makeEntry('a'), makeEntry('a', 2)], 3))
+    api.onGet(nextUrl).reply(200, page([makeEntry('a', 3)], 3, 2))
     const { result } = renderHook(() => useActivityViewModel({ limit: 2 }), { wrapper: createWrapper() })
     await waitFor(() => expect(result.current.hasMore).toBe(true))
     expect(result.current.groups[0].items).toHaveLength(1)
@@ -68,22 +107,22 @@ describe('useActivityViewModel with the generated API client', () => {
 
   it('coalesces concurrent load-more calls and exposes loading state', async () => {
     const pending = deferredPage()
-    api.onGet(firstUrl).reply(200, { data: [makeEntry('a'), makeEntry('b')] })
+    api.onGet(firstUrl).reply(200, page([makeEntry('a'), makeEntry('b')], 3))
     api.onGet(nextUrl).reply(() => pending.promise)
     const { result } = renderHook(() => useActivityViewModel({ limit: 2 }), { wrapper: createWrapper() })
     await waitFor(() => expect(result.current.hasMore).toBe(true))
     act(() => { result.current.loadMore(); result.current.loadMore(); result.current.loadMore() })
     await waitFor(() => expect(result.current.isFetchingMore).toBe(true))
     expect(api.history.get).toHaveLength(2)
-    await act(async () => { pending.resolve([200, { data: [] }]) })
+    await act(async () => { pending.resolve([200, page([makeEntry('c')], 3, 2)]) })
     await waitFor(() => expect(result.current.hasMore).toBe(false))
   })
 
   it('cancels the old request on a limit change and ignores its late page', async () => {
     const pending = deferredPage()
-    api.onGet(firstUrl).reply(200, { data: [makeEntry('a'), makeEntry('b')] })
+    api.onGet(firstUrl).reply(200, page([makeEntry('a'), makeEntry('b')], 3))
     api.onGet(nextUrl).reply(() => pending.promise)
-    api.onGet('/api/activity/history?limit=3&offset=0').reply(200, { data: [makeEntry('new')] })
+    api.onGet('/api/activity/history?limit=3&offset=0').reply(200, page([makeEntry('new')], 1, 0, 3))
     const { result, rerender } = renderHook(({ limit }) => useActivityViewModel({ limit }), {
       initialProps: { limit: 2 }, wrapper: createWrapper(),
     })
@@ -94,7 +133,7 @@ describe('useActivityViewModel with the generated API client', () => {
     rerender({ limit: 3 })
     await waitFor(() => expect(result.current.groups[0].items[0].publicId).toBe('new'))
     expect(oldSignal?.aborted).toBe(true)
-    await act(async () => { pending.resolve([200, { data: [makeEntry('late')] }]) })
+    await act(async () => { pending.resolve([200, page([makeEntry('late')], 3, 2)]) })
     expect(result.current.groups.flatMap(group => group.items).map(entry => entry.publicId)).toEqual(['new'])
     expect(result.current.hasMore).toBe(false)
   })
@@ -107,13 +146,13 @@ describe('useActivityViewModel with the generated API client', () => {
     const signal = api.history.get[0].signal
     unmount()
     expect(signal?.aborted).toBe(true)
-    await act(async () => { pending.resolve([200, { data: [] }]) })
+    await act(async () => { pending.resolve([200, page([], 0)]) })
   })
 
   it('retains rows after a page failure and retries the same offset', async () => {
-    api.onGet(firstUrl).reply(200, { data: [makeEntry('a'), makeEntry('b')] })
+    api.onGet(firstUrl).reply(200, page([makeEntry('a'), makeEntry('b')], 3))
     api.onGet(nextUrl).replyOnce(500, { error: { message: 'Failed' } })
-    api.onGet(nextUrl).reply(200, { data: [makeEntry('c')] })
+    api.onGet(nextUrl).reply(200, page([makeEntry('c')], 3, 2))
     const { result } = renderHook(() => useActivityViewModel({ limit: 2 }), { wrapper: createWrapper() })
     await waitFor(() => expect(result.current.hasMore).toBe(true))
     act(() => result.current.loadMore())
@@ -128,8 +167,8 @@ describe('useActivityViewModel with the generated API client', () => {
   })
 
   it('replaces updated and removed rows after refetch', async () => {
-    api.onGet(firstUrl).replyOnce(200, { data: [makeEntry('a'), makeEntry('b')] })
-    api.onGet(firstUrl).reply(200, { data: [makeEntry('a', 4)] })
+    api.onGet(firstUrl).replyOnce(200, page([makeEntry('a'), makeEntry('b')], 3))
+    api.onGet(firstUrl).reply(200, page([makeEntry('a', 4)], 1))
     const { result } = renderHook(() => useActivityViewModel({ limit: 2 }), { wrapper: createWrapper() })
     await waitFor(() => expect(result.current.hasMore).toBe(true))
     await act(async () => { await result.current.refetch() })
@@ -139,10 +178,10 @@ describe('useActivityViewModel with the generated API client', () => {
   })
 
   it('groups entries in period order', async () => {
-    api.onGet(firstUrl).reply(200, { data: [
+    api.onGet(firstUrl).reply(200, page([
       { ...makeEntry('yesterday'), lastPlayedAt: new Date(Date.now() - 86400000).toISOString() },
       makeEntry('today'),
-    ] })
+    ], 2))
     const { result } = renderHook(() => useActivityViewModel({ limit: 2 }), { wrapper: createWrapper() })
     await waitFor(() => expect(result.current.groups).toHaveLength(2))
     expect(result.current.groups.map(group => group.label)).toEqual(['Today', 'Yesterday'])

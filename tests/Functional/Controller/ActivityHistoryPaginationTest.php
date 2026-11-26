@@ -48,6 +48,20 @@ final class ActivityHistoryPaginationTest extends TestCase
         self::assertSame($expectedIds, array_column($this->history($user, ''), 'publicId'));
     }
 
+    public function testTheLastPageCarriesTheTotalOfTheUsersActivities(): void
+    {
+        $user = $this->createTestUser();
+        $this->seedActivities($user, 45, new \DateTimeImmutable('2026-10-01T12:00:00+00:00'));
+        $this->seedActivities($this->createTestUser(), 3, null);
+        $this->entityManager->clear();
+
+        $response = $this->authenticatedRequest('GET', '/api/activity/history?limit=20&offset=40', $user);
+
+        $body = $this->assertJsonResponse($response, 200, 'meta');
+        self::assertCount(5, $body['data']);
+        self::assertSame(['total' => 45, 'limit' => 20, 'offset' => 40], $body['meta']);
+    }
+
     /** @return iterable<string, array{string, string}> */
     public static function invalidQueries(): iterable
     {

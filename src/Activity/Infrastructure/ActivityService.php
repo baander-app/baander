@@ -37,6 +37,11 @@ final class ActivityService implements ActivityPortInterface
         return $this->activityRepository->findByUser($userId, $limit, $offset);
     }
 
+    public function countByUser(Uuid $userId): int
+    {
+        return $this->activityRepository->countByUser($userId);
+    }
+
     public function findForSong(Uuid $userId, Uuid $songId): ?MediaActivity
     {
         return $this->activityRepository->findForSong($userId, $songId);

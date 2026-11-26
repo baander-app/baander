@@ -75,7 +75,14 @@ describe('ActivityView', () => {
   })
 
   it('shows empty state', async () => {
-    api.onGet(url).reply(200, { data: [] })
+    api.onGet(url).reply(200, {
+      data: [],
+      meta: {
+        total: 0,
+        limit: 50,
+        offset: 0,
+      },
+    })
     render(<ActivityView />, { wrapper: createWrapper() })
     expect(await screen.findByText('No listening activity yet')).toBeInTheDocument()
   })
@@ -109,7 +116,14 @@ describe('ActivityView', () => {
       },
     ]
 
-    api.onGet(url).reply(200, { data: entries })
+    api.onGet(url).reply(200, {
+      data: entries,
+      meta: {
+        total: entries.length,
+        limit: 50,
+        offset: 0,
+      },
+    })
 
     render(<ActivityView />, { wrapper: createWrapper() })
 

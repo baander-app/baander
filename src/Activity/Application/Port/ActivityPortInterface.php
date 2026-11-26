@@ -23,6 +23,9 @@ interface ActivityPortInterface
      */
     public function findByUser(Uuid $userId, int $limit = 50, int $offset = 0): array;
 
+    /** The number of activities findByUser() pages through for the user. */
+    public function countByUser(Uuid $userId): int;
+
     /**
      * Find a user's activity for a specific song.
      */

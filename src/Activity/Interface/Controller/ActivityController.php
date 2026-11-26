@@ -97,7 +97,17 @@ final class ActivityController
                                 type: 'array',
                                 items: new OA\Schema(ref: ActivityResource::class),
                             ),
+                            'meta' => new OA\Schema(
+                                type: 'object',
+                                properties: [
+                                    'total' => new OA\Schema(description: 'Activities the user has', type: 'integer'),
+                                    'limit' => new OA\Schema(type: 'integer'),
+                                    'offset' => new OA\Schema(type: 'integer'),
+                                ],
+                                required: ['total', 'limit', 'offset'],
+                            ),
                         ],
+                        required: ['data', 'meta'],
                     ),
                 ),
             ),
@@ -126,16 +136,22 @@ final class ActivityController
         }
 
         $pagination = QueryParameters::pagination($request->query);
+        $userId = Uuid::fromString($user->getId());
 
         $activities = $this->activityService->findByUser(
-            Uuid::fromString($user->getId()),
+            $userId,
             $pagination->limit,
             $pagination->offset,
         );
 
-        $enriched = $this->enrichmentService->enrich($activities, $this->publicOrigins->forRequest($request));
-
-        return $this->successResponse($enriched);
+        return new JsonResponse([
+            'data' => $this->enrichmentService->enrich($activities, $this->publicOrigins->forRequest($request)),
+            'meta' => [
+                'total' => $this->activityService->countByUser($userId),
+                'limit' => $pagination->limit,
+                'offset' => $pagination->offset,
+            ],
+        ]);
     }
 
     /**

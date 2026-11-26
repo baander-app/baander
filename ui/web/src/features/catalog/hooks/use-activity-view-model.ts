@@ -41,8 +41,10 @@ export function useActivityViewModel({
     queryKey: [...getGetActivityHistoryQueryKey({ limit }), 'infinite'],
     initialPageParam: 0,
     queryFn: ({ pageParam, signal }) => getActivityHistory({ limit, offset: pageParam }, { signal }),
-    getNextPageParam: (lastPage, _pages, lastOffset) =>
-      (lastPage.data?.length ?? 0) >= limit ? lastOffset + limit : undefined,
+    getNextPageParam: (lastPage, _pages, lastOffset) => {
+      const nextOffset = lastOffset + limit
+      return nextOffset < lastPage.meta.total ? nextOffset : undefined
+    },
   })
 
   const entries = useMemo(() => {
