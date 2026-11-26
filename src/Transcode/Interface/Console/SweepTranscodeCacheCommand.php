@@ -105,7 +105,7 @@ final class SweepTranscodeCacheCommand extends Command implements SchedulableCon
         }
 
         if (count($result->skippedActive) > 0) {
-            $io->text(sprintf('<comment>Protected %d active director%s.</comment>', count($result->skippedActive), count($result->skippedActive) === 1 ? 'y' : 'ies'));
+            sprintf('<comment>Protected %d active director%s.</comment>', count($result->skippedActive), count($result->skippedActive) === 1 ? 'y' : 'ies') |> $io->text(...);
             $io->listing($result->skippedActive);
         }
 

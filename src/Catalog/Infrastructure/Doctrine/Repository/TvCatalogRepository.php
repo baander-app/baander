@@ -116,7 +116,7 @@ final readonly class TvCatalogRepository implements TvCatalogPortInterface
             ->where('library.id = :library')
             ->setParameter('library', $libraryId, 'uuid')
             ->orderBy('series.id', 'ASC')
-            ->setMaxResults(max(1, min($limit, 100)));
+            ->setMaxResults(self::pageSize($limit));
         if ($after !== null) {
             $query->andWhere('series.id > :after')->setParameter('after', $after, 'uuid');
         }
@@ -135,12 +135,17 @@ final readonly class TvCatalogRepository implements TvCatalogPortInterface
             ->where('series.id = :series')
             ->setParameter('series', $seriesId, 'uuid')
             ->orderBy('episode.id', 'ASC')
-            ->setMaxResults(max(1, min($limit, 100)));
+            ->setMaxResults(self::pageSize($limit));
         if ($after !== null) {
             $query->andWhere('episode.id > :after')->setParameter('after', $after, 'uuid');
         }
 
         return array_map($this->episodeRecord(...), $query->getQuery()->getResult());
+    }
+
+    private static function pageSize(int $limit): int
+    {
+        return max(1, min($limit, 100));
     }
 
     private function seriesRecord(TvSeriesEntity $series): TvTitleRecord

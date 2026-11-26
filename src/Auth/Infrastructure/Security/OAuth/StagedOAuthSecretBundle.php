@@ -67,7 +67,7 @@ final readonly class StagedOAuthSecretBundle implements OAuthSecretBundleInterfa
             $this->directory($directory);
             $manifest = json_decode($this->read($directory, 'manifest.json'), false, 4, JSON_THROW_ON_ERROR);
             if (!$manifest instanceof stdClass || count(get_object_vars($manifest)) !== 2
-                || array_diff(array_keys(get_object_vars($manifest)), ['version', 'sha256']) !== []
+                || array_diff($manifest |> get_object_vars(...) |> array_keys(...), ['version', 'sha256']) !== []
                 || $manifest->version !== 1 || !$manifest->sha256 instanceof stdClass
             ) {
                 throw new RuntimeException();

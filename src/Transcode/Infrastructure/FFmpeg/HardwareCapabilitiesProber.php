@@ -223,17 +223,17 @@ class HardwareCapabilitiesProber
         // The test frame takes the smallest tier the ladder encodes: hardware encoders have
         // minimum sizes, and AMD's RDNA4 HEVC encoder refuses widths below 384.
         $tier = QualityTier::p360();
-        array_push($command, ...FFmpegArguments::inputClause(
-            sprintf('nullsrc=s=%dx%d:d=0.1', $tier->width, $tier->height),
-            FFmpegInputKind::GeneratedSource,
-        ));
+        $testSource = sprintf('nullsrc=s=%dx%d:d=0.1', $tier->width, $tier->height);
+        array_push($command, ...FFmpegArguments::inputClause($testSource, FFmpegInputKind::GeneratedSource));
         if ($accel->requiresDevicePath()) {
             array_push($command, '-vf', 'format=nv12,hwupload');
         }
         array_push($command, '-c:v', $encoder, '-threads', '1', '-f', 'null', '-');
         $output = $this->exec($command);
-        $lines = array_filter(array_map(trim(...), explode("\n", $output)), static fn (string $line): bool => $line !== '') |> array_values(...);
-        $this->lastDiagnostic = substr(implode(' | ', array_slice($lines, -3)), 0, 512);
+        $outputLines = explode("\n", $output);
+        $lines = array_filter(array_map(trim(...), $outputLines), static fn (string $line): bool => $line !== '') |> array_values(...);
+        $lastLines = array_slice($lines, -3);
+        $this->lastDiagnostic = substr(implode(' | ', $lastLines), 0, 512);
 
         if ($this->lastExitCode !== 0) {
             $this->logger->debug('Encoder validation failed', [

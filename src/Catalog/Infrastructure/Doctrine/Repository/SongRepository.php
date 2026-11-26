@@ -207,7 +207,7 @@ final class SongRepository implements SongRepositoryInterface
     public function findByPathsInLibrary(Uuid $libraryId, array $paths): array
     {
         $songs = [];
-        foreach (array_chunk(array_values(array_unique($paths)), self::PATHS_PER_STATEMENT) as $chunk) {
+        foreach (array_chunk($paths |> array_unique(...) |> array_values(...), self::PATHS_PER_STATEMENT) as $chunk) {
             /** @var list<SongEntity> $entities */
             $entities = $this->entityManager->createQuery(
                 <<<'DQL'
@@ -845,26 +845,28 @@ final class SongRepository implements SongRepositoryInterface
             return;
         }
 
-        $slugs = array_filter(array_map('trim', explode(',', $genreSlugs)));
+        $slugs = array_map('trim', explode(',', $genreSlugs)) |> array_filter(...);
         if ($slugs === []) {
             return;
         }
 
         if ($isExclusion) {
             // Subquery to avoid count inflation in cursor pagination
-            $qb->andWhere($qb->expr()->notIn(
+            $notInGenres = $qb->expr()->notIn(
                 's.id',
                 sprintf(
                     'SELECT IDENTITY(gs.song) FROM App\Catalog\Infrastructure\Doctrine\Entity\GenreSongEntity gs JOIN gs.genre g WHERE g.slug IN (:excluded_genres)',
                 ),
-            ))->setParameter('excluded_genres', $slugs);
+            );
+            $qb->andWhere($notInGenres)->setParameter('excluded_genres', $slugs);
         } else {
-            $qb->andWhere($qb->expr()->in(
+            $inGenres = $qb->expr()->in(
                 's.id',
                 sprintf(
                     'SELECT IDENTITY(gs.song) FROM App\Catalog\Infrastructure\Doctrine\Entity\GenreSongEntity gs JOIN gs.genre g WHERE g.slug IN (:included_genres)',
                 ),
-            ))->setParameter('included_genres', $slugs);
+            );
+            $qb->andWhere($inGenres)->setParameter('included_genres', $slugs);
         }
     }
 
@@ -874,7 +876,7 @@ final class SongRepository implements SongRepositoryInterface
             return;
         }
 
-        $ids = array_filter(array_map('trim', explode(',', $publicIds)));
+        $ids = array_map('trim', explode(',', $publicIds)) |> array_filter(...);
         if ($ids === []) {
             return;
         }

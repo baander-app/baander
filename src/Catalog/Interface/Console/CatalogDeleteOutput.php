@@ -68,14 +68,14 @@ final class CatalogDeleteOutput
         foreach ($result->deleted as $kind => $count) {
             $counts[] = sprintf('%s: %d', $kind, $count);
         }
-        $io->success(sprintf('%s deleted (%s).', $deleted, implode(', ', $counts)));
+        sprintf('%s deleted (%s).', $deleted, implode(', ', $counts)) |> $io->success(...);
 
         if ($result->removed !== [] || $result->missing !== []) {
             $io->text(sprintf('Files removed: %d; already missing: %d.', count($result->removed), count($result->missing)));
         }
         if ($result->leftAny()) {
             $errors = $io->getErrorStyle();
-            $errors->error(sprintf('%d file(s) were left on disk; the next scan imports them again.', count($result->left)));
+            sprintf('%d file(s) were left on disk; the next scan imports them again.', count($result->left)) |> $errors->error(...);
             $errors->listing(array_map(
                 static fn (array $file): string => sprintf('%s (%s: %s)', $file['path'], $file['reason'], $file['detail']),
                 $result->left,

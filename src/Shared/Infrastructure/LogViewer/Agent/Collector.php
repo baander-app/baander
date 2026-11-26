@@ -549,7 +549,7 @@ final class Collector
         $previous = $this->sourceStates[$id] ?? [];
         if ($preserveGap && 'gap' === ($previous['status'] ?? null)) {
             $fields['status'] = 'gap';
-            $fields['issues'] = array_values(array_unique(array_merge($previous['issues'], $fields['issues'] ?? [])));
+            $fields['issues'] = array_merge($previous['issues'], $fields['issues'] ?? []) |> array_unique(...) |> array_values(...);
         }
         $source = array_replace(['id' => $id, 'name' => $identity, 'node' => $this->config->get('nodeId'), 'status' => 'following', 'issues' => []], $previous, $fields, ['lastAttemptAt' => gmdate('c'), 'available' => $fields['available'] ?? true]);
         if ($successful) {

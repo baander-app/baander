@@ -177,7 +177,8 @@ final readonly class ArchiveReader
             while ($offset < strlen($chunk)) {
                 $newline = strpos($chunk, "\n", $offset);
                 $end = $newline === false ? strlen($chunk) : $newline + 1;
-                $line .= substr($chunk, $offset, min($end - $offset, max(0, $retained - strlen($line))));
+                $lineRoom = max(0, $retained - strlen($line));
+                $line .= substr($chunk, $offset, min($end - $offset, $lineRoom));
                 $offset = $end;
                 if ($newline === false) {
                     break;

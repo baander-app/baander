@@ -42,7 +42,7 @@ final class DebugHwTranscodeCommand extends Command
 
             return Command::FAILURE;
         }
-        $io->text(sprintf('Last worker observation: %s at %s (not a live measurement).', $report->workerIdentity, gmdate('Y-m-d\TH:i:s\Z', $report->observedAt)));
+        sprintf('Last worker observation: %s at %s (not a live measurement).', $report->workerIdentity, gmdate('Y-m-d\TH:i:s\Z', $report->observedAt)) |> $io->text(...);
 
         // --- Profile summary ---
         $io->section('Resolved Encoder Profile');

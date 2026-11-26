@@ -47,7 +47,9 @@ final class DockerRecords
             $this->buffers[$stream] = ($this->buffers[$stream] ?? '').substr($data, $offset);
             $offset = 0;
             while (false !== ($newline = strpos($this->buffers[$stream], "\n", $offset))) {
-                array_push($records, ...$this->consume($stream, substr($this->buffers[$stream], $offset, min($newline - $offset, 262272))));
+                $length = min($newline - $offset, 262272);
+                $line = substr($this->buffers[$stream], $offset, $length);
+                array_push($records, ...$this->consume($stream, $line));
                 $offset = $newline + 1;
             }
             $this->buffers[$stream] = substr($this->buffers[$stream], $offset);

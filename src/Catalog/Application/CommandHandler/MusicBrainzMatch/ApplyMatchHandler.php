@@ -525,7 +525,8 @@ final readonly class ApplyMatchHandler
             disc: self::number($field(MatchField::Disc)),
             year: self::number($field(MatchField::Year)),
         );
-        $song->updateExternalIds(mbid: self::text($field(MatchField::Mbid)));
+        $mbid = $field(MatchField::Mbid) |> self::text(...);
+        $song->updateExternalIds(mbid: $mbid);
         $matched = array_map(static fn (MatchFieldRow $row): ?MatchedSongField => MatchedSongField::tryFrom($row->field->value), $fields)
             |> array_filter(...);
 

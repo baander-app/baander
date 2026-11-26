@@ -51,9 +51,10 @@ final class MonitorStatusCommand extends Command
         if ($status['counts'] === []) {
             $io->text('No jobs are recorded.');
         } else {
+            $statuses = array_keys($status['counts']);
             $io->table(
                 ['Status', 'Jobs'],
-                array_map(static fn (string $name, int $count): array => [$name, $count], array_keys($status['counts']), $status['counts']),
+                array_map(static fn (string $name, int $count): array => [$name, $count], $statuses, $status['counts']),
             );
         }
 

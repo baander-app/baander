@@ -46,17 +46,14 @@ final class TitleNormalizer
      */
     public function normalize(string $title): string
     {
-        // Remove MusicBrainz-style disambiguation: [Label, catalog, country]
-        $normalized = preg_replace('/\s*\[[^]]*\]\s*$/', '', $title);
-
-        // Transliterate to ASCII (removes diacritics)
-        $normalized = self::$transliterator->transliterate($normalized);
-
-        // Convert to lowercase
-        $normalized = strtolower($normalized);
+        // Remove MusicBrainz-style disambiguation ([Label, catalog, country]), transliterate
+        // to ASCII (removes diacritics) and convert to lowercase
+        $lowercaseAscii = preg_replace('/\s*\[[^]]*\]\s*$/', '', $title)
+            |> self::$transliterator->transliterate(...)
+            |> strtolower(...);
 
         // Remove punctuation and special characters, keep alphanumeric and spaces
-        $normalized = preg_replace('/[^\p{L}\p{N}\s]/u', ' ', $normalized);
+        $normalized = preg_replace('/[^\p{L}\p{N}\s]/u', ' ', $lowercaseAscii);
 
         // Remove extra whitespace
         $normalized = preg_replace('/\s+/', ' ', $normalized);

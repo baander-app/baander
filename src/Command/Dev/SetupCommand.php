@@ -132,13 +132,13 @@ final class SetupCommand extends Command
         $process->run();
 
         if (!$process->isSuccessful()) {
-            $io->error(sprintf('Command failed: %s', implode(' ', $args)));
+            sprintf('Command failed: %s', implode(' ', $args)) |> $io->error(...);
             $io->text($process->getErrorOutput() ?: $process->getOutput());
 
             return false;
         }
 
-        $io->text(sprintf('<info>✓</info> %s', implode(' ', $args)));
+        sprintf('<info>✓</info> %s', implode(' ', $args)) |> $io->text(...);
 
         return true;
     }

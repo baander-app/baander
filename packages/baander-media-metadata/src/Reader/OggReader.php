@@ -66,7 +66,7 @@ final class OggReader
 
             $genre = $this->first($comments, 'GENRE');
             if ($genre !== null) {
-                $metadata->setGenre(array_map('trim', explode(',', $genre)));
+                array_map('trim', explode(',', $genre)) |> $metadata->setGenre(...);
             }
 
             $track = $this->first($comments, 'TRACKNUMBER');

@@ -145,7 +145,8 @@ final class LearningDataPersister
     private function write(array $data): void
     {
         $filePath = $this->stateFilePath();
-        $temporary = sprintf('%s.%s.tmp', $filePath, bin2hex(random_bytes(6)));
+        $suffix = random_bytes(6) |> bin2hex(...);
+        $temporary = sprintf('%s.%s.tmp', $filePath, $suffix);
         $json = $this->jsonEncoder->encode(['version' => self::FORMAT_VERSION, ...$data], 'json', [JsonEncode::OPTIONS => JSON_PRETTY_PRINT]);
         try {
             if (file_put_contents($temporary, $json) === false || !rename($temporary, $filePath)) {

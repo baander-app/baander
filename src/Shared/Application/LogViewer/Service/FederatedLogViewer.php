@@ -284,7 +284,8 @@ final readonly class FederatedLogViewer implements LogViewerInterface
     private function selectedSources(LogQuery $query, array $inventory): array
     {
         $known = array_fill_keys(array_column($inventory['items'], 'id'), true);
-        $healthy = array_fill_keys(array_column(array_filter($inventory['nodes'], static fn (array $node): bool => $node['status'] === 'healthy'), 'id'), true);
+        $healthyNodes = array_filter($inventory['nodes'], static fn (array $node): bool => $node['status'] === 'healthy');
+        $healthy = array_fill_keys(array_column($healthyNodes, 'id'), true);
         $selected = [];
         foreach ($query->sources as $source) {
             [$node, $local] = $this->unqualify($source);
@@ -316,7 +317,9 @@ final readonly class FederatedLogViewer implements LogViewerInterface
 
     private static function qualify(string $node, string $id): string
     {
-        return rtrim(strtr(base64_encode(json_encode([$node, $id], JSON_THROW_ON_ERROR)), '+/', '-_'), '=');
+        $encodedPair = json_encode([$node, $id], JSON_THROW_ON_ERROR) |> base64_encode(...);
+
+        return rtrim(strtr($encodedPair, '+/', '-_'), '=');
     }
 
     /** @return array{string,string} */

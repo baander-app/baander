@@ -51,7 +51,7 @@ final class UserRolesCommand extends Command
             return AdminCommandSupport::json($io, $user);
         }
 
-        $io->success(sprintf('User %s now has the roles %s.', $user['email'], implode(', ', $user['roles'])));
+        sprintf('User %s now has the roles %s.', $user['email'], implode(', ', $user['roles'])) |> $io->success(...);
 
         return Command::SUCCESS;
     }

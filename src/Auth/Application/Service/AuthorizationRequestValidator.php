@@ -135,7 +135,7 @@ final readonly class AuthorizationRequestValidator
         }
 
         try {
-            $requestId = TokenId::fromString(substr($requestUri, strlen(PushedAuthorizationRequest::REQUEST_URI_PREFIX)));
+            $requestId = substr($requestUri, strlen(PushedAuthorizationRequest::REQUEST_URI_PREFIX)) |> TokenId::fromString(...);
         } catch (InvalidArgumentException) {
             return null;
         }

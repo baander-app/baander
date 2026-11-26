@@ -147,7 +147,8 @@ final class TranscodeFileStorage implements TranscodeStoragePortInterface
         if ($root === false || !is_dir($root)) {
             return $missing;
         }
-        $components = explode('/', substr($directory, strlen($prefix)));
+        $prefixLength = strlen($prefix);
+        $components = explode('/', substr($directory, $prefixLength));
         if (!self::retentionDirectoryExists($root, $components)) {
             return $missing;
         }
@@ -234,7 +235,8 @@ final class TranscodeFileStorage implements TranscodeStoragePortInterface
 
         // Resolve the trusted configured root once, then inspect every component
         // below it without following links (including links to another cache dir).
-        $components = explode('/', substr($path, strlen($prefix)));
+        $prefixLength = strlen($prefix);
+        $components = explode('/', substr($path, $prefixLength));
         $target = rtrim($root, '/');
         foreach ($components as $index => $component) {
             $target .= '/' . $component;

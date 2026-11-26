@@ -25,7 +25,8 @@ final class SnapshotQueryEngine
         $db->exec('PRAGMA temp_store=MEMORY');
         $db->exec('CREATE TABLE logs ('.implode(',', array_map(static fn (string $column): string => $column.($column === 'truncated' ? ' INTEGER' : ' TEXT'), self::COLUMNS)).')');
         $db->exec('BEGIN');
-        $insert = $db->prepare('INSERT INTO logs VALUES ('.implode(',', array_fill(0, count(self::COLUMNS), '?')).')');
+        $columnCount = count(self::COLUMNS);
+        $insert = $db->prepare('INSERT INTO logs VALUES ('.implode(',', array_fill(0, $columnCount, '?')).')');
         foreach ($records as $record) {
             foreach (self::KEYS as $index => $key) {
                 $value = $record[$key] ?? null;

@@ -173,7 +173,7 @@ final class PartySessionController
     {
         $sessions = $this->sessionPort->findActiveSessionsForMember(Uuid::fromString($user->getId()));
 
-        return $this->successResponse(PartySessionResource::collection(array_map($this->identities->session(...), $sessions)));
+        return array_map($this->identities->session(...), $sessions) |> PartySessionResource::collection(...) |> $this->successResponse(...);
     }
 
     #[OA\Operation\Get(

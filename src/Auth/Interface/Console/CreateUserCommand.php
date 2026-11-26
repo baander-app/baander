@@ -67,13 +67,14 @@ final class CreateUserCommand extends Command
         try {
             $email = self::email((string) $input->getArgument('email'));
             // An array input may pass a single role as a string.
-            $roles = self::rolesFor(array_values(array_map(strval(...), (array) $input->getOption('role'))));
+            $roles = array_map(strval(...), (array) $input->getOption('role')) |> array_values(...) |> self::rolesFor(...);
         } catch (InvalidInputException $exception) {
             return AdminCommandSupport::fail($io, $exception);
         }
 
         if (array_diff($roles, ['ROLE_USER']) !== []) {
-            $refused = AdminCommandSupport::confirm($input, $prompts, sprintf('Create user with the roles %s?', implode(', ', $roles)));
+            $roleList = implode(', ', $roles);
+            $refused = AdminCommandSupport::confirm($input, $prompts, sprintf('Create user with the roles %s?', $roleList));
             if ($refused !== null) {
                 return $refused;
             }

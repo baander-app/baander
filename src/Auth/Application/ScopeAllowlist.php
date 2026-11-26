@@ -53,10 +53,10 @@ final readonly class ScopeAllowlist
     {
         $granted = array_values(array_unique($this->filter($requestedScopes)));
         if ($granted === []) {
-            throw OAuthProtocolException::invalidScope(sprintf(
+            throw sprintf(
                 'None of the requested scopes can be granted; request at least one of: %s.',
                 implode(', ', $this->scopes),
-            ));
+            ) |> OAuthProtocolException::invalidScope(...);
         }
 
         return array_map(static fn (string $scope): Scope => new Scope($scope), $granted);

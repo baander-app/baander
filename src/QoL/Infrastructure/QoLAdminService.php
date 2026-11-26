@@ -80,7 +80,8 @@ final readonly class QoLAdminService implements QoLAdminPortInterface
     {
         $algorithmProfile = AlgorithmProfile::tryFrom($profile);
         if ($algorithmProfile === null) {
-            $allowed = sprintf('Must be one of: %s.', implode(', ', array_column(AlgorithmProfile::cases(), 'value')));
+            $profileNames = array_column(AlgorithmProfile::cases(), 'value');
+            $allowed = sprintf('Must be one of: %s.', implode(', ', $profileNames));
 
             $message = $profile === '' ? 'A profile is required.' : sprintf('Unknown profile "%s".', $profile);
 

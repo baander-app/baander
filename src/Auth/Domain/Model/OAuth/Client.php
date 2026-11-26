@@ -367,7 +367,7 @@ final class Client
      */
     private static function validRedirectUris(array $redirectUris): array
     {
-        $uris = array_values(array_unique(array_map('trim', $redirectUris)));
+        $uris = array_map('trim', $redirectUris) |> array_unique(...) |> array_values(...);
         if ($uris === [] || $uris === ['']) {
             throw new InvalidArgumentException('At least one redirect URI is required.');
         }

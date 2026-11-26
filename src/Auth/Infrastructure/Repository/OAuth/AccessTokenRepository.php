@@ -335,6 +335,6 @@ final class AccessTokenRepository implements AccessTokenRepositoryInterface
         $uris = $this->jsonEncoder->decode($redirect, 'json');
 
         return is_array($uris) ? $uris
-            : array_filter(array_map('trim', explode(',', $redirect)));
+            : array_map('trim', explode(',', $redirect)) |> array_filter(...);
     }
 }

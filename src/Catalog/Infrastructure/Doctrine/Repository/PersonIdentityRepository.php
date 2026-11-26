@@ -330,7 +330,7 @@ final readonly class PersonIdentityRepository implements PersonIdentityPortInter
         if (array_key_exists('aliases', $profile)) {
             $aliases = is_array($profile['aliases']) ? $profile['aliases'] : [];
             $aliases = array_filter($aliases, static fn(mixed $alias): bool => is_string($alias) && trim($alias) !== '');
-            $result['aliases'] = json_encode(array_values(array_unique(array_map(trim(...), $aliases))), JSON_THROW_ON_ERROR);
+            $result['aliases'] = json_encode(array_map(trim(...), $aliases) |> array_unique(...) |> array_values(...), JSON_THROW_ON_ERROR);
         }
         if (($profile['is_deceased'] ?? false) === true || ($result['death_date'] ?? null) !== null) {
             $result['is_deceased'] = true;

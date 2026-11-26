@@ -317,7 +317,7 @@ final readonly class PersonAdministrationRepository implements PersonAdministrat
         }
         if (!isset($targetOverrides['aliases'])) {
             $aliases = array_merge(self::aliases($target), self::aliases($source), [(string) $source['name']]);
-            $values['aliases'] = json_encode(array_values(array_unique(array_diff($aliases, [(string) $target['name']]))), JSON_THROW_ON_ERROR);
+            $values['aliases'] = json_encode(array_diff($aliases, [(string) $target['name']]) |> array_unique(...) |> array_values(...), JSON_THROW_ON_ERROR);
         }
         if ((bool) $source['is_deceased'] && !isset($targetOverrides['is_deceased'])) {
             $values['is_deceased'] = true;

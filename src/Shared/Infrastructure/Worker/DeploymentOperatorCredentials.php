@@ -35,7 +35,7 @@ final readonly class DeploymentOperatorCredentials implements JsonSerializable
         try {
             $document = json_decode($contents, false, 6, JSON_THROW_ON_ERROR);
             if (!$document instanceof stdClass
-                || array_diff(array_keys(get_object_vars($document)), ['controllerDatabaseUrl', 'runtimeEnvironment']) !== []
+                || array_diff($document |> get_object_vars(...) |> array_keys(...), ['controllerDatabaseUrl', 'runtimeEnvironment']) !== []
                 || !isset($document->controllerDatabaseUrl, $document->runtimeEnvironment)
                 || !is_string($document->controllerDatabaseUrl)
                 || !$document->runtimeEnvironment instanceof stdClass

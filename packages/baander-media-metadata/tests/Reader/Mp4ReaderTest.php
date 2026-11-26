@@ -91,7 +91,9 @@ final class Mp4ReaderTest extends TestCase
         foreach ([$extended . $valid . pack('Na4', 0, 'mdat'), $valid . pack('Na4', 7, 'bad!'), $valid . pack('Na4NN', 1, 'free', 0xFFFFFFFF, 0xFFFFFFFF), $valid . pack('Na4', 999999, 'free')] as $bytes) {
             self::assertSame('Survives', (new Mp4Reader(new NullLogger()))->read($this->file($bytes))->getTitle());
         }
-        self::assertNull((new Mp4Reader(new NullLogger()))->read($this->file(pack('Na4', 100, 'moov')))->getTitle());
+        $reader = new Mp4Reader(new NullLogger());
+        $truncatedMoov = pack('Na4', 100, 'moov');
+        self::assertNull($reader->read($this->file($truncatedMoov))->getTitle());
         self::assertNull((new Mp4Reader(new NullLogger()))->read('/missing/baander.app.m4a')->getTitle());
     }
 

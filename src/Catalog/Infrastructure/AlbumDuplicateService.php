@@ -131,13 +131,13 @@ final class AlbumDuplicateService implements AlbumDuplicatePortInterface
         $allGroups = $this->detector->findDuplicates($album->getLibraryId());
 
         // Filter to only groups containing the specified album
-        return $this->enrichGroups(array_values(array_filter(
+        return array_filter(
             $allGroups,
             fn(DuplicateGroup $group) => in_array(
                 $albumId->toString(),
                 array_map(fn($id) => $id->toString(), $group->getAlbumIds()),
                 true,
             ),
-        )));
+        ) |> array_values(...) |> $this->enrichGroups(...);
     }
 }

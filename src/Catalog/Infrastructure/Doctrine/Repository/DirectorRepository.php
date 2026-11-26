@@ -195,7 +195,8 @@ final readonly class DirectorRepository implements DirectorRepositoryInterface
         if (!$options->hasQuery()) {
             return;
         }
-        $text = str_replace(['!', '%', '_'], ['!!', '!%', '!_'], mb_strtolower($options->getQuery()));
+        $search = $options->getQuery() |> mb_strtolower(...);
+        $text = str_replace(['!', '%', '_'], ['!!', '!%', '!_'], $search);
         $query->andWhere("LOWER($field) LIKE :query ESCAPE '!'")
             ->setParameter('query', '%' . $text . '%');
     }

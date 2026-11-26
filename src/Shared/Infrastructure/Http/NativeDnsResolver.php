@@ -70,7 +70,7 @@ final class NativeDnsResolver
                     }
                     return self::decode($reply);
                 }
-                Async::sleep(min(self::POLL_SECONDS, max(0.001, $deadline - hrtime(true) / 1e9)));
+                min(self::POLL_SECONDS, max(0.001, $deadline - hrtime(true) / 1e9)) |> Async::sleep(...);
             }
         } finally {
             if (isset(self::$children[$pid])) {

@@ -403,7 +403,7 @@ final class ExtractedMetadata
             if (in_array($property, ['genre', 'coverArt'], true)) {
                 if (is_string($value)) {
                     // Convert comma-separated string to array
-                    $value = array_filter(array_map('trim', explode(',', $value)));
+                    $value = array_map('trim', explode(',', $value)) |> array_filter(...);
                 } elseif (!is_array($value)) {
                     continue;
                 }

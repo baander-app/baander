@@ -44,7 +44,8 @@ final readonly class TotpService
         $current = intdiv($this->clock->now()->getTimestamp() - $totp->getEpoch(), $totp->getPeriod());
         $matches = static fn (int $step): bool => hash_equals($totp->at($totp->getEpoch() + $step * $totp->getPeriod()), $code);
 
-        $matched = array_filter(range(max(0, $current - $this->window), $current + $this->window), $matches);
+        $firstStep = max(0, $current - $this->window);
+        $matched = array_filter(range($firstStep, $current + $this->window), $matches);
 
         return $matched === [] ? null : max($matched);
     }

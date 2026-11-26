@@ -58,7 +58,7 @@ final class IngestTestVideoCommand extends Command
             return Command::FAILURE;
         }
 
-        $io->success(sprintf('Ingested %d video(s)', count($result->videoIds)));
+        sprintf('Ingested %d video(s)', count($result->videoIds)) |> $io->success(...);
         $io->listing($result->videoIds);
 
         return Command::SUCCESS;

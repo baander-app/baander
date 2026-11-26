@@ -30,12 +30,13 @@ final class ConfigValidateCommand extends Command
 
     protected function configure(): void
     {
+        $categoryList = implode(', ', self::CATEGORIES);
         $this
             ->addOption(
                 'category',
                 'c',
                 InputOption::VALUE_REQUIRED,
-                sprintf('Check category to run (%s).', implode(', ', self::CATEGORIES)),
+                sprintf('Check category to run (%s).', $categoryList),
                 'all',
             );
     }
@@ -46,7 +47,7 @@ final class ConfigValidateCommand extends Command
         $category = $input->getOption('category');
 
         if (!in_array($category, self::CATEGORIES, true)) {
-            $io->error(sprintf('Invalid category "%s". Must be one of: %s', $category, implode(', ', self::CATEGORIES)));
+            sprintf('Invalid category "%s". Must be one of: %s', $category, implode(', ', self::CATEGORIES)) |> $io->error(...);
 
             return Command::FAILURE;
         }
@@ -90,7 +91,7 @@ final class ConfigValidateCommand extends Command
         if ($warningCount > 0) {
             $io->warning(sprintf('%d warning(s), %d passed. No errors found.', $warningCount, $passCount));
         } else {
-            $io->success(sprintf('All %d checks passed.', count($results)));
+            sprintf('All %d checks passed.', count($results)) |> $io->success(...);
         }
 
         return Command::SUCCESS;

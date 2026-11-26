@@ -170,13 +170,14 @@ final class CatalogReadScopeQuery
                     SQL;
             }
             if ($kind === 'song' && $filter['field'] === 'publicIds' && is_string($filter['value']) && $filter['value'] !== '') {
-                $parameters[$parameter] = array_values(array_filter(array_map('trim', explode(',', $filter['value']))));
+                $parameters[$parameter] = array_map('trim', explode(',', $filter['value'])) |> array_filter(...) |> array_values(...);
                 $types[$parameter] = ArrayParameterType::STRING;
                 $clauses[] = "s.public_id IN (:$parameter)";
             }
             if ($kind === 'song' && $filter['field'] === 'genres' && is_string($filter['value']) && $filter['value'] !== '') {
                 $exclude = str_starts_with($filter['value'], '!');
-                $names = array_values(array_filter(array_map('trim', explode(',', ltrim($filter['value'], '!')))));
+                $genreList = ltrim($filter['value'], '!');
+                $names = array_map('trim', explode(',', $genreList)) |> array_filter(...) |> array_values(...);
                 if ($names !== []) {
                     $parameters[$parameter] = $names;
                     $types[$parameter] = ArrayParameterType::STRING;

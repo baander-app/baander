@@ -271,6 +271,8 @@ final class DpopProofValidator
 
     private function base64urlEncode(string $data): string
     {
-        return rtrim(strtr(base64_encode($data), '+/', '-_'), '=');
+        $base64 = base64_encode($data);
+
+        return rtrim(strtr($base64, '+/', '-_'), '=');
     }
 }

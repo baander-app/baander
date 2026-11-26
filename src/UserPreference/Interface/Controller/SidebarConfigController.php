@@ -254,8 +254,10 @@ final class SidebarConfigController
     private function validateMediaType(string $mediaType): ?JsonResponse
     {
         if (!in_array($mediaType, self::VALID_MEDIA_TYPES, true)) {
+            $validTypes = implode(', ', self::VALID_MEDIA_TYPES);
+
             return $this->errorResponse(
-                sprintf('Invalid media type "%s". Must be one of: %s', $mediaType, implode(', ', self::VALID_MEDIA_TYPES)),
+                sprintf('Invalid media type "%s". Must be one of: %s', $mediaType, $validTypes),
                 422,
             );
         }

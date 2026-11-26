@@ -456,7 +456,7 @@ final class RefreshTokenRepository implements RefreshTokenRepositoryInterface
             return $uris;
         }
 
-        return array_filter(array_map('trim', explode(',', $redirect)));
+        return array_map('trim', explode(',', $redirect)) |> array_filter(...);
     }
 
     /**

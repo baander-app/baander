@@ -57,7 +57,8 @@ final class LogTerminalViewer
             while (!$this->stopped) {
                 [$height, $width] = $this->dimensions();
                 $items = $data['items'] ?? $data['rows'] ?? [];
-                $selected = max(0, min($selected, max(0, $panel !== null ? count(explode("\n", $panel)) - 1 : count($items) - 1)));
+                $lastIndex = max(0, $panel !== null ? count(explode("\n", $panel)) - 1 : count($items) - 1);
+                $selected = max(0, min($selected, $lastIndex));
                 $lines = ['Baander logs | '.($following ? 'FOLLOW' : 'paused').' | '.count($items).' rows | partial SQL '.($allowPartial ? 'allowed' : 'refused')];
                 if ($panel !== null) {
                     $lines = array_merge($lines, array_slice(explode("\n", $panel), $selected, max(1, $height - 4)));

@@ -71,10 +71,11 @@ final readonly class JobMonitorAdministration implements JobMonitorAdministratio
     public function jobs(JobMonitorQuery $query): JobMonitorPage
     {
         if ($query->status !== null && JobStatus::tryFrom($query->status) === null) {
-            $message = sprintf('status must be one of: %s.', implode(', ', array_map(
+            $statuses = array_map(
                 static fn (JobStatus $status): string => $status->value,
                 JobStatus::cases(),
-            )));
+            );
+            $message = sprintf('status must be one of: %s.', implode(', ', $statuses));
 
             throw new InvalidInputException($message, ['status' => $message]);
         }
@@ -82,7 +83,7 @@ final readonly class JobMonitorAdministration implements JobMonitorAdministratio
         $result = $this->jobMonitorService->findWithCursor(
             new JobMonitorFilter($query->status, $query->name, $query->queue),
             $query->cursor === null ? null : $this->cursorCodec->decode($query->cursor),
-            max(1, min($query->limit, JobMonitorQuery::MAX_LIMIT)),
+            self::pageSize($query->limit),
             $query->sort,
             $query->direction,
         );
@@ -222,7 +223,9 @@ final readonly class JobMonitorAdministration implements JobMonitorAdministratio
 
     public function analyticsFailures(JobAnalyticsRange $range, int $limit = 50): array
     {
-        return $this->jobMonitorService->getAnalyticsFailures($range->from, $range->to, max(1, min($limit, 200)));
+        $cappedLimit = min($limit, 200);
+
+        return $this->jobMonitorService->getAnalyticsFailures($range->from, $range->to, max(1, $cappedLimit));
     }
 
     public function runInline(object $message): InlineJobRun
@@ -312,6 +315,11 @@ final readonly class JobMonitorAdministration implements JobMonitorAdministratio
     private static function cancelFlag(string $jobId): string
     {
         return sprintf('job_cancel:%s', $jobId);
+    }
+
+    private static function pageSize(int $limit): int
+    {
+        return max(1, min($limit, JobMonitorQuery::MAX_LIMIT));
     }
 
     private static function record(JobMonitorEntity $job, bool $cancellable): JobMonitorRecord

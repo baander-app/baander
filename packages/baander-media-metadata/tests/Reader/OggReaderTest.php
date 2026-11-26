@@ -210,9 +210,11 @@ final class OggReaderTest extends TestCase
     private function buildOggFile(array $comments): string
     {
         $vendor = 'Test';
+        $vendorLength = pack('V', strlen($vendor));
+        $commentCount = array_map('count', $comments) |> array_sum(...);
         $commentPacket = "\x03vorbis"
-                       . pack('V', strlen($vendor)) . $vendor
-                       . pack('V', array_sum(array_map('count', $comments)));
+                       . $vendorLength . $vendor
+                       . pack('V', $commentCount);
 
         foreach ($comments as $key => $values) {
             foreach ($values as $value) {

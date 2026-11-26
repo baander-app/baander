@@ -36,7 +36,8 @@ final readonly class DeleteMovieHandler
     {
         $movie = $this->movies->findByPublicId(CatalogInput::publicId($command->publicId))
             ?? throw new NotFoundException(sprintf('Movie "%s" not found.', $command->publicId));
-        $videoIds = array_map(static fn (string $id): Uuid => Uuid::fromString($id), array_values($movie->getVideoIds()));
+        $storedVideoIds = $movie->getVideoIds() |> array_values(...);
+        $videoIds = array_map(static fn (string $id): Uuid => Uuid::fromString($id), $storedVideoIds);
 
         $videos = $this->transaction->run(function () use ($movie, $videoIds): int {
             $this->movies->delete($movie);

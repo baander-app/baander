@@ -52,11 +52,12 @@ final class MetadataFileExtractCommand extends Command
         }
 
         $io->text(sprintf('Format: %s', $data['format']));
+        $tags = array_keys($data['metadata']);
         $io->table(
             ['Tag', 'Value'],
             array_map(
                 static fn (string $tag, mixed $value): array => [$tag, self::value($value)],
-                array_keys($data['metadata']),
+                $tags,
                 $data['metadata'],
             ),
         );

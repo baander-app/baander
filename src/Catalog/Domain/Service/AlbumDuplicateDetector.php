@@ -162,7 +162,7 @@ final class AlbumDuplicateDetector
         $setB = array_flip($artistsB);
 
         $intersection = count(array_intersect_key($setA, $setB));
-        $union = count(array_unique(array_merge($artistsA, $artistsB)));
+        $union = array_merge($artistsA, $artistsB) |> array_unique(...) |> count(...);
 
         if ($union === 0) {
             return 0.0;

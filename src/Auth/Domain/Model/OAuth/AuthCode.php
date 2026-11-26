@@ -239,7 +239,8 @@ final class AuthCode
             return false;
         }
 
-        $computed = rtrim(strtr(base64_encode(hash('sha256', $codeVerifier, true)), '+/', '-_'), '=');
+        $encodedDigest = hash('sha256', $codeVerifier, true) |> base64_encode(...);
+        $computed = rtrim(strtr($encodedDigest, '+/', '-_'), '=');
 
         return hash_equals($this->state->codeChallenge, $computed);
     }

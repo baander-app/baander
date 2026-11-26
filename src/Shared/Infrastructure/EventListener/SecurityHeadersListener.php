@@ -122,9 +122,11 @@ final readonly class SecurityHeadersListener
             'frame-ancestors' => ["'none'"],
         ];
 
+        $directiveNames = array_keys($directives);
+
         return implode('; ', array_map(
             static fn (string $name, array $sources): string => $name . ' ' . implode(' ', array_unique($sources)),
-            array_keys($directives),
+            $directiveNames,
             $directives,
         ));
     }

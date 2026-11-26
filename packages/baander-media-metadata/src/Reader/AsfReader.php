@@ -40,10 +40,10 @@ final class AsfReader
         $metadata->setComposer($first('WM/COMPOSER'));
         $metadata->setComment($first('DESCRIPTION'));
         $metadata->setGenre($fields['WM/GENRE'] ?? []);
-        $metadata->setTrackNumber(self::positiveNumber($first('WM/TRACKNUMBER')));
-        $metadata->setDiscNumber(self::positiveNumber($first('WM/PARTOFSET')));
-        $metadata->setYear(self::positiveNumber(substr($first('WM/YEAR') ?? '', 0, 4)));
-        $metadata->setBpm(self::positiveNumber($first('WM/BEATSPERMINUTE')));
+        $first('WM/TRACKNUMBER') |> self::positiveNumber(...) |> $metadata->setTrackNumber(...);
+        $first('WM/PARTOFSET') |> self::positiveNumber(...) |> $metadata->setDiscNumber(...);
+        substr($first('WM/YEAR') ?? '', 0, 4) |> self::positiveNumber(...) |> $metadata->setYear(...);
+        $first('WM/BEATSPERMINUTE') |> self::positiveNumber(...) |> $metadata->setBpm(...);
         $metadata->setMbid($first('MUSICBRAINZ/TRACK ID'));
         $metadata->setMbAlbumId($first('MUSICBRAINZ/ALBUM ID'));
         $metadata->setMbArtistIds($fields['MUSICBRAINZ/ARTIST ID'] ?? []);

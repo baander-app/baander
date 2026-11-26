@@ -300,8 +300,10 @@ final class FlacParserTest extends TestCase
     private function buildBlockHeader(int $type, string $data, bool $isLast): string
     {
         $firstByte = ($isLast ? 0x80 : 0x00) | ($type & 0x7F);
+        $headerByte = chr($firstByte);
+        $length = strlen($data);
 
-        return chr($firstByte) . substr(pack('N', strlen($data)), 1);
+        return $headerByte . substr(pack('N', $length), 1);
     }
 
     private function tempFile(string $content): string

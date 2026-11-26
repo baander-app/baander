@@ -60,10 +60,10 @@ final class HealthCheckCommand extends Command
         $io->table(['Component', 'Status', 'Latency', 'Details'], $rows);
 
         if ($unhealthyElsewhere !== []) {
-            $io->warning(sprintf(
+            sprintf(
                 'Unhealthy but not counted toward this container: %s.',
                 implode(', ', $unhealthyElsewhere),
-            ));
+            ) |> $io->warning(...);
         }
 
         if (HealthCheckService::containerHealthy($results)) {

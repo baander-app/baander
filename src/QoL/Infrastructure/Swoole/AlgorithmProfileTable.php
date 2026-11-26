@@ -104,7 +104,8 @@ final class AlgorithmProfileTable implements AlgorithmProfileStoreInterface, Boo
         }
 
         $path = $this->path();
-        $temporary = sprintf('%s.%s.tmp', $path, bin2hex(random_bytes(6)));
+        $suffix = random_bytes(6) |> bin2hex(...);
+        $temporary = sprintf('%s.%s.tmp', $path, $suffix);
         $json = json_encode(['profile' => $profile->value], JSON_THROW_ON_ERROR);
         if (file_put_contents($temporary, $json) === false || !rename($temporary, $path)) {
             if (is_file($temporary)) {

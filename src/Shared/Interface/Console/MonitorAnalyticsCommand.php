@@ -118,9 +118,10 @@ final class MonitorAnalyticsCommand extends Command
             ['Success rate' => sprintf('%.2f%%', $summary['successRate'] * 100)],
             ['Completed per hour' => (string) $summary['throughputPerHour']],
         );
+        $statuses = array_keys($summary['statusCounts']);
         $io->table(
             ['Status', 'Jobs'],
-            array_map(static fn (string $status, int $count): array => [$status, $count], array_keys($summary['statusCounts']), $summary['statusCounts']),
+            array_map(static fn (string $status, int $count): array => [$status, $count], $statuses, $summary['statusCounts']),
         );
         $io->table(['Type', 'Jobs'], array_map(static fn (array $type): array => [$type['name'], $type['count']], $summary['jobTypeBreakdown']));
     }

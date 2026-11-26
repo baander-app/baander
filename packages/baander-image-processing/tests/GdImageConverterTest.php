@@ -39,7 +39,8 @@ final class GdImageConverterTest extends TestCase
         $output = new ImageProcessor()->resizeToWebp($source, $destination, 30);
 
         $this->assertSame($destination, $output);
-        $this->assertSame([30, 15], array_slice(getimagesize($output), 0, 2));
+        $outputSize = getimagesize($output);
+        $this->assertSame([30, 15], array_slice($outputSize, 0, 2));
         $decoded = imagecreatefromwebp($output);
         $this->assertNotFalse($decoded);
         $this->assertSame(127, (imagecolorat($decoded, 0, 0) >> 24) & 0x7F);
@@ -56,8 +57,10 @@ final class GdImageConverterTest extends TestCase
         $converted = new ImageProcessor()->convertToWebp($source, $this->tmpDir . '/cover.webp');
         $resized = new ImageProcessor()->resizeToWebp($source, $this->tmpDir . '/cover_small.webp', 300);
 
-        $this->assertSame([1200, 1200, IMAGETYPE_WEBP], array_slice(getimagesize($converted), 0, 3));
-        $this->assertSame([300, 300, IMAGETYPE_WEBP], array_slice(getimagesize($resized), 0, 3));
+        $convertedSize = getimagesize($converted);
+        $this->assertSame([1200, 1200, IMAGETYPE_WEBP], array_slice($convertedSize, 0, 3));
+        $resizedSize = getimagesize($resized);
+        $this->assertSame([300, 300, IMAGETYPE_WEBP], array_slice($resizedSize, 0, 3));
     }
 
     /**

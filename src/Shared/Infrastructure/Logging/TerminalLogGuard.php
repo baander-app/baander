@@ -31,7 +31,7 @@ final class TerminalLogGuard implements TerminalLogGuardInterface
             foreach ($this->loggers as $logger) {
                 $handlers = $logger->getHandlers();
                 $this->saved[] = [$logger, $handlers];
-                $logger->setHandlers(array_values(array_filter($handlers, self::keepsFileOutput(...))));
+                array_filter($handlers, self::keepsFileOutput(...)) |> array_values(...) |> $logger->setHandlers(...);
             }
         } catch (\Throwable $error) {
             $this->end();

@@ -112,7 +112,7 @@ final class PartyMemberController
 
         $members = $this->memberPort->findBySession($session->getId());
 
-        return $this->successResponse(PartyMemberResource::collection(array_map($this->identities->member(...), $members)));
+        return array_map($this->identities->member(...), $members) |> PartyMemberResource::collection(...) |> $this->successResponse(...);
     }
 
     #[OA\Operation\Patch(

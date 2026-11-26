@@ -339,7 +339,7 @@ final class Mp4Parser
     {
         $bits = '';
         foreach (str_split(substr($data, 0, 8)) as $byte) {
-            $bits .= str_pad(decbin(ord($byte)), 8, '0', STR_PAD_LEFT);
+            $bits .= str_pad($byte |> ord(...) |> decbin(...), 8, '0', STR_PAD_LEFT);
         }
         $offset = bindec(substr($bits, 0, 5)) === 31 ? 11 : 5;
         $index = bindec(substr($bits, $offset, 4));

@@ -62,9 +62,10 @@ final class RecommendationJobShowCommand extends Command
         );
 
         if ($job['strategy_counts'] !== []) {
+            $strategies = array_keys($job['strategy_counts']);
             $io->table(
                 ['Strategy', 'Recommendations saved'],
-                array_map(static fn (int|string $strategy, mixed $count): array => [(string) $strategy, $count], array_keys($job['strategy_counts']), $job['strategy_counts']),
+                array_map(static fn (int|string $strategy, mixed $count): array => [(string) $strategy, $count], $strategies, $job['strategy_counts']),
             );
         }
 

@@ -34,7 +34,8 @@ final readonly class ArtistMatchWriter
             disambiguation: self::text($field(MatchField::Disambiguation)),
             sortName: self::text($field(MatchField::SortName)),
         );
-        $artist->updateExternalIds(mbid: self::text($field(MatchField::Mbid)));
+        $mbid = $field(MatchField::Mbid) |> self::text(...);
+        $artist->updateExternalIds(mbid: $mbid);
         $this->artists->save($artist);
     }
 

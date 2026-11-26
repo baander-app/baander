@@ -104,7 +104,8 @@ final class ServerSpansCommand extends Command
         if (!is_int($startTimeUs)) {
             return '-';
         }
-        $started = DateTimeImmutable::createFromFormat('U.u', sprintf('%d.%06d', intdiv($startTimeUs, 1_000_000), $startTimeUs % 1_000_000));
+        $startSeconds = intdiv($startTimeUs, 1_000_000);
+        $started = DateTimeImmutable::createFromFormat('U.u', sprintf('%d.%06d', $startSeconds, $startTimeUs % 1_000_000));
 
         return $started === false ? '-' : $started->setTimezone(new DateTimeZone('UTC'))->format('Y-m-d H:i:s.v');
     }

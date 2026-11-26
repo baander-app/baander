@@ -254,7 +254,9 @@ final readonly class AuthorizedPlayback implements PlaybackPortInterface
         }
         // Each tier is a session of the user's share, so a share below the tier count admits fewer
         // renditions rather than refusing every automatic start.
-        return array_slice($tiers, 0, max(1, min($this->deploymentProfile->videoEncoderSlots, $this->share->limit())));
+        $tierLimit = min($this->deploymentProfile->videoEncoderSlots, $this->share->limit());
+
+        return array_slice($tiers, 0, max(1, $tierLimit));
     }
 
     private function manualTier(Uuid $videoId, string $qualityTier): QualityTier

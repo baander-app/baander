@@ -876,7 +876,8 @@ final class OAuthController
             return null;
         }
 
-        $decoded = base64_decode(trim(substr($header, 6)), strict: true);
+        $encodedCredentials = substr($header, 6) |> trim(...);
+        $decoded = base64_decode($encodedCredentials, strict: true);
         if ($decoded === false || !str_contains($decoded, ':')) {
             throw OAuthProtocolException::invalidClient('The Authorization header does not carry valid Basic credentials.');
         }
@@ -1057,7 +1058,7 @@ final class OAuthController
             return [];
         }
 
-        return array_values(array_filter(explode(' ', $scope), static fn (string $s): bool => $s !== ''));
+        return array_filter(explode(' ', $scope), static fn (string $s): bool => $s !== '') |> array_values(...);
     }
 
     private static function stringOrNull(mixed $value): ?string

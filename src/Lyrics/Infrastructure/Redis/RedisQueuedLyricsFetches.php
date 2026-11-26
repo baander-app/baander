@@ -171,8 +171,21 @@ final readonly class RedisQueuedLyricsFetches implements QueuedLyricsFetchesInte
             is_string($jobId) && $jobId !== '' ? $jobId : null,
             new \DateTimeImmutable('@' . $fields['finished_at']),
             (int) $fields['queued'],
-            array_map(static fn (mixed $count): int => (int) $count, array_intersect_key($fields, array_flip($outcomes))),
+            self::outcomeCounts($fields, $outcomes),
         );
+    }
+
+    /**
+     * @param array<mixed> $fields
+     * @param list<string> $outcomes
+     *
+     * @return array<string, int>
+     */
+    private static function outcomeCounts(array $fields, array $outcomes): array
+    {
+        $outcomeFields = array_intersect_key($fields, array_flip($outcomes));
+
+        return array_map(static fn (mixed $count): int => (int) $count, $outcomeFields);
     }
 
     private function latestRunKey(): string

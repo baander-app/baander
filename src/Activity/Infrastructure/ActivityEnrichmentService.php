@@ -73,7 +73,7 @@ final class ActivityEnrichmentService
 
         // Batch-resolve albums, keeping those in the viewer's libraries and the songs on them
         $albums = $albumIds !== []
-            ? array_filter($this->albumService->findByUuids(array_values($albumIds)), $inScope)
+            ? array_filter($albumIds |> array_values(...) |> $this->albumService->findByUuids(...), $inScope)
             : [];
         $songs = array_filter(
             $songs,
@@ -92,9 +92,8 @@ final class ActivityEnrichmentService
 
         // Batch-resolve artist names for the readable albums
         $albumArtists = $albums !== []
-            ? $this->albumService->getArtistNamesForAlbums(
-                array_map(static fn (object $album): Uuid => $album->getId(), array_values($albums)),
-            )
+            ? array_map(static fn (object $album): Uuid => $album->getId(), array_values($albums))
+                |> $this->albumService->getArtistNamesForAlbums(...)
             : [];
 
         // Batch-resolve movie titles for activities with movieId

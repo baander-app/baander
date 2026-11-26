@@ -17,10 +17,11 @@ final class InvalidSettingValuesException extends RuntimeException
      */
     public function __construct(public readonly array $violations)
     {
-        parent::__construct(implode(' ', array_map(
+        $messages = array_map(
             static fn (SettingViolation $violation): string => sprintf('%s: %s', $violation->key, $violation->message),
             $violations,
-        )));
+        );
+        parent::__construct(implode(' ', $messages));
     }
 
     /**

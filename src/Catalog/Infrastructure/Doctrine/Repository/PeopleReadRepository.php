@@ -158,7 +158,7 @@ final readonly class PeopleReadRepository implements PeopleReadPortInterface, Pe
     public function series(SearchOptions $options, LibraryReadScope $scope): SearchResult
     {
         $query = $this->seriesQuery($scope);
-        $query->andWhere('LOCATE(:query, LOWER(s.name)) > 0')->setParameter('query', mb_strtolower($options->getQuery()));
+        $query->andWhere('LOCATE(:query, LOWER(s.name)) > 0')->setParameter('query', self::searchText($options));
         $total = (int) (clone $query)->select('COUNT(s.id)')->getQuery()->getSingleScalarResult();
         $rows = $query->select('s.publicId', 's.name', 's.overview', 's.posterUrl')
             ->orderBy('s.name')->addOrderBy('s.publicId')
@@ -183,7 +183,7 @@ final readonly class PeopleReadRepository implements PeopleReadPortInterface, Pe
             return null;
         }
         $query = $this->episodeQuery($scope)->andWhere('s.publicId = :publicId')->setParameter('publicId', $series)
-            ->andWhere('LOCATE(:query, LOWER(episode.name)) > 0')->setParameter('query', mb_strtolower($options->getQuery()));
+            ->andWhere('LOCATE(:query, LOWER(episode.name)) > 0')->setParameter('query', self::searchText($options));
         $total = (int) (clone $query)->select('COUNT(episode.id)')->getQuery()->getSingleScalarResult();
         $rows = $query->select(self::episodeSelect())
             ->orderBy('season.seasonNumber')->addOrderBy('episode.episodeNumber')->addOrderBy('episode.publicId')
@@ -380,6 +380,11 @@ final readonly class PeopleReadRepository implements PeopleReadPortInterface, Pe
     private static function portrait(array $row): ?string
     {
         return $row['portrait_public_id'] === null ? $row['profile_url'] : '/api/images/' . $row['portrait_public_id'] . '/file';
+    }
+
+    private static function searchText(SearchOptions $options): string
+    {
+        return mb_strtolower($options->getQuery());
     }
 
     /** @return array{limit: int, offset: int} */

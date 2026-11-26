@@ -70,7 +70,7 @@ final class SpanBridge implements Bootable
         $data = json_encode($spanData, JSON_THROW_ON_ERROR);
         // Swoole would truncate a longer value, and the cut JSON would break every read.
         if (strlen($data) > self::MAX_SPAN_BYTES) {
-            $this->logDrop(sprintf('its JSON is %d bytes, over the %d-byte limit', strlen($data), self::MAX_SPAN_BYTES));
+            sprintf('its JSON is %d bytes, over the %d-byte limit', strlen($data), self::MAX_SPAN_BYTES) |> $this->logDrop(...);
 
             return;
         }

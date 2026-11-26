@@ -63,11 +63,12 @@ final class RecommendationStatsCommand extends Command
         if ($sourceQuality['by_source_type'] === []) {
             $io->text('No recommendations are stored.');
         } else {
+            $sourceTypes = array_keys($sourceQuality['by_source_type']);
             $io->table(
                 ['Source type', 'Recommendations'],
                 array_map(
                     static fn (int|string $type, mixed $count): array => [(string) $type, $count],
-                    array_keys($sourceQuality['by_source_type']),
+                    $sourceTypes,
                     $sourceQuality['by_source_type'],
                 ),
             );

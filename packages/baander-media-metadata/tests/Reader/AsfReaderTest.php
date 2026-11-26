@@ -95,7 +95,9 @@ final class AsfReaderTest extends TestCase
         $picture = chr(3) . pack('V', 70000) . self::wide('image/jpeg') . self::wide('Large cover') . str_repeat('x', 70000);
         $pictureRecord = pack('v', 1) . pack('vvvvV', 0, 0, strlen($pictureName), 1, strlen($picture)) . $pictureName . $picture;
         $objects[] = self::object('941c23449894d149a1411d134e457054', $pictureRecord);
-        $extension = str_repeat("\0", 16) . pack('vV', 6, strlen(implode('', $objects))) . implode('', $objects);
+        $reservedGuid = str_repeat("\0", 16);
+        $objectsLength = implode('', $objects) |> strlen(...);
+        $extension = $reservedGuid . pack('vV', 6, $objectsLength) . implode('', $objects);
         $metadata = (new AsfReader(new NullLogger()))->read($this->fixture([self::object('b503bf5f2ea9cf118ee300c00c205365', $extension)]));
         self::assertSame(['First', 'Second'], $metadata->getArtists());
         self::assertSame(70000, $metadata->getFrontCover()?->getImageSize());

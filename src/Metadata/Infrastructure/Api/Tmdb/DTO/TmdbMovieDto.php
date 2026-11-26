@@ -50,20 +50,14 @@ final readonly class TmdbMovieDto
         $fullCast = TmdbPersonCreditDto::partition($data['credits']['cast'] ?? null, 'cast');
         $fullCrew = TmdbPersonCreditDto::partition($data['credits']['crew'] ?? null, 'crew');
         $summaryCast = $data['credits']['cast'] ?? null;
-        $cast = is_array($summaryCast)
-            ? array_values(array_map(static fn (array $member): array => [
-                'name' => is_string($member['name'] ?? null) ? $member['name'] : '',
-                'character' => is_string($member['character'] ?? null) ? $member['character'] : '',
-                'order' => is_int($member['order'] ?? null) ? $member['order'] : 0,
-            ], array_filter(array_slice($summaryCast, 0, 10), is_array(...))))
-            : [];
-        $crew = array_values(array_map(static fn(PersonCreditInput $credit): array => [
+        $cast = is_array($summaryCast) ? self::castSummary($summaryCast) : [];
+        $crew = array_map(static fn(PersonCreditInput $credit): array => [
             'id' => (int) $credit->tmdbId,
             'profilePath' => $credit->profileUrl === null ? null : substr($credit->profileUrl, strlen('https://image.tmdb.org/t/p/w185')),
             'name' => $credit->name,
             'job' => $credit->job,
             'department' => $credit->department ?? '',
-        ], array_filter($fullCrew ?? [], static fn(PersonCreditInput $credit): bool => $credit->job === 'Director')));
+        ], array_filter($fullCrew ?? [], static fn(PersonCreditInput $credit): bool => $credit->job === 'Director')) |> array_values(...);
 
         return new self(
             id: $data['id'],
@@ -98,5 +92,21 @@ final readonly class TmdbMovieDto
         }
 
         return (int) substr($this->releaseDate, 0, 4);
+    }
+
+    /**
+     * @param array<mixed> $summaryCast
+     *
+     * @return list<array{name: string, character: string, order: int}>
+     */
+    private static function castSummary(array $summaryCast): array
+    {
+        $members = array_filter(array_slice($summaryCast, 0, 10), is_array(...));
+
+        return array_map(static fn (array $member): array => [
+            'name' => is_string($member['name'] ?? null) ? $member['name'] : '',
+            'character' => is_string($member['character'] ?? null) ? $member['character'] : '',
+            'order' => is_int($member['order'] ?? null) ? $member['order'] : 0,
+        ], $members) |> array_values(...);
     }
 }

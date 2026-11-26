@@ -121,7 +121,7 @@ final class MovieRepository implements MovieRepositoryInterface
             ->where('IDENTITY(movie.library) = :libraryId')
             ->setParameter('libraryId', $libraryId, 'uuid')
             ->orderBy('movie.id', 'ASC')
-            ->setMaxResults(max(1, min(100, $limit)));
+            ->setMaxResults(self::pageSize($limit));
         if ($after !== null) {
             $query->andWhere('movie.id > :after')->setParameter('after', $after, 'uuid');
         }
@@ -130,6 +130,11 @@ final class MovieRepository implements MovieRepositoryInterface
         return array_map(static fn(array $row): Uuid => $row['movieId'] instanceof Uuid
             ? $row['movieId']
             : Uuid::fromString($row['movieId']), $rows);
+    }
+
+    private static function pageSize(int $limit): int
+    {
+        return max(1, min(100, $limit));
     }
 
     private function visibleQuery(LibraryReadScope $scope): QueryBuilder

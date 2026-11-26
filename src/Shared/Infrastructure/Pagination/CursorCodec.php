@@ -23,7 +23,9 @@ final readonly class CursorCodec
             'values' => $cursor->getValues(),
         ], 'json');
 
-        return rtrim(strtr(base64_encode($json), '+/', '-_'), '=');
+        $base64 = base64_encode($json);
+
+        return rtrim(strtr($base64, '+/', '-_'), '=');
     }
 
     public function decode(string $cursor): ?Cursor

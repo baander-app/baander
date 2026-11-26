@@ -114,9 +114,10 @@ final class RecommendationGenerateCommand extends Command
         );
 
         if ($result->counts !== []) {
+            $strategies = array_keys($result->counts);
             $io->table(
                 ['Strategy', 'Recommendations saved'],
-                array_map(static fn (string $strategy, int $count): array => [$strategy, $count], array_keys($result->counts), $result->counts),
+                array_map(static fn (string $strategy, int $count): array => [$strategy, $count], $strategies, $result->counts),
             );
         }
 

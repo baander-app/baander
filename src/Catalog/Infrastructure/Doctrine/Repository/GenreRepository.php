@@ -369,7 +369,7 @@ final class GenreRepository implements GenreRepositoryInterface
 
     private static function newTaggedGenre(string $name, string $slug): GenreEntity
     {
-        $genre = Genre::create(ucfirst(trim($name)), $slug);
+        $genre = Genre::create($name |> trim(...) |> ucfirst(...), $slug);
 
         return new GenreEntity(
             $genre->getName(),

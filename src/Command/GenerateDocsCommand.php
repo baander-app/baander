@@ -67,7 +67,7 @@ final class GenerateDocsCommand extends Command
 
         $io->section('Scanning codebase');
         $contexts = $this->scanner->scan($sourceDir);
-        $io->text(sprintf('Found %d bounded contexts', count($contexts)));
+        sprintf('Found %d bounded contexts', count($contexts)) |> $io->text(...);
 
         $totalRoutes = 0;
         $totalModels = 0;
@@ -81,7 +81,7 @@ final class GenerateDocsCommand extends Command
         $convertedPages = [];
         if (is_dir($docsBookDir)) {
             $convertedPages = $this->markdownConverter->convert($docsBookDir, $outputDir, $phpdocDir);
-            $io->text(sprintf('Converted %d markdown pages', count($convertedPages)));
+            sprintf('Converted %d markdown pages', count($convertedPages)) |> $io->text(...);
         } else {
             $io->warning(sprintf('docs-book directory "%s" not found. Skipping markdown conversion.', $docsBookDir));
         }

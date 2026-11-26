@@ -357,7 +357,8 @@ final class Id3Parser
         ];
 
         foreach ($fields as $name => $length) {
-            $value = $this->decodeText(trim(fread($handle, $length)), self::ENCODING_ISO_8859_1);
+            $rawText = fread($handle, $length) |> trim(...);
+            $value = $this->decodeText($rawText, self::ENCODING_ISO_8859_1);
             if ($value !== '') {
                 $this->tags[$name][] = $value;
             }

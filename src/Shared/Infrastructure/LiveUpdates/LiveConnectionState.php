@@ -37,7 +37,10 @@ final class LiveConnectionState
         }
         if ($previous->authorizationFingerprint !== $snapshot->authorizationFingerprint) {
             ++$this->generation;
-            return [$this->frame('live.reset', array_values(array_unique([...array_column($previous->families, 'value'), ...array_column($snapshot->families, 'value')])))];
+            return [$this->frame(
+                'live.reset',
+                [...array_column($previous->families, 'value'), ...array_column($snapshot->families, 'value')] |> array_unique(...) |> array_values(...),
+            )];
         }
         $changed = [];
         foreach ($snapshot->revisions as $scope => $revision) {
@@ -45,7 +48,7 @@ final class LiveConnectionState
                 $changed[explode(':', $scope, 2)[0]] = true;
             }
         }
-        $families = array_values(array_filter(array_column($snapshot->families, 'value'), static fn(string $family): bool => isset($changed[$family])));
+        $families = array_filter(array_column($snapshot->families, 'value'), static fn(string $family): bool => isset($changed[$family])) |> array_values(...);
         if ($families !== []) {
             return [$this->frame('live.changed', $families)];
         }

@@ -81,7 +81,10 @@ final class ServerControlCoordinator implements ServerControlPortInterface
             unset($this->pending[$id]);
         }
 
-        return $this->result($outcomes, array_values(array_diff($others, array_keys($outcomes))));
+        $answered = array_keys($outcomes);
+        $missing = array_diff($others, $answered) |> array_values(...);
+
+        return $this->result($outcomes, $missing);
     }
 
     /**

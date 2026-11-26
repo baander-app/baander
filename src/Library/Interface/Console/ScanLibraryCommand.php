@@ -179,10 +179,13 @@ final class ScanLibraryCommand extends Command implements SignalableCommandInter
         }
 
         if ($all) {
-            $io->text(sprintf('Started: %s', self::names(array_map(
+            $startedClaims = array_filter($claims->claimed, static fn (LibraryScanClaim $claim): bool => isset($started[$claim->claimId->toString()]))
+                |> array_values(...);
+            $startedNames = array_map(
                 static fn (LibraryScanClaim $claim): array => LibraryResource::from($claim->library),
-                array_values(array_filter($claims->claimed, static fn (LibraryScanClaim $claim): bool => isset($started[$claim->claimId->toString()]))),
-            ))));
+                $startedClaims,
+            ) |> self::names(...);
+            $io->text(sprintf('Started: %s', $startedNames));
         }
         if ($this->interruptedBy !== null) {
             $io->getErrorStyle()->error('Interrupted. The claims of unfinished scans are released.');
@@ -252,10 +255,11 @@ final class ScanLibraryCommand extends Command implements SignalableCommandInter
         foreach ($claims as $claim) {
             $this->endClaim($io, $claim);
         }
-        $io->text(sprintf('Not started: %s', self::names(array_map(
+        $notStartedNames = array_map(
             static fn (LibraryScanClaim $claim): array => LibraryResource::from($claim->library),
             $claims,
-        ))));
+        ) |> self::names(...);
+        $io->text(sprintf('Not started: %s', $notStartedNames));
     }
 
     private function release(SymfonyStyle $io, string $library, bool $force): int
