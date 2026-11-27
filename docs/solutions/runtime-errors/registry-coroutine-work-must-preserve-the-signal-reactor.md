@@ -12,6 +12,7 @@ root_cause: wrong_api
 resolution_type: code_fix
 severity: high
 framework_version: "PHP 8.5.12, Swoole 6.2.4"
+last_updated: 2026-11-27
 tags: [swoole, registry, reactor, signals, teardown, native-tests]
 ---
 
@@ -42,18 +43,22 @@ The registry crash reproduced in NTS PHP without Xdebug. Reusing the coverage
 workaround could not repair it. Treating every native crash during the upgrade as
 one incompatibility would have hidden the separate teardown failure.
 
+The reverse mistake happened later. A 139 in this harness that came from an active
+Xdebug, in any mode and not only coverage, was first recorded as a ZTS limitation;
+see [the Xdebug learning](registry-harness-exits-139-at-request-shutdown-under-an-active-xdebug.md).
+
 ## Solution
 
 The standalone harness keeps signal-reactor ownership in `Runtime::main()`.
 Coroutine work runs through `Runtime::runCoroutines()`, which requires an idle
 coroutine scope, saves the hook flags, creates the task, and dispatches the existing
 reactor. It cancels and drains remaining coroutines on failure and restores the
-caller’s hooks before returning (`relay/tests/Support/Runtime.php:201`).
+caller’s hooks before returning (`relay/tests/Support/Runtime.php:220`).
 
 Signal callbacks record the signal. The harness raises the interruption after
 event dispatch returns to PHP, allowing task cleanup to run. The outer scope then
 unregisters its handlers and performs the final event wait when no timers remain
-(`relay/tests/Support/Runtime.php:271`, `relay/tests/Support/Runtime.php:291`).
+(`relay/tests/Support/Runtime.php:304-315`, `relay/tests/Support/Runtime.php:345-350`).
 
 The load driver and observer use this shared scope. This is a contract for the
 standalone registry harness, not a replacement for coroutine entry points inside
@@ -61,23 +66,27 @@ the application web server.
 
 ## Verification and prevention
 
-The regression driver checks four child-process outcomes: success, task failure,
-SIGTERM, and deadline expiry. It checks root and descendant cleanup, restored
-hooks, no remaining timers or coroutines, child reaping, and the final exit status.
-Only success may print the marker after `Runtime::main()` returns
-(`relay/tests/test_runtime_lifecycle.php:14`,
-`relay/tests/test_runtime_lifecycle.php:61`).
+The regression driver runs five child-process cases: success, task failure, a task
+failure whose cleanup starts another coroutine, SIGTERM, and deadline expiry. It
+checks root and descendant cleanup, restored hooks, no remaining timers or
+coroutines, child reaping, and the final exit status. Only success may print the
+marker after `Runtime::main()` returns (`relay/tests/test_runtime_lifecycle.php:14`,
+`relay/tests/test_runtime_lifecycle.php:72-93`).
 
-The repaired driver passed all four scenarios. The registry release and sanitizer
-gates subsequently completed successfully on the upgraded runtime. Thread and fuzz
-qualification were not established by this evidence.
+The repaired driver passed the four scenarios it had at the time. The registry
+release and sanitizer gates subsequently completed successfully on the upgraded
+runtime. Thread and fuzz qualification were not established by this evidence.
 
 When a future native upgrade produces a similar crash, retain both the last
-successful assertion and the process outcome. Reproduce with and without coverage
-before selecting a workaround, then isolate reactor creation, task completion,
-signal removal, and process exit. A passing workload report cannot substitute for
-the final exit status and cleanup result.
+successful assertion and the process outcome. Rule out Xdebug first: rerun with
+`XDEBUG_MODE=off` and confirm that `xdebug_info('mode')` is empty, because
+`ini_get('xdebug.mode')` keeps reporting the ini value. `Runtime::main()` now refuses
+to start under an active Xdebug, so only code that skips `main()` can still crash that
+way. Then isolate reactor creation, task completion, signal removal, and process exit.
+A passing workload report cannot substitute for the final exit status and cleanup
+result.
 
 The [web-server shutdown investigation](swoole-sigterm-waits-for-master-timers-and-closes-connections-before-workers-stop.md)
 documents a different ownership boundary: master timers and client connections in
-Swoole process mode.
+Swoole process mode. [The Xdebug learning](registry-harness-exits-139-at-request-shutdown-under-an-active-xdebug.md)
+documents the other cause of a 139 in this harness.
