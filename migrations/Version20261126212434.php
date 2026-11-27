@@ -66,7 +66,7 @@ final class Version20261126212434 extends AbstractMigration
         // ALTER TABLE takes ACCESS EXCLUSIVE on the four jsonb tables until the commit; fail rather
         // than queue behind a running writer, and run the migration again.
         $this->addSql("SET LOCAL lock_timeout = '2s'");
-        $this->addSql('CREATE TEMPORARY TABLE ' . self::REPAIRS . ' (constraint_name text NOT NULL, repaired bigint NOT NULL) ON COMMIT DROP');
+        $this->addSql(sprintf('CREATE TEMPORARY TABLE %s (constraint_name text NOT NULL, repaired bigint NOT NULL) ON COMMIT DROP', self::REPAIRS));
         foreach (self::TEXT_FORM_BOUNDS as $table => [$name, $column, $bound]) {
             $this->addSql(sprintf(
                 'ALTER TABLE %1$s DROP CONSTRAINT %2$s, ADD CONSTRAINT %2$s CHECK (octet_length(%3$s::text) <= %4$d) NOT VALID',
