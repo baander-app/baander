@@ -101,6 +101,7 @@ final class MovieLibraryIngestTest extends TestCase
             audioProbe: $this->audioProbeStub(),
             artistIdentities: $this->artistIdentitiesStub(),
             artistSyncs: $this->createStub(ArtistSyncRequestInterface::class),
+            tvLibraryIngest: $this->unusedTvIngest(),
         );
 
         return new MovieLibraryIngest($provisioning, $handler, $videos);

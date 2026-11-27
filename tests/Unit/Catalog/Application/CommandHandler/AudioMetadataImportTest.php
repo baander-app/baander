@@ -99,6 +99,7 @@ final class AudioMetadataImportTest extends TestCase
                 $this->audioProbeStub(),
                 $this->artistIdentitiesStub(),
                 $this->createStub(ArtistSyncRequestInterface::class),
+                tvLibraryIngest: $this->unusedTvIngest(),
             );
             $handler(new FilesDiscovered($library, 'music', $directory, [$file]));
             self::assertSame($before, hash_file('sha256', $path));

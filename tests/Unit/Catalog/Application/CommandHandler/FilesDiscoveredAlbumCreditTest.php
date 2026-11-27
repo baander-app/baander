@@ -389,6 +389,7 @@ final class FilesDiscoveredAlbumCreditTest extends TestCase
             audioProbe: $this->audioProbeStub(),
             artistIdentities: $resolver,
             artistSyncs: $this->createStub(ArtistSyncRequestInterface::class),
+            tvLibraryIngest: $this->unusedTvIngest(),
         );
     }
 

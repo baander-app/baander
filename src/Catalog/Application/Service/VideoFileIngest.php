@@ -21,6 +21,7 @@ use Throwable;
 /**
  * @phpstan-type PreparedVideo array{file: DiscoveredFile, video: Video, isNew: bool, probe: array<string, mixed>|null}
  * @phpstan-type VideoImportFailure array{path: string, error: string}
+ * @phpstan-type VideoBatchImportResult array{writtenPaths: list<string>|null, failures: list<VideoImportFailure>}
  */
 final readonly class VideoFileIngest
 {
@@ -39,10 +40,16 @@ final readonly class VideoFileIngest
      * @param list<DiscoveredFile> $batch
      * @param Closure(DiscoveredFile, Video): void $link
      * @param Closure(): void $flush
-     * @return array{writtenPaths: list<string>|null, failures: list<VideoImportFailure>} Null paths mean a delete holds the library.
+     * @param (Closure(list<DiscoveredFile>): void)|null $prepareLink
+     * @return VideoBatchImportResult Null paths mean a delete holds the library.
      */
-    public function importBatch(Uuid $libraryId, array $batch, Closure $link, Closure $flush): array
-    {
+    public function importBatch(
+        Uuid $libraryId,
+        array $batch,
+        Closure $link,
+        Closure $flush,
+        ?Closure $prepareLink = null,
+    ): array {
         $prepared = [];
         $refused = [];
         $failures = [];
@@ -71,7 +78,7 @@ final readonly class VideoFileIngest
             return ['writtenPaths' => [], 'failures' => $failures];
         }
 
-        $writtenPaths = $this->transaction->run(function () use ($libraryId, $prepared, $link, $flush, &$failures): ?array {
+        $writtenPaths = $this->transaction->run(function () use ($libraryId, $prepared, $link, $flush, $prepareLink, &$failures): ?array {
             if ($this->mediaFiles->isHeldByDeleteForImport($libraryId)) {
                 return null;
             }
@@ -87,6 +94,9 @@ final readonly class VideoFileIngest
                 return [];
             }
 
+            $prepareLink?->__invoke(
+                array_map(static fn (array $entry): DiscoveredFile => $entry['file'], $current) |> array_values(...),
+            );
             $written = [];
             foreach ($current as $entry) {
                 try {
@@ -155,7 +165,7 @@ final readonly class VideoFileIngest
             return $video;
         }
         $video = $this->videos->findFreshByUuid($video->getId());
-        if ($video === null || $video->getHash() !== $file->hash || $video->getPath() !== $file->absolutePath) {
+        if ($video === null || $video->getHash() !== $file->hash) {
             return null;
         }
         $video->updateProbe($probe);

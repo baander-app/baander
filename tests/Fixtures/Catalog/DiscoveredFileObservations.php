@@ -7,6 +7,10 @@ namespace App\Tests\Fixtures\Catalog;
 use App\Catalog\Application\Port\ArtistIdentityResolverInterface;
 use App\Catalog\Application\Port\ArtistResolution;
 use App\Catalog\Application\Port\IdentifiedArtist;
+use App\Catalog\Application\Service\TvLibraryIngest;
+use App\Catalog\Domain\Repository\TvCatalogRepositoryInterface;
+use App\Catalog\Domain\Repository\VideoRepositoryInterface;
+use App\Catalog\Domain\Service\VideoName\EpisodeNameParser;
 use App\Library\Application\Message\DiscoveredFile;
 use App\Library\Application\Port\LibraryMediaFilesInterface;
 use App\Shared\Domain\Model\Uuid;
@@ -18,6 +22,16 @@ trait DiscoveredFileObservations
 {
     /** @var array<string, string> */
     private array $availableHashes = [];
+
+    private function unusedTvIngest(): TvLibraryIngest
+    {
+        return new TvLibraryIngest(
+            $this->createStub(TvCatalogRepositoryInterface::class),
+            $this->createStub(VideoRepositoryInterface::class),
+            $this->createStub(LibraryMediaFilesInterface::class),
+            new EpisodeNameParser(),
+        );
+    }
 
     private function audioProbeStub(): AudioProbePortInterface
     {

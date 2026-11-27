@@ -15,6 +15,7 @@ use App\Catalog\Application\Port\IdentifiedArtist;
 use App\Catalog\Application\Port\MetadataContentReaderPortInterface;
 use App\Catalog\Application\Port\MoviePortInterface;
 use App\Catalog\Application\Port\SongPortInterface;
+use App\Catalog\Application\Service\TvLibraryIngest;
 use App\Catalog\Application\Service\VideoFileIngest;
 use App\Catalog\Domain\Model\Album;
 use App\Catalog\Domain\Model\Movie;
@@ -44,6 +45,7 @@ use Symfony\Component\Messenger\Stamp\DelayStamp;
 use Symfony\Component\Messenger\Stamp\TransportNamesStamp;
 
 /**
+ * @phpstan-import-type VideoBatchImportResult from VideoFileIngest
  * @phpstan-type TaggedCredit array{identity: ArtistIdentity, creditedName: string}
  * @phpstan-type SongCredit array{identity: ArtistIdentity, creditedName: string, featured: list<ArtistIdentity>}
  * @phpstan-type TagFields array{title: string, track: int|null, disc: int|null, year: int|null, comment: string|null}
@@ -77,6 +79,7 @@ final class FilesDiscoveredHandler
         private readonly AudioProbePortInterface $audioProbe,
         private readonly ArtistIdentityResolverInterface $artistIdentities,
         private readonly ArtistSyncRequestInterface $artistSyncs,
+        private readonly TvLibraryIngest $tvLibraryIngest,
     ) {
     }
 
@@ -100,7 +103,7 @@ final class FilesDiscoveredHandler
 
         match ($message->libraryType) {
             'music' => $this->processMusicFiles($message, $files),
-            'movie' => $this->processMovieFiles($message, $files),
+            'movie', 'tv_show' => $this->processVideoFiles($message, $files),
             default => throw new RuntimeException(sprintf('Unknown library type: %s', $message->libraryType)),
         };
     }
@@ -1154,25 +1157,19 @@ final class FilesDiscoveredHandler
     }
 
     /** @param list<DiscoveredFile> $files the message's files that still exist */
-    private function processMovieFiles(FilesDiscovered $message, array $files): void
+    private function processVideoFiles(FilesDiscovered $message, array $files): void
     {
         $failures = [];
         $committedPaths = [];
-        $videoFiles = array_filter($files, static fn(DiscoveredFile $file): bool => $file->isVideo()) |> array_values(...);
+        $tv = $message->libraryType === 'tv_show';
+        $videoFiles = array_values(array_filter(
+            $files,
+            fn (DiscoveredFile $file): bool => $file->isVideo() && (!$tv || $this->tvLibraryIngest->accepts($file)),
+        ));
         foreach (array_chunk($videoFiles, self::BATCH_SIZE) as $batch) {
-            $movie = null;
-            $result = $this->videoFileIngest->importBatch(
-                $message->libraryId,
-                $batch,
-                function (DiscoveredFile $file, Video $video) use ($message, &$movie): void {
-                    $movie ??= $this->resolveMovie($message->libraryId, basename($message->directory));
-                    if (!in_array($video->getId()->toString(), $movie->getVideoIds(), true)) {
-                        $movie->addVideo($video->getId());
-                        $this->movieService->persist($movie);
-                    }
-                },
-                $this->movieService->flush(...),
-            );
+            $result = $tv
+                ? $this->importTvBatch($message->libraryId, $batch)
+                : $this->importMovieBatch($message, $batch);
             array_push($failures, ...$result['failures']);
             $written = $result['writtenPaths'];
             if ($written === null) {
@@ -1195,6 +1192,49 @@ final class FilesDiscoveredHandler
         if ($failures !== []) {
             throw new RuntimeException($this->buildFailureMessage($failures));
         }
+    }
+
+    /**
+     * @param list<DiscoveredFile> $batch
+     * @return VideoBatchImportResult
+     */
+    private function importTvBatch(Uuid $library, array $batch): array
+    {
+        $known = [];
+
+        return $this->videoFileIngest->importBatch(
+            $library,
+            $batch,
+            function (DiscoveredFile $file, Video $video) use ($library, &$known): void {
+                $this->tvLibraryIngest->ingestFile($library, $file, $video, $known);
+            },
+            $this->tvLibraryIngest->flush(...),
+            function (array $files) use ($library, &$known): void {
+                $known = $this->tvLibraryIngest->prepareBatch($library, $files);
+            },
+        );
+    }
+
+    /**
+     * @param list<DiscoveredFile> $batch
+     * @return VideoBatchImportResult
+     */
+    private function importMovieBatch(FilesDiscovered $message, array $batch): array
+    {
+        $movie = null;
+
+        return $this->videoFileIngest->importBatch(
+            $message->libraryId,
+            $batch,
+            function (DiscoveredFile $file, Video $video) use ($message, &$movie): void {
+                $movie ??= $this->resolveMovie($message->libraryId, basename($message->directory));
+                if (!in_array($video->getId()->toString(), $movie->getVideoIds(), true)) {
+                    $movie->addVideo($video->getId());
+                    $this->movieService->persist($movie);
+                }
+            },
+            $this->movieService->flush(...),
+        );
     }
 
     /**

@@ -108,6 +108,7 @@ final class FilesDiscoveredHandlerReliabilityTest extends TestCase
             audioProbe: $this->audioProbeStub(),
             artistIdentities: $this->artistIdentitiesStub(),
             artistSyncs: $this->createStub(ArtistSyncRequestInterface::class),
+            tvLibraryIngest: $this->unusedTvIngest(),
         );
 
         $message = new FilesDiscovered($libraryId, 'music', $directory, [$file]);
@@ -191,6 +192,7 @@ final class FilesDiscoveredHandlerReliabilityTest extends TestCase
             audioProbe: $this->audioProbeStub(),
             artistIdentities: $this->artistIdentitiesStub(),
             artistSyncs: $this->createStub(ArtistSyncRequestInterface::class),
+            tvLibraryIngest: $this->unusedTvIngest(),
         );
 
         $message = new FilesDiscovered($libraryId, 'music', $directory, [$fileOne, $fileTwo]);
@@ -376,6 +378,7 @@ final class FilesDiscoveredHandlerReliabilityTest extends TestCase
             audioProbe: $this->audioProbeStub(),
             artistIdentities: $this->artistIdentitiesStub(),
             artistSyncs: $this->createStub(ArtistSyncRequestInterface::class),
+            tvLibraryIngest: $this->unusedTvIngest(),
         );
         $file = $this->observedFile(new DiscoveredFile('/music/Test Album/01-track.mp3', 'Test Album/01-track.mp3', 'mp3', 1_000_000, time(), 'cover-fanout-hash'));
         $message = new FilesDiscovered($libraryId, 'music', '/music/Test Album', [$file]);

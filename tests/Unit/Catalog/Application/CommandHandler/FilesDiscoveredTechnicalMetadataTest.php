@@ -86,6 +86,7 @@ final class FilesDiscoveredTechnicalMetadataTest extends TestCase
             $probe,
             $this->artistIdentitiesStub(),
             $this->createStub(ArtistSyncRequestInterface::class),
+            tvLibraryIngest: $this->unusedTvIngest(),
         );
 
         $handler(new FilesDiscovered($library, 'music', '/music/Album', [$file]));
@@ -149,6 +150,7 @@ final class FilesDiscoveredTechnicalMetadataTest extends TestCase
             $probe,
             $this->artistIdentitiesStub(),
             $this->createStub(ArtistSyncRequestInterface::class),
+            tvLibraryIngest: $this->unusedTvIngest(),
         );
 
         $handler(new FilesDiscovered($library, 'music', '/music/Album', [$file]));
@@ -214,6 +216,7 @@ final class FilesDiscoveredTechnicalMetadataTest extends TestCase
             $this->createStub(AudioProbePortInterface::class),
             $this->artistIdentitiesStub(),
             $this->createStub(ArtistSyncRequestInterface::class),
+            tvLibraryIngest: $this->unusedTvIngest(),
         );
 
         $handler(new FilesDiscovered($library, 'movie', '/movies/Movie', [$file]));

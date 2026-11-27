@@ -454,6 +454,7 @@ final class FilesDiscoveredRetagTest extends TestCase
             $probe,
             $resolver,
             $this->createStub(ArtistSyncRequestInterface::class),
+            tvLibraryIngest: $this->unusedTvIngest(),
         );
     }
 

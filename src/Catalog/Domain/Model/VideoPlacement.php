@@ -76,6 +76,19 @@ final class VideoPlacement
         $this->state->assigned = $assigned;
     }
 
+    public function copyAssignmentFrom(self $previous): void
+    {
+        if (!$previous->isAssigned()) {
+            return;
+        }
+        $extra = $previous->getExtraKind();
+        if ($extra !== null) {
+            $this->assignExtra($extra, assigned: true);
+        } else {
+            $this->assignEpisodes($previous->getEpisodeIds(), assigned: true);
+        }
+    }
+
     public function review(?string $reason): void
     {
         $this->state->reviewReason = $reason;
