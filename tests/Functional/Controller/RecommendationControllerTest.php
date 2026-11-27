@@ -414,6 +414,21 @@ final class RecommendationControllerTest extends TestCase
         self::assertContains($source, $this->targetsOf($target, $user->getId(), 'collaborative'));
     }
 
+    public function testARunForAUserKeepsTheCollaborativeRowsEveryMemberReads(): void
+    {
+        $user = $this->createTestUser();
+        [$source] = $this->song($user);
+        [$target] = $this->song($user);
+        $shared = Recommendation::create('song', $source, 'song', $target, 0.5, name: 'collaborative');
+        $this->recommendations->save($shared);
+
+        $result = $this->generate(new GenerateRecommendationsCommand(userId: $user->getId(), foreground: true));
+
+        self::assertSame('completed', $result->status);
+        $this->entityManager->clear();
+        self::assertNotNull($this->recommendations->findByUuid($shared->getId()));
+    }
+
     public function testAnonymousRequestsRemainRejected(): void
     {
         foreach (['GET', 'POST', 'DELETE'] as $method) {

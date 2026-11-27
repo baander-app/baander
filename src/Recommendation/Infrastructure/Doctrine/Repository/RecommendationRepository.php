@@ -233,13 +233,16 @@ final class RecommendationRepository implements RecommendationRepositoryInterfac
         $query->getQuery()->execute();
     }
 
-    public function deleteGeneratedBySource(string $sourceType, string $sourceId, ?Uuid $userId): void
+    public function deleteGeneratedBySource(string $sourceType, string $sourceId, ?Uuid $userId, array $sharedNames): void
     {
-        $query = $this->deleteOfSource($sourceType, $sourceId)->andWhere(self::origin(RecommendationOrigin::Generator));
+        $shared = 'r.user IS NULL AND r.name IN (:sharedNames)';
+        $query = $this->deleteOfSource($sourceType, $sourceId)
+            ->andWhere(self::origin(RecommendationOrigin::Generator))
+            ->setParameter('sharedNames', $sharedNames);
         if ($userId === null) {
-            $query->andWhere('r.user IS NULL');
+            $query->andWhere($shared);
         } else {
-            $query->andWhere('(r.user IS NULL OR r.user = :user)')->setParameter('user', $userId);
+            $query->andWhere('r.user = :user OR (' . $shared . ')')->setParameter('user', $userId);
         }
         $query->getQuery()->execute();
     }

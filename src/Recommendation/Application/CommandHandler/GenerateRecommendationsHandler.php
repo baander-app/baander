@@ -188,11 +188,16 @@ final class GenerateRecommendationsHandler
             self::STRATEGY_GENRE => 0,
         ];
 
+        // Content and genre rows belong to no user; collaborative rows belong to the run's user, if it has one.
+        $sharedNames = $userId === null
+            ? [self::STRATEGY_COLLABORATIVE, self::STRATEGY_CONTENT, self::STRATEGY_GENRE]
+            : [self::STRATEGY_CONTENT, self::STRATEGY_GENRE];
         foreach ($songs as $song) {
             $this->commandBus->dispatch(new DeleteGeneratedRecommendationsBySourceCommand(
                 sourceType: (string) RecommendationType::song(),
                 sourceId: $song->getId()->toString(),
                 userId: $userId,
+                sharedNames: $sharedNames,
             ));
         }
 

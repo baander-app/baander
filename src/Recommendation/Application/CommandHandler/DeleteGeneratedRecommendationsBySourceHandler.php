@@ -18,6 +18,6 @@ final class DeleteGeneratedRecommendationsBySourceHandler
     #[AsMessageHandler]
     public function __invoke(DeleteGeneratedRecommendationsBySourceCommand $command): void
     {
-        $this->recommendationRepository->deleteGeneratedBySource($command->sourceType, $command->sourceId, $command->userId);
+        $this->recommendationRepository->deleteGeneratedBySource($command->sourceType, $command->sourceId, $command->userId, $command->sharedNames);
     }
 }

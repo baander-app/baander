@@ -72,10 +72,12 @@ interface RecommendationRepositoryInterface
     public function deleteBySource(string $sourceType, string $sourceId, ?Uuid $actorId = null): void;
 
     /**
-     * Deletes the source's generator rows that belong to the user or to no user, which a run for
-     * the user writes anew; a null user deletes only the rows of no user. Member rows stay.
+     * Deletes the source's generator rows that a run writes anew: those of the user, and those of
+     * no user under the shared names. Member rows stay.
+     *
+     * @param list<string> $sharedNames
      */
-    public function deleteGeneratedBySource(string $sourceType, string $sourceId, ?Uuid $userId): void;
+    public function deleteGeneratedBySource(string $sourceType, string $sourceId, ?Uuid $userId, array $sharedNames): void;
 
     public function delete(Recommendation $recommendation): void;
 }
