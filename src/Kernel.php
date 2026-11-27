@@ -20,8 +20,6 @@ use Symfony\Component\HttpKernel\Kernel as BaseKernel;
 
 class Kernel extends BaseKernel
 {
-    public const int LOG_QUERY_HOOKS = SWOOLE_HOOK_NATIVE_CURL | SWOOLE_HOOK_PROC;
-
     /**
      * The environments the configuration defines. Every environment guard in the application
      * tells prod from dev and test, so another name would boot with neither's guards.

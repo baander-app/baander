@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Shared\Application\LogViewer;
 
-use App\Kernel;
 use App\Shared\Infrastructure\LogViewer\Http\ConfiguredLogNodeClient;
+use App\Shared\Infrastructure\Swoole\HookFlags;
 use PHPUnit\Framework\TestCase;
 use Swoole\Coroutine;
 use Swoole\Runtime;
@@ -49,7 +49,7 @@ final class ConfiguredLogNodeClientTest extends TestCase
         $originalHooks = Runtime::getHookFlags();
         try {
             $client = new ConfiguredLogNodeClient(json_encode([['id' => 'local', 'url' => 'http://'.$address, 'tokenFile' => $tokenFile]], JSON_THROW_ON_ERROR));
-            Runtime::enableCoroutine(Kernel::LOG_QUERY_HOOKS);
+            Runtime::enableCoroutine(HookFlags::logQuery());
             $yielded = false;
             $response = null;
             \Swoole\Coroutine\run(static function () use ($client, &$yielded, &$response): void {
