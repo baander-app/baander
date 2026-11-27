@@ -14,13 +14,13 @@ This guide defines the canonical icon-to-concept mapping for the Baander fronten
 |---------|--------|-----|
 | Overlay menus (dropdown, context menu) | Yes, up to 3 | Overlays are scanned quickly; icons anchor the eye to key actions |
 | Compact/chrome areas (player bar, panel tabs) | Yes | Space is limited; icons replace labels by necessity |
-| Static menus (sidebar, admin nav) | No -- text labels | Space is available; text is more scannable at rest. Use icons only for the top 2-3 highest-priority items if at all |
+| Static menus (sidebar, admin nav) | No -- text labels | Space is available; text is more scannable at rest. Use icons, if at all, on at most 3 items; a destructive action's icon counts toward the 3 |
 | Buttons with text | Generally no | The label already communicates; an icon adds noise |
 | Standalone icon buttons (no label) | Yes | The icon IS the label -- e.g. play/pause, close, volume |
 
 ### Rules
 
-1. **Max 3 icons per menu.** If everything is highlighted, nothing is.
+1. **Max 3 icons per menu.** If everything is highlighted, nothing is. A destructive action's icon takes one of the 3 slots.
 2. **Same concept = same icon.** If "favorites" uses `Star` somewhere, it uses `Star` everywhere.
 3. **Overlay menus:** icons make great sense. Use them for destructive, primary, or disambiguating actions.
 4. **Static menus:** text labels are preferred. Only add icons when space is a genuine luxury.

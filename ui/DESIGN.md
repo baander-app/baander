@@ -394,6 +394,27 @@ Keyboard shortcut help overlay: press `?`.
 
 ---
 
+## Writing
+
+Interface text tells the reader what is happening and what they can do next. The
+application's English strings in `ui/web/src/shared/i18n/locales/en/translation.json`
+follow these rules; loading, error and empty states add their own under Components.
+
+- **Plain and specific:** name the thing and the action in everyday words.
+- **Person:** the reader is *you*. The product says *we* only for what it sends:
+  "Open the link in the verification email we sent to this address, or send a new
+  one."
+- **Case:** titles, buttons and labels use sentence case. Text appears in uppercase
+  only through the `label` type role; the string itself stays in sentence case.
+- **Errors:** say what happened, then what to do next: "That code was not accepted.
+  Wait for the next code and try again."
+- **Progress:** text for work in progress ends with the ellipsis character (…), not
+  three periods: "Verifying your email address…"
+- **Tone:** no emoji and no exclamation marks.
+- **Product name:** write Bånder. Baander appears only in code and domains.
+
+---
+
 ## Motion
 
 Motion communicates *where things went*, not *how fancy the UI is*.
@@ -441,10 +462,12 @@ styled-components and their accessible interactions retain Radix primitives:
 - Hover on grid card: no visible change — content is the affordance.
 
 ### Icons in menu lists
-Icons in navigation menus, sidebar lists, and dropdown menus must be **extremely sparing**. Apply icons only to:
+Icons in navigation menus, sidebar lists, and dropdown menus must be **extremely sparing**. A menu holds **at most 3 icons**, chosen from:
 
 1. **Destructive actions** (delete, remove, disconnect) — visual warning
-2. **The 3 most frequently used actions** in that menu — scannability anchors
+2. **The most frequently used actions** in that menu — scannability anchors
+
+A destructive action's icon counts toward the three: a menu with one destructive action has two icons left for its most-used actions.
 
 When every item has an icon, none of them stand out. A sea of icons is visual noise. **Default: no icon. Add one only when you can justify why that specific item needs to be noticed faster than its neighbors.**
 
@@ -520,7 +543,7 @@ View mode preference persists across sessions (Zustand + localStorage).
 | `any` type | Never. Define the type. |
 | Gradients on surfaces | Flat colors except the surface that holds the well |
 | Drop shadows on cards | No shadows except overlays and the well's shallow inset edge and faint lower lip |
-| Bounce/spring animations | ease-out only, <120ms |
+| Bounce/spring animations | ease-out only, 120ms or less |
 | "..." menu buttons on items | Native right-click only |
 | Full-page reloads for navigation | React Router `<Link>` / `useNavigate()` |
 | Client-side filtering on paginated data | Server-side filtering via API params |
