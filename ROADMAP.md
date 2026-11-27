@@ -213,6 +213,16 @@ raised one more finding and one residual risk. Each fix has a test seen failing 
 - The queue repair now moves `listening_sessions.revision`, so a control sent with an
   index into the old queue is refused as stale (`5d296cc58`).
 
+Delivered, web test stability. The intermittent "removes a denied playlist snapshot"
+failure in `collections.test.tsx` (runs 45900306324 and 45653910522) came from the
+test: it switched to fake timers while a 100 ms coordinator wake was armed on the real
+clock, so the refetch depended on host speed. It now waits until no wake is armed
+(`63b200d6f`). Shuffled runs then showed a production defect: the live HTTP admission
+kept attempt starts stamped in the future, so after a backward clock step it stalled
+every live read once 20 such starts had gathered. It now drops them (`db3abcdaa`). The
+file passed 20 straight, 40 shuffled and 10 single-core runs, and the full suite
+passed (327 files, 3,930 tests).
+
 Verification checkpoint:
 
 - Every behaviour commit carries a test seen failing first. The commit messages
@@ -251,8 +261,12 @@ Open:
   both this tree and the base. The cause is not established.
 - The development controller can wedge a preview: `down()` saves `quiescing` before
   `compose stop`, so one failed compose call leaves the instance needing `recover`.
-- `tests/live-updates/collections.test.tsx` ("removes a denied playlist snapshot")
-  fails intermittently in CI's web checks: runs 45900306324 and 45653910522.
+- `tests/live-updates/personal-state.test.tsx` ("represents an idle initial session")
+  fails under `vitest run tests/live-updates --sequence.shuffle --sequence.seed=4`, on
+  this tree and before it; CI runs the suite unshuffled. The Frontend CI coverage run
+  45653910522 failed four `waitFor` checks in three files for a reason not
+  established. `LiveQueryCoordinator` still times `lastPass`, `retryAt` and `wakeAt`
+  with `Date.now()`, so a backward clock step probably delays a family's refresh.
 
 ## Symfony 8.1.12 and the media ownership drill, 2026-11-26
 
