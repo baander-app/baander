@@ -152,11 +152,14 @@ test('the sitemap lists every published page at its canonical URL and robots.txt
       return {
         location, status: response.status, canonical: html.includes(`<link rel="canonical" href="${location}">`),
         title: head.title, description: head.querySelector('meta[name="description"]')?.getAttribute('content') ?? '',
+        icons: [...head.querySelectorAll('link[rel~="icon"]')].map((link) => link.getAttribute('href')),
       };
     }));
     const robots = await fetch('/robots.txt');
+    const favicon = await fetch('/assets/site/favicon.svg');
     return {
       status: sitemap.status, type: sitemap.headers.get('content-type'), locations, lastModified, pages,
+      favicon: { status: favicon.status, body: await favicon.text() },
       robots: { status: robots.status, body: await robots.text() },
     };
   });
@@ -172,6 +175,10 @@ test('the sitemap lists every published page at its canonical URL and robots.txt
   expect(repeated(result.pages.map((listed) => listed.title)), 'Every listed page has its own title').toEqual([]);
   expect(repeated(result.pages.map((listed) => listed.description)), 'Every listed page has its own description').toEqual([]);
   for (const listed of result.pages) expect(listed.description.length, listed.location).toBeLessThanOrEqual(160);
+  // The site icon is the cassette mark drawn for 16 to 32 pixels, not the full-detail logo.
+  for (const listed of result.pages) expect(listed.icons, listed.location).toEqual(['/assets/site/favicon.svg']);
+  expect(result.favicon.status).toBe(200);
+  expect(result.favicon.body).toContain('simplified for 16-32px');
   expect(result.robots.status).toBe(200);
   expect(result.robots.body).toContain('Sitemap: https://baander.app/sitemap.xml');
 });
