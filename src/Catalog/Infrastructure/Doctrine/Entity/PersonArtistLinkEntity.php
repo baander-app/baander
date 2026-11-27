@@ -12,7 +12,7 @@ use Doctrine\ORM\Mapping as ORM;
 class PersonArtistLinkEntity
 {
     #[ORM\Id]
-    #[ORM\ManyToOne(targetEntity: ArtistEntity::class)]
+    #[ORM\OneToOne(targetEntity: ArtistEntity::class)]
     #[ORM\JoinColumn(name: 'artist_id', referencedColumnName: 'id', nullable: false, onDelete: 'CASCADE')]
     private ArtistEntity $artist;
 

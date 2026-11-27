@@ -11,7 +11,6 @@ use App\Catalog\Domain\Model\Movie;
 use App\Metadata\Application\Message\SyncAlbumMessage;
 use App\Metadata\Application\Message\SyncLibraryMessage;
 use App\Metadata\Application\Message\SyncMovieMessage;
-use App\Metadata\Application\Message\SyncTvLibraryMessage;
 use App\Metadata\Application\MessageHandler\SyncLibraryHandler;
 use App\Shared\Application\JobCancelledException;
 use App\Shared\Domain\Model\Uuid;
@@ -30,11 +29,7 @@ final class SyncLibraryHandlerTest extends TestCase
         $movies = $this->createMock(MoviePortInterface::class);
         $movies->expects(self::once())->method('movieIdsByLibraryAfter')->with($libraryId, null, 100)->willReturn([$movie->getId()]);
         $bus = $this->createMock(MessageBusInterface::class);
-        $bus->expects(self::exactly(2))->method('dispatch')->willReturnCallback(static function (object $message) use ($movie): Envelope {
-            if ($message instanceof SyncTvLibraryMessage) {
-                self::assertTrue($message->forceUpdate);
-                return new Envelope($message);
-            }
+        $bus->expects(self::once())->method('dispatch')->willReturnCallback(static function (object $message) use ($movie): Envelope {
             self::assertInstanceOf(SyncMovieMessage::class, $message);
             self::assertTrue($movie->getId()->equals($message->movieId));
             self::assertTrue($message->forceUpdate);
@@ -69,10 +64,6 @@ final class SyncLibraryHandlerTest extends TestCase
         $queued = [];
         $bus = $this->createStub(MessageBusInterface::class);
         $bus->method('dispatch')->willReturnCallback(static function (object $message) use (&$queued): Envelope {
-            if ($message instanceof SyncTvLibraryMessage) {
-                self::assertTrue($message->forceUpdate);
-                return new Envelope($message);
-            }
             self::assertInstanceOf(SyncMovieMessage::class, $message);
             self::assertTrue($message->forceUpdate);
             $queued[] = $message->movieId->toString();

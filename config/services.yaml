@@ -1289,11 +1289,8 @@ services:
     App\Catalog\Application\Port\PersonAdministrationPortInterface:
         alias: App\Catalog\Infrastructure\Doctrine\Repository\PersonAdministrationRepository
 
-    App\Catalog\Application\Port\TvCatalogPortInterface:
+    App\Catalog\Domain\Repository\TvCatalogRepositoryInterface:
         alias: App\Catalog\Infrastructure\Doctrine\Repository\TvCatalogRepository
-
-    App\Metadata\Application\Port\TvMetadataPortInterface:
-        alias: App\Metadata\Infrastructure\Tv\TvMetadataProvider
 
     App\Metadata\Application\Port\TmdbPersonLookupInterface:
         alias: App\Metadata\Infrastructure\Api\Tmdb\TmdbAdapter

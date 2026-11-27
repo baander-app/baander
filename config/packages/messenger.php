@@ -17,7 +17,6 @@ use App\Metadata\Application\Message\SyncLibraryMessage;
 use App\Metadata\Application\Message\SyncMovieMessage;
 use App\Metadata\Application\Message\SyncPeopleMessage;
 use App\Metadata\Application\Message\SyncSongMessage;
-use App\Metadata\Application\Message\SyncTvLibraryMessage;
 use App\Notification\Application\DTO\SendEmailCommand;
 use App\Notification\Application\DTO\SendPushCommand;
 use App\Notification\Application\DTO\SendPushToSubscriptionCommand;
@@ -78,11 +77,6 @@ return static function (ContainerConfigurator $container): void {
             'default' => true,
         ],
         SyncPeopleMessage::class => [
-            'transport' => 'async',
-            'resource_class' => 'io',
-            'default' => true,
-        ],
-        SyncTvLibraryMessage::class => [
             'transport' => 'async',
             'resource_class' => 'io',
             'default' => true,

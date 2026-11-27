@@ -205,13 +205,16 @@ final class PlaybackVideoFixture
                 throw new RuntimeException('The director for the cross-media fixture is missing.');
             }
             $this->connection->insert('tv_series', $credits['series'] + [
-                'library_id' => $manifest['library']['id'], 'tmdb_id' => 1, 'name' => 'Owned series ' . $run,
+                'library_id' => $manifest['library']['id'], 'folder_path' => 'Owned series ' . $run,
+                'name' => 'Owned series ' . $run, 'created_at' => (new DateTimeImmutable())->format('Y-m-d H:i:s.uP'),
+                'updated_at' => (new DateTimeImmutable())->format('Y-m-d H:i:s.uP'),
             ]);
             $this->connection->insert('tv_seasons', $credits['season'] + [
                 'series_id' => $credits['series']['id'], 'season_number' => 1,
             ]);
             $this->connection->insert('tv_episodes', $credits['episode'] + [
-                'season_id' => $credits['season']['id'], 'episode_number' => 1, 'tmdb_id' => 2, 'name' => 'Owned episode ' . $run,
+                'series_id' => $credits['series']['id'], 'season_id' => $credits['season']['id'],
+                'episode_number' => 1, 'name' => 'Owned episode ' . $run,
             ]);
             foreach (['series', 'episode'] as $kind) {
                 $this->connection->insert($kind . '_person_credits', [

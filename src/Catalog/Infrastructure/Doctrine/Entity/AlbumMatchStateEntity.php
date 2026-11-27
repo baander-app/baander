@@ -21,7 +21,7 @@ use Doctrine\ORM\Mapping as ORM;
 class AlbumMatchStateEntity
 {
     #[ORM\Id]
-    #[ORM\ManyToOne(targetEntity: AlbumEntity::class)]
+    #[ORM\OneToOne(targetEntity: AlbumEntity::class)]
     #[ORM\JoinColumn(name: 'album_id', referencedColumnName: 'id', nullable: false, onDelete: 'CASCADE')]
     private AlbumEntity $album;
 

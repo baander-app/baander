@@ -7,7 +7,6 @@ namespace App\Metadata\Application\MessageHandler;
 use App\Catalog\Application\Port\AlbumPortInterface;
 use App\Catalog\Application\Port\MoviePortInterface;
 use App\Metadata\Application\Message\SyncMovieMessage;
-use App\Metadata\Application\Message\SyncTvLibraryMessage;
 use App\Metadata\Application\Message\SyncAlbumMessage;
 use App\Metadata\Application\Message\SyncLibraryMessage;
 use App\Metadata\Application\Message\SyncSongMessage;
@@ -70,6 +69,5 @@ final class SyncLibraryHandler
                 $after = $movieId;
             }
         } while (count($movieIds) === 100);
-        $this->bus->dispatch(new SyncTvLibraryMessage($libraryId, $message->forceUpdate));
     }
 }

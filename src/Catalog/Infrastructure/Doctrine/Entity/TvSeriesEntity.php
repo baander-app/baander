@@ -5,15 +5,16 @@ declare(strict_types=1);
 namespace App\Catalog\Infrastructure\Doctrine\Entity;
 
 use App\Catalog\Domain\Model\TvSeriesState;
-use App\Library\Infrastructure\Doctrine\Entity\LibraryEntity;
 use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
+use App\Library\Infrastructure\Doctrine\Entity\LibraryEntity;
+use DateTimeImmutable;
 use Doctrine\ORM\Mapping as ORM;
 
 #[ORM\Entity]
 #[ORM\Table(name: 'tv_series')]
 #[ORM\UniqueConstraint(name: 'uniq_tv_series_public_id', columns: ['public_id'])]
-#[ORM\UniqueConstraint(name: 'uniq_tv_series_library_id_tmdb_id', columns: ['library_id', 'tmdb_id'])]
+#[ORM\UniqueConstraint(name: 'uniq_tv_series_library_id_folder_path', columns: ['library_id', 'folder_path'])]
 class TvSeriesEntity
 {
     #[ORM\Id]
@@ -27,43 +28,90 @@ class TvSeriesEntity
     #[ORM\JoinColumn(name: 'library_id', nullable: false, onDelete: 'CASCADE')]
     public LibraryEntity $library;
 
-    #[ORM\Column(name: 'tmdb_id', type: 'integer')]
-    public int $tmdbId;
+    #[ORM\Column(type: 'text')]
+    public string $folderPath;
 
     #[ORM\Column(type: 'text')]
     public string $name;
 
+    #[ORM\Column(type: 'integer', nullable: true)]
+    public ?int $year = null;
+
+    #[ORM\Column(type: 'text', nullable: true)]
+    public ?string $matchedProvider = null;
+
+    #[ORM\Column(type: 'text', nullable: true)]
+    public ?string $providerId = null;
+
+    /** @var array<string, string> */
+    #[ORM\Column(type: 'json', options: ['jsonb' => true, 'default' => '[]'])]
+    public array $externalIds = [];
+
+    #[ORM\Column(type: 'text', options: ['default' => 'aired'])]
+    public string $ordering = 'aired';
+
+    #[ORM\Column(type: 'boolean', options: ['default' => false])]
+    public bool $handMatched = false;
+
     #[ORM\Column(type: 'text', nullable: true)]
     public ?string $overview = null;
 
-    #[ORM\Column(name: 'poster_url', type: 'text', nullable: true)]
+    #[ORM\Column(type: 'text', nullable: true)]
     public ?string $posterUrl = null;
+
+    #[ORM\Column(type: 'text', nullable: true)]
+    public ?string $backdropUrl = null;
+
+    #[ORM\Column(type: 'datetime_immutable')]
+    public DateTimeImmutable $createdAt;
+
+    #[ORM\Column(type: 'datetime_immutable')]
+    public DateTimeImmutable $updatedAt;
 
     public function __construct(LibraryEntity $library, TvSeriesState $state)
     {
         $this->id = $state->id;
         $this->publicId = $state->publicId;
         $this->library = $library;
+        $this->createdAt = $state->createdAt;
         $this->apply($state);
     }
+
     public function state(): TvSeriesState
     {
         return new TvSeriesState(
             id: $this->id,
             publicId: $this->publicId,
             libraryId: $this->library->getId(),
-            tmdbId: $this->tmdbId,
+            folderPath: $this->folderPath,
             name: $this->name,
+            year: $this->year,
+            matchedProvider: $this->matchedProvider,
+            providerId: $this->providerId,
+            externalIds: $this->externalIds,
+            ordering: $this->ordering,
+            handMatched: $this->handMatched,
             overview: $this->overview,
             posterUrl: $this->posterUrl,
+            backdropUrl: $this->backdropUrl,
+            createdAt: $this->createdAt,
+            updatedAt: $this->updatedAt,
         );
     }
 
     public function apply(TvSeriesState $state): void
     {
-        $this->tmdbId = $state->tmdbId;
+        $this->folderPath = $state->folderPath;
         $this->name = $state->name;
+        $this->year = $state->year;
+        $this->matchedProvider = $state->matchedProvider;
+        $this->providerId = $state->providerId;
+        $this->externalIds = $state->externalIds;
+        $this->ordering = $state->ordering;
+        $this->handMatched = $state->handMatched;
         $this->overview = $state->overview;
         $this->posterUrl = $state->posterUrl;
+        $this->backdropUrl = $state->backdropUrl;
+        $this->updatedAt = $state->updatedAt;
     }
 }

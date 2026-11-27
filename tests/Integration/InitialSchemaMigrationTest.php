@@ -169,7 +169,10 @@ final class InitialSchemaMigrationTest extends TestCase
             'DoctrineMigrations\\Version20261126213944',
             'DoctrineMigrations\\Version20261126220235',
         ], $this->connection->fetchFirstColumn('SELECT version FROM doctrine_migration_versions ORDER BY version'));
-        self::assertSame(108, (int) $this->connection->fetchOne("SELECT count(*) FROM pg_tables WHERE schemaname = 'public' AND tablename <> 'doctrine_migration_versions'"));
+        self::assertSame(110, (int) $this->connection->fetchOne("SELECT count(*) FROM pg_tables WHERE schemaname = 'public' AND tablename <> 'doctrine_migration_versions'"));
+        foreach (['video_placements', 'video_placement_episode'] as $table) {
+            self::assertSame($table, $this->connection->fetchOne('SELECT to_regclass(?)::text', [$table]));
+        }
         self::assertSame(['TimeZone=UTC'], $this->databaseSettings($this->connection));
         $this->assertSchedules();
         $this->assertIdentitiesAllocate();

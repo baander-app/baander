@@ -213,7 +213,8 @@ final readonly class PeopleReadRepository implements PeopleReadPortInterface, Pe
     private function episodeQuery(LibraryReadScope $scope): QueryBuilder
     {
         $query = $this->entityManager->createQueryBuilder()->from(TvEpisodeEntity::class, 'episode')
-            ->innerJoin('episode.season', 'season')->innerJoin('season.series', 's');
+            ->innerJoin('episode.series', 's')->innerJoin('episode.season', 'season')
+            ->andWhere('episode.episodeNumber IS NOT NULL');
         CatalogReadScopeQuery::apply($query, $scope, 'movie', 's');
 
         return $query;
@@ -288,7 +289,7 @@ final readonly class PeopleReadRepository implements PeopleReadPortInterface, Pe
                 $target = match ($kind) {
                     'movie' => 'movies s',
                     'series' => 'tv_series s',
-                    default => 'tv_episodes episode JOIN tv_seasons season ON season.id = episode.season_id JOIN tv_series s ON s.id = season.series_id',
+                    default => 'tv_episodes episode JOIN tv_series s ON s.id = episode.series_id',
                 };
                 $targetAlias = $kind === 'episode' ? 'episode' : 's';
                 $title = $kind === 'movie' ? 's.title' : $targetAlias . '.name';

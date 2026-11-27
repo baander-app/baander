@@ -853,6 +853,48 @@
       "capture": "before-parent-delete"
     },
     {
+      "parent": "tv_series",
+      "child": "tv_episodes",
+      "foreign_key": "series_id",
+      "action": "CASCADE",
+      "capture": "child-row-or-exempt"
+    },
+    {
+      "parent": "libraries",
+      "child": "video_placements",
+      "foreign_key": "library_id",
+      "action": "CASCADE",
+      "capture": "child-row-or-exempt"
+    },
+    {
+      "parent": "tv_series",
+      "child": "video_placements",
+      "foreign_key": "series_id",
+      "action": "CASCADE",
+      "capture": "child-row-or-exempt"
+    },
+    {
+      "parent": "movies",
+      "child": "video_placements",
+      "foreign_key": "movie_id",
+      "action": "CASCADE",
+      "capture": "child-row-or-exempt"
+    },
+    {
+      "parent": "video_placements",
+      "child": "video_placement_episode",
+      "foreign_key": "placement_id",
+      "action": "CASCADE",
+      "capture": "child-row-or-exempt"
+    },
+    {
+      "parent": "tv_episodes",
+      "child": "video_placement_episode",
+      "foreign_key": "episode_id",
+      "action": "CASCADE",
+      "capture": "child-row-or-exempt"
+    },
+    {
       "parent": "tv_seasons",
       "child": "tv_episodes",
       "foreign_key": "season_id",
@@ -1857,19 +1899,31 @@
       "table": "tv_episodes",
       "mapping": "src/Catalog/Infrastructure/Doctrine/Entity/TvEpisodeEntity.php",
       "classification": "excluded",
-      "reason": "Registered TV episodes; the library-scoped TV and People views refresh them by 30-second visible sampling and catalog hints, without capture."
+      "reason": "TV episodes; the library-scoped TV and People views refresh them by 30-second visible sampling and catalog hints, without capture."
     },
     {
       "table": "tv_seasons",
       "mapping": "src/Catalog/Infrastructure/Doctrine/Entity/TvSeasonEntity.php",
       "classification": "excluded",
-      "reason": "Seasons of registered TV series; the library-scoped TV views refresh them by 30-second visible sampling and catalog hints, without capture."
+      "reason": "TV seasons; the library-scoped TV views refresh them by 30-second visible sampling and catalog hints, without capture."
     },
     {
       "table": "tv_series",
       "mapping": "src/Catalog/Infrastructure/Doctrine/Entity/TvSeriesEntity.php",
       "classification": "excluded",
-      "reason": "Registered TV series; the library-scoped TV and People views refresh them by 30-second visible sampling and catalog hints, without capture."
+      "reason": "TV series; the library-scoped TV and People views refresh them by 30-second visible sampling and catalog hints, without capture."
+    },
+    {
+      "table": "video_placements",
+      "mapping": "src/Catalog/Infrastructure/Doctrine/Entity/VideoPlacementEntity.php",
+      "classification": "excluded",
+      "reason": "Video placement storage; library-scoped video views refresh through catalog hints and visible sampling."
+    },
+    {
+      "table": "video_placement_episode",
+      "mapping": "src/Catalog/Infrastructure/Doctrine/Entity/VideoPlacementEpisodeEntity.php",
+      "classification": "excluded",
+      "reason": "Video placement storage; library-scoped video views refresh through catalog hints and visible sampling."
     },
     {
       "table": "user_accent_colors",

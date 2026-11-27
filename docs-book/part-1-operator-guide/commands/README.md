@@ -80,8 +80,6 @@ Application console commands run inside `web`. The control and execution worker 
 | [app:artist:cover:remove](app-artist-cover-remove.md) | Remove an artist cover and delete its image files |
 | [app:artist:cover:set](app-artist-cover-set.md) | Set or replace an artist cover from an image file in the container |
 | [app:artist:create](app-artist-create.md) | Create an artist, such as a performer to credit by hand |
-| [app:tv:series:register](app-tv-series-register.md) | Register a TV series and import its Person credits from TMDB |
-| [app:tv:episode:register](app-tv-episode-register.md) | Register a TV episode and import its Person credits from TMDB |
 | [app:artist:delete](app-artist-delete.md) | Delete an artist, its credits, favorites, recommendations and cover image |
 | [app:artist:song:add](app-artist-song-add.md) | Credit an artist on a song with a role |
 | [app:artist:song:remove](app-artist-song-remove.md) | Remove every one of an artist's credits on a song |

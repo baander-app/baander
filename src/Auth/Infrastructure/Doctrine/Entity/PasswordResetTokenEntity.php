@@ -19,7 +19,7 @@ use Doctrine\ORM\Mapping as ORM;
 class PasswordResetTokenEntity
 {
     #[ORM\Id]
-    #[ORM\ManyToOne(targetEntity: UserEntity::class)]
+    #[ORM\OneToOne(targetEntity: UserEntity::class)]
     #[ORM\JoinColumn(name: 'user_id', referencedColumnName: 'id', nullable: false, onDelete: 'CASCADE')]
     private UserEntity $user;
 

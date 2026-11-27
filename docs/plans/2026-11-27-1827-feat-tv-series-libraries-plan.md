@@ -599,6 +599,8 @@ Deferred to implementation:
   1. The postgres specialist designs the tables (KTD3) with names from the database naming page and the remediation checklist applied. Placements serve episodes, movies and extras.
   2. Registered TV rows and their scoped credits are not carried over (R53); Person rows and identifiers are untouched.
   3. The register commands, their docs pages and the TV sync path are removed in this unit, so no handler, codec or route is left dangling (R38); the match commands arrive in U13.
+  4. Correct the four one-to-one associations that Doctrine ORM 3.8 rejects as sole many-to-one identifiers. The preview's `doctrine:schema:validate` reports the mappings on `EmailVerificationTokenEntity::user`, `PasswordResetTokenEntity::user`, `AlbumMatchStateEntity::album` and `PersonArtistLinkEntity::artist`. Keep their existing primary and foreign keys. (session-settled: user-approved)
+  5. Keep the repair migration’s temporary table statement in one format string. The pool-safe SQL test scans each PHP literal separately, so it missed the existing `ON COMMIT DROP` clause in `Version20261126212434.php`.
 - **Patterns to follow:** `src/Catalog/Domain/Model/Album.php` with `AlbumState.php` (state objects); `migrations/Version20261121194500.php` (migration shape).
 - **Test scenarios:**
   - The rewritten migration creates the new tables on a fresh database, and `doctrine:schema:validate` and `tests/Integration/DatabaseNamingConventionTest.php` pass.
