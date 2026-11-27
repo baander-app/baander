@@ -58,6 +58,23 @@ describe('resource HTTP admission', () => {
     expect(order).toEqual(['foreground', 'background'])
   })
 
+  it('stops counting attempts stamped after a wall clock that stepped backward', async () => {
+    const admission = new LiveHttpAdmission()
+    for (let attempt = 0; attempt < 20; attempt++) {
+      const release = await admission.acquire(undefined, 'background')
+      release()
+    }
+    vi.setSystemTime(Date.now() - 60_000)
+    const admitted = vi.fn()
+    const pending = admission.acquire(undefined, 'foreground').then(release => {
+      admitted()
+      release()
+    })
+    await flush()
+    expect(admitted).toHaveBeenCalledOnce()
+    await pending
+  })
+
   it('removes cancelled queued work and releases cancelled active attempts', async () => {
     const admission = new LiveHttpAdmission()
     const active = new AbortController()

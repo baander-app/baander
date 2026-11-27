@@ -87,7 +87,9 @@ export class LiveHttpAdmission {
     if (this.timer !== undefined) clearTimeout(this.timer)
     this.timer = undefined
     const now = Date.now()
-    this.starts = this.starts.filter(start => now - start < 1000)
+    // A start later than now predates a backward wall-clock step; counting it would keep the
+    // window full, and starts[0] + 1000 far away, until the clock caught up.
+    this.starts = this.starts.filter(start => start <= now && now - start < 1000)
     while (this.waiting.length > 0) {
       const foreground = this.waiting.findIndex(attempt => attempt.priority === 'foreground')
       const index = foreground >= 0 ? foreground : this.activeBackground < 4 ? 0 : -1
