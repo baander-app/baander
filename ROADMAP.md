@@ -99,7 +99,10 @@ Delivered, behaviour:
   deletes them with their tokens, and a seeded schedule runs it daily at 03:45 UTC.
 - Actor IDs (`c173c31a2`). The limiter clear, the job monitor and the recommendation
   administration record the administrator's user ID through a Shared
-  `SignedInUserInterface` port. Console paths still record `cli`.
+  `SignedInUserInterface` port. Console paths still record `cli`. Owner decision of
+  2026-11-27: the admin API and `app:recommendation:job:show` / `list --json` show a
+  job's `triggered_by` and `requeued_by` as the administrator's public ID, resolved
+  when the job is shown; storage keeps the user ID (`3074f145a`).
 - Console listings (`44ef7d005`). `TerminalText::literalRows()` strips CSI, OSC and
   C0/C1 controls from table cells and escapes formatter tags. `AdminCommandSupport::list()`
   and every listing of stored or external text use it. `--json` is unchanged.
@@ -246,9 +249,6 @@ Open:
 - The preset qualification in the libvirt guest was not run.
 - A member `POST` that races a generation run for the same user and key can still
   answer `500`, because the ORM flush meets the unique index.
-- The admin API shows HTTP-started recommendation jobs' `triggered_by` and
-  `requeued_by` as `[internal ID]`, because `PublicDiagnosticText` redacts the stored
-  user ID. Showing who started a job needs the public ID.
 - Console "show" outputs (`horizontalTable()`, `definitionList()` and `text()` lines in
   commands such as `app:metadata:match:apply`, song and album delete, and user setting
   `show`) still print stored text through the formatter. `TerminalText::literal()`
