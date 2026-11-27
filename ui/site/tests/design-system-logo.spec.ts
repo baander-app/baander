@@ -111,8 +111,8 @@ test('the page names the marks that draw a dark version, as their files do', asy
   await page.goto('/design-system/logo/');
   const adapting = marks.filter((file) => /@media\s*\(\s*prefers-color-scheme:\s*dark\s*\)/.test(repository(`ui/web/public/${file}`)));
   expect(adapting).toEqual(['logo.svg', 'icon.svg']);
-  const statement = page.locator('section[aria-labelledby="light-and-dark"] p');
-  await expect(statement).toContainText(`${adapting.join(' and ')} draw a second version of the mark for dark color schemes`);
+  const statement = page.locator('section[aria-labelledby="light-and-dark"] p').first();
+  await expect(statement).toContainText(`${adapting.join(' and ')} draw a second version for dark color schemes`);
   await expect(statement).toContainText('favicon.svg has one version for both');
 });
 
@@ -135,8 +135,8 @@ for (const [system, site] of [['dark', 'light'], ['light', 'dark']] as const) {
     }
     test.info().annotations.push({ type: 'painted version', description: `system ${system}, site ${site}: ${JSON.stringify(painted)}` });
     for (const [name, found] of Object.entries(painted)) expect(found, `${name} follows the site's theme, not the system`).toBe(site);
-    await expect(page.locator('section[aria-labelledby="light-and-dark"] p'))
-      .toContainText('Shown as an image, a mark follows the color scheme of the page around it, not the operating system’s setting, so on this website it changes with the theme toggle in the header.');
+    await expect(page.locator('section[aria-labelledby="light-and-dark"] p').last())
+      .toHaveText('Shown as an image, a mark takes its color scheme from the page around it rather than from the operating system, so on this website it changes with the theme toggle in the header.');
 
     await page.locator('[data-appearance-toggle]').click();
     const other = site === 'light' ? 'dark' : 'light';

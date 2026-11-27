@@ -14,7 +14,7 @@ $id = static fn(array $mark): string => 'mark-' . pathinfo($mark['file'], PATHIN
 ?>
 <section class="ds-logo" aria-labelledby="marks">
   <h2 id="marks">Marks and sizes</h2>
-  <p>Each file lives in <code>ui/web/public/</code> and opens with a comment naming the sizes it is drawn for. Below, each mark is shown at the ends of that range.</p>
+  <p>Each file lives in <code>ui/web/public/</code> and opens with a comment naming the sizes it is drawn for. Below, each mark appears at the sizes at either end of its range.</p>
   <?php foreach ($marks as $mark): ?>
     <section class="ds-logo-mark" aria-labelledby="<?= $escape($id($mark)) ?>">
       <h3 id="<?= $escape($id($mark)) ?>"><code><?= $escape($mark['file']) ?></code></h3>
@@ -35,5 +35,6 @@ $id = static fn(array $mark): string => 'mark-' . pathinfo($mark['file'], PATHIN
 </section>
 <section aria-labelledby="light-and-dark">
   <h2 id="light-and-dark">Light and dark</h2>
-  <p><?= $files($adapting) ?> <?= $verb($adapting, 'draws', 'draw') ?> a second version of the mark for dark color schemes, chosen by the <code>prefers-color-scheme</code> media query inside the file<?php if ($fixed !== []): ?>; <?= $files($fixed) ?> <?= $verb($fixed, 'has', 'have') ?> one version for both<?php endif; ?>. Shown as an image, a mark follows the color scheme of the page around it, not the operating system’s setting, so on this website it changes with the theme toggle in the header.</p>
+  <p><?= $files($adapting) ?> <?= $verb($adapting, 'draws', 'draw') ?> a second version for dark color schemes, chosen by a <code>prefers-color-scheme</code> media query inside the file<?php if ($fixed !== []): ?>; <?= $files($fixed) ?> <?= $verb($fixed, 'has', 'have') ?> one version for both<?php endif; ?>.</p>
+  <p>Shown as an image, a mark takes its color scheme from the page around it rather than from the operating system, so on this website it changes with the theme toggle in the header.</p>
 </section>

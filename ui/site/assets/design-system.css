@@ -102,8 +102,10 @@
 .ds-logo-label { color: var(--color-muted-foreground); font-size: 13px; font-variant-numeric: tabular-nums; }
 .ds-logo-figure figcaption { margin-top: 8px; color: var(--color-muted-foreground); font-size: 14px; }
 
+/* Four columns fit the article on desktop and scroll inside their region on phones. */
 .manual-article .ds-website-table table { min-width: 640px; }
-.manual-article .ds-website-table code { overflow-wrap: normal; }
+.manual-article .ds-website-table th, .manual-article .ds-website-table td { min-width: 0; padding: 10px 8px; background: none; overflow-wrap: normal; }
+.manual-article .ds-website-table thead th { padding-top: 0; }
+.manual-article .ds-website-table code { padding: 0; background: none; font-size: 12px; }
 .ds-website-table tbody th { white-space: nowrap; }
-.ds-website-value { white-space: nowrap; }
 /* end logo and website */

@@ -109,7 +109,7 @@ return [
             'title' => 'Website',
             'summary' => 'Where this website departs from the application’s design.',
             'description' => 'Where Bånder’s public website departs from the application’s design: body text, eyebrow labels, two moods, a softer dark foreground and picture sizes.',
-            'opening' => 'This website follows the application’s design language, with changes for long reading and static pages. The table lists them with the values the site’s stylesheets set.',
+            'opening' => 'This website follows the application’s design language, with changes for long reading and static pages. The table lists them with the values the site’s stylesheets and theme set.',
             'borrow' => [
                 ['id' => 'static-public-website', 'document' => 'ui/DESIGN.md', 'headings' => ['Static public website']],
             ],
