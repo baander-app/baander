@@ -11,6 +11,12 @@ use RuntimeException;
 
 final class AssetPublication
 {
+    /** The shared design-token mood the site uses as its light theme and its system-preference light fallback. */
+    public const string LIGHT_MOOD = 'balanced';
+
+    /** The cassette marks the site publishes from the web client, each drawn for its own size range. */
+    private const array MARKS = ['logo.svg', 'icon.svg', 'favicon.svg'];
+
     /** The Latin variable faces the site self-hosts, by the family names the shared font stacks use. */
     private const array FONTS = ['Geist Variable' => 'geist', 'Geist Mono Variable' => 'geist-mono'];
 
@@ -77,14 +83,16 @@ final class AssetPublication
     private const array MOVED_PAGES = ['/baac/' => '/bac/'];
 
     /**
-     * Copies the branding and the Latin faces, and writes the site theme with the faces declared before it.
+     * Copies the cassette marks and the Latin faces, and writes the site theme with the faces declared before it.
      *
      * @return array<string,string> the published path of each Latin face, by family, for pages to preload
      */
     public static function assets(string $root, string $staging): array
     {
         $destination = $staging . '/assets/site';
-        self::copy($root . '/ui/web/public/logo.svg', $destination . '/logo.svg');
+        foreach (self::MARKS as $mark) {
+            self::copy($root . '/ui/web/public/' . $mark, $destination . '/' . $mark);
+        }
         $faces = self::latinFaces($root, $staging);
         file_put_contents($destination . '/theme.css', self::fonts($root, $faces) . self::theme($root));
         return $faces;
@@ -98,8 +106,9 @@ final class AssetPublication
     public static function theme(string $root): string
     {
         $tokens = file_get_contents($root . '/ui/design-tokens/build/web/theme.css');
-        if ($tokens === false || !preg_match('/:root\[data-theme="balanced"\]:not\(\[data-accent\]\)\s*\{([^}]+)\}/', $tokens, $light)) {
-            throw new RuntimeException('The shared balanced theme is missing; rebuild design tokens.');
+        $rule = '/:root\[data-theme="' . preg_quote(self::LIGHT_MOOD, '/') . '"\]:not\(\[data-accent\]\)\s*\{([^}]+)\}/';
+        if ($tokens === false || !preg_match($rule, $tokens, $light)) {
+            throw new RuntimeException('The shared ' . self::LIGHT_MOOD . ' theme is missing; rebuild design tokens.');
         }
         $tone = file_get_contents($root . '/ui/site/theme-tone.css')
             ?: throw new RuntimeException('The site theme tone is missing: ui/site/theme-tone.css.');

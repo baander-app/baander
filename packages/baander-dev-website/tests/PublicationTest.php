@@ -26,6 +26,9 @@ final class PublicationTest extends TestCase
         'Geist Mono Variable' => '/assets/site/fonts/geist-mono-latin-wght-normal-fedcba9876543210.woff2',
     ];
 
+    /** The cassette marks the web client serves, which the site publishes beside its own assets. */
+    private const array MARKS = ['logo.svg', 'icon.svg', 'favicon.svg'];
+
     private string $directory;
 
     protected function setUp(): void
@@ -110,7 +113,6 @@ final class PublicationTest extends TestCase
         $this->writeSources($root);
         $published = AssetPublication::assets($root, $this->directory);
         $fonts = $this->directory . '/assets/site/fonts';
-        self::assertFileExists($this->directory . '/assets/site/logo.svg');
         $files = array_map(basename(...), glob($fonts . '/*') ?: []);
         sort($files);
         $hash = static fn(string $content): string => substr(hash('sha256', $content), 0, 16);
@@ -132,6 +134,31 @@ final class PublicationTest extends TestCase
         self::assertStringContainsString('@media (prefers-color-scheme: light)', $css);
         self::assertStringContainsString(':root:not([data-theme])', $css);
         self::assertStringEndsWith(':root[data-theme="dark"] { --color-foreground: #e6e6e9; }', $css, 'The site tone follows the shared tokens');
+    }
+
+    public function testSharedAssetsPublishTheThreeCassetteMarksByteIdenticalToTheWebClient(): void
+    {
+        $root = $this->directory . '/source';
+        $this->writeSources($root);
+        AssetPublication::assets($root, $this->directory);
+        foreach (self::MARKS as $mark) {
+            self::assertFileEquals(self::repository() . '/ui/web/public/' . $mark, $this->directory . '/assets/site/' . $mark, $mark);
+        }
+    }
+
+    public function testTheSystemLightFallbackCarriesTheBalancedMoodTheConstantNames(): void
+    {
+        $root = $this->directory . '/source';
+        $this->writeSources($root);
+        $tokens = $root . '/ui/design-tokens/build/web/theme.css';
+        file_put_contents($tokens, ':root[data-theme="warm"]:not([data-accent]) { color-scheme: light; --color-background: #faf3e8; }' . "\n" . file_get_contents($tokens));
+
+        self::assertSame('balanced', AssetPublication::LIGHT_MOOD);
+        self::assertStringContainsString(
+            "@media (prefers-color-scheme: light) {\n:root:not([data-theme]) { color-scheme: light; --color-background: #f5f5f5; }\n}",
+            AssetPublication::theme($root),
+            'The system-preference light fallback carries the declarations of the constant\'s mood, not of the first light mood',
+        );
     }
 
     public function testTheThemeDeclaresMetricMatchedFallbackFacesAfterEachGeistFamily(): void
@@ -410,15 +437,22 @@ final class PublicationTest extends TestCase
         ];
     }
 
+    private static function repository(): string
+    {
+        return dirname(__DIR__, 3);
+    }
+
     /**
-     * Writes the sources the shared assets read: branding, the site tone, the design tokens with the
-     * shared font stacks, and Fontsource-shaped packages for every family the stacks name.
+     * Writes the sources the shared assets read: the web client's cassette marks, the site tone, the design
+     * tokens with the shared font stacks, and Fontsource-shaped packages for every family the stacks name.
      */
     private function writeSources(string $root): void
     {
         mkdir($root . '/ui/web/public', 0700, true);
         mkdir($root . '/ui/site', 0700, true);
-        file_put_contents($root . '/ui/web/public/logo.svg', '<svg></svg>');
+        foreach (self::MARKS as $mark) {
+            copy(self::repository() . '/ui/web/public/' . $mark, $root . '/ui/web/public/' . $mark);
+        }
         file_put_contents($root . '/ui/site/theme-tone.css', ':root[data-theme="dark"] { --color-foreground: #e6e6e9; }');
         $default = ['"Noto Sans SC Variable"', '"Noto Sans TC Variable"', '"Noto Sans JP Variable"', '"Noto Sans KR Variable"'];
         $orders = ['' => $default, '-ja' => ['"Noto Sans JP Variable"', '"Noto Sans SC Variable"', '"Noto Sans TC Variable"', '"Noto Sans KR Variable"'],
