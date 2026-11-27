@@ -40,11 +40,12 @@ final class Contrast
 
     /**
      * A ratio as text with two decimals, truncated rather than rounded, so a ratio just below a
-     * target never reads as meeting it.
+     * target never reads as meeting it. The hundredths are rounded to six places before the floor,
+     * because a binary double such as 1.15 scales to 114.999…, which would truncate a decimal down.
      */
     public static function format(float $ratio): string
     {
-        return number_format(floor($ratio * 100) / 100, 2, '.', '');
+        return number_format(floor(round($ratio * 100, 6)) / 100, 2, '.', '');
     }
 
     private static function luminance(string $color): float

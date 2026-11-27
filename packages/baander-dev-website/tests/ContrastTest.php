@@ -38,6 +38,13 @@ final class ContrastTest extends TestCase
         self::assertSame('21.00', Contrast::format(21.0));
     }
 
+    public function testFormatKeepsADecimalWhoseBinaryValueFallsJustBelowIt(): void
+    {
+        self::assertSame('1.15', Contrast::format(1.15));
+        self::assertSame('2.01', Contrast::format(2.01));
+        self::assertSame('4.49', Contrast::format(4.4999));
+    }
+
     public function testAColorThatIsNotOpaqueHexFails(): void
     {
         $this->expectExceptionMessage('Contrast needs an opaque #rrggbb color, not transparent.');

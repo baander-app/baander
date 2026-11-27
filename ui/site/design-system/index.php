@@ -54,11 +54,11 @@ return [
             'opening' => 'Layout values come from two scales, spacing and radius, each with a short list of uses. Surfaces stay flat, with one exception: the well, a recessed face that one surface holds at a time.',
             'borrow' => [
                 ['id' => 'app-shell', 'document' => 'ui/DESIGN.md', 'headings' => ['Layout', 'App Shell']],
+                ['id' => 'footer-player', 'document' => 'ui/DESIGN.md', 'headings' => ['Layout', 'Footer player']],
+                ['id' => 'notification-pane', 'document' => 'ui/DESIGN.md', 'headings' => ['Layout', 'Notification pane']],
                 ['id' => 'surfaces', 'document' => 'ui/DESIGN.md', 'headings' => ['Layout', 'Surfaces']],
                 ['id' => 'border-radius', 'document' => 'ui/DESIGN.md', 'headings' => ['Layout', 'Border radius']],
                 ['id' => 'spacing', 'document' => 'ui/DESIGN.md', 'headings' => ['Layout', 'Spacing']],
-                ['id' => 'footer-player', 'document' => 'ui/DESIGN.md', 'headings' => ['Layout', 'Footer player']],
-                ['id' => 'notification-pane', 'document' => 'ui/DESIGN.md', 'headings' => ['Layout', 'Notification pane']],
             ],
         ],
         [

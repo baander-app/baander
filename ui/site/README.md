@@ -332,12 +332,12 @@ ICON-GUIDE.md are the documents in `ui/`, paths under `tokens/` are in
 | Color | the Surfaces list and the Token and Use table of DESIGN.md; the default accent's colors per mood from `theme.css`; the mood names from `tokens/web/semantic-colors.json`; the website's dark foreground from `ui/site/theme-tone.css` | DESIGN.md › Color › Token authority, without its table |
 | Accents | the identity colors from `tokens/accent/palette.json`; all 32 color blocks of `theme.css`; the contrast targets from `semantic-colors.json` | DESIGN.md › Color › Dynamic accent; Foreground-on-accent contrast |
 | Type | the Roles table of DESIGN.md joined with `tokens/base/type.json`; samples set in the role classes of `site.css` | DESIGN.md › Typography › Roles, without its table |
-| Layout | the spacing and radius scales of `theme.css`; the Spacing and Border radius lists of DESIGN.md | DESIGN.md › Layout › App Shell; Surfaces; Border radius; Spacing; Footer player; Notification pane |
+| Layout | the spacing and radius scales of `theme.css`; the Border radius list of DESIGN.md, and the items of its Spacing list that describe a padding or a gap | DESIGN.md › Layout › App Shell; Footer player; Notification pane; Surfaces; Border radius; Spacing |
 | Motion | the Motion table and the anti-patterns' duration limit in DESIGN.md; the duration tokens of `theme.css`, with the files under `ui/site/assets/` and `ui/web/src/` that use each | DESIGN.md › Motion, without its table |
 | Iconography | nothing beyond the borrowed sections | ICON-GUIDE.md › When to Use Icons; Canonical Concept to Icon Assignments; DESIGN.md › Components › Icons in menu lists |
 | Writing | nothing beyond the borrowed sections | DESIGN.md › Writing; Components › Loading states; Error states; Empty states; Typography › Content language, from its last paragraph |
 | Logo | the size comment that opens `logo.svg`, `icon.svg` and `favicon.svg` in `ui/web/public/` | nothing |
-| Website | the `body` and `.eyebrow` declarations of `site.css`; the dark foreground of `theme-tone.css`; the moods of `semantic-colors.json` and the light mood in `AssetPublication::LIGHT_MOOD`; the `body` and `label` roles | DESIGN.md › Static public website |
+| Website | the `body` and `.eyebrow` declarations of `site.css`; the dark foreground of `theme-tone.css`; the moods of `semantic-colors.json` and the light mood in `AssetPublication::LIGHT_MOOD`, in `packages/baander-dev-website/src/Assets/AssetPublication.php`; the `body` and `label` roles of `tokens/base/type.json` | DESIGN.md › Static public website |
 
 The build fails, naming the cause, when a page's input is missing or disagrees with
 another:
@@ -345,8 +345,8 @@ another:
 - a borrowed heading path that names no section or several, with the data file,
   the document and the path; a renamed heading is fixed with a one-line edit to the
   data file;
-- a borrowed section that links to anything but an `https:` address, or holds raw
-  HTML, because nothing rewrites a repository link for these pages;
+- a borrowed section with a link or an image whose address is not `https:`, or
+  with raw HTML, because nothing rewrites a repository address for these pages;
 - a token, theme block, table column, type role or stylesheet declaration a page
   reads, with the file and the missing part;
 - a documented color role that a mood and accent block does not set;

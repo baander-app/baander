@@ -4,7 +4,7 @@ $scales = [
     ['id' => 'radius-scale', 'title' => 'Radius scale', 'steps' => $section['values']['radii'], 'sample' => 'radius'],
 ];
 ?>
-<p>A token’s documented use is the label of each item in the Spacing or Border radius list below that names its pixel value. A token that no item names has none.</p>
+<p>A token’s documented use is the label of each item in the Border radius list below that names its pixel value, and of each item in the Spacing list that names it and describes a padding or a gap in its label or first sentence. A token that no such item names has none.</p>
 <?php foreach ($scales as $scale): ?>
   <section class="ds-layout" aria-labelledby="<?= $escape($scale['id']) ?>">
     <h2 id="<?= $escape($scale['id']) ?>"><?= $escape($scale['title']) ?></h2>

@@ -126,6 +126,17 @@ final class DesignTokensTest extends TestCase
         self::assertSame('60ms', $tokens->durations()['--duration-hover']);
     }
 
+    public function testAScaleWithSubjectsCreditsOnlyTheItemsThatNameOne(): void
+    {
+        $items = ['Header height: `48px`', 'Section gap: `48px`', 'Compact rows: `4px` vertical padding', 'Panel width: `16px` wide. Padding is not set here.'];
+        $uses = array_column(DesignTokens::load($this->root)->scale('space', $items, ['padding', 'gap']), 'uses', 'name');
+
+        self::assertSame(['Section gap'], $uses['--space-2xl'], 'An item about a component dimension is not a use.');
+        self::assertSame(['Compact rows'], $uses['--space-xs'], 'A subject named after the label counts.');
+        self::assertSame([], $uses['--space-md'], 'A subject named after the first sentence does not count.');
+        self::assertSame(['Header height', 'Section gap'], array_column(DesignTokens::load($this->root)->scale('space', $items), 'uses', 'name')['--space-2xl']);
+    }
+
     public function testEveryAccentMeetsTheGeneratorTargetsInEveryMood(): void
     {
         $tokens = DesignTokens::load($this->root);

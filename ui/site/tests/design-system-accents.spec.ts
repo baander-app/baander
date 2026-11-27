@@ -9,7 +9,8 @@ const repository = (path: string) => readFileSync(fileURLToPath(new URL(`../../.
 const semantics = JSON.parse(repository('ui/design-tokens/tokens/web/semantic-colors.json'));
 const moods: Record<string, string> = semantics.moods;
 const palette: Record<string, { value: string }> = JSON.parse(repository('ui/design-tokens/tokens/accent/palette.json')).accent;
-const defaultAccent = repository('ui/design-tokens/build/web/theme.css').match(/\[data-accent="([a-z]+)"\],\s*:root\[data-theme="dark"\]:not\(\[data-accent\]\)/)![1];
+const theme = repository('ui/design-tokens/build/web/theme.css');
+const defaultAccent = theme.match(/\[data-accent="([a-z]+)"\],\s*:root\[data-theme="dark"\]:not\(\[data-accent\]\)/)![1];
 const title = (accent: string) => accent[0].toUpperCase() + accent.slice(1);
 
 const luminance = (color: string) => {
@@ -23,7 +24,14 @@ const contrast = (first: string, second: string) => {
   const [lighter, darker] = [luminance(first), luminance(second)].sort((a, b) => b - a);
   return (lighter + 0.05) / (darker + 0.05);
 };
-const truncated = (ratio: number) => `${(Math.floor(ratio * 100) / 100).toFixed(2)}:1`;
+// The hundredths are rounded to six places before the floor, as the page's formatter does, so a binary
+// double such as 1.15, which scales to 114.999…, still truncates to its own decimal.
+const truncated = (ratio: number) => `${(Math.floor(Number((ratio * 100).toFixed(6))) / 100).toFixed(2)}:1`;
+/** The color variables the generated theme declares for one mood with one accent. */
+const built = (mood: string, accent: string) => {
+  const block = theme.split(`:root[data-theme="${mood}"][data-accent="${accent}"]`)[1].split('{')[1].split('}')[0];
+  return Object.fromEntries([...block.matchAll(/(--color-[a-z0-9-]+):\s*([^;]+);/g)].map(([, name, value]) => [name, value.trim()]));
+};
 
 const appearances = ['dark', 'light'] as const;
 const openIn = async (page: Page, appearance: (typeof appearances)[number]) => {
@@ -96,6 +104,32 @@ test('every printed ratio is the WCAG 2 contrast between the two colors in its c
     expect(codes).toHaveLength(2);
     expect(ratio).toBe(truncated(contrast(codes[0], codes[1])));
     expect(contrast(codes[0], codes[1])).toBeGreaterThanOrEqual(targets[column - 1]);
+  }
+});
+
+test('accent text and the ring are measured on the lowest of the surfaces the page names, printed with its built color', async ({ page }) => {
+  await page.goto('/design-system/accents/');
+  const intro = (await page.locator('#derived-colors ~ p').first().textContent())!;
+  const surfaces = intro.match(/the token generator checks, (.+?), and the table gives/)![1].split(/, | and /);
+  expect(surfaces).toHaveLength(7);
+  for (const [mood, label] of Object.entries(moods)) {
+    const rows = await moodTable(page, label).locator('tbody tr').evaluateAll((elements) => elements.map((element) => ({
+      accent: element.querySelector('.ds-accents-name')!.firstChild!.textContent!.trim().toLowerCase(),
+      measures: [...element.querySelectorAll('td')].slice(1).map((cell) => ({
+        codes: [...cell.querySelectorAll('code')].map((code) => code.textContent!),
+        surface: cell.querySelector('.ds-accents-measure')!.textContent!.match(/ on ([a-z]+) /)![1],
+      })),
+    })));
+    expect(rows.map((row) => row.accent)).toEqual(Object.keys(palette));
+    for (const { accent, measures } of rows) {
+      const colors = built(mood, accent);
+      for (const { codes: [derived, printed], surface } of measures) {
+        const where = `${mood} ${accent} ${derived} on ${surface}`;
+        expect(surfaces, where).toContain(surface);
+        expect(printed, where).toBe(colors[`--color-${surface}`]);
+        expect(contrast(derived, printed), where).toBe(Math.min(...surfaces.map((name) => contrast(derived, colors[`--color-${name}`]))));
+      }
+    }
   }
 });
 

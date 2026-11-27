@@ -52,6 +52,10 @@ final class DesignDocumentTest extends TestCase
 
         A <b>bold</b> claim.
 
+        ### Images
+
+        ![The archive](https://baander.app/archive.png) beside ![the shelf](shelf.png).
+
         ## Motion
 
         Motion is brief.
@@ -143,6 +147,7 @@ final class DesignDocumentTest extends TestCase
         yield 'missing' => [['Layout', 'Grids'], 'ui/DESIGN.md › Layout › Grids does not exist.'];
         yield 'ambiguous' => [['Spacing'], 'ui/DESIGN.md › Spacing names 2 sections.'];
         yield 'relative link' => [['Color', 'Links'], 'ui/DESIGN.md › Color › Links links to ../rules.md, which the site cannot resolve; link to an https: address.'];
+        yield 'relative image' => [['Color', 'Images'], 'ui/DESIGN.md › Color › Images shows the image shelf.png, which the site cannot resolve; use an https: address.'];
         yield 'raw markup' => [['Color', 'Markup'], 'ui/DESIGN.md › Color › Markup holds raw HTML.'];
     }
 

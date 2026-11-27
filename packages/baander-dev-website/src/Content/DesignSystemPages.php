@@ -67,9 +67,13 @@ final class DesignSystemPages
     private const string TONE = 'ui/site/theme-tone.css';
     private const string MARKS = 'ui/web/public';
     private const string APPLICATION = 'ui/web/src';
+    /** The class that sets the website's light mood. */
+    private const string ASSET_PUBLICATION = 'packages/baander-dev-website/src/Assets/AssetPublication.php';
     /** The dark theme's selector in the website's tone, whose foreground it softens. */
     private const string DARK_TONE = ':root[data-theme="dark"]:not([data-accent])';
     private const string OVERVIEW = 'overview';
+    /** The Spacing list also states component dimensions; only an item about one of these uses the spacing scale. */
+    private const array SPACING_SUBJECTS = ['padding', 'gap'];
 
     private const array BORROW = [
         'id' => FeatureField::Id,
@@ -239,7 +243,7 @@ final class DesignSystemPages
             'type' => [['roles' => self::typeRoles($tokens, $design)], [DesignTokens::TYPE, self::SITE_STYLESHEET]],
             'layout' => [
                 [
-                    'spacing' => $tokens->scale('space', $design->items(['Layout', 'Spacing'])),
+                    'spacing' => $tokens->scale('space', $design->items(['Layout', 'Spacing']), self::SPACING_SUBJECTS),
                     'radii' => $tokens->scale('radius', $design->items(['Layout', 'Border radius'])),
                 ],
                 [DesignTokens::THEME],
@@ -249,7 +253,7 @@ final class DesignSystemPages
                 [DesignTokens::THEME, 'ui/site/assets', self::APPLICATION],
             ],
             'logo' => [['marks' => self::marks($root)], array_map(static fn(string $file): string => self::MARKS . '/' . $file, AssetPublication::MARKS)],
-            'website' => [self::website($root, $tokens, $design), [self::SITE_STYLESHEET, self::TONE, DesignTokens::THEME, DesignTokens::TYPE]],
+            'website' => [self::website($root, $tokens, $design), [self::SITE_STYLESHEET, self::TONE, DesignTokens::THEME, DesignTokens::TYPE, DesignTokens::SEMANTICS, self::ASSET_PUBLICATION]],
             default => [[], []],
         };
     }

@@ -10,9 +10,10 @@ use League\CommonMark\Extension\CommonMark\Node\Block\Heading;
 use League\CommonMark\Extension\CommonMark\Node\Block\HtmlBlock;
 use League\CommonMark\Extension\CommonMark\Node\Block\ListBlock;
 use League\CommonMark\Extension\CommonMark\Node\Block\ThematicBreak;
+use League\CommonMark\Extension\CommonMark\Node\Inline\AbstractWebResource;
 use League\CommonMark\Extension\CommonMark\Node\Inline\Code;
 use League\CommonMark\Extension\CommonMark\Node\Inline\HtmlInline;
-use League\CommonMark\Extension\CommonMark\Node\Inline\Link;
+use League\CommonMark\Extension\CommonMark\Node\Inline\Image;
 use League\CommonMark\Extension\Table\Table;
 use League\CommonMark\Extension\Table\TableCell;
 use League\CommonMark\Extension\Table\TableExtension;
@@ -33,9 +34,9 @@ use RuntimeException;
  * next heading of the same or a higher level, and a path must name exactly one.
  *
  * The site publishes these documents' rules as they stand: tables and lists come back as text for
- * pages that add values beside them, and a whole section comes back rendered. A rendered section may
- * link only to `https:` addresses, because nothing rewrites a repository-relative link for the site,
- * and it may hold no raw HTML.
+ * pages that add values beside them, and a whole section comes back rendered. A rendered section's
+ * links and images may point only to `https:` addresses, because nothing rewrites a
+ * repository-relative address for the site, and it may hold no raw HTML.
  */
 final readonly class DesignDocument
 {
@@ -226,8 +227,10 @@ final readonly class DesignDocument
     private function checkBorrowable(array $headings, Node $block): void
     {
         foreach ($block->iterator() as $node) {
-            if ($node instanceof Link && !str_starts_with($node->getUrl(), 'https://')) {
-                throw $this->problem($headings, 'links to ' . $node->getUrl() . ', which the site cannot resolve; link to an https: address');
+            if ($node instanceof AbstractWebResource && !str_starts_with($node->getUrl(), 'https://')) {
+                throw $this->problem($headings, $node instanceof Image
+                    ? 'shows the image ' . $node->getUrl() . ', which the site cannot resolve; use an https: address'
+                    : 'links to ' . $node->getUrl() . ', which the site cannot resolve; link to an https: address');
             }
             if ($node instanceof HtmlBlock || $node instanceof HtmlInline) {
                 throw $this->problem($headings, 'holds raw HTML');

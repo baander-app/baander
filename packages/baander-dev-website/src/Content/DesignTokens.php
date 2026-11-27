@@ -156,17 +156,22 @@ final readonly class DesignTokens
     /**
      * The variables of one scale, smallest first, each with the items of a `ui/DESIGN.md` list that state
      * its size. An item counts when it reads `Label: …` and the sentence after the label names the step's
-     * size in pixels; the use is the label.
+     * size in pixels; the use is the label. With `$subjects`, an item counts only when its label or that
+     * sentence also names one of those words, so a list that mixes uses of the scale with component
+     * dimensions of the same size credits only the uses.
      *
      * @param string $prefix the variable prefix: `space` or `radius`
      * @param list<string> $items the list items that state sizes
+     * @param list<string> $subjects words one of which an item must name, such as `padding`; none admits every item
      * @return list<ScaleStep>
      */
-    public function scale(string $prefix, array $items = []): array
+    public function scale(string $prefix, array $items = [], array $subjects = []): array
     {
+        $describes = static fn(string $text): bool => $subjects === []
+            || preg_match('/\b(?:' . implode('|', array_map(static fn(string $subject): string => preg_quote($subject, '/'), $subjects)) . ')\b/iu', $text) === 1;
         $documented = [];
         foreach ($items as $item) {
-            if (preg_match('/^([^:]+):\s*([^.]*)/u', $item, $match) === 1) {
+            if (preg_match('/^([^:]+):\s*([^.]*)/u', $item, $match) === 1 && $describes($match[1] . ' ' . $match[2])) {
                 preg_match_all('/(?<![\d.])(\d+(?:\.\d+)?)px\b/', $match[2], $sizes);
                 foreach ($sizes[1] as $size) {
                     $documented[(string) (float) $size][] = trim($match[1]);

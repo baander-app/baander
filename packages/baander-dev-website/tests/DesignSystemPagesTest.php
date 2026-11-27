@@ -63,7 +63,7 @@ final class DesignSystemPagesTest extends TestCase
             self::assertSame([['title' => 'Typography', 'url' => '/typography/']], $section['related']);
         }
         self::assertSame(
-            ['app-shell', 'surfaces', 'border-radius', 'spacing', 'footer-player', 'notification-pane'],
+            ['app-shell', 'footer-player', 'notification-pane', 'surfaces', 'border-radius', 'spacing'],
             array_keys($pages[4]['data']['designSystem']['borrowed']),
         );
         self::assertSame('Border radius', $pages[4]['data']['designSystem']['borrowed']['border-radius']['title']);
@@ -85,6 +85,8 @@ final class DesignSystemPagesTest extends TestCase
         self::assertContains('ui/ICON-GUIDE.md', $sources['/design-system/iconography/']);
         self::assertContains('ui/web/src', $sources['/design-system/motion/']);
         self::assertContains('ui/web/public/favicon.svg', $sources['/design-system/logo/']);
+        self::assertContains('ui/design-tokens/tokens/web/semantic-colors.json', $sources['/design-system/website/']);
+        self::assertContains('packages/baander-dev-website/src/Assets/AssetPublication.php', $sources['/design-system/website/']);
         self::assertNotContains('ui/ICON-GUIDE.md', $sources['/design-system/color/']);
     }
 
@@ -100,6 +102,12 @@ final class DesignSystemPagesTest extends TestCase
         self::assertCount(8, $values[2]['derivations']['cool']);
         self::assertSame('Continue watching', $values[3]['roles']['hero']['sample']);
         self::assertSame('--space-xs', $values[4]['spacing'][0]['name']);
+        self::assertSame(
+            ['--space-xs' => ['Compact mode lists'], '--space-sm' => [], '--space-md' => ['Item gap'], '--space-lg' => ['Page padding'], '--space-xl' => ['Section gap'], '--space-2xl' => [], '--space-3xl' => []],
+            array_column($values[4]['spacing'], 'uses', 'name'),
+            'The Spacing list credits a step only with its padding and gap items, not with Header height or Context panel width.',
+        );
+        self::assertSame(['Cards'], array_column($values[4]['radii'], 'uses', 'name')['--radius-lg']);
         self::assertSame('Hover state', $values[5]['rows'][7]['transition']);
         $fast = array_find($values[5]['durations'], static fn(array $duration): bool => $duration['name'] === '--duration-fast');
         self::assertContains('ui/site/assets/site.css', $fast['website']);
