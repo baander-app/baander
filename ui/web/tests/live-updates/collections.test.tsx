@@ -127,7 +127,7 @@ describe('personal collection freshness', () => {
       expect(screen.queryByText('Playlist not found')).toBeNull()
       expect(http.history.get).toHaveLength(0)
     } finally { release() }
-    await screen.findByRole('heading', { name: 'Available mix', exact: true })
+    await screen.findByRole('heading', { name: 'Available mix' })
     expect(http.history.get.filter(request => request.url === '/api/playlists/mix')).toHaveLength(1)
   })
 
@@ -266,6 +266,9 @@ describe('personal collection freshness', () => {
     await screen.findByText('Shared mix')
     fireEvent.click(screen.getAllByRole('button', { name: /Share/ })[0])
     await screen.findByText('friend')
+    // The coordinator folds a later wake into an earlier pending one, so a wake still armed on the
+    // real clock would absorb the hint's refresh and never fire under fake time.
+    await waitFor(() => expect(coordinator.getWorkSnapshot().wakeScheduled).toBe(false))
     vi.useFakeTimers()
     denied = true
     await act(async () => {
