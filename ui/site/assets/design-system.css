@@ -25,3 +25,65 @@
   .ds-pages li { grid-template-columns: minmax(0, 1fr); }
   .ds-opening { font-size: 16px; }
 }
+
+/* Color and accents pages */
+.manual-article .ds-color-table th, .manual-article .ds-color-table td,
+.manual-article .ds-accents-table th, .manual-article .ds-accents-table td { min-width: 0; padding: 10px 8px; background: none; }
+.manual-article .ds-color-table thead th, .manual-article .ds-accents-table thead th { padding-top: 0; }
+.manual-article .ds-color-table code, .manual-article .ds-accents-table code { padding: 0; background: none; font-size: 12px; }
+.ds-color-table .ds-swatch, .ds-accents-table .ds-swatch { margin-right: 6px; }
+.ds-color-table tbody th[scope="rowgroup"] { width: 128px; min-width: 112px; font-weight: 600; }
+.ds-color-table tbody th[scope="row"] { font-weight: 400; white-space: nowrap; }
+.ds-color-table tbody tr:not(:last-child) > * { border-bottom-color: transparent; }
+.ds-color-table tbody tr:not(:last-child) > th[scope="rowgroup"] { border-bottom-color: var(--color-border); }
+.ds-color-detail { display: block; margin-top: 4px; color: var(--color-muted-foreground); font-size: 13px; font-weight: 400; line-height: 1.45; }
+
+.manual-article .ds-accents-identities { display: grid; grid-template-columns: repeat(auto-fill, minmax(132px, 1fr)); gap: 16px; padding: 0; list-style: none; }
+.ds-accents-identities li { display: grid; gap: 8px; margin: 0; padding: 12px; border: 1px solid var(--color-border); border-radius: var(--radius-md); }
+.ds-accents-identities .ds-swatch { width: 24px; height: 24px; vertical-align: -7px; }
+.ds-accents-name { display: block; font-weight: 600; white-space: nowrap; }
+.ds-accents-default { margin-left: 4px; color: var(--color-muted-foreground); font-size: 12px; font-weight: 400; }
+.ds-accents-table tbody th .ds-value { display: block; margin-top: 4px; font-weight: 400; }
+.ds-accents-table td { white-space: nowrap; }
+.ds-accents-measure { display: block; margin-top: 4px; color: var(--color-muted-foreground); font-size: 13px; }
+.ds-accents-measure .ds-swatch { width: 12px; height: 12px; margin: 0 4px 0 2px; vertical-align: -1px; }
+.ds-accents-ratio { color: var(--color-foreground); font-weight: 600; }
+/* end color and accents */
+
+/* Type, layout and motion pages */
+.ds-type-roles th, .ds-type-roles td, .ds-layout-scale th, .ds-layout-scale td, .ds-motion-transitions th, .ds-motion-transitions td, .ds-motion-tokens th, .ds-motion-tokens td { min-width: 0; overflow-wrap: normal; }
+.manual-article .ds-type-roles table { min-width: 720px; }
+.manual-article .ds-layout-scale table { min-width: 480px; }
+.manual-article .ds-motion-tokens table { min-width: 560px; }
+.ds-type-roles tbody th, .ds-layout-scale tbody th, .ds-motion-tokens tbody th { white-space: nowrap; overflow-wrap: normal; }
+.ds-motion-users code { overflow-wrap: anywhere; }
+.ds-motion-users p { margin: 0 0 8px; }
+.ds-motion-users p:last-child { margin: 0; }
+.ds-motion-users summary { cursor: pointer; }
+.ds-motion-users ul { margin: 8px 0 0; padding-left: 16px; }
+.ds-motion-users li { margin: 4px 0; }
+
+/* A sample sits beside its role's name; on phones the name goes above it. */
+.ds-type-samples { padding: 0; list-style: none; }
+.manual-article .ds-type-samples { padding-left: 0; }
+.ds-type-samples li { display: grid; grid-template-columns: minmax(0, 120px) minmax(0, 1fr); gap: 8px 24px; align-items: baseline; margin: 0; padding: 16px 0; border-top: 1px solid var(--color-border); }
+.ds-type-samples li:last-child { border-bottom: 1px solid var(--color-border); }
+.ds-type-samples p { margin: 0; }
+.ds-type-name { color: var(--color-muted-foreground); }
+.ds-type-links li { margin: 8px 0; }
+
+/* Live scale samples read the published tokens: a bar as wide as a spacing step, and the corner of a
+   square rounded by a radius step. */
+.ds-layout-space { display: block; width: var(--sample); height: 8px; border-radius: 2px; background: var(--color-primary); }
+.ds-layout-radius { display: block; width: 32px; height: 32px; border-top: 2px solid var(--color-muted-foreground); border-left: 2px solid var(--color-muted-foreground); border-top-left-radius: var(--sample); }
+
+@media (max-width: 640px) {
+  .ds-type-samples li { grid-template-columns: minmax(0, 1fr); }
+}
+/* end type, layout and motion */
+
+/* Iconography and writing pages */
+/* end iconography and writing */
+
+/* Logo and website pages */
+/* end logo and website */

@@ -232,6 +232,7 @@ final class DesignSystemPages
                     'defaultAccent' => $tokens->defaultAccent(),
                     'targets' => $tokens->targets(),
                     'derivations' => $tokens->accentDerivations(),
+                    'surfaces' => self::accentSurfaces($tokens),
                 ],
                 [DesignTokens::THEME, DesignTokens::PALETTE, DesignTokens::SEMANTICS],
             ],
@@ -243,7 +244,10 @@ final class DesignSystemPages
                 ],
                 [DesignTokens::THEME],
             ],
-            'motion' => [['rows' => $tokens->motion($design), 'durations' => self::durations($root, $tokens)], [DesignTokens::THEME, 'ui/site/assets', self::APPLICATION]],
+            'motion' => [
+                ['rows' => $tokens->motion($design), 'durations' => self::durations($root, $tokens), 'limit' => self::motionLimit($design)],
+                [DesignTokens::THEME, 'ui/site/assets', self::APPLICATION],
+            ],
             'logo' => [['marks' => self::marks($root)], array_map(static fn(string $file): string => self::MARKS . '/' . $file, AssetPublication::MARKS)],
             'website' => [self::website($root, $tokens, $design), [self::SITE_STYLESHEET, self::TONE, DesignTokens::THEME, DesignTokens::TYPE]],
             default => [[], []],
@@ -267,6 +271,25 @@ final class DesignSystemPages
         }
 
         return $roles;
+    }
+
+    /**
+     * The surfaces accent text and the focus ring are measured against, so the accents page can print
+     * the color each lowest ratio falls on.
+     *
+     * @return array<string, array<string, array<string, string>>> colors by mood, accent and surface name
+     */
+    private static function accentSurfaces(DesignTokens $tokens): array
+    {
+        $surfaces = [];
+        foreach (array_keys($tokens->moods()) as $mood) {
+            foreach (array_keys($tokens->accents()) as $accent) {
+                $colors = $tokens->colors($mood, $accent);
+                $surfaces[$mood][$accent] = array_map(static fn(string $variable): string => $colors[$variable], DesignTokens::SURFACES);
+            }
+        }
+
+        return $surfaces;
     }
 
     /** @return array<string, mixed> */
@@ -313,6 +336,23 @@ final class DesignSystemPages
         }
 
         return $durations;
+    }
+
+    /**
+     * The longest duration the design language allows interface motion, with the anti-patterns row
+     * that states it.
+     *
+     * @return array{antiPattern: string, instead: string, duration: string}
+     */
+    private static function motionLimit(DesignDocument $design): array
+    {
+        $headings = ['Anti-patterns (do not do these)'];
+        foreach ($design->table($headings, ['Anti-pattern', 'Instead']) as $row) {
+            if (preg_match('/\b(\d+ms) or less\b/', $row['Instead'], $limit) === 1) {
+                return ['antiPattern' => $row['Anti-pattern'], 'instead' => $row['Instead'], 'duration' => $limit[1]];
+            }
+        }
+        throw new RuntimeException($design->path() . ' › ' . implode(' › ', $headings) . ' states no motion limit of the form "<duration>ms or less".');
     }
 
     /**

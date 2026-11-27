@@ -168,6 +168,49 @@ final class DesignSystemPagesTest extends TestCase
         DesignSystemPages::load($this->root);
     }
 
+    public function testTheAccentsPageCarriesTheSurfaceEachLowestRatioFallsOn(): void
+    {
+        $accents = DesignSystemPages::load($this->repository())[2]['data']['designSystem']['values'];
+
+        self::assertSame(['dark', 'warm', 'cool', 'balanced'], array_keys($accents['surfaces']));
+        self::assertSame(['background', 'card', 'popover', 'sidebar', 'secondary', 'muted', 'highlight'], array_keys($accents['surfaces']['warm']['violet']));
+        foreach ($accents['derivations'] as $mood => $derivations) {
+            foreach ($derivations as $accent => $derivation) {
+                $surfaces = $accents['surfaces'][$mood][$accent];
+                self::assertSame($derivation['text']['ratio'], \Baander\DevWebsite\Content\Contrast::ratio($derivation['accentText'], $surfaces[$derivation['text']['surface']]), $mood . ' ' . $accent);
+                self::assertSame($derivation['ringContrast']['ratio'], \Baander\DevWebsite\Content\Contrast::ratio($derivation['ring'], $surfaces[$derivation['ringContrast']['surface']]), $mood . ' ' . $accent);
+            }
+        }
+        self::assertSame('#6e5ca5', $accents['derivations']['warm']['violet']['accentText']);
+    }
+
+    public function testTheMotionPageCarriesTheAntiPatternsDurationLimit(): void
+    {
+        $motion = array_column(DesignSystemPages::load($this->repository()), 'data', 'url')['/design-system/motion/']['designSystem']['values'];
+
+        self::assertSame(['antiPattern' => 'Bounce/spring animations', 'instead' => 'ease-out only, 120ms or less', 'duration' => '120ms'], $motion['limit']);
+    }
+
+    public function testADesignLanguageWithoutAMotionLimitFailsNamingTheTable(): void
+    {
+        $root = $this->root . '/repository';
+        $repository = $this->repository();
+        mkdir($root . '/ui', 0700, true);
+        $links = [];
+        foreach (['ui/site', 'ui/web', 'ui/design-tokens', 'ui/ICON-GUIDE.md'] as $path) {
+            symlink($repository . '/' . $path, $root . '/' . $path);
+            $links[] = $root . '/' . $path;
+        }
+        file_put_contents($root . '/ui/DESIGN.md', str_replace('ease-out only, 120ms or less', 'ease-out only', (string) file_get_contents($repository . '/ui/DESIGN.md')));
+
+        try {
+            $this->expectExceptionMessage('ui/DESIGN.md › Anti-patterns (do not do these) states no motion limit of the form "<duration>ms or less".');
+            DesignSystemPages::load($root);
+        } finally {
+            array_map(unlink(...), $links);
+        }
+    }
+
     private function repository(): string
     {
         return dirname(__DIR__, 3);
