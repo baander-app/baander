@@ -261,30 +261,37 @@ jobs:
                       bash scripts/test-two-command-deployment-container.sh
 
             -   name: Composer platform requirements
+                if: ${{ !cancelled() }}
                 run: docker run --rm "$CI_IMAGE" composer check-platform-reqs
 
             -   name: PHPStan
+                if: ${{ !cancelled() }}
                 run: |
                     docker run --rm -e XDEBUG_MODE=off \
                       "$CI_IMAGE" \
                       php ./vendor/bin/phpstan analyse --memory-limit=1G --no-progress
 
             -   name: OpenAPI drift
+                if: ${{ !cancelled() }}
                 run: |
                     docker run --rm "$CI_IMAGE" \
                       php bin/console app:export-openapi-spec --env=test --no-debug --check
 
             -   name: Deptrac
+                if: ${{ !cancelled() }}
                 run: |
                     docker run --rm "$CI_IMAGE" vendor/bin/deptrac analyse --no-cache --no-progress
 
             -   name: Imports
+                if: ${{ !cancelled() }}
                 run: docker run --rm --network none "$CI_IMAGE" composer check:imports
 
             -   name: Docker Compose availability
+                if: ${{ !cancelled() }}
                 run: docker compose version
 
             -   name: Backend runner regressions
+                if: ${{ !cancelled() }}
                 run: |
                     docker run --rm --network none --entrypoint php "$CI_IMAGE" \
                       vendor/bin/phpunit --configuration phpunit-tooling.xml.dist packages/baander-images/tests/RetainBuildEvidenceTest.php
@@ -292,6 +299,7 @@ jobs:
                       vendor/bin/phpunit --configuration phpunit-tooling.xml.dist packages/baander-dev-qualification/tests/WorkerCleanupTest.php
 
             -   name: PHP tooling regressions
+                if: ${{ !cancelled() }}
                 run: |
                     docker run --rm --network none "$CI_IMAGE" \
                       composer check:js-dependencies:local
@@ -309,6 +317,7 @@ jobs:
                       php vendor/bin/phpstan analyse --configuration phpstan-tooling.neon --memory-limit=1G --no-progress
 
             -   name: Python-free workflow contracts
+                if: ${{ !cancelled() }}
                 run: |
                     TOOLING_IMAGE="baander-tooling:${{ github.run_id }}-${{ github.run_attempt }}"
                     docker build --target tooling --file docker/runner/Dockerfile \
@@ -319,6 +328,7 @@ jobs:
                       --build-arg TOOLING_IMAGE="$TOOLING_IMAGE" .
 
             -   name: Development instance safety and source admission
+                if: ${{ !cancelled() }}
                 run: |
                     BAANDER_TEST_IMAGE="$CI_IMAGE" \
                     BAANDER_TEST_POSTGRES_IMAGE="$REGISTRY/$POSTGRES_IMAGE:latest" \
@@ -326,12 +336,14 @@ jobs:
                       bash scripts/test-dev-environment-container.sh --components-only
 
             -   name: Backend stack isolation
+                if: ${{ !cancelled() }}
                 run: |
                     BAANDER_TEST_IMAGE="$CI_IMAGE" \
                     BAANDER_TEST_POSTGRES_IMAGE="$REGISTRY/$POSTGRES_IMAGE:latest" \
                       php scripts/test-backend-stack-isolation.php --artifacts var/test-isolation
 
             -   name: PHPUnit with coverage
+                if: ${{ !cancelled() }}
                 run: |
                     BAANDER_TEST_IMAGE="$CI_IMAGE" \
                     BAANDER_TEST_POSTGRES_IMAGE="$REGISTRY/$POSTGRES_IMAGE:latest" \
@@ -340,6 +352,7 @@ jobs:
                       --coverage-text=coverage/report.txt --coverage-clover=coverage/clover.xml
 
             -   name: Messenger without Swoole
+                if: ${{ !cancelled() }}
                 run: |
                     BAANDER_TEST_IMAGE="$CI_IMAGE" \
                     BAANDER_TEST_POSTGRES_IMAGE="$REGISTRY/$POSTGRES_IMAGE:latest" \
@@ -352,9 +365,11 @@ jobs:
                       tests/Integration/MessengerAdmissionLifecycleTest.php
 
             -   name: Container startup contract
+                if: ${{ !cancelled() }}
                 run: bash scripts/test-container-startup.sh
 
             -   name: Legacy transport redelivery recovery
+                if: ${{ !cancelled() }}
                 run: |
                     BAANDER_TEST_IMAGE="$CI_IMAGE" \
                     BAANDER_TEST_POSTGRES_IMAGE="$REGISTRY/$POSTGRES_IMAGE:latest" \
@@ -362,6 +377,7 @@ jobs:
                       timeout 300 bash scripts/test-worker-runtime-container.sh
 
             -   name: Worker command lifecycle and delivery
+                if: ${{ !cancelled() }}
                 run: |
                     BAANDER_TEST_IMAGE="$CI_IMAGE" \
                     BAANDER_TEST_POSTGRES_IMAGE="$REGISTRY/$POSTGRES_IMAGE:latest" \
@@ -369,6 +385,7 @@ jobs:
                       bash scripts/test-worker-command-container.sh
 
             -   name: Worker deployment operator lifecycle
+                if: ${{ !cancelled() }}
                 run: |
                     BAANDER_TEST_IMAGE="$CI_IMAGE" \
                     BAANDER_TEST_POSTGRES_IMAGE="$REGISTRY/$POSTGRES_IMAGE:latest" \
@@ -377,6 +394,7 @@ jobs:
                       bash scripts/test-worker-operator-container.sh
 
             -   name: Standalone worker dependency outages and recovery
+                if: ${{ !cancelled() }}
                 run: |
                     BAANDER_TEST_IMAGE="$CI_IMAGE" \
                     BAANDER_TEST_POSTGRES_IMAGE="$REGISTRY/$POSTGRES_IMAGE:latest" \
@@ -385,6 +403,7 @@ jobs:
                       bash scripts/test-worker-lifecycle-container.sh
 
             -   name: Outbox notification replay
+                if: ${{ !cancelled() }}
                 run: |
                     BAANDER_TEST_IMAGE="$CI_IMAGE" \
                     BAANDER_TEST_POSTGRES_IMAGE="$REGISTRY/$POSTGRES_IMAGE:latest" \
@@ -392,6 +411,7 @@ jobs:
                       timeout 180 bash scripts/test-outbox-runtime-container.sh
 
             -   name: Producer transaction rollback and recovery
+                if: ${{ !cancelled() }}
                 run: |
                     BAANDER_TEST_IMAGE="$CI_IMAGE" \
                     BAANDER_TEST_POSTGRES_IMAGE="$REGISTRY/$POSTGRES_IMAGE:latest" \
@@ -399,6 +419,7 @@ jobs:
                       timeout 180 bash scripts/test-producer-runtime-container.sh
 
             -   name: Web server mail language, audio streaming and health alerts
+                if: ${{ !cancelled() }}
                 run: |
                     BAANDER_TEST_IMAGE="$CI_IMAGE" \
                     BAANDER_TEST_POSTGRES_IMAGE="$REGISTRY/$POSTGRES_IMAGE:latest" \
@@ -406,6 +427,7 @@ jobs:
                       timeout 180 bash scripts/test-web-runtime-container.sh
 
             -   name: Application security runtime boundaries
+                if: ${{ !cancelled() }}
                 run: |
                     BAANDER_TEST_IMAGE="$CI_IMAGE" \
                     BAANDER_TEST_POSTGRES_IMAGE="$REGISTRY/$POSTGRES_IMAGE:latest" \
@@ -413,11 +435,13 @@ jobs:
                       bash scripts/test-security-runtime-container.sh
 
             -   name: WebSocket proxy credential logging
+                if: ${{ !cancelled() }}
                 run: |
                     docker build -f docker/nginx/Dockerfile.test -t "${CI_IMAGE}-proxy" docker/nginx
                     BAANDER_TEST_PROXY_IMAGE="${CI_IMAGE}-proxy" bash scripts/test-websocket-proxy-logs.sh
 
             -   name: Web server drain on stop (PID 1)
+                if: ${{ !cancelled() }}
                 run: |
                     BAANDER_TEST_IMAGE="$CI_IMAGE" \
                     BAANDER_TEST_POSTGRES_IMAGE="$REGISTRY/$POSTGRES_IMAGE:latest" \
@@ -425,6 +449,7 @@ jobs:
                       timeout 900 bash scripts/test-web-shutdown-container.sh
 
             -   name: Extract coverage metrics
+                if: ${{ !cancelled() }}
                 run: php scripts/validate-backend-coverage.php coverage
 
             -   name: Preserve backend verification artifacts on GitHub

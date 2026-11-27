@@ -955,10 +955,6 @@ These entries are review items left for the author; they do not block implementa
 
 ### From 2026-11-26 review
 
-- **Later CI gates stop at the first failing browser drill** — Verification Contract (P1, adversarial, confidence 75)
-
-  While any browser drill in the quality gate fails, GitHub CI skips every later step, so PHPUnit and the stack lanes have not run on `master` since 2026-11-22 and a remaining flake leaves the backend work verified neither on CI nor by a full local run. Giving the quality-gate steps after the browser drills `if: ${{ !cancelled() }}` would let the static gates, PHPUnit and the stack lanes report on every run while the job still fails on the drill; that changes how the CI gate fails, so the owner decides.
-
 - **The wasm media type has no requirement** — R16, media types (P3, coherence, confidence 100)
 
   The media-types unit serves `/dsp/*.wasm` as `application/wasm`, which the owner selected with the audit's behaviour gaps, but the requirement for media types names only container types and the `.webm` rule, so the change does not trace to the Product Contract.

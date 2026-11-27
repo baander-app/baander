@@ -20,6 +20,7 @@ final class PublicationWorkflowTest extends TestCase
 {
     private const string FORGE = "github.server_url == 'https://github.com'";
     private const string TRUSTED = "github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository";
+    private const string UNLESS_CANCELLED = '${{ !cancelled() }}';
     private const string CANCEL_PULL_REQUESTS = "\${{ github.event_name == 'pull_request' }}";
     private const string GITHUB = 'https://github.com';
     private const string FORGEJO = 'https://forge.baander.app';
@@ -67,7 +68,7 @@ final class PublicationWorkflowTest extends TestCase
             $step = $this->step($jobs[$job], $stepName);
             self::assertStringContainsString($command, $step['run']);
             self::assertArrayNotHasKey('continue-on-error', $step);
-            self::assertArrayNotHasKey('if', $step);
+            self::assertContains($step['if'] ?? null, [null, self::UNLESS_CANCELLED], $stepName);
             self::assertArrayNotHasKey('continue-on-error', $jobs[$job]);
         }
 
@@ -702,6 +703,21 @@ SH;
         foreach (self::qualificationCommands() as [$job, $stepName]) {
             self::assertArrayNotHasKey('if', $jobs[$job]);
             self::assertTrue(self::runs($this->step($jobs[$job], $stepName), self::context(self::GITHUB, 'pull_request', self::FORK)));
+        }
+    }
+
+    public function testQualityGateStepsAfterTheBrowserDrillsReportWhenADrillFails(): void
+    {
+        $steps = $this->workflow('ci.yaml')['jobs']['quality-gate']['steps'];
+        $names = array_column($steps, 'name');
+        $lastDrill = array_search('Independent web and worker media ownership in Firefox', $names, true);
+        $coverage = array_search('Extract coverage metrics', $names, true);
+        self::assertIsInt($lastDrill);
+        self::assertIsInt($coverage);
+        self::assertGreaterThan($lastDrill + 1, $coverage);
+
+        foreach (array_slice($steps, $lastDrill + 1, $coverage - $lastDrill) as $step) {
+            self::assertSame(self::UNLESS_CANCELLED, $step['if'] ?? null, $step['name']);
         }
     }
 
