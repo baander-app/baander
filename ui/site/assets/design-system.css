@@ -101,12 +101,15 @@
 /* end type, layout and motion */
 
 /* Iconography and writing pages */
-/* The first column has one width in every borrowed table, so component names line up from table to
-   table. On phones the third column of a three-column table keeps a readable width and the region
-   scrolls instead. */
-.manual-article .ds-iconography-table th, .manual-article .ds-iconography-table td { min-width: 128px; overflow-wrap: normal; }
-.ds-iconography-table :is(th, td):first-child { width: 33%; }
-.manual-article .ds-iconography-table :is(th, td):nth-child(3):last-child { min-width: 224px; }
+/* Fixed table layout takes the column widths from the table, not from the text, so a row wraps alike
+   in Geist and in the fallback faces. The first column has one width in every borrowed table, so
+   component names line up from table to table; on phones a three-column table keeps readable columns
+   and its region scrolls instead. */
+.manual-article .ds-iconography-table table { table-layout: fixed; width: 100%; }
+.manual-article .ds-iconography-table table:has(:is(th, td):nth-child(3)) { min-width: 560px; }
+.manual-article .ds-iconography-table th, .manual-article .ds-iconography-table td { min-width: 0; overflow-wrap: normal; }
+.ds-iconography-table thead :is(th, td):first-child { width: 33%; }
+.ds-iconography-table thead :is(th, td):nth-child(2):not(:last-child) { width: 24%; }
 .ds-iconography-table td code { white-space: nowrap; }
 /* end iconography and writing */
 
