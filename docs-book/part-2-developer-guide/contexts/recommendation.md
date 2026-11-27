@@ -91,7 +91,7 @@ The source and targeting queries carry the viewer. For a member, the repository 
 | `RecommendationJobRepositoryInterface` | Domain repository contract for `RecommendationJob` persistence and queries | `RecommendationJobRepository` |
 | `RecommendationInsightsPortInterface` | Read access to recommendation coverage, source quality, and freshness metrics | `RecommendationInsightsRepository` |
 | `RecommendationJobPortInterface` | Recommendation job lifecycle operations | `RecommendationJobService` |
-| `RecommendationPublicIdentityInterface` | Resolves and projects public and internal identifiers for recommendations and catalog entities | `RecommendationPublicIdentity` |
+| `RecommendationPublicIdentityInterface` | Resolves and projects public and internal identifiers for recommendations and catalog entities; resolves the public ID of the user that a job's `triggered_by` or `requeued_by` metadata names | `RecommendationPublicIdentity` |
 | `ArtistRecommendationMergePortInterface` | Published contract for Catalog's artist merge (the `Recommendation Artist Merge Contract` Deptrac layer): inside the caller's transaction, points the recommendations from or to a merged artist at the target, deleting any that would recommend the target to itself or duplicate one it has, or deletes every recommendation from or to a removed artist | `ArtistRecommendationMerge` |
 
 ## API Endpoints

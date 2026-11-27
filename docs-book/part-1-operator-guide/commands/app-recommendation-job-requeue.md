@@ -28,7 +28,7 @@ make exec cmd="php bin/console app:recommendation:job:requeue V1StGXR8_Z5jdHi6B-
 
 ## Details
 
-The command creates a new job with the original's mode, user and metadata, linked to the original. The metadata adds `requeued_from`, `requeued_at`, `requeued_by: cli` and `requeued_reason`, which is the original's fail reason or `manual_requeue`. The new job then runs in the command's own process, as with `app:recommendation:generate`, and the run is recorded in the job monitor as `RequeueRecommendationJobCommand`. Requeueing from the web starts the new job on the web server's CPU process pool instead, and `requeued_by` records the admin's user ID, which the job list and the admin API show as `[internal ID]`.
+The command creates a new job with the original's mode, user and metadata, linked to the original. The metadata adds `requeued_from`, `requeued_at`, `requeued_by: cli` and `requeued_reason`, which is the original's fail reason or `manual_requeue`. The new job then runs in the command's own process, as with `app:recommendation:generate`, and the run is recorded in the job monitor as `RequeueRecommendationJobCommand`. Requeueing from the web starts the new job on the web server's CPU process pool instead, and `requeued_by` records the admin's user ID; the job list, `app:recommendation:job:show` and the admin API show that admin's public ID in its place.
 
 When the run finishes, the command prints the new job's public ID, the job monitor ID, the mode, the final status and the recommendations each strategy saved.
 

@@ -29,5 +29,8 @@ interface RecommendationPublicIdentityInterface
 
     public function publicEntityId(string $type, string $internalId, Uuid $actorId, bool $administrator): ?string;
 
+    /** Null when the value is not the UUID of an existing user, such as an actor recorded as `cli` or `system`. */
+    public function publicUserId(string $internalId): ?string;
+
     public function recommendationId(string $publicId, Uuid $actorId, bool $administrator): Uuid;
 }

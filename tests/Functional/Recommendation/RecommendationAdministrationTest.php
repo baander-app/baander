@@ -45,7 +45,7 @@ final class RecommendationAdministrationTest extends TestCase
         self::assertSame('finished', $record->status->value);
     }
 
-    public function testAJobAnAdminStartsOverHttpRecordsTheAdminsUserId(): void
+    public function testAJobAnAdminStartsOverHttpRecordsTheAdminsUserIdAndShowsTheirPublicIdOnBothPaths(): void
     {
         $admin = $this->createAdminUser();
 
@@ -54,8 +54,23 @@ final class RecommendationAdministrationTest extends TestCase
             202,
             'data',
         )['data'];
+        $job = (string) $started['public_id'];
 
-        self::assertSame($admin->getId()->toString(), $this->storedMetadata((string) $started['public_id'])['triggered_by']);
+        self::assertSame($admin->getId()->toString(), $this->storedMetadata($job)['triggered_by']);
+
+        $shown = $this->assertJsonResponse($this->authenticatedRequest('GET', self::PATH . '/jobs/' . $job, $admin), 200, 'data')['data'];
+        self::assertSame($admin->getPublicId()->toString(), $shown['metadata']['triggered_by']);
+        $listed = $this->find($this->assertJsonResponse($this->authenticatedRequest('GET', self::PATH . '/jobs', $admin), 200, 'data')['data'], $job);
+        self::assertSame($shown, $listed);
+
+        $show = $this->command('app:recommendation:job:show');
+        self::assertSame(Command::SUCCESS, $show->execute(['publicId' => $job, '--json' => true]));
+        self::assertSame($shown, json_decode($show->getDisplay(), true, flags: JSON_THROW_ON_ERROR));
+
+        $list = $this->command('app:recommendation:job:list');
+        self::assertSame(Command::SUCCESS, $list->execute(['--json' => true]));
+        $printed = json_decode($list->getDisplay(), true, flags: JSON_THROW_ON_ERROR);
+        self::assertSame($listed, $this->find($printed, $job));
     }
 
     public function testARequeuedJobIsDispatchedAndReachesATerminalStatusOnBothPaths(): void
@@ -71,6 +86,9 @@ final class RecommendationAdministrationTest extends TestCase
         $show = $this->assertJsonResponse($this->authenticatedRequest('GET', self::PATH . '/jobs/' . $requeued['public_id'], $admin), 200, 'data')['data'];
         self::assertSame('pending', $show['status']);
         self::assertSame($failed, $show['metadata']['requeued_from']);
+        self::assertSame($admin->getPublicId()->toString(), $show['metadata']['requeued_by']);
+        $jobs = $this->assertJsonResponse($this->authenticatedRequest('GET', self::PATH . '/jobs', $admin), 200, 'data')['data'];
+        self::assertSame($admin->getPublicId()->toString(), $this->find($jobs, (string) $requeued['public_id'])['metadata']['requeued_by']);
         self::assertSame($admin->getId()->toString(), $this->storedMetadata((string) $requeued['public_id'])['requeued_by']);
 
         $cancelled = $this->cancelledJob();
@@ -196,7 +214,7 @@ final class RecommendationAdministrationTest extends TestCase
     }
 
     /**
-     * The job's metadata as stored; the API redacts internal IDs in it.
+     * The job's metadata as stored, which holds the internal user IDs the API shows as public IDs.
      *
      * @return array<string, mixed>
      */

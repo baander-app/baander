@@ -10,6 +10,7 @@ use App\Recommendation\Application\Command\RequeueRecommendationJobCommand;
 use App\Recommendation\Application\CommandHandler\CancelRecommendationJobHandler;
 use App\Recommendation\Application\DTO\RecommendationGenerationResult;
 use App\Recommendation\Application\Port\RecommendationInsightsPortInterface;
+use App\Recommendation\Application\Port\RecommendationPublicIdentityInterface;
 use App\Recommendation\Application\Query\GetRecommendationJobQuery;
 use App\Recommendation\Application\Query\ListRecommendationJobsQuery;
 use App\Recommendation\Application\QueryHandler\GetRecommendationJobHandler;
@@ -38,6 +39,10 @@ use Symfony\Component\Messenger\Middleware\HandleMessageMiddleware;
 
 final class RecommendationCommandsTest extends TestCase
 {
+    private const string ADMIN_ID = '0192f3c4-0000-7000-8000-00000000000a';
+
+    private const string ADMIN_PUBLIC_ID = 'adminPublicId00000001';
+
     private InMemoryRecommendationJobs $jobs;
 
     protected function setUp(): void
@@ -71,40 +76,40 @@ final class RecommendationCommandsTest extends TestCase
         self::assertStringContainsString('2026-10-08T04:00:00+00:00', $table->getDisplay());
     }
 
-    public function testListAndShowPrintTheApiResource(): void
+    public function testListAndShowPrintTheApiResourceWithTheAdminsPublicId(): void
     {
-        $failed = $this->jobs->create(isFull: false, metadata: ['mode' => 'incremental']);
+        $failed = $this->jobs->create(isFull: false, metadata: ['mode' => 'incremental', 'triggered_by' => self::ADMIN_ID]);
         $failed->markFailed('Worker crashed');
         $pending = $this->jobs->create(isFull: true);
+        $actors = [self::ADMIN_ID => self::ADMIN_PUBLIC_ID];
 
-        $list = new CommandTester(new RecommendationJobListCommand($this->support()));
+        $list = new CommandTester(new RecommendationJobListCommand($this->support(), $this->identities()));
         self::assertSame(Command::SUCCESS, $list->execute(['--status' => 'failed', '--json' => true]));
-        self::assertSame(
-            self::asJson(RecommendationJobResource::collection([$failed])),
-            json_decode($list->getDisplay(), true, flags: JSON_THROW_ON_ERROR),
-        );
+        $listed = json_decode($list->getDisplay(), true, flags: JSON_THROW_ON_ERROR);
+        self::assertSame(self::asJson(RecommendationJobResource::collectionWithActors([$failed], $actors)), $listed);
+        self::assertSame(self::ADMIN_PUBLIC_ID, $listed[0]['metadata']['triggered_by']);
 
-        $table = new CommandTester(new RecommendationJobListCommand($this->support()));
+        $table = new CommandTester(new RecommendationJobListCommand($this->support(), $this->identities()));
         self::assertSame(Command::SUCCESS, $table->execute([]));
         self::assertMatchesRegularExpression('/' . $failed->getPublicId() . '\s+failed\s+incremental/', $table->getDisplay());
         self::assertMatchesRegularExpression('/' . $pending->getPublicId() . '\s+pending\s+full/', $table->getDisplay());
 
-        $show = new CommandTester(new RecommendationJobShowCommand($this->support()));
+        $show = new CommandTester(new RecommendationJobShowCommand($this->support(), $this->identities()));
         self::assertSame(Command::SUCCESS, $show->execute(['publicId' => $failed->getPublicId()->toString(), '--json' => true]));
-        self::assertSame(self::asJson(RecommendationJobResource::from($failed)), json_decode($show->getDisplay(), true, flags: JSON_THROW_ON_ERROR));
+        self::assertSame(self::asJson(RecommendationJobResource::from($failed, $actors)), json_decode($show->getDisplay(), true, flags: JSON_THROW_ON_ERROR));
     }
 
     public function testListRejectsAnUnknownStatusOrANonIntegerLimit(): void
     {
-        self::assertSame(Command::INVALID, (new CommandTester(new RecommendationJobListCommand($this->support())))->execute(['--status' => 'done']));
-        self::assertSame(Command::INVALID, (new CommandTester(new RecommendationJobListCommand($this->support())))->execute(['--limit' => 'ten']));
+        self::assertSame(Command::INVALID, (new CommandTester(new RecommendationJobListCommand($this->support(), $this->identities())))->execute(['--status' => 'done']));
+        self::assertSame(Command::INVALID, (new CommandTester(new RecommendationJobListCommand($this->support(), $this->identities())))->execute(['--limit' => 'ten']));
     }
 
     public function testShowAndCancelOfAnUnknownJobFail(): void
     {
         $unknown = (new PublicId())->toString();
 
-        $show = new CommandTester(new RecommendationJobShowCommand($this->support()));
+        $show = new CommandTester(new RecommendationJobShowCommand($this->support(), $this->identities()));
         self::assertSame(Command::FAILURE, $show->execute(['publicId' => $unknown]));
         self::assertStringContainsString('Recommendation job not found.', $show->getDisplay());
 
@@ -243,6 +248,14 @@ final class RecommendationCommandsTest extends TestCase
     private static function asJson(array $data): array
     {
         return json_decode(json_encode($data, JSON_THROW_ON_ERROR), true, flags: JSON_THROW_ON_ERROR);
+    }
+
+    private function identities(): RecommendationPublicIdentityInterface
+    {
+        $identities = $this->createStub(RecommendationPublicIdentityInterface::class);
+        $identities->method('publicUserId')->willReturnCallback(static fn (string $userId): ?string => $userId === self::ADMIN_ID ? self::ADMIN_PUBLIC_ID : null);
+
+        return $identities;
     }
 
     private function support(): AdminCommandSupport

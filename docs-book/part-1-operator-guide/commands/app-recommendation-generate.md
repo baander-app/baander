@@ -32,7 +32,7 @@ make exec cmd="php bin/console app:recommendation:generate --mode=incremental --
 
 ## Details
 
-The command creates a recommendation job, then runs it in its own process: in the web server, jobs run on the CPU process pool, which a console process cannot reach. The job record records `triggered_by: cli`; a run started from the admin panel records the admin's user ID, which the job list and the admin API show as `[internal ID]`. The job moves to `in_progress`, names each strategy (collaborative, content, genre) as it starts, and ends `completed`. Follow it from another shell with `app:recommendation:job:list` or `app:recommendation:job:show`.
+The command creates a recommendation job, then runs it in its own process: in the web server, jobs run on the CPU process pool, which a console process cannot reach. The job's metadata records `triggered_by: cli`; a run started from the admin panel records the admin's user ID, and the job list, `app:recommendation:job:show` and the admin API show that admin's public ID in its place. The job moves to `in_progress`, names each strategy (collaborative, content, genre) as it starts, and ends `completed`. Follow it from another shell with `app:recommendation:job:list` or `app:recommendation:job:show`.
 
 The run is also recorded in the job monitor as `GenerateRecommendationsCommand`, so `app:monitor:jobs` and the admin Job monitor page show it.
 

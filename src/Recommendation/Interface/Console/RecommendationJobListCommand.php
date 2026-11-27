@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Recommendation\Interface\Console;
 
+use App\Recommendation\Application\Port\RecommendationPublicIdentityInterface;
 use App\Recommendation\Application\Query\ListRecommendationJobsQuery;
 use App\Recommendation\Interface\Resource\RecommendationJobResource;
 use App\Shared\Interface\Console\AdminCommandSupport;
@@ -24,6 +25,7 @@ final class RecommendationJobListCommand extends Command
 {
     public function __construct(
         private readonly AdminCommandSupport $support,
+        private readonly RecommendationPublicIdentityInterface $identities,
     ) {
         parent::__construct();
     }
@@ -52,7 +54,10 @@ final class RecommendationJobListCommand extends Command
         return AdminCommandSupport::list(
             $input,
             $io,
-            RecommendationJobResource::collection($jobs),
+            RecommendationJobResource::collectionWithActors(
+                $jobs,
+                RecommendationJobResource::actorPublicIds($jobs, $this->identities->publicUserId(...)),
+            ),
             ['Public ID', 'Status', 'Mode', 'Strategy', 'Created', 'Completed', 'Fail reason'],
             static fn (array $job): array => [
                 $job['public_id'],

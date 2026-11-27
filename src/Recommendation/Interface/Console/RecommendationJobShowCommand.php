@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Recommendation\Interface\Console;
 
+use App\Recommendation\Application\Port\RecommendationPublicIdentityInterface;
 use App\Recommendation\Application\Query\GetRecommendationJobQuery;
 use App\Recommendation\Interface\Resource\RecommendationJobResource;
 use App\Shared\Interface\Console\AdminCommandSupport;
@@ -24,6 +25,7 @@ final class RecommendationJobShowCommand extends Command
 {
     public function __construct(
         private readonly AdminCommandSupport $support,
+        private readonly RecommendationPublicIdentityInterface $identities,
     ) {
         parent::__construct();
     }
@@ -39,7 +41,11 @@ final class RecommendationJobShowCommand extends Command
         $io = new SymfonyStyle($input, $output);
 
         try {
-            $job = RecommendationJobResource::from($this->support->dispatch(new GetRecommendationJobQuery((string) $input->getArgument('publicId'))));
+            $found = $this->support->dispatch(new GetRecommendationJobQuery((string) $input->getArgument('publicId')));
+            $job = RecommendationJobResource::from(
+                $found,
+                RecommendationJobResource::actorPublicIds([$found], $this->identities->publicUserId(...)),
+            );
         } catch (Throwable $exception) {
             return AdminCommandSupport::fail($io, $exception);
         }

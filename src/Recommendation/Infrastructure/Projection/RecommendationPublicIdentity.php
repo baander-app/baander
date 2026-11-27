@@ -89,6 +89,17 @@ final readonly class RecommendationPublicIdentity implements RecommendationPubli
         return $this->row($recommendation, $sourcePublicId, $targetPublicId, $userPublicId);
     }
 
+    public function publicUserId(string $internalId): ?string
+    {
+        try {
+            $id = Uuid::fromString($internalId);
+        } catch (\InvalidArgumentException) {
+            return null;
+        }
+
+        return $this->userPublicId($id);
+    }
+
     private function userPublicId(Uuid $user): ?string
     {
         $publicId = $this->connection->fetchOne('SELECT public_id FROM users WHERE id = :id', ['id' => $user->toString()]);

@@ -9,6 +9,7 @@ use App\Recommendation\Application\Command\GenerateRecommendationsCommand;
 use App\Recommendation\Application\Command\RequeueRecommendationJobCommand;
 use App\Recommendation\Application\DTO\RecommendationGenerationResult;
 use App\Recommendation\Application\Port\RecommendationInsightsPortInterface;
+use App\Recommendation\Application\Port\RecommendationPublicIdentityInterface;
 use App\Recommendation\Application\Query\GetRecommendationJobQuery;
 use App\Recommendation\Application\Query\ListRecommendationJobsQuery;
 use App\Recommendation\Interface\Resource\RecommendationGenerationResource;
@@ -40,6 +41,7 @@ final class RecommendationAdminController
         private readonly RecommendationInsightsPortInterface $insights,
         private readonly MessageBusInterface $commandBus,
         private readonly SignedInUserInterface $signedInUser,
+        private readonly RecommendationPublicIdentityInterface $identities,
     ) {
     }
 
@@ -302,7 +304,12 @@ final class RecommendationAdminController
     #[Route('/jobs/{publicId}', name: 'job_status', methods: ['GET'])]
     public function jobStatus(string $publicId): JsonResponse
     {
-        return $this->successResponse(RecommendationJobResource::from($this->dispatch(new GetRecommendationJobQuery($publicId))));
+        $job = $this->dispatch(new GetRecommendationJobQuery($publicId));
+
+        return $this->successResponse(RecommendationJobResource::from(
+            $job,
+            RecommendationJobResource::actorPublicIds([$job], $this->identities->publicUserId(...)),
+        ));
     }
 
     #[OA\Operation\Post(
@@ -494,7 +501,10 @@ final class RecommendationAdminController
         ));
         assert(is_array($jobs));
 
-        return $this->successResponse(RecommendationJobResource::collection($jobs));
+        return $this->successResponse(RecommendationJobResource::collectionWithActors(
+            $jobs,
+            RecommendationJobResource::actorPublicIds($jobs, $this->identities->publicUserId(...)),
+        ));
     }
 
     private function dispatch(object $message): mixed
