@@ -29,6 +29,9 @@ export interface PlayArtistOptions {
 
 type PlayTrack = (track: Track, queue?: Track[]) => void
 
+/** Bumped by every play-artist request; a read that a later request overtook plays nothing. */
+let latestRequest = 0
+
 function record(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
 }
@@ -84,6 +87,7 @@ async function playArtistSongs(
   artistName: string,
   options: PlayArtistOptions,
 ): Promise<void> {
+  const request = ++latestRequest
   const owner = captureOwnership()
   let read: CursorRead<unknown>
   try {
@@ -99,7 +103,7 @@ async function playArtistSongs(
       },
     )
   } catch (error) {
-    if (isCancel(error) || !isCurrentOwnership(owner)) {
+    if (isCancel(error) || !isCurrentOwnership(owner) || request !== latestRequest) {
       return
     }
     logger.warn('Failed to fetch artist songs:', error)
@@ -108,6 +112,10 @@ async function playArtistSongs(
         logger.error('Failed to retry the artist songs:', retryError)
       })
     })
+    return
+  }
+
+  if (request !== latestRequest) {
     return
   }
 
