@@ -4,7 +4,8 @@ import { test as base, expect, type Page } from '@playwright/test';
 import { openMenuPanel } from './site-menu';
 
 // Checks every page of the design system section shares: the menu entry, the section navigation,
-// the breadcrumb and the page's own metadata. Each page's content has a spec of its own.
+// the breadcrumb, the page's own metadata, search, containment in both site themes and reading
+// without JavaScript. Each page's content has a spec of its own.
 
 const test = base.extend<{ localRequests: void }>({
   localRequests: [async ({ context, baseURL }, use) => {
@@ -26,9 +27,14 @@ const sectionPages = [...sitemap.matchAll(/<loc>https:\/\/baander\.app(\/design-
 
 const sectionNavigation = (page: Page) => page.getByRole('navigation', { name: 'Design system', exact: true });
 
+// The primary color in the color table, a value that sits only in cells left out of the search index.
+const colorPage = readFileSync(fileURLToPath(new URL('../../../var/website/design-system/color/index.html', import.meta.url)), 'utf8');
+const primaryColor = /--color-primary<\/code><\/th>\s*<td class="ds-value" data-pagefind-ignore><span class="ds-swatch" style="--swatch: (#[0-9a-f]{6})"/.exec(colorPage)![1];
+
 test('the sitemap lists the overview and nine pages below it', () => {
   expect(sectionPages).toContain('/design-system/');
   expect(sectionPages).toHaveLength(10);
+  expect(new Set(sectionPages).size).toBe(sectionPages.length);
   for (const path of sectionPages.filter((path) => path !== '/design-system/')) expect(path).toMatch(/^\/design-system\/[a-z]+(?:-[a-z]+)*\/$/);
 });
 
@@ -90,3 +96,98 @@ for (const path of sectionPages) {
     await expect(page.locator('article[data-pagefind-body] [data-pagefind-meta="label"]')).toHaveText('Design system');
   });
 }
+
+test('a manual search finds the layout page by its prose under the Design system label, and no page by a color value', async ({ page }) => {
+  await page.goto('/docs/');
+  const input = page.getByRole('searchbox', { name: 'Search manuals' });
+  const results = page.locator('#manual-search-results');
+  await input.fill('Context panel width');
+  const layout = results.locator('li').filter({ has: page.locator('a[href^="/design-system/layout/"]') });
+  await expect(layout).toHaveCount(1);
+  await expect(layout.locator('.search-context')).toHaveText('Design system');
+  await expect(layout.locator('a').first()).toHaveAttribute('href', '/design-system/layout/');
+
+  expect(colorPage).toContain(`<code>${primaryColor}</code>`);
+  await input.fill(primaryColor);
+  await expect(results).toHaveAttribute('aria-busy', 'false');
+  await expect(page.getByRole('status')).not.toHaveText('Searching…');
+  await expect(results.locator('a[href^="/design-system/"]')).toHaveCount(0);
+});
+
+for (const width of [390, 1440]) {
+  for (const appearance of ['light', 'dark'] as const) {
+    test(`${width}px ${appearance} site theme: no page scrolls sideways and nothing spills out of its box`, async ({ page }) => {
+      await page.setViewportSize({ width, height: 900 });
+      await page.addInitScript((choice) => localStorage.setItem('baander-site-appearance', choice), appearance);
+      for (const path of sectionPages) {
+        await page.goto(path);
+        await expect(page.locator('html'), path).toHaveAttribute('data-theme', appearance === 'light' ? 'balanced' : 'dark');
+        await page.evaluate(() => document.fonts.ready.then(() => undefined));
+        expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1), `${path} scrolls sideways`).toBe(true);
+        // A value table scrolls inside its focusable region; any other box wider inside than outside spills.
+        const spilling = await page.locator('.manual-layout, .manual-layout *').evaluateAll((elements) => elements
+          .filter((element) => element.scrollWidth > element.clientWidth + 1
+            && getComputedStyle(element).display !== 'inline'
+            && !element.matches('[role="region"][tabindex="0"]')
+            && element.closest('.visually-hidden') === null)
+          .map((element) => `${element.tagName.toLowerCase()}.${[...element.classList].join('.')} ${element.scrollWidth}>${element.clientWidth}`));
+        expect(spilling, path).toEqual([]);
+      }
+    });
+  }
+}
+
+test.describe('without JavaScript', () => {
+  test.use({ javaScriptEnabled: false });
+  for (const path of sectionPages) {
+    test(`${path}: the tables, samples and navigation are present and readable`, async ({ page }) => {
+      await page.goto(path);
+      await expect(page.locator('main h1')).toBeVisible();
+      await expect(page.locator('.ds-opening')).toBeVisible();
+      await expect(page.getByRole('navigation', { name: 'Breadcrumb' })).toBeVisible();
+      const links = sectionNavigation(page).getByRole('link');
+      await expect(links).toHaveCount(sectionPages.length + 1);
+      for (const link of await links.all()) await expect(link).toBeVisible();
+
+      for (const table of await page.locator('main table').all()) {
+        const region = table.locator('xpath=ancestor::*[@role="region"][1]');
+        await expect(region).toHaveAttribute('tabindex', '0');
+        await expect(region).toHaveAttribute('aria-label', /\S/);
+        await expect(table.locator('tr').first()).toBeVisible();
+      }
+      for (const image of await page.locator('main img').all()) {
+        await image.scrollIntoViewIfNeeded();
+        await expect(image).toBeVisible();
+        await expect.poll(() => image.evaluate((element: HTMLImageElement) => element.complete && element.naturalWidth > 0)).toBe(true);
+      }
+
+      // Every text and every swatch paints with a size and a color; a closed disclosure shows only its summary.
+      const unreadable = await page.locator('main').evaluate((main) => {
+        const hidden = (element: Element) => element.closest('.visually-hidden, [hidden], script, style') !== null
+          || [...main.querySelectorAll('details:not([open])')].some((details) => details.contains(element) && !details.querySelector('summary')!.contains(element));
+        const painted = (color: string) => !/^rgba\(.*,\s*0\)$/.test(color) && color !== 'transparent';
+        const problems: string[] = [];
+        const walker = document.createTreeWalker(main, NodeFilter.SHOW_TEXT);
+        for (let node = walker.nextNode(); node !== null; node = walker.nextNode()) {
+          const element = node.parentElement!;
+          const text = node.textContent!.trim();
+          if (text === '' || hidden(element)) continue;
+          const range = document.createRange();
+          range.selectNodeContents(node);
+          const box = range.getBoundingClientRect();
+          if (!element.checkVisibility({ opacityProperty: true, visibilityProperty: true }) || box.width === 0 || box.height === 0
+            || !painted(getComputedStyle(element).color)) problems.push(`text "${text.slice(0, 60)}"`);
+        }
+        for (const swatch of main.querySelectorAll('.ds-swatch')) {
+          const box = swatch.getBoundingClientRect();
+          const code = swatch.nextElementSibling?.textContent ?? '';
+          if (box.width === 0 || box.height === 0 || !painted(getComputedStyle(swatch).backgroundColor) || !/^#[0-9a-f]{6}$/i.test(code)) {
+            problems.push(`swatch beside "${code}"`);
+          }
+        }
+        return problems;
+      });
+      expect(unreadable).toEqual([]);
+    });
+  }
+});

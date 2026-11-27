@@ -47,11 +47,13 @@ declare global {
   }
 }
 
-// The specs cannot read the site's data files, so the built sitemap says which feature pages exist.
+// The specs cannot read the site's data files, so the built sitemap says which feature and design
+// system pages exist.
 const sitemap = readFileSync(fileURLToPath(new URL('../../../var/website/sitemap.xml', import.meta.url)), 'utf8');
 const featurePages = [...sitemap.matchAll(/<loc>https:\/\/baander\.app(\/features\/[^<]+)<\/loc>/g)].map((match) => match[1]);
+const designSystemPages = [...sitemap.matchAll(/<loc>https:\/\/baander\.app(\/design-system\/[^<]*)<\/loc>/g)].map((match) => match[1]);
 
-const pages = ['/', '/docs/operator-guide/', '/bac/', '/features/', ...featurePages];
+const pages = ['/', '/docs/operator-guide/', '/bac/', '/features/', ...featurePages, ...designSystemPages];
 const viewports = [{ width: 1440, height: 900 }, { width: 390, height: 844 }];
 const fontFiles = '**/assets/site/fonts/*.woff2';
 
@@ -172,6 +174,11 @@ const geometryPages = [
     path,
     blocks: '.hero-copy :is(h1, p), .home-section :is(h2, h3, p, li), .site-header nav, .feature-breadcrumb, .feature-pager',
     rows: '.site-header nav, .feature-breadcrumb',
+  })),
+  ...designSystemPages.map((path) => ({
+    path,
+    blocks: '.manual-article :is(h1, h2, h3, p, li), .site-header nav, .manual-breadcrumb, .chapter-navigation nav',
+    rows: '.site-header nav, .manual-breadcrumb',
   })),
 ];
 const rowTolerance = 0.025;

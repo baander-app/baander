@@ -34,6 +34,7 @@ if (mount && field && statusLine && resultList) {
 
 function mountSearch(container: HTMLElement, input: HTMLInputElement, status: HTMLElement, results: HTMLOListElement): void {
   input.disabled = false;
+  const idleStatus = status.textContent;
 
   let generation = 0;
   let timer: ReturnType<typeof setTimeout> | undefined;
@@ -50,7 +51,7 @@ function mountSearch(container: HTMLElement, input: HTMLInputElement, status: HT
     const query = input.value.trim();
     results.setAttribute('aria-busy', query ? 'true' : 'false');
     if (!query) {
-      status.textContent = 'Search the operator and developer guides and the reference pages.';
+      status.textContent = idleStatus;
       return;
     }
     status.textContent = 'Searching…';

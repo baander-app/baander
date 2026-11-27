@@ -6,7 +6,13 @@ $value = static fn(string $color): string => '<span class="ds-value" data-pagefi
 ?>
 <section class="ds-color" aria-labelledby="roles-and-values">
   <h2 id="roles-and-values">Roles and values</h2>
-  <p class="ds-color-note">The swatches show the application’s values with the default accent, <?= $escape($values['defaultAccent']) ?>. This website’s dark theme softens the text from <?= $value($values['appForeground']) ?> to <?= $value($values['siteForeground']) ?>, which this page uses; the <a href="/design-system/website/">website page</a> explains why.</p>
+  <div class="ds-color-note">
+    <p>The swatches show the application’s values with the default accent, <?= $escape($values['defaultAccent']) ?>. This website’s dark theme softens the application’s text color, and this page uses the website’s; the <a href="/design-system/website/">website page</a> explains why.</p>
+    <dl class="ds-color-foregrounds">
+      <dt>Application</dt><dd><?= $value($values['appForeground']) ?></dd>
+      <dt>This website</dt><dd><?= $value($values['siteForeground']) ?></dd>
+    </dl>
+  </div>
   <div class="ds-table ds-color-table" role="region" tabindex="0" aria-label="Color roles in each mood">
     <table>
       <thead>

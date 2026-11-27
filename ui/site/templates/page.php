@@ -8,7 +8,7 @@ include __DIR__ . '/header.php';
       <label for="manual-search-input">Search manuals</label>
       <input id="manual-search-input" type="search" placeholder="Find a task or topic" autocomplete="off" spellcheck="false" aria-describedby="manual-search-status" aria-controls="manual-search-results" disabled>
       <noscript>Search needs JavaScript. Browse the chapters below to find a topic.</noscript>
-      <p id="manual-search-status" role="status" aria-live="polite">Search the operator and developer guides and the reference pages.</p>
+      <p id="manual-search-status" role="status" aria-live="polite">Search the operator and developer guides, the reference pages and the design system pages.</p>
       <ol id="manual-search-results" hidden></ol>
     </section>
     <details class="chapter-navigation" open>

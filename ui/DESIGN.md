@@ -232,8 +232,8 @@ Every text element uses one of the ten type roles. Phone sizes apply at
 
 - **Weights:** 400 to 700 only; never 100 to 300. Use 400 for body text, 500 for
   emphasis and secondary buttons, 600 for section headers, buttons and active
-  states, and 700 for titles and hero text. Every bundled family is variable, so
-  each weight has a real face and no browser synthesises bold.
+  states, and 700 for titles and hero text. Every bundled family is variable: each
+  weight has a real face, and no browser synthesises bold.
 - **Floor:** no text renders below 12px. Two surfaces are exempt and may use
   11px: admin tables and feature-level badges and chips. They apply their role and
   then set `font-size: var(--text-dense-size)`.
@@ -473,7 +473,7 @@ Icons in navigation menus, sidebar lists, and dropdown menus must be **extremely
 1. **Destructive actions** (delete, remove, disconnect) — visual warning
 2. **The most frequently used actions** in that menu — scannability anchors
 
-A destructive action's icon counts toward the three: a menu with one destructive action has two icons left for its most-used actions.
+The icon of a destructive action counts toward the three: a menu with one destructive action has two icons left for its most-used actions.
 
 When every item has an icon, none of them stand out. A sea of icons is visual noise. **Default: no icon. Add one only when you can justify why that specific item needs to be noticed faster than its neighbors.**
 

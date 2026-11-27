@@ -64,7 +64,8 @@ test('the dark column shows the application’s foreground, and the note gives t
   const foreground = table(page).locator('tbody tr', { has: page.locator('th[scope="row"] code', { hasText: /^--color-foreground$/ }) });
   await expect(foreground.locator('td').nth(darkColumn).locator('code')).toHaveText('#f0f0f2');
   const note = page.locator('.ds-color-note');
-  await expect(note.locator('code')).toHaveText(['#f0f0f2', '#e6e6e9']);
+  await expect(note.locator('dt')).toHaveText(['Application', 'This website']);
+  await expect(note.locator('dd code')).toHaveText(['#f0f0f2', '#e6e6e9']);
   expect(hex(await note.evaluate((element) => getComputedStyle(element).color))).toBe('#e6e6e9');
   await expect(note.getByRole('link', { name: 'website page' })).toHaveAttribute('href', '/design-system/website/');
 });
