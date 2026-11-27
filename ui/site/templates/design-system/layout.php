@@ -4,7 +4,7 @@ $scales = [
     ['id' => 'radius-scale', 'title' => 'Radius scale', 'steps' => $section['values']['radii'], 'sample' => 'radius'],
 ];
 ?>
-<p>A token’s documented use is each item of the Spacing or Border radius list below that names the token’s pixel value.</p>
+<p>A token’s documented use is the label of each item in the Spacing or Border radius list below that names its pixel value. A token that no item names has none.</p>
 <?php foreach ($scales as $scale): ?>
   <section class="ds-layout" aria-labelledby="<?= $escape($scale['id']) ?>">
     <h2 id="<?= $escape($scale['id']) ?>"><?= $escape($scale['title']) ?></h2>
@@ -33,5 +33,5 @@ $scales = [
 <?php endforeach; ?>
 <section class="ds-layout" aria-labelledby="layout-well">
   <h2 id="layout-well">The well in the application</h2>
-  <p>This site shows the well only in screenshots of the application. The footer player’s centerpiece holds it by default; the <a href="/features/player/">player feature page</a> shows the footer along the bottom of the window.</p>
+  <p>This site shows the well only in screenshots of the application. The footer player’s centerpiece holds it by default; the <a href="/features/player/">player feature page</a> shows the player bar along the bottom of the window.</p>
 </section>

@@ -373,10 +373,11 @@ final class DesignSystemPages
     }
 
     /**
-     * The cassette marks, each with the size comment its file opens with and the sizes that comment
-     * names, largest first.
+     * The cassette marks, each with the size comment its file opens with, the sizes that comment
+     * names, largest first, and whether the file draws a second version under
+     * `prefers-color-scheme: dark`.
      *
-     * @return list<array{file: string, url: string, comment: string, sizes: list<int>}>
+     * @return list<array{file: string, url: string, comment: string, sizes: list<int>, darkVersion: bool}>
      */
     private static function marks(string $root): array
     {
@@ -389,7 +390,13 @@ final class DesignSystemPages
             }
             $sizes = array_map(intval(...), array_slice($range, 1)) |> array_unique(...);
             rsort($sizes);
-            $marks[] = ['file' => $file, 'url' => '/assets/site/' . $file, 'comment' => $comment[1], 'sizes' => $sizes];
+            $marks[] = [
+                'file' => $file,
+                'url' => '/assets/site/' . $file,
+                'comment' => $comment[1],
+                'sizes' => $sizes,
+                'darkVersion' => preg_match('/@media\s*\(\s*prefers-color-scheme:\s*dark\s*\)/', $svg) === 1,
+            ];
         }
 
         return $marks;
@@ -402,6 +409,8 @@ final class DesignSystemPages
         $declaration = static fn(string $selector, string $property): string => DesignTokens::declaration($site, self::SITE_STYLESHEET, $selector, $property);
         $roles = $tokens->typeRoles($design);
         $foreground = self::tone($root);
+        $moods = $tokens->moods();
+        $siteMoods = [$moods['dark'], $moods[AssetPublication::LIGHT_MOOD] ?? throw new RuntimeException('The light mood ' . AssetPublication::LIGHT_MOOD . ' is not a mood of ' . DesignTokens::SEMANTICS . '.')];
 
         return [
             'departures' => [
@@ -419,8 +428,8 @@ final class DesignSystemPages
                 ],
                 [
                     'subject' => 'Moods',
-                    'website' => 'dark and ' . AssetPublication::LIGHT_MOOD,
-                    'application' => array_keys($tokens->moods()) |> (static fn(array $moods): string => implode(', ', $moods)),
+                    'website' => implode(' and ', $siteMoods),
+                    'application' => implode(', ', $moods),
                     'source' => 'AssetPublication::LIGHT_MOOD',
                 ],
                 [
@@ -431,6 +440,7 @@ final class DesignSystemPages
                 ],
             ],
             'lightMood' => AssetPublication::LIGHT_MOOD,
+            'moodLabels' => ['dark' => $siteMoods[0], 'light' => $siteMoods[1]],
             'siteForeground' => $foreground,
         ];
     }

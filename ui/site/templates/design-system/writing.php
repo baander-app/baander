@@ -1,6 +1,11 @@
 <?php declare(strict_types=1);
-// Stub body: it shows the borrowed sections in the data file's order until this page's own body,
-// with the values in $section['values'], is written.
-foreach (array_keys($section['borrowed']) as $id) {
-    echo $borrowed($id);
-}
+// The Writing section shares the page's title, so its rules follow the opening under the page's own
+// heading.
+$rules = $section['borrowed']['writing']['html'] ?? throw new RuntimeException('The writing page borrows no Writing section.');
+$following = array_diff(array_keys($section['borrowed']), ['writing']);
+?>
+<div class="ds-borrowed"><?= $rules ?></div>
+<?php foreach ($following as $id): ?>
+  <?= $borrowed($id) ?>
+<?php endforeach; ?>
+<p>Scripts, glyph forms and script rules are on the <a href="/typography/">typography page</a>.</p>

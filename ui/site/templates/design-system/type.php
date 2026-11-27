@@ -33,7 +33,7 @@ $tracking = static fn (string $value): string => match (true) {
 </section>
 <section class="ds-type" aria-labelledby="type-samples">
   <h2 id="type-samples">Samples</h2>
-  <p>Each sample is set in its role and follows your window’s width, so a phone shows the phone sizes.</p>
+  <p>Each sample is set in its role and follows your window’s width: a phone-width window shows the phone sizes.</p>
   <ol class="ds-type-samples">
     <?php foreach ($roles as $role => $values): ?>
       <li data-role="<?= $escape($role) ?>">

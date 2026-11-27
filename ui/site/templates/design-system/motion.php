@@ -42,7 +42,7 @@ $users = static function (array $duration) use ($escape): string {
 <?= $borrowed('motion') ?>
 <section class="ds-motion" aria-labelledby="motion-tokens">
   <h2 id="motion-tokens">Duration tokens</h2>
-  <p>The Hover state transition takes its duration from <code>--duration-hover</code>. Each token lists the website stylesheets and the application files that use it.</p>
+  <p>The Hover state transition takes its duration from <code>--duration-hover</code>. Beside each token are the website stylesheets and application files that use it.</p>
   <div class="ds-table ds-motion-tokens" role="region" tabindex="0" aria-label="Duration tokens and where they are used">
     <table>
       <thead>

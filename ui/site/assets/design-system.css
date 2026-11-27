@@ -83,7 +83,27 @@
 /* end type, layout and motion */
 
 /* Iconography and writing pages */
+/* The first column has one width in every borrowed table, so component names line up from table to
+   table. On phones the third column of a three-column table keeps a readable width and the region
+   scrolls instead. */
+.manual-article .ds-iconography-table th, .manual-article .ds-iconography-table td { min-width: 128px; overflow-wrap: normal; }
+.ds-iconography-table :is(th, td):first-child { width: 33%; }
+.manual-article .ds-iconography-table :is(th, td):nth-child(3):last-child { min-width: 224px; }
+.ds-iconography-table td code { white-space: nowrap; }
 /* end iconography and writing */
 
 /* Logo and website pages */
+/* Each mark sits on the card surface at the sizes its file names, aligned on a shared baseline so the
+   sizes compare at a glance. */
+.manual-article .ds-logo-figure { margin: 0 0 32px; }
+.ds-logo-sizes { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 24px 32px; padding: 24px; border: 1px solid var(--color-border); border-radius: var(--radius-lg); background: var(--color-card); }
+.ds-logo-size { display: grid; justify-items: center; gap: 8px; }
+.ds-logo-size img { max-width: none; }
+.ds-logo-label { color: var(--color-muted-foreground); font-size: 13px; font-variant-numeric: tabular-nums; }
+.ds-logo-figure figcaption { margin-top: 8px; color: var(--color-muted-foreground); font-size: 14px; }
+
+.manual-article .ds-website-table table { min-width: 640px; }
+.manual-article .ds-website-table code { overflow-wrap: normal; }
+.ds-website-table tbody th { white-space: nowrap; }
+.ds-website-value { white-space: nowrap; }
 /* end logo and website */
