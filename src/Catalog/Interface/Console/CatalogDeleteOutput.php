@@ -78,7 +78,7 @@ final class CatalogDeleteOutput
             $errors = $io->getErrorStyle();
             sprintf('%d file(s) were left on disk; the next scan imports them again.', count($result->left)) |> $errors->error(...);
             $errors->listing(array_map(
-                static fn (array $file): string => sprintf('%s (%s: %s)', $file['path'], $file['reason'], $file['detail']),
+                static fn (array $file): string => sprintf('%s (%s: %s)', $file['path'], $file['reason'], $file['detail']) |> TerminalText::literal(...),
                 $result->left,
             ));
         }

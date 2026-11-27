@@ -107,9 +107,9 @@ final class MusicBrainzMatchSearchCommand extends Command
 
     private static function heading(MatchCandidates $candidates, string $noun): string
     {
-        $by = $candidates->artist === null ? '' : sprintf(' by "%s"', $candidates->artist);
+        $by = $candidates->artist === null ? '' : sprintf(' by "%s"', TerminalText::literal($candidates->artist));
 
-        return sprintf('MusicBrainz %ss for "%s"%s, best first:', $noun, $candidates->title, $by);
+        return sprintf('MusicBrainz %ss for "%s"%s, best first:', $noun, TerminalText::literal($candidates->title), $by);
     }
 
     /** @return array{list<string>, list<list<string|int>>} the headers and rows */

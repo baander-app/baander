@@ -130,6 +130,18 @@ final class MusicBrainzMatchCommandsTest extends TestCase
         self::assertStringContainsString('MusicBrainz has no artist that fits.', $empty->getDisplay());
     }
 
+    public function testTheSearchHeadingPrintsAStoredNameAsWritten(): void
+    {
+        $artist = $this->catalog->artist("<href=https://baander.app>Head</>\033]0;owned\007");
+        $this->musicBrainz->artistSearch = [new MusicBrainzArtist(self::HEADHUNTERZ_ID, 'Headhunterz', 0, 'Headhunterz', 'Person', 'NL', 'Dutch hardstyle DJ', '1985-09-12', null, false)];
+        $search = $this->search();
+
+        self::assertSame(Command::SUCCESS, $search->execute(['type' => 'artist', 'public-id' => $artist->getPublicId()->toString()]));
+        $display = $search->getDisplay();
+        self::assertStringContainsString('for "<href=https://baander.app>Head</>"', $display);
+        self::assertStringNotContainsString("\033", $display);
+    }
+
     public function testCompareJsonIsTheDataTheComparisonRouteReturns(): void
     {
         [$album, $release] = $this->longBed();
