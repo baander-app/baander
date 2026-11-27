@@ -50,27 +50,6 @@
 .typography-page .typography-without-size { --script-size-boost: 0px; }
 .typography-page .typography-without-numerals { font-family: var(--font-ui); font-variant-numeric: proportional-nums; }
 
-/* A type role from the design tokens: tracking scales with the script, the line-height never drops
-   below the script minimum, and the size boost is added to the role size. */
-.type {
-  font-family: var(--font-ui);
-  font-size: calc(var(--role-size) + var(--script-size-boost, 0px));
-  font-weight: var(--role-weight);
-  letter-spacing: calc(var(--role-tracking) * var(--tracking-scale, 1));
-  line-height: max(var(--role-line-height), var(--script-line-height, 0));
-  overflow-wrap: anywhere;
-}
-.type-hero { --role-size: var(--text-hero-size); --role-weight: var(--text-hero-weight); --role-tracking: var(--text-hero-tracking); --role-line-height: var(--text-hero-line-height); }
-.type-title-lg { --role-size: var(--text-title-lg-size); --role-weight: var(--text-title-lg-weight); --role-tracking: var(--text-title-lg-tracking); --role-line-height: var(--text-title-lg-line-height); }
-.type-title { --role-size: var(--text-title-size); --role-weight: var(--text-title-weight); --role-tracking: var(--text-title-tracking); --role-line-height: var(--text-title-line-height); }
-.type-subtitle { --role-size: var(--text-subtitle-size); --role-weight: var(--text-subtitle-weight); --role-tracking: var(--text-subtitle-tracking); --role-line-height: var(--text-subtitle-line-height); }
-.type-body { --role-size: var(--text-body-size); --role-weight: var(--text-body-weight); --role-tracking: var(--text-body-tracking); --role-line-height: var(--text-body-line-height); }
-.type-body-sm { --role-size: var(--text-body-sm-size); --role-weight: var(--text-body-sm-weight); --role-tracking: var(--text-body-sm-tracking); --role-line-height: var(--text-body-sm-line-height); }
-.type-caption { --role-size: var(--text-caption-size); --role-weight: var(--text-caption-weight); --role-tracking: var(--text-caption-tracking); --role-line-height: var(--text-caption-line-height); }
-.type-label { --role-size: var(--text-label-size); --role-weight: var(--text-label-weight); --role-tracking: var(--text-label-tracking); --role-line-height: var(--text-label-line-height); text-transform: var(--text-label-transform); }
-.type-timecode { --role-size: var(--text-timecode-size); --role-weight: var(--text-timecode-weight); --role-tracking: var(--text-timecode-tracking); --role-line-height: var(--text-timecode-line-height); }
-.type-mono-sm { --role-size: var(--text-mono-sm-size); --role-weight: var(--text-mono-sm-weight); --role-tracking: var(--text-mono-sm-tracking); --role-line-height: var(--text-mono-sm-line-height); }
-.type-timecode, .type-mono-sm { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
 .typography-page code { font-size: .875em; }
 
 .typography-intro { max-width: 760px; padding: 64px 0 48px; }

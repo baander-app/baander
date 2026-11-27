@@ -515,6 +515,20 @@ test('visitors reach the typography page from the header and it describes itself
   await expect(page.locator('.typography-role')).toHaveCount(10);
 });
 
+test('the type scale states each role\'s use as the Roles table of the design language does', async ({ page }) => {
+  const design = readFileSync(fileURLToPath(new URL('../../DESIGN.md', import.meta.url)), 'utf8');
+  const roles = design.slice(design.indexOf('### Roles')).split('\n\n')
+    .find((block) => block.startsWith('| Role |'))!
+    .split('\n').slice(2)
+    .map((row) => row.split('|').map((cell) => cell.trim()))
+    .map((cells) => ({ role: cells[1].replaceAll('`', ''), use: cells[cells.length - 2] }));
+  expect(roles).toHaveLength(10);
+  await openTypography(page);
+  for (const { role, use } of roles) {
+    await expect(page.locator(`.typography-role[data-role="${role}"] .typography-role-meta > p`), role).toHaveText(use);
+  }
+});
+
 test('the glyph-form columns put their own Han family first', async ({ page }) => {
   await openTypography(page);
   const firstHan = async (lang: string) => (await families(page, `#glyph-forms [lang="${lang}"]`)).find((family) => HAN_FAMILY.test(family));
