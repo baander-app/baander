@@ -81,6 +81,9 @@ Commits:
   checks, with the color and type tables and two DESIGN.md sentences fixed to wrap
   alike in Geist and the fallback faces; `1315b27` the same for the iconography
   tables.
+- `e18fbf6` code-review fixes: layout sections in document order, https-only borrowed
+  images, website page sitemap sources, contrast formatting, spacing uses limited
+  to padding and gap, and stronger layout and accents specs.
 
 Verification checkpoint:
 
@@ -89,7 +92,8 @@ ondrej/php archive and Chromium 1243 mapped to the 1248 name the site's Playwrig
 expects:
 
 - Tooling tests (`phpunit-tooling.xml.dist`, `packages/baander-dev-website/tests`):
-  215 tests, 1,978 assertions, OK.
+  215 tests, 1,978 assertions, OK; 218 tests, 1,990 assertions after the review
+  fixes.
 - PHPStan (`phpstan-tooling.neon`): no errors. php-cs-fixer
   (`.php-cs-fixer.tooling.php`): 0 of 548 files to fix. Tooling source policy:
   passes. Design tokens: current.
@@ -98,7 +102,8 @@ expects:
 - Site browser suite at `1b7557e`: 282 of 282. After the site-wide checks:
   `design-system*.spec.ts`, `stability.spec.ts` and `website.spec.ts` 278 of 278 at
   `513b91b`; the iconography, writing, section-wide and stability checks 94 of 94 at
-  `1315b27`.
+  `1315b27`; after the review fixes, `design-system*.spec.ts` and
+  `stability.spec.ts` 214 of 214 at `e18fbf6`.
 - The CI image's Chromium 1248 and its Composer scripts are authoritative and were
   not run here.
 
