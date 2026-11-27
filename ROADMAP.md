@@ -1,6 +1,6 @@
 # Baander roadmap
 
-Updated 2026-11-26. The roadmap records remaining work, decisions and acceptance
+Updated 2026-11-27. The roadmap records remaining work, decisions and acceptance
 gates. The linked guides describe current operating contracts. Git history
 keeps completed milestones and their verification evidence.
 
@@ -16,6 +16,244 @@ Read [AGENTS.md](AGENTS.md) for workflow, [CONCEPTS.md](CONCEPTS.md) for shared 
 and the [testing guide](docs-book/part-2-developer-guide/testing/README.md) for current
 runners and verification boundaries. Historical suite counts apply to their own trees.
 
+## Roadmap open items, 2026-11-26
+
+The owner selected all four groups of open items on 2026-11-26: the day's leftovers
+(the Symfony entry's and the pipe-operator check's open items), and the security
+audit's behaviour gaps, build and supply chain, and tests and gates. The
+[plan](docs/plans/2026-11-26-2023-fix-roadmap-open-items-plan.md) records the design
+and the owner decisions.
+
+Owner decisions:
+
+- A library-refused track answers `409` with reason `media_unavailable` on every
+  playback route.
+- Rows over a member-input bound are repaired in place and the bounds validated.
+- A write over a bound answers `409` with reason `member_input_bound`.
+- The song and recommendation lists refuse an out-of-range `limit`, and the web app
+  reads every page.
+- The recommendation `POST` answers `201` with the created recommendation.
+- `.opus` originals are served as `audio/ogg`.
+- PHP moves to 8.5.13 in every image together.
+- rav1e and zix stay and build for the portable x86-64 baseline.
+- The image-drift check retries Docker Hub `429` answers and logs in only when a token
+  secret exists.
+- The preset qualification runs in the libvirt guest, and the worker load proof stays
+  blocked.
+- Native build items may end as recorded findings.
+
+The owner confirmed on 2026-11-26 that the Forgejo registry holds the runner build of
+`f46c6148a` and the FFmpeg build of `7aa5172fb`, and skipped the preset qualification
+for that night.
+
+Delivered, behaviour:
+
+- Member-input bounds (`61a1f0a37`, `d2ecc26bb`). A `NOT VALID` check still applies
+  to every new row version, so an over-bound row failed every write that touched it,
+  heartbeats and `ON DELETE SET NULL` cascades included. The `jsonb` bounds measured
+  `pg_column_size()`, which reads a stored value compressed and a new one raw. The
+  bounds now measure `octet_length(<column>::text)` and admit the largest value
+  validation accepts: the queue's bound is 262,144 bytes, and 10,000 public IDs print
+  as 250,000. The migration repairs stored rows, then validates all fifteen bounds:
+  - over-long text is cut, or reset to its column default;
+  - repaired playlists get a new `persistence_version`;
+  - push subscriptions with an over-bound endpoint or key are deleted, and a long
+    User-Agent is cut;
+  - recommendations named longer than 255 characters are deleted, since cut names
+    could collide on the unique index.
+
+  `postUp()` reports the rows repaired per bound, and the migration is irreversible.
+  `DoctrineTransaction` maps a violated bound to `MemberInputBoundException`, which
+  answers `409` `member_input_bound`. Other check violations stay a logged `500`.
+- Refused tracks (`b66a2c1fa`). Delivery answered `500`, the signed original `403`
+  and the legacy stream `404` for a file outside its library. All three now answer
+  `409` `media_unavailable`, and the web player stops on it with an explanation. A
+  missing file keeps each route's former answer.
+- Media types (`7216f3cc1`). `.opus` originals go out as `audio/ogg` (RFC 7845), and
+  a migration rewrites stored `audio/opus` songs. A `.webm` file counts as WebM only
+  with VP8, VP9 or AV1 video and Vorbis or Opus audio. Otherwise it is Matroska and is
+  offered only to destinations that play Matroska. `/dsp/*.wasm` is served as
+  `application/wasm`.
+- Strict list limits (`c09665585`). The song list and the four recommendation lists
+  answer `400` with `details.limit` for an out-of-range `limit`, before any lookup.
+  The web app sent `limit=1000` from three artist actions; one `usePlayArtist` hook
+  now reads every page.
+- Transcode session share (`431ef5825`, `12c7c256d`):
+  - one SQL predicate decides whether a session occupies a slot, so a dead admission
+    no longer counts;
+  - a start locks every silent session it may end, then reads them again;
+  - a tiered start selects every tier's presentation before the first tier makes
+    room;
+  - cancel, pause and resume lock the video's admission row, then the execution row,
+    and change the execution as stale expiry does.
+- Session-limit message (`f7b8175e0`). The player names the limit when a start
+  answers `409` `transcode_session_limit`. It used to show the Axios text or a generic
+  preparation error.
+- Recommendations (`b68d74326`). The `POST` answers `201` with the created row. A
+  generation run deletes only generator rows, of its own user or of no user, and
+  writes with `INSERT … ON CONFLICT DO NOTHING`, so overlapping runs both complete
+  and member rows survive.
+- Activity history (`2725abc41`). Its response carries `meta` with `total`, `limit`
+  and `offset`, and the view model pages until `total`.
+- Revoked personal access clients (`3fa8838e1`). `app:oauth:client:purge-revoked`
+  deletes them with their tokens, and a seeded schedule runs it daily at 03:45 UTC.
+- Actor IDs (`c173c31a2`). The limiter clear, the job monitor and the recommendation
+  administration record the administrator's user ID through a Shared
+  `SignedInUserInterface` port. Console paths still record `cli`.
+- Console listings (`44ef7d005`). `TerminalText::literalRows()` strips CSI, OSC and
+  C0/C1 controls from table cells and escapes formatter tags. `AdminCommandSupport::list()`
+  and every listing of stored or external text use it. `--json` is unchanged.
+
+Delivered, build and supply chain:
+
+- Every image carries PHP 8.5.13, and the six drifted bases are repinned
+  (`e31225083`); `postgres:18-trixie` is repinned at its new index (`18b9ee13c`). The
+  amd64 image behind that index is unchanged: PostgreSQL 18.7-1.pgdg13+5.
+- Node and corepack move to the `dev` stage, so production, worker and dev-operator
+  images carry no unowned Node tree; the PIE inventory entries are gone
+  (`57bbb6ab7`).
+- The FFmpeg build (`f22f623d0`, `7aa5172fb`):
+  - `sources.txt` lists 44 archives by SHA-256, plus 11 forge archives and the libjxl
+    and glslang trees by commit;
+  - `download()` refuses a file that was not pre-seeded;
+  - `cargo-c` 0.10.26 installs with `--locked`;
+  - rav1e and zix build for the x86-64 baseline.
+
+  GitHub run 45894734494 built it, and GHCR serves it as
+  `ffmpeg-baander-static@sha256:762d62b2…`.
+- The image-drift check reads a rate-limited manifest again after 5, 10 and 20
+  seconds. The workflow logs in only when `DOCKERHUB_TOKEN` is set (`626df2407`).
+- Registry (`286614af9`):
+  - GCC 16's `-Warray-bounds` report in Asio's resolver is a false positive:
+    `endpoint::resize()` bounds the copy by `sockaddr_storage`, and only AF_INET and
+    AF_INET6 entries reach it. It stays a warning on GCC 16 and later.
+    `-Wstringop-overflow` did not reproduce.
+  - The ZTS image's exit 139 came from an active Xdebug, not ZTS: gdb showed
+    `xdebug.so` under `zend_observer_fcall_end_all` at request shutdown. The harness
+    now refuses an active Xdebug. With `XDEBUG_MODE=off`, `scripts/test-registry.sh
+    release` passes in the ZTS image.
+- Pins: every workflow runs on the runner built from `f46c6148a` (`bb2002895`). CI
+  uses the FFmpeg build of `7aa5172fb` on both forges (`69c6504e4`, `a50e42f62`).
+
+Delivered, tests and gates:
+
+- `ConfigurationTest` fails when either PHPStan configuration stops including the
+  rules extension or the extension stops tagging a rule (`f1ed3352e`).
+- A throwing reset releases the pool's mutex and the next `get()` builds a new
+  instance (`77fc84c0a`).
+- The log agent's Docker proxy allow-list ended in `$`, which also matches before a
+  final newline, so `…/json%0A` reached the daemon. It now ends in `\z`, and the
+  integration test sends `%0A`, `%0D%0A` and `%2e%2e` forms (`7966eb39e`).
+- The `409` answers' `error.details.reason` and `error.details.limit` are covered by
+  `TranscodeSessionLimitResponseTest` (`431ef5825`).
+- Registry stop tests cover a stop during a held schema write and during a delayed
+  probe, and each checks that the stop ends the readiness coroutine (`ffd7fb2ec`).
+  Against mutated server builds, each case failed with "Child wait deadline exceeded."
+- Tests that skip without their environment already fail in CI, which passes
+  `--fail-on-skipped` to every lane
+  (`packages/baander-dev-ci/src/Backend/Coordinator.php`). Setting `failOnSkipped` in
+  `phpunit.xml.dist` would only break host and IDE runs.
+- The two PostgreSQL findings are in the postgres-remediation skill's Doctrine
+  reference (`61a1f0a37`, `d2ecc26bb`).
+
+Delivered, CI repairs found on the way:
+
+- Symfony 8.1.12 stores a sliding window's size as a second entry. The Redis
+  limiter's state codec refused it, so every charged `/api` request answered `503`
+  outside the dev environment from `69dad984a` on (`9e22148f9`). This was the media
+  ownership step's failure on run 45877146331.
+- hls.js treats every `nextLevel` assignment as a smooth switch and flushes buffered
+  media and the subtitle cues that end before it. The player now assigns it only when
+  the level changes (`f46c6148a`). This was the Matroska movie-origin step's failure
+  on runs 45657127671, 45779297953 and 45869964516.
+- The website's font-arrival test failed when Chromium restarted handshakes on the
+  test server's self-signed certificate; the suite now accepts that certificate
+  (`79b1aa032`).
+- The app-root toast test took 4.4–4.7 s of its 5 s limit, because jsdom reparses a
+  whole `<style>` element for every styled-components rule. Vitest now selects the
+  CSSOM injection that production uses (`b7ce66a45`).
+- From `5783943a6` on, development and preview instances could not start: the log
+  agent mounted the proxy's `docker_proxy` volume, which the development runtime never
+  declared. The runtime now runs the proxy with the preset's hardening and recreates
+  it when its configuration changes (`1500050d2`). A test checks that every mounted
+  volume is declared.
+- The disposable database drill had not run on CI since 2026-11-22, and it failed for
+  two reasons (`56b1d0ab4`):
+  - Compose refused its project, because it kept only `postgres` and `redis` while
+    every development service depends on `log-agent`.
+  - Its production migration run lacked the secrets the boot check of `b7206492e`
+    and `2a4498344` requires.
+- Owner decision of 2026-11-27: the quality gate's 25 steps after the browser drills
+  run with `if: ${{ !cancelled() }}`, so PHPUnit and the stack lanes report even when
+  a drill fails (`1f8b7cdbe`). `PublicationWorkflowTest` allows only that condition on
+  a qualification step.
+
+Delivered, browser checks (`2c217a26c`). On a fresh preview of `f2ca7146c`,
+`api-path-encoding.spec.ts` passed in Chromium and the new `original-download.spec.ts`
+passed in Chromium and Firefox. A signed original opened as a page aborts into a
+download of the whole file, carries `Content-Disposition: attachment` and
+`Content-Security-Policy: default-src 'none'; sandbox`, and leaves the page at
+`about:blank` with no script output. This ran through the development gateway in front
+of Swoole, not the preset gateway. Owner-approved cleanup removed the dead preview
+record `preview-6b8641d04eb77339`, which an interrupted stop had left, and its gateway
+route.
+
+Delivered, code review fixes. The full-depth review ran eleven reviewers (correctness,
+security, adversarial, data migration, API contract, reliability, project standards,
+testing, maintainability, frontend races, learnings). It confirmed two findings and
+raised one more finding and one residual risk. Each fix has a test seen failing first:
+
+- A run for one user deleted the `collaborative` rows of no user, which every member
+  reads, and did not write them back. It now deletes only the rows it writes anew
+  (`c3ba4acd5`).
+- Two overlapping play-artist requests both started playback, and the slower read
+  replaced the queue. An overtaken read now plays nothing (`38fbb20cf`).
+- The MusicBrainz search heading and the catalog delete listing printed stored text
+  through the formatter; both now use `TerminalText::literal()` (`04263e23c`).
+- The queue repair now moves `listening_sessions.revision`, so a control sent with an
+  index into the old queue is refused as stale (`5d296cc58`).
+
+Verification checkpoint:
+
+- Every behaviour commit carries a test seen failing first. The commit messages
+  quote the failures.
+- The affected unit lanes, stack files, Vitest files, `tsc -b`, ESLint, PHPStan,
+  `check:imports`, `check:tooling-architecture` and Deptrac (0 violations) passed on
+  the integrated tree after each merge.
+- `InitialSchemaMigrationTest` passed with 51 migrations.
+- The development-environment and registry tooling suites passed (429 tests, 7
+  skipped by design).
+- GitHub CI run 45900306324 on `18b9ee13c` passed every browser drill: Matroska movie
+  origins, media ownership in Chromium and Firefox, and the selected video endpoint
+  through movie completion. It also passed the static gates and the registry jobs. It
+  failed at the disposable database drill, fixed in `56b1d0ab4`, and at the
+  intermittent `collections.test.tsx` case below.
+- The simplification pass changed one web reader and three docblocks (`c24213665`).
+
+Open:
+
+- The worker load proof (8 video and 12 audio jobs) needs a live deployment.
+- The preset qualification in the libvirt guest was not run.
+- A member `POST` that races a generation run for the same user and key can still
+  answer `500`, because the ORM flush meets the unique index.
+- The admin API shows HTTP-started recommendation jobs' `triggered_by` and
+  `requeued_by` as `[internal ID]`, because `PublicDiagnosticText` redacts the stored
+  user ID. Showing who started a job needs the public ID.
+- Console "show" outputs (`horizontalTable()`, `definitionList()` and `text()` lines in
+  commands such as `app:metadata:match:apply`, song and album delete, and user setting
+  `show`) still print stored text through the formatter. `TerminalText::literal()`
+  would cover them.
+- Write routes other than `PATCH /api/playlists/{publicId}` can answer `409`
+  `member_input_bound` for a row stored over a bound before the repair, and their
+  OpenAPI operations do not document it.
+- The registry load smoke failed twice in three full release runs in the runner image
+  (`lookup failed for load-057: HTTP 503`). It passed 4 of 4 when run alone, from
+  both this tree and the base. The cause is not established.
+- The development controller can wedge a preview: `down()` saves `quiescing` before
+  `compose stop`, so one failed compose call leaves the instance needing `recover`.
+- `tests/live-updates/collections.test.tsx` ("removes a denied playlist snapshot")
+  fails intermittently in CI's web checks: runs 45900306324 and 45653910522.
+
 ## Symfony 8.1.12 and the media ownership drill, 2026-11-26
 
 The scheduled advisory check reported 19 Symfony advisories published on 2026-11-25 against the locked 8.1.10 and 8.1.11 components. `69dad984a` is a full `composer update` inside the existing constraints: 41 Symfony components move to 8.1.12, eleven other packages take minor or patch releases, and the scripts lock moves `league/commonmark` to 2.10.10. The Redis Messenger patch applies unchanged. `a06ba18aa` stops the local dependency check from reading Composer's root-version notice for `baander/redis-rate-limiter` as a fetch failure.
@@ -28,10 +266,9 @@ Verification checkpoint:
 - The two-command drill passed end to end, with the Chromium step's environment, against a worker image built from the fix applied to `eb10d354e`.
 - The full backend suite was started on `a06ba18aa` and stopped unfinished at the owner's request. GitHub CI on `c4297b363` is the outstanding check.
 
-Open:
+Open: none. `e31225083` repinned the six drifted base images, and the roadmap open items entry above records the movie-endpoint step.
 
-- The movie-endpoint step has not run on `master` since 2026-11-20 and was not run locally.
-- The scheduled advisory run also reported six base images (`composer`, `debian:bookworm-slim`, `docker:cli`, three `nginx` tags) whose tags now resolve to new digests; the pins have not moved.
+Correction: the update broke every sliding-window rate limiter, so charged API requests answered `503`; `9e22148f9` fixes the state codec. The full unit lanes would have failed, but they were not run before the update shipped.
 
 ## Push without VAPID keys, 2026-11-26
 
@@ -77,7 +314,7 @@ Verification checkpoint:
 
 Open:
 
-- No test loads either PHPStan configuration. If the extension include were dropped, the rules would go quiet without a failing check, although PhpStorm would still show the findings.
+- Closed in `f1ed3352e`: `ConfigurationTest` fails when either configuration stops including the rules extension.
 - The ordinary unit lane crashed once on `8661c86ad` with random-order seed 138315351: `DiscoveryRegisterCommandTest` reached Symfony Console's `stty` probe while a Swoole runtime hook was active outside a coroutine. The test is not in this diff and the lane passed on rerun; the hook left on by an earlier test is unidentified.
 - After a PhpStorm or PHPStan upgrade, rerun the parity check in the developer guide.
 
@@ -412,41 +649,8 @@ Residual risks, recorded in the threat models:
   itself, such as `subtitles=` or `movie=`, would not show), and no audio rendition
   takes a video file as its source under the audio-only whitelist.
 
-Behaviour gaps:
+Behaviour gaps that remain (the roadmap open items entry of 2026-11-26 closes the rest):
 
-- A row stored over a member-input bound before the `NOT VALID` checks stays readable
-  and deletable, but any update of it, heartbeat writes included, fails with
-  SQLSTATE `23514` and answers `500`. Writing the guarded fields inside
-  `guardExistingWrite`'s compare-and-set and mapping `23514` to `409` would close it.
-  Real data was not checked for such rows.
-- Track delivery answers a generic `500` when confinement refuses a track:
-  `StreamService::resolveTrackPath` throws `InvalidArgumentException`, which
-  `DeliveryController::decide` does not catch. Video answers `409`.
-- `GET /api/songs/` and the recommendation source and target routes still clamp the
-  page size, and ui/web sends `limit=1000` to songs, so strict paging there would
-  break those calls. `ui/web/src/shared/utils/read-all-pages.ts` stops at the first
-  short page even when `meta.total` reports more, which is correct only while the
-  client's page limits equal the server's maxima.
-- Transcode session share: an expired pending session can count as a freed slot,
-  concurrent playback reports can make `makeRoom()` throw, and `assertRoomFor()` can
-  pass while a later tier fails. The web player shows `409`
-  `transcode_session_limit` as a generic failure, and its message is not translated.
-  `TranscodeSessionService::cancelSession` leaves the execution running.
-- A Matroska file named `.webm` is offered as a WebM original and ends playback in an
-  error with no fallback. Audio responses take their type from the container table;
-  the planned native players were not checked against it. The static handler serves
-  `/dsp/*.wasm` as `application/octet-stream`.
-- The recommendation `POST` documents `201` with a `RecommendationResource` but
-  returns a message; generation deletes every user's rows for the songs it
-  regenerates, member rows included; and a collaborative-row race with console
-  generation can still answer `500`.
-- `ActivityController::history` takes `limit` and `offset` but returns no `meta`.
-- Revoked personal access clients are never purged, so create and revoke cycles add
-  rows.
-- A limiter clear logs the super admin's email address; logging the user ID needs a
-  small Shared port.
-- `app:login-block:list`, like other console listings of user data, prints
-  sender-controlled text without removing ANSI and OSC escape sequences.
 - No server-side LAN discovery responder exists. The desktop client accepts an
   announcement whose fields are at most 256 characters, `http:` only for a loopback
   or private IP literal or a `.local` name, stores the origin only, keeps at most 64
@@ -454,6 +658,8 @@ Behaviour gaps:
   responder and the native apps should follow the same rules.
 - `App\Media\Infrastructure\Converter\ImageConverter` is deprecated and has no callers;
   its removal is the owner's decision, after reading its history.
+- A member's recommendation `POST` that races a generation run on the same key can
+  still answer `500`; see the 2026-11-26 entry.
 
 Preset and operations:
 
@@ -472,46 +678,15 @@ Preset and operations:
   command writes; `compose-stack.md` documents the gap.
 - The 64 MiB cap on the IPRD catalogue was not checked against the live catalogue.
 
-Build and supply chain:
-
-- The workflows pin `baander-runner` at commit tag `7491ddce…`. GHCR holds that tag
-  and `ffmpeg-baander-static`'s; the Forgejo registry was not checked, and Forgejo CI
-  fails closed without them. The pin keeps CI on that runner until it moves to a
-  build of `944605d1e` or later.
-- `docker/nginx/Dockerfile.test` does not build, because Alpine now offers only
-  `php85` 8.5.13; the runtime declarations need the same bump.
-- Fixed in `a06ba18aa`: `composer check:php-dependencies:local` exited `2` because its
-  stale-source pattern `rate.limit` matched the package name in Composer's
-  "could not detect the root package (baander/redis-rate-limiter) version" notice.
-- Node has no owner in the production inventory (2,114 review gaps): move Node to the
-  development stages or add build evidence. PIE is still listed in
-  `third_party/inventory/application-review.json`.
-- The FFmpeg build script's 55 nested downloads are not verified, `cargo-c` floats,
-  and two builds use `-march=native`.
-- Registry: the host's GCC 16 reports false `-Warray-bounds` and `-Wstringop-overflow`
-  errors in Asio under `_FORTIFY_SOURCE=3`, and the ZTS CI gate image cannot run the
-  registry harness (`test_runtime_lifecycle.php` exits 139).
+Build and supply chain: closed by the roadmap open items entry of 2026-11-26.
 
 Tests and gates:
 
-- Not run on this work: the preset qualification, the worker load proof with 8 video
-  and 12 audio jobs, the Playwright path-encoding spec, and the original-media browser
-  check through Swoole and the gateway.
-- No test checks that a throwing `SimpleResetter` method still lets the later methods
-  run and the pool free its slot; that newline-suffixed or percent-encoded dot paths
-  are refused by the Docker proxy; that the `409` answers carry
-  `error.details.reason` `transcode_session_limit` and `error.details.limit`; or that
-  the registry's `stop()` during the startup loop or a probe wait ends the readiness
-  coroutine.
-- `RequestIdentityInterleaveTest`, the Redis ACL tests and the Messenger and DPoP
-  outage tests skip instead of failing when their environment variables are missing,
-  and `failOnSkipped` is not set.
-- Two verified PostgreSQL findings await the postgres-remediation skill's Doctrine
-  reference: a `NOT VALID` check applies to every new row version, so an update of
-  any column of a violating row fails with `23514`, and `pg_column_size()` reads a
-  stored `jsonb` value compressed (`MemberInputBoundsMigrationTest`); a partial index
-  whose predicate compares a column with a constant serves only queries that state
-  that constant (`RecommendationOriginMigrationTest`).
+- Not run: the preset qualification and the worker load proof with 8 video and 12
+  audio jobs. The 2026-11-26 entry records the Playwright path-encoding spec and the
+  original-media browser check.
+- The 2026-11-26 entry closes the missing tests, the skipped-test item and the two
+  PostgreSQL findings.
 
 ## Security review findings
 
