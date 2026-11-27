@@ -35,4 +35,9 @@ export default defineConfig({
     actionTimeout: 10_000,
     navigationTimeout: 30_000,
   },
+  // Firefox runs only the scenarios tagged for it: the ones about how the engine itself handles a response.
+  projects: [
+    { name: 'chromium', use: { browserName: 'chromium' } },
+    { name: 'firefox', use: { browserName: 'firefox' }, grep: /@firefox/ },
+  ],
 })
