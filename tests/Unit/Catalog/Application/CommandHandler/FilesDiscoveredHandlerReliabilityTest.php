@@ -12,6 +12,7 @@ use App\Catalog\Application\Port\GenrePortInterface;
 use App\Catalog\Application\Port\MetadataContentReaderPortInterface;
 use App\Catalog\Application\Port\MoviePortInterface;
 use App\Catalog\Application\Port\SongPortInterface;
+use App\Catalog\Application\Service\VideoFileIngest;
 use App\Catalog\Domain\Model\Album;
 use App\Catalog\Domain\Model\Song;
 use App\Catalog\Domain\Repository\VideoRepositoryInterface;
@@ -83,20 +84,27 @@ final class FilesDiscoveredHandlerReliabilityTest extends TestCase
         $messageBus = $this->createMock(MessageBusInterface::class);
         $logger = new NullLogger();
 
+        $videoIngestMedia = $this->observedMediaFiles($this->createStub(LibraryMediaFilesInterface::class));
+        $videoIngestTransaction = new PassThroughTransaction();
         $handler = new FilesDiscoveredHandler(
             $albumPort,
             $genrePort,
             $songPort,
             $moviePort,
-            $videoRepository,
+            new VideoFileIngest(
+                $videoRepository,
+                $ffprobe,
+                $videoIngestMedia,
+                $videoIngestTransaction,
+                $logger,
+            ),
             $metadataReader,
-            $ffprobe,
             $messageBus,
             $this->createStub(LyricsFetchRequestInterface::class),
             $this->createStub(AlbumMatchRequestInterface::class),
             $logger,
-            $this->observedMediaFiles($this->createStub(LibraryMediaFilesInterface::class)),
-            new PassThroughTransaction(),
+            $videoIngestMedia,
+            $videoIngestTransaction,
             audioProbe: $this->audioProbeStub(),
             artistIdentities: $this->artistIdentitiesStub(),
             artistSyncs: $this->createStub(ArtistSyncRequestInterface::class),
@@ -159,20 +167,27 @@ final class FilesDiscoveredHandlerReliabilityTest extends TestCase
         $messageBus = $this->createMock(MessageBusInterface::class);
         $logger = new NullLogger();
 
+        $videoIngestMedia = $this->observedMediaFiles($this->createStub(LibraryMediaFilesInterface::class));
+        $videoIngestTransaction = new PassThroughTransaction();
         $handler = new FilesDiscoveredHandler(
             $albumPort,
             $genrePort,
             $songPort,
             $moviePort,
-            $videoRepository,
+            new VideoFileIngest(
+                $videoRepository,
+                $ffprobe,
+                $videoIngestMedia,
+                $videoIngestTransaction,
+                $logger,
+            ),
             $metadataReader,
-            $ffprobe,
             $messageBus,
             $this->createStub(LyricsFetchRequestInterface::class),
             $this->createStub(AlbumMatchRequestInterface::class),
             $logger,
-            $this->observedMediaFiles($this->createStub(LibraryMediaFilesInterface::class)),
-            new PassThroughTransaction(),
+            $videoIngestMedia,
+            $videoIngestTransaction,
             audioProbe: $this->audioProbeStub(),
             artistIdentities: $this->artistIdentitiesStub(),
             artistSyncs: $this->createStub(ArtistSyncRequestInterface::class),
@@ -336,20 +351,28 @@ final class FilesDiscoveredHandlerReliabilityTest extends TestCase
         $metadataReader = $this->createStub(MetadataContentReaderPortInterface::class);
         $metadataReader->method('readMetadata')->willReturn((new ExtractedMetadata())->setTitle('Track One')->setAlbum('Test Album')->setDuration(180.0));
         $bus = $this->createMock(MessageBusInterface::class);
+        $videoIngestLogger = $logger ?? new NullLogger();
+        $videoIngestMedia = $this->observedMediaFiles($this->createStub(LibraryMediaFilesInterface::class));
+        $videoIngestTransaction = new PassThroughTransaction();
         $handler = new FilesDiscoveredHandler(
             $albumPort,
             $genrePort,
             $songPort,
             $this->createStub(MoviePortInterface::class),
-            $this->createStub(VideoRepositoryInterface::class),
+            new VideoFileIngest(
+                $this->createStub(VideoRepositoryInterface::class),
+                new FFprobeAdapter(new JsonEncoder()),
+                $videoIngestMedia,
+                $videoIngestTransaction,
+                $videoIngestLogger,
+            ),
             $metadataReader,
-            new FFprobeAdapter(new JsonEncoder()),
             $bus,
             $this->createStub(LyricsFetchRequestInterface::class),
             $this->createStub(AlbumMatchRequestInterface::class),
-            $logger ?? new NullLogger(),
-            $this->observedMediaFiles($this->createStub(LibraryMediaFilesInterface::class)),
-            new PassThroughTransaction(),
+            $videoIngestLogger,
+            $videoIngestMedia,
+            $videoIngestTransaction,
             audioProbe: $this->audioProbeStub(),
             artistIdentities: $this->artistIdentitiesStub(),
             artistSyncs: $this->createStub(ArtistSyncRequestInterface::class),

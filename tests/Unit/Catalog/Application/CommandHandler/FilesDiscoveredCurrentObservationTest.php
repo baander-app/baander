@@ -12,6 +12,7 @@ use App\Catalog\Application\Port\GenrePortInterface;
 use App\Catalog\Application\Port\MetadataContentReaderPortInterface;
 use App\Catalog\Application\Port\MoviePortInterface;
 use App\Catalog\Application\Port\SongPortInterface;
+use App\Catalog\Application\Service\VideoFileIngest;
 use App\Catalog\Domain\Model\Album;
 use App\Catalog\Domain\Model\Song;
 use App\Catalog\Domain\Model\Video;
@@ -200,9 +201,28 @@ final class FilesDiscoveredCurrentObservationTest extends TestCase
 
     private function handler(): FilesDiscoveredHandler
     {
-        return new FilesDiscoveredHandler($this->albums, $this->createStub(GenrePortInterface::class), $this->songs,
-            $this->movies, $this->videos, $this->metadata, new FFprobeAdapter(new JsonEncoder()), $this->bus,
-            $this->lyrics, $this->sync, new NullLogger(), $this->media, $this->transaction,
+        $videoIngestLogger = new NullLogger();
+        $videoIngestMedia = $this->media;
+        $videoIngestTransaction = $this->transaction;
+        return new FilesDiscoveredHandler(
+            $this->albums,
+            $this->createStub(GenrePortInterface::class),
+            $this->songs,
+            $this->movies,
+            new VideoFileIngest(
+                $this->videos,
+                new FFprobeAdapter(new JsonEncoder()),
+                $videoIngestMedia,
+                $videoIngestTransaction,
+                $videoIngestLogger,
+            ),
+            $this->metadata,
+            $this->bus,
+            $this->lyrics,
+            $this->sync,
+            $videoIngestLogger,
+            $videoIngestMedia,
+            $videoIngestTransaction,
             audioProbe: $this->audioProbeStub(),
             artistIdentities: $this->artistIdentitiesStub(),
             artistSyncs: $this->createStub(ArtistSyncRequestInterface::class),

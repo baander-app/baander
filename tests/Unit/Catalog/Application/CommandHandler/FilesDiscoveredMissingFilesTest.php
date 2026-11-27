@@ -12,6 +12,7 @@ use App\Catalog\Application\Port\GenrePortInterface;
 use App\Catalog\Application\Port\MetadataContentReaderPortInterface;
 use App\Catalog\Application\Port\MoviePortInterface;
 use App\Catalog\Application\Port\SongPortInterface;
+use App\Catalog\Application\Service\VideoFileIngest;
 use App\Catalog\Domain\Model\Album;
 use App\Catalog\Domain\Model\Song;
 use App\Catalog\Domain\Repository\VideoRepositoryInterface;
@@ -244,20 +245,27 @@ final class FilesDiscoveredMissingFilesTest extends TestCase
             $bus->method('dispatch')->willReturnCallback(static fn (object $message): Envelope => new Envelope($message));
         }
 
+        $videoIngestLogger = new NullLogger();
+        $videoIngestTransaction = $transaction ?? new PassThroughTransaction();
         return new FilesDiscoveredHandler(
             $albums,
             $this->createStub(GenrePortInterface::class),
             $songs ?? $this->createStub(SongPortInterface::class),
             $movies ?? $this->createStub(MoviePortInterface::class),
-            $videos ?? $this->createStub(VideoRepositoryInterface::class),
+            new VideoFileIngest(
+                $videos ?? $this->createStub(VideoRepositoryInterface::class),
+                new FFprobeAdapter(new JsonEncoder()),
+                $mediaFiles,
+                $videoIngestTransaction,
+                $videoIngestLogger,
+            ),
             $metadata,
-            new FFprobeAdapter(new JsonEncoder()),
             $bus,
             $this->createStub(LyricsFetchRequestInterface::class),
             $this->createStub(AlbumMatchRequestInterface::class),
-            new NullLogger(),
+            $videoIngestLogger,
             $mediaFiles,
-            $transaction ?? new PassThroughTransaction(),
+            $videoIngestTransaction,
             audioProbe: $this->audioProbeStub(),
             artistIdentities: $this->artistIdentitiesStub(),
             artistSyncs: $this->createStub(ArtistSyncRequestInterface::class),

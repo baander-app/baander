@@ -13,6 +13,7 @@ use App\Catalog\Application\Port\MetadataContentReaderPortInterface;
 use App\Catalog\Application\Port\MoviePortInterface;
 use App\Catalog\Application\Port\SongPortInterface;
 use App\Catalog\Application\Service\MovieLibraryIngest;
+use App\Catalog\Application\Service\VideoFileIngest;
 use App\Catalog\Domain\Model\Movie;
 use App\Catalog\Domain\Model\Video;
 use App\Catalog\Domain\Repository\VideoRepositoryInterface;
@@ -75,13 +76,28 @@ final class MovieLibraryIngestTest extends TestCase
 
     private function ingest(LibraryProvisioningInterface $provisioning, MoviePortInterface $movies, VideoRepositoryInterface $videos): MovieLibraryIngest
     {
+        $videoIngestLogger = new NullLogger();
+        $videoIngestMedia = $this->observedMediaFiles($this->createStub(LibraryMediaFilesInterface::class));
+        $videoIngestTransaction = new PassThroughTransaction();
         $handler = new FilesDiscoveredHandler(
-            $this->createStub(AlbumPortInterface::class), $this->createStub(GenrePortInterface::class),
-            $this->createStub(SongPortInterface::class), $movies,
-            $videos, $this->createStub(MetadataContentReaderPortInterface::class), new FFprobeAdapter(new JsonEncoder()),
-            $this->createStub(MessageBusInterface::class), $this->createStub(LyricsFetchRequestInterface::class), $this->createStub(AlbumMatchRequestInterface::class), new NullLogger(),
-            $this->observedMediaFiles($this->createStub(LibraryMediaFilesInterface::class)),
-            new PassThroughTransaction(),
+            $this->createStub(AlbumPortInterface::class),
+            $this->createStub(GenrePortInterface::class),
+            $this->createStub(SongPortInterface::class),
+            $movies,
+            new VideoFileIngest(
+                $videos,
+                new FFprobeAdapter(new JsonEncoder()),
+                $videoIngestMedia,
+                $videoIngestTransaction,
+                $videoIngestLogger,
+            ),
+            $this->createStub(MetadataContentReaderPortInterface::class),
+            $this->createStub(MessageBusInterface::class),
+            $this->createStub(LyricsFetchRequestInterface::class),
+            $this->createStub(AlbumMatchRequestInterface::class),
+            $videoIngestLogger,
+            $videoIngestMedia,
+            $videoIngestTransaction,
             audioProbe: $this->audioProbeStub(),
             artistIdentities: $this->artistIdentitiesStub(),
             artistSyncs: $this->createStub(ArtistSyncRequestInterface::class),

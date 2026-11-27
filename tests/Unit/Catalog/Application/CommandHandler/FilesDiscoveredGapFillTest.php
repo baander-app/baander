@@ -15,6 +15,7 @@ use App\Catalog\Application\Port\GenrePortInterface;
 use App\Catalog\Application\Port\MetadataContentReaderPortInterface;
 use App\Catalog\Application\Port\MoviePortInterface;
 use App\Catalog\Application\Port\SongPortInterface;
+use App\Catalog\Application\Service\VideoFileIngest;
 use App\Catalog\Domain\Model\Album;
 use App\Catalog\Domain\Model\Song;
 use App\Catalog\Domain\Repository\VideoRepositoryInterface;
@@ -458,18 +459,24 @@ final class FilesDiscoveredGapFillTest extends TestCase
         $bus = $this->createStub(MessageBusInterface::class);
         $bus->method('dispatch')->willReturnCallback(static fn (object $message): Envelope => new Envelope($message));
 
+        $videoIngestLogger = $logger ?? new NullLogger();
         return new FilesDiscoveredHandler(
             $albums,
             $this->createStub(GenrePortInterface::class),
             $songs,
             $this->createStub(MoviePortInterface::class),
-            $this->createStub(VideoRepositoryInterface::class),
+            new VideoFileIngest(
+                $this->createStub(VideoRepositoryInterface::class),
+                $this->createStub(VideoProbePortInterface::class),
+                $media,
+                $transaction,
+                $videoIngestLogger,
+            ),
             $metadata,
-            $this->createStub(VideoProbePortInterface::class),
             $bus,
             new LyricsFetchRequester($settings, $lyricsBus, new MockClock()),
             $this->createStub(AlbumMatchRequestInterface::class),
-            $logger ?? new NullLogger(),
+            $videoIngestLogger,
             $media,
             $transaction,
             $probe,

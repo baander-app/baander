@@ -12,6 +12,7 @@ use App\Catalog\Application\Port\GenrePortInterface;
 use App\Catalog\Application\Port\MetadataContentReaderPortInterface;
 use App\Catalog\Application\Port\MoviePortInterface;
 use App\Catalog\Application\Port\SongPortInterface;
+use App\Catalog\Application\Service\VideoFileIngest;
 use App\Catalog\Domain\Model\Album;
 use App\Catalog\Domain\Model\Song;
 use App\Catalog\Domain\Repository\VideoRepositoryInterface;
@@ -303,20 +304,28 @@ final class FilesDiscoveredLyricsRequestTest extends TestCase
         $bus = $this->createStub(MessageBusInterface::class);
         $bus->method('dispatch')->willReturnCallback(static fn (object $message): Envelope => new Envelope($message));
 
+        $videoIngestLogger = $logger ?? new NullLogger();
+        $videoIngestMedia = $this->observedMediaFiles($this->createStub(LibraryMediaFilesInterface::class));
+        $videoIngestTransaction = new PassThroughTransaction();
         return new FilesDiscoveredHandler(
             $albums,
             $genres,
             $songs,
             $this->createStub(MoviePortInterface::class),
-            $this->createStub(VideoRepositoryInterface::class),
+            new VideoFileIngest(
+                $this->createStub(VideoRepositoryInterface::class),
+                new FFprobeAdapter(new JsonEncoder()),
+                $videoIngestMedia,
+                $videoIngestTransaction,
+                $videoIngestLogger,
+            ),
             $metadata,
-            new FFprobeAdapter(new JsonEncoder()),
             $bus,
             $lyrics,
             $this->createStub(AlbumMatchRequestInterface::class),
-            $logger ?? new NullLogger(),
-            $this->observedMediaFiles($this->createStub(LibraryMediaFilesInterface::class)),
-            new PassThroughTransaction(),
+            $videoIngestLogger,
+            $videoIngestMedia,
+            $videoIngestTransaction,
             audioProbe: $this->audioProbeStub(),
             artistIdentities: $this->artistIdentitiesStub(),
             artistSyncs: $this->createStub(ArtistSyncRequestInterface::class),

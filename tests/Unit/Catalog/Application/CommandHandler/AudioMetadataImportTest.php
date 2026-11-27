@@ -11,6 +11,7 @@ use App\Catalog\Application\Port\ArtistSyncRequestInterface;
 use App\Catalog\Application\Port\GenrePortInterface;
 use App\Catalog\Application\Port\MoviePortInterface;
 use App\Catalog\Application\Port\SongPortInterface;
+use App\Catalog\Application\Service\VideoFileIngest;
 use App\Catalog\Domain\Model\Album;
 use App\Catalog\Domain\Model\Song;
 use App\Catalog\Domain\Repository\VideoRepositoryInterface;
@@ -73,14 +74,30 @@ final class AudioMetadataImportTest extends TestCase
                 self::assertSame($album->getId()->toString(), $song->getAlbumId()->toString());
             });
             $songs->expects(self::once())->method('addArtistCredit');
+            $videoIngestLogger = new NullLogger();
+            $videoIngestMedia = $this->observedMediaFiles($this->createStub(LibraryMediaFilesInterface::class));
+            $videoIngestTransaction = new PassThroughTransaction();
             $handler = new FilesDiscoveredHandler(
-                $albums, $this->createStub(GenrePortInterface::class), $songs,
-                $this->createStub(MoviePortInterface::class), $this->createStub(VideoRepositoryInterface::class),
-                MetadataReaderFixture::contentReader(), $this->createStub(VideoProbePortInterface::class),
-                $this->createStub(MessageBusInterface::class), $this->createStub(LyricsFetchRequestInterface::class),
-                $this->createStub(AlbumMatchRequestInterface::class), new NullLogger(),
-                $this->observedMediaFiles($this->createStub(LibraryMediaFilesInterface::class)),
-                new PassThroughTransaction(), $this->audioProbeStub(), $this->artistIdentitiesStub(),
+                $albums,
+                $this->createStub(GenrePortInterface::class),
+                $songs,
+                $this->createStub(MoviePortInterface::class),
+                new VideoFileIngest(
+                    $this->createStub(VideoRepositoryInterface::class),
+                    $this->createStub(VideoProbePortInterface::class),
+                    $videoIngestMedia,
+                    $videoIngestTransaction,
+                    $videoIngestLogger,
+                ),
+                MetadataReaderFixture::contentReader(),
+                $this->createStub(MessageBusInterface::class),
+                $this->createStub(LyricsFetchRequestInterface::class),
+                $this->createStub(AlbumMatchRequestInterface::class),
+                $videoIngestLogger,
+                $videoIngestMedia,
+                $videoIngestTransaction,
+                $this->audioProbeStub(),
+                $this->artistIdentitiesStub(),
                 $this->createStub(ArtistSyncRequestInterface::class),
             );
             $handler(new FilesDiscovered($library, 'music', $directory, [$file]));

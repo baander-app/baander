@@ -12,6 +12,7 @@ use App\Catalog\Application\Port\GenrePortInterface;
 use App\Catalog\Application\Port\MetadataContentReaderPortInterface;
 use App\Catalog\Application\Port\MoviePortInterface;
 use App\Catalog\Application\Port\SongPortInterface;
+use App\Catalog\Application\Service\VideoFileIngest;
 use App\Catalog\Domain\Model\Album;
 use App\Catalog\Domain\Model\Movie;
 use App\Catalog\Domain\Model\Song;
@@ -60,12 +61,32 @@ final class FilesDiscoveredTechnicalMetadataTest extends TestCase
         $metadata->method('readMetadata')->willReturn((new ExtractedMetadata())->setTitle('Track')->setDuration(17.37)->setSampleRate(1));
         $probe = $this->createStub(AudioProbePortInterface::class);
         $probe->method('probeAudio')->willReturn(new AudioProbeResult('mov,mp4,m4a,3gp,3g2,mj2', 3, 'aac', 2, 48000, 128000, 20.5));
-        $handler = new FilesDiscoveredHandler($albums, $this->createStub(GenrePortInterface::class), $songs,
-            $this->createStub(MoviePortInterface::class), $this->createStub(VideoRepositoryInterface::class), $metadata,
-            $this->createStub(VideoProbePortInterface::class), $this->createStub(MessageBusInterface::class),
-            $this->createStub(LyricsFetchRequestInterface::class), $this->createStub(AlbumMatchRequestInterface::class), new NullLogger(),
-            $this->observedMediaFiles($this->createStub(LibraryMediaFilesInterface::class)), new PassThroughTransaction(), $probe,
-            $this->artistIdentitiesStub(), $this->createStub(ArtistSyncRequestInterface::class));
+        $videoIngestLogger = new NullLogger();
+        $videoIngestMedia = $this->observedMediaFiles($this->createStub(LibraryMediaFilesInterface::class));
+        $videoIngestTransaction = new PassThroughTransaction();
+        $handler = new FilesDiscoveredHandler(
+            $albums,
+            $this->createStub(GenrePortInterface::class),
+            $songs,
+            $this->createStub(MoviePortInterface::class),
+            new VideoFileIngest(
+                $this->createStub(VideoRepositoryInterface::class),
+                $this->createStub(VideoProbePortInterface::class),
+                $videoIngestMedia,
+                $videoIngestTransaction,
+                $videoIngestLogger,
+            ),
+            $metadata,
+            $this->createStub(MessageBusInterface::class),
+            $this->createStub(LyricsFetchRequestInterface::class),
+            $this->createStub(AlbumMatchRequestInterface::class),
+            $videoIngestLogger,
+            $videoIngestMedia,
+            $videoIngestTransaction,
+            $probe,
+            $this->artistIdentitiesStub(),
+            $this->createStub(ArtistSyncRequestInterface::class),
+        );
 
         $handler(new FilesDiscovered($library, 'music', '/music/Album', [$file]));
     }
@@ -103,12 +124,32 @@ final class FilesDiscoveredTechnicalMetadataTest extends TestCase
 
             return new AudioProbeResult('aac', 3, 'aac', 2, 48000, 128000, 20.5);
         });
-        $handler = new FilesDiscoveredHandler($albums, $this->createStub(GenrePortInterface::class), $songs,
-            $this->createStub(MoviePortInterface::class), $this->createStub(VideoRepositoryInterface::class), $metadata,
-            $this->createStub(VideoProbePortInterface::class), $this->createStub(MessageBusInterface::class), $lyrics,
-            $this->createStub(AlbumMatchRequestInterface::class), new NullLogger(),
-            $this->observedMediaFiles($this->createStub(LibraryMediaFilesInterface::class)), new PassThroughTransaction(), $probe,
-            $this->artistIdentitiesStub(), $this->createStub(ArtistSyncRequestInterface::class));
+        $videoIngestLogger = new NullLogger();
+        $videoIngestMedia = $this->observedMediaFiles($this->createStub(LibraryMediaFilesInterface::class));
+        $videoIngestTransaction = new PassThroughTransaction();
+        $handler = new FilesDiscoveredHandler(
+            $albums,
+            $this->createStub(GenrePortInterface::class),
+            $songs,
+            $this->createStub(MoviePortInterface::class),
+            new VideoFileIngest(
+                $this->createStub(VideoRepositoryInterface::class),
+                $this->createStub(VideoProbePortInterface::class),
+                $videoIngestMedia,
+                $videoIngestTransaction,
+                $videoIngestLogger,
+            ),
+            $metadata,
+            $this->createStub(MessageBusInterface::class),
+            $lyrics,
+            $this->createStub(AlbumMatchRequestInterface::class),
+            $videoIngestLogger,
+            $videoIngestMedia,
+            $videoIngestTransaction,
+            $probe,
+            $this->artistIdentitiesStub(),
+            $this->createStub(ArtistSyncRequestInterface::class),
+        );
 
         $handler(new FilesDiscovered($library, 'music', '/music/Album', [$file]));
 
@@ -148,12 +189,32 @@ final class FilesDiscoveredTechnicalMetadataTest extends TestCase
         $movie->addVideo($video->getId());
         $movies->method('findByTitleAndLibrary')->willReturn($movie);
         $movies->expects($this->never())->method('persist');
-        $handler = new FilesDiscoveredHandler($this->createStub(AlbumPortInterface::class), $this->createStub(GenrePortInterface::class),
-            $this->createStub(SongPortInterface::class), $movies, $videos, $this->createStub(MetadataContentReaderPortInterface::class),
-            $probe, $this->createStub(MessageBusInterface::class), $this->createStub(LyricsFetchRequestInterface::class),
-            $this->createStub(AlbumMatchRequestInterface::class), new NullLogger(),
-            $this->observedMediaFiles($this->createStub(LibraryMediaFilesInterface::class)), new PassThroughTransaction(),
-            $this->createStub(AudioProbePortInterface::class), $this->artistIdentitiesStub(), $this->createStub(ArtistSyncRequestInterface::class));
+        $videoIngestLogger = new NullLogger();
+        $videoIngestMedia = $this->observedMediaFiles($this->createStub(LibraryMediaFilesInterface::class));
+        $videoIngestTransaction = new PassThroughTransaction();
+        $handler = new FilesDiscoveredHandler(
+            $this->createStub(AlbumPortInterface::class),
+            $this->createStub(GenrePortInterface::class),
+            $this->createStub(SongPortInterface::class),
+            $movies,
+            new VideoFileIngest(
+                $videos,
+                $probe,
+                $videoIngestMedia,
+                $videoIngestTransaction,
+                $videoIngestLogger,
+            ),
+            $this->createStub(MetadataContentReaderPortInterface::class),
+            $this->createStub(MessageBusInterface::class),
+            $this->createStub(LyricsFetchRequestInterface::class),
+            $this->createStub(AlbumMatchRequestInterface::class),
+            $videoIngestLogger,
+            $videoIngestMedia,
+            $videoIngestTransaction,
+            $this->createStub(AudioProbePortInterface::class),
+            $this->artistIdentitiesStub(),
+            $this->createStub(ArtistSyncRequestInterface::class),
+        );
 
         $handler(new FilesDiscovered($library, 'movie', '/movies/Movie', [$file]));
 
