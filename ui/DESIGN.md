@@ -83,13 +83,13 @@ marker shapes and line patterns so color is not the only way to identify a serie
 Content is the interface. The UI gets out of the way. Progressive disclosure: simple by default, powerful on demand. Interactions are precise and immediate. Motion communicates spatial continuity, never decoration.
 
 The reference era is Apple's 2008–2014 Human Interface Guidelines: clear hierarchy,
-restrained controls, and precise interaction, adapted to Baander's responsive web
+restrained controls, and precise interaction, adapted to Bånder's responsive web
 interface and current accessibility requirements. The supplied
 [2018 macOS HIG archive](https://martin-juul.github.io/aslice/library/apple-macos-hig-2018/index.html#470c81114d39cd61d4ec2d2af0c4aa565d70ee758c5b4b6dff3be78c84700e2c.html)
 is supplementary Mojave-era material, not a 2014 source. Apple Music is not the
 visual reference.
 
-Baander is gradually combining restrained Aqua material cues with flat surfaces.
+Bånder is gradually combining restrained Aqua material cues with flat surfaces.
 The material is the well: a recessed face that one surface holds at a time. The
 web music footer's centerpiece holds it by default and the sidebar notification
 pane takes it while open; other surfaces retain their existing rules. Material
@@ -203,7 +203,7 @@ Sans JP and Noto Sans KR. In a mono context, such as a file name with Japanese o
 Thai characters, Noto Sans Mono comes first and the same chain follows, so the text
 never falls to a system font.
 
-Every font is bundled and served from Baander's own origin. A browser downloads a
+Every font is bundled and served from Bånder's own origin. A browser downloads a
 script's font only when text in that script appears on screen.
 
 ### Roles
