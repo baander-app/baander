@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\Library\Infrastructure\Scanner;
+namespace App\Library\Application\DTO;
 
 use App\Shared\Domain\ValueObject\MediaContainer;
 use App\Shared\Domain\ValueObject\MediaKind;
@@ -41,6 +41,11 @@ final readonly class MediaFile
     public function getModifiedAt(): int
     {
         return $this->modifiedAt;
+    }
+
+    public function isVideoSidecar(): bool
+    {
+        return in_array($this->extension, ['nfo', 'jpg', 'jpeg', 'png', 'webp'], true);
     }
 
     public function isAudio(): bool

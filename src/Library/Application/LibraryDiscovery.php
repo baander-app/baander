@@ -31,6 +31,7 @@ final class LibraryDiscovery
     public function __construct(
         private readonly MusicScanner $musicScanner,
         private readonly MovieScanner $movieScanner,
+        private readonly TvScanner $tvScanner,
         private readonly EventDispatcherInterface $eventDispatcher,
         private readonly LoggerInterface $logger,
     ) {
@@ -49,6 +50,7 @@ final class LibraryDiscovery
             $result = match ($library->getType()) {
                 LibraryType::Music => $this->musicScanner->scan($library, $rescan, $publishDirectory, $lease),
                 LibraryType::Movie => $this->movieScanner->scan($library, $rescan, $publishDirectory, $lease),
+                LibraryType::TvShow => $this->tvScanner->scan($library, $rescan, $publishDirectory, $lease),
                 default => throw new RuntimeException(sprintf('Unsupported library type: %s', $library->getType()->value)),
             };
 

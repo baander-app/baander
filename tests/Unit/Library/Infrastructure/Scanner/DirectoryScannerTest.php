@@ -6,7 +6,7 @@ namespace App\Tests\Unit\Library\Infrastructure\Scanner;
 
 use App\Library\Domain\ValueObject\LibraryPath;
 use App\Library\Infrastructure\Scanner\DirectoryScanner;
-use App\Library\Infrastructure\Scanner\MediaFile;
+use App\Library\Application\DTO\MediaFile;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\AbstractLogger;
 use Stringable;

@@ -132,11 +132,11 @@ final class LibraryScanCommandTest extends KernelTestCase
             {
             }
 
-            public function scan(LibraryPath $path): array
+            public function scan(LibraryPath $path, ?\Closure $checkpoint = null): array
             {
                 ($this->beforeScan)();
 
-                return new DirectoryScanner(new NullLogger())->scan($path);
+                return new DirectoryScanner(new NullLogger())->scan($path, $checkpoint);
             }
         });
 

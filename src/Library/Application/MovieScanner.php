@@ -10,7 +10,7 @@ use App\Library\Application\Message\DiscoveredFile;
 use App\Library\Application\Service\LibraryScanLease;
 use App\Library\Domain\Model\Library;
 use App\Library\Domain\Repository\LibraryFileIndexRepositoryInterface;
-use App\Library\Infrastructure\Scanner\MediaFile;
+use App\Library\Application\DTO\MediaFile;
 use App\Shared\Application\JobCancelledException;
 use App\Shared\Application\Port\JobCancellationCheckpointInterface;
 use App\Shared\Application\Port\TransactionPortInterface;
@@ -29,7 +29,7 @@ final class MovieScanner
     }
 
     /**
-     * Hashes the library's video files one directory (movie) at a time. A directory with new
+     * Hashes the library's video files and sidecars one directory at a time. A directory with new
      * or changed files commits its index updates and the callback's durable event capture
      * together. The callback must use the same transaction and must not send to an external
      * transport. Capture failure rolls back the directory so a later scan can retry it.
@@ -46,13 +46,16 @@ final class MovieScanner
         $filesProcessed = 0;
         $filesSkipped = 0;
 
-        $mediaFiles = $this->directoryScanner->scan($library->getPath());
+        $mediaFiles = $this->directoryScanner->scan($library->getPath(), static function () use ($lease): void {
+            $lease?->renew();
+        });
         $lease?->renew();
-        $videoFiles = array_filter($mediaFiles, fn (MediaFile $f) => $f->isVideo());
-        $filesDiscovered = count($videoFiles);
+        $videoAndSidecarFiles = array_filter($mediaFiles, fn (MediaFile $f) => $f->isVideo() || $f->isVideoSidecar());
+        $filesDiscovered = count($videoAndSidecarFiles);
 
-        $this->logger->info('Starting movie library scan', [
+        $this->logger->info('Starting video library scan', [
             'library' => $library->getSlug()->toString(),
+            'type' => $library->getType()->value,
             'discovered' => $filesDiscovered,
         ]);
 
@@ -62,9 +65,9 @@ final class MovieScanner
             ? []
             : $this->fileIndexRepository->findAvailableIndexPathMapByLibrary($library->getId());
 
-        // Group files by parent directory (movie grouping)
+        // Each directory commits its observations and publication together.
         $filesByDirectory = [];
-        foreach ($videoFiles as $file) {
+        foreach ($videoAndSidecarFiles as $file) {
             $filesByDirectory[dirname($file->getAbsolutePath())][] = $file;
         }
 

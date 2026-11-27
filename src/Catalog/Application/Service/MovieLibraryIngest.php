@@ -49,6 +49,9 @@ final class MovieLibraryIngest
             ($this->filesDiscoveredHandler)($discovery);
 
             foreach ($discovery->files as $file) {
+                if (!$file->isVideo()) {
+                    continue;
+                }
                 $video = $this->videoRepository->findByHash($file->hash);
                 if ($video !== null) {
                     $videoIds[] = $video->getId()->toString();

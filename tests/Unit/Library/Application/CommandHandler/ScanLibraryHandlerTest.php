@@ -12,6 +12,7 @@ use App\Library\Application\Exception\LibraryScanClaimLostException;
 use App\Library\Application\LibraryDiscovery;
 use App\Library\Domain\Event\LibraryDirectoryIndexed;
 use App\Library\Application\MovieScanner;
+use App\Library\Application\TvScanner;
 use App\Library\Application\MusicScanner;
 use App\Library\Application\Port\DirectoryScannerPortInterface;
 use App\Library\Application\Service\LibraryLookup;
@@ -22,7 +23,7 @@ use App\Library\Domain\Repository\LibraryFileIndexRepositoryInterface;
 use App\Library\Domain\ValueObject\LibraryPath;
 use App\Library\Domain\ValueObject\LibrarySlug;
 use App\Library\Domain\ValueObject\LibraryType;
-use App\Library\Infrastructure\Scanner\MediaFile;
+use App\Library\Application\DTO\MediaFile;
 use App\Shared\Application\JobCancelledException;
 use App\Shared\Domain\Model\Uuid;
 use App\Shared\Domain\ValueObject\FilesystemType;
@@ -262,12 +263,15 @@ final class ScanLibraryHandlerTest extends TestCase
         $fileIndex = $this->createStub(LibraryFileIndexRepositoryInterface::class);
         $logger = new NullLogger();
 
+        $movieScanner = new MovieScanner($directoryScanner, $fileIndex, $logger, $cancellation, new PassThroughTransaction());
+
         return new ScanLibraryHandler(
             $this->libraries,
             $this->claims(),
             new LibraryDiscovery(
                 new MusicScanner($directoryScanner, $fileIndex, $logger, $cancellation, new PassThroughTransaction()),
-                new MovieScanner($directoryScanner, $fileIndex, $logger, $cancellation, new PassThroughTransaction()),
+                $movieScanner,
+                new TvScanner($movieScanner),
                 $events,
                 $logger,
             ),

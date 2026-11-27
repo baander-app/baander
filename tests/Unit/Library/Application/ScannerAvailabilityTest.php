@@ -19,7 +19,7 @@ use App\Library\Domain\Repository\LibraryFileIndexRepositoryInterface;
 use App\Library\Domain\ValueObject\LibraryPath;
 use App\Library\Domain\ValueObject\LibrarySlug;
 use App\Library\Domain\ValueObject\LibraryType;
-use App\Library\Infrastructure\Scanner\MediaFile;
+use App\Library\Application\DTO\MediaFile;
 use App\Shared\Application\JobCancelledException;
 use App\Shared\Domain\ValueObject\FilesystemType;
 use App\Tests\Fixtures\Messaging\CancelAtCheckpoint;
