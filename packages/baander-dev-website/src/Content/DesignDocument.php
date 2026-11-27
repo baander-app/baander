@@ -9,6 +9,7 @@ use League\CommonMark\Extension\CommonMark\CommonMarkCoreExtension;
 use League\CommonMark\Extension\CommonMark\Node\Block\Heading;
 use League\CommonMark\Extension\CommonMark\Node\Block\HtmlBlock;
 use League\CommonMark\Extension\CommonMark\Node\Block\ListBlock;
+use League\CommonMark\Extension\CommonMark\Node\Block\ThematicBreak;
 use League\CommonMark\Extension\CommonMark\Node\Inline\Code;
 use League\CommonMark\Extension\CommonMark\Node\Inline\HtmlInline;
 use League\CommonMark\Extension\CommonMark\Node\Inline\Link;
@@ -110,8 +111,9 @@ final readonly class DesignDocument
     }
 
     /**
-     * A section rendered to HTML without its own heading. Headings inside it move up so that its
-     * direct subsections become `h3`, below the `h2` the page sets for the section's title.
+     * A section rendered to HTML without its own heading or the rules that separate it from the next
+     * section. Headings inside it move up so that its direct subsections become `h3`, below the `h2`
+     * the page sets for the section's title.
      *
      * @param list<string> $headings
      * @param bool $tables false leaves the section's tables out, for a page that renders them with values
@@ -126,9 +128,10 @@ final readonly class DesignDocument
                 ?? throw $this->problem($headings, 'has no block starting with "' . $from . '"');
             $blocks = array_slice($blocks, $start);
         }
-        if (!$tables) {
-            $blocks = array_values(array_filter($blocks, static fn(Node $block): bool => !$block instanceof Table));
-        }
+        $blocks = array_values(array_filter(
+            $blocks,
+            static fn(Node $block): bool => !$block instanceof ThematicBreak && ($tables || !$block instanceof Table),
+        ));
         foreach ($blocks as $block) {
             $this->checkBorrowable($headings, $block);
         }

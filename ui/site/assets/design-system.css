@@ -1,0 +1,27 @@
+/* The design system pages: the manual layout with the section's own navigation, value tables that
+   scroll inside their own region, and swatches whose code beside them carries the value. */
+.ds-opening { margin-bottom: 32px; color: var(--color-muted-foreground); font-size: 18px; line-height: 1.6; }
+.ds-borrowed h2 { scroll-margin-top: 32px; }
+
+.ds-pages { padding: 0; list-style: none; }
+.ds-pages li { display: grid; grid-template-columns: minmax(0, 160px) minmax(0, 1fr); gap: 4px 24px; margin: 0; padding: 16px 0; border-top: 1px solid var(--color-border); }
+.ds-pages li:last-child { border-bottom: 1px solid var(--color-border); }
+.ds-pages a { font-weight: 600; }
+.ds-pages span { color: var(--color-muted-foreground); }
+
+/* A value table keeps table layout and scrolls inside its region, which takes focus so a keyboard can
+   scroll it. */
+.ds-table { position: relative; max-width: 100%; margin-bottom: 24px; overflow-x: auto; overscroll-behavior-x: contain; }
+.ds-table:focus-visible { outline-offset: 2px; }
+.manual-article .ds-table table { display: table; width: 100%; margin: 0; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+.ds-table th, .ds-table td { padding: 8px 12px; border-bottom: 1px solid var(--color-border); text-align: left; vertical-align: top; }
+.ds-table thead th { color: var(--color-muted-foreground); font-size: 12px; font-weight: 600; white-space: nowrap; }
+
+/* A swatch has an edge, so a value close to the page background stays visible. */
+.ds-swatch { display: inline-block; width: 16px; height: 16px; margin-right: 8px; border: 1px solid var(--color-border); border-radius: var(--radius-sm); background: var(--swatch); vertical-align: -3px; }
+.ds-value { white-space: nowrap; }
+
+@media (max-width: 640px) {
+  .ds-pages li { grid-template-columns: minmax(0, 1fr); }
+  .ds-opening { font-size: 16px; }
+}

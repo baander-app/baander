@@ -14,7 +14,7 @@ use Baander\DevWebsite\WebsiteBuilder;
  * feature entry is described by its page's summary and every other entry by the menu file.
  *
  * The menu marks the page it is shown on: the entry for that page is the current page, an entry for
- * a section the page belongs to (the features, the operator manual or the developer guide) is
+ * a section the page belongs to (the features, the operator manual, the developer guide or the design system) is
  * marked as its section, and a panel holding a marked entry is marked too.
  *
  * @phpstan-import-type PublicPage from WebsiteBuilder
@@ -33,7 +33,7 @@ final readonly class SiteMenu
         'resources' => [['title' => FeatureField::Text, 'entries' => [self::ENTRY]]],
     ];
     /** Entries whose pages head a section: the entry is marked on every page below it. */
-    private const array SECTIONS = ['/features/', '/docs/operator-guide/', '/docs/developer-guide/'];
+    private const array SECTIONS = ['/features/', '/docs/operator-guide/', '/docs/developer-guide/', '/design-system/'];
 
     /** @param array<string, list<MenuColumn>> $panels each panel's columns by its title */
     private function __construct(private array $panels) {}

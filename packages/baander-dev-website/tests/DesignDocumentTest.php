@@ -36,6 +36,8 @@ final class DesignDocumentTest extends TestCase
 
         Put one item in each element.
 
+        ---
+
         ## Color
 
         ### Spacing
@@ -106,6 +108,7 @@ final class DesignDocumentTest extends TestCase
         self::assertStringContainsString('<code>--color-card</code>', $section['html']);
         self::assertStringContainsString('Only overlays cast one.', $section['html']);
         self::assertStringNotContainsString('Colors have no spacing', $section['html']);
+        self::assertStringNotContainsString('<hr', $section['html'], 'The rule that separates the next section stays behind.');
     }
 
     public function testASectionCanLeaveOutItsTablesAndStartAtAGivenBlock(): void

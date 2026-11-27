@@ -15,7 +15,7 @@ final class AssetPublication
     public const string LIGHT_MOOD = 'balanced';
 
     /** The cassette marks the site publishes from the web client, each drawn for its own size range. */
-    private const array MARKS = ['logo.svg', 'icon.svg', 'favicon.svg'];
+    public const array MARKS = ['logo.svg', 'icon.svg', 'favicon.svg'];
 
     /** The Latin variable faces the site self-hosts, by the family names the shared font stacks use. */
     private const array FONTS = ['Geist Variable' => 'geist', 'Geist Mono Variable' => 'geist-mono'];

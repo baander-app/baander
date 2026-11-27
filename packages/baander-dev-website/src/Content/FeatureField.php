@@ -21,4 +21,6 @@ enum FeatureField
     case Layout;
     /** A picture in both appearances, or a block borrowed from a manual page. */
     case Figure;
+    /** True or false. */
+    case Flag;
 }

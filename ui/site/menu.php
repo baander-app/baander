@@ -48,6 +48,11 @@ return [
                     'description' => 'The terms the code and documentation use, each with its meaning in Bånder.',
                 ],
                 [
+                    'title' => 'Design system',
+                    'url' => '/design-system/',
+                    'description' => 'The principles, colors, type, layout, motion, icons and writing rules the interface is built from.',
+                ],
+                [
                     'title' => 'Typography',
                     'url' => '/typography/',
                     'description' => 'The fonts, glyph forms, script rules and type roles for every supported script.',

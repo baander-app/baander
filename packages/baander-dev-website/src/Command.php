@@ -9,6 +9,7 @@ use Baander\Process\Execution\EngineExecutor;
 use Baander\Process\Execution\ExecutionContext;
 use Baander\Process\Execution\ProcessSpec;
 use Baander\DevWebsite\Content\DesignDocument;
+use Baander\DevWebsite\Content\DesignSystemPages;
 use Baander\DevWebsite\Content\DesignTokens;
 use Baander\DevWebsite\Content\FeaturePages;
 use Baander\DevWebsite\Content\ReferencePages;
@@ -33,10 +34,10 @@ final class Command
         ReferencePages::DIRECTORY,
         ReferencePages::PRESETS,
         Screenshots::DIRECTORY,
-        'ui/site/assets/site.css',
-        'ui/site/assets/typography.css',
-        'ui/design-tokens/tokens/base/type.json',
-        self::DESIGN,
+        'ui/design-tokens/tokens',
+        DesignTokens::THEME,
+        ...DesignSystemPages::DOCUMENTS,
+        ...DesignSystemPages::SOURCES,
         'packages/baander-audio-core/bench/results',
     ];
 
@@ -45,20 +46,6 @@ final class Command
      * sample without the numeral rule uses the interface stack.
      */
     private const string MONO_SELECTOR = '.step-number, .type-timecode:not(.typography-without-numerals), .type-mono-sm';
-
-    /** A sample text for each type role; the roles, their values and their uses come from the tokens and `ui/DESIGN.md`. */
-    private const array TYPE_SAMPLES = [
-        'hero' => 'Continue watching',
-        'title-lg' => 'Albums',
-        'title' => 'Recently added',
-        'subtitle' => 'Season 2 · 8 episodes',
-        'body' => 'Scan your music folders to add new albums to the library.',
-        'body-sm' => '12 songs, 48 minutes',
-        'caption' => 'Added 3 days ago',
-        'label' => 'New release',
-        'timecode' => '1:42:07',
-        'mono-sm' => 'FLAC · 24-bit · 96 kHz',
-    ];
 
     private const string DESIGN = 'ui/DESIGN.md';
 
@@ -83,6 +70,7 @@ final class Command
             $evidence = new AacEvidence()->load($root);
             $features = FeaturePages::load($root);
             $references = ReferencePages::load($root);
+            $designSystem = DesignSystemPages::load($root);
             $history = $executor->run(new ProcessSpec([...SourceHistory::GIT_LOG, '--', ...self::SITE_SOURCES, ...array_column($references, 'markdown')]))->stdout
                 |> SourceHistory::fromGitLog(...);
             $typography = [
@@ -122,7 +110,7 @@ final class Command
                         'charts' => new AacCharts()->render($evidence),
                         'sourceBase' => 'https://github.com/baander-app/baander/blob/' . $codecRevision . '/packages/baander-audio-core/',
                     ]],
-                ], $typography, ...$features, ...$references],
+                ], $typography, ...$designSystem, ...$features, ...$references],
                 $history,
             );
             fwrite(STDOUT, 'Built ' . count($pages) . ' manual pages in var/website.' . "\n");
@@ -140,14 +128,7 @@ final class Command
      */
     private static function typography(string $root): array
     {
-        $roles = DesignTokens::load($root)->typeRoles(DesignDocument::load($root, self::DESIGN));
-        $unsampled = array_diff_key($roles, self::TYPE_SAMPLES) + array_diff_key(self::TYPE_SAMPLES, $roles);
-        if ($unsampled !== []) {
-            throw new \RuntimeException('The typography page needs one sample per type role; these differ: ' . implode(', ', array_keys($unsampled)) . '.');
-        }
-        foreach (array_keys($roles) as $role) {
-            $roles[$role]['sample'] = self::TYPE_SAMPLES[$role];
-        }
+        $roles = DesignSystemPages::typeRoles(DesignTokens::load($root), DesignDocument::load($root, self::DESIGN));
         $burmese = ['ဆက်ကြည့်ရန်', 'မြန်မာစာ စမ်းသပ်ခြင်း', 'နေကောင်းပါသလား'];
         return [
             'specimens' => [

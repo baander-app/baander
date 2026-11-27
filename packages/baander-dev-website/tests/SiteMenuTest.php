@@ -79,7 +79,7 @@ final class SiteMenuTest extends TestCase
         self::assertSame(
             [
                 [['Operator manual', '/docs/operator-guide/'], ['Deploy preset', '/deploy/']],
-                [['Developer guide', '/docs/developer-guide/'], ['Concepts', '/concepts/'], ['Typography', '/typography/']],
+                [['Developer guide', '/docs/developer-guide/'], ['Concepts', '/concepts/'], ['Design system', '/design-system/'], ['Typography', '/typography/']],
                 [['Third-party licensing', '/licensing/']],
             ],
             array_map(static fn(array $column): array => self::titlesAndUrls($column['groups'][0]['entries']), $resources['columns']),
@@ -115,6 +115,26 @@ final class SiteMenuTest extends TestCase
 
         [$product, $resources] = $menu->forPage('/');
         self::assertFalse($product['current'] || $resources['current']);
+    }
+
+    public function testTheDesignSystemEntryIsMarkedOnEveryPageOfItsSection(): void
+    {
+        $this->menuFile(<<<'PHP'
+            'features' => 'Every feature page, by audience.',
+            'product' => [['title' => 'Audio Core', 'url' => '/bac/', 'description' => 'The codec library.']],
+            'resources' => [
+                ['title' => 'Build on it', 'entries' => [
+                    ['title' => 'Design system', 'url' => '/design-system/', 'description' => 'The interface rules.'],
+                    ['title' => 'Typography', 'url' => '/typography/', 'description' => 'The fonts.'],
+                ]],
+            ],
+            PHP);
+        $menu = SiteMenu::load($this->root, [self::OVERVIEW]);
+
+        self::assertSame(['Design system' => 'page', 'Typography' => null], self::marks($menu->forPage('/design-system/')[1]));
+        [, $resources] = $menu->forPage('/design-system/color/');
+        self::assertTrue($resources['current']);
+        self::assertSame(['Design system' => 'true', 'Typography' => null], self::marks($resources));
     }
 
     public function testAMenuFileWithoutADescriptionFailsTheBuildNamingTheEntry(): void
