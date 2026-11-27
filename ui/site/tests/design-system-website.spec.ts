@@ -79,16 +79,18 @@ test('the dark foreground row shows the application’s value and the text color
   const { website, application } = await row(page, 'Dark foreground');
   const darkBlock = repository('ui/design-tokens/build/web/theme.css').match(/:root\[data-theme="dark"\]:not\(\[data-accent\]\)[^{]*\{([^}]*)\}/)![1];
   expect(application).toBe(darkBlock.match(/--color-foreground:\s*(#[0-9a-f]{6})/)![1]);
-  expect(hex(await page.locator('article p').first().evaluate((element) => getComputedStyle(element).color))).toBe(website);
+  expect(hex(await page.locator('section[aria-labelledby="departures"] p').first().evaluate((element) => getComputedStyle(element).color))).toBe(website);
   for (const swatch of await departures(page).locator('.ds-swatch').all()) {
     expect(hex(await swatch.evaluate((element) => getComputedStyle(element).backgroundColor))).toBe(await swatch.evaluate((element) => element.nextElementSibling!.textContent));
   }
 });
 
-for (const [system, unchosen, chosen] of [['dark', 'dark', 'balanced'], ['light', 'balanced', 'dark']] as const) {
-  test(`with the system preferring ${system}, the site starts in ${unchosen} and the toggle sets ${chosen}, then back`, async ({ page }) => {
+for (const system of ['dark', 'light'] as const) {
+  test(`with the system preferring ${system}, the site starts in its matching mood and the toggle moves between the two moods the page names`, async ({ page }) => {
     await page.emulateMedia({ colorScheme: system });
     await page.goto('/design-system/website/');
+    const [dark, light] = (await row(page, 'Moods')).website.split(' and ').map((label) => moodByLabel[label]);
+    const [unchosen, chosen] = system === 'dark' ? [dark, light] : [light, dark];
     const root = page.locator('html');
     await expect(root).toHaveAttribute('data-theme', unchosen);
     const toggle = page.locator('[data-appearance-toggle]');

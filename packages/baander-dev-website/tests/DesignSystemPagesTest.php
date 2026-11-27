@@ -211,6 +211,24 @@ final class DesignSystemPagesTest extends TestCase
         }
     }
 
+    public function testTheLogoPageKnowsWhichMarksDrawADarkVersion(): void
+    {
+        $logo = array_column(DesignSystemPages::load($this->repository()), 'data', 'url')['/design-system/logo/']['designSystem']['values'];
+
+        self::assertSame(['logo.svg' => true, 'icon.svg' => true, 'favicon.svg' => false], array_column($logo['marks'], 'darkVersion', 'file'));
+    }
+
+    public function testTheWebsitePageNamesTheMoodsByTheirLabels(): void
+    {
+        $website = array_column(DesignSystemPages::load($this->repository()), 'data', 'url')['/design-system/website/']['designSystem']['values'];
+        $moods = array_column($website['departures'], null, 'subject')['Moods'];
+
+        self::assertSame('Dark and Balanced', $moods['website']);
+        self::assertSame('Dark, Warm, Cool, Balanced', $moods['application']);
+        self::assertSame(['dark' => 'Dark', 'light' => 'Balanced'], $website['moodLabels']);
+        self::assertSame('balanced', $website['lightMood']);
+    }
+
     private function repository(): string
     {
         return dirname(__DIR__, 3);
