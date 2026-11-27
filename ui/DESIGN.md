@@ -71,6 +71,12 @@ and gets its fonts the same way. It restates the application's language reorders
 and script rules in its stylesheet, because the site has no `ContentText`
 component, and reads the type roles from the design tokens.
 
+The design system section at `/design-system/` publishes the rules of this design
+language and the generated design tokens. It reads both when the site builds, so a
+changed rule or token reaches the section with the next build. Its color swatches
+show the application's values; the website's dark theme sets its text in a softer
+foreground, which the section states beside them.
+
 Codec comparison charts use a distinct color for each vendor, consistent across
 profiles and encoding or decoding views. These data colors have light and dark
 variants and do not replace the site's semantic colors. Keep vendor labels,
@@ -398,7 +404,7 @@ Keyboard shortcut help overlay: press `?`.
 
 Interface text tells the reader what is happening and what they can do next. The
 application's English strings in `ui/web/src/shared/i18n/locales/en/translation.json`
-follow these rules; loading, error and empty states add their own under Components.
+follow these rules; loading, error and empty states have rules of their own.
 
 - **Plain and specific:** name the thing and the action in everyday words.
 - **Person:** the reader is *you*. The product says *we* only for what it sends:
