@@ -225,18 +225,29 @@ final class PublicationWorkflowTest extends TestCase
             self::assertArrayNotHasKey('continue-on-error', $step);
         }
 
-        // A step condition cannot read secrets, so the job states whether the token is set.
+        // A step condition cannot read secrets, so the job states whether a token and a username are set.
         self::assertSame("always() && env.HAS_DOCKERHUB == 'true'", $login['if']);
         foreach ([self::GITHUB, self::FORGEJO] as $server) {
-            // A forge answers an unset secret with the empty string.
-            foreach (['dockerhub-token' => true, '' => false] as $token => $logsIn) {
+            // A forge answers an unset secret or variable with the empty string.
+            foreach ([
+                'token and username variable' => ['dockerhub-token', 'baander', '', true],
+                'token and username secret' => ['dockerhub-token', '', 'baander', true],
+                'token without a username' => ['dockerhub-token', '', '', false],
+                'username without a token' => ['', 'baander', '', false],
+                'neither' => ['', '', '', false],
+            ] as $case => [$token, $variable, $secret, $logsIn]) {
                 $context = self::context($server);
-                $context['secrets']['DOCKERHUB_TOKEN'] = (string) $token;
+                $context['secrets']['DOCKERHUB_TOKEN'] = $token;
+                $context['secrets']['DOCKERHUB_USERNAME'] = $secret;
+                $context['vars']['DOCKERHUB_USERNAME'] = $variable;
                 $context['env'] = array_map(static fn(mixed $value): string => self::text(self::interpolate($value, $context)), $job['env']);
-                self::assertSame($logsIn, self::runs($login, $context, $job), $server . ($logsIn ? ' with' : ' without') . ' a Docker Hub token');
+                self::assertSame($logsIn, self::runs($login, $context, $job), $server . ': ' . $case);
+                if ($logsIn) {
+                    self::assertSame('baander', self::text(self::interpolate($login['env']['DOCKERHUB_USERNAME'], $context)), $server . ': ' . $case);
+                }
             }
         }
-        self::assertSame(['DOCKERHUB_USERNAME' => '${{ secrets.DOCKERHUB_USERNAME }}', 'DOCKERHUB_TOKEN' => '${{ secrets.DOCKERHUB_TOKEN }}'], $login['env']);
+        self::assertSame(['DOCKERHUB_USERNAME' => '${{ vars.DOCKERHUB_USERNAME || secrets.DOCKERHUB_USERNAME }}', 'DOCKERHUB_TOKEN' => '${{ secrets.DOCKERHUB_TOKEN }}'], $login['env']);
         self::assertSame('printf \'%s\n\' "$DOCKERHUB_TOKEN" | docker login -u "$DOCKERHUB_USERNAME" --password-stdin', $login['run']);
     }
 

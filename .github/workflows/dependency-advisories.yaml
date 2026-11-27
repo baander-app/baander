@@ -19,9 +19,10 @@ jobs:
         container:
             image: ${{ github.server_url == 'https://github.com' && 'ghcr.io' || vars.REGISTRY_URL }}/${{ github.server_url == 'https://github.com' && 'baander-app' || vars.REGISTRY_OWNER }}/baander-runner:f46c6148ad63d4b84a401383457dad6e84b3ea87
             options: --init
-        # A step condition cannot read secrets, so the job tells the login step whether one is set.
+        # A step condition cannot read secrets, so the job tells the login step whether a token and
+        # a username are set. The username may be a variable or a secret.
         env:
-            HAS_DOCKERHUB: ${{ secrets.DOCKERHUB_TOKEN != '' }}
+            HAS_DOCKERHUB: ${{ secrets.DOCKERHUB_TOKEN != '' && (vars.DOCKERHUB_USERNAME || secrets.DOCKERHUB_USERNAME) != '' }}
         steps:
             -   name: Checkout
                 env:
@@ -54,7 +55,7 @@ jobs:
             -   name: Docker Hub login
                 if: always() && env.HAS_DOCKERHUB == 'true'
                 env:
-                    DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+                    DOCKERHUB_USERNAME: ${{ vars.DOCKERHUB_USERNAME || secrets.DOCKERHUB_USERNAME }}
                     DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
                 run: printf '%s\n' "$DOCKERHUB_TOKEN" | docker login -u "$DOCKERHUB_USERNAME" --password-stdin
             # Exits 1 when a pinned tag now resolves to another digest and 2 when a registry

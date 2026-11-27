@@ -64,11 +64,11 @@ or an unknown manifest, is a gap at once. The whole command runs within one
 600-second budget, so the pauses cannot hold the job past its 30-minute timeout.
 
 The Docker Hub login step runs before the drift step when the repository defines the
-optional secret `DOCKERHUB_TOKEN`. It signs in as `DOCKERHUB_USERNAME` with that
-token, and the drift step then reads under that account's limit. Without the token,
-the step is skipped and the drift step reads anonymously. A step condition cannot
-read secrets, so the job sets `HAS_DOCKERHUB` from the token, and the login step
-checks that variable instead.
+optional secret `DOCKERHUB_TOKEN` and a `DOCKERHUB_USERNAME`, as a repository variable
+or a secret. It signs in as that user with the token, and the drift step then reads
+under that account's limit. Without both, the step is skipped and the drift step reads
+anonymously. A step condition cannot read secrets, so the job sets `HAS_DOCKERHUB`
+from the token and the username, and the login step checks that variable instead.
 
 The job publishes nothing and keeps no artifact; the report is the step
 log. The
@@ -431,10 +431,10 @@ Forgejo's registry already holds every image, so Forgejo needs no staging.
   secrets as the earlier Forgejo-only workflows, so none needs removing.
 - `BAANDER_TEST_DOCKER_SOCKET_PATH` is optional. The CI quality gate defaults it to
   `/var/run/docker.sock`; set it for a runner whose daemon socket lives elsewhere.
-- The secrets `DOCKERHUB_USERNAME` and `DOCKERHUB_TOKEN` are optional. With them,
-  the image-drift check reads Docker Hub under that account's rate limit (see
-  [Dependency advisories](#dependency-advisories)). A token with the
-  "Public Repo Read-only" scope is enough.
+- The secret `DOCKERHUB_TOKEN` and the variable or secret `DOCKERHUB_USERNAME` are
+  optional. With them, the image-drift check reads Docker Hub under that account's rate
+  limit (see [Dependency advisories](#dependency-advisories)). A token with the "Public
+  Repo Read-only" scope is enough.
 - Keep a runner registered with the `docker-cli` label.
 - Register no runner with the `fork-pull-request` label. Jobs of pull requests from
   forks resolve to it and wait in the queue, so they never reach the runner that
@@ -454,8 +454,9 @@ Keep these settings in place:
 - **No registry secret.** The repository defines no `REGISTRY_TOKEN` secret. Login
   uses `secrets.REGISTRY_TOKEN || github.token`, so such a secret would replace the
   workflow token.
-- **Optional Docker Hub secrets.** `DOCKERHUB_USERNAME` and `DOCKERHUB_TOKEN` let the
-  image-drift check read Docker Hub under that account's rate limit, as on Forgejo.
+- **Optional Docker Hub login.** The `DOCKERHUB_USERNAME` variable and the
+  `DOCKERHUB_TOKEN` secret let the image-drift check read Docker Hub under that
+  account's rate limit, as on Forgejo.
 
 ### First bring-up on GitHub
 
