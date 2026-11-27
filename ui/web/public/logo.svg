@@ -1,5 +1,5 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
-  <!-- Baander cassette logo — full detail, 256px+ -->
+  <!-- Bånder cassette logo — full detail, 256px+ -->
   <defs>
     <linearGradient id="bg" x1="256" y1="96" x2="256" y2="416" gradientUnits="userSpaceOnUse">
       <stop offset="0%" stop-color="#60a5fa"/>
