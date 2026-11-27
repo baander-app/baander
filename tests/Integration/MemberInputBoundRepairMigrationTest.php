@@ -165,6 +165,10 @@ final class MemberInputBoundRepairMigrationTest extends TestCase
         self::assertSame(array_slice($queue, 19_515), $kept);
         self::assertSame(10_484, $current);
         self::assertSame([['q00000000000000000000', 'q00000000000000000001'], 1], $this->session($short));
+        // A client that read the queue before the repair holds an index into the old queue, so
+        // the repair moves the revision its controls are checked against.
+        $revision = fn (string $user): int => (int) $this->connection->fetchOne('SELECT revision FROM listening_sessions WHERE user_id = ?', [$user]);
+        self::assertSame([1, 1, 0], [$revision($owner), $revision($nearTheEnd), $revision($short)]);
         self::assertSame(
             [262_125, 262_125, 50],
             array_map(intval(...), $this->connection->fetchFirstColumn('SELECT octet_length(queue::text) FROM listening_sessions ORDER BY octet_length(queue::text) DESC')),

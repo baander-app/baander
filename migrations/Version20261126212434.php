@@ -121,7 +121,8 @@ final class Version20261126212434 extends AbstractMigration
         // A queue keeps the entries nearest its current one, in queue order, while its text form fits
         // the bound: each entry costs its own text and the two bytes of its separator, and the last
         // entry's separator pays for the brackets. The current entry stays current; an index past
-        // the end counts as the last entry.
+        // the end counts as the last entry. The revision moves, so a control sent with an index into
+        // the old queue is refused as stale.
         $this->repair(<<<'SQL'
             WITH over AS (
                 SELECT id, queue, least(greatest(current_track_index, 0), jsonb_array_length(queue) - 1) AS current
@@ -140,7 +141,8 @@ final class Version20261126212434 extends AbstractMigration
                 GROUP BY id
             )
             UPDATE listening_sessions session
-            SET queue = coalesce(kept.queue, '[]'::jsonb), current_track_index = coalesce(kept.current, 0)
+            SET queue = coalesce(kept.queue, '[]'::jsonb), current_track_index = coalesce(kept.current, 0),
+                revision = session.revision + 1
             FROM over LEFT JOIN kept ON kept.id = over.id
             WHERE session.id = over.id
             RETURNING true AS chk_listening_sessions_queue_size
