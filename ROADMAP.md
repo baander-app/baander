@@ -245,6 +245,19 @@ Verification checkpoint:
 
 Open:
 
+- Check GitHub CI on `bc19054f8` (run started 2026-11-27 18:01 CET), the first run
+  with the backend lanes since 2026-11-22. The run before it, 45988518139 on
+  `5d296cc58`, also failed four steps:
+  - `PoolSafeSqlConventionTest` and "Messenger without Swoole", fixed in `e86641ed1`
+    and `f4c7e3ac2`;
+  - two `LogAgentTest` file-archive cases ("actual size 0 matches expected size 3"
+    and "size 1"), which also fail locally and are not yet investigated to a cause;
+  - the disposable database drill, past the two causes `56b1d0ab4` fixed. Its
+    diagnostic stays on the runner.
+- Check the Docker Hub login in the manual "Dependency advisories" run 46038060179.
+  The step failed with `DOCKERHUB_TOKEN` set as a secret and `DOCKERHUB_USERNAME` as a
+  repository variable (`bc19054f8`); its log was not read. The token was pasted into a
+  chat session and should be rotated.
 - The worker load proof (8 video and 12 audio jobs) needs a live deployment.
 - The preset qualification in the libvirt guest was not run.
 - A member `POST` that races a generation run for the same user and key can still
