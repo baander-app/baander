@@ -10,6 +10,7 @@ use Baander\Containers\Docker\TargetResolver;
 use Baander\Containers\Resources\DisposableContainer;
 use Baander\Containers\Resources\ResourceKind;
 use Baander\Containers\Resources\ResourceLedger;
+use Baander\Core\EnvironmentVariable;
 use Baander\DevEnvironment\Host\ProcessEnvironment;
 use Baander\DevEnvironment\Runtime\ComposeRuntime;
 use Baander\DevEnvironment\Runtime\Database;
@@ -62,6 +63,29 @@ function drillRedis(Client $docker, string $container, string ...$arguments): st
         'export REDISCLI_AUTH="$REDIS_PASSWORD"; exec redis-cli --raw "$@"',
         'redis-check', ...$arguments,
     ])->stdout |> trim(...);
+}
+
+/**
+ * The named services of a rendered model, each depending only on services kept with it:
+ * every development service also waits for the log agent, which the drill does not run.
+ *
+ * @param array<string, array<string, mixed>> $services
+ * @param list<string> $names
+ * @return array<string, array<string, mixed>>
+ */
+function drillServices(array $services, array $names): array
+{
+    $kept = array_intersect_key($services, array_flip($names));
+    foreach ($kept as &$service) {
+        if (isset($service['depends_on'])) {
+            $service['depends_on'] = array_intersect_key($service['depends_on'], $kept);
+            if ($service['depends_on'] === []) {
+                unset($service['depends_on']);
+            }
+        }
+    }
+    unset($service);
+    return $kept;
 }
 
 /** @param array<string,mixed> $model */
@@ -284,7 +308,7 @@ try {
         $model = $runtime->config($instance, $release);
         $compose = [
             'name' => $name,
-            'services' => array_intersect_key($model['services'], array_flip(['postgres', 'redis'])),
+            'services' => drillServices($model['services'], ['postgres', 'redis']),
             'networks' => ['private' => $model['networks']['private']],
             'volumes' => array_intersect_key($model['volumes'], array_flip(['database', 'redis'])),
         ];
@@ -336,7 +360,22 @@ try {
             }
             drillCheck(drillSql($docker, $postgres, "SELECT to_regclass('doctrine_migration_versions') IS NULL") === 't');
             drillSql($docker, $postgres, 'DROP TABLE development_checkpoint_probe');
-            $migrationEnv = array_intersect_key($environment, array_flip(['DB_USERNAME', 'DB_PASSWORD', 'DB_DATABASE', 'APP_SECRET', 'DATABASE_URL']));
+            // A production kernel refuses to boot without the instance's own secrets and credentials.
+            $migrationEnv = array_intersect_key($environment, array_flip([
+                'DB_USERNAME',
+                'DB_PASSWORD',
+                'DB_DATABASE',
+                EnvironmentVariable::APP_SECRET,
+                EnvironmentVariable::STREAM_URL_HMAC_SECRET,
+                EnvironmentVariable::AUTH_TOTP_ENCRYPTION_KEY,
+                EnvironmentVariable::DATABASE_URL,
+                EnvironmentVariable::DATABASE_CONTROL_URL,
+                EnvironmentVariable::REDIS_URL,
+                EnvironmentVariable::REDIS_PASSWORD,
+                EnvironmentVariable::VAPID_PRIVATE_KEY,
+            ]));
+            // The drill runs no pooler, so the control connection uses the instance's own database URL.
+            $migrationEnv[EnvironmentVariable::DATABASE_CONTROL_URL] ??= $migrationEnv[EnvironmentVariable::DATABASE_URL];
             $migrationEnv += ['APP_ENV' => 'prod', 'APP_DEBUG' => '0'];
             $migrationArguments = [];
             foreach ($migrationEnv as $key => $value) {
