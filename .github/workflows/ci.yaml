@@ -15,7 +15,7 @@ env:
     # tooling catalog's reference (empty means unset); Forgejo reads its own registry copy
     # of the same build by the commit tag ffmpeg.yaml gave it, so the tag moves with the
     # catalog's digest.
-    BAANDER_FFMPEG_IMAGE: ${{ github.server_url != 'https://github.com' && format('{0}/{1}/ffmpeg-baander-static:489926f682adb4aa21eb037121b027fc9e748c8c', vars.REGISTRY_URL, vars.REGISTRY_OWNER) || '' }}
+    BAANDER_FFMPEG_IMAGE: ${{ github.server_url != 'https://github.com' && format('{0}/{1}/ffmpeg-baander-static:7aa5172fb98d47feab09ad3e3bc7856f17c905ef', vars.REGISTRY_URL, vars.REGISTRY_OWNER) || '' }}
     COVERAGE_PACKAGE: coverage-backend
     BUILDKIT_CACHE_PACKAGE: buildkit-cache-backend
     CI_IMAGE: baander-ci:${{ github.run_id }}-${{ github.run_attempt }}
