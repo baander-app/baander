@@ -10,7 +10,7 @@ use App\Catalog\Application\Port\AlbumPortInterface;
 use App\Catalog\Application\Port\ArtistSyncRequestInterface;
 use App\Catalog\Application\Port\GenrePortInterface;
 use App\Catalog\Application\Port\MetadataContentReaderPortInterface;
-use App\Catalog\Application\Port\MoviePortInterface;
+use App\Catalog\Domain\Repository\MovieRepositoryInterface;
 use App\Catalog\Application\Port\SongPortInterface;
 use App\Catalog\Application\Service\VideoFileIngest;
 use App\Catalog\Domain\Model\Album;
@@ -131,8 +131,8 @@ final class FilesDiscoveredRefusedContainerTest extends TestCase
         $videos->method('findByHash')->willReturn($stored);
         $videoProbe = $this->createMock(VideoProbePortInterface::class);
         $videoProbe->expects($this->never())->method('probeVideo');
-        $movies = $this->createStub(MoviePortInterface::class);
-        $movies->method('findByTitleAndLibrary')->willReturn(Movie::create(Uuid::v7(), 'Film'));
+        $movies = $this->createStub(MovieRepositoryInterface::class);
+        $movies->method('findByPlacementFolder')->willReturn(Movie::create(Uuid::v7(), 'Film'));
         $marked = [];
 
         $this->handler($this->mediaFiles($marked), movies: $movies, videos: $videos, videoProbe: $videoProbe)(
@@ -188,7 +188,7 @@ final class FilesDiscoveredRefusedContainerTest extends TestCase
     private function handler(
         LibraryMediaFilesInterface $mediaFiles,
         ?SongPortInterface $songs = null,
-        ?MoviePortInterface $movies = null,
+        ?MovieRepositoryInterface $movies = null,
         ?VideoRepositoryInterface $videos = null,
         ?AudioProbePortInterface $audioProbe = null,
         ?VideoProbePortInterface $videoProbe = null,
@@ -207,7 +207,7 @@ final class FilesDiscoveredRefusedContainerTest extends TestCase
             $albums,
             $this->createStub(GenrePortInterface::class),
             $songs ?? $this->createStub(SongPortInterface::class),
-            $movies ?? $this->createStub(MoviePortInterface::class),
+            $this->movieIngest($movies ?? $this->createStub(MovieRepositoryInterface::class), $videos ?? $this->createStub(VideoRepositoryInterface::class), $mediaFiles),
             new VideoFileIngest(
                 $videos ?? $this->createStub(VideoRepositoryInterface::class),
                 $videoProbe ?? $this->createStub(VideoProbePortInterface::class),

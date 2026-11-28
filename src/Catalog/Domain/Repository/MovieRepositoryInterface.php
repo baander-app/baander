@@ -50,6 +50,15 @@ interface MovieRepositoryInterface extends Searchable
      */
     public function findByLibrary(Uuid $libraryId): array;
 
+    /** A root-level file uses its relative filename as the folder identity. */
+    public function findByPlacementFolder(Uuid $libraryId, string $folderIdentity): ?Movie;
+
+    /** Adds a feature version without rewriting the movie's metadata or other versions. */
+    public function addVideoForImport(Uuid $movieId, Uuid $videoId): void;
+
+    /** Removes a feature link when its placement is classified as an extra. */
+    public function removeVideoForImport(Uuid $movieId, Uuid $videoId): void;
+
     public function findByTitleAndLibrary(string $title, Uuid $libraryId): ?Movie;
 
     public function findByTmdbId(?int $tmdbId): ?Movie;

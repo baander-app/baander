@@ -22,6 +22,7 @@ use App\Shared\Domain\ValueObject\LibraryReadScope;
 use App\Shared\Infrastructure\Doctrine\Repository\PgroongaSearchTrait;
 use Doctrine\DBAL\ArrayParameterType;
 use Doctrine\ORM\EntityManagerInterface;
+use Doctrine\ORM\Query;
 use Doctrine\ORM\QueryBuilder;
 
 /**
@@ -209,6 +210,66 @@ final class MovieRepository implements MovieRepositoryInterface
         return array_map(fn(MovieEntity $entity) => $this->toDomain($entity), $entities);
     }
 
+    public function findByPlacementFolder(Uuid $libraryId, string $folderIdentity): ?Movie
+    {
+        // DQL has no JSON path extraction for the stored parse.
+        $id = $this->entityManager->getConnection()->fetchOne(
+            <<<'SQL'
+                SELECT placement.movie_id
+                FROM video_placements placement
+                WHERE placement.library_id = :library
+                  AND placement.movie_id IS NOT NULL
+                  AND CASE
+                      WHEN placement.raw_parse->>'folderPath' = '' THEN placement.relative_path
+                      ELSE placement.raw_parse->>'folderPath'
+                  END = :folder
+                ORDER BY placement.id
+                LIMIT 1
+                SQL,
+            ['library' => $libraryId->toString(), 'folder' => $folderIdentity],
+        );
+        if (!is_string($id)) {
+            return null;
+        }
+        $entity = $this->entityManager->createQueryBuilder()
+            ->select('movie')
+            ->from(MovieEntity::class, 'movie')
+            ->where('movie.id = :id')
+            ->setParameter('id', Uuid::fromString($id), 'uuid')
+            ->getQuery()
+            ->setHint(Query::HINT_REFRESH, true)
+            ->getOneOrNullResult();
+
+        return $entity === null ? null : $this->toDomain($entity);
+    }
+
+    public function addVideoForImport(Uuid $movieId, Uuid $videoId): void
+    {
+        $movie = $this->entityManager->find(MovieEntity::class, $movieId);
+        $video = $this->entityManager->find(VideoEntity::class, $videoId);
+        if ($movie === null || $video === null) {
+            throw new \LogicException('A feature version requires a stored movie and video.');
+        }
+        $links = $this->entityManager->getRepository(MovieVideoEntity::class);
+        if ($links->findOneBy(['movie' => $movieId, 'video' => $videoId]) !== null) {
+            return;
+        }
+        $this->entityManager->persist(new MovieVideoEntity(
+            $movie,
+            $video,
+            $links->count(['movie' => $movieId]),
+        ));
+    }
+
+    public function removeVideoForImport(Uuid $movieId, Uuid $videoId): void
+    {
+        $links = $this->entityManager->getRepository(MovieVideoEntity::class)
+            ->findBy(['movie' => $movieId, 'video' => $videoId]);
+        foreach ($links as $link) {
+            $this->entityManager->remove($link);
+        }
+    }
+
     public function findByTitleAndLibrary(string $title, Uuid $libraryId): ?Movie
     {
         $entity = $this->entityManager
@@ -364,6 +425,7 @@ final class MovieRepository implements MovieRepositoryInterface
             createdAt: $entity->getCreatedAt(),
             updatedAt: $entity->getUpdatedAt(),
             videoPublicIds: $videoPublicIds,
+            lockedFields: $entity->getLockedFields(),
         ));
     }
 
@@ -372,6 +434,7 @@ final class MovieRepository implements MovieRepositoryInterface
         $entity->setTitle($movie->getTitle());
         $entity->setYear($movie->getYear());
         $entity->setSummary($movie->getSummary());
+        $entity->setLockedFields($movie->getLockedFields());
         $this->syncMetadataToEntity($movie, $entity);
     }
 

@@ -44,6 +44,7 @@ final class MovieIngestCharacterizationTest extends KernelTestCase
         if (isset($this->root)) {
             $libraryId = $this->database->fetchOne('SELECT id FROM libraries WHERE slug = ?', [$this->slug]);
             if ($libraryId !== false) {
+                $this->database->executeStatement('DELETE FROM video_placements WHERE library_id = ?', [$libraryId]);
                 $this->database->executeStatement(
                     'DELETE FROM videos WHERE id IN (SELECT mv.video_id FROM movie_video mv JOIN movies m ON m.id = mv.movie_id WHERE m.library_id = ?)',
                     [$libraryId],

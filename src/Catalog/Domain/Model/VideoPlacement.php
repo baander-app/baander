@@ -76,6 +76,17 @@ final class VideoPlacement
         $this->state->assigned = $assigned;
     }
 
+    public function applyParsedExtraKind(?ExtraKind $kind): void
+    {
+        if ($this->state->assigned) {
+            return;
+        }
+        $this->state->extraKind = $kind;
+        if ($kind !== null) {
+            $this->state->episodeIds = [];
+        }
+    }
+
     public function copyAssignmentFrom(self $previous): void
     {
         if (!$previous->isAssigned()) {
@@ -84,8 +95,11 @@ final class VideoPlacement
         $extra = $previous->getExtraKind();
         if ($extra !== null) {
             $this->assignExtra($extra, assigned: true);
-        } else {
+        } elseif ($this->state->seriesId !== null) {
             $this->assignEpisodes($previous->getEpisodeIds(), assigned: true);
+        } else {
+            $this->state->extraKind = null;
+            $this->state->assigned = true;
         }
     }
 

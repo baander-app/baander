@@ -9,7 +9,7 @@ use App\Catalog\Application\Port\AlbumMatchRequestInterface;
 use App\Catalog\Application\Port\AlbumPortInterface;
 use App\Catalog\Application\Port\ArtistSyncRequestInterface;
 use App\Catalog\Application\Port\GenrePortInterface;
-use App\Catalog\Application\Port\MoviePortInterface;
+use App\Catalog\Domain\Repository\MovieRepositoryInterface;
 use App\Catalog\Application\Port\SongPortInterface;
 use App\Catalog\Application\Service\VideoFileIngest;
 use App\Catalog\Domain\Model\Album;
@@ -81,7 +81,7 @@ final class AudioMetadataImportTest extends TestCase
                 $albums,
                 $this->createStub(GenrePortInterface::class),
                 $songs,
-                $this->createStub(MoviePortInterface::class),
+                $this->movieIngest($this->createStub(MovieRepositoryInterface::class), $this->createStub(VideoRepositoryInterface::class), $videoIngestMedia),
                 new VideoFileIngest(
                     $this->createStub(VideoRepositoryInterface::class),
                     $this->createStub(VideoProbePortInterface::class),

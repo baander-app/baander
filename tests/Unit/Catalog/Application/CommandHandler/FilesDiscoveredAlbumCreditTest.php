@@ -11,7 +11,7 @@ use App\Catalog\Application\Port\ArtistResolution;
 use App\Catalog\Application\Port\ArtistSyncRequestInterface;
 use App\Catalog\Application\Port\GenrePortInterface;
 use App\Catalog\Application\Port\MetadataContentReaderPortInterface;
-use App\Catalog\Application\Port\MoviePortInterface;
+use App\Catalog\Domain\Repository\MovieRepositoryInterface;
 use App\Catalog\Application\Port\SongPortInterface;
 use App\Catalog\Application\Service\CoverImageDiscarder;
 use App\Catalog\Application\Service\VideoFileIngest;
@@ -371,7 +371,7 @@ final class FilesDiscoveredAlbumCreditTest extends TestCase
             $albumService,
             $this->createStub(GenrePortInterface::class),
             $songs,
-            $this->createStub(MoviePortInterface::class),
+            $this->movieIngest($this->createStub(MovieRepositoryInterface::class), $this->createStub(VideoRepositoryInterface::class), $videoIngestMedia),
             new VideoFileIngest(
                 $this->createStub(VideoRepositoryInterface::class),
                 new FFprobeAdapter(new JsonEncoder()),

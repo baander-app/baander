@@ -10,7 +10,7 @@ use App\Catalog\Application\Port\AlbumPortInterface;
 use App\Catalog\Application\Port\ArtistSyncRequestInterface;
 use App\Catalog\Application\Port\GenrePortInterface;
 use App\Catalog\Application\Port\MetadataContentReaderPortInterface;
-use App\Catalog\Application\Port\MoviePortInterface;
+use App\Catalog\Domain\Repository\MovieRepositoryInterface;
 use App\Catalog\Application\Port\SongPortInterface;
 use App\Catalog\Application\Service\VideoFileIngest;
 use App\Catalog\Domain\Model\Album;
@@ -42,7 +42,7 @@ final class FilesDiscoveredCurrentObservationTest extends TestCase
 
     private AlbumPortInterface&MockObject $albums;
     private SongPortInterface&MockObject $songs;
-    private MoviePortInterface&MockObject $movies;
+    private MovieRepositoryInterface&MockObject $movies;
     private VideoRepositoryInterface&MockObject $videos;
     private MetadataContentReaderPortInterface&MockObject $metadata;
     private LibraryMediaFilesInterface&MockObject $media;
@@ -57,7 +57,7 @@ final class FilesDiscoveredCurrentObservationTest extends TestCase
         $this->libraryId = Uuid::v7();
         $this->albums = $this->createMock(AlbumPortInterface::class);
         $this->songs = $this->createMock(SongPortInterface::class);
-        $this->movies = $this->createMock(MoviePortInterface::class);
+        $this->movies = $this->createMock(MovieRepositoryInterface::class);
         $this->videos = $this->createMock(VideoRepositoryInterface::class);
         $this->metadata = $this->createMock(MetadataContentReaderPortInterface::class);
         $this->media = $this->observedMediaFiles($this->createMock(LibraryMediaFilesInterface::class));
@@ -182,7 +182,7 @@ final class FilesDiscoveredCurrentObservationTest extends TestCase
             $this->availableHashes[$file->absolutePath] = 'replacement';
             return $video;
         });
-        $this->movies->expects($this->never())->method('findByTitleAndLibrary');
+        $this->movies->expects($this->never())->method('findByPlacementFolder');
         $this->movies->expects($this->never())->method('persist');
         $this->videos->expects($this->never())->method('save');
 
@@ -208,7 +208,7 @@ final class FilesDiscoveredCurrentObservationTest extends TestCase
             $this->albums,
             $this->createStub(GenrePortInterface::class),
             $this->songs,
-            $this->movies,
+            $this->movieIngest($this->movies, $this->videos, $videoIngestMedia),
             new VideoFileIngest(
                 $this->videos,
                 new FFprobeAdapter(new JsonEncoder()),

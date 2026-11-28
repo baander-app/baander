@@ -60,7 +60,7 @@ final class MovieMetadataSyncTest extends TestCase
             $movies,
         );
         $libraryHandler(new SyncLibraryMessage($library->getId()));
-        self::assertCount(2, $messages);
+        self::assertCount(1, $messages);
         self::assertInstanceOf(SyncMovieMessage::class, $messages[0]);
         self::assertFalse($messages[0]->forceUpdate);
         $codec = new MetadataMessagePayloadCodec();

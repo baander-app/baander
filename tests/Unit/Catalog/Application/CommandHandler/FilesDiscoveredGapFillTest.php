@@ -13,7 +13,7 @@ use App\Catalog\Application\Port\ArtistResolution;
 use App\Catalog\Application\Port\ArtistSyncRequestInterface;
 use App\Catalog\Application\Port\GenrePortInterface;
 use App\Catalog\Application\Port\MetadataContentReaderPortInterface;
-use App\Catalog\Application\Port\MoviePortInterface;
+use App\Catalog\Domain\Repository\MovieRepositoryInterface;
 use App\Catalog\Application\Port\SongPortInterface;
 use App\Catalog\Application\Service\VideoFileIngest;
 use App\Catalog\Domain\Model\Album;
@@ -464,7 +464,7 @@ final class FilesDiscoveredGapFillTest extends TestCase
             $albums,
             $this->createStub(GenrePortInterface::class),
             $songs,
-            $this->createStub(MoviePortInterface::class),
+            $this->movieIngest($this->createStub(MovieRepositoryInterface::class), $this->createStub(VideoRepositoryInterface::class), $media),
             new VideoFileIngest(
                 $this->createStub(VideoRepositoryInterface::class),
                 $this->createStub(VideoProbePortInterface::class),

@@ -10,7 +10,7 @@ use App\Catalog\Application\Port\AlbumPortInterface;
 use App\Catalog\Application\Port\ArtistSyncRequestInterface;
 use App\Catalog\Application\Port\GenrePortInterface;
 use App\Catalog\Application\Port\MetadataContentReaderPortInterface;
-use App\Catalog\Application\Port\MoviePortInterface;
+use App\Catalog\Domain\Repository\MovieRepositoryInterface;
 use App\Catalog\Application\Port\SongPortInterface;
 use App\Catalog\Application\Service\VideoFileIngest;
 use App\Catalog\Domain\Model\Album;
@@ -311,7 +311,7 @@ final class FilesDiscoveredLyricsRequestTest extends TestCase
             $albums,
             $genres,
             $songs,
-            $this->createStub(MoviePortInterface::class),
+            $this->movieIngest($this->createStub(MovieRepositoryInterface::class), $this->createStub(VideoRepositoryInterface::class), $videoIngestMedia),
             new VideoFileIngest(
                 $this->createStub(VideoRepositoryInterface::class),
                 new FFprobeAdapter(new JsonEncoder()),

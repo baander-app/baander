@@ -11,6 +11,8 @@ use InvalidArgumentException;
 
 final class Movie
 {
+    private const array LOCKABLE_FIELDS = ['title', 'year', 'summary'];
+
     private function __construct(
         private MovieState $state,
     ) {
@@ -43,6 +45,36 @@ final class Movie
         return new self($state);
     }
 
+    public function edit(?string $title = null, ?int $year = null, ?string $summary = null): void
+    {
+        if ($title !== null && trim($title) === '') {
+            throw new InvalidArgumentException('Movie title cannot be empty.');
+        }
+        $this->state->title = $title ?? $this->state->title;
+        $this->state->year = $year ?? $this->state->year;
+        $this->state->summary = $summary ?? $this->state->summary;
+        foreach (['title' => $title, 'year' => $year, 'summary' => $summary] as $field => $value) {
+            if ($value !== null) {
+                $this->lockField($field);
+            }
+        }
+        $this->state->updatedAt = new DateTimeImmutable();
+    }
+
+    public function lockField(string $field): void
+    {
+        LockedFields::assertLockable(self::LOCKABLE_FIELDS, $field, 'lock');
+        if (!in_array($field, $this->state->lockedFields, true)) {
+            $this->state->lockedFields[] = $field;
+            $this->state->updatedAt = new DateTimeImmutable();
+        }
+    }
+
+    public function isFieldLocked(string $field): bool
+    {
+        return in_array($field, $this->state->lockedFields, true);
+    }
+
     public function updateMetadata(
         ?string $title = null,
         ?int $year = null,
@@ -57,15 +89,19 @@ final class Movie
         ?int $tmdbCollectionId = null,
         ?string $collectionName = null,
     ): void {
-        if ($title !== null) {
+        if ($title !== null && !$this->isFieldLocked('title')) {
             if (trim($title) === '') {
                 throw new InvalidArgumentException('Movie title cannot be empty.');
             }
             $this->state->title = $title;
         }
 
-        $this->state->year = $year ?? $this->state->year;
-        $this->state->summary = $summary ?? $this->state->summary;
+        if (!$this->isFieldLocked('year')) {
+            $this->state->year = $year ?? $this->state->year;
+        }
+        if (!$this->isFieldLocked('summary')) {
+            $this->state->summary = $summary ?? $this->state->summary;
+        }
         $this->state->overview = $overview ?? $this->state->overview;
         $this->state->tagline = $tagline ?? $this->state->tagline;
         $this->state->posterUrl = $posterUrl ?? $this->state->posterUrl;
@@ -106,6 +142,8 @@ final class Movie
         $this->state->updatedAt = new DateTimeImmutable();
     }
 
+    /** @return list<string> */
+    public function getLockedFields(): array { return $this->state->lockedFields; }
     public function getId(): Uuid { return $this->state->id; }
     public function getPublicId(): PublicId { return $this->state->publicId; }
     public function getLibraryId(): Uuid { return $this->state->libraryId; }

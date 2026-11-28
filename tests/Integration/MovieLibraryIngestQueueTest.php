@@ -55,6 +55,7 @@ final class MovieLibraryIngestQueueTest extends KernelTestCase
             self::assertInstanceOf(Connection::class, $database);
             $libraryId = $database->fetchOne('SELECT id FROM libraries WHERE slug = ?', [self::SLUG]);
             if ($libraryId !== false) {
+                $database->executeStatement('DELETE FROM video_placements WHERE library_id = ?', [$libraryId]);
                 $database->executeStatement(
                     'DELETE FROM videos WHERE id IN (SELECT mv.video_id FROM movie_video mv JOIN movies m ON m.id = mv.movie_id WHERE m.library_id = ?)',
                     [$libraryId],

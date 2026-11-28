@@ -14,7 +14,7 @@ use App\Catalog\Application\Port\ArtistSyncRequestInterface;
 use App\Catalog\Application\Port\GenrePortInterface;
 use App\Catalog\Application\Port\IdentifiedArtist;
 use App\Catalog\Application\Port\MetadataContentReaderPortInterface;
-use App\Catalog\Application\Port\MoviePortInterface;
+use App\Catalog\Domain\Repository\MovieRepositoryInterface;
 use App\Catalog\Application\Port\SongPortInterface;
 use App\Catalog\Application\Service\ArtistSyncQueue;
 use App\Catalog\Application\Service\ArtistSyncRequester;
@@ -442,7 +442,7 @@ final class FilesDiscoveredArtistCreditTest extends TestCase
             $albums,
             $genres,
             $songs,
-            $this->createStub(MoviePortInterface::class),
+            $this->movieIngest($this->createStub(MovieRepositoryInterface::class), $this->createStub(VideoRepositoryInterface::class), $videoIngestMedia),
             new VideoFileIngest(
                 $this->createStub(VideoRepositoryInterface::class),
                 new FFprobeAdapter(new JsonEncoder()),

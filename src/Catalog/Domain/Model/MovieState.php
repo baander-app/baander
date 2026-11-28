@@ -19,6 +19,7 @@ final class MovieState
     /**
      * @param string[] $videoIds
      * @param list<string> $videoPublicIds
+     * @param list<string> $lockedFields
      */
     public function __construct(
         public readonly Uuid $id,
@@ -42,6 +43,7 @@ final class MovieState
         public readonly DateTimeImmutable $createdAt = new DateTimeImmutable(),
         public DateTimeImmutable $updatedAt = new DateTimeImmutable(),
         public array $videoPublicIds = [],
+        public array $lockedFields = [],
     ) {
     }
 }

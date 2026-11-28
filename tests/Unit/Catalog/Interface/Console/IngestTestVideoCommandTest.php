@@ -10,7 +10,7 @@ use App\Catalog\Application\Port\AlbumPortInterface;
 use App\Catalog\Application\Port\ArtistSyncRequestInterface;
 use App\Catalog\Application\Port\GenrePortInterface;
 use App\Catalog\Application\Port\MetadataContentReaderPortInterface;
-use App\Catalog\Application\Port\MoviePortInterface;
+use App\Catalog\Domain\Repository\MovieRepositoryInterface;
 use App\Catalog\Application\Port\SongPortInterface;
 use App\Catalog\Application\Service\MovieLibraryIngest;
 use App\Catalog\Application\Service\VideoFileIngest;
@@ -117,7 +117,7 @@ final class IngestTestVideoCommandTest extends TestCase
             $this->createStub(AlbumPortInterface::class),
             $this->createStub(GenrePortInterface::class),
             $this->createStub(SongPortInterface::class),
-            $this->createStub(MoviePortInterface::class),
+            $this->movieIngest($this->createStub(MovieRepositoryInterface::class), $videos, $videoIngestMedia),
             new VideoFileIngest(
                 $videos,
                 new FFprobeAdapter(new JsonEncoder()),

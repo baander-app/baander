@@ -39,7 +39,7 @@ final readonly class TvLibraryIngest
      * videos whose observations are under different folders or libraries.
      *
      * @param list<DiscoveredFile> $files
-     * @return array<string, TvSeries>
+     * @return array<string, string>
      */
     public function prepareBatch(Uuid $library, array $files): array
     {
@@ -63,14 +63,14 @@ final readonly class TvLibraryIngest
             }
             $series = $this->catalog->findSeriesByVideo($library, $video->getId());
             if ($series !== null) {
-                $known[$this->folder($this->parser->parse($file->relativePath))] = $series;
+                $known[$this->folder($this->parser->parse($file->relativePath))] = $series->getId()->toString();
             }
         }
 
         return $known;
     }
 
-    /** @param array<string, TvSeries> $known */
+    /** @param array<string, string> $known */
     public function ingestFile(Uuid $library, DiscoveredFile $file, Video $video, array $known): void
     {
         $name = $this->parser->parse($file->relativePath);
@@ -82,7 +82,8 @@ final readonly class TvLibraryIngest
             return;
         }
 
-        $series = $known[$folder] ?? $this->catalog->findSeriesByVideo($library, $video->getId())
+        $series = isset($known[$folder]) ? $this->catalog->findSeriesByUuid(Uuid::fromString($known[$folder])) : null;
+        $series ??= $this->catalog->findSeriesByVideo($library, $video->getId())
             ?? $this->catalog->findSeriesByFolder($library, $folder);
         if ($series === null) {
             $series = TvSeries::create($library, $folder, $name->title, $name->year);

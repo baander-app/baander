@@ -10,7 +10,7 @@ use App\Catalog\Application\Port\AlbumPortInterface;
 use App\Catalog\Application\Port\ArtistSyncRequestInterface;
 use App\Catalog\Application\Port\GenrePortInterface;
 use App\Catalog\Application\Port\MetadataContentReaderPortInterface;
-use App\Catalog\Application\Port\MoviePortInterface;
+use App\Catalog\Domain\Repository\MovieRepositoryInterface;
 use App\Catalog\Application\Port\SongPortInterface;
 use App\Catalog\Application\Service\VideoFileIngest;
 use App\Catalog\Domain\Model\Album;
@@ -68,7 +68,7 @@ final class FilesDiscoveredTechnicalMetadataTest extends TestCase
             $albums,
             $this->createStub(GenrePortInterface::class),
             $songs,
-            $this->createStub(MoviePortInterface::class),
+            $this->movieIngest($this->createStub(MovieRepositoryInterface::class), $this->createStub(VideoRepositoryInterface::class), $videoIngestMedia),
             new VideoFileIngest(
                 $this->createStub(VideoRepositoryInterface::class),
                 $this->createStub(VideoProbePortInterface::class),
@@ -132,7 +132,7 @@ final class FilesDiscoveredTechnicalMetadataTest extends TestCase
             $albums,
             $this->createStub(GenrePortInterface::class),
             $songs,
-            $this->createStub(MoviePortInterface::class),
+            $this->movieIngest($this->createStub(MovieRepositoryInterface::class), $this->createStub(VideoRepositoryInterface::class), $videoIngestMedia),
             new VideoFileIngest(
                 $this->createStub(VideoRepositoryInterface::class),
                 $this->createStub(VideoProbePortInterface::class),
@@ -186,10 +186,10 @@ final class FilesDiscoveredTechnicalMetadataTest extends TestCase
                 ['index' => 7, 'codec_type' => 'audio', 'codec_name' => 'aac'],
             ]]);
         });
-        $movies = $this->createMock(MoviePortInterface::class);
+        $movies = $this->createMock(MovieRepositoryInterface::class);
         $movie = Movie::create($library, 'Movie');
         $movie->addVideo($video->getId());
-        $movies->method('findByTitleAndLibrary')->willReturn($movie);
+        $movies->method('findByPlacementFolder')->willReturn($movie);
         $movies->expects($this->never())->method('persist');
         $videoIngestLogger = new NullLogger();
         $videoIngestMedia = $this->observedMediaFiles($this->createStub(LibraryMediaFilesInterface::class));
@@ -198,7 +198,7 @@ final class FilesDiscoveredTechnicalMetadataTest extends TestCase
             $this->createStub(AlbumPortInterface::class),
             $this->createStub(GenrePortInterface::class),
             $this->createStub(SongPortInterface::class),
-            $movies,
+            $this->movieIngest($movies, $videos, $videoIngestMedia),
             new VideoFileIngest(
                 $videos,
                 $probe,

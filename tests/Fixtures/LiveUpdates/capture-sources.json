@@ -1390,7 +1390,7 @@
       "mapping": "src/Catalog/Infrastructure/Doctrine/Entity/MovieEntity.php",
       "classification": "capture",
       "operations": ["INSERT", "UPDATE", "DELETE"],
-      "relevant_columns": ["id", "public_id", "library_id", "title", "year", "summary", "tmdb_id", "imdb_id", "overview", "tagline", "poster_url", "backdrop_url", "runtime", "rating", "original_language", "tmdb_collection_id", "collection_name", "created_at"],
+      "relevant_columns": ["id", "public_id", "library_id", "title", "year", "summary", "tmdb_id", "imdb_id", "overview", "tagline", "poster_url", "backdrop_url", "runtime", "rating", "original_language", "tmdb_collection_id", "collection_name", "locked_fields", "created_at"],
       "excluded_columns": ["updated_at"],
       "families": ["catalog", "libraries", "activity", "recommendations", "admin-media", "admin-metadata"],
       "scope_routes": ["library"],

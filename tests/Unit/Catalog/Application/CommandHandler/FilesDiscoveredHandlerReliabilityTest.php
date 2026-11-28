@@ -10,7 +10,7 @@ use App\Catalog\Application\Port\AlbumPortInterface;
 use App\Catalog\Application\Port\ArtistSyncRequestInterface;
 use App\Catalog\Application\Port\GenrePortInterface;
 use App\Catalog\Application\Port\MetadataContentReaderPortInterface;
-use App\Catalog\Application\Port\MoviePortInterface;
+use App\Catalog\Domain\Repository\MovieRepositoryInterface;
 use App\Catalog\Application\Port\SongPortInterface;
 use App\Catalog\Application\Service\VideoFileIngest;
 use App\Catalog\Domain\Model\Album;
@@ -74,7 +74,7 @@ final class FilesDiscoveredHandlerReliabilityTest extends TestCase
         $songPort->method('persist')->willThrowException(new RuntimeException('Database write failed'));
 
         $genrePort = $this->createMock(GenrePortInterface::class);
-        $moviePort = $this->createMock(MoviePortInterface::class);
+        $moviePort = $this->createMock(MovieRepositoryInterface::class);
         $videoRepository = $this->createMock(VideoRepositoryInterface::class);
 
         $metadataReader = $this->createMock(MetadataContentReaderPortInterface::class);
@@ -90,7 +90,7 @@ final class FilesDiscoveredHandlerReliabilityTest extends TestCase
             $albumPort,
             $genrePort,
             $songPort,
-            $moviePort,
+            $this->movieIngest($moviePort, $videoRepository, $videoIngestMedia),
             new VideoFileIngest(
                 $videoRepository,
                 $ffprobe,
@@ -158,7 +158,7 @@ final class FilesDiscoveredHandlerReliabilityTest extends TestCase
         $songPort->method('persist')->willThrowException(new RuntimeException('Database write failed'));
 
         $genrePort = $this->createMock(GenrePortInterface::class);
-        $moviePort = $this->createMock(MoviePortInterface::class);
+        $moviePort = $this->createMock(MovieRepositoryInterface::class);
         $videoRepository = $this->createMock(VideoRepositoryInterface::class);
 
         $metadataReader = $this->createMock(MetadataContentReaderPortInterface::class);
@@ -174,7 +174,7 @@ final class FilesDiscoveredHandlerReliabilityTest extends TestCase
             $albumPort,
             $genrePort,
             $songPort,
-            $moviePort,
+            $this->movieIngest($moviePort, $videoRepository, $videoIngestMedia),
             new VideoFileIngest(
                 $videoRepository,
                 $ffprobe,
@@ -360,7 +360,7 @@ final class FilesDiscoveredHandlerReliabilityTest extends TestCase
             $albumPort,
             $genrePort,
             $songPort,
-            $this->createStub(MoviePortInterface::class),
+            $this->movieIngest($this->createStub(MovieRepositoryInterface::class), $this->createStub(VideoRepositoryInterface::class), $videoIngestMedia),
             new VideoFileIngest(
                 $this->createStub(VideoRepositoryInterface::class),
                 new FFprobeAdapter(new JsonEncoder()),
