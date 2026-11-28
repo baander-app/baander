@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Tests\Unit\Session\Interface\Resource;
 
 use App\Session\Interface\Resource\PlaybackSnapshotResource;
+use App\Shared\Domain\Model\PublicId;
 use PHPUnit\Framework\TestCase;
 
 final class PlaybackSnapshotResourceTest extends TestCase
@@ -40,5 +41,11 @@ final class PlaybackSnapshotResourceTest extends TestCase
             'user_id' => 'internal-account-key',
             'capability_hash' => 'internal-credential-hash',
         ]));
+        $snapshot['media'] = [
+            'kind' => 'video',
+            'publicId' => new PublicId()->toString(),
+            'viewing' => ['titleKind' => 'episode', 'titleId' => new PublicId()->toString()],
+        ];
+        self::assertSame($snapshot, PlaybackSnapshotResource::from($snapshot));
     }
 }

@@ -318,6 +318,8 @@ describe('useBaanderPlayer sessions and source end', () => {
       seekable?: number
       staysSeeking?: boolean
       canControlPresentation?: () => boolean
+      onViewingTick?: (position: number, playing: boolean, videoId: string) => void
+      onViewingAction?: (action: 'progress' | 'pause' | 'seek' | 'end', position: number, videoId: string) => void
     } = {}
   ) => {
     // One ref object for the hook's lifetime: a new one on every render would remount the player.
@@ -329,6 +331,8 @@ describe('useBaanderPlayer sessions and source end', () => {
         containerRef,
         coordinated: true,
         onCompleted: completed,
+        onViewingTick: element.onViewingTick,
+        onViewingAction: element.onViewingAction,
         canControlPresentation: element.canControlPresentation
       })
     )
@@ -393,7 +397,7 @@ describe('useBaanderPlayer sessions and source end', () => {
       })
     }
     await waitFor(() => {
-      expect(signs.length).toBeGreaterThan(0)
+      expect(signs.length > 0 || vi.mocked(attachNativePlayback).mock.calls.length > 0 || attachments() > 0).toBe(true)
     })
     await act(async () => {
       video.dispatchEvent(new Event('canplay'))
@@ -1641,6 +1645,77 @@ describe('useBaanderPlayer sessions and source end', () => {
 
     expect(completed).not.toHaveBeenCalled()
   })
+
+  it('reports the source cursor for a user seek while keeping initial resume restoration silent', async () => {
+    const action = vi.fn()
+    const { video, state, execution } = await mount({ seekable: first.duration, onViewingAction: action })
+    let restoring!: Promise<void>
+    act(() => {
+      restoring = execution.prepare(83, true, signal())
+    })
+    await waitFor(() => expect(seeks()).toContain(83))
+    await act(async () => {
+      video.dispatchEvent(new Event('canplay'))
+      await restoring
+    })
+    expect(action).not.toHaveBeenCalled()
+    let seeking!: ReturnType<typeof execution.execute>
+    act(() => {
+      seeking = execution.execute('seek', 123, signal())
+    })
+    await waitFor(() => expect(seeks()).toContain(123))
+    await act(async () => {
+      video.dispatchEvent(new Event('canplay'))
+      await seeking
+    })
+    expect(state.time).not.toBe(123)
+    expect(action).toHaveBeenCalledExactlyOnceWith('seek', 123, 'video-1')
+  })
+
+  it.each(['original', 'cached', 'copy', 'encoded'] as const)(
+    'emits source viewing ticks, pause and end for %s delivery',
+    async kind => {
+      if (kind !== 'encoded') {
+        vi.mocked(negotiateMediaDelivery).mockResolvedValue({
+          kind,
+          url: `https://media.baander.app/signed/${kind}.${kind === 'original' ? 'mp4' : 'm3u8'}`,
+          sessionId: kind === 'copy' ? 'session-1' : null,
+          jobId: kind === 'copy' ? 'job-1' : null,
+          selection: null,
+          requestId: 'client-request',
+          reason: null
+        })
+      }
+      const tick = vi.fn()
+      const action = vi.fn()
+      const { video, state, execution, rendered } = await mount({
+        seekable: first.duration,
+        onViewingTick: tick,
+        onViewingAction: action
+      })
+      await act(async () => {
+        await execution.prepare(0, true, signal())
+        await execution.execute('play', undefined, signal())
+      })
+      state.time = 42
+      await waitFor(() => expect(tick).toHaveBeenCalledWith(42, true, 'video-1'), { timeout: 2500 })
+      await act(async () => {
+        await execution.execute('pause', undefined, signal())
+      })
+      expect(action).toHaveBeenCalledWith('pause', 42, 'video-1')
+      state.time = first.duration
+      state.ended = true
+      await act(async () => {
+        video.dispatchEvent(new Event('ended'))
+        video.dispatchEvent(new Event('ended'))
+      })
+      expect(action.mock.calls.filter(call => call[0] === 'end')).toEqual([['end', first.duration, 'video-1']])
+      rendered.unmount()
+      const count = action.mock.calls.length
+      video.dispatchEvent(new Event('pause'))
+      expect(action).toHaveBeenCalledTimes(count)
+    }
+  )
 
   it('reports the end of a delivery without a transcode session', async () => {
     vi.mocked(negotiateMediaDelivery)

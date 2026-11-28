@@ -133,5 +133,8 @@ describe('SettingsPage', () => {
     renderWithTheme(<SettingsPage />);
     expect(screen.getByText('Bånder')).toBeInTheDocument();
     expect(screen.getByText('v0.1.0')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'TheTVDB.com' })).toHaveAttribute('href', 'https://thetvdb.com');
+    expect(screen.getByRole('img', { name: 'TMDB' })).toBeInTheDocument();
+    expect(screen.getByText('This product uses the TMDB API but is not endorsed or certified by TMDB.')).toBeInTheDocument();
   });
 });

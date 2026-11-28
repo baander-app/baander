@@ -1,4 +1,6 @@
-import { act, cleanup, render, waitFor } from '@testing-library/react'
+import type { ReactNode } from 'react'
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { act, cleanup, render as renderView, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { VideoPlaybackRuntime } from '@/features/catalog/components/VideoPlaybackRuntime'
 import { useVideoPresentation } from '@/features/catalog/stores/video-presentation-store'
@@ -20,7 +22,14 @@ const payload: PlaybackCommandResource['payload'] = {
 }
 const signal = () => new AbortController().signal
 
+let client: QueryClient
+
+function render(children: ReactNode) {
+  return renderView(<QueryClientProvider client={client}>{children}</QueryClientProvider>)
+}
+
 beforeEach(() => {
+  client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
   vi.clearAllMocks()
   execution.ready.mockResolvedValue(undefined)
   execution.prepare.mockResolvedValue(undefined)
@@ -28,7 +37,10 @@ beforeEach(() => {
   execution.execute.mockResolvedValue({ observedState: 'playing', position: 0 })
   useVideoPresentation.getState().select('')
 })
-afterEach(cleanup)
+afterEach(() => {
+  cleanup()
+  client.clear()
+})
 
 describe('persistent video execution', () => {
   it('registers one shell adapter and unregisters the same owner on teardown', () => {

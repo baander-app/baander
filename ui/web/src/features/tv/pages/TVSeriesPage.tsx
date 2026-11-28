@@ -3,13 +3,14 @@ import styled from 'styled-components'
 import { ContentText } from '@/shared/typography'
 import { focusVisibleRing } from '@/shared/theme'
 import { useTvSeriesIndex, type TvSeriesResource } from '@/shared/api-client/gen/endpoints'
+import { Skeleton } from '@/shared/components/ui/skeleton'
 import { retryPersonRead } from '@/features/catalog/api/people-api'
 import { PaginatedGrid } from '@/features/catalog/components/PaginatedGrid'
+import { VideoArtwork } from '@/features/catalog/components/VideoArtwork'
 import {
   DirectorBrowseEmpty,
   DirectorBrowseError,
   DirectorBrowseLayout,
-  DirectorBrowseLoading,
 } from '@/features/catalog/components/DirectorBrowseLayout'
 
 const Card = styled(Link)`
@@ -21,14 +22,25 @@ const Card = styled(Link)`
   color: var(--color-foreground);
   text-decoration: none;
   ${focusVisibleRing}
-  img { width: 100%; aspect-ratio: 2 / 3; object-fit: cover; border-radius: var(--radius-md); }
 `
+
+const LoadingGrid = styled.div`
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 9rem), 1fr));
+  gap: var(--space-md);
+`
+
+const LoadingPoster = styled(Skeleton)`
+  aspect-ratio: 2 / 3;
+`
+
 export function TVSeriesPage() {
   const [params, setParams] = useSearchParams()
   const requested = Number(params.get('page') ?? 1)
   const page = Number.isSafeInteger(requested) && requested > 0 ? requested : 1
   const q = params.get('q') ?? ''
-  const series = useTvSeriesIndex({ page, limit: 50, q }, { query: { retry: retryPersonRead } })
+  const library = params.get('library') ?? undefined
+  const series = useTvSeriesIndex({ page, limit: 50, q, library }, { query: { retry: retryPersonRead } })
   const change = (key: string, value: string) => {
     setParams(previous => {
       const next = new URLSearchParams(previous)
@@ -56,9 +68,11 @@ export function TVSeriesPage() {
       {series.isError ? (
         <DirectorBrowseError retry={series.refetch} />
       ) : series.isPending ? (
-        <DirectorBrowseLoading />
+        <LoadingGrid role="status" aria-label="Loading TV shows">
+          {[0, 1, 2, 3, 4, 5].map(index => <LoadingPoster key={index} />)}
+        </LoadingGrid>
       ) : !series.data?.data.length ? (
-        <DirectorBrowseEmpty>{q ? 'No matching shows.' : 'No TV shows registered yet.'}</DirectorBrowseEmpty>
+        <DirectorBrowseEmpty>{q ? 'No matching shows.' : 'No TV shows are available.'}</DirectorBrowseEmpty>
       ) : (
         <PaginatedGrid
           pagination={{
@@ -68,9 +82,9 @@ export function TVSeriesPage() {
           }}
           onPageChange={value => change('page', String(value))}
         >
-          {(series.data.data as TvSeriesResource[]).map(show => (
+          {series.data.data.map((show: TvSeriesResource) => (
             <Card to={`/tv/series/${show.publicId}`} key={show.publicId}>
-              {show.posterUrl ? <img src={show.posterUrl} alt="" loading="lazy" /> : null}
+              <VideoArtwork source={show.posterUrl} />
               <ContentText text={show.name} textRole="body" element="h2" />
             </Card>
           ))}

@@ -307,6 +307,30 @@ final class DirectorCreditPersistenceTest extends TestCase
         self::assertSame(2_000_000_092, $view->tmdbId);
     }
 
+    public function testFilmographyKeysetKeepsTitleTiesAcrossTheAvailabilityBatchBoundary(): void
+    {
+        $library = $this->manager->find(MovieEntity::class, $this->first)->getLibrary();
+        $person = new PersonEntity('Batch Director');
+        $this->manager->persist($person);
+        $this->manager->persist(new PersonExternalIdEntity($person, 'tmdb_person', '2000000999', 'tmdb'));
+        $expected = [];
+        for ($index = 0; $index < 253; ++$index) {
+            $movie = new MovieEntity(new PublicId(), $library, 'Shared title');
+            $this->manager->persist($movie);
+            IndexedMovie::add($this->manager, $movie, available: $index !== 249);
+            $this->manager->persist(MoviePersonCreditEntity::director($movie, $person));
+            if ($index !== 249) {
+                $expected[] = $movie->getId()->toString();
+            }
+        }
+        $this->manager->flush();
+        sort($expected, SORT_STRING);
+        $repository = new DirectorRepository($this->manager, IndexedMovie::availability($this->manager));
+        $page = $repository->searchMovieIdsVisible($person->getPublicId(), SearchOptions::create('', limit: 5, offset: 247), LibraryReadScope::restricted([$library->getId()]));
+        self::assertSame(252, $page->getTotal());
+        self::assertSame(array_slice($expected, 247, 5), array_map(static fn (Uuid $id): string => $id->toString(), $page->getItems()));
+    }
+
     public function testTwoProviderIdsForOnePersonProduceOneDirectorCreditAndDirectoryEntry(): void
     {
         $person = new PersonEntity('Several Credits');

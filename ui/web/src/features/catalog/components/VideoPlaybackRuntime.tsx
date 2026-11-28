@@ -8,11 +8,13 @@ import {
 } from '@/features/session/services/playback-execution'
 import { usePlaybackSession } from '@/features/session/hooks/use-playback-session'
 import { useBaanderPlayer } from '../hooks/useBaanderPlayer'
+import { useVideoViewingReporter } from '../hooks/use-video-viewing-reporter'
 import { initialVideoSettings } from '../hooks/video-presentation'
 import { useVideoPresentation } from '../stores/video-presentation-store'
 
 export function VideoPlaybackRuntime() {
   const videoId = useVideoPresentation((state) => state.videoId)
+  const viewing = useVideoPresentation((state) => state.viewing)
   const [host] = useState(() => document.createElement('div'))
   const containerRef = useRef(host)
   const parkingRef = useRef<HTMLDivElement>(null)
@@ -53,11 +55,25 @@ export function VideoPlaybackRuntime() {
       current.media.publicId === mountedVideo.current
     )
   }, [])
+  const canRecordViewing = useCallback(() => {
+    const { snapshot: current, endpoint: local } = session.current
+    return Boolean(
+      current &&
+      local &&
+      !current.transfer &&
+      current.activeIncarnationId === local.incarnationId &&
+      mountedVideo.current === videoId
+    )
+  }, [videoId])
+  const reports = useVideoViewingReporter(videoId, viewing ?? undefined, canRecordViewing)
+  const flushViewing = reports.flush
   const player = useBaanderPlayer({
     videoId,
     containerRef,
     coordinated: true,
     onCompleted: pauseSessionAtEnd,
+    onViewingTick: reports.tick,
+    onViewingAction: reports.action,
     canControlPresentation
   })
   const { execution, presentationCommands } = player
@@ -172,9 +188,13 @@ export function VideoPlaybackRuntime() {
       if (payload.media?.kind !== 'video')
         throw new Error('A video selection is required.')
       const next = payload.media.publicId
-      if (mountedVideo.current) await execution.quiesce(signal)
+      if (mountedVideo.current) {
+        await execution.quiesce(signal)
+        await flushViewing(signal)
+        signal.throwIfAborted()
+      }
       stoppedObservation = null
-      useVideoPresentation.getState().select(next)
+      useVideoPresentation.getState().select(next, payload.media.viewing)
       while (mountedVideo.current !== next) {
         signal.throwIfAborted()
         await new Promise<void>((resolve) => window.setTimeout(resolve, 20))
@@ -213,6 +233,8 @@ export function VideoPlaybackRuntime() {
       signal.throwIfAborted()
       if (stoppedObservation) return stoppedObservation
       const observed = await execution.execute('stop', undefined, signal)
+      await flushViewing(signal)
+      signal.throwIfAborted()
       useVideoPresentation.getState().select('')
       stoppedObservation = observed
       return observed
@@ -261,7 +283,7 @@ export function VideoPlaybackRuntime() {
       }
     }
     return registerPlaybackAdapter(adapter)
-  }, [execution])
+  }, [execution, flushViewing])
 
   return <div hidden ref={parkingRef} />
 }

@@ -136,7 +136,7 @@ final class ListeningSession
         $this->state->queue = $nextQueue;
         $this->state->currentTrackIndex = $nextIndex;
         if ($media !== null) {
-            if ($action === 'load' && $position === null && $media->toArray() !== $this->state->media?->toArray()) {
+            if ($action === 'load' && $position === null && !$media->matches($this->state->media)) {
                 // The session has one cursor and no resume position per media, so other media starts at zero.
                 $position = 0.0;
             }
@@ -192,7 +192,7 @@ final class ListeningSession
         }
         if ($releaseRunner && $checkpointRevision === $this->state->revision
             && $checkpointIndex === $this->state->currentTrackIndex
-            && $checkpointMedia?->toArray() === $this->state->media?->toArray()) {
+            && ($checkpointMedia?->matches($this->state->media) ?? $this->state->media === null)) {
             $this->state->position = $checkpointPosition;
         }
         $this->releaseGoneIncarnation($releaseRunner, $sourceStopped);

@@ -139,6 +139,42 @@ final class MemberVideoCatalogReadTest extends TestCase
         self::assertSame(0, $this->query->movies(SearchOptions::create('Saturn'), $scope, null)->getTotal());
     }
 
+    public function testMovieScanKeepsTiesAndPgroongaRankingAcrossTheBatchBoundary(): void
+    {
+        $this->connection->executeStatement('CREATE INDEX ON movies USING pgroonga (title)');
+        $library = $this->library('batch', 'movie');
+        for ($index = 0; $index < 103; ++$index) {
+            $title = $index < 101 ? 'Galaxy' : 'Galaxy Galaxy Galaxy';
+            $movie = $this->movie($library, $title);
+            $video = $this->video('batch-' . $index);
+            $this->place($library, $video, $index . '/feature.mp4', $movie, indexHash: $video->getHash());
+        }
+        $expected = $this->connection->fetchFirstColumn('SELECT public_id FROM movies ORDER BY title, id');
+        $scope = LibraryReadScope::restricted([$library->getId()]);
+        $page = $this->query->movies(SearchOptions::create('', limit: 5, offset: 98), $scope, null);
+        self::assertSame(103, $page->getTotal());
+        self::assertSame(array_slice($expected, 98, 5), array_map(static fn (array $row): string => $row['movie']->getPublicId()->toString(), $page->getItems()));
+
+        $this->connection->executeStatement('SET enable_seqscan TO off');
+        try {
+            $ranked = [];
+            for ($offset = 0; $offset < 103; $offset += 100) {
+                array_push($ranked, ...$this->connection->fetchFirstColumn(
+                    'SELECT s.id, s.library_id, library.public_id AS library_public_id, pgroonga_score(s.tableoid, s.ctid) AS score '
+                    . 'FROM movies s INNER JOIN libraries library ON library.id = s.library_id '
+                    . "WHERE s.library_id = :library AND s.title &@~ 'Galaxy' ORDER BY score DESC, s.id LIMIT 100 OFFSET " . $offset,
+                    ['library' => $library->getId()->toString()],
+                ));
+            }
+            $page = $this->query->movies(SearchOptions::create('Galaxy', limit: 5, offset: 98), $scope, null);
+            self::assertSame(103, $page->getTotal());
+            self::assertSame(array_slice($ranked, 98, 5), array_map(static fn (array $row): string => $row['movie']->getId()->toString(), $page->getItems()));
+        } finally {
+            $this->connection->executeStatement('RESET enable_seqscan');
+        }
+        self::assertFalse($this->connection->isTransactionActive());
+    }
+
     public function testSeriesCountsSeasonlessAndParticularFileStateUseOnlyAvailableOwnedEpisodes(): void
     {
         $library = $this->library('television', 'tv');

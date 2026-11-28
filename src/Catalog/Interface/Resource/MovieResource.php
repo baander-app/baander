@@ -165,9 +165,13 @@ final class MovieResource extends AbstractResource
     {
         assert($source['movie'] instanceof Movie);
         $movie = $source['movie'];
-        $data = self::fromWithPoster($movie, $movie->getPosterUrl() === null ? null : ['url' => $movie->getPosterUrl()]);
-        $data['videos'] = VideoVersionResource::collection($source['videos']);
-        $data['videoIds'] = array_column($data['videos'], 'publicId');
+        $videos = VideoVersionResource::collection($source['videos']);
+        $data = self::fromWithPoster(
+            $movie,
+            $movie->getPosterUrl() === null ? null : ['url' => $movie->getPosterUrl()],
+            videos: $videos,
+        );
+        $data['videoIds'] = array_column($videos, 'publicId');
         $data['extras'] = VideoExtraResource::collection($source['extras']);
         foreach (['libraryPublicId', 'metadataSource', 'watched', 'progress', 'defaultVideoPublicId'] as $field) {
             $data[$field] = $source[$field];

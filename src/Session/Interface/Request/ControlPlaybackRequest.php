@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace App\Session\Interface\Request;
 
 use App\Shared\Domain\Model\PublicId;
+use App\Session\Interface\Resource\PlaybackMediaResource;
+use App\Session\Interface\Validator\PlaybackMediaSelection;
 use OpenApi\Spec as OA;
 use Symfony\Component\Validator\Constraints as Assert;
 
@@ -27,23 +29,7 @@ use Symfony\Component\Validator\Constraints as Assert;
         'media' => new OA\Schema(
             type: 'object',
             nullable: true,
-            allOf: [
-                new OA\Schema(
-                    type: 'object',
-                    nullable: true,
-                    additionalProperties: new OA\Schema(type: 'string'),
-                ),
-                new OA\Schema(
-                    type: 'object',
-                    nullable: true,
-                    properties: [
-                        'kind' => new OA\Schema(
-                            type: 'string',
-                            enum: ['song', 'video'],
-                        ),
-                    ],
-                ),
-            ],
+            allOf: [new OA\Schema(ref: PlaybackMediaResource::class)],
             default: null,
         ),
         'queue' => new OA\Schema(
@@ -92,7 +78,7 @@ final readonly class ControlPlaybackRequest
     public const int MAX_QUEUE = 10000;
 
     /**
-     * @param array{kind:string,publicId:string}|null $media
+     * @param array{kind:string,publicId:string,viewing?:array{titleKind:string,titleId:string}}|null $media
      * @param list<string>|null $queue
      */
     public function __construct(
@@ -104,7 +90,7 @@ final readonly class ControlPlaybackRequest
         public string $action,
         #[Assert\PositiveOrZero]
         public ?float $position = null,
-        #[Assert\Collection(fields: ['kind' => new Assert\Choice(choices: ['song', 'video']), 'publicId' => new Assert\Regex(pattern: PublicId::REGEX)])]
+        #[PlaybackMediaSelection]
         public ?array $media = null,
         #[Assert\Type('list')]
         #[Assert\Count(max: self::MAX_QUEUE)]

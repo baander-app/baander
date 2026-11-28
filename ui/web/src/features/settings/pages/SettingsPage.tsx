@@ -1,3 +1,4 @@
+import { MetadataAttribution } from '@/features/catalog/components/MetadataAttribution';
 import { Switch } from '@/shared/components/ui/switch';
 import { useEqProcessingStore } from '@/features/equalizer/stores/eq-processing-store';
 import styled from 'styled-components';
@@ -185,6 +186,8 @@ export function SettingsPage() {
                   Self-hosted media library server
                 </FieldDescription>
                 <FieldDescription>v0.1.0</FieldDescription>
+                <MetadataAttribution provider="tmdb" />
+                <MetadataAttribution provider="tvdb" />
               </CardStackSmall>
             </Card>
           </Section>

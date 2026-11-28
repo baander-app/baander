@@ -37,7 +37,6 @@ final readonly class VideoViewingProjection
                 $videos[$link['video_id']] = Uuid::fromString($link['video_id']);
             }
         }
-        // Title IDs are already limited by one page or one season-count batch.
         $chunks = array_chunk(array_values($videos), self::BATCH_SIZE);
         $state = $this->viewing->forMember(
             $memberId,

@@ -48,9 +48,9 @@ final readonly class MemberVideoCatalogReadQuery implements MemberVideoCatalogRe
             $query->andWhere('library.public_id = :library')->setParameter('library', $libraryId->toString());
         }
 
-        [$page] = $this->page($query, 'series', $options);
+        $page = $this->page($query, 'series', $options);
 
-        return SearchResult::create(array_map(self::seriesRow(...), $page->getItems()), $page->getTotal());
+        return SearchResult::create(array_map(self::seriesRow(...), $page['items']), $page['total']);
     }
 
     public function seriesDetail(PublicId $id, LibraryReadScope $scope, ?Uuid $memberId): ?array
@@ -103,14 +103,13 @@ final readonly class MemberVideoCatalogReadQuery implements MemberVideoCatalogRe
             $query->andWhere('season.id IS NULL');
         }
 
-        // An empty text search within a visible season still has a valid parent.
-        [$page, $anyVisible] = $this->page($query, 'episode', $options);
-        if (!$anyVisible && ($seasonId !== null || $unseasoned
+        ['items' => $items, 'total' => $total, 'anyVisible' => $hasAvailableEpisodes] = $this->page($query, 'episode', $options);
+        if (!$hasAvailableEpisodes && ($seasonId !== null || $unseasoned
             || $this->availability->files('series', [$owner['id'] => $owner['library_id']], extrasOnly: true) === [])) {
             return null;
         }
 
-        return SearchResult::create($this->episodeRows($page->getItems(), $memberId), $page->getTotal());
+        return SearchResult::create($this->episodeRows($items, $memberId), $total);
     }
 
     public function episodeDetail(PublicId $id, LibraryReadScope $scope, ?Uuid $memberId): ?array
@@ -136,11 +135,11 @@ final readonly class MemberVideoCatalogReadQuery implements MemberVideoCatalogRe
             $query->orderBy('s.title');
         }
         $query->addOrderBy('s.id');
-        [$page] = $this->page($query, 'movie', $options);
+        $page = $this->page($query, 'movie', $options);
 
         return SearchResult::create(
-            $this->movieRows($page->getItems(), $scope, $memberId),
-            $page->getTotal(),
+            $this->movieRows($page['items'], $scope, $memberId),
+            $page['total'],
         );
     }
 
@@ -207,7 +206,7 @@ final readonly class MemberVideoCatalogReadQuery implements MemberVideoCatalogRe
 
     /**
      * @param WorkKind $kind
-     * @return array{SearchResult,bool}
+     * @return array{items:list<mixed>,total:int,anyVisible:bool}
      */
     private function page(QueryBuilder $query, string $kind, SearchOptions $options): array
     {
@@ -216,7 +215,7 @@ final readonly class MemberVideoCatalogReadQuery implements MemberVideoCatalogRe
         $anyVisible = false;
         $offset = $options->getOffset();
         $limit = $options->getLimit();
-        foreach (self::batches($query) as $rows) {
+        foreach ($this->batches($query) as $rows) {
             $visible = $this->visibleIds($kind, $rows);
             $anyVisible = $anyVisible || $visible !== [];
             foreach ($rows as $row) {
@@ -230,24 +229,22 @@ final readonly class MemberVideoCatalogReadQuery implements MemberVideoCatalogRe
             }
         }
 
-        return [SearchResult::create($items, $total), $anyVisible];
+        return ['items' => $items, 'total' => $total, 'anyVisible' => $anyVisible];
     }
 
     /** @return iterable<list<WorkRow>> */
-    private static function batches(QueryBuilder $query): iterable
+    private function batches(QueryBuilder $query): iterable
     {
-        $query->setMaxResults(self::BATCH_SIZE);
-        for ($offset = 0; ; $offset += self::BATCH_SIZE) {
-            /** @var list<WorkRow> $rows */
-            $rows = $query->setFirstResult($offset)->fetchAllAssociative();
-            if ($rows === []) {
-                return;
-            }
-            yield $rows;
-            if (count($rows) < self::BATCH_SIZE) {
-                return;
-            }
-        }
+        /** @var iterable<list<WorkRow>> $batches */
+        $batches = AvailabilityReadCursor::batches(
+            $this->connection,
+            $query->getSQL(),
+            $query->getParameters(),
+            $query->getParameterTypes(),
+            self::BATCH_SIZE,
+        );
+
+        yield from $batches;
     }
 
     /**
@@ -275,7 +272,7 @@ final readonly class MemberVideoCatalogReadQuery implements MemberVideoCatalogRe
             ->orderBy('e.id');
 
         $counts = [];
-        foreach (self::batches($episodes) as $rows) {
+        foreach ($this->batches($episodes) as $rows) {
             $available = $this->visibleIds('episode', $rows);
             $state = $this->viewing->state($memberId, array_keys($available), [], []);
             $watched = self::uuidSet($state->watchedEpisodeIds);

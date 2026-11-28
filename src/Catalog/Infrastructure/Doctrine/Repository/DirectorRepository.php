@@ -87,9 +87,15 @@ final readonly class DirectorRepository implements DirectorRepositoryInterface
             ->setMaxResults(self::AVAILABILITY_BATCH_SIZE);
         $ids = [];
         $total = 0;
-        $offset = 0;
+        $last = null;
         do {
-            $rows = $query->setFirstResult($offset)->getQuery()->getArrayResult();
+            $batch = clone $query;
+            if ($last !== null) {
+                $batch->andWhere('visible.title > :scanTitle OR (visible.title = :scanTitle AND visible.id > :scanId)')
+                    ->setParameter('scanTitle', $last['movieTitle'])
+                    ->setParameter('scanId', $last['movieId'], 'uuid');
+            }
+            $rows = $batch->getQuery()->getArrayResult();
             $works = array_map(static fn (array $row): array => [
                 'kind' => 'movie',
                 'id' => (string) $row['movieId'],
@@ -101,7 +107,9 @@ final readonly class DirectorRepository implements DirectorRepositoryInterface
                 }
                 ++$total;
             }
-            $offset += count($rows);
+            if ($rows !== []) {
+                $last = $rows[array_key_last($rows)];
+            }
         } while (count($rows) === self::AVAILABILITY_BATCH_SIZE);
 
         return SearchResult::create($ids, $total);

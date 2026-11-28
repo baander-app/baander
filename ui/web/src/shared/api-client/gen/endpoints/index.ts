@@ -1526,13 +1526,6 @@ export const ControlPlaybackRequestAction = {
 /**
  * @nullable
  */
-export type ControlPlaybackRequestMedia = ({[key: string]: string} | null) & ({
-  kind?: 'song' | 'video';
-} | null) | null;
-
-/**
- * @nullable
- */
 export type ControlPlaybackRequestDesiredState = typeof ControlPlaybackRequestDesiredState[keyof typeof ControlPlaybackRequestDesiredState] | null;
 
 
@@ -1541,6 +1534,39 @@ export const ControlPlaybackRequestDesiredState = {
   paused: 'paused',
   stopped: 'stopped',
 } as const;
+
+export type PlaybackMediaResourceKind = typeof PlaybackMediaResourceKind[keyof typeof PlaybackMediaResourceKind];
+
+
+export const PlaybackMediaResourceKind = {
+  song: 'song',
+  video: 'video',
+} as const;
+
+export type PlaybackViewingContextResourceTitleKind = typeof PlaybackViewingContextResourceTitleKind[keyof typeof PlaybackViewingContextResourceTitleKind];
+
+
+export const PlaybackViewingContextResourceTitleKind = {
+  episode: 'episode',
+  movie: 'movie',
+  extra: 'extra',
+} as const;
+
+export interface PlaybackViewingContextResource {
+  titleKind: PlaybackViewingContextResourceTitleKind;
+  /**
+     * @minLength 21
+     * @maxLength 21
+     * @pattern ^[0-9a-zA-Z_-]{21}$
+     */
+  titleId: string;
+}
+
+export interface PlaybackMediaResource {
+  kind: PlaybackMediaResourceKind;
+  publicId: string;
+  viewing?: PlaybackViewingContextResource;
+}
 
 export interface ControlPlaybackRequest {
   requestId: string;
@@ -1553,7 +1579,7 @@ export interface ControlPlaybackRequest {
      */
   position?: number | null;
   /** @nullable */
-  media?: ControlPlaybackRequestMedia;
+  media?: PlaybackMediaResource | null;
   /**
      * @maxItems 10000
      * @nullable
@@ -1584,12 +1610,15 @@ export interface ReconcilePlaybackRequest {
   expectedRevision: number;
 }
 
-export type RecoverLocalPlaybackRequestCheckpointMedia = {[key: string]: string} & ({
-  kind?: 'song' | 'video';
-}) | number | null;
-
-export type RecoverLocalPlaybackRequestCheckpoint = ({[key: string]: {[key: string]: string} | number | null}) & {
-  media?: RecoverLocalPlaybackRequestCheckpointMedia;
+export type RecoverLocalPlaybackRequestCheckpoint = {
+  /** @nullable */
+  media: PlaybackMediaResource | null;
+  /** @minimum 0 */
+  revision: number;
+  /** @minimum 0 */
+  currentTrackIndex: number;
+  /** @minimum 0 */
+  position: number;
 };
 
 export interface RecoverLocalPlaybackRequest {
@@ -1599,12 +1628,15 @@ export interface RecoverLocalPlaybackRequest {
   checkpoint: RecoverLocalPlaybackRequestCheckpoint;
 }
 
-export type ClosePlaybackEndpointRequestCheckpointMedia = {[key: string]: string} & ({
-  kind?: 'song' | 'video';
-}) | number | null;
-
-export type ClosePlaybackEndpointRequestCheckpoint = ({[key: string]: {[key: string]: string} | number | null}) & {
-  media?: ClosePlaybackEndpointRequestCheckpointMedia;
+export type ClosePlaybackEndpointRequestCheckpoint = {
+  /** @nullable */
+  media: PlaybackMediaResource | null;
+  /** @minimum 0 */
+  revision: number;
+  /** @minimum 0 */
+  currentTrackIndex: number;
+  /** @minimum 0 */
+  position: number;
 };
 
 export interface ClosePlaybackEndpointRequest {
@@ -5050,19 +5082,6 @@ export type PlaybackSnapshotResourceRequestResult = {
   /** @nullable */
   rejectionReason: string | null;
 } | null;
-
-export type PlaybackMediaResourceKind = typeof PlaybackMediaResourceKind[keyof typeof PlaybackMediaResourceKind];
-
-
-export const PlaybackMediaResourceKind = {
-  song: 'song',
-  video: 'video',
-} as const;
-
-export interface PlaybackMediaResource {
-  kind: PlaybackMediaResourceKind;
-  publicId: string;
-}
 
 export type PlaybackTransferResourceState = typeof PlaybackTransferResourceState[keyof typeof PlaybackTransferResourceState];
 

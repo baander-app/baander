@@ -71,6 +71,12 @@ const Header = styled.header`
   border-bottom: 1px solid var(--color-border);
   padding: var(--space-sm) var(--space-md);
 `
+const ResumeControls = styled.div`
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-sm);
+`
 const MovieTitle = styled(ContentText)`
   display: block;
   overflow: hidden;
@@ -172,6 +178,7 @@ interface MoviePlayerOverlayProps {
   title: string
   videoId: string
   sourceDuration?: number
+  startSeconds?: number
   onClose: () => void
 }
 
@@ -184,7 +191,7 @@ function remotePlaybackStatus(
     return 'Connection lost. Playback may still be active.'
   }
   if (preparing) {
-    return 'Preparing movie playback…'
+    return 'Preparing video playback…'
   }
   if (playing) {
     return 'Playing on the selected destination'
@@ -196,6 +203,7 @@ export function MoviePlayerOverlay({
   title,
   videoId,
   sourceDuration = 0,
+  startSeconds = 0,
   onClose
 }: MoviePlayerOverlayProps) {
   const overlayRef = useRef<HTMLDivElement>(null)
@@ -207,6 +215,8 @@ export function MoviePlayerOverlay({
     scope: string
     value: number
   } | null>(null)
+  const [dismissedResume, setDismissedResume] = useState<string | null>(null)
+  const resumeScope = `${videoId}:${startSeconds}:${title}`
   const [panel, setPanel] = useState<'settings' | 'chapters' | null>(null)
   const [idle, setIdle] = useState(false)
   const [fullscreenActive, setFullscreenActive] = useState(false)
@@ -324,6 +334,12 @@ export function MoviePlayerOverlay({
       document.removeEventListener('fullscreenchange', updateFullscreen)
   }, [])
 
+  const showResume = startSeconds > 0 && dismissedResume !== resumeScope
+  const startOver = () => {
+    requestPlayback({ action: 'seek', position: 0 })
+      .then(() => setDismissedResume(resumeScope))
+      .catch(useVideoPresentation.getState().reportError)
+  }
   const hidden = idle && playing && !focused && !panel && !error && connected
   return (
     <Dialog open>
@@ -422,6 +438,17 @@ export function MoviePlayerOverlay({
           <DialogPrimitive.Title asChild>
             <MovieTitle textRole="body" text={title} />
           </DialogPrimitive.Title>
+          {showResume ? (
+            <ResumeControls aria-label="Playback resume">
+              <ContentText textRole="caption" text={`Resumed at ${formatVideoTime(startSeconds)}`} element="span" />
+              <Button variant="ghost" size="sm" disabled={disabled} onClick={startOver}>
+                Start Over
+              </Button>
+              <CinemaButton label="Dismiss resume notice" onClick={() => setDismissedResume(resumeScope)}>
+                <X size={16} />
+              </CinemaButton>
+            </ResumeControls>
+          ) : null}
         </Header>
         <VideoContainer ref={containerRef}>
           {!local ? (
@@ -477,12 +504,12 @@ export function MoviePlayerOverlay({
                 <p>
                   {information.isPending
                     ? 'Loading chapters…'
-                    : 'No chapters are available for this movie.'}
+                    : 'No chapters are available for this video.'}
                 </p>
               )}
               {information.isError ? (
                 <Notice role="status">
-                  Movie information could not be loaded.{' '}
+                  Video information could not be loaded.{' '}
                   <Button
                     variant="ghost"
                     size="sm"
@@ -556,7 +583,7 @@ export function MoviePlayerOverlay({
             <VolumeWrap>
               <Slider
                 key={volumeScope}
-                aria-label="Movie volume"
+                aria-label="Video volume"
                 aria-valuetext={`${Math.round(volume * 100)}%`}
                 min={0}
                 max={1}

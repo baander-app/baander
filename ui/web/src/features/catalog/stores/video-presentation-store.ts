@@ -1,3 +1,4 @@
+import type { PlaybackViewingContextResource } from '@/shared/api-client/gen/endpoints'
 import { create } from 'zustand'
 import {
   initialVideoSettings,
@@ -11,13 +12,14 @@ export interface VideoPresentation extends VideoPresentationSettings {
   commands: VideoPresentationCommands | null
   controlsAvailable: boolean
   videoId: string
+  viewing: PlaybackViewingContextResource | null
   host: HTMLDivElement | null
   duration: number
   currentTime: number
   pendingSeekPosition: number | null
   state: string | null
   error: string | null
-  select: (videoId: string) => void
+  select: (videoId: string, viewing?: PlaybackViewingContextResource) => void
   publish: (
     values: Partial<
       Omit<
@@ -39,18 +41,20 @@ export const useVideoPresentation = create<VideoPresentation>()(
       commands: null,
       controlsAvailable: false,
       videoId: '',
+      viewing: null,
       host: null,
       duration: 0,
       currentTime: 0,
       pendingSeekPosition: null,
       state: null,
       error: null,
-      select: (videoId) =>
+      select: (videoId, viewing) =>
         set((state) => {
-          if (state.videoId === videoId) return { error: null }
+          if (state.videoId === videoId) return { error: null, viewing: viewing ?? null }
           return {
             ...initialVideoSettings(),
             videoId,
+            viewing: viewing ?? null,
             error: null,
             commands: null,
             controlsAvailable: false

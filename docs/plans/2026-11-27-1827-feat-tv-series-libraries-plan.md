@@ -979,6 +979,7 @@ Deferred to implementation:
   5. The overlay's movie-specific copy becomes neutral.
   6. Pages show layout-matching skeletons while loading, an empty state for a library or season with no available episodes and an error state with retry. An unmatched series shows a placeholder poster with episodes titled by number, and a failed mark rolls its row back with a toast.
   7. Sidebar links with no route are removed.
+  8. The phase review found that repeated page offsets re-read earlier candidates during availability checks. Keep exact counts and ordering, and walk each ordered result once. The file-stability regression test also exposed a race between the test writer and the reader. Synchronize the replacement with the reader’s first sample. The web gate found a theme transition callback running after its window closed. Schedule the transition on the window that owns its document.
 - **Patterns to follow:** `ui/web/src/features/catalog/components/MovieGridItem.tsx`, `ui/web/src/features/catalog/components/ListRow.tsx`; `ui/web/src/features/catalog/components/__tests__/MoviePlayerOverlay.test.tsx`.
 - **Test scenarios:**
   - A series page renders one tab per season with Specials last and the owned-of-total count.

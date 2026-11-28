@@ -82,3 +82,35 @@ describe('playback wire snapshots', () => {
     expect(parsePlaybackSnapshot({ ...value, destinations: [{ ...value.destinations[0], observedVolume: -1 }] })).toBeNull()
   })
 })
+
+
+describe('video viewing context in playback handoffs', () => {
+  it.each(['episode', 'movie', 'extra'] as const)('preserves %s identity in snapshots and commands', titleKind => {
+    const media = {
+      kind: 'video',
+      publicId: 'selectedVideo00000001',
+      viewing: { titleKind, titleId: 'selectedTitle00000001' }
+    }
+    const value = {
+      ...snapshot,
+      media,
+      commands: [{
+        ...snapshot.commands[0],
+        payload: { ...snapshot.commands[0].payload, media }
+      }]
+    }
+    expect(parsePlaybackSnapshot(structuredClone(value))).toEqual(value)
+  })
+
+  it.each([
+    { kind: 'song', viewing: { titleKind: 'episode', titleId: 'selectedTitle00000001' } },
+    { kind: 'video', viewing: { titleKind: 'series', titleId: 'selectedTitle00000001' } },
+    { kind: 'video', viewing: { titleKind: 'episode', titleId: 'internal-or-invalid-id' } },
+    { kind: 'video', viewing: null }
+  ])('rejects malformed or nonvideo context %#', supplied => {
+    expect(parsePlaybackSnapshot({
+      ...snapshot,
+      media: { publicId: 'selectedVideo00000001', ...supplied }
+    })).toBeNull()
+  })
+})

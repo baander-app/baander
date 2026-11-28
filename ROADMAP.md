@@ -19,7 +19,7 @@ runners and verification boundaries. Historical suite counts apply to their own 
 ## TV series libraries, checkpoint 2026-11-28
 
 Implementation follows the [TV series libraries plan](docs/plans/2026-11-27-1827-feat-tv-series-libraries-plan.md).
-This checkpoint covers the catalog foundation and video metadata providers.
+The entries below cover scanning, matching, member playback and their verification.
 
 - Phase A is committed through `8509b7f06`, covering U20, U1, U2, U3, U21, U4 and
   U5. TV libraries scan into provider-neutral series, seasons, episodes and video
@@ -70,8 +70,11 @@ This checkpoint covers the catalog foundation and video metadata providers.
   metadata source, file versions, extras and the requesting member’s progress.
   Filmographies and Person credit feeds use the same availability check before
   paging. The Party API documents the session and video IDs it already returns.
-  Phase D web units U16–U17 and Phase E documentation and browser verification
-  units U18–U19 remain pending.
+- U16 lets members browse a TV library by season, resume the last played file
+  version or start over, and mark episodes, seasons and series watched. A
+  browser receiving a playback handoff retains the opened title and its library
+  context. Movie and series pages list playable extras and credit the metadata
+  provider.
 
 ### Verification
 
@@ -169,6 +172,18 @@ This checkpoint covers the catalog foundation and video metadata providers.
   passed all 19 distinct cases across the corrected runs, with 255 assertions.
   Scoped PHPStan, imports, OpenAPI drift and Orval drift passed. Deptrac
   reported zero violations and 439 existing skipped violations.
+- U16 passed 3,980 web tests in 336 files. TypeScript and ESLint passed
+  (10 lint warnings). Session tests passed 198 cases with 1,181 assertions,
+  and the PostgreSQL handoff tests passed two cases with 12 assertions.
+  The file-stability suite passed eight tests with 32 assertions after the
+  writer was synchronized with the first file sample. Scoped PHPStan, imports
+  and both OpenAPI and Orval drift checks passed. Deptrac reported zero
+  violations and 439 existing skipped violations.
+- The Phase D availability review replaced repeated page offsets with bounded
+  reads. The PostgreSQL suites passed 23 tests with 10,823 assertions. The
+  10,000-row fixture evaluated each candidate once. The movie search kept its
+  previous ranking across a batch boundary, and the credit feeds kept their
+  totals and tie order.
 - The full U8 run counted 15,653 tests and 156,814 assertions, with two
   errors and four failures. U9 corrected the ingest, playback access,
   workload and log-retention fixtures, and U13 corrected the sleep test’s

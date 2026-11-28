@@ -2,6 +2,30 @@ import type { LiveCoverageDescriptor } from '@/shared/live/coverage-types'
 
 export const sessionLiveCoverage = [
   {
+    id: 'session.party-membership',
+    family: 'sessions',
+    policy: {
+      kind: 'demand',
+      reason: 'Party sessions and membership are excluded from live capture. The viewing reporter owns a fresh preflight before every report; retained query data never authorizes recording and needs no invalidation.',
+    },
+    audiences: ['user'],
+    sourceTables: [],
+    deploymentTables: [],
+    sources: ['/api/party/sessions/'],
+    keyVariants: ['getGetPartySessionIndexQueryKey()'],
+    dependentFamilies: [],
+    mirrors: [],
+    responseCaches: ['authoritative-read'],
+    consumers: [
+      'src/features/catalog/hooks/use-video-viewing-reporter.ts#getPartySessionIndex:generated',
+      'src/features/catalog/hooks/use-video-viewing-reporter.ts#fetchQuery:{queryKey:getGetPartySessionIndexQueryKey(),queryFn:({signal:querySignal})=>getPartySessionIndex({signal:AbortSignal.any([signal,querySignal])}),staleTime:0,retry:false}',
+    ],
+    coverageVerification: ['tests/live-updates/coverage.test.ts'],
+    behaviorVerification: {
+      unitProofs: ['src/features/catalog/hooks/__tests__/use-video-viewing-reporter.test.tsx'],
+    },
+  },
+  {
     id: 'session.devices',
     family: 'devices',
     policy: {

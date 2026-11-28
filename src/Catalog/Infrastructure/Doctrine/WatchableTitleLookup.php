@@ -112,7 +112,6 @@ final readonly class WatchableTitleLookup implements WatchableTitlePortInterface
         }
         $parentKind = $kind === 'extra' ? $before['parent_kind'] : $kind;
         $table = $parentKind === 'movie' ? 'movies' : 'tv_series';
-        // This is the same parent row lock held by placement and watched-mark moves.
         if ($this->connection->fetchOne('SELECT id FROM ' . $table . ' WHERE id = :id FOR UPDATE', ['id' => $before['parent_id']]) === false) {
             return null;
         }

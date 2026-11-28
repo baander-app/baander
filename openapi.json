@@ -30335,24 +30335,7 @@
                         "nullable": true,
                         "allOf": [
                             {
-                                "type": "object",
-                                "nullable": true,
-                                "additionalProperties": {
-                                    "type": "string"
-                                }
-                            },
-                            {
-                                "type": "object",
-                                "nullable": true,
-                                "properties": {
-                                    "kind": {
-                                        "type": "string",
-                                        "enum": [
-                                            "song",
-                                            "video"
-                                        ]
-                                    }
-                                }
+                                "$ref": "#/components/schemas/PlaybackMediaResource"
                             }
                         ],
                         "default": null
@@ -30431,79 +30414,36 @@
                         "type": "string"
                     },
                     "checkpoint": {
-                        "allOf": [
-                            {
+                        "type": "object",
+                        "properties": {
+                            "media": {
                                 "type": "object",
-                                "additionalProperties": {
-                                    "oneOf": [
-                                        {
-                                            "type": "object",
-                                            "additionalProperties": {
-                                                "type": "string"
-                                            }
-                                        },
-                                        {
-                                            "type": "number",
-                                            "format": "float"
-                                        },
-                                        {
-                                            "type": "integer"
-                                        },
-                                        {
-                                            "type": "object",
-                                            "nullable": true,
-                                            "enum": [
-                                                null
-                                            ]
-                                        }
-                                    ]
-                                }
-                            },
-                            {
-                                "type": "object",
-                                "properties": {
-                                    "media": {
-                                        "oneOf": [
-                                            {
-                                                "allOf": [
-                                                    {
-                                                        "type": "object",
-                                                        "additionalProperties": {
-                                                            "type": "string"
-                                                        }
-                                                    },
-                                                    {
-                                                        "type": "object",
-                                                        "properties": {
-                                                            "kind": {
-                                                                "type": "string",
-                                                                "enum": [
-                                                                    "song",
-                                                                    "video"
-                                                                ]
-                                                            }
-                                                        }
-                                                    }
-                                                ]
-                                            },
-                                            {
-                                                "type": "number",
-                                                "format": "float"
-                                            },
-                                            {
-                                                "type": "integer"
-                                            },
-                                            {
-                                                "type": "object",
-                                                "nullable": true,
-                                                "enum": [
-                                                    null
-                                                ]
-                                            }
-                                        ]
+                                "nullable": true,
+                                "allOf": [
+                                    {
+                                        "$ref": "#/components/schemas/PlaybackMediaResource"
                                     }
-                                }
+                                ]
+                            },
+                            "revision": {
+                                "type": "integer",
+                                "minimum": 0
+                            },
+                            "currentTrackIndex": {
+                                "type": "integer",
+                                "minimum": 0
+                            },
+                            "position": {
+                                "type": "number",
+                                "format": "float",
+                                "minimum": 0
                             }
+                        },
+                        "required": [
+                            "media",
+                            "revision",
+                            "currentTrackIndex",
+                            "position"
                         ]
                     }
                 },
@@ -30521,79 +30461,36 @@
                         "type": "string"
                     },
                     "checkpoint": {
-                        "allOf": [
-                            {
+                        "type": "object",
+                        "properties": {
+                            "media": {
                                 "type": "object",
-                                "additionalProperties": {
-                                    "oneOf": [
-                                        {
-                                            "type": "object",
-                                            "additionalProperties": {
-                                                "type": "string"
-                                            }
-                                        },
-                                        {
-                                            "type": "number",
-                                            "format": "float"
-                                        },
-                                        {
-                                            "type": "integer"
-                                        },
-                                        {
-                                            "type": "object",
-                                            "nullable": true,
-                                            "enum": [
-                                                null
-                                            ]
-                                        }
-                                    ]
-                                }
-                            },
-                            {
-                                "type": "object",
-                                "properties": {
-                                    "media": {
-                                        "oneOf": [
-                                            {
-                                                "allOf": [
-                                                    {
-                                                        "type": "object",
-                                                        "additionalProperties": {
-                                                            "type": "string"
-                                                        }
-                                                    },
-                                                    {
-                                                        "type": "object",
-                                                        "properties": {
-                                                            "kind": {
-                                                                "type": "string",
-                                                                "enum": [
-                                                                    "song",
-                                                                    "video"
-                                                                ]
-                                                            }
-                                                        }
-                                                    }
-                                                ]
-                                            },
-                                            {
-                                                "type": "number",
-                                                "format": "float"
-                                            },
-                                            {
-                                                "type": "integer"
-                                            },
-                                            {
-                                                "type": "object",
-                                                "nullable": true,
-                                                "enum": [
-                                                    null
-                                                ]
-                                            }
-                                        ]
+                                "nullable": true,
+                                "allOf": [
+                                    {
+                                        "$ref": "#/components/schemas/PlaybackMediaResource"
                                     }
-                                }
+                                ]
+                            },
+                            "revision": {
+                                "type": "integer",
+                                "minimum": 0
+                            },
+                            "currentTrackIndex": {
+                                "type": "integer",
+                                "minimum": 0
+                            },
+                            "position": {
+                                "type": "number",
+                                "format": "float",
+                                "minimum": 0
                             }
+                        },
+                        "required": [
+                            "media",
+                            "revision",
+                            "currentTrackIndex",
+                            "position"
                         ]
                     }
                 },
@@ -36172,6 +36069,28 @@
                     "definition"
                 ]
             },
+            "PlaybackMediaResource": {
+                "type": "object",
+                "properties": {
+                    "kind": {
+                        "type": "string",
+                        "enum": [
+                            "song",
+                            "video"
+                        ]
+                    },
+                    "publicId": {
+                        "type": "string"
+                    },
+                    "viewing": {
+                        "$ref": "#/components/schemas/PlaybackViewingContextResource"
+                    }
+                },
+                "required": [
+                    "kind",
+                    "publicId"
+                ]
+            },
             "LogFilterRequest": {
                 "type": "object",
                 "properties": {
@@ -37133,25 +37052,6 @@
                     "watchedCount"
                 ]
             },
-            "PlaybackMediaResource": {
-                "type": "object",
-                "properties": {
-                    "kind": {
-                        "type": "string",
-                        "enum": [
-                            "song",
-                            "video"
-                        ]
-                    },
-                    "publicId": {
-                        "type": "string"
-                    }
-                },
-                "required": [
-                    "kind",
-                    "publicId"
-                ]
-            },
             "PlaybackTransferResource": {
                 "type": "object",
                 "properties": {
@@ -37567,6 +37467,29 @@
                     "expiresAt",
                     "filters",
                     "nodeSnapshots"
+                ]
+            },
+            "PlaybackViewingContextResource": {
+                "type": "object",
+                "properties": {
+                    "titleKind": {
+                        "type": "string",
+                        "enum": [
+                            "episode",
+                            "movie",
+                            "extra"
+                        ]
+                    },
+                    "titleId": {
+                        "type": "string",
+                        "minLength": 21,
+                        "maxLength": 21,
+                        "pattern": "^[0-9a-zA-Z_-]{21}$"
+                    }
+                },
+                "required": [
+                    "titleKind",
+                    "titleId"
                 ]
             },
             "MatchPredictedArtistResource": {

@@ -9,7 +9,7 @@ export const catalogLiveCoverage = [
       reason:
         'Stored catalog metadata and relation changes affect lists, details, filters, covers and availability.'
     },
-    audiences: ['library'],
+    audiences: ['library', 'user'],
     sourceTables: [
       'albums',
       'artists',
@@ -25,7 +25,9 @@ export const catalogLiveCoverage = [
       'genre_movie',
       'movie_video',
       'movie_collections',
-      'user_favorites'
+      'user_favorites',
+      'watched_marks',
+      'resume_positions'
     ],
     deploymentTables: [],
     sources: [
@@ -99,6 +101,7 @@ export const catalogLiveCoverage = [
       unitProofs: [
         'tests/live-updates/catalog-consumers.test.tsx',
         'tests/live-updates/collections.test.tsx',
+        'src/features/catalog/pages/__tests__/MovieDetailPage.test.tsx',
         'src/features/catalog/components/metadata/__tests__/InfoPanel.test.tsx',
         'src/features/catalog/components/metadata/__tests__/use-metadata-form.test.tsx',
         'src/shared/drafts/__tests__/use-draft.test.tsx'
@@ -112,10 +115,10 @@ export const catalogLiveCoverage = [
       kind: 'sampled',
       intervalMs: 30000,
       reason:
-        'Person identities, screen credits and registered TV titles refresh while visible and after catalog hints.'
+        'Person identities, screen credits and TV titles refresh while visible and after catalog hints. Member hints also refresh watched state and resume positions.'
     },
-    audiences: ['library'],
-    sourceTables: ['movies', 'songs', 'albums', 'artists', 'user_library_access'],
+    audiences: ['library', 'user'],
+    sourceTables: ['movies', 'songs', 'albums', 'artists', 'user_library_access', 'watched_marks', 'resume_positions'],
     deploymentTables: [],
     sources: [
       '/api/people',
@@ -123,6 +126,8 @@ export const catalogLiveCoverage = [
       '/api/movies/{publicId}/credits',
       '/api/artists/{publicId}/person',
       '/api/tv/series',
+      '/api/tv/series/{publicId}',
+      '/api/tv/series/{publicId}/episodes',
       '/api/tv/episodes/{publicId}'
     ],
     keyVariants: ['Generated People and television query keys with filter and page parameters'],
@@ -135,6 +140,9 @@ export const catalogLiveCoverage = [
       'src/features/catalog/pages/PersonDetailPage.tsx#usePersonCredits:generated',
       'src/features/catalog/components/WorkPeople.tsx#usePersonArtist:generated',
       'src/features/catalog/components/WorkPeople.tsx#useQuery:queries[kind](publicId,params,options)',
+      'src/features/catalog/components/use-video-watched.ts#getTvSeriesShowQueryKey:generated',
+      'src/features/catalog/components/use-video-watched.ts#getTvSeriesEpisodesQueryKey:generated',
+      'src/features/catalog/components/use-video-watched.ts#getTvEpisodeShowQueryKey:generated',
       'src/features/tv/pages/TVSeriesPage.tsx#useTvSeriesIndex:generated',
       'src/features/tv/pages/TVDetailPage.tsx#useTvSeriesShow:generated',
       'src/features/tv/pages/TVDetailPage.tsx#useTvSeriesEpisodes:generated',
@@ -142,7 +150,10 @@ export const catalogLiveCoverage = [
     ],
     coverageVerification: ['tests/live-updates/coverage.test.ts'],
     behaviorVerification: {
-      unitProofs: ['tests/live-updates/people.test.tsx']
+      unitProofs: [
+        'tests/live-updates/people.test.tsx',
+        'src/features/tv/pages/__tests__/TVDetailPage.test.tsx'
+      ]
     }
   },
   {

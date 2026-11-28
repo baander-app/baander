@@ -85,6 +85,29 @@ final class PeopleReadRepositoryTest extends TestCase
         }
     }
 
+    public function testMixedCreditsKeepTitleTiesAndAvailabilityAcrossTheScanBoundary(): void
+    {
+        for ($index = 0; $index < 253; ++$index) {
+            $movie = $this->movie('Shared title', $this->library, available: $index !== 249);
+            $this->credit('movie', $movie, 'actor');
+            if ($index === 250) {
+                $this->credit('movie', $movie, 'director');
+            }
+        }
+        $this->music();
+        $expected = $this->connection->fetchFirstColumn(
+            'SELECT movie.public_id FROM movies movie JOIN movie_video link ON link.movie_id = movie.id '
+            . 'JOIN video_placements placement ON placement.movie_id = movie.id '
+            . 'JOIN library_file_index file ON file.path = :prefix || placement.relative_path '
+            . 'WHERE file.available = TRUE ORDER BY lower(movie.title), movie.public_id',
+            ['prefix' => '/media/baander.app/' . $this->library . '/'],
+        );
+        $page = $this->reads->credits($this->personPublicId, SearchOptions::create('Shared title', limit: 5, offset: 247), $this->scope());
+        self::assertSame(252, $page->getTotal());
+        self::assertSame(array_slice($expected, 247, 5), array_column($page->getItems(), 'publicId'));
+        self::assertFalse($this->connection->isTransactionActive());
+    }
+
     public function testScopeFiltersBeforeGroupingAndCountsAcrossMusicAndMovies(): void
     {
         $visible = $this->movie('A visible movie', $this->library);
@@ -260,8 +283,11 @@ final class PeopleReadRepositoryTest extends TestCase
 
             public function log($level, string|Stringable $message, array $context = []): void
             {
-                if (isset($context['sql']) && str_starts_with($context['sql'], 'WITH visible_credits')) {
-                    $this->queries[] = ['sql' => $context['sql'], 'params' => $context['params'] ?? []];
+                if (isset($context['sql'])) {
+                    $sql = preg_replace('/\ADECLARE availability_scan_[0-9a-f]+ NO SCROLL CURSOR FOR /', '', $context['sql']) ?? $context['sql'];
+                    if (str_starts_with($sql, 'WITH visible_credits')) {
+                        $this->queries[] = ['sql' => $sql, 'params' => $context['params'] ?? []];
+                    }
                 }
             }
         };
@@ -274,6 +300,7 @@ final class PeopleReadRepositoryTest extends TestCase
             self::assertCount(50, $reads->credits($this->personPublicId, SearchOptions::create(''), $this->scope())->getItems());
             self::assertCount(1, $logger->queries);
             $query = $logger->queries[0];
+            self::assertStringNotContainsString('OFFSET', $query['sql']);
             $plan = $connection->fetchOne('EXPLAIN (FORMAT JSON) ' . $query['sql'], array_values($query['params']));
             self::assertIsArray(json_decode($plan, true, flags: JSON_THROW_ON_ERROR)[0]['Plan']);
         } finally {

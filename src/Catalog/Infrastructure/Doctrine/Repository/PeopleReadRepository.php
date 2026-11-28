@@ -13,6 +13,7 @@ use App\Catalog\Infrastructure\Doctrine\Entity\PersonArtistLinkEntity;
 use App\Catalog\Infrastructure\Doctrine\Entity\TvEpisodeEntity;
 use App\Catalog\Infrastructure\Doctrine\Entity\TvSeriesEntity;
 use App\Catalog\Infrastructure\Doctrine\Query\CatalogReadScopeQuery;
+use App\Catalog\Infrastructure\Doctrine\Query\AvailabilityReadCursor;
 use App\Catalog\Infrastructure\Doctrine\Query\VideoWorkAvailability;
 use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\SearchOptions;
@@ -80,21 +81,22 @@ final readonly class PeopleReadRepository implements PeopleReadPortInterface, Pe
         $musicOnly = in_array($kind, ['song', 'album'], true);
         $rows = [];
         $total = $musicOnly ? (int) $this->connection->fetchOne($cte . ' SELECT COUNT(*) FROM (SELECT kind, public_id' . $group . ') grouped', $parameters, $types) : 0;
-        $offset = $musicOnly ? $options->getOffset() : 0;
-        $batchSize = $musicOnly ? $options->getLimit() : self::AVAILABILITY_BATCH_SIZE;
-        do {
-            $batch = $this->connection->fetchAllAssociative(
-                $cte . <<<'SQL'
-                     SELECT kind, public_id AS "publicId", title, work_id, library_id,
-                        jsonb_agg(DISTINCT jsonb_build_object(
-                            'role', role, 'job', job, 'characterName', character_name,
-                            'department', department, 'creditedName', credited_name, 'billingOrder', billing_order
-                        )) AS roles
-                    SQL
-                    . $group . ' ORDER BY lower(title), kind, public_id LIMIT :limit OFFSET :offset',
-                $parameters + ['limit' => $batchSize, 'offset' => $offset],
+        $sql = $cte . <<<'SQL'
+            SELECT kind, public_id AS "publicId", title, work_id, library_id,
+                jsonb_agg(DISTINCT jsonb_build_object(
+                    'role', role, 'job', job, 'characterName', character_name,
+                    'department', department, 'creditedName', credited_name, 'billingOrder', billing_order
+                )) AS roles
+            SQL
+            . $group . ' ORDER BY lower(title), kind, public_id';
+        $batches = $musicOnly
+            ? [$this->connection->fetchAllAssociative(
+                $sql . ' LIMIT :limit OFFSET :offset',
+                $parameters + self::page($options),
                 $types + self::pageTypes(),
-            );
+            )]
+            : AvailabilityReadCursor::batches($this->connection, $sql, $parameters, $types, self::AVAILABILITY_BATCH_SIZE);
+        foreach ($batches as $batch) {
             foreach ($this->visibleCreditRows($batch) as $row) {
                 if (($musicOnly || $total >= $options->getOffset()) && count($rows) < $options->getLimit()) {
                     unset($row['work_id'], $row['library_id']);
@@ -104,8 +106,7 @@ final readonly class PeopleReadRepository implements PeopleReadPortInterface, Pe
                     ++$total;
                 }
             }
-            $offset += count($batch);
-        } while (!$musicOnly && count($batch) === self::AVAILABILITY_BATCH_SIZE);
+        }
         foreach ($rows as &$row) {
             $row['roles'] = json_decode((string) $row['roles'], true, flags: JSON_THROW_ON_ERROR);
             usort($row['roles'], static fn(array $left, array $right): int => [

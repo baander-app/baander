@@ -1,27 +1,29 @@
-import { useState } from 'react'
 import { useParams } from 'react-router-dom'
 import styled from 'styled-components'
-import { useGetMovieShow } from '@/shared/api-client/gen/endpoints'
+import { useGetMovieShow, type MovieResource } from '@/shared/api-client/gen/endpoints'
 import { Skeleton } from '@/shared/components/ui/skeleton'
 import { Button } from '@/shared/components/ui/button'
+import { ProgressBar } from '@/shared/components/progress-bar'
+import { useImageBlob } from '@/shared/hooks/use-image-blob'
+import { textRole } from '@/shared/theme'
 import { asMovieFromData } from '../utils/api-adapters'
 import { MovieHeader } from '../components/MovieHeader'
 import { MovieMetadata } from '../components/MovieMetadata'
-import { requestPlayback } from '@/features/session/services/playback-execution'
-import { usePlaybackSession } from '@/features/session/hooks/use-playback-session'
-import { useVideoPresentation } from '../stores/video-presentation-store'
-import { useVideoPresentationError } from '../hooks/use-video-presentation-error'
-import { MoviePlayerOverlay } from '../components/MoviePlayerOverlay'
+import { ActiveVideoOverlay } from '../components/ActiveVideoOverlay'
 import { WorkPeople } from '../components/WorkPeople'
-import { textRole } from '@/shared/theme'
+import { ExtrasRow } from '../components/ExtrasRow'
+import { MetadataAttribution } from '../components/MetadataAttribution'
+import { VideoActionMenu } from '../components/VideoActionMenu'
+import { useVideoDetailPlayback } from '../components/use-video-detail-playback'
+import { useVideoWatched } from '../components/use-video-watched'
 
 const CenterMessage = styled.div`
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 0.75rem;
-  padding: 5rem 0;
+  gap: var(--space-md);
+  padding: var(--space-xl) 0;
 `
 
 const ErrorText = styled.p`
@@ -32,8 +34,8 @@ const ErrorText = styled.p`
 const LoadingContainer = styled.div`
   display: flex;
   flex-direction: column;
-  gap: 1.5rem;
-  padding: 1.5rem;
+  gap: var(--space-lg);
+  padding: var(--space-lg);
 `
 
 const PageContainer = styled.div`
@@ -43,17 +45,85 @@ const PageContainer = styled.div`
   overflow-y: auto;
 `
 
+const HeaderActions = styled(VideoActionMenu)`
+  align-items: flex-end;
+  padding-inline-end: var(--space-lg);
+
+  > :first-child {
+    flex: 1;
+    min-width: 0;
+  }
+`
+
+const DetailSection = styled.div`
+  display: grid;
+  gap: var(--space-lg);
+  padding: 0 var(--space-lg) var(--space-lg);
+`
+
+const Watched = styled.p`
+  ${textRole('caption')}
+  color: var(--color-muted-foreground);
+`
+
+function MovieDetail({ data, publicId }: { data: MovieResource; publicId: string }) {
+  const playback = useVideoDetailPlayback()
+  const watched = useVideoWatched()
+  const poster = useImageBlob(data.posterUrl?.startsWith('/api/') ? data.posterUrl : null)
+  const backdrop = useImageBlob(data.backdropUrl?.startsWith('/api/') ? data.backdropUrl : null)
+  const movie = asMovieFromData({ data })
+
+  if (!movie) return null
+
+  const video = data.videos.find(item => item.publicId === data.defaultVideoPublicId)
+  const isWatched = watched.pending?.data.watched ?? data.watched
+  const actions = watched.actions({ kind: 'movie', publicId }, !video)
+
+  return (
+    <>
+      <PageContainer>
+        <HeaderActions label={`Options for ${movie.title}`} actions={actions}>
+          <MovieHeader
+            movie={{
+              ...movie,
+              posterUrl: data.posterUrl?.startsWith('/api/') ? poster.src : movie.posterUrl,
+              backdropUrl: data.backdropUrl?.startsWith('/api/') ? backdrop.src : movie.backdropUrl,
+            }}
+            onPlay={() => {
+              if (!video) return
+              playback.play({
+                titleKind: 'movie',
+                titleId: publicId,
+                videoId: video.publicId,
+                startSeconds: video.positionSeconds ?? 0,
+                title: movie.title,
+                duration: video.duration,
+              })
+            }}
+          />
+        </HeaderActions>
+        <DetailSection>
+          {playback.error ? <ErrorText role="alert">{playback.error}</ErrorText> : null}
+          {isWatched ? <Watched>Watched</Watched> : data.progress ? <ProgressBar value={data.progress * 100} label="Progress" /> : null}
+          <MetadataAttribution provider={data.metadataSource} />
+          <ExtrasRow extras={data.extras ?? []} onPlay={playback.play} />
+        </DetailSection>
+        <MovieMetadata movie={movie} />
+        <WorkPeople kind="movie" publicId={publicId} />
+      </PageContainer>
+      <ActiveVideoOverlay active={playback.active} onClose={playback.close} />
+    </>
+  )
+}
+
 export function MovieDetailPage() {
-  const { publicId } = useParams<{ publicId: string }>()
-  const { data, isLoading, isError, refetch } = useGetMovieShow(publicId!)
-  const [isPlaying, setIsPlaying] = useState(false)
-  const { snapshot } = usePlaybackSession()
-  const error = useVideoPresentationError(snapshot)
+  const { publicId = '' } = useParams<{ publicId: string }>()
+  const { data, isLoading, isError, refetch } = useGetMovieShow(publicId)
 
   if (isError) {
     return (
       <CenterMessage>
-        <ErrorText>Failed to load movie</ErrorText>
+        <ErrorText role="alert">Failed to load movie</ErrorText>
         <Button variant="ghost" size="sm" onClick={() => refetch()}>
           Retry
         </Button>
@@ -61,58 +131,15 @@ export function MovieDetailPage() {
     )
   }
 
-  const movie = asMovieFromData(data)
-
-  if (isLoading || !data?.data || !movie) {
+  if (isLoading || !data?.data) {
     return (
-      <LoadingContainer>
-        <Skeleton
-          style={{ height: '16rem', width: '100%', borderRadius: '0.5rem' }}
-        />
-        <Skeleton style={{ height: '2rem', width: '16rem' }} />
-        <Skeleton style={{ height: '1rem', width: '12rem' }} />
-        <Skeleton style={{ height: '8rem', width: '100%' }} />
+      <LoadingContainer role="status" aria-label="Loading movie">
+        <Skeleton style={{ height: '16rem', width: '100%' }} />
+        <Skeleton style={{ height: '2rem', width: 'min(100%, 16rem)' }} />
+        <Skeleton style={{ height: '1rem', width: 'min(100%, 12rem)' }} />
       </LoadingContainer>
     )
   }
 
-  const video = movie.videos?.[0]
-
-  return (
-    <>
-      <PageContainer>
-        <MovieHeader
-          movie={movie}
-          onPlay={() => {
-            if (!video) return
-            if (
-              snapshot?.media?.kind === 'video' &&
-              snapshot.media.publicId === video.publicId
-            ) {
-              setIsPlaying(true)
-              return
-            }
-            requestPlayback({
-              action: 'load',
-              media: { kind: 'video', publicId: video.publicId },
-              desiredState: 'playing'
-            })
-              .then(() => setIsPlaying(true))
-              .catch(useVideoPresentation.getState().reportError)
-          }}
-        />
-        {error ? <ErrorText role="alert">{error}</ErrorText> : null}
-        <MovieMetadata movie={movie} />
-        <WorkPeople key={publicId} kind="movie" publicId={publicId!} />
-      </PageContainer>
-      {isPlaying && video ? (
-        <MoviePlayerOverlay
-          title={movie.title}
-          videoId={video.publicId}
-          sourceDuration={video.duration}
-          onClose={() => setIsPlaying(false)}
-        />
-      ) : null}
-    </>
-  )
+  return <MovieDetail key={publicId} data={data.data} publicId={publicId} />
 }
