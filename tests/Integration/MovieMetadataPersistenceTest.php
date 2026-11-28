@@ -9,6 +9,7 @@ use App\Catalog\Infrastructure\Doctrine\Entity\MovieVideoEntity;
 use App\Catalog\Infrastructure\Doctrine\Entity\VideoEntity;
 use App\Catalog\Infrastructure\Doctrine\ImportIdentity\ImportIdentityLock;
 use App\Catalog\Infrastructure\Doctrine\Repository\GenreRepository;
+use App\Catalog\Infrastructure\Doctrine\Repository\MovieRepository;
 use App\Library\Infrastructure\Doctrine\Entity\LibraryEntity;
 use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
@@ -70,16 +71,18 @@ final class MovieMetadataPersistenceTest extends TestCase
         }
     }
 
-    public function testEnrichmentPreservesVideoLinksAndUnrelatedEditsCommittedDuringProviderLookup(): void
+    public function testEnrichmentPreservesVideoLinksAndUserEditsCommittedDuringProviderLookup(): void
     {
         $newVideoId = null;
         $result = MovieMetadataRace::apply($this->manager, $this->movieId, [], function () use (&$newVideoId): void {
             self::assertFalse($this->writer->isTransactionActive(), 'Provider calls precede the producer transaction.');
             $concurrent = ArtistImportIdentityRace::entityManager($this->observer);
+            $movies = new MovieRepository($concurrent);
+            $edited = $movies->findByUuid($this->movieId);
+            self::assertNotNull($edited);
+            $edited->edit(title: 'Concurrent title', year: 2027, summary: 'Concurrent summary');
+            $movies->save($edited);
             $movie = $concurrent->find(MovieEntity::class, $this->movieId);
-            $movie->setTitle('Concurrent title');
-            $movie->setYear(2027);
-            $movie->setSummary('Concurrent summary');
             $video = new VideoEntity(new PublicId(), '/media/metadata-fixture/new.mkv', hash('xxh3', 'new'));
             $newVideoId = $video->getId()->toString();
             $concurrent->persist($video);
@@ -94,6 +97,7 @@ final class MovieMetadataPersistenceTest extends TestCase
             'summary' => 'Concurrent summary',
             'overview' => 'Provider overview',
         ], $this->observer->fetchAssociative('SELECT title, year, summary, overview FROM movies WHERE id = ?', [$this->movieId->toString()]));
+        self::assertSame(['title', 'year', 'summary'], json_decode($this->observer->fetchOne('SELECT locked_fields FROM movies WHERE id = ?', [$this->movieId->toString()]), true, flags: JSON_THROW_ON_ERROR));
         self::assertSame([$this->videoId->toString(), $newVideoId], $this->observer->fetchFirstColumn('SELECT video_id::text FROM movie_video ORDER BY sort_order'));
         self::assertSame(1, (int) $this->observer->fetchOne('SELECT COUNT(*) FROM movie_person_credits'));
     }
