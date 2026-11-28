@@ -272,6 +272,28 @@ The entries below cover scanning, matching, member playback and their verificati
   through `Version20261128160000`. All six Chromium and Firefox cases passed
   against that preview with retries disabled. The U24 simplification and code
   reviews found no additional changes.
+- The first full U24 run counted 16,003 tests with 170,601 assertions. Four
+  tests failed, including an OpenAPI test that also emitted two warnings.
+  The reference inventory now identifies the external movie ID, match claim
+  token and watched-mark receipt. The schema test follows the published
+  playback media reference. The movie credit fixture has an available file,
+  and the concurrent movie edit goes through the aggregate that records field
+  locks. The four focused CI runs passed 99 tests with 3,548 assertions.
+- The full release CI run at `9fe714410` passed all 16,003 tests with
+  170,703 assertions across eight lanes. Composer validation and
+  normalization, PHPStan, Deptrac, imports, tooling architecture, tooling
+  format and tooling PHPStan all passed in the CI image.
+- On the merged tree, the member progress HTTP, log client and publication
+  workflow suites passed 122 tests with 3,267 assertions in the CI image.
+  The import gate also found a fully qualified contrast helper in the design
+  system test. After importing the helper, that suite passed 18 tests with
+  177 assertions and both import and tooling-format checks passed.
+  The public site build generated 304 manual pages and 332 HTML files. All
+  378 Chromium cases, 76 design token tests and 35 renderer tests passed.
+  The guide links to the clock tolerance setting and retains the design system
+  navigation. The local
+  build instructions now install the website builder’s Composer dependencies
+  with the same command as the website workflow.
 - The full U8 run counted 15,653 tests and 156,814 assertions, with two
   errors and four failures. U9 corrected the ingest, playback access,
   workload and log-retention fixtures, and U13 corrected the sleep test’s

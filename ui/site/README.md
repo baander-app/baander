@@ -16,7 +16,7 @@ Run these commands from the repository root with PHP 8.5 or newer, DOM, mbstring
 tokenizer, Composer 2.11.1, Node.js 24 and Corepack available:
 
 ```bash
-composer --working-dir=scripts install --no-dev --no-interaction --no-scripts --no-plugins
+composer --working-dir=scripts install --no-interaction --no-scripts --no-plugins
 (cd ui/site && corepack yarn install --immutable)
 (cd ui/site && corepack yarn playwright install --with-deps chromium)
 make website-build
