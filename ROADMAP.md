@@ -88,6 +88,16 @@ This checkpoint covers the catalog foundation and video metadata providers.
 
 ## Website design system section, 2026-11-27
 
+The 2026-11-28 production deployment serves the website from `841a82782` at
+[baander.app](https://baander.app). The release built 297 manual pages and
+passed 76 design-token checks, 35 rendering checks and all 378 Chromium tests.
+The deployed CI archive’s SHA-256 is
+`c8ee3cb3f2945ebb17f8109f76652d4d5d242377583950b7ac664e718e4ebd00`.
+Live checks on the preview and production passed for the homepage, the design
+system, a nested manual section, search, light and dark themes, mobile navigation
+and a missing page returning HTTP 404. [Website CI](https://github.com/baander-app/baander/actions/runs/46146408661)
+and [Vercel deployment](https://vercel.com/martin-juuls-projects/baander/9oDJKvMBptTK9MQAeaqsDUYoZo9j).
+
 The website publishes Bånder's design system in ten pages under `/design-system/`,
 built from `ui/DESIGN.md`, `ui/ICON-GUIDE.md` and the design tokens when the site
 builds. The [plan](docs/plans/2026-11-27-1843-feat-website-design-system-page-plan.md)
