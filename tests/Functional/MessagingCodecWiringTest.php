@@ -20,7 +20,6 @@ use App\Metadata\Application\Message\SyncAlbumMessage;
 use App\Metadata\Application\Message\SyncArtistMessage;
 use App\Metadata\Application\Message\SyncArtistsMessage;
 use App\Metadata\Application\Message\SyncLibraryMessage;
-use App\Metadata\Application\Message\SyncMovieMessage;
 use App\Metadata\Application\Message\SyncPeopleMessage;
 use App\Metadata\Application\Message\SyncSongMessage;
 use App\Notification\Application\DTO\SendEmailCommand;
@@ -73,14 +72,13 @@ final class MessagingCodecWiringTest extends KernelTestCase
             new SyncArtistsMessage(),
             new SyncArtistMessage($id, Uuid::generate(), 2),
             new SyncPeopleMessage('41'),
-            new SyncMovieMessage($id, true),
             new FetchLyricsCommand($id),
             new SendEmailCommand($id, 'listener@baander.app', NotificationCategory::Security, 'title', [], 'body', [], new \DateTimeImmutable('2026-10-18T04:00:00Z')),
             new UpdateTranscodePositionCommand($id, 12.5, 'seek'),
             new PrepareTimelinePreview('/media/movies/film.mkv', 'film-preview', 5400.5, 12.5, str_repeat('a', 64), 0),
         ];
 
-        self::assertCount(27, $messages);
+        self::assertCount(26, $messages);
         $catalog = self::getContainer()->get(AsyncWorkloadCatalog::class);
         self::assertInstanceOf(AsyncWorkloadCatalog::class, $catalog);
         $covered = array_fill_keys(array_map(static fn (object $message): string => $message::class, $messages), true);

@@ -16,7 +16,6 @@ use App\Metadata\Application\Message\SyncAlbumMessage;
 use App\Metadata\Application\Message\SyncArtistMessage;
 use App\Metadata\Application\Message\SyncArtistsMessage;
 use App\Metadata\Application\Message\SyncLibraryMessage;
-use App\Metadata\Application\Message\SyncMovieMessage;
 use App\Metadata\Application\Message\SyncPeopleMessage;
 use App\Metadata\Application\Message\SyncSongMessage;
 use App\Notification\Application\DTO\SendEmailCommand;
@@ -89,11 +88,6 @@ return static function (ContainerConfigurator $container): void {
             'default' => true,
         ],
         SyncPeopleMessage::class => [
-            'transport' => 'async',
-            'resource_class' => 'io',
-            'default' => true,
-        ],
-        SyncMovieMessage::class => [
             'transport' => 'async',
             'resource_class' => 'io',
             'default' => true,

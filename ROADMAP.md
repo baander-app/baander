@@ -54,7 +54,10 @@ This checkpoint covers the catalog foundation and video metadata providers.
 - U22 places files against the matched provider’s structure and keeps the exact
   ordering selected for the series. A refresh preserves hand assignments, native
   episode identities and the last mapping when an ordering disappears.
-  Phase C units U12 and U13 remain pending. Phase D member
+- U12 applies provider metadata, imports managed artwork and resolves screen credits
+  against every supplied person ID. TV refresh preserves manual edits and locks.
+  Movie sync now uses the video match queue.
+  Phase C unit U13 remains pending. Phase D member
   progress, read API and web units U14–U17 and Phase E documentation and browser
   verification units U18–U19 remain pending.
 
@@ -111,6 +114,11 @@ This checkpoint covers the catalog foundation and video metadata providers.
   snapshot. The 38-test rerun covered all six after the unit was separated.
   Scoped PHPStan and imports passed. Deptrac reported zero violations and 451
   existing skipped violations.
+
+- U12 passed 70 focused CI-image tests with 1,055 assertions for metadata,
+  artwork and person identity. The fresh-install suite passed 26 tests with 468
+  assertions. Scoped PHPStan and imports passed. Deptrac reported zero violations
+  and 439 existing skipped violations.
 
 ## Roadmap open items, 2026-11-26
 

@@ -782,6 +782,8 @@ services:
         alias: App\Catalog\Application\Service\VideoMatch\VideoMatchRefresh
     App\Catalog\Application\Port\VideoMatchRefreshStoreInterface:
         alias: App\Catalog\Infrastructure\VideoMatch\VideoMatchRefresher
+    App\Media\Application\Port\VideoArtworkImportInterface:
+        alias: App\Media\Infrastructure\ManagedVideoArtworkImporter
     App\Catalog\Application\Port\ArtistPortInterface:
         alias: App\Catalog\Infrastructure\ArtistService
     App\Catalog\Application\Port\ArtistIdentityResolverInterface:

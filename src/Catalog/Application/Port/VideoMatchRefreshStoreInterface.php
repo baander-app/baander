@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Catalog\Application\Port;
 
 use App\Catalog\Application\Dto\ResolvedVideoMatch;
+use App\Catalog\Application\Dto\PreparedVideoMatchMetadata;
 use App\Catalog\Application\Message\RefreshVideoMatchMessage;
 use App\Metadata\Application\DTO\Video\VideoProviderId;
 use App\Metadata\Application\DTO\Video\VideoRequest;
@@ -16,5 +17,6 @@ interface VideoMatchRefreshStoreInterface
         VideoProviderId $provider,
         VideoRequest $request,
         ResolvedVideoMatch $match,
+        ?PreparedVideoMatchMetadata $prepared,
     ): bool;
 }

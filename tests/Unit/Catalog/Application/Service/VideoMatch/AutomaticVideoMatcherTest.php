@@ -4,6 +4,13 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Catalog\Application\Service\VideoMatch;
 
+use App\Catalog\Application\CommandHandler\VideoMatch\ApplyVideoMatchHandler;
+use App\Catalog\Application\Port\GenrePortInterface;
+use App\Catalog\Application\Port\PersonCreditPortInterface;
+use App\Catalog\Domain\Repository\MovieRepositoryInterface;
+use App\Catalog\Domain\Repository\TvCatalogRepositoryInterface;
+use App\Media\Application\Port\VideoArtworkImportInterface;
+use App\Metadata\Application\Port\PersonProfileSyncRequestInterface;
 use App\Catalog\Application\Dto\ResolvedVideoMatch;
 use App\Catalog\Application\Port\VideoMatchApplyInterface;
 use App\Catalog\Application\Port\VideoMatchTargetLoaderInterface;
@@ -286,7 +293,20 @@ final class AutomaticVideoMatcherTest extends TestCase
         if ($order !== null) {
             $orders->method('findByLibrary')->willReturn(LibraryProviderOrder::fromProviders($this->library, $order, $order));
         }
-        return new AutomaticVideoMatcher($this->targets, $this->providers, new LibraryProviderOrderService($libraries, $this->providers, $orders), $this->pauses, new VideoMatchConfidence(), $this->apply, $this->clock, new VideoMatchStructureLookup($this->providers));
+                $metadata = new ApplyVideoMatchHandler(
+            $this->createStub(MovieRepositoryInterface::class),
+            $this->createStub(TvCatalogRepositoryInterface::class),
+            $this->createStub(PersonCreditPortInterface::class),
+            $this->createStub(GenrePortInterface::class),
+            $this->createStub(VideoArtworkImportInterface::class),
+            $this->createStub(PersonProfileSyncRequestInterface::class),
+        );
+
+        return new AutomaticVideoMatcher(
+            $this->targets, $this->providers, new LibraryProviderOrderService($libraries, $this->providers, $orders),
+            $this->pauses, new VideoMatchConfidence(), $this->apply, $this->clock,
+            new VideoMatchStructureLookup($this->providers), $metadata,
+        );
     }
 
     private function claim(VideoKind $kind): VideoMatchState

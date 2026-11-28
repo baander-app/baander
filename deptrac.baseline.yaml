@@ -122,11 +122,6 @@ deptrac:
       - App\Catalog\Application\Port\SongPortInterface
     App\Metadata\Application\MetadataSyncOrchestrator:
       - App\Library\Application\Port\LibraryPortInterface
-    App\Metadata\Application\MovieMetadataEnricher:
-      - App\Catalog\Application\Port\GenrePortInterface
-      - App\Catalog\Domain\Model\Movie
-      - App\Metadata\Infrastructure\Api\Tmdb\DTO\TmdbMovieDto
-      - App\Metadata\Infrastructure\Api\Tmdb\TmdbAdapter
     App\Metadata\Application\SongMetadataEnricher:
       - App\Catalog\Application\Port\GenrePortInterface
       - App\Catalog\Application\Port\SongPortInterface

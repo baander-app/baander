@@ -11,7 +11,6 @@ use App\Metadata\Application\Message\SyncArtistsMessage;
 use App\Metadata\Application\Message\SyncGenresMessage;
 use App\Metadata\Application\Message\SyncLibraryMessage;
 use App\Metadata\Application\Message\SyncSongMessage;
-use App\Metadata\Application\Message\SyncMovieMessage;
 use App\Metadata\Application\Port\MetadataAdminPortInterface;
 use App\Metadata\Application\Settings\MetadataProvider;
 use App\Metadata\Application\Settings\MetadataProviderSwitches;
@@ -29,7 +28,6 @@ final class MetadataAdminService implements MetadataAdminPortInterface
         SyncGenresMessage::class,
         SyncAlbumMessage::class,
         SyncSongMessage::class,
-        SyncMovieMessage::class,
         SyncArtistsMessage::class,
         SyncArtistMessage::class,
     ];

@@ -9,6 +9,13 @@ use App\Shared\Domain\Model\Uuid;
 interface PersonCreditPortInterface
 {
     /**
+     * Synchronize all titles in one placement transaction under one sorted lock set.
+     *
+     * @param list<PersonCreditTargetInput> $targets
+     */
+    public function syncCredits(array $targets): bool;
+
+    /**
      * The caller owns the transaction. Null means the provider partition was unavailable.
      *
      * @param list<PersonCreditInput>|null $cast

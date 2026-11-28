@@ -30,21 +30,20 @@ make exec cmd="php bin/console app:metadata:sync --json"
 ## Details
 
 Without a source, the command queues one job per library, one Artist sync and one
-Person sync. A music library job queues its albums and songs. A movie library job
-queues its movies. A TV library job refreshes registered series and episodes.
+Person sync. A music library job queues its albums and songs. A movie or TV library
+job queues a refresh for the library's matched titles.
 
 An album sync requests the album's MusicBrainz match, whatever the `metadata.auto_sync` setting says, unless the album has nothing to match; the album match queue then runs it as [Automatic matching](../media/musicbrainz-matching.md#automatic-matching) describes. A confident match sets IDs and artist credits and fills empty fields, and never replaces a field that holds a value; any other album is left for review. A song sync adds the genres of the MusicBrainz recording found for the song's title and writes nothing else.
 
-A movie sync uses the stored TMDB ID or searches by title and year when the ID
-is missing. It skips a conflicting match that belongs to another local movie.
-Enrichment fills missing metadata and credits. Cast and crew can be accepted
-independently. A forced refresh can replace either complete set, including a
-successful empty result. If a partition is unavailable, its stored credits
-remain. The command has no force option. Use `--refresh-credits` on the TV registration commands to replace registered
-TV credits.
+A video refresh uses the provider and entry ID already stored on each movie or
+series. For a series, it also uses the stored episode ordering. Locked fields
+keep their current values. Cast and crew are handled separately. When the provider
+omits either list, the stored credits for that list remain. [Metadata context](../../part-2-developer-guide/contexts/metadata.md#commands-and-handlers).
 
-Screen credits store TMDB person IDs and queue profile enrichment. Workers
-need `TMDB_BEARER_TOKEN` for these requests.
+Screen credits use the person IDs supplied by the matched provider to resolve
+People. Changed credits queue profile enrichment after the metadata is saved.
+Workers need `TMDB_BEARER_TOKEN` for TMDB requests and
+`TVDB_API_KEY` for TheTVDB requests.
 [Worker configuration](../media/external-apis.md#configuration),
 [People and credits](../media/library-management.md#people-and-credits).
 

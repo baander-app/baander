@@ -1040,6 +1040,13 @@
       "foreign_key": "session_id",
       "action": "CASCADE",
       "capture": "child-row-or-exempt"
+    },
+    {
+      "parent": "libraries",
+      "child": "images",
+      "foreign_key": "library_id",
+      "action": "CASCADE",
+      "capture": "child-row-or-exempt"
     }
   ],
   "sources": [
@@ -1276,10 +1283,10 @@
       "mapping": "src/Media/Infrastructure/Doctrine/Entity/ImageEntity.php",
       "classification": "capture",
       "operations": ["INSERT", "UPDATE", "DELETE"],
-      "relevant_columns": ["id", "path", "extension", "mime_type", "blurhash", "public_id", "size", "width", "height", "imageable_type", "album_id", "artist_id", "playlist_id", "created_at"],
+      "relevant_columns": ["id", "path", "extension", "mime_type", "blurhash", "public_id", "size", "width", "height", "imageable_type", "album_id", "artist_id", "playlist_id", "created_at", "library_id"],
       "excluded_columns": ["updated_at"],
       "families": ["catalog", "playlists", "activity", "admin-media"],
-      "scope_routes": ["image"],
+      "scope_routes": ["image", "library"],
       "readers": ["src/Media/Infrastructure/Doctrine/Repository/ImageRepository.php"],
       "response_cache": "authoritative-read"
     },

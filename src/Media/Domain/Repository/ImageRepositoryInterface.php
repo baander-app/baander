@@ -52,9 +52,9 @@ interface ImageRepositoryInterface
      */
     public function findByOwner(string $imageableType, Uuid $ownerId): array;
 
-    /**
-     * Find the primary/first image for a given owner.
-     */
+    /** @return list<Image> */
+    public function findManagedVideoArtwork(Uuid $libraryId, string $pathPrefix): array;
+
     public function findPrimaryForOwner(string $imageableType, Uuid $ownerId): ?Image;
 
     /**

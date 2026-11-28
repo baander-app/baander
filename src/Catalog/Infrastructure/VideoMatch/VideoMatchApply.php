@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Catalog\Infrastructure\VideoMatch;
 
+use App\Catalog\Application\CommandHandler\VideoMatch\ApplyVideoMatchHandler;
+use App\Catalog\Application\Dto\PreparedVideoMatchMetadata;
 use App\Catalog\Application\Dto\ResolvedVideoMatch;
 use App\Catalog\Application\Port\VideoMatchApplyInterface;
 use App\Catalog\Application\Service\VideoMatch\VideoMatchTarget;
@@ -34,19 +36,28 @@ final readonly class VideoMatchApply implements VideoMatchApplyInterface
         private TvCatalogRepositoryInterface $catalog,
         private ClockInterface $clock,
         private VideoPlacementService $placements,
+        private ApplyVideoMatchHandler $metadata,
     ) {}
 
-    public function apply(VideoMatchState $claim, VideoMatchTarget $target, VideoProviderId $provider, ResolvedVideoMatch $match): bool
-    {
+    public function apply(
+        VideoMatchState $claim,
+        VideoMatchTarget $target,
+        VideoProviderId $provider,
+        ResolvedVideoMatch $match,
+        PreparedVideoMatchMetadata $prepared,
+    ): bool {
         $claimId = $claim->claimId;
-        if ($claimId === null || !self::owns($claim, $target) || !$provider->serves($target->request->kind)) {
+        $library = $target->request->libraryId;
+        if ($claimId === null || !self::owns($claim, $target) || !$provider->serves($target->request->kind)
+            || $prepared->metadata !== $match->metadata || $library === null || !$library->equals($prepared->libraryId)
+        ) {
             return false;
         }
 
-        return $this->transaction->run(function () use ($claim, $claimId, $target, $provider, $match): bool {
+        return $this->transaction->run(function () use ($claim, $claimId, $target, $provider, $match, $prepared, $library): bool {
             // Lock the title before its FK-dependent claim row, as a title delete does.
             $title = $this->lockTitle($target);
-            if ($title === null || $target->request->libraryId?->equals($title->getLibraryId()) !== true
+            if ($title === null || !$library->equals($title->getLibraryId())
                 || ($title instanceof TvSeries && ($title->getOrdering() !== $target->request->ordering
                     || !$match->metadata->hasOrdering($match->ordering)))
             ) {
@@ -74,8 +85,9 @@ final readonly class VideoMatchApply implements VideoMatchApplyInterface
                 $this->movies->saveMatchIdentity($title);
             } else {
                 $this->catalog->saveSeries($title);
-                $this->catalog->flush();
             }
+            $this->metadata->apply($title, $provider, $prepared);
+            $this->catalog->flush();
 
             return true;
         });

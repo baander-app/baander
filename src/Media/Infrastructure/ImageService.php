@@ -52,6 +52,11 @@ final class ImageService implements ImagePortInterface
         return $this->imageRepository->findByOwner($imageableType, $ownerId);
     }
 
+    public function findManagedVideoArtwork(Uuid $libraryId, string $pathPrefix): array
+    {
+        return $this->imageRepository->findManagedVideoArtwork($libraryId, $pathPrefix);
+    }
+
     public function findPrimaryForOwner(string $imageableType, Uuid $ownerId): ?Image
     {
         return $this->imageRepository->findPrimaryForOwner($imageableType, $ownerId);

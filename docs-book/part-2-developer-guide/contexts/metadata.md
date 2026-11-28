@@ -1,6 +1,6 @@
 # Metadata
 
-The Metadata context enriches catalog entities with data from external music and movie APIs: Discogs, Last.fm, Spotify, MusicBrainz, TasteDive, CoverArtArchive, and TMDB (`TmdbAdapter` and `MovieMetadataEnricher`). It handles metadata matching (pairing scanned files with external records), cover art retrieval, and audio file tag parsing through the [media metadata package](../../../packages/baander-media-metadata/README.md).
+The Metadata context reads external music data from Discogs, Last.fm, Spotify, MusicBrainz, TasteDive, and Cover Art Archive. It supplies video metadata from TMDB, TheTVDB, and local NFO files through `VideoMetadataPortInterface`. It handles cover art retrieval and parses audio tags through the [media metadata package](../../../packages/baander-media-metadata/README.md).
 
 ## Domain Models
 
@@ -17,14 +17,16 @@ The Metadata context enriches catalog entities with data from external music and
 |---------|---------|---------|
 | `ExtractAlbumCoverCommand` | `ExtractAlbumCoverHandler` | Extract and store cover art from an album |
 | `SyncMetadataCommand` | `SyncMetadataHandler` | The admin sync: without a source, one `SyncLibraryMessage` per library and one `SyncArtistsMessage`; with the `genres` source, only `SyncGenresMessage`. Returns the number of jobs queued |
-| `SyncLibraryMessage` | `SyncLibraryHandler` | Queue a `SyncAlbumMessage` for every album in a library and, with `includeSongs`, a `SyncSongMessage` for each of its songs |
+| `SyncLibraryMessage` | `SyncLibraryHandler` | Queue a `SyncAlbumMessage` for every album in a library and, with `includeSongs`, a `SyncSongMessage` for each of its songs. Request a Catalog refresh for the library's matched movie and TV titles |
 | `SyncAlbumMessage` | Catalog's `RequestAlbumMatchHandler` | Request the album's MusicBrainz match in Catalog's album match queue, as an admin request |
 | `SyncArtistsMessage` | Catalog's `QueueArtistSyncsHandler` | Queue a `SyncArtistMessage` for every artist with a MusicBrainz ID and missing details |
 | `SyncArtistMessage` | Catalog's `SyncArtistHandler` | Fill one artist's empty details from MusicBrainz by the ID it holds |
 | `SyncGenresMessage` | `SyncGenresHandler` | Queue a `SyncAlbumMessage` for every album and a `SyncSongMessage` for each of its songs; returns the number queued |
 | `SyncSongMessage` | `SyncSongHandler` | Add the genres of the MusicBrainz recording found for the song's title |
 
-Application enricher services (`SongMetadataEnricher`, and `MovieMetadataEnricher` in `Application/MovieMetadataEnricher.php`) perform the external lookups and write enriched fields and genres back to Catalog through its ports. `SongMetadataEnricher` writes genres only, and a forced run adds them the same way; a song's recording ID comes only from a Catalog match. Metadata has no album enricher: an album's MusicBrainz data comes from a match in Catalog, and no album lookup falls back to Discogs. Metadata has no artist enricher either: an artist's details come from Catalog's [artist sync](catalog-matching.md#artist-sync), by the MusicBrainz ID the artist holds.
+`SongMetadataEnricher` writes only genres through Catalog's ports. A forced run adds them the same way. Catalog matching is the only source of a song's recording ID. Catalog uses MusicBrainz for album matches and looks up artists by their stored MusicBrainz IDs. See [artist sync](catalog-matching.md#artist-sync).
+
+Catalog owns video matching and persists the provider's answer. Metadata's `VideoMetadataPortInterface` returns a movie or series with its artwork and credits, and includes episode structure under the requested ordering for series. `SyncLibraryHandler` asks Catalog to queue matched titles through `VideoMatchRefreshInterface`. See [`VideoMetadataPortInterface`](../../../src/Metadata/Application/Port/VideoMetadataPortInterface.php) and [`SyncLibraryHandler`](../../../src/Metadata/Application/MessageHandler/SyncLibraryHandler.php).
 
 ## Album Syncs and Automatic Matching
 
@@ -87,11 +89,12 @@ Routes under `/api/admin/metadata` (controller `MetadataAdminController`, gated 
 | Direction | Context | Relationship |
 |-----------|---------|-------------|
 | Depends on | Shared | Uses `Uuid` for identifiers, `PublicHttpClient` and `Async` for external HTTP calls, and `SettingDefinitionProviderInterface` to define `metadata.auto_sync` |
-| Depends on | Catalog | Reads and updates albums, songs, movies, and genres via `AlbumPortInterface`, `SongPortInterface`, `MoviePortInterface`, and `GenrePortInterface`; `MetadataContentReader` implements `MetadataContentReaderPortInterface` |
+| Depends on | Catalog | Reads and updates albums, songs, and genres via `AlbumPortInterface`, `SongPortInterface`, and `GenrePortInterface`. Requests video refreshes through `VideoMatchRefreshInterface`. `MetadataContentReader` implements `MetadataContentReaderPortInterface` |
 | Depends on | Library | `MetadataSyncOrchestrator` looks up libraries through `LibraryPortInterface`. `MediaFileMetadata` and `ExtractAlbumCoverHandler` resolve files inside a library through `LibraryMediaFileResolverInterface` (the Library Media Files Contract) |
 | Depends on | Media | `ExtractAlbumCoverHandler` stores cover art via `ImagePortInterface` and `StoragePortInterface` |
 | Depended on by | Catalog | Ingest reads embedded tags via `MetadataContentReaderPortInterface` and dispatches `ExtractAlbumCoverCommand`. `RequestAlbumMatchHandler` handles `SyncAlbumMessage`, `QueueArtistSyncsHandler` and `SyncArtistHandler` handle `SyncArtistsMessage` and `SyncArtistMessage`, and the album match queue and the artist sync requester read `metadata.auto_sync` through `MetadataSettingDefinitions` (the `Metadata Sync Contract` Deptrac layer) |
 | Depended on by | Catalog | MusicBrainz matching and the artist sync search and read MusicBrainz through `MusicBrainzLookupInterface` (the `Metadata MusicBrainz Lookup Contract` Deptrac layer) |
+| Depended on by | Catalog | Video matching and refresh call `VideoMetadataPortInterface` for provider search and identification |
 
 ## Infrastructure
 

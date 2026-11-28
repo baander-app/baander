@@ -86,10 +86,10 @@ final class PersonIdentityPersistenceTest extends TestCase
     {
         $movie = $this->movie();
         $cast = [
-            new PersonCreditInput('22', 'Alex Fields', 'cast', 'actor', 'Actor', 'Pilot', providerCreditId: 'cast-1'),
-            new PersonCreditInput('22', 'Alex Fields', 'cast', 'actor', 'Actor', 'Navigator', providerCreditId: 'cast-2'),
+            new PersonCreditInput(['tmdb_person' => '22'], 'Alex Fields', 'cast', 'actor', 'Actor', 'Pilot', providerCreditId: 'cast-1'),
+            new PersonCreditInput(['tmdb_person' => '22'], 'Alex Fields', 'cast', 'actor', 'Actor', 'Navigator', providerCreditId: 'cast-2'),
         ];
-        $crew = [new PersonCreditInput('22', 'Alex Fields', 'crew', 'director', 'Director', providerCreditId: 'crew-1')];
+        $crew = [new PersonCreditInput(['tmdb_person' => '22'], 'Alex Fields', 'crew', 'director', 'Director', providerCreditId: 'crew-1')];
         self::assertTrue($this->transaction->run(fn() => $this->credits->syncMovieCredits($movie, $cast, $crew)));
         $credits = $this->connection->fetchFirstColumn('SELECT id FROM movie_person_credits ORDER BY credit_key');
         self::assertCount(3, $credits);
@@ -105,7 +105,7 @@ final class PersonIdentityPersistenceTest extends TestCase
     public function testProviderEvidenceAndOperatorCorrectionConvergeOnOneIdentity(): void
     {
         $movie = $this->movie();
-        $screenCredit = new PersonCreditInput('22', 'Alex Fields', 'crew', 'director', 'Director');
+        $screenCredit = new PersonCreditInput(['tmdb_person' => '22'], 'Alex Fields', 'crew', 'director', 'Director');
         $this->transaction->run(fn() => $this->credits->syncMovieCredits($movie, null, [$screenCredit]));
         $mbid = Uuid::v7()->toString();
         $matched = $this->transaction->run(fn() => $this->identities->resolve([
@@ -131,8 +131,8 @@ final class PersonIdentityPersistenceTest extends TestCase
     public function testLateIdentificationRecordsAConflictAndMergeRetainsBothPublicIds(): void
     {
         $movie = $this->movie();
-        $director = new PersonCreditInput('22', 'Alex Fields', 'crew', 'director', 'Director');
-        $writer = new PersonCreditInput('23', 'Alex Fields', 'crew', 'writer', 'Writer');
+        $director = new PersonCreditInput(['tmdb_person' => '22'], 'Alex Fields', 'crew', 'director', 'Director');
+        $writer = new PersonCreditInput(['tmdb_person' => '23'], 'Alex Fields', 'crew', 'writer', 'Writer');
         $this->transaction->run(fn() => $this->credits->syncMovieCredits($movie, null, [$director, $writer]));
         $source = $this->identities->owner('tmdb_person', '22');
         $survivor = $this->identities->owner('tmdb_person', '23');
@@ -204,7 +204,7 @@ final class PersonIdentityPersistenceTest extends TestCase
     {
         $movie = $this->movie();
         $this->transaction->run(fn () => $this->credits->syncMovieCredits($movie, null, [
-            new PersonCreditInput('22', 'Imported Person', 'crew', 'director', 'Director'),
+            new PersonCreditInput(['tmdb_person' => '22'], 'Imported Person', 'crew', 'director', 'Director'),
         ]));
         $source = $this->identities->owner('tmdb_person', '22');
         $sourcePublicId = $this->connection->fetchOne('SELECT public_id FROM people WHERE id = ?', [$source]);

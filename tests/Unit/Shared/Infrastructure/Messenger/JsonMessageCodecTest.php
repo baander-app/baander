@@ -21,7 +21,6 @@ use App\Metadata\Application\Message\SyncAlbumMessage;
 use App\Metadata\Application\Message\SyncArtistMessage;
 use App\Metadata\Application\Message\SyncArtistsMessage;
 use App\Metadata\Application\Message\SyncLibraryMessage;
-use App\Metadata\Application\Message\SyncMovieMessage;
 use App\Metadata\Application\Message\SyncPeopleMessage;
 use App\Metadata\Application\Message\SyncSongMessage;
 use App\Notification\Application\DTO\SendEmailCommand;
@@ -73,7 +72,6 @@ final class JsonMessageCodecTest extends TestCase
         yield [new ExtractAlbumCoverCommand($id)];
         yield [new FetchLyricsCommand($id)];
         yield [new SyncSongMessage($id, true)];
-        yield [new SyncMovieMessage($id, true)];
         yield [new SyncPeopleMessage()];
         yield [new SyncPeopleMessage('42')];
         yield [new SyncAlbumMessage($id)];

@@ -324,7 +324,7 @@ deptrac:
     - name: 'Catalog Person Contract'
       collectors:
         - type: classLike
-          value: '^App\\Catalog\\Application\\Port\\(PersonCreditInput|PersonCreditPortInterface|PersonIdentityPortInterface|PersonPortraitAccessPortInterface)$'
+          value: '^App\\Catalog\\Application\\Port\\(PersonCreditInput|PersonCreditTargetInput|PersonCreditPortInterface|PersonIdentityPortInterface|PersonPortraitAccessPortInterface)$'
 
     - name: 'Catalog Application'
       collectors:
@@ -345,7 +345,7 @@ deptrac:
               value: '^App\\Catalog\\Application\\Port\\(MoviePortInterface|DirectorPortInterface|DirectorCredit)$'
 
             - type: classLike
-              value: '^App\\Catalog\\Application\\Port\\(PersonCreditInput|PersonCreditPortInterface|PersonIdentityPortInterface|PersonPortraitAccessPortInterface)$'
+              value: '^App\\Catalog\\Application\\Port\\(PersonCreditInput|PersonCreditTargetInput|PersonCreditPortInterface|PersonIdentityPortInterface|PersonPortraitAccessPortInterface)$'
 
     # These mappings reference the foreign rows targeted by the catalog's persistent FKs.
     - name: 'Catalog Persistence Associations'
@@ -539,7 +539,7 @@ deptrac:
     - name: 'Media Image Contract'
       collectors:
         - type: classLike
-          value: '^App\\Media\\(Application\\Port\\(ImagePortInterface|StoragePortInterface)|Domain\\Model\\(Image|ImageState|StoredFile)|Domain\\ReadModel\\ImageReadView)$'
+          value: '^App\\Media\\(Application\\(Port\\(ImagePortInterface|StoragePortInterface|VideoArtworkImportInterface)|DTO\\PreparedVideoArtwork)|Domain\\Model\\(Image|ImageState|StoredFile)|Domain\\ReadModel\\ImageReadView)$'
 
     - name: 'Media Domain'
       collectors:
@@ -549,7 +549,7 @@ deptrac:
               value: '^App\\Media\\Domain\\'
           must_not:
             - type: classLike
-              value: '^App\\Media\\(Application\\Port\\(ImagePortInterface|StoragePortInterface)|Domain\\Model\\(Image|ImageState|StoredFile)|Domain\\ReadModel\\ImageReadView)$'
+              value: '^App\\Media\\(Application\\(Port\\(ImagePortInterface|StoragePortInterface|VideoArtworkImportInterface)|DTO\\PreparedVideoArtwork)|Domain\\Model\\(Image|ImageState|StoredFile)|Domain\\ReadModel\\ImageReadView)$'
 
     - name: 'Media Playback Access Contract'
       collectors:
@@ -573,7 +573,7 @@ deptrac:
             - type: classLike
               value: '^App\\Media\\Application\\Port\\PlaybackMediaAccessInterface$'
             - type: classLike
-              value: '^App\\Media\\(Application\\Port\\(ImagePortInterface|StoragePortInterface)|Domain\\Model\\(Image|ImageState|StoredFile)|Domain\\ReadModel\\ImageReadView)$'
+              value: '^App\\Media\\(Application\\(Port\\(ImagePortInterface|StoragePortInterface|VideoArtworkImportInterface)|DTO\\PreparedVideoArtwork)|Domain\\Model\\(Image|ImageState|StoredFile)|Domain\\ReadModel\\ImageReadView)$'
 
     - name: 'Media Infrastructure'
       collectors:
@@ -1691,6 +1691,7 @@ deptrac:
       - 'Shared Domain'
       - 'Shared Application'
     'Media Infrastructure':
+      - 'Filesystem MIME Contract'
       - 'Catalog Person Contract'
       - Core
       - 'Image Processing'
@@ -1745,7 +1746,6 @@ deptrac:
       - 'Catalog Video Refresh Contract'
       - 'Catalog Person Contract'
       - 'Metadata Person Provider Contract'
-      - 'Catalog Movie Contract'
       - 'Catalog Director Contract'
       - 'Library Media Files Contract'
       - Core

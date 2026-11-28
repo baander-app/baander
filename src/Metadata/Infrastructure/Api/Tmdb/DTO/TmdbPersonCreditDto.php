@@ -30,7 +30,7 @@ final class TmdbPersonCreditDto
             }
             $path = self::text($member['profile_path'] ?? null);
             $credits[] = new PersonCreditInput(
-                tmdbId: (string) $member['id'],
+                identifiers: ['tmdb_person' => (string) $member['id']],
                 name: $member['name'],
                 category: $category,
                 role: $category === 'cast' ? 'actor' : self::role($job),

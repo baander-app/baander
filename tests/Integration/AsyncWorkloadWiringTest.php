@@ -22,8 +22,8 @@ final class AsyncWorkloadWiringTest extends KernelTestCase
         self::bootKernel();
         $container = self::getContainer();
         $catalog = $container->get(AsyncWorkloadCatalog::class);
-        self::assertCount(27, $catalog->workloads());
-        self::assertCount(25, array_filter($catalog->workloads(), static fn (array $workload): bool => $workload['default']));
+        self::assertCount(26, $catalog->workloads());
+        self::assertCount(24, array_filter($catalog->workloads(), static fn (array $workload): bool => $workload['default']));
         self::assertSame(['transport' => 'async', 'resource_class' => 'io', 'default' => true], $catalog->workloads()[DrainAlbumMatchesMessage::class]);
         self::assertSame(['transport' => 'async', 'resource_class' => 'io', 'default' => true], $catalog->workloads()[DrainVideoMatchesMessage::class]);
         self::assertSame(['transport' => 'async', 'resource_class' => 'io', 'default' => true], $catalog->workloads()[RefreshVideoMatchMessage::class]);

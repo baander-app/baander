@@ -467,6 +467,9 @@ final class MovieRepository implements MovieRepositoryInterface
 
     private function syncMetadataToEntity(Movie $movie, MovieEntity $entity): void
     {
+        $entity->setTitle($movie->getTitle());
+        $entity->setYear($movie->getYear());
+        $entity->setSummary($movie->getSummary());
         $entity->setTmdbId($movie->getTmdbId());
         $entity->setImdbId($movie->getImdbId());
         $entity->setOverview($movie->getOverview());

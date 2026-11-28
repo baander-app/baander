@@ -75,8 +75,8 @@ final class ScreenCreditBackfillTest extends TestCase
         $identities = new PersonIdentityRepository($this->connection, $transaction, $this->manager);
         $credits = new PersonCreditRepository($this->connection, $identities);
         $crew = [
-            new PersonCreditInput('41', 'Existing Director', 'crew', 'director', 'Director', department: 'Directing', creditedName: 'A. Director', billingOrder: 7, providerCreditId: 'director-provider-41'),
-            new PersonCreditInput('43', 'Screenwriter', 'crew', 'writer', 'Writer', department: 'Writing', providerCreditId: 'writer-provider-43'),
+            new PersonCreditInput(['tmdb_person' => '41'], 'Existing Director', 'crew', 'director', 'Director', department: 'Directing', creditedName: 'A. Director', billingOrder: 7, providerCreditId: 'director-provider-41'),
+            new PersonCreditInput(['tmdb_person' => '43'], 'Screenwriter', 'crew', 'writer', 'Writer', department: 'Writing', providerCreditId: 'writer-provider-43'),
         ];
 
         self::assertTrue($transaction->run(fn () => $credits->syncMovieCredits($movie->getId(), null, $crew)));

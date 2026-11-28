@@ -27,6 +27,7 @@ final class Image
         ?Uuid $albumId = null,
         ?Uuid $artistId = null,
         ?Uuid $playlistId = null,
+        ?Uuid $libraryId = null,
     ): self {
         if ($path === '') {
             throw new InvalidArgumentException('Image path cannot be empty.');
@@ -48,12 +49,18 @@ final class Image
             playlistId: $playlistId,
             createdAt: new DateTimeImmutable(),
             updatedAt: new DateTimeImmutable(),
+            libraryId: $libraryId,
         ));
     }
 
     public static function reconstitute(ImageState $state): self
     {
         return new self($state);
+    }
+
+    public function getLibraryId(): ?Uuid
+    {
+        return $this->state->libraryId;
     }
 
     public function setBlurhash(string $blurhash): void

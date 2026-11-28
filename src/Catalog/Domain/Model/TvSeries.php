@@ -11,6 +11,8 @@ use InvalidArgumentException;
 
 final class TvSeries
 {
+    private const array METADATA_FIELDS = ['name', 'overview', 'posterUrl', 'backdropUrl', 'year'];
+
     private function __construct(private TvSeriesState $state) {}
 
     public static function create(Uuid $libraryId, string $folderPath, string $name, ?int $year = null): self
@@ -81,6 +83,46 @@ final class TvSeries
         $this->state->backdropUrl = $backdropUrl;
         $this->state->year = $year;
         $this->state->updatedAt = new DateTimeImmutable();
+        foreach (self::METADATA_FIELDS as $field) {
+            $this->lockField($field);
+        }
+    }
+
+    /** @param array<string, string|int|null> $values */
+    public function applyProviderMetadata(array $values, bool $force = false): void
+    {
+        $current = [
+            'name' => $this->state->name,
+            'overview' => $this->state->overview,
+            'posterUrl' => $this->state->posterUrl,
+            'backdropUrl' => $this->state->backdropUrl,
+            'year' => $this->state->year,
+        ];
+        $merged = ProviderMetadataFields::merge($current, $this->state->providerFields, $values, $this->state->lockedFields, $force);
+        $fields = $merged['values'];
+        $name = ProviderMetadataFields::text($fields['name']) ?? '';
+        self::assertName($name);
+        $this->state->name = $name;
+        $this->state->overview = ProviderMetadataFields::text($fields['overview']);
+        $this->state->posterUrl = ProviderMetadataFields::text($fields['posterUrl']);
+        $this->state->backdropUrl = ProviderMetadataFields::text($fields['backdropUrl']);
+        $this->state->year = ProviderMetadataFields::number($fields['year']);
+        $this->state->providerFields = $merged['providerFields'];
+        $this->state->updatedAt = new DateTimeImmutable();
+    }
+
+    public function lockField(string $field): void
+    {
+        LockedFields::assertLockable(self::METADATA_FIELDS, $field, 'lock');
+        if (!in_array($field, $this->state->lockedFields, true)) {
+            $this->state->lockedFields[] = $field;
+        }
+    }
+
+    /** @return list<string> */
+    public function getLockedFields(): array
+    {
+        return $this->state->lockedFields;
     }
 
     private static function assertName(string $name): void
@@ -102,5 +144,7 @@ final class TvSeries
     public function getExternalIds(): array { return $this->state->externalIds; }
     public function getOrdering(): string { return $this->state->ordering; }
     public function isHandMatched(): bool { return $this->state->handMatched; }
+    public function getPosterUrl(): ?string { return $this->state->posterUrl; }
+    public function getBackdropUrl(): ?string { return $this->state->backdropUrl; }
     public function getState(): TvSeriesState { return $this->state; }
 }

@@ -4,6 +4,11 @@ declare(strict_types=1);
 
 namespace App\Tests\Integration;
 
+use App\Catalog\Application\CommandHandler\VideoMatch\ApplyVideoMatchHandler;
+use App\Catalog\Application\Port\GenrePortInterface;
+use App\Catalog\Application\Port\PersonCreditPortInterface;
+use App\Media\Application\Port\VideoArtworkImportInterface;
+use App\Metadata\Application\Port\PersonProfileSyncRequestInterface;
 use App\Activity\Application\Port\WatchedMarkMovePortInterface;
 use App\Catalog\Application\Command\RefreshVideoMatchesCommand;
 use App\Catalog\Application\CommandHandler\RefreshVideoMatchesHandler;
@@ -163,6 +168,7 @@ final class VideoMatchRefreshTest extends TestCase
         $restoredNumber = $this->episodeNumber($episode);
         $refresher->refresh($message);
         self::assertSame([5, 5], [$restoredNumber, $this->episodeNumber($episode)]);
+        self::assertSame(['name' => 'Show', 'overview' => 'Refreshed overview'], $this->connection->fetchAssociative('SELECT name, overview FROM tv_series'));
         $fresh = $this->catalog->findPlacement($series->getLibraryId(), $placement->getVideoId());
         self::assertNotNull($fresh);
         self::assertTrue($fresh->isAssigned());
@@ -252,6 +258,7 @@ final class VideoMatchRefreshTest extends TestCase
         $series = TvSeries::create($library, 'Show', 'Show');
         $series->match('tvdb', '10', ['tmdb' => '42'], handMatched: true);
         $series->setOrdering('dvd-group', ['dvd-group']);
+        $series->lockField('name');
         $this->catalog->saveSeries($series);
         $this->catalog->flush();
         $season = TvSeason::create($series->getId(), 1);
@@ -286,7 +293,8 @@ final class VideoMatchRefreshTest extends TestCase
     private static function dvd(int $number): VideoTitle
     {
         return new VideoTitle(
-            new VideoCandidate('10', 'Show'),
+            new VideoCandidate('10', 'Provider Show'),
+            overview: 'Refreshed overview',
             orderings: [new VideoOrdering('dvd-group', 'DVD', 'dvd')],
             seasons: [new VideoSeason(1, episodes: [new VideoEpisode('99', $number, 'Episode', absoluteNumber: 1)])],
         );
@@ -312,6 +320,15 @@ final class VideoMatchRefreshTest extends TestCase
             $this->createStub(VideoAvailabilityPortInterface::class),
         );
 
+        $metadata = new ApplyVideoMatchHandler(
+            $this->movies,
+            $this->catalog,
+            $this->createStub(PersonCreditPortInterface::class),
+            $this->createStub(GenrePortInterface::class),
+            $this->createStub(VideoArtworkImportInterface::class),
+            $this->createStub(PersonProfileSyncRequestInterface::class),
+        );
+
         return new VideoMatchRefresh(
             $this->movies,
             $this->catalog,
@@ -326,8 +343,10 @@ final class VideoMatchRefreshTest extends TestCase
                 new VideoMatchRefreshReview($this->connection),
                 $transaction,
                 new NativeClock(),
+                $metadata,
             ),
             new NullLogger(),
+            $metadata,
         );
     }
 }

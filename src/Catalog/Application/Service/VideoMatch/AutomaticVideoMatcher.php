@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Catalog\Application\Service\VideoMatch;
 
+use App\Catalog\Application\CommandHandler\VideoMatch\ApplyVideoMatchHandler;
 use App\Catalog\Application\Port\VideoMatchApplyInterface;
 use App\Catalog\Application\Port\VideoMatchTargetLoaderInterface;
 use App\Catalog\Domain\Model\VideoMatchState;
@@ -28,6 +29,7 @@ final readonly class AutomaticVideoMatcher implements AutomaticVideoMatcherInter
         private VideoMatchApplyInterface $apply,
         private ClockInterface $clock,
         private VideoMatchStructureLookup $structures,
+        private ApplyVideoMatchHandler $metadata,
     ) {}
 
     public function match(VideoMatchState $claim): VideoMatchOutcome
@@ -122,7 +124,15 @@ final readonly class AutomaticVideoMatcher implements AutomaticVideoMatcherInter
         if ($match instanceof VideoProviderProblem) {
             return $this->problem($provider, $match) ?? new VideoMatchOutcome(VideoMatchOutcomeKind::AwaitingProvider);
         }
-        if (!$this->apply->apply($claim, $target, $provider, $match)) {
+        $library = $target->request->libraryId ?? throw new \LogicException('A video match target has a library.');
+        $prepared = $this->metadata->prepare($library, $match->metadata);
+        $committed = false;
+        try {
+            $committed = $this->apply->apply($claim, $target, $provider, $match, $prepared);
+        } finally {
+            $this->metadata->discard($prepared, $committed);
+        }
+        if (!$committed) {
             return new VideoMatchOutcome(VideoMatchOutcomeKind::RetryLater, $provider, retryAt: $this->clock->now()->modify('+15 seconds'));
         }
         $this->pauses->clear($provider->value);

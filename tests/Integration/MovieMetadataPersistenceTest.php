@@ -16,6 +16,7 @@ use App\Tests\Fixtures\Catalog\ArtistImportIdentityRace;
 use App\Tests\Fixtures\Catalog\GenreImportRace;
 use App\Tests\Fixtures\Metadata\MovieMetadataRace;
 use Doctrine\DBAL\Connection;
+use Doctrine\DBAL\Exception\DriverException;
 use Doctrine\ORM\EntityManager;
 use PHPUnit\Framework\TestCase;
 
@@ -38,7 +39,7 @@ final class MovieMetadataPersistenceTest extends TestCase
         self::assertSame('read committed', $this->observer->fetchOne('SHOW default_transaction_isolation'));
         $this->observer->executeStatement('CREATE SCHEMA ' . $this->schema);
         $this->observer->executeStatement('SET search_path TO ' . $this->schema . ', public');
-        foreach (['libraries', 'movies', 'videos', 'movie_video', 'genres', 'genre_movie', 'people', 'person_external_ids', 'person_identifier_blocks', 'movie_person_credits', 'movie_person_credit_state'] as $table) {
+        foreach (['libraries', 'movies', 'videos', 'movie_video', 'genres', 'genre_movie', 'people', 'person_external_ids', 'person_identifier_blocks', 'movie_person_credits', 'movie_person_credit_state', 'video_match_states'] as $table) {
             ArtistImportIdentityRace::copyTableWithoutPgroonga($this->observer, $table);
         }
         $this->writer = ArtistImportIdentityRace::connect($this->schema);
@@ -72,7 +73,7 @@ final class MovieMetadataPersistenceTest extends TestCase
     public function testEnrichmentPreservesVideoLinksAndUnrelatedEditsCommittedDuringProviderLookup(): void
     {
         $newVideoId = null;
-        $result = MovieMetadataRace::enrich($this->manager, $this->movieId, [], function () use (&$newVideoId): void {
+        $result = MovieMetadataRace::apply($this->manager, $this->movieId, [], function () use (&$newVideoId): void {
             self::assertFalse($this->writer->isTransactionActive(), 'Provider calls precede the producer transaction.');
             $concurrent = ArtistImportIdentityRace::entityManager($this->observer);
             $movie = $concurrent->find(MovieEntity::class, $this->movieId);
@@ -86,7 +87,7 @@ final class MovieMetadataPersistenceTest extends TestCase
             $concurrent->flush();
         });
 
-        self::assertTrue($result->isSuccess());
+        self::assertTrue($result);
         self::assertSame([
             'title' => 'Concurrent title',
             'year' => 2027,
@@ -131,13 +132,15 @@ final class MovieMetadataPersistenceTest extends TestCase
                  WHERE a.application_name = ? AND l.locktype = 'advisory' AND l.granted",
                 [$child['application']],
             );
-            $expected = (string) $this->observer->fetchOne('SELECT hashtextextended(?, 20261114120000)::text', ['genre:a-' . $tag]);
+            $first = (string) $this->observer->fetchOne('SELECT hashtextextended(?, 20261114120000)::text', ['genre:a-' . $tag]);
+            $last = (string) $this->observer->fetchOne('SELECT hashtextextended(?, 20261114120000)::text', ['genre:c-' . $tag]);
         } finally {
             $this->writer->commit();
         }
 
         self::assertSame(['success' => true], ArtistImportIdentityRace::finish($child, $this->observer));
-        self::assertSame([$expected], $held);
+        self::assertContains($first, $held);
+        self::assertNotContains($last, $held);
         self::assertSame(3, (int) $this->observer->fetchOne('SELECT COUNT(*) FROM genre_movie'));
     }
 
@@ -145,14 +148,32 @@ final class MovieMetadataPersistenceTest extends TestCase
     {
         $this->observer->executeStatement("ALTER TABLE people ADD CONSTRAINT reject_provider_director CHECK (name <> 'Provider Director')");
 
-        $result = MovieMetadataRace::enrich($this->manager, $this->movieId, ['Rollback ' . bin2hex(random_bytes(6))]);
+        $this->assertFailedApplyRolledBack('reject_provider_director');
+    }
 
-        self::assertTrue($result->isFailure());
+    public function testGenreLinkFailureRollsBackMetadataGenresAndCredits(): void
+    {
+        $this->observer->executeStatement('ALTER TABLE genre_movie ADD CONSTRAINT reject_provider_genre_link CHECK (false)');
+
+        $this->assertFailedApplyRolledBack('reject_provider_genre_link');
+    }
+
+    private function assertFailedApplyRolledBack(string $constraint): void
+    {
+        try {
+            MovieMetadataRace::apply($this->manager, $this->movieId, ['Rollback ' . bin2hex(random_bytes(6))]);
+            self::fail('The forced database constraint must abort the metadata apply.');
+        } catch (DriverException $failure) {
+            self::assertSame('23514', $failure->getSQLState());
+            self::assertStringContainsString($constraint, $failure->getMessage());
+        }
+
         self::assertNull($this->observer->fetchOne('SELECT overview FROM movies'));
         self::assertSame(0, (int) $this->observer->fetchOne('SELECT COUNT(*) FROM genres'));
         self::assertSame(0, (int) $this->observer->fetchOne('SELECT COUNT(*) FROM genre_movie'));
         self::assertSame(0, (int) $this->observer->fetchOne('SELECT COUNT(*) FROM people'));
         self::assertSame(0, (int) $this->observer->fetchOne('SELECT COUNT(*) FROM movie_person_credits'));
+        self::assertSame('requested', $this->observer->fetchOne('SELECT status FROM video_match_states'));
         self::assertSame([$this->videoId->toString()], $this->observer->fetchFirstColumn('SELECT video_id::text FROM movie_video'));
     }
 }

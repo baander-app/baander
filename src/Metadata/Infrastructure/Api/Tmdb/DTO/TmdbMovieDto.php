@@ -52,7 +52,7 @@ final readonly class TmdbMovieDto
         $summaryCast = $data['credits']['cast'] ?? null;
         $cast = is_array($summaryCast) ? self::castSummary($summaryCast) : [];
         $crew = array_map(static fn(PersonCreditInput $credit): array => [
-            'id' => (int) $credit->tmdbId,
+            'id' => (int) $credit->identifiers['tmdb_person'],
             'profilePath' => $credit->profileUrl === null ? null : substr($credit->profileUrl, strlen('https://image.tmdb.org/t/p/w185')),
             'name' => $credit->name,
             'job' => $credit->job,

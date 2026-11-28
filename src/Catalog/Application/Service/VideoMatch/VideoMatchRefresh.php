@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Catalog\Application\Service\VideoMatch;
 
+use App\Catalog\Application\CommandHandler\VideoMatch\ApplyVideoMatchHandler;
 use App\Catalog\Application\Message\RefreshVideoMatchMessage;
 use App\Catalog\Application\Port\VideoMatchRefresherInterface;
 use App\Catalog\Application\Port\VideoMatchRefreshStoreInterface;
@@ -30,6 +31,7 @@ final readonly class VideoMatchRefresh implements VideoMatchRefresherInterface
         private VideoMatchStructureLookup $structures,
         private VideoMatchRefreshStoreInterface $store,
         private LoggerInterface $logger,
+        private ApplyVideoMatchHandler $metadata,
     ) {}
 
     public function refresh(RefreshVideoMatchMessage $message): void
@@ -72,7 +74,18 @@ final readonly class VideoMatchRefresh implements VideoMatchRefresherInterface
             return;
         }
 
-        $this->store->apply($message, $provider, $request, $match);
+        if ($kind === VideoKind::Series && !$match->metadata->hasOrdering($match->ordering)) {
+            $this->store->apply($message, $provider, $request, $match, null);
+
+            return;
+        }
+        $prepared = $this->metadata->prepare($title->getLibraryId(), $match->metadata);
+        $committed = false;
+        try {
+            $committed = $this->store->apply($message, $provider, $request, $match, $prepared);
+        } finally {
+            $this->metadata->discard($prepared, $committed);
+        }
     }
 
     private function providerFailure(VideoProviderId $provider, VideoRequest $request, ?VideoProviderProblem $problem): void

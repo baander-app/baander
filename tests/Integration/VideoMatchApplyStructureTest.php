@@ -32,12 +32,14 @@ use Doctrine\DBAL\Schema\Schema;
 use Doctrine\ORM\EntityManager;
 use DoctrineMigrations\Version20261121194700;
 use DoctrineMigrations\Version20261128123000;
+use DoctrineMigrations\Version20261128123600;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
 
 require_once dirname(__DIR__, 2) . '/migrations/Version20261121194700.php';
 require_once dirname(__DIR__, 2) . '/migrations/Version20261128123000.php';
+require_once dirname(__DIR__, 2) . '/migrations/Version20261128123600.php';
 
 final class VideoMatchApplyStructureTest extends TestCase
 {
@@ -63,7 +65,12 @@ final class VideoMatchApplyStructureTest extends TestCase
             ArtistImportIdentityRace::copyTableWithoutPgroonga($this->connection, $table);
         }
         $this->connection->executeStatement('CREATE TABLE people (id UUID PRIMARY KEY)');
-        foreach ([Version20261121194700::class, Version20261128123000::class] as $migrationClass) {
+        $this->connection->executeStatement('CREATE TABLE images (id UUID PRIMARY KEY)');
+        foreach ([
+            Version20261121194700::class,
+            Version20261128123000::class,
+            Version20261128123600::class,
+        ] as $migrationClass) {
             $migration = new $migrationClass($this->connection, new NullLogger());
             $migration->up(new Schema());
             $this->connection->transactional(static function (Connection $connection) use ($migration): void {

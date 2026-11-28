@@ -68,6 +68,14 @@ class TvSeriesEntity
     #[ORM\Column(type: 'datetime_immutable')]
     public DateTimeImmutable $updatedAt;
 
+    /** @var array<string, string|int|null> */
+    #[ORM\Column(type: 'json', options: ['jsonb' => true, 'default' => '[]'])]
+    public array $providerFields = [];
+
+    /** @var list<string> */
+    #[ORM\Column(type: 'json', options: ['jsonb' => true, 'default' => '[]'])]
+    public array $lockedFields = [];
+
     public function __construct(LibraryEntity $library, TvSeriesState $state)
     {
         $this->id = $state->id;
@@ -96,11 +104,15 @@ class TvSeriesEntity
             backdropUrl: $this->backdropUrl,
             createdAt: $this->createdAt,
             updatedAt: $this->updatedAt,
+            providerFields: $this->providerFields,
+            lockedFields: $this->lockedFields,
         );
     }
 
     public function apply(TvSeriesState $state): void
     {
+        $this->providerFields = $state->providerFields;
+        $this->lockedFields = $state->lockedFields;
         $this->folderPath = $state->folderPath;
         $this->name = $state->name;
         $this->year = $state->year;

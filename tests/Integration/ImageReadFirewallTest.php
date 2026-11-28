@@ -130,8 +130,8 @@ final class ImageReadFirewallTest extends TestCase
         $this->manager->persist(new ArtistAlbumEntity($deniedArtist, $this->deniedAlbum, 'primary', $deniedArtist->getName()));
         $this->manager->persist(new UserLibraryAccessEntity($this->member->getId(), $this->allowedLibrary, new \DateTimeImmutable()));
 
-        foreach (['album', 'artist', 'reverse-album', 'reverse-artist', 'playlist', 'mixed', 'denied-album', 'denied-artist', 'denied-playlist', 'orphan'] as $name) {
-            $image = new ImageEntity('internal/' . $this->deniedAlbum->getId() . '/' . $name . '.gif', 'gif', 'image/gif', new PublicId(), 42, 1, 1, 'album');
+        foreach (['album', 'artist', 'reverse-album', 'reverse-artist', 'playlist', 'mixed', 'denied-album', 'denied-artist', 'denied-playlist', 'orphan', 'library', 'denied-library'] as $name) {
+            $image = new ImageEntity('internal/' . $this->deniedAlbum->getId() . '/' . $name . '.gif', 'gif', 'image/gif', new PublicId(), 42, 1, 1, in_array($name, ['library', 'denied-library'], true) ? 'video' : 'album');
             $image->setBlurhash('fixture-hash');
             $this->images[$name] = $image;
             $this->persist($image);
@@ -147,6 +147,8 @@ final class ImageReadFirewallTest extends TestCase
         $this->images['denied-album']->setAlbum($this->deniedAlbum);
         $this->images['denied-artist']->setArtist($deniedArtist);
         $this->images['denied-playlist']->setPlaylist($this->deniedPlaylist);
+        $this->images['library']->setLibraryId($this->allowedLibrary->getId());
+        $this->images['denied-library']->setLibraryId($deniedLibrary->getId());
         $this->manager->flush();
     }
 
@@ -184,7 +186,7 @@ final class ImageReadFirewallTest extends TestCase
     {
         $this->authenticate($actor);
         foreach ($this->images as $name => $image) {
-            $allowed = $actor === 'admin' || ($actor === 'member' && in_array($name, ['album', 'artist', 'reverse-album', 'reverse-artist', 'playlist', 'mixed'], true));
+            $allowed = $actor === 'admin' || ($actor === 'member' && in_array($name, ['album', 'artist', 'reverse-album', 'reverse-artist', 'playlist', 'mixed', 'library'], true));
             $expectedStatus = $actor === 'anonymous' ? 401 : ($allowed ? 200 : 404);
             $reads = $this->storageReads;
             $response = $this->request($image, $suffix);
@@ -295,6 +297,25 @@ final class ImageReadFirewallTest extends TestCase
         self::assertSame(200, $response->getStatusCode());
         self::assertInstanceOf(BinaryFileResponse::class, $response);
         self::assertSame($presetPath, $response->getFile()->getPathname());
+    }
+
+    public function testManagedVideoArtworkAndThumbnailsRequireTheirLibraryGrant(): void
+    {
+        $this->authenticate('member');
+        foreach (['', '/file', '/file?preset=thumb', '/blurhash'] as $suffix) {
+            self::assertSame(200, $this->request($this->images['library'], $suffix)->getStatusCode());
+            $reads = $this->storageReads;
+            self::assertSame(404, $this->request($this->images['denied-library'], $suffix)->getStatusCode());
+            self::assertSame($reads, $this->storageReads);
+        }
+        $access = $this->kernel->getContainer()->get('media.acceptance.library_access');
+        self::assertInstanceOf(LibraryAccessPortInterface::class, $access);
+        $access->revoke($this->member->getId(), $this->allowedLibrary->getId());
+        foreach (['', '/file', '/file?preset=thumb', '/blurhash'] as $suffix) {
+            $reads = $this->storageReads;
+            self::assertSame(404, $this->request($this->images['library'], $suffix)->getStatusCode());
+            self::assertSame($reads, $this->storageReads);
+        }
     }
 
     public function testRevocationImmediatelyDeniesAllImageReadRoutes(): void
