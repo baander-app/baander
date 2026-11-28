@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<tvshow>
+  <title>Fixture Show</title>
+  <plot>A series from sidecars.</plot>
+  <premiered>2022-02-20</premiered>
+  <uniqueid type="tvdb" default="true">1234</uniqueid>
+  <uniqueid type="tmdb">4321</uniqueid>
+  <uniqueid type="imdb">tt1234567</uniqueid>
+  <actor><name>Credited Actor</name><role>Lead</role><order>3</order><imdbid>nm1234567</imdbid><uniqueid type="tvdb">81</uniqueid></actor>
+  <actor><name>Unidentified Actor</name><role>Friend</role></actor>
+</tvshow>

@@ -133,6 +133,91 @@ final class TvdbAdapterTest extends TestCase
         self::assertSame(3, $http->getRequestsCount());
     }
 
+    public function testEpisodeDetailsAreSharedUntilTheirRevisionChangesOrExpires(): void
+    {
+        $clock = new MockClock('2026-11-28T12:00:00Z');
+        $cache = new ArrayAdapter(clock: $clock);
+        $first = ['id' => 42, 'lastUpdated' => '2026-11-27 12:00:00', 'characters' => [['peopleId' => 9]]];
+        $updated = ['id' => 42, 'lastUpdated' => '2026-11-28 12:00:00', 'characters' => [['peopleId' => 10]]];
+        $http = new MockHttpClient([
+            self::response(['token' => 'fixture-token']),
+            self::response($first),
+            self::response($updated),
+            self::response($updated),
+        ]);
+        $adapter = $this->adapter($http, cache: $cache);
+
+        self::assertSame($first, $adapter->episodeExtended(42, $first['lastUpdated']));
+        $secondAdapter = $this->adapter($http, cache: $cache);
+        self::assertSame($first, $secondAdapter->episodeExtended(42, $first['lastUpdated']));
+        self::assertSame(2, $http->getRequestsCount());
+
+        self::assertSame($updated, $secondAdapter->episodeExtended(42, $updated['lastUpdated']));
+        self::assertSame(3, $http->getRequestsCount());
+        $clock->sleep(86401);
+        self::assertSame($updated, $adapter->episodeExtended(42, $updated['lastUpdated']));
+        self::assertSame(4, $http->getRequestsCount());
+    }
+
+    public function testEpisodeDetailsAreReadWithoutCacheWhenTheRevisionIsUnusable(): void
+    {
+        $http = new MockHttpClient(static fn (string $method): MockResponse => $method === 'POST'
+            ? self::response(['token' => 'fixture-token'])
+            : self::response(['id' => 42]));
+        $adapter = $this->adapter($http);
+        $revisions = [null, '', [], 0, '2026-02-30 12:00:00', 'yesterday'];
+        foreach ($revisions as $revision) {
+            $adapter->episodeExtended(42, $revision);
+            $adapter->episodeExtended(42, $revision);
+        }
+        self::assertSame(1 + 2 * count($revisions), $http->getRequestsCount());
+    }
+
+    public function testEpisodeRetriesReuseEarlierSuccessesAndDiscardFailures(): void
+    {
+        $http = new MockHttpClient([
+            self::response(['token' => 'fixture-token']),
+            self::response(['id' => 42]),
+            new MockResponse('{}', ['http_code' => 503]),
+            self::response(['id' => 42]),
+            self::response(['id' => 43]),
+        ]);
+        $adapter = $this->adapter($http);
+        $revision = 1795867200;
+
+        self::assertSame(['id' => 42], $adapter->episodeExtended(42, $revision));
+        try {
+            $adapter->episodeExtended(43, $revision);
+            self::fail('A provider error must not return episode details.');
+        } catch (TvdbHttpException $failure) {
+            self::assertSame(503, $failure->status);
+        }
+        self::assertSame(['id' => 42], $adapter->episodeExtended(42, (string) $revision));
+        self::assertSame(3, $http->getRequestsCount());
+        try {
+            $adapter->episodeExtended(43, $revision);
+            self::fail('An extended response for another episode must be rejected.');
+        } catch (TvdbTransportException) {
+            self::assertSame(4, $http->getRequestsCount());
+        }
+        self::assertSame(['id' => 43], $adapter->episodeExtended(43, $revision));
+        self::assertSame(5, $http->getRequestsCount());
+    }
+
+    public function testEpisodeDetailsFromAnotherRevisionDoNotReplaceTheListedVersion(): void
+    {
+        $http = new MockHttpClient([
+            self::response(['token' => 'fixture-token']),
+            self::response(['id' => 42, 'lastUpdated' => 1795867100]),
+            self::response(['id' => 42, 'lastUpdated' => 1795867200]),
+        ]);
+        $adapter = $this->adapter($http);
+
+        self::assertSame(1795867100, $adapter->episodeExtended(42, 1795867200)['lastUpdated']);
+        self::assertSame(1795867200, $adapter->episodeExtended(42, 1795867200)['lastUpdated']);
+        self::assertSame(3, $http->getRequestsCount());
+    }
+
     public function testDisabledAndEmptyKeyAdaptersMakeNoRequestIncludingCacheHits(): void
     {
         $http = new MockHttpClient(static function (): never { self::fail('No unusable adapter may contact the provider.'); });
@@ -166,6 +251,20 @@ final class TvdbAdapterTest extends TestCase
         } catch (MetadataProviderDisabled) {
             self::assertSame(2, $http->getRequestsCount());
         }
+    }
+
+    public function testDisablingTheProviderPreventsAFormerlyCachedEpisodeRead(): void
+    {
+        $cache = new ArrayAdapter();
+        $http = new MockHttpClient([
+            self::response(['token' => 'fixture-token']),
+            self::response(['id' => 42]),
+        ]);
+        $revision = '2026-11-28 12:00:00';
+        self::assertSame(['id' => 42], $this->adapter($http, cache: $cache)->episodeExtended(42, $revision));
+        $disabled = $this->adapter($http, cache: $cache, switches: ProviderSwitches::withDisabled(MetadataProvider::Tvdb));
+        $this->expectException(MetadataProviderDisabled::class);
+        $disabled->episodeExtended(42, $revision);
     }
 
     public function testOneBoundedRateLimitRetryCanCompleteTheRequest(): void

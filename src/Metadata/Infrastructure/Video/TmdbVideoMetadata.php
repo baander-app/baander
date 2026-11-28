@@ -74,6 +74,14 @@ final readonly class TmdbVideoMetadata implements VideoProviderAdapter
             if ($entry->id !== (string) $id) {
                 return VideoProviderProblem::Unavailable;
             }
+            $suppliedIds = array_intersect_key($request->externalIds, ['tmdb' => true, 'tvdb' => true, 'imdb' => true]);
+            if ($request->kind === VideoKind::Series && count($suppliedIds) > 1) {
+                foreach ($suppliedIds as $source => $suppliedId) {
+                    if (isset($entry->externalIds[$source]) && $entry->externalIds[$source] !== $suppliedId) {
+                        return null;
+                    }
+                }
+            }
         } catch (TmdbHttpException $exception) {
             return $exception->status === 404 ? null : self::problem($exception);
         } catch (Throwable $exception) {
@@ -85,7 +93,6 @@ final readonly class TmdbVideoMetadata implements VideoProviderAdapter
                 ? $this->series($record, $entry, $request->ordering)
                 : $this->movie($record, $entry);
         } catch (Throwable $exception) {
-            // Missing season or ordering data must not apply a partial series structure.
             return $exception instanceof TmdbHttpException && $exception->status === 404
                 ? VideoProviderProblem::Unavailable
                 : self::problem($exception);
@@ -128,6 +135,10 @@ final readonly class TmdbVideoMetadata implements VideoProviderAdapter
         }
         $response = $this->tmdb->findVideo($externalId, $source . '_id');
         $results = self::rows($response[$request->kind === VideoKind::Series ? 'tv_results' : 'movie_results'] ?? null);
+        if ($results === [] && $source === 'tvdb' && isset($request->externalIds['imdb'])) {
+            $response = $this->tmdb->findVideo($request->externalIds['imdb'], 'imdb_id');
+            $results = self::rows($response['tv_results'] ?? null);
+        }
         if (count($results) !== 1) {
             return null;
         }

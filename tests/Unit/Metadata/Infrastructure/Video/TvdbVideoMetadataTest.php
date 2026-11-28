@@ -344,6 +344,112 @@ final class TvdbVideoMetadataTest extends TestCase
         self::assertCount(1, $extendedRequests);
     }
 
+    public function testACleanImdbMissFallsBackToTheSuppliedTmdbIdentity(): void
+    {
+        $records = $this->records();
+        $records['/v4/search/remoteid/tt0944947'] = ['data' => []];
+        $records['/v4/search/remoteid/1399'] = ['data' => [['series' => ['id' => 10, 'name' => 'Show']]]];
+        $records['/v4/series/10/extended']['data']['remoteIds'] = [
+            ['id' => '1399', 'sourceName' => 'TheMovieDB.com'],
+        ];
+        $request = new VideoRequest(VideoKind::Series, 'Show', externalIds: ['imdb' => 'tt0944947', 'tmdb' => '1399']);
+
+        $title = $this->provider($records)->identify($request);
+
+        self::assertInstanceOf(VideoTitle::class, $title);
+        self::assertSame('10', $title->entry->id);
+        self::assertSame('1399', $title->entry->externalIds['tmdb']);
+        self::assertSame([
+            '/v4/login', '/v4/search/remoteid/tt0944947', '/v4/search/remoteid/1399', '/v4/series/10/extended',
+        ], array_slice($this->requests, 0, 4));
+    }
+
+    /** @return iterable<string, array{int|array<string, mixed>, VideoProviderProblem}> */
+    public static function remoteLookupFailures(): iterable
+    {
+        yield 'outage' => [503, VideoProviderProblem::Unavailable];
+        yield 'refused request' => [400, VideoProviderProblem::Refused];
+        yield 'malformed answer' => [['data' => ['malformed' => true]], VideoProviderProblem::Unavailable];
+    }
+
+    /** @param int|array<string, mixed> $failure */
+    #[DataProvider('remoteLookupFailures')]
+    public function testImdbLookupFailuresDoNotFallBackToTheTmdbId(int|array $failure, VideoProviderProblem $expected): void
+    {
+        $records = ['/v4/search/remoteid/tt0944947' => $failure];
+        $request = new VideoRequest(VideoKind::Series, 'Show', externalIds: ['imdb' => 'tt0944947', 'tmdb' => '1399']);
+
+        self::assertSame($expected, $this->provider($records)->identify($request));
+        self::assertNotContains('/v4/search/remoteid/1399', $this->requests);
+    }
+
+    public function testAnExtendedCandidateFailureDoesNotFallBackToTheTmdbId(): void
+    {
+        $records = [
+            '/v4/search/remoteid/tt0944947' => ['data' => [['series' => ['id' => 10, 'name' => 'Show']]]],
+            '/v4/series/10/extended' => 503,
+        ];
+        $request = new VideoRequest(VideoKind::Series, 'Show', externalIds: ['imdb' => 'tt0944947', 'tmdb' => '1399']);
+
+        self::assertSame(VideoProviderProblem::Unavailable, $this->provider($records)->identify($request));
+        self::assertNotContains('/v4/search/remoteid/1399', $this->requests);
+    }
+
+    public function testAnAmbiguousImdbIdentityDoesNotFallBackToAnotherCandidate(): void
+    {
+        $records = $this->records();
+        $records['/v4/search/remoteid/tt0944947'] = ['data' => [
+            ['series' => ['id' => 10, 'name' => 'Show']],
+            ['series' => ['id' => 11, 'name' => 'Another show']],
+        ]];
+        $records['/v4/series/10/extended']['data']['remoteIds'] = [
+            ['id' => 'tt0944947', 'sourceName' => 'IMDB'],
+            ['id' => '1399', 'sourceName' => 'TheMovieDB.com'],
+        ];
+        $records['/v4/series/11/extended'] = ['data' => [
+            'id' => 11, 'name' => 'Another show', 'remoteIds' => [
+                ['id' => 'tt0944947', 'sourceName' => 'IMDB'],
+                ['id' => '1499', 'sourceName' => 'TheMovieDB.com'],
+            ],
+        ]];
+        $request = new VideoRequest(VideoKind::Series, 'Show', externalIds: ['imdb' => 'tt0944947', 'tmdb' => '1399']);
+
+        self::assertNull($this->provider($records)->identify($request));
+        self::assertNotContains('/v4/search/remoteid/1399', $this->requests);
+        self::assertNotContains('/v4/series/10/episodes/official?page=0', $this->requests);
+    }
+
+    public function testATmdbFallbackCannotOverrideAConflictingSuppliedImdbIdentity(): void
+    {
+        $records = $this->records();
+        $records['/v4/search/remoteid/tt0944947'] = ['data' => []];
+        $records['/v4/search/remoteid/1399'] = ['data' => [['series' => ['id' => 10, 'name' => 'Show']]]];
+        $records['/v4/series/10/extended']['data']['remoteIds'] = [
+            ['id' => 'tt9999999', 'sourceName' => 'IMDB'],
+            ['id' => '1399', 'sourceName' => 'TheMovieDB.com'],
+        ];
+        $request = new VideoRequest(VideoKind::Series, 'Show', externalIds: ['imdb' => 'tt0944947', 'tmdb' => '1399']);
+
+        self::assertNull($this->provider($records)->identify($request));
+        self::assertContains('/v4/search/remoteid/1399', $this->requests);
+        self::assertNotContains('/v4/series/10/episodes/official?page=0', $this->requests);
+    }
+
+    public function testAVerifiedImdbMatchCannotOverrideAConflictingSuppliedTmdbIdentity(): void
+    {
+        $records = $this->records();
+        $records['/v4/search/remoteid/tt0944947'] = ['data' => [['series' => ['id' => 10, 'name' => 'Show']]]];
+        $records['/v4/series/10/extended']['data']['remoteIds'] = [
+            ['id' => 'tt0944947', 'sourceName' => 'IMDB'],
+            ['id' => '1499', 'sourceName' => 'TheMovieDB.com'],
+        ];
+        $request = new VideoRequest(VideoKind::Series, 'Show', externalIds: ['imdb' => 'tt0944947', 'tmdb' => '1399']);
+
+        self::assertNull($this->provider($records)->identify($request));
+        self::assertNotContains('/v4/search/remoteid/1399', $this->requests);
+        self::assertNotContains('/v4/series/10/episodes/official?page=0', $this->requests);
+    }
+
     public function testConflictingRemoteIdsDoNotSelectAnIdentity(): void
     {
         $records = $this->records();

@@ -17,6 +17,7 @@ final readonly class TvdbAdapter
     private const string API_HOST = 'api4.thetvdb.com';
     private const int TOKEN_TTL = 25 * 86400;
     private const int PERSON_TTL = 86400;
+    private const int EPISODE_TTL = 86400;
     private const int REQUEST_TIMEOUT = 15;
     private const int MAX_RETRY_AFTER = 5;
     private const int MAX_EPISODE_PAGES = 1000;
@@ -62,9 +63,45 @@ final readonly class TvdbAdapter
     }
 
     /** @return array<string, mixed> */
-    public function episodeExtended(int $id): array
+    public function episodeExtended(int $id, mixed $lastUpdated = null): array
     {
-        return $this->extended('/episodes/' . $id . '/extended', $id);
+        $endpoint = '/episodes/' . $id . '/extended';
+        $revision = self::episodeRevision($lastUpdated);
+        if ($revision === null) {
+            return $this->extended($endpoint, $id);
+        }
+
+        $this->requireUsable();
+        $key = $this->cacheKey('episode.' . $id . '.' . hash('sha256', $revision));
+
+        return $this->cache->get($key, function (CacheItemInterface $item, bool &$save) use ($endpoint, $id, $revision): array {
+            $episode = $this->extended($endpoint, $id);
+            $detailRevision = self::episodeRevision($episode['lastUpdated'] ?? null);
+            // The listing and detail request can straddle a provider update.
+            $save = $detailRevision === null || $detailRevision === $revision;
+            $item->expiresAfter(self::EPISODE_TTL);
+
+            return $episode;
+        }, beta: 0.0);
+    }
+
+    private static function episodeRevision(mixed $value): ?string
+    {
+        if (is_int($value)) {
+            return $value > 0 ? (string) $value : null;
+        }
+        if (!is_string($value)) {
+            return null;
+        }
+        if (preg_match('/\A[1-9][0-9]{0,18}\z/', $value) === 1) {
+            return $value;
+        }
+        if (preg_match('/\A[0-9]{4}-[0-9]{2}-[0-9]{2}[ T][0-9]{2}:[0-9]{2}:[0-9]{2}(?:\.[0-9]{1,9})?(?:Z|[+-][0-9]{2}:?[0-9]{2})?\z/', $value) !== 1) {
+            return null;
+        }
+        $date = date_parse($value);
+
+        return $date['error_count'] === 0 && $date['warning_count'] === 0 ? $value : null;
     }
 
     /** @return list<array<string, mixed>> */

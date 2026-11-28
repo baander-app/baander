@@ -1,0 +1,5 @@
+<movie>
+  <title>Fixture Movie</title><year>1984</year><plot>A movie from a sidecar.</plot>
+  <uniqueid type="TMDb" default="true">00042</uniqueid>
+  <thumb>https://assets.baander.app/ignored.png</thumb>
+</movie>

@@ -11,7 +11,6 @@ use App\Metadata\Application\DTO\Video\VideoProviderProblem;
 use App\Metadata\Application\DTO\Video\VideoRequest;
 use App\Metadata\Application\DTO\Video\VideoTitle;
 
-/** Provider failures are returned to the match queue. */
 interface VideoMetadataPortInterface
 {
     /** @return list<VideoProviderId> Providers in their default order for this kind of title. */

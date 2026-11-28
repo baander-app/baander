@@ -233,7 +233,7 @@ final class TmdbAdapter implements ImdbPersonLookupInterface, TmdbPersonLookupIn
     /** @return array<string, mixed> */
     public function lookupTvSeason(int $seriesId, int $season): array
     {
-        return $this->request('/tv/' . $seriesId . '/season/' . $season, ['append_to_response' => 'credits'], allowNotFound: false);
+        return $this->request('/tv/' . $seriesId . '/season/' . $season, allowNotFound: false);
     }
 
     /** @return array<string, mixed> */

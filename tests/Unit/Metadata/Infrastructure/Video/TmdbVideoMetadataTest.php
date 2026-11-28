@@ -23,6 +23,9 @@ use Symfony\Component\Serializer\Encoder\JsonEncoder;
 
 final class TmdbVideoMetadataTest extends TestCase
 {
+    /** @var list<string> */
+    private array $requests = [];
+
     public function testSeriesSearchUsesFirstAirYearAndReturnsCandidates(): void
     {
         $http = new MockHttpClient(static function (string $method, string $url): MockResponse {
@@ -236,6 +239,102 @@ final class TmdbVideoMetadataTest extends TestCase
         self::assertSame(VideoProviderProblem::Unavailable, $this->provider($this->http($records))->identify(new VideoRequest(VideoKind::Series, 'Show', externalIds: ['tmdb' => '10'], ordering: 'dvd-group')));
     }
 
+    public function testASeriesWithNoTvdbCounterpartUsesItsSuppliedImdbId(): void
+    {
+        $records = $this->seriesRecords();
+        $records['/3/find/777'] = ['tv_results' => []];
+        $records['/3/find/tt123'] = ['tv_results' => [['id' => 10, 'name' => 'Show']]];
+        $records['/3/tv/10']['external_ids'] = ['tvdb_id' => 777, 'imdb_id' => 'tt123'];
+        $request = new VideoRequest(VideoKind::Series, 'Show', externalIds: ['tvdb' => '777', 'imdb' => 'tt123']);
+
+        $title = $this->provider($this->http($records))->identify($request);
+
+        self::assertInstanceOf(VideoTitle::class, $title);
+        self::assertSame('10', $title->entry->id);
+        self::assertSame(['/3/find/777', '/3/find/tt123', '/3/tv/10'], array_slice($this->requests, 0, 3));
+    }
+
+    /** @return iterable<string, array{array<string, mixed>|MockResponse, VideoProviderProblem|null}> */
+    public static function tvdbFindFailures(): iterable
+    {
+        yield 'outage' => [new MockResponse('{}', ['http_code' => 503]), VideoProviderProblem::Unavailable];
+        yield 'refused request' => [new MockResponse('{}', ['http_code' => 400]), VideoProviderProblem::Refused];
+        yield 'malformed result' => [['tv_results' => ['malformed' => true]], VideoProviderProblem::Unavailable];
+        yield 'ambiguous result' => [['tv_results' => [['id' => 10], ['id' => 11]]], null];
+    }
+
+    /** @param array<string, mixed>|MockResponse $failure */
+    #[DataProvider('tvdbFindFailures')]
+    public function testATvdbLookupFailureOrAmbiguityDoesNotFallThroughToImdb(array|MockResponse $failure, ?VideoProviderProblem $expected): void
+    {
+        $records = ['/3/find/777' => $failure];
+        $request = new VideoRequest(VideoKind::Series, 'Show', externalIds: ['tvdb' => '777', 'imdb' => 'tt123']);
+
+        self::assertSame($expected, $this->provider($this->http($records))->identify($request));
+        self::assertNotContains('/3/find/tt123', $this->requests);
+    }
+
+    public function testAFailedSeriesDetailLookupDoesNotFallThroughToImdb(): void
+    {
+        $records = [
+            '/3/find/777' => ['tv_results' => [['id' => 10]]],
+            '/3/tv/10' => new MockResponse('{}', ['http_code' => 503]),
+        ];
+        $request = new VideoRequest(VideoKind::Series, 'Show', externalIds: ['tvdb' => '777', 'imdb' => 'tt123']);
+
+        self::assertSame(VideoProviderProblem::Unavailable, $this->provider($this->http($records))->identify($request));
+        self::assertNotContains('/3/find/tt123', $this->requests);
+    }
+
+    /** @return iterable<string, array{array<string, int|string>}> */
+    public static function conflictingSuppliedIds(): iterable
+    {
+        yield 'another TVDB identity' => [['tvdb_id' => 888, 'imdb_id' => 'tt123']];
+        yield 'another IMDb identity' => [['tvdb_id' => 777, 'imdb_id' => 'tt456']];
+    }
+
+    /** @param array<string, int|string> $externalIds */
+    #[DataProvider('conflictingSuppliedIds')]
+    public function testASeriesFoundByTvdbCannotContradictItsSuppliedIdentities(array $externalIds): void
+    {
+        $records = $this->seriesRecords();
+        $records['/3/find/777'] = ['tv_results' => [['id' => 10]]];
+        $records['/3/tv/10']['external_ids'] = $externalIds;
+        $request = new VideoRequest(VideoKind::Series, 'Show', externalIds: ['tvdb' => '777', 'imdb' => 'tt123']);
+
+        self::assertNull($this->provider($this->http($records))->identify($request));
+        self::assertNotContains('/3/find/tt123', $this->requests);
+        self::assertNotContains('/3/tv/10/season/5', $this->requests);
+    }
+
+    public function testAnImdbFallbackCannotSelectASeriesWithAnotherTvdbIdentity(): void
+    {
+        $records = $this->seriesRecords();
+        $records['/3/find/777'] = ['tv_results' => []];
+        $records['/3/find/tt123'] = ['tv_results' => [['id' => 10]]];
+        $records['/3/tv/10']['external_ids'] = ['tvdb_id' => 888, 'imdb_id' => 'tt123'];
+        $request = new VideoRequest(VideoKind::Series, 'Show', externalIds: ['tvdb' => '777', 'imdb' => 'tt123']);
+
+        self::assertNull($this->provider($this->http($records))->identify($request));
+        self::assertContains('/3/find/tt123', $this->requests);
+        self::assertNotContains('/3/tv/10/season/5', $this->requests);
+    }
+
+    public function testMovieIdentificationStillUsesItsImdbIdWhenATvdbIdIsAlsoSupplied(): void
+    {
+        $records = [
+            '/3/find/tt123' => ['movie_results' => [['id' => 12]]],
+            '/3/movie/12' => ['id' => 12, 'title' => 'Film'],
+        ];
+        $request = new VideoRequest(VideoKind::Movie, 'Film', externalIds: ['tvdb' => '777', 'imdb' => 'tt123']);
+
+        $title = $this->provider($this->http($records))->identify($request);
+
+        self::assertInstanceOf(VideoTitle::class, $title);
+        self::assertSame('12', $title->entry->id);
+        self::assertSame(['/3/find/tt123', '/3/movie/12'], $this->requests);
+    }
+
     private function provider(MockHttpClient $http, bool $enabled = true, string $token = 'fixture-token'): TmdbVideoMetadata
     {
         $client = new PublicHttpClient($http, new PublicDestinationPolicy(static fn (string $host): array => ['1.1.1.1']));
@@ -247,13 +346,18 @@ final class TmdbVideoMetadataTest extends TestCase
     /** @param array<string, array<string, mixed>|MockResponse> $records */
     private function http(array $records): MockHttpClient
     {
-        return new MockHttpClient(static function (string $method, string $url) use ($records): MockResponse {
-            $path = parse_url($url, PHP_URL_PATH);
+        return new MockHttpClient(function (string $method, string $url) use ($records): MockResponse {
+            $path = (string) parse_url($url, PHP_URL_PATH);
+            $this->requests[] = $path;
             self::assertArrayHasKey($path, $records);
             $record = $records[$path];
             if ($path === '/3/find/777') {
                 parse_str(parse_url($url, PHP_URL_QUERY), $query);
                 self::assertSame('tvdb_id', $query['external_source']);
+            }
+            if ($path === '/3/find/tt123') {
+                parse_str(parse_url($url, PHP_URL_QUERY), $query);
+                self::assertSame('imdb_id', $query['external_source']);
             }
 
             return $record instanceof MockResponse ? $record : new MockResponse(json_encode($record, JSON_THROW_ON_ERROR));

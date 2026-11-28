@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<episodedetails>
+  <title>First &amp; foremost</title><season>1</season><episode>1</episode><plot>Part one.</plot>
+  <aired>2022-02-20</aired><uniqueid type="tvdb">610</uniqueid>
+  <actor><name>Guest Actor</name><role>Visitor</role><tmdbid>50</tmdbid></actor>
+</episodedetails>
+<episodedetails>
+  <title>Second</title><season>1</season><episode>2</episode><plot>Part two.</plot>
+  <aired>2022-02-27</aired><uniqueid type="tvdb">611</uniqueid>
+</episodedetails>

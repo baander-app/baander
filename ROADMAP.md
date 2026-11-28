@@ -16,6 +16,69 @@ Read [AGENTS.md](AGENTS.md) for workflow, [CONCEPTS.md](CONCEPTS.md) for shared 
 and the [testing guide](docs-book/part-2-developer-guide/testing/README.md) for current
 runners and verification boundaries. Historical suite counts apply to their own trees.
 
+## TV series libraries, checkpoint 2026-11-28
+
+Implementation follows the [TV series libraries plan](docs/plans/2026-11-27-1827-feat-tv-series-libraries-plan.md).
+This checkpoint covers the catalog foundation and video metadata providers.
+
+- Phase A is committed through `8509b7f06`, covering U20, U1, U2, U3, U21, U4 and
+  U5. TV libraries scan into provider-neutral series, seasons, episodes and video
+  placements. The shared video parser handles season, absolute and date numbering,
+  provider tags and sidecars. Movie ingestion uses folder identity, separates
+  features from extras and preserves administrator field locks (`2f3d58555`).
+  Playback resolves available placement paths within the member's library scope,
+  checks the indexed hash and tries another placement when a file has vanished.
+  Missing video library roots retain the catalog and mark their files unavailable.
+- U6 is committed as `d2b1d69ce`. All nine providers have server-wide switches,
+  enabled and configured states, and attribution in the provider list. The admin
+  switch route, its console command and `app:settings:set` write the same settings.
+  Switched-off adapters stop provider calls, and the album match drain preserves
+  requests for recovery after MusicBrainz is enabled again.
+- U7 is committed as `c07fa7433`. The provider-neutral video port supports TMDB
+  search, identification, cross-references, metadata, credits and aired, absolute
+  and DVD orderings. Provider availability checks read current switch settings
+  without contacting a provider.
+- U8 adds licensed-key TheTVDB series lookup, episode orderings and person IDs.
+  A live lookup resolved TMDB series 1399 to TheTVDB series 121361. Its extended
+  record identified IMDb `tt0944947` and TMDB `1399`.
+- U9 reads movie, series, season and episode NFOs and local artwork. An NFO
+  containing only a recognized provider ID supplies that identity for matching.
+- Phase C matching units U10, U11, U23, U22, U12 and U13 remain pending. Phase D member
+  progress, read API and web units U14–U17 and Phase E documentation and browser
+  verification units U18–U19 remain pending.
+
+### Verification
+
+- The isolated preview migrated a fresh database through
+  `Version20261127194100`. A second migration run reported the current version,
+  and `doctrine:schema:validate` reported valid mappings and a synchronized schema.
+- U6 passed the CI-image static gates from `make ci`, covering Composer validation
+  and normalization, PHPStan, Deptrac, imports, tooling architecture, tooling format
+  and tooling PHPStan. Its ordinary PHPUnit lane passed 10,041 tests with 57,577
+  assertions. The native lane passed 1,005 tests with 32,610 assertions. Across
+  all eight lanes the run counted 15,569 tests and 156,435 assertions, with
+  four failures and one teardown error. The affected fixtures covered the
+  retired TV sync workload, placement-backed playback, log retention and video
+  ingest cleanup. After the fixture corrections, those four test files passed
+  in the CI image with 32 tests and 322 assertions. CI also exhausted its
+  cleanup budget. The run's ownership receipts released its remaining resources.
+- Provider route authorization passed four cases with 105 assertions, and route
+  inventory passed nine tests with 58 assertions. The OpenAPI specification and
+  Orval client were regenerated together and their drift checks passed for U6.
+- U7 passed 61 focused CI-image tests, scoped PHPStan and Deptrac with zero
+  violations and 451 existing skipped violations.
+- During U8 and U9, 114 provider tests passed with 548 assertions. Full PHPStan
+  and import checks passed. Deptrac reported zero violations and 451 baseline
+  entries. After adding support for an NFO containing only a provider ID, the
+  local provider passed all nine tests with 72 assertions and scoped PHPStan.
+- The final U8 adapter, mapper, destination and empty-key services passed 85
+  tests with 373 assertions. The mapper also passed scoped PHPStan.
+- The provider review found that a clean lookup miss could hide a second
+  supplied ID, and retries fetched episode details again. Both adapters now
+  try the next supplied ID after a clean miss. TheTVDB reuses episode details
+  for the listed revision for up to 24 hours. The three affected test files
+  passed with 93 tests and 430 assertions, and scoped PHPStan passed.
+
 ## Roadmap open items, 2026-11-26
 
 The owner selected all four groups of open items on 2026-11-26: the day's leftovers

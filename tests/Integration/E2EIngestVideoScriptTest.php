@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Integration;
 
+use Doctrine\DBAL\ArrayParameterType;
 use Doctrine\DBAL\Connection;
 use Doctrine\DBAL\DriverManager;
 use Doctrine\DBAL\Tools\DsnParser;
@@ -55,12 +56,20 @@ final class E2EIngestVideoScriptTest extends TestCase
 
         $libraryId = $this->database->fetchOne('SELECT id FROM libraries WHERE slug = ?', [self::SLUG]);
         if ($libraryId !== false) {
-            $this->database->executeStatement(
-                'DELETE FROM videos WHERE id IN (SELECT mv.video_id FROM movie_video mv JOIN movies m ON m.id = mv.movie_id WHERE m.library_id = ?)',
-                [$libraryId],
-            );
-            $this->database->executeStatement('DELETE FROM library_file_index WHERE library_id = ?', [$libraryId]);
-            $this->database->executeStatement('DELETE FROM libraries WHERE id = ?', [$libraryId]);
+            $this->database->transactional(function (Connection $database) use ($libraryId): void {
+                $videoIds = $database->fetchFirstColumn(
+                    'SELECT video_id FROM video_placements WHERE library_id = :library UNION SELECT mv.video_id FROM movie_video mv JOIN movies m ON m.id = mv.movie_id WHERE m.library_id = :library',
+                    ['library' => $libraryId],
+                );
+                $database->executeStatement('DELETE FROM libraries WHERE id = ?', [$libraryId]);
+                if ($videoIds !== []) {
+                    $database->executeStatement(
+                        'DELETE FROM videos v WHERE v.id IN (:ids) AND NOT EXISTS (SELECT 1 FROM movie_video mv WHERE mv.video_id = v.id) AND NOT EXISTS (SELECT 1 FROM video_placements p WHERE p.video_id = v.id)',
+                        ['ids' => $videoIds],
+                        ['ids' => ArrayParameterType::STRING],
+                    );
+                }
+            });
         }
         $this->database->close();
         (new Filesystem())->remove($this->directory);
@@ -92,6 +101,7 @@ final class E2EIngestVideoScriptTest extends TestCase
             json_decode($script->getOutput(), true, 8, JSON_THROW_ON_ERROR),
         );
         self::assertSame(1, (int) $this->database->fetchOne('SELECT COUNT(*) FROM libraries WHERE slug = ?', [self::SLUG]));
+        self::assertSame($listed[1], $this->database->fetchFirstColumn('SELECT video_id FROM video_placements WHERE library_id = ?', [$libraryId]));
     }
 
     private function script(): Process

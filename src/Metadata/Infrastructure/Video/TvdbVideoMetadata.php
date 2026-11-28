@@ -93,11 +93,36 @@ final readonly class TvdbVideoMetadata implements VideoProviderAdapter
     /** @return array<string, mixed>|null */
     private function remoteRecord(VideoRequest $request): ?array
     {
-        $source = isset($request->externalIds['imdb']) ? 'imdb' : 'tmdb';
-        $remoteId = $request->externalIds[$source] ?? null;
-        if ($remoteId === null) {
-            return null;
+        foreach (['imdb', 'tmdb'] as $source) {
+            $remoteId = $request->externalIds[$source] ?? null;
+            if ($remoteId === null) {
+                continue;
+            }
+            $matches = $this->remoteMatches($source, $remoteId);
+            if ($matches === []) {
+                continue;
+            }
+            if (count($matches) !== 1) {
+                return null;
+            }
+            $record = reset($matches);
+            $ids = self::identifiers($record);
+            foreach (['imdb', 'tmdb'] as $namespace) {
+                $requested = $request->externalIds[$namespace] ?? null;
+                if ($requested !== null && isset($ids[$namespace]) && $ids[$namespace] !== $requested) {
+                    return null;
+                }
+            }
+
+            return $record;
         }
+
+        return null;
+    }
+
+    /** @return array<int, array<string, mixed>> */
+    private function remoteMatches(string $source, string $remoteId): array
+    {
         $matches = [];
         $checked = [];
         foreach ($this->tvdb->searchRemoteId($remoteId) as $result) {
@@ -110,21 +135,13 @@ final readonly class TvdbVideoMetadata implements VideoProviderAdapter
                 continue;
             }
             $checked[$id] = true;
-            try {
-                $record = $this->tvdb->seriesExtended($id);
-            } catch (TvdbHttpException $failure) {
-                if ($failure->status === 404) {
-                    continue;
-                }
-
-                throw $failure;
-            }
+            $record = $this->tvdb->seriesExtended($id);
             if ((self::identifiers($record)[$source] ?? null) === $remoteId) {
                 $matches[$id] = $record;
             }
         }
 
-        return count($matches) === 1 ? reset($matches) : null;
+        return $matches;
     }
 
     /** @param array<string, mixed> $record
@@ -268,7 +285,7 @@ final readonly class TvdbVideoMetadata implements VideoProviderAdapter
                 ? 0 : self::number($episode['seasonNumber'] ?? null);
             $number = $seasonNumber === 0 && isset($canonical[$id])
                 ? self::number($canonical[$id]['number'] ?? null) : self::number($episode['number'] ?? null);
-            $details = $this->tvdb->episodeExtended($id);
+            $details = $this->tvdb->episodeExtended($id, $episode['lastUpdated'] ?? null);
             if (isset($seen[$id]) || isset($grouped[$seasonNumber][$number])) {
                 throw new UnexpectedValueException('TheTVDB ordering contains conflicting episodes.');
             }
@@ -283,7 +300,7 @@ final readonly class TvdbVideoMetadata implements VideoProviderAdapter
             if (isset($grouped[0][$number])) {
                 throw new UnexpectedValueException('TheTVDB specials contain conflicting episode numbers.');
             }
-            $details = $this->tvdb->episodeExtended($id);
+            $details = $this->tvdb->episodeExtended($id, $episode['lastUpdated'] ?? null);
             $grouped[0][$number] = $this->episode(array_replace($episode, $details), $number, null);
         }
         ksort($grouped, SORT_NUMERIC);

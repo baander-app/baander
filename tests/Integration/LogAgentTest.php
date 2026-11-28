@@ -48,8 +48,11 @@ final class LogAgentTest extends TestCase
 
     public function testFilesArchivesAndRestartUseDurableCheckpointsWithAuthenticatedReads(): void
     {
-        file_put_contents($this->directory.'/logs/app.log', "[2026-11-20T12:00:00+00:00] app.INFO: first\n[2026-11-20T12:00:01+00:00] app.ERROR: second\n");
-        file_put_contents($this->directory.'/logs/old.log.gz', gzencode("[2026-11-20T12:00:00+00:00] app.INFO: archived\n"));
+        $now = time();
+        $firstTime = gmdate('c', $now - 2);
+        $secondTime = gmdate('c', $now - 1);
+        file_put_contents($this->directory.'/logs/app.log', "[$firstTime] app.INFO: first\n[$secondTime] app.ERROR: second\n");
+        file_put_contents($this->directory.'/logs/old.log.gz', gzencode("[$firstTime] app.INFO: archived\n"));
         $index = new LogIndex($this->directory.'/logs.sqlite');
         $collector = new Collector($this->config(), $index);
         // A final pass flushes a stopped producer's last logical record.
@@ -332,7 +335,10 @@ final class LogAgentTest extends TestCase
     public function testStableFileGraceFlushesLatestRecordAndMarksLateContinuation(): void
     {
         $path = $this->directory.'/logs/app.log';
-        file_put_contents($path, "[2026-11-20T12:00:00+00:00] app.ERROR: first\n  initial frame\n");
+        $now = time();
+        $firstTime = gmdate('c', $now - 2);
+        $nextTime = gmdate('c', $now - 1);
+        file_put_contents($path, "[$firstTime] app.ERROR: first\n  initial frame\n");
         $index = new LogIndex($this->directory.'/logs.sqlite');
         $collector = new Collector($this->config(), $index);
         $collector->tick();
@@ -342,7 +348,7 @@ final class LogAgentTest extends TestCase
         $records = $index->query(new LogQuery())['items'];
         self::assertCount(1, $records);
         self::assertStringContainsString('initial frame', $records[0]['raw']);
-        file_put_contents($path, "  delayed frame\n[2026-11-20T12:00:01+00:00] app.INFO: next\n", FILE_APPEND);
+        file_put_contents($path, "  delayed frame\n[$nextTime] app.INFO: next\n", FILE_APPEND);
         $collector->tick();
         $records = $index->query(new LogQuery())['items'];
         self::assertCount(2, $records);
