@@ -1272,6 +1272,14 @@ services:
     App\Transcode\Application\Port\VideoProbePortInterface:
         alias: App\Transcode\Infrastructure\FFmpeg\FFprobeAdapter
 
+    App\Metadata\Application\Port\VideoMetadataPortInterface:
+        alias: App\Metadata\Infrastructure\Video\VideoMetadataProviders
+
+    App\Metadata\Infrastructure\Video\VideoMetadataProviders:
+        arguments:
+            $adapters:
+                - '@App\Metadata\Infrastructure\Video\TmdbVideoMetadata'
+
     App\Metadata\Infrastructure\Api\Tmdb\TmdbAdapter:
         arguments:
             $bearerToken: '%env(TMDB_BEARER_TOKEN)%'

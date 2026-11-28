@@ -186,11 +186,73 @@ final class TmdbAdapter implements ImdbPersonLookupInterface, TmdbPersonLookupIn
         );
     }
 
+    /** @return array<string, mixed> */
+    public function searchTvSeries(string $query, ?int $year = null): array
+    {
+        $params = ['query' => $query, 'page' => 1];
+        if ($year !== null) {
+            $params['first_air_date_year'] = $year;
+        }
+
+        return $this->request('/search/tv', $params, allowNotFound: false);
+    }
+
+    /** @return array<string, mixed> */
+    public function searchMovieRecords(string $query, ?int $year = null): array
+    {
+        $params = ['query' => $query, 'page' => 1];
+        if ($year !== null) {
+            $params['year'] = $year;
+        }
+
+        return $this->request('/search/movie', $params, allowNotFound: false);
+    }
+
+    /** @return array<string, mixed> */
+    public function findVideo(string $externalId, string $source): array
+    {
+        if (!in_array($source, ['tvdb_id', 'imdb_id'], true)) {
+            throw new \InvalidArgumentException('Unsupported TMDB external identifier source.');
+        }
+
+        return $this->request('/find/' . rawurlencode($externalId), ['external_source' => $source], allowNotFound: false);
+    }
+
+    /** @return array<string, mixed> */
+    public function lookupMovieDetails(int $id): array
+    {
+        return $this->request('/movie/' . $id, ['append_to_response' => 'credits,external_ids'], allowNotFound: false);
+    }
+
+    /** @return array<string, mixed> */
+    public function lookupTvSeriesDetails(int $id): array
+    {
+        return $this->request('/tv/' . $id, ['append_to_response' => 'aggregate_credits,external_ids,episode_groups'], allowNotFound: false);
+    }
+
+    /** @return array<string, mixed> */
+    public function lookupTvSeason(int $seriesId, int $season): array
+    {
+        return $this->request('/tv/' . $seriesId . '/season/' . $season, ['append_to_response' => 'credits'], allowNotFound: false);
+    }
+
+    /** @return array<string, mixed> */
+    public function lookupTvEpisodeGroups(int $seriesId): array
+    {
+        return $this->request('/tv/' . $seriesId . '/episode_groups', allowNotFound: false);
+    }
+
+    /** @return array<string, mixed> */
+    public function lookupTvEpisodeGroup(string $groupId): array
+    {
+        return $this->request('/tv/episode_group/' . rawurlencode($groupId), allowNotFound: false);
+    }
+
     /**
      * @return array<string, mixed>
      * @param array<string, mixed> $params
      */
-    private function request(string $endpoint, array $params = [], int $timeout = self::REQUEST_TIMEOUT): array
+    private function request(string $endpoint, array $params = [], int $timeout = self::REQUEST_TIMEOUT, bool $allowNotFound = true): array
     {
         $url = self::BASE_URL . $endpoint . '?' . http_build_query($params);
         $this->logger->debug('TMDB API request', ['service' => 'tmdb', 'endpoint' => $endpoint]);
@@ -224,13 +286,13 @@ final class TmdbAdapter implements ImdbPersonLookupInterface, TmdbPersonLookupIn
                 $retried = true;
                 continue;
             }
-            if ($status === 404) {
+            if ($status === 404 && $allowNotFound) {
                 return [];
             }
             if ($status >= 300) {
                 $this->logger->warning('TMDB API error response', ['service' => 'tmdb', 'status' => $status]);
 
-                throw new \RuntimeException('TMDB API returned an unsuccessful response.');
+                throw new TmdbHttpException($status);
             }
             try {
                 $data = $this->jsonEncoder->decode($body, 'json');
