@@ -206,30 +206,40 @@ final class OpenApiSpecTest extends KernelTestCase
             self::assertContains(null, $property['enum']);
         }
 
-        $media = $schemas['ControlPlaybackRequest']['properties']['media'];
-        $kind = ['type' => 'string', 'enum' => ['song', 'video']];
-        self::assertTrue($media['nullable']);
-        [$mediaMap, $mediaChoices] = $media['allOf'];
-        self::assertSame(['type' => 'string'], $mediaMap['additionalProperties']);
-        self::assertTrue($mediaMap['nullable']);
-        self::assertTrue($mediaChoices['nullable']);
-        self::assertSame($kind, $mediaChoices['properties']['kind']);
+        $media = $schemas['PlaybackMediaResource'];
+        self::assertSame('object', $media['type']);
+        self::assertEqualsCanonicalizing(['kind', 'publicId'], $media['required']);
+        self::assertSame(['song', 'video'], $media['properties']['kind']['enum']);
+        self::assertSame('string', $media['properties']['publicId']['type']);
+        self::assertSame('#/components/schemas/PlaybackViewingContextResource', $media['properties']['viewing']['$ref']);
 
-        $checkpointValues = [
-            ['type' => 'object', 'additionalProperties' => ['type' => 'string']],
-            ['type' => 'number', 'format' => 'float'],
-            ['type' => 'integer'],
-            ['type' => 'object', 'nullable' => true, 'enum' => [null]],
-        ];
+        $viewing = $schemas['PlaybackViewingContextResource'];
+        self::assertEqualsCanonicalizing(['titleKind', 'titleId'], $viewing['required']);
+        self::assertSame(['episode', 'movie', 'extra'], $viewing['properties']['titleKind']['enum']);
+        $this->assertPublicIdentifierSchema($viewing['properties']['titleId']);
+
+        $controlMedia = $schemas['ControlPlaybackRequest']['properties']['media'];
+        self::assertArrayHasKey('default', $controlMedia);
+        self::assertNull($controlMedia['default']);
+        $nullableMedia = [$controlMedia];
         foreach (['ClosePlaybackEndpointRequest', 'RecoverLocalPlaybackRequest'] as $request) {
             $checkpoint = $schemas[$request]['properties']['checkpoint'];
-            [$checkpointMap, $checkpointChoices] = $checkpoint['allOf'];
-            $branches = $checkpointChoices['properties']['media']['oneOf'];
-            [$mediaMap, $mediaChoices] = $branches[0]['allOf'];
-            self::assertSame(['kind' => $kind], $mediaChoices['properties']);
-            $branches[0] = $mediaMap;
-            self::assertSame($checkpointValues, $checkpointMap['additionalProperties']['oneOf']);
-            self::assertSame($checkpointValues, $branches);
+            self::assertSame('object', $checkpoint['type']);
+            self::assertEqualsCanonicalizing(['media', 'revision', 'currentTrackIndex', 'position'], $checkpoint['required']);
+            $properties = $checkpoint['properties'];
+            $nullableMedia[] = $properties['media'];
+            foreach (['revision', 'currentTrackIndex'] as $field) {
+                self::assertSame('integer', $properties[$field]['type']);
+                self::assertSame(0, $properties[$field]['minimum']);
+            }
+            self::assertSame('number', $properties['position']['type']);
+            self::assertSame('float', $properties['position']['format']);
+            self::assertSame(0, $properties['position']['minimum']);
+        }
+        foreach ($nullableMedia as $selection) {
+            self::assertSame('object', $selection['type']);
+            self::assertTrue($selection['nullable']);
+            self::assertSame([['$ref' => '#/components/schemas/PlaybackMediaResource']], $selection['allOf']);
         }
     }
 
