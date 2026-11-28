@@ -1091,6 +1091,11 @@ Deferred to implementation:
 
 The authoritative gates run in the CI image, as the [testing guide](../../docs-book/part-2-developer-guide/testing/README.md) states. `ROADMAP.md` records the suite counts and static gate results of the final run.
 
+On 2026-11-28 the owner accepted the focused unit checks and the merged
+release’s full `make ci` as the final verification for U4, U5, U12–U16, U22
+and U23. Those nine historical replays were cancelled before they started.
+U11 was already running and was retained. (session-settled: user-approved.)
+
 ### Acceptance tests
 
 | Example | Named regression test |

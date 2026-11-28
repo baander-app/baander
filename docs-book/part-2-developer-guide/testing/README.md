@@ -6,6 +6,14 @@ below, then read the subsystem guide for prerequisites and the limits of its
 results. Historical qualification results describe earlier runs; they do not
 replace running the checks for your change.
 
+## When to run full CI
+
+For each unit in a phased plan, run the tests that exercise its changes and
+static analysis on the affected paths. For PHP, run
+`make phpstan PHPSTAN_OPTIONS="<paths>"` in the CI image. Run the full
+`make ci` at each phase boundary and on the merged release. Record the
+revision, suite counts and static gate results in `ROADMAP.md`.
+
 ## Test Suites
 
 | Suite | Directory | Scope |

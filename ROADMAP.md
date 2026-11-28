@@ -298,6 +298,13 @@ The entries below cover scanning, matching, member playback and their verificati
   workload and log-retention fixtures, and U13 corrected the sleep test’s
   signal timer.
 
+- The U19 replay ran 15,993 tests with 170,456 assertions. Its four failures
+  and two warnings came from the same four tests corrected before the merged
+  release passed.
+- On November 28 the owner accepted the focused unit checks and the merged
+  release result for U4, U5, U12–U16, U22 and U23. The nine queued full-suite
+  replays were cancelled before they started.
+
 The [published video matching guide](https://baander.app/docs/operator-guide/media/video-matching/)
 includes the progress clock setting. The site uses the CI archive from
 `b67344508`, verified against SHA-256
