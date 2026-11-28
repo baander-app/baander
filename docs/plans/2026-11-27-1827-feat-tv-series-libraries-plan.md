@@ -743,6 +743,7 @@ Deferred to implementation:
   4. Before fixing the mapping, check the base host, the remote-ID `sourceName` strings and remote-ID search against the published OpenAPI file and one live call with the owner's key. The tests use recorded fixtures.
   5. `TVDB_API_KEY` is admitted to the worker environment at every site that admits `TMDB_BEARER_TOKEN` (KTD7).
 - **Execution note:** Start with the kernel test that resolves the adapter with `TVDB_API_KEY` empty in `$_ENV`, `$_SERVER` and the process environment.
+- **Live check, 2026-11-28.** The operator's licensed key authenticated at `https://api4.thetvdb.com/v4/login`. A lookup at `/v4/search/remoteid/1399` returned one series, *Game of Thrones*, with `series.id` 121361. The search result omitted `remoteIds`. A follow-up read of `/v4/series/121361/extended` returned `IMDB` (type 2, ID `tt0944947`) and `TheMovieDB.com` (type 12, ID `1399`).
 - **Patterns to follow:** `src/Metadata/Infrastructure/Api/Tmdb/TmdbAdapter.php` (allowlist, bounded body, 429); `src/Metadata/Infrastructure/Api/MusicBrainz/MusicBrainzAdapter.php` (outcome value objects).
 - **Test scenarios:**
   - Login sends only the licensed API key.
@@ -815,7 +816,7 @@ Deferred to implementation:
   - Covers AE14. TheTVDB answering 503 leaves the series queued and not matched to TMDB, and pauses TheTVDB only.
   - While TheTVDB is paused after a failed login, a movie library ordered local, then TMDB keeps matching.
   - Covers AE16. A movie library ordered local, then TMDB, with TMDB switched off and no NFO files, leaves new movies awaiting a provider, and the recovery run queues them once TMDB is switched on.
-  - A candidate scoring 92 with a runner-up at 85 is confident; one at 92 with a runner-up at 88 goes to review as a close runner-up.
+  - A candidate scoring 92 with a runner-up at 82 is confident. With a runner-up at 85 or 88 it goes to review as a close runner-up. (session-settled: user-approved — keep the album rule’s ten-point minimum lead.)
   - A tagged folder is confident without a search.
   - Two drain runs never claim the same title.
 - **Verification:** the queue claims, pauses and recovers as the state diagram shows, and the race test passes.

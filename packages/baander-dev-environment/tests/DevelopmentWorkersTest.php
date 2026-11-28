@@ -764,6 +764,21 @@ final class DevelopmentWorkersTest extends DevDataTestCase
         self::assertSame($runtime, new DeploymentRuntimeEnvironment($runtime)->variables);
     }
 
+    public function testWorkerCredentialsCarryTheConfiguredTvdbKey(): void
+    {
+        AtomicFile::writeJson(
+            $this->store->directory('persistent') . '/env.json',
+            $this->environment() + ['TVDB_API_KEY' => 'fixture-tvdb-key'],
+        );
+
+        new WorkerDeployment($this->store, $this->preparationRunner())->prepare($this->instance, $this->release);
+        $runtime = AtomicFile::readJson($this->instance['workers']['directory'] . '/credentials.json')['runtimeEnvironment'];
+
+        self::assertSame('fixture-tvdb-key', $runtime['TVDB_API_KEY'] ?? null);
+        ksort($runtime);
+        self::assertSame($runtime, new DeploymentRuntimeEnvironment($runtime)->variables);
+    }
+
     public function testDerivedBindIsRefusedBeforeSavingWorkerPointer(): void
     {
         AtomicFile::writeJson($this->store->directory('persistent') . '/env.json', $this->environment());

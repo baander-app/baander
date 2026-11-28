@@ -656,6 +656,18 @@ final class PresetDeploymentTest extends TestCase
         self::assertSame($worker, new DeploymentRuntimeEnvironment($worker)->variables);
     }
 
+    public function testWorkerEnvironmentCarriesTheConfiguredTvdbKey(): void
+    {
+        $data = self::configuration();
+        $data['environment']['TVDB_API_KEY'] = 'fixture-tvdb-key';
+
+        $worker = Renderer::workerEnvironment(Configuration::fromArray($data), $this->profile());
+
+        self::assertSame('fixture-tvdb-key', $worker['TVDB_API_KEY'] ?? null);
+        ksort($worker);
+        self::assertSame($worker, new DeploymentRuntimeEnvironment($worker)->variables);
+    }
+
     public function testProcessSizeBoundsMatchTheApplicationProfile(): void
     {
         self::assertSame([

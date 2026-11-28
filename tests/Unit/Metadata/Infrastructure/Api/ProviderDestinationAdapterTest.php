@@ -12,6 +12,8 @@ use App\Metadata\Infrastructure\Api\MusicBrainz\MusicBrainzAdapter;
 use App\Metadata\Infrastructure\Api\Spotify\SpotifyAdapter;
 use App\Metadata\Infrastructure\Api\TasteDive\TasteDiveAdapter;
 use App\Metadata\Infrastructure\Api\Tmdb\TmdbAdapter;
+use App\Metadata\Infrastructure\Api\Tvdb\TvdbAdapter;
+use Symfony\Component\Cache\Adapter\ArrayAdapter;
 use Baander\HttpClient\PublicDestinationPolicy;
 use Baander\HttpClient\PublicHttpClient;
 use Monolog\Handler\TestHandler;
@@ -33,7 +35,7 @@ final class ProviderDestinationAdapterTest extends TestCase
     /** @return iterable<string, array{string}> */
     public static function providers(): iterable
     {
-        foreach (['musicbrainz', 'discogs', 'lastfm', 'spotify', 'tastedive', 'tmdb', 'coverartarchive'] as $provider) {
+        foreach (['musicbrainz', 'discogs', 'lastfm', 'spotify', 'tastedive', 'tmdb', 'tvdb', 'coverartarchive'] as $provider) {
             yield $provider => [$provider];
         }
     }
@@ -49,6 +51,12 @@ final class ProviderDestinationAdapterTest extends TestCase
             self::assertSame(0, $options['max_redirects']);
             self::assertTrue($options['verify_peer']);
             self::assertTrue($options['verify_host']);
+            if (str_ends_with($url, '/v4/login')) {
+                self::assertSame('POST', $method);
+                self::assertSame(['apikey' => self::SECRET], json_decode($options['body'], true, flags: JSON_THROW_ON_ERROR));
+
+                return new MockResponse('{"status":"success","data":{"token":"tvdb-access-fixture"}}');
+            }
             if (parse_url($url, PHP_URL_HOST) === 'accounts.spotify.com') {
                 self::assertSame('POST', $method);
                 self::assertSame('grant_type=client_credentials', $options['body']);
@@ -61,7 +69,7 @@ final class ProviderDestinationAdapterTest extends TestCase
         });
         $client = new PublicHttpClient($raw, new PublicDestinationPolicy(static fn(string $host): array => ['1.1.1.1']));
         self::assertSame($provider === 'coverartarchive' ? 'https://images.baander.app/cover.jpg' : 'Artist', $this->invokeProvider($provider, $client));
-        self::assertCount($provider === 'spotify' ? 2 : 1, $requests);
+        self::assertCount(in_array($provider, ['spotify', 'tvdb'], true) ? 2 : 1, $requests);
         if ($provider === 'spotify') {
             self::assertStringContainsString('spotify-access-canary', json_encode($requests[1]['options']['headers'], JSON_THROW_ON_ERROR));
         }
@@ -79,12 +87,12 @@ final class ProviderDestinationAdapterTest extends TestCase
             return new MockResponse('{}');
         });
         $client = new PublicHttpClient($raw, new PublicDestinationPolicy(static fn(string $host): array => ['127.0.0.1']));
-        if (in_array($provider, ['spotify', 'tmdb'], true)) {
+        if (in_array($provider, ['spotify', 'tmdb', 'tvdb'], true)) {
             try {
                 $this->invokeProvider($provider, $client, $logger);
                 self::fail('Spotify authentication must report its failed token acquisition.');
             } catch (\RuntimeException $exception) {
-                self::assertSame($provider === 'spotify' ? 'Failed to authenticate with Spotify API.' : 'TMDB API request failed.', $exception->getMessage());
+                self::assertSame(self::failureMessage($provider), $exception->getMessage());
             }
         } else {
             self::assertNull($this->invokeProvider($provider, $client, $logger));
@@ -111,8 +119,8 @@ final class ProviderDestinationAdapterTest extends TestCase
         try {
             self::assertNull($this->invokeProvider($provider, $client, $logger));
         } catch (\RuntimeException $exception) {
-            self::assertContains($provider, ['spotify', 'tmdb']);
-            self::assertSame($provider === 'spotify' ? 'Failed to authenticate with Spotify API.' : 'TMDB API request failed.', $exception->getMessage());
+            self::assertContains($provider, ['spotify', 'tmdb', 'tvdb']);
+            self::assertSame(self::failureMessage($provider), $exception->getMessage());
         }
         self::assertSame(1, $requests);
         self::assertStringNotContainsString(self::SECRET, json_encode($handler->getRecords(), JSON_THROW_ON_ERROR));
@@ -124,15 +132,17 @@ final class ProviderDestinationAdapterTest extends TestCase
     public function testAnAnswerOverTheSizeCapIsAFailure(string $provider): void
     {
         $padded = json_encode($this->successBody($provider), JSON_THROW_ON_ERROR) . str_repeat(' ', PublicHttpClient::MAX_BODY_BYTES);
-        $raw = new MockHttpClient(static fn (string $method, string $url): MockResponse => parse_url($url, PHP_URL_HOST) === 'accounts.spotify.com'
-            ? new MockResponse('{"access_token":"spotify-access-canary","expires_in":3600}')
-            : new MockResponse($padded));
+        $raw = new MockHttpClient(static fn (string $method, string $url): MockResponse => match (true) {
+            parse_url($url, PHP_URL_HOST) === 'accounts.spotify.com' => new MockResponse('{"access_token":"spotify-access-canary","expires_in":3600}'),
+            str_ends_with($url, '/v4/login') => new MockResponse('{"status":"success","data":{"token":"tvdb-access-fixture"}}'),
+            default => new MockResponse($padded),
+        });
         $client = new PublicHttpClient($raw, new PublicDestinationPolicy(static fn(string $host): array => ['1.1.1.1']));
         try {
             self::assertNull($this->invokeProvider($provider, $client));
         } catch (\RuntimeException $exception) {
-            self::assertSame('tmdb', $provider);
-            self::assertSame('TMDB API request failed.', $exception->getMessage());
+            self::assertContains($provider, ['tmdb', 'tvdb']);
+            self::assertSame(self::failureMessage($provider), $exception->getMessage());
         }
     }
 
@@ -199,6 +209,16 @@ final class ProviderDestinationAdapterTest extends TestCase
         self::assertSame(['POST accounts.spotify.com', 'GET api.spotify.com', 'GET api.spotify.com'], $calls);
     }
 
+    private static function failureMessage(string $provider): string
+    {
+        return match ($provider) {
+            'spotify' => 'Failed to authenticate with Spotify API.',
+            'tmdb' => 'TMDB API request failed.',
+            'tvdb' => 'TheTVDB API request failed.',
+            default => throw new \LogicException('Provider has no throwing transport fixture.'),
+        };
+    }
+
     /** @return array<array-key, mixed> */
     private function successBody(string $provider): array
     {
@@ -208,6 +228,7 @@ final class ProviderDestinationAdapterTest extends TestCase
             'lastfm' => ['artist' => ['name' => 'Artist']],
             'spotify' => ['artists' => ['items' => [['id' => 'artist', 'name' => 'Artist']]]],
             'tastedive' => ['Similar' => ['Results' => [['Name' => 'Artist']]]],
+            'tvdb' => ['status' => 'success', 'data' => [['tvdb_id' => '1', 'name' => 'Artist']]],
             'tmdb' => ['total_results' => 1, 'results' => [['id' => 1, 'title' => 'Artist']]],
             'coverartarchive' => [['image' => 'https://images.baander.app/cover.jpg']],
             default => throw new \LogicException('Unknown fixture provider.'),
@@ -232,6 +253,7 @@ final class ProviderDestinationAdapterTest extends TestCase
             'lastfm' => new LastFmAdapter(self::SECRET, $logger, $encoder, $client, ProviderSwitches::allEnabled())->getArtistInfo('Artist')['name'] ?? null,
             'spotify' => new SpotifyAdapter('client', self::SECRET, $logger, $encoder, $client, ProviderSwitches::allEnabled())->searchArtist('Artist')[0]['name'] ?? null,
             'tastedive' => new TasteDiveAdapter(self::SECRET, $logger, $encoder, $client, ProviderSwitches::allEnabled())->getSimilar('Artist')[0]['name'] ?? null,
+            'tvdb' => new TvdbAdapter(self::SECRET, $client, ProviderSwitches::allEnabled(), new ArrayAdapter())->searchSeries('Artist')[0]['name'] ?? null,
             'tmdb' => new TmdbAdapter(self::SECRET, $logger, $encoder, $client, ProviderSwitches::allEnabled())->searchMovie('Artist')->first()?->title,
             'coverartarchive' => new CoverArtArchiveAdapter($logger, $encoder, $client, ProviderSwitches::allEnabled())->getReleaseCover('release')[0]['image'] ?? null,
             default => throw new \LogicException('Unknown fixture provider.'),

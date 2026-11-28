@@ -104,6 +104,7 @@ class WorkerDeployment
                 EnvironmentVariable::MAIL_FROM_ADDRESS,
                 EnvironmentVariable::VIDEO_ENCODER,
                 EnvironmentVariable::TMDB_BEARER_TOKEN,
+                EnvironmentVariable::TVDB_API_KEY,
                 EnvironmentVariable::VAPID_PRIVATE_KEY,
                 EnvironmentVariable::VAPID_PUBLIC_KEY,
                 EnvironmentVariable::STREAM_URL_HMAC_SECRET,

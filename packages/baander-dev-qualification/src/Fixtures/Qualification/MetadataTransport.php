@@ -24,7 +24,7 @@ final class MetadataTransport
     public static function dnsResolver(): Closure
     {
         return static function (string $host, float $deadline): array {
-            if (!in_array($host, ['musicbrainz.org', 'api.themoviedb.org'], true) || $deadline <= hrtime(true) / 1e9) {
+            if (!in_array($host, ['musicbrainz.org', 'api.themoviedb.org', 'api4.thetvdb.com'], true) || $deadline <= hrtime(true) / 1e9) {
                 throw new RuntimeException('Unknown qualification metadata destination.');
             }
             return ['1.1.1.1'];
@@ -68,7 +68,7 @@ final class MetadataTransport
                 'score' => 100, 'tags' => [['name' => 'Qualification fixture', 'count' => 1]]];
         }
         $releases = self::releases($plan);
-        return new MockHttpClient(static function (string $method, string $url) use ($recordings, $movies, $albums, $artists, $releases, $auditPath): MockResponse {
+        return new MockHttpClient(static function (string $method, string $url, array $options) use ($recordings, $movies, $albums, $artists, $releases, $auditPath): MockResponse {
             $parts = parse_url($url);
             $host = $parts['host'] ?? '';
             $path = $parts['path'] ?? '';
@@ -82,6 +82,21 @@ final class MetadataTransport
                     [$body, $identity, $status] = self::musicbrainz($path, $query, $recordings, $albums, $artists, $releases) + [2 => 200];
                 } elseif ($host === 'api.themoviedb.org') {
                     [$body, $identity] = self::tmdb($path, $query, $movies);
+                }
+            }
+            if ($host === 'api4.thetvdb.com' && ($parts['scheme'] ?? '') === 'https'
+                && !isset($parts['user']) && !isset($parts['pass']) && !isset($parts['port']) && !isset($parts['fragment'])
+            ) {
+                if ($method === 'POST' && $path === '/v4/login' && $query === []) {
+                    $credentials = is_string($options['body'] ?? null) ? json_decode($options['body'], true) : null;
+                    if (is_array($credentials) && array_keys($credentials) === ['apikey'] && $credentials['apikey'] === 'qualification-tvdb-key') {
+                        $body = ['status' => 'success', 'data' => ['token' => 'qualification-tvdb-token']];
+                    }
+                } elseif ($method === 'GET' && $path === '/v4/search' && ($query['type'] ?? null) === 'series'
+                    && is_string($query['query'] ?? null) && str_starts_with($query['query'], 'Qualification ')
+                    && array_diff(array_keys($query), ['query', 'type', 'year']) === []
+                ) {
+                    $body = ['status' => 'success', 'data' => []];
                 }
             }
             self::audit($auditPath, ['at' => microtime(true), 'method' => $method, 'host' => $host, 'path' => substr($path, 0, 180),

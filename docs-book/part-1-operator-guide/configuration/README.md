@@ -52,11 +52,32 @@ The worker pair runs with `APP_ENV=prod` and receives a fixed subset of the web
 environment: the derived connection and media path values, `APP_URL`,
 `DEFAULT_URI` and `BAANDER_DEPLOYMENT_PROFILE`, the three secrets,
 `REDIS_PASSWORD`, `MAILER_DSN`, `MAIL_FROM_ADDRESS`, `VIDEO_ENCODER`, the VAPID
-pair, `OTEL_ENABLED`, `OTEL_EXPORTER_OTLP_ENDPOINT` and `TMDB_BEARER_TOKEN`.
+pair, `OTEL_ENABLED`, `OTEL_EXPORTER_OTLP_ENDPOINT`, `TMDB_BEARER_TOKEN` and
+`TVDB_API_KEY`.
 Any other `environment` key reaches web alone. Other worker values, including
 `HW_ACCEL_DEVICE` and `HW_BITRATE_MULTIPLIER`, come from the image as the worker
 and transcoding guides describe. The preset gives web and workers the same database,
 Redis and media paths. See [Shared media paths](../getting-started/storage-and-data.md#shared-media-paths).
+
+## Video metadata credentials
+
+Set `TVDB_API_KEY` to the installation's licensed TheTVDB v4 API key and
+`TMDB_BEARER_TOKEN` to its TMDB API read access token. Both values reach web and
+workers. After editing the installation's private configuration, run the preset's
+`start` so both use the new credentials. A development preview picks up its changed
+configuration through `make preview-up`.
+
+An empty key leaves that provider unconfigured while the application and workers
+start normally. Provider switches are database settings and take effect on the next
+check. Use [app:metadata:providers](../commands/app-metadata-providers.md) to inspect
+the enabled and configured states, and
+[app:metadata:provider:set](../commands/app-metadata-provider-set.md) to change a switch.
+
+The [preset worker environment](../../../packages/baander-deployment/src/Presets/Renderer.php)
+and [worker environment admission](../../../src/Shared/Infrastructure/Worker/DeploymentRuntimeEnvironment.php)
+carry these credentials. The
+[empty-key kernel test](../../../tests/Functional/Metadata/ProviderKeysEmptyKernelTest.php)
+checks that both adapters resolve without credentials.
 
 ## Protect configuration
 

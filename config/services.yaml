@@ -1278,11 +1278,17 @@ services:
     App\Metadata\Infrastructure\Video\VideoMetadataProviders:
         arguments:
             $adapters:
+                - '@App\Metadata\Infrastructure\Video\TvdbVideoMetadata'
                 - '@App\Metadata\Infrastructure\Video\TmdbVideoMetadata'
 
     App\Metadata\Infrastructure\Api\Tmdb\TmdbAdapter:
         arguments:
             $bearerToken: '%env(TMDB_BEARER_TOKEN)%'
+
+    App\Metadata\Infrastructure\Api\Tvdb\TvdbAdapter:
+        arguments:
+            $apiKey: '%env(TVDB_API_KEY)%'
+            $cache: '@cache.app'
 
     App\Catalog\Application\Port\PeopleReadPortInterface:
         alias: App\Catalog\Infrastructure\Doctrine\Repository\PeopleReadRepository
@@ -1843,6 +1849,9 @@ when@test:
     parameters:
         notification.push.allowed_domains: ['push.baander.app']
     services:
+        test.tvdb_adapter:
+            alias: App\Metadata\Infrastructure\Api\Tvdb\TvdbAdapter
+            public: true
         # A message whose handler fails on demand, for failure transport tests.
         App\Tests\Fixtures\Messaging\FailureTransportProbeCodec:
             tags: ['baander.message_payload_codec']
