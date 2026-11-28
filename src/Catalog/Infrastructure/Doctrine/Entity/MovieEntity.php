@@ -74,6 +74,19 @@ class MovieEntity
     #[ORM\Column(type: 'json', options: ['jsonb' => true, 'default' => '[]'])]
     private array $lockedFields = [];
 
+    #[ORM\Column(type: 'text', nullable: true)]
+    private ?string $matchedProvider = null;
+
+    #[ORM\Column(type: 'text', nullable: true)]
+    private ?string $providerId = null;
+
+    /** @var array<string, string> */
+    #[ORM\Column(type: 'json', options: ['jsonb' => true, 'default' => '{}'])]
+    private array $externalIds = [];
+
+    #[ORM\Column(type: 'boolean', options: ['default' => false])]
+    private bool $handMatched = false;
+
     #[ORM\Column(type: 'datetime_immutable')]
     private \DateTimeImmutable $createdAt;
 
@@ -96,6 +109,16 @@ class MovieEntity
 
     /** @return list<string> */
     public function getLockedFields(): array { return $this->lockedFields; }
+    public function getMatchedProvider(): ?string { return $this->matchedProvider; }
+    public function setMatchedProvider(?string $provider): void { $this->matchedProvider = $provider; }
+    public function getProviderId(): ?string { return $this->providerId; }
+    public function setProviderId(?string $providerId): void { $this->providerId = $providerId; }
+    /** @return array<string, string> */
+    public function getExternalIds(): array { return $this->externalIds; }
+    /** @param array<string, string> $externalIds */
+    public function setExternalIds(array $externalIds): void { $this->externalIds = $externalIds; }
+    public function isHandMatched(): bool { return $this->handMatched; }
+    public function setHandMatched(bool $handMatched): void { $this->handMatched = $handMatched; }
     /** @param list<string> $fields */
     public function setLockedFields(array $fields): void { $this->lockedFields = $fields; }
     public function getId(): Uuid { return $this->id; }

@@ -187,6 +187,9 @@ final readonly class TvdbVideoMetadata implements VideoProviderAdapter
         if ($failure instanceof TvdbNotConfiguredException) {
             return VideoProviderProblem::NotConfigured;
         }
+        if ($failure instanceof TvdbHttpException && $failure->login && in_array($failure->status, [400, 401, 403], true)) {
+            return VideoProviderProblem::LoginFailed;
+        }
         if ($failure instanceof TvdbHttpException && $failure->status >= 400 && $failure->status < 500
             && !in_array($failure->status, [401, 403, 408, 429], true)
         ) {

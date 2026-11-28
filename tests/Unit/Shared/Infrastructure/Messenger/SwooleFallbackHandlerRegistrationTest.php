@@ -5,7 +5,9 @@ declare(strict_types=1);
 namespace App\Tests\Unit\Shared\Infrastructure\Messenger;
 
 use App\Catalog\Application\Message\DrainAlbumMatchesMessage;
+use App\Catalog\Application\Message\DrainVideoMatchesMessage;
 use App\Catalog\Application\MessageHandler\DrainAlbumMatchesHandler;
+use App\Catalog\Application\MessageHandler\DrainVideoMatchesHandler;
 use App\Catalog\Application\MessageHandler\QueueArtistSyncsHandler;
 use App\Catalog\Application\MessageHandler\RequestAlbumMatchHandler;
 use App\Catalog\Application\MessageHandler\SyncArtistHandler;
@@ -74,6 +76,7 @@ final class SwooleFallbackHandlerRegistrationTest extends TestCase
             SyncMovieHandler::class => new SyncMovieMessage(Uuid::v7()),
             RequestAlbumMatchHandler::class => new SyncAlbumMessage(Uuid::v7()),
             DrainAlbumMatchesHandler::class => new DrainAlbumMatchesMessage(),
+            DrainVideoMatchesHandler::class => new DrainVideoMatchesMessage(),
             SyncLibraryHandler::class => new SyncLibraryMessage(Uuid::v7()),
             QueueArtistSyncsHandler::class => new SyncArtistsMessage(),
             SyncArtistHandler::class => new SyncArtistMessage(Uuid::v7()),

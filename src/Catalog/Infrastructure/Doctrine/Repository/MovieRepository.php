@@ -176,6 +176,19 @@ final class MovieRepository implements MovieRepositoryInterface
         $this->entityManager->flush();
     }
 
+    public function saveMatchIdentity(Movie $movie): void
+    {
+        $entity = $this->entityManager->find(MovieEntity::class, $movie->getId());
+        if ($entity === null) {
+            throw new \LogicException('Cannot record a match for a movie that has not been persisted.');
+        }
+        $entity->setMatchedProvider($movie->getMatchedProvider());
+        $entity->setProviderId($movie->getProviderId());
+        $entity->setExternalIds($movie->getExternalIds());
+        $entity->setHandMatched($movie->isHandMatched());
+        $this->entityManager->flush();
+    }
+
     public function flush(): void
     {
         $this->entityManager->flush();
@@ -432,6 +445,10 @@ final class MovieRepository implements MovieRepositoryInterface
             updatedAt: $entity->getUpdatedAt(),
             videoPublicIds: $videoPublicIds,
             lockedFields: $entity->getLockedFields(),
+            matchedProvider: $entity->getMatchedProvider(),
+            providerId: $entity->getProviderId(),
+            externalIds: $entity->getExternalIds(),
+            handMatched: $entity->isHandMatched(),
         ));
     }
 
@@ -441,6 +458,10 @@ final class MovieRepository implements MovieRepositoryInterface
         $entity->setYear($movie->getYear());
         $entity->setSummary($movie->getSummary());
         $entity->setLockedFields($movie->getLockedFields());
+        $entity->setMatchedProvider($movie->getMatchedProvider());
+        $entity->setProviderId($movie->getProviderId());
+        $entity->setExternalIds($movie->getExternalIds());
+        $entity->setHandMatched($movie->isHandMatched());
         $this->syncMetadataToEntity($movie, $entity);
     }
 

@@ -6,6 +6,7 @@ namespace App\Tests\Unit\Shared\Infrastructure\Messenger;
 
 use App\Catalog\Application\Command\BatchExtractCoversCommand;
 use App\Catalog\Application\Message\DrainAlbumMatchesMessage;
+use App\Catalog\Application\Message\DrainVideoMatchesMessage;
 use App\Library\Application\Command\ScanLibraryCommand;
 use App\Library\Application\Message\DiscoveredFile;
 use App\Library\Application\Message\FilesDiscovered;
@@ -63,6 +64,7 @@ final class JsonMessageCodecTest extends TestCase
         yield [new BatchExtractCoversCommand()];
         yield [new DrainAlbumMatchesMessage()];
         yield [new DrainAlbumMatchesMessage('0199bf3c-8a00-7000-8000-c4a1d0000001', 2)];
+        yield [new DrainVideoMatchesMessage()];
         yield [new ScanLibraryCommand(new LibrarySlug('music'), true)];
         yield [new FilesDiscovered($id, 'music', '/music', [new DiscoveredFile('/music/a.flac', 'a.flac', 'flac', 100, 12345, 'abc')])];
         yield [new ExtractAlbumCoverCommand($id)];
@@ -110,6 +112,17 @@ final class JsonMessageCodecTest extends TestCase
         $json = '{"format":"baander.message","version":1,"type":"metadata.extract_album_cover","payload":{"album_id":"00000000-0000-4000-8000-000000000001"},"metadata":{}}';
         self::assertSame($json, $codec->encode(new ExtractAlbumCoverCommand(Uuid::fromString('00000000-0000-4000-8000-000000000001'))));
         self::assertInstanceOf(ExtractAlbumCoverCommand::class, $codec->decode($json)->message);
+    }
+
+    public function testVideoMatchDrainWireCarriesAnEmptyPayload(): void
+    {
+        $codec = MessageCodecFactory::create();
+        $wire = json_decode($codec->encode(new DrainVideoMatchesMessage()), true, flags: JSON_THROW_ON_ERROR);
+        self::assertSame('catalog.drain_video_matches', $wire['type']);
+        self::assertSame([], $wire['payload']);
+        $wire['payload']['provider'] = 'local';
+        $this->expectException(\InvalidArgumentException::class);
+        $codec->decode(json_encode($wire, JSON_THROW_ON_ERROR));
     }
 
     public function testOccurrenceWireCarriesOnlyItsIdentity(): void

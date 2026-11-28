@@ -15,6 +15,7 @@ use App\Catalog\Application\Port\GenrePortInterface;
 use App\Catalog\Application\Port\MetadataContentReaderPortInterface;
 use App\Catalog\Domain\Repository\MovieRepositoryInterface;
 use App\Catalog\Application\Port\SongPortInterface;
+use App\Catalog\Application\Port\VideoMatchRequestInterface;
 use App\Catalog\Application\Service\VideoFileIngest;
 use App\Catalog\Domain\Model\Album;
 use App\Catalog\Domain\Model\Song;
@@ -455,6 +456,7 @@ final class FilesDiscoveredRetagTest extends TestCase
             $resolver,
             $this->createStub(ArtistSyncRequestInterface::class),
             tvLibraryIngest: $this->unusedTvIngest(),
+            videoMatches: $this->createStub(VideoMatchRequestInterface::class),
         );
     }
 

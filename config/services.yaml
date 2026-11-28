@@ -759,11 +759,23 @@ services:
         alias: App\Catalog\Infrastructure\Doctrine\Repository\AlbumMatchStateRepository
     App\Catalog\Domain\Repository\LibraryProviderOrderRepositoryInterface:
         alias: App\Catalog\Infrastructure\Doctrine\Repository\LibraryProviderOrderRepository
+    App\Catalog\Domain\Repository\VideoMatchStateRepositoryInterface:
+        alias: App\Catalog\Infrastructure\Doctrine\Repository\VideoMatchStateRepository
+    App\Catalog\Domain\Repository\VideoProviderPauseRepositoryInterface:
+        alias: App\Catalog\Infrastructure\Doctrine\Repository\VideoProviderPauseRepository
 
     App\Shared\Application\Port\OpenApiExporterInterface:
         alias: App\Shared\Infrastructure\OpenApi\NativeOpenApiExporter
 
     # --- Catalog Application Port Aliases ---
+    App\Catalog\Application\Port\VideoMatchRequestInterface:
+        alias: App\Catalog\Application\Service\VideoMatch\VideoMatchRequester
+    App\Catalog\Application\Service\VideoMatch\AutomaticVideoMatcherInterface:
+        alias: App\Catalog\Application\Service\VideoMatch\AutomaticVideoMatcher
+    App\Catalog\Application\Port\VideoMatchTargetLoaderInterface:
+        alias: App\Catalog\Infrastructure\VideoMatch\VideoMatchTargetLoader
+    App\Catalog\Application\Port\VideoMatchApplyInterface:
+        alias: App\Catalog\Infrastructure\VideoMatch\VideoMatchApply
     App\Catalog\Application\Port\ArtistPortInterface:
         alias: App\Catalog\Infrastructure\ArtistService
     App\Catalog\Application\Port\ArtistIdentityResolverInterface:
@@ -815,6 +827,8 @@ services:
 
     App\Library\Application\Port\LibraryFileAvailabilityInterface:
         alias: App\Library\Infrastructure\LibraryFileAvailability
+    App\Library\Application\Port\VideoSidecarIndexInterface:
+        alias: App\Library\Infrastructure\Doctrine\Repository\VideoSidecarIndex
     App\Library\Application\Port\LibraryTypeLookupInterface:
         alias: App\Library\Infrastructure\LibraryTypeLookup
     App\Library\Application\Port\LibraryMediaFilesInterface:

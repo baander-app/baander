@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Tests\Unit\Messenger;
 
 use App\Catalog\Application\Message\DrainAlbumMatchesMessage;
+use App\Catalog\Application\Message\DrainVideoMatchesMessage;
 use App\Lyrics\Application\Command\FetchLyricsCommand;
 use App\Metadata\Application\Message\SyncArtistMessage;
 use App\Metadata\Application\Message\SyncArtistsMessage;
@@ -23,10 +24,11 @@ final class MessengerRoutingTest extends TestCase
     public function testProductionRoutesPreserveLyricsSynchronousDispatchAndSchedulerIsolation(): void
     {
         $config = MessengerConfiguration::messenger();
-        self::assertCount(22, $config['routing']);
+        self::assertCount(23, $config['routing']);
         self::assertSame('scheduler', $config['routing'][ExecuteScheduledOccurrenceCommand::class]);
-        self::assertCount(21, array_filter($config['routing'], static fn (string $queue): bool => $queue === 'async'));
+        self::assertCount(22, array_filter($config['routing'], static fn (string $queue): bool => $queue === 'async'));
         self::assertSame('async', $config['routing'][DrainAlbumMatchesMessage::class]);
+        self::assertSame('async', $config['routing'][DrainVideoMatchesMessage::class]);
         self::assertSame('async', $config['routing'][SyncArtistsMessage::class]);
         self::assertSame('async', $config['routing'][SyncArtistMessage::class]);
         self::assertSame('async', $config['routing'][SyncMovieMessage::class]);
@@ -37,7 +39,7 @@ final class MessengerRoutingTest extends TestCase
         self::assertArrayNotHasKey(SendWebhookCommand::class, $config['routing']);
         self::assertArrayNotHasKey(FailureTransportProbe::class, $config['routing']);
         $workloads = MessengerConfiguration::container()->getParameter('app.messenger.workloads');
-        self::assertCount(24, $workloads);
+        self::assertCount(25, $workloads);
         self::assertSame(['transport' => 'async', 'resource_class' => 'io', 'default' => false], $workloads[FetchLyricsCommand::class]);
         self::assertSame(['transport' => 'async', 'resource_class' => 'io', 'default' => false], $workloads[SendWebhookCommand::class]);
     }

@@ -16,6 +16,7 @@ use App\Catalog\Application\Port\IdentifiedArtist;
 use App\Catalog\Application\Port\MetadataContentReaderPortInterface;
 use App\Catalog\Domain\Repository\MovieRepositoryInterface;
 use App\Catalog\Application\Port\SongPortInterface;
+use App\Catalog\Application\Port\VideoMatchRequestInterface;
 use App\Catalog\Application\Service\ArtistSyncQueue;
 use App\Catalog\Application\Service\ArtistSyncRequester;
 use App\Catalog\Application\Service\VideoFileIngest;
@@ -461,6 +462,7 @@ final class FilesDiscoveredArtistCreditTest extends TestCase
             artistIdentities: $resolver,
             artistSyncs: $this->artistSyncs(),
             tvLibraryIngest: $this->unusedTvIngest(),
+            videoMatches: $this->createStub(VideoMatchRequestInterface::class),
         );
     }
 

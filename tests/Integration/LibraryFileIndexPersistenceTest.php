@@ -11,6 +11,7 @@ use App\Library\Domain\ValueObject\LibraryType;
 use App\Library\Infrastructure\Doctrine\Entity\LibraryFileIndexEntity;
 use App\Library\Infrastructure\Doctrine\Repository\LibraryFileIndexRepository;
 use App\Library\Infrastructure\Doctrine\Repository\LibraryRepository;
+use App\Library\Infrastructure\Doctrine\Repository\VideoSidecarIndex;
 use App\Shared\Domain\Model\Uuid;
 use App\Shared\Domain\ValueObject\FilesystemType;
 use Doctrine\DBAL\Exception\ForeignKeyConstraintViolationException;
@@ -26,6 +27,23 @@ final class LibraryFileIndexPersistenceTest extends TestCase
     use OwnershipPersistenceHarness;
 
     private const FOREIGN_KEY = 'fk_library_file_index_library_id';
+
+    public function testVideoSidecarsAreScopedToTheExactFolderAndTheRootHasOnlyDirectFiles(): void
+    {
+        $library = $this->createLibrary();
+        $libraryId = $library->getId();
+        $root = $library->getPath()->toString();
+        $index = new LibraryFileIndexRepository($this->manager);
+        foreach (['movie.nfo', 'Été_1/season/episode.nfo', 'Été_1/removed.png', 'Été_1/main.mkv', 'Été_12/other.nfo'] as $relative) {
+            $index->upsert($libraryId, $root . '/' . $relative, 'hash', 1, pathinfo($relative, PATHINFO_EXTENSION), 1);
+        }
+        $index->markUnavailableByPaths($libraryId, [$root . '/Été_1/removed.png']);
+        $index->upsert($this->createLibrary()->getId(), $root . '/Été_1/foreign.nfo', 'hash', 1, 'nfo', 1);
+        $sidecars = new VideoSidecarIndex($this->manager->getConnection(), new LibraryRepository($this->manager, new NativeClock()));
+
+        self::assertSame([['path' => $root . '/movie.nfo', 'relativePath' => 'movie.nfo']], $sidecars->forFolder($libraryId, ''));
+        self::assertSame([['path' => $root . '/Été_1/season/episode.nfo', 'relativePath' => 'Été_1/season/episode.nfo']], $sidecars->forFolder($libraryId, 'Été_1'));
+    }
 
     public function testAvailableHashReadsOmitUnavailableAndAbsentPathsAndScopeTheLibrary(): void
     {

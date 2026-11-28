@@ -37,6 +37,9 @@ interface MovieRepositoryInterface extends Searchable
     /** Updates an existing movie's provider metadata while preserving its other state. */
     public function saveMetadata(Movie $movie): void;
 
+    /** Updates only an existing movie's matching provider, identifiers and manual choice. */
+    public function saveMatchIdentity(Movie $movie): void;
+
     public function persist(Movie $movie): void;
 
     public function flush(): void;

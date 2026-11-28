@@ -6,7 +6,9 @@ namespace App\Tests\Integration;
 
 use App\Tests\Fixtures\Metadata\ProviderSwitches;
 use App\Catalog\Application\Message\DrainAlbumMatchesMessage;
+use App\Catalog\Application\Message\DrainVideoMatchesMessage;
 use App\Catalog\Application\MessageHandler\DrainAlbumMatchesHandler;
+use App\Catalog\Application\MessageHandler\DrainVideoMatchesHandler;
 use App\Catalog\Application\MessageHandler\QueueArtistSyncsHandler;
 use App\Catalog\Application\MessageHandler\RequestAlbumMatchHandler;
 use App\Catalog\Application\MessageHandler\SyncArtistHandler;
@@ -26,6 +28,9 @@ use App\Catalog\Application\Service\MusicBrainzMatch\AlbumMatchQueueChain;
 use App\Catalog\Application\Service\MusicBrainzMatch\ArtistMatchWriter;
 use App\Catalog\Application\Service\MusicBrainzMatch\AutomaticAlbumMatcherInterface;
 use App\Catalog\Application\Service\MusicBrainzMatch\AutomaticMatchOutcome;
+use App\Catalog\Application\Service\VideoMatch\AutomaticVideoMatcherInterface;
+use App\Catalog\Domain\Repository\VideoMatchStateRepositoryInterface;
+use App\Catalog\Domain\Repository\VideoProviderPauseRepositoryInterface;
 use App\Catalog\Domain\ValueObject\AlbumMatchSource;
 use App\Catalog\Domain\ValueObject\AlbumMatchState;
 use App\Catalog\Domain\ValueObject\AlbumMatchStatus;
@@ -234,6 +239,7 @@ final class MessengerJsonDeliveryTest extends TestCase
             'movie' => SyncMovieMessage::class,
             'album' => SyncAlbumMessage::class,
             'album match queue' => DrainAlbumMatchesMessage::class,
+            'video match queue' => DrainVideoMatchesMessage::class,
             'library' => SyncLibraryMessage::class,
             'artists' => SyncArtistsMessage::class,
             'artist' => SyncArtistMessage::class,
@@ -314,6 +320,25 @@ final class MessengerJsonDeliveryTest extends TestCase
             $nestedBus = $this->createMock(MessageBusInterface::class);
             $nestedBus->expects($this->never())->method('dispatch');
             $handler = new DrainAlbumMatchesHandler($states, $matcher, new AlbumMatchQueueChain(new ArrayAdapter()), $this->createStub(SystemSettingsPortInterface::class), $nestedBus, $clock, $logger, $musicBrainz);
+        } elseif ($messageType === DrainVideoMatchesMessage::class) {
+            $message = new DrainVideoMatchesMessage();
+            $clock = new MockClock('2026-11-14 12:00:00 UTC');
+            $states = $this->createMock(VideoMatchStateRepositoryInterface::class);
+            $states->expects($this->once())->method('claimOldestDueRequest')->willReturnCallback(static function () use (&$effects): null {
+                ++$effects;
+                return null;
+            });
+            $nestedBus = $this->createMock(MessageBusInterface::class);
+            $nestedBus->expects($this->never())->method('dispatch');
+            $handler = new DrainVideoMatchesHandler(
+                $states,
+                $this->createStub(VideoProviderPauseRepositoryInterface::class),
+                $this->createStub(AutomaticVideoMatcherInterface::class),
+                $nestedBus,
+                $clock,
+                $logger,
+                new PassThroughTransaction(),
+            );
         } elseif ($messageType === SyncLibraryMessage::class) {
             $message = new SyncLibraryMessage($id, true, true);
             $albums = $this->createMock(AlbumPortInterface::class);

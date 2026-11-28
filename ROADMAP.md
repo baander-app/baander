@@ -45,7 +45,10 @@ This checkpoint covers the catalog foundation and video metadata providers.
   containing only a recognized provider ID supplies that identity for matching.
 - U10 lets admins read and replace each TV or movie library's provider order
   through the API and the console. The order retains disabled providers.
-  Phase C matching units U11, U23, U22, U12 and U13 remain pending. Phase D member
+- U11 queues matches after ingestion commits, claims one title at a time,
+  pauses failing providers and retries when a provider becomes usable. Folder
+  tags remain available when the local provider is off. NFO IDs follow its switch.
+  Phase C units U23, U22, U12 and U13 remain pending. Phase D member
   progress, read API and web units U14–U17 and Phase E documentation and browser
   verification units U18–U19 remain pending.
 
@@ -85,6 +88,11 @@ This checkpoint covers the catalog foundation and video metadata providers.
   passed. The fresh-install and rollback check passed 96 assertions after its
   fixture was updated for the new migration. OpenAPI drift, imports and scoped
   PHPStan passed. Deptrac reported zero violations and 451 baseline entries.
+- U11 passed 108 focused CI-image tests with 983 assertions after correcting
+  the schedule-count and JSON object comparison fixtures. The five storage
+  adapter tests passed 41 assertions covering stale claims, rollback, sidecar
+  scoping and retained identities. Scoped PHPStan and imports passed. Deptrac
+  reported zero violations and 451 existing skipped violations.
 
 ## Roadmap open items, 2026-11-26
 

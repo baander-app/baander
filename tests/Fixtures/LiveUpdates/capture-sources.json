@@ -867,6 +867,20 @@
       "capture": "child-row-or-exempt"
     },
     {
+      "parent": "tv_series",
+      "child": "video_match_states",
+      "foreign_key": "series_id",
+      "action": "CASCADE",
+      "capture": "child-row-or-exempt"
+    },
+    {
+      "parent": "movies",
+      "child": "video_match_states",
+      "foreign_key": "movie_id",
+      "action": "CASCADE",
+      "capture": "child-row-or-exempt"
+    },
+    {
       "parent": "libraries",
       "child": "video_placements",
       "foreign_key": "library_id",
@@ -1409,7 +1423,7 @@
       "mapping": "src/Catalog/Infrastructure/Doctrine/Entity/MovieEntity.php",
       "classification": "capture",
       "operations": ["INSERT", "UPDATE", "DELETE"],
-      "relevant_columns": ["id", "public_id", "library_id", "title", "year", "summary", "tmdb_id", "imdb_id", "overview", "tagline", "poster_url", "backdrop_url", "runtime", "rating", "original_language", "tmdb_collection_id", "collection_name", "locked_fields", "created_at"],
+      "relevant_columns": ["id", "public_id", "library_id", "title", "year", "summary", "tmdb_id", "imdb_id", "overview", "tagline", "poster_url", "backdrop_url", "runtime", "rating", "original_language", "tmdb_collection_id", "collection_name", "locked_fields", "created_at", "matched_provider", "provider_id", "external_ids", "hand_matched"],
       "excluded_columns": ["updated_at"],
       "families": ["catalog", "libraries", "activity", "recommendations", "admin-media", "admin-metadata"],
       "scope_routes": ["library"],
@@ -1931,6 +1945,30 @@
       "mapping": "src/Catalog/Infrastructure/Doctrine/Entity/TvSeriesEntity.php",
       "classification": "excluded",
       "reason": "TV series; the library-scoped TV and People views refresh them by 30-second visible sampling and catalog hints, without capture."
+    },
+    {
+      "table": "video_match_states",
+      "mapping": "src/Catalog/Infrastructure/Doctrine/Entity/VideoMatchStateEntity.php",
+      "classification": "capture",
+      "operations": ["INSERT", "UPDATE", "DELETE"],
+      "relevant_columns": ["id", "series_id", "movie_id", "status", "source", "due_at", "reason", "best_score", "checked_at"],
+      "excluded_columns": ["claim_id", "claim_expires_at", "next_due_at"],
+      "families": ["admin-metadata"],
+      "scope_routes": ["admin"],
+      "readers": ["src/Catalog/Infrastructure/Doctrine/Repository/VideoMatchStateRepository.php"],
+      "response_cache": "authoritative-read"
+    },
+    {
+      "table": "video_provider_pauses",
+      "mapping": "src/Catalog/Infrastructure/Doctrine/Entity/VideoProviderPauseEntity.php",
+      "classification": "capture",
+      "operations": ["INSERT", "UPDATE", "DELETE"],
+      "relevant_columns": ["provider", "failure_kind", "failure_count", "retry_at"],
+      "excluded_columns": [],
+      "families": ["admin-metadata"],
+      "scope_routes": ["admin"],
+      "readers": ["src/Catalog/Infrastructure/Doctrine/Repository/VideoProviderPauseRepository.php"],
+      "response_cache": "authoritative-read"
     },
     {
       "table": "video_placements",

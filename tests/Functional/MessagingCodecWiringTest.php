@@ -6,6 +6,7 @@ namespace App\Tests\Functional;
 
 use App\Catalog\Application\Command\BatchExtractCoversCommand;
 use App\Catalog\Application\Message\DrainAlbumMatchesMessage;
+use App\Catalog\Application\Message\DrainVideoMatchesMessage;
 use App\Library\Application\Command\ScanLibraryCommand;
 use App\Library\Application\Message\FilesDiscovered;
 use App\Library\Domain\ValueObject\LibrarySlug;
@@ -50,6 +51,7 @@ final class MessagingCodecWiringTest extends KernelTestCase
         $messages = [
             new BatchExtractCoversCommand(),
             new DrainAlbumMatchesMessage('0199bf3c-8a00-7000-8000-c4a1d0000001', 2),
+            new DrainVideoMatchesMessage(),
             new ScanLibraryCommand(new LibrarySlug('music'), true),
             new PruneMissingImagesCommand(),
             new GenerateImageDerivativeCommand('image.png', 'thumb'),
@@ -75,7 +77,7 @@ final class MessagingCodecWiringTest extends KernelTestCase
             new PrepareTimelinePreview('/media/movies/film.mkv', 'film-preview', 5400.5, 12.5, str_repeat('a', 64), 0),
         ];
 
-        self::assertCount(25, $messages);
+        self::assertCount(26, $messages);
         $catalog = self::getContainer()->get(AsyncWorkloadCatalog::class);
         self::assertInstanceOf(AsyncWorkloadCatalog::class, $catalog);
         $covered = array_fill_keys(array_map(static fn (object $message): string => $message::class, $messages), true);
