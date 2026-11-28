@@ -134,7 +134,8 @@ Application console commands run inside `web`. The control and execution worker 
 | [app:metadata:match:compare](app-metadata-match-compare.md) | Compare an album, song or artist with a MusicBrainz candidate: what a match would set, row by row |
 | [app:metadata:match:reviews](app-metadata-match-reviews.md) | List the albums that need a MusicBrainz match review, the most recently checked first |
 | [app:metadata:match:search](app-metadata-match-search.md) | List the MusicBrainz candidates for an album, song or artist, best first |
-| [app:metadata:providers](app-metadata-providers.md) | List the metadata providers and whether each one is configured |
+| [app:metadata:provider:set](app-metadata-provider-set.md) | Switch a metadata provider on or off for the server |
+| [app:metadata:providers](app-metadata-providers.md) | List metadata providers, their enabled state, credential status and attribution |
 | [app:metadata:status](app-metadata-status.md) | Show track coverage, the last sync and the sync jobs by type |
 | [app:metadata:sync](app-metadata-sync.md) | Queue a metadata sync for every library and an artist sync, or only the genre sync |
 

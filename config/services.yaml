@@ -8,6 +8,7 @@ parameters:
     env(BAANDER_DEPLOYMENT_PROFILE): ''
     env(BAANDER_LOG_NODES): '[]'
     env(WEBHOOK_LAN_ALLOWLIST): ''
+    env(TVDB_API_KEY): ''
     app.domain: '%env(APP_DOMAIN)%'
     app.name: 'Bånder'
     swoole_bundle.cache_dir: '%kernel.cache_dir%/swoole_bundle'
@@ -1113,6 +1114,8 @@ services:
             $spotifyClientId: '%env(SPOTIFY_CLIENT_ID)%'
             $spotifyClientSecret: '%env(SPOTIFY_CLIENT_SECRET)%'
             $tasteDiveApiKey: '%env(TASTE_DIVE_API_KEY)%'
+            $tmdbBearerToken: '%env(TMDB_BEARER_TOKEN)%'
+            $tvdbApiKey: '%env(TVDB_API_KEY)%'
 
     App\Shared\Infrastructure\Messenger\ResultStampMiddleware:
         arguments:

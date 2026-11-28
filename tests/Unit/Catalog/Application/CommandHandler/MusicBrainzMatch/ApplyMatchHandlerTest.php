@@ -60,6 +60,7 @@ use App\Metadata\Application\DTO\MusicBrainz\MusicBrainzArtist;
 use App\Metadata\Application\DTO\MusicBrainz\MusicBrainzCoverImage;
 use App\Metadata\Application\DTO\MusicBrainz\MusicBrainzRecording;
 use App\Metadata\Application\DTO\MusicBrainz\MusicBrainzRejected;
+use App\Metadata\Application\DTO\MusicBrainz\MusicBrainzDisabled;
 use App\Metadata\Application\DTO\MusicBrainz\MusicBrainzRelease;
 use App\Metadata\Application\DTO\MusicBrainz\MusicBrainzReleaseGroup;
 use App\Metadata\Application\DTO\MusicBrainz\MusicBrainzUnavailable;
@@ -439,6 +440,24 @@ final class ApplyMatchHandlerTest extends TestCase
         self::assertSame($release->id, $album->getReleaseMbid());
         self::assertEqualsCanonicalizing(['releaseMbid', 'mbid', 'country', 'genres', 'cover'], $applied->fields);
         self::assertFalse($applied->coverRefused);
+    }
+
+    public function testAnAutomaticMatchContinuesWithoutCoverArtWhenItsProviderIsDisabled(): void
+    {
+        $album = $this->addAlbum();
+        [$release] = $this->longBed($album);
+        $release = self::releaseWith($release, hasFrontCover: true);
+        $this->lookup->covers[$release->id] = new MusicBrainzDisabled('coverartarchive');
+
+        $applied = ApplyMatchCommand::automatic($album->getId(), $this->candidate($album, $release)) |> $this->apply(...);
+
+        self::assertTrue($applied->isApplied());
+        self::assertFalse($applied->coverRefused);
+        self::assertSame($release->id, $album->getReleaseMbid());
+        self::assertNotContains('cover', $applied->fields);
+        self::assertNull($album->getCoverImageId());
+        self::assertSame([], $this->savedImages);
+        self::assertSame([], array_intersect(['store file', 'delete file'], $this->calls));
     }
 
     public function testAMatchWithoutAnAdminIsAppliedWithoutTheCoverTheCoverArtArchiveRefuses(): void

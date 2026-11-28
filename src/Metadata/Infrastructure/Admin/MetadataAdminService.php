@@ -13,6 +13,8 @@ use App\Metadata\Application\Message\SyncLibraryMessage;
 use App\Metadata\Application\Message\SyncSongMessage;
 use App\Metadata\Application\Message\SyncMovieMessage;
 use App\Metadata\Application\Port\MetadataAdminPortInterface;
+use App\Metadata\Application\Settings\MetadataProvider;
+use App\Metadata\Application\Settings\MetadataProviderSwitches;
 use Doctrine\DBAL\ArrayParameterType;
 use Doctrine\ORM\EntityManagerInterface;
 
@@ -34,11 +36,14 @@ final class MetadataAdminService implements MetadataAdminPortInterface
 
     public function __construct(
         private readonly EntityManagerInterface $entityManager,
+        private readonly MetadataProviderSwitches $switches,
         private readonly string $discogsToken = '',
         private readonly string $lastFmApiKey = '',
         private readonly string $spotifyClientId = '',
         private readonly string $spotifyClientSecret = '',
         private readonly string $tasteDiveApiKey = '',
+        private readonly string $tmdbBearerToken = '',
+        private readonly string $tvdbApiKey = '',
     ) {}
 
     public function getSyncStatus(): array
@@ -93,37 +98,28 @@ final class MetadataAdminService implements MetadataAdminPortInterface
 
     public function getProviders(): array
     {
+        return array_map($this->getProvider(...), MetadataProvider::cases());
+    }
+
+    public function getProvider(MetadataProvider $provider): array
+    {
+        $configured = match ($provider) {
+            MetadataProvider::MusicBrainz, MetadataProvider::CoverArtArchive, MetadataProvider::Local => true,
+            MetadataProvider::Discogs => trim($this->discogsToken) !== '',
+            MetadataProvider::LastFm => trim($this->lastFmApiKey) !== '',
+            MetadataProvider::Spotify => trim($this->spotifyClientId) !== '' && trim($this->spotifyClientSecret) !== '',
+            MetadataProvider::TasteDive => trim($this->tasteDiveApiKey) !== '',
+            MetadataProvider::Tmdb => trim($this->tmdbBearerToken) !== '',
+            MetadataProvider::Tvdb => trim($this->tvdbApiKey) !== '',
+        };
+
         return [
-            [
-                'name' => 'MusicBrainz',
-                'enabled' => true,
-                'configured' => true,
-            ],
-            [
-                'name' => 'Discogs',
-                'enabled' => true,
-                'configured' => $this->discogsToken !== '',
-            ],
-            [
-                'name' => 'Last.fm',
-                'enabled' => true,
-                'configured' => $this->lastFmApiKey !== '',
-            ],
-            [
-                'name' => 'Spotify',
-                'enabled' => true,
-                'configured' => $this->spotifyClientId !== '' && $this->spotifyClientSecret !== '',
-            ],
-            [
-                'name' => 'TasteDive',
-                'enabled' => true,
-                'configured' => $this->tasteDiveApiKey !== '',
-            ],
-            [
-                'name' => 'CoverArtArchive',
-                'enabled' => true,
-                'configured' => true,
-            ],
+            'id' => $provider->value,
+            'name' => $provider->label(),
+            'enabled' => $this->switches->enabled($provider),
+            'configured' => $configured,
+            'attributionText' => $provider->attributionText(),
+            'attributionUrl' => $provider->attributionUrl(),
         ];
     }
 

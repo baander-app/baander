@@ -628,6 +628,12 @@ final class NewAlbumMetadataSyncTest extends KernelTestCase
             {
             }
 
+            /** @phpstan-pure */
+            public function isEnabled(): bool
+            {
+                return true;
+            }
+
             public function findReleases(string $title, ?string $artist, MusicBrainzSlotWait $wait = MusicBrainzSlotWait::Bounded): array
             {
                 $this->calls[] = 'findReleases:' . $title . '|' . $artist;

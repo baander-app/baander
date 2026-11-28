@@ -26,7 +26,7 @@ final readonly class SyncPeopleHandler
     #[AsMessageHandler(fromTransport: 'async', sign: true)]
     public function __invoke(SyncPeopleMessage $message): void
     {
-        if (!$this->tmdb->isConfigured()) {
+        if (!$this->tmdb->isEnabled() || !$this->tmdb->isConfigured()) {
             return;
         }
         $ids = $this->people->pendingTmdbPeople(self::PAGE_SIZE, $message->after);

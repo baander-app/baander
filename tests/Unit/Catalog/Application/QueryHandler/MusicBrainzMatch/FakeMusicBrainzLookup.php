@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Tests\Unit\Catalog\Application\QueryHandler\MusicBrainzMatch;
 
 use App\Metadata\Application\DTO\MusicBrainz\MusicBrainzArtist;
+use App\Metadata\Application\DTO\MusicBrainz\MusicBrainzDisabled;
 use App\Metadata\Application\DTO\MusicBrainz\MusicBrainzCoverImage;
 use App\Metadata\Application\DTO\MusicBrainz\MusicBrainzMerged;
 use App\Metadata\Application\DTO\MusicBrainz\MusicBrainzRecording;
@@ -22,22 +23,22 @@ final class FakeMusicBrainzLookup implements MusicBrainzLookupInterface
     /** @var list<string> each call as "method:argument|argument" */
     public array $calls = [];
 
-    /** @var array<string, list<MusicBrainzReleaseSummary>|MusicBrainzRejected|MusicBrainzUnavailable> by "title|artist" */
+    /** @var array<string, list<MusicBrainzReleaseSummary>|MusicBrainzRejected|MusicBrainzUnavailable|MusicBrainzDisabled> by "title|artist" */
     public array $releaseSearches = [];
 
-    /** @var array<string, MusicBrainzRelease|MusicBrainzRejected|MusicBrainzUnavailable> by release ID; an ID not listed is a 404 */
+    /** @var array<string, MusicBrainzRelease|MusicBrainzRejected|MusicBrainzUnavailable|MusicBrainzDisabled> by release ID; an ID not listed is a 404 */
     public array $releases = [];
 
-    /** @var list<MusicBrainzRecording>|MusicBrainzRejected|MusicBrainzUnavailable */
-    public array|MusicBrainzRejected|MusicBrainzUnavailable $recordingSearch = [];
+    /** @var list<MusicBrainzRecording>|MusicBrainzRejected|MusicBrainzUnavailable|MusicBrainzDisabled */
+    public array|MusicBrainzRejected|MusicBrainzUnavailable|MusicBrainzDisabled $recordingSearch = [];
 
-    /** @var array<string, MusicBrainzRecording|MusicBrainzRejected|MusicBrainzUnavailable> by recording ID */
+    /** @var array<string, MusicBrainzRecording|MusicBrainzRejected|MusicBrainzUnavailable|MusicBrainzDisabled> by recording ID */
     public array $recordings = [];
 
-    /** @var list<MusicBrainzArtist>|MusicBrainzRejected|MusicBrainzUnavailable */
-    public array|MusicBrainzRejected|MusicBrainzUnavailable $artistSearch = [];
+    /** @var list<MusicBrainzArtist>|MusicBrainzRejected|MusicBrainzUnavailable|MusicBrainzDisabled */
+    public array|MusicBrainzRejected|MusicBrainzUnavailable|MusicBrainzDisabled $artistSearch = [];
 
-    /** @var array<string, MusicBrainzArtist|MusicBrainzMerged|MusicBrainzRejected|MusicBrainzUnavailable> by artist ID; an ID not listed is a 404 */
+    /** @var array<string, MusicBrainzArtist|MusicBrainzMerged|MusicBrainzRejected|MusicBrainzUnavailable|MusicBrainzDisabled> by artist ID; an ID not listed is a 404 */
     public array $artists = [];
 
     /**
@@ -56,8 +57,16 @@ final class FakeMusicBrainzLookup implements MusicBrainzLookupInterface
      */
     public ?Closure $duringArtistLookup = null;
 
+    public bool $enabled = true;
+
+    /** @phpstan-pure */
+    public function isEnabled(): bool
+    {
+        return $this->enabled;
+    }
+
     #[\Override]
-    public function findReleases(string $title, ?string $artist, MusicBrainzSlotWait $wait = MusicBrainzSlotWait::Bounded): array|MusicBrainzRejected|MusicBrainzUnavailable
+    public function findReleases(string $title, ?string $artist, MusicBrainzSlotWait $wait = MusicBrainzSlotWait::Bounded): array|MusicBrainzRejected|MusicBrainzUnavailable|MusicBrainzDisabled
     {
         $key = $title . '|' . $artist;
         $this->calls[] = 'findReleases:' . $key;
@@ -66,7 +75,7 @@ final class FakeMusicBrainzLookup implements MusicBrainzLookupInterface
     }
 
     #[\Override]
-    public function fetchRelease(string $releaseId, MusicBrainzSlotWait $wait = MusicBrainzSlotWait::Bounded): MusicBrainzRelease|MusicBrainzRejected|MusicBrainzUnavailable|null
+    public function fetchRelease(string $releaseId, MusicBrainzSlotWait $wait = MusicBrainzSlotWait::Bounded): MusicBrainzRelease|MusicBrainzRejected|MusicBrainzUnavailable|MusicBrainzDisabled|null
     {
         $this->calls[] = 'fetchRelease:' . $releaseId;
         $this->duringReleaseLookup?->__invoke($releaseId);
@@ -75,7 +84,7 @@ final class FakeMusicBrainzLookup implements MusicBrainzLookupInterface
     }
 
     #[\Override]
-    public function findRecordings(string $title, ?string $artist, MusicBrainzSlotWait $wait = MusicBrainzSlotWait::Bounded): array|MusicBrainzRejected|MusicBrainzUnavailable
+    public function findRecordings(string $title, ?string $artist, MusicBrainzSlotWait $wait = MusicBrainzSlotWait::Bounded): array|MusicBrainzRejected|MusicBrainzUnavailable|MusicBrainzDisabled
     {
         $this->calls[] = 'findRecordings:' . $title . '|' . $artist;
 
@@ -83,7 +92,7 @@ final class FakeMusicBrainzLookup implements MusicBrainzLookupInterface
     }
 
     #[\Override]
-    public function fetchRecording(string $recordingId, MusicBrainzSlotWait $wait = MusicBrainzSlotWait::Bounded): MusicBrainzRecording|MusicBrainzRejected|MusicBrainzUnavailable|null
+    public function fetchRecording(string $recordingId, MusicBrainzSlotWait $wait = MusicBrainzSlotWait::Bounded): MusicBrainzRecording|MusicBrainzRejected|MusicBrainzUnavailable|MusicBrainzDisabled|null
     {
         $this->calls[] = 'fetchRecording:' . $recordingId;
 
@@ -91,7 +100,7 @@ final class FakeMusicBrainzLookup implements MusicBrainzLookupInterface
     }
 
     #[\Override]
-    public function findArtists(string $name, MusicBrainzSlotWait $wait = MusicBrainzSlotWait::Bounded): array|MusicBrainzRejected|MusicBrainzUnavailable
+    public function findArtists(string $name, MusicBrainzSlotWait $wait = MusicBrainzSlotWait::Bounded): array|MusicBrainzRejected|MusicBrainzUnavailable|MusicBrainzDisabled
     {
         $this->calls[] = 'findArtists:' . $name;
 
@@ -99,7 +108,7 @@ final class FakeMusicBrainzLookup implements MusicBrainzLookupInterface
     }
 
     #[\Override]
-    public function fetchArtist(string $artistId, MusicBrainzSlotWait $wait = MusicBrainzSlotWait::Bounded): MusicBrainzArtist|MusicBrainzMerged|MusicBrainzRejected|MusicBrainzUnavailable|null
+    public function fetchArtist(string $artistId, MusicBrainzSlotWait $wait = MusicBrainzSlotWait::Bounded): MusicBrainzArtist|MusicBrainzMerged|MusicBrainzRejected|MusicBrainzUnavailable|MusicBrainzDisabled|null
     {
         $this->calls[] = 'fetchArtist:' . $artistId;
         $this->duringArtistLookup?->__invoke($artistId);
@@ -108,7 +117,7 @@ final class FakeMusicBrainzLookup implements MusicBrainzLookupInterface
     }
 
     #[\Override]
-    public function fetchFrontCover(string $releaseId, MusicBrainzSlotWait $wait = MusicBrainzSlotWait::Bounded): MusicBrainzCoverImage|MusicBrainzRejected|MusicBrainzUnavailable|null
+    public function fetchFrontCover(string $releaseId, MusicBrainzSlotWait $wait = MusicBrainzSlotWait::Bounded): MusicBrainzCoverImage|MusicBrainzRejected|MusicBrainzUnavailable|MusicBrainzDisabled|null
     {
         $this->calls[] = 'fetchFrontCover:' . $releaseId;
 

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Integration;
 
+use App\Tests\Fixtures\Metadata\ProviderSwitches;
 use App\Catalog\Application\Message\DrainAlbumMatchesMessage;
 use App\Catalog\Application\MessageHandler\DrainAlbumMatchesHandler;
 use App\Catalog\Application\MessageHandler\QueueArtistSyncsHandler;
@@ -258,7 +259,8 @@ final class MessengerJsonDeliveryTest extends TestCase
             $encoder,
             $httpClient,
             new RateLimiterFactory(['id' => 'musicbrainz', 'policy' => 'no_limit'], new InMemoryStorage()),
-            new CoverArtArchiveAdapter($logger, $encoder, $httpClient),
+            new CoverArtArchiveAdapter($logger, $encoder, $httpClient, ProviderSwitches::allEnabled()),
+            ProviderSwitches::allEnabled(),
         );
         $genres = $this->createStub(GenrePortInterface::class);
         if ($messageType === SyncSongMessage::class) {
@@ -282,7 +284,7 @@ final class MessengerJsonDeliveryTest extends TestCase
                     return null;
                 });
             $enricher = new MovieMetadataEnricher(
-                new TmdbAdapter('fixture-token', $logger, $encoder, $httpClient),
+                new TmdbAdapter('fixture-token', $logger, $encoder, $httpClient, ProviderSwitches::allEnabled()),
                 $movies,
                 $genres,
                 $logger,
@@ -311,7 +313,7 @@ final class MessengerJsonDeliveryTest extends TestCase
                 });
             $nestedBus = $this->createMock(MessageBusInterface::class);
             $nestedBus->expects($this->never())->method('dispatch');
-            $handler = new DrainAlbumMatchesHandler($states, $matcher, new AlbumMatchQueueChain(new ArrayAdapter()), $this->createStub(SystemSettingsPortInterface::class), $nestedBus, $clock, $logger);
+            $handler = new DrainAlbumMatchesHandler($states, $matcher, new AlbumMatchQueueChain(new ArrayAdapter()), $this->createStub(SystemSettingsPortInterface::class), $nestedBus, $clock, $logger, $musicBrainz);
         } elseif ($messageType === SyncLibraryMessage::class) {
             $message = new SyncLibraryMessage($id, true, true);
             $albums = $this->createMock(AlbumPortInterface::class);

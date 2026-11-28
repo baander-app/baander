@@ -597,7 +597,7 @@ deptrac:
     - name: 'Metadata Person Provider Contract'
       collectors:
         - type: classLike
-          value: '^App\\Metadata\\Application\\(Port\\(ImdbPersonLookupInterface|PersonProfileSyncRequestInterface)|Message\\SyncPeopleMessage)$'
+          value: '^App\\Metadata\\Application\\(Port\\(ImdbPersonLookupInterface|PersonProfileSyncRequestInterface)|Message\\SyncPeopleMessage|DTO\\ImdbPersonLookupDisabled)$'
 
     - name: 'Metadata Application'
       collectors:
@@ -612,7 +612,7 @@ deptrac:
               value: '^App\\Metadata\\Application\\(Port\\MusicBrainzLookupInterface$|DTO\\MusicBrainz\\)'
 
             - type: classLike
-              value: '^App\\Metadata\\Application\\(Port\\(ImdbPersonLookupInterface|PersonProfileSyncRequestInterface)|Message\\SyncPeopleMessage)$'
+              value: '^App\\Metadata\\Application\\(Port\\(ImdbPersonLookupInterface|PersonProfileSyncRequestInterface)|Message\\SyncPeopleMessage|DTO\\ImdbPersonLookupDisabled)$'
 
     - name: 'Metadata Infrastructure'
       collectors:

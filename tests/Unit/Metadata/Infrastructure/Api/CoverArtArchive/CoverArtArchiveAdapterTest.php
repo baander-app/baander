@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Metadata\Infrastructure\Api\CoverArtArchive;
 
+use App\Tests\Fixtures\Metadata\ProviderSwitches;
 use App\Metadata\Application\DTO\MusicBrainz\MusicBrainzCoverImage;
 use App\Metadata\Application\DTO\MusicBrainz\MusicBrainzRejected;
 use App\Metadata\Application\DTO\MusicBrainz\MusicBrainzUnavailable;
@@ -97,6 +98,7 @@ final class CoverArtArchiveAdapterTest extends TestCase
             new NullLogger(),
             new JsonEncoder(),
             new PublicHttpClient($raw, new PublicDestinationPolicy(static fn(string $host): array => ['1.1.1.1'])),
+            ProviderSwitches::allEnabled(),
         );
     }
 }

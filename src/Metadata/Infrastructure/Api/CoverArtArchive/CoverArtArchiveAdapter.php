@@ -5,6 +5,9 @@ declare(strict_types=1);
 namespace App\Metadata\Infrastructure\Api\CoverArtArchive;
 
 use App\Metadata\Application\DTO\MusicBrainz\MusicBrainzCoverImage;
+use App\Metadata\Application\DTO\MusicBrainz\MusicBrainzDisabled;
+use App\Metadata\Application\Settings\MetadataProvider;
+use App\Metadata\Application\Settings\MetadataProviderSwitches;
 use App\Metadata\Application\DTO\MusicBrainz\MusicBrainzRejected;
 use App\Metadata\Application\DTO\MusicBrainz\MusicBrainzUnavailable;
 use Baander\HttpClient\PublicHttpClient;
@@ -34,6 +37,7 @@ final readonly class CoverArtArchiveAdapter
         private LoggerInterface $logger,
         private JsonEncoder $jsonEncoder,
         private PublicHttpClient $httpClient,
+        private MetadataProviderSwitches $switches,
     ) {
     }
 
@@ -47,8 +51,11 @@ final readonly class CoverArtArchiveAdapter
      * MusicBrainzUnavailable when the archive gave no usable answer, an image over 10 MiB included.
      * The image's type is the one the archive served; only its bytes can confirm it.
      */
-    public function fetchFrontCover(string $releaseId): MusicBrainzCoverImage|MusicBrainzRejected|MusicBrainzUnavailable|null
+    public function fetchFrontCover(string $releaseId): MusicBrainzCoverImage|MusicBrainzRejected|MusicBrainzUnavailable|MusicBrainzDisabled|null
     {
+        if (!$this->switches->enabled(MetadataProvider::CoverArtArchive)) {
+            return new MusicBrainzDisabled('coverartarchive');
+        }
         $endpoint = '/release/' . rawurlencode($releaseId) . '/front-1200';
         $response = null;
         try {
@@ -141,6 +148,7 @@ final readonly class CoverArtArchiveAdapter
      */
     private function request(string $endpoint): array
     {
+        $this->switches->requireEnabled(MetadataProvider::CoverArtArchive);
         $response = null;
         try {
             $response = $this->httpClient->request('GET', self::BASE_URL . $endpoint, ['coverartarchive.org'], [

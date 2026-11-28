@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Metadata\Infrastructure\Api;
 
+use App\Tests\Fixtures\Metadata\ProviderSwitches;
 use App\Metadata\Infrastructure\Api\CoverArtArchive\CoverArtArchiveAdapter;
 use App\Metadata\Infrastructure\Api\Discogs\DiscogsAdapter;
 use App\Metadata\Infrastructure\Api\LastFm\LastFmAdapter;
@@ -224,14 +225,15 @@ final class ProviderDestinationAdapterTest extends TestCase
                 $encoder,
                 $client,
                 new RateLimiterFactory(['id' => 'musicbrainz', 'policy' => 'no_limit'], new InMemoryStorage()),
-                new CoverArtArchiveAdapter($logger, $encoder, $client),
+                new CoverArtArchiveAdapter($logger, $encoder, $client, ProviderSwitches::allEnabled()),
+                ProviderSwitches::allEnabled(),
             )->searchArtist('Artist')->artists[0]->name ?? null,
-            'discogs' => new DiscogsAdapter(self::SECRET, $logger, $encoder, $client)->searchArtist('Artist')->artists[0]->name ?? null,
-            'lastfm' => new LastFmAdapter(self::SECRET, $logger, $encoder, $client)->getArtistInfo('Artist')['name'] ?? null,
-            'spotify' => new SpotifyAdapter('client', self::SECRET, $logger, $encoder, $client)->searchArtist('Artist')[0]['name'] ?? null,
-            'tastedive' => new TasteDiveAdapter(self::SECRET, $logger, $encoder, $client)->getSimilar('Artist')[0]['name'] ?? null,
-            'tmdb' => new TmdbAdapter(self::SECRET, $logger, $encoder, $client)->searchMovie('Artist')->first()?->title,
-            'coverartarchive' => new CoverArtArchiveAdapter($logger, $encoder, $client)->getReleaseCover('release')[0]['image'] ?? null,
+            'discogs' => new DiscogsAdapter(self::SECRET, $logger, $encoder, $client, ProviderSwitches::allEnabled())->searchArtist('Artist')->artists[0]->name ?? null,
+            'lastfm' => new LastFmAdapter(self::SECRET, $logger, $encoder, $client, ProviderSwitches::allEnabled())->getArtistInfo('Artist')['name'] ?? null,
+            'spotify' => new SpotifyAdapter('client', self::SECRET, $logger, $encoder, $client, ProviderSwitches::allEnabled())->searchArtist('Artist')[0]['name'] ?? null,
+            'tastedive' => new TasteDiveAdapter(self::SECRET, $logger, $encoder, $client, ProviderSwitches::allEnabled())->getSimilar('Artist')[0]['name'] ?? null,
+            'tmdb' => new TmdbAdapter(self::SECRET, $logger, $encoder, $client, ProviderSwitches::allEnabled())->searchMovie('Artist')->first()?->title,
+            'coverartarchive' => new CoverArtArchiveAdapter($logger, $encoder, $client, ProviderSwitches::allEnabled())->getReleaseCover('release')[0]['image'] ?? null,
             default => throw new \LogicException('Unknown fixture provider.'),
         };
     }

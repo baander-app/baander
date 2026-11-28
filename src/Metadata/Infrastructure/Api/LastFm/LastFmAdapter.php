@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 namespace App\Metadata\Infrastructure\Api\LastFm;
 
+use App\Metadata\Application\Settings\MetadataProvider;
+use App\Metadata\Application\Settings\MetadataProviderSwitches;
+
 use Baander\HttpClient\PublicHttpClient;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\Serializer\Encoder\JsonEncoder;
@@ -17,6 +20,7 @@ final readonly class LastFmAdapter
         private readonly LoggerInterface $logger,
         private readonly JsonEncoder $jsonEncoder,
         private readonly PublicHttpClient $httpClient,
+        private readonly MetadataProviderSwitches $switches,
     ) {
     }
 
@@ -129,6 +133,7 @@ final readonly class LastFmAdapter
      */
     private function request(array $params): array
     {
+        $this->switches->requireEnabled(MetadataProvider::LastFm);
         $params['api_key'] = $this->apiKey;
         $params['format'] = 'json';
         $url = self::BASE_URL . '?' . http_build_query($params);

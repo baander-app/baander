@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Metadata\Interface\Controller;
 
+use App\Tests\Fixtures\Metadata\ProviderSwitches;
 use App\Auth\Infrastructure\Security\SecurityUser;
 use App\Metadata\Application\DTO\MusicBrainz\MusicBrainzRelease;
 use App\Metadata\Application\DTO\MusicBrainz\MusicBrainzSlotWait;
@@ -69,13 +70,14 @@ final class MetadataMusicBrainzUserLimitTest extends TestCase
             $encoder,
             $client,
             self::shippedLimiter('musicbrainz'),
-            new CoverArtArchiveAdapter($logger, $encoder, $client),
+            new CoverArtArchiveAdapter($logger, $encoder, $client, ProviderSwitches::allEnabled()),
+            ProviderSwitches::allEnabled(),
         );
-        $lastFm = new LastFmAdapter('local-test-token', $logger, $encoder, $client);
+        $lastFm = new LastFmAdapter('local-test-token', $logger, $encoder, $client, ProviderSwitches::allEnabled());
         $userLimiter = self::shippedLimiter('musicbrainz_user');
         $this->search = new MetadataSearchController(
             $this->musicBrainz,
-            new DiscogsAdapter('local-test-token', $logger, $encoder, $client),
+            new DiscogsAdapter('local-test-token', $logger, $encoder, $client, ProviderSwitches::allEnabled()),
             $lastFm,
             $userLimiter,
             self::shippedLimiter('metadata_provider_user'),

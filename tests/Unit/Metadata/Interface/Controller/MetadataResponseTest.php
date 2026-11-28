@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Metadata\Interface\Controller;
 
+use App\Tests\Fixtures\Metadata\ProviderSwitches;
+
 use App\Auth\Infrastructure\Security\SecurityUser;
 use App\Metadata\Infrastructure\Api\CoverArtArchive\CoverArtArchiveAdapter;
 use App\Metadata\Infrastructure\Api\Discogs\DiscogsAdapter;
@@ -46,8 +48,8 @@ final class MetadataResponseTest extends TestCase
         $httpClient = new PublicHttpClient(new MockHttpClient(static fn(): MockResponse => new MockResponse(self::$response === false ? '' : self::$response)), new PublicDestinationPolicy(static fn(string $host): array => ['1.1.1.1']));
         $controller = new MetadataSearchController(
             self::musicBrainz($logger, $encoder, $httpClient),
-            new DiscogsAdapter('local-test-token', $logger, $encoder, $httpClient),
-            new LastFmAdapter('local-test-token', $logger, $encoder, $httpClient),
+            new DiscogsAdapter('local-test-token', $logger, $encoder, $httpClient, ProviderSwitches::allEnabled()),
+            new LastFmAdapter('local-test-token', $logger, $encoder, $httpClient, ProviderSwitches::allEnabled()),
             self::unlimited(),
             self::unlimited(),
         );
@@ -68,7 +70,7 @@ final class MetadataResponseTest extends TestCase
         $httpClient = new PublicHttpClient(new MockHttpClient(static fn(): MockResponse => new MockResponse(self::$response === false ? '' : self::$response)), new PublicDestinationPolicy(static fn(string $host): array => ['1.1.1.1']));
         $controller = new MetadataBrowseController(
             self::musicBrainz($logger, $encoder, $httpClient),
-            new LastFmAdapter('local-test-token', $logger, $encoder, $httpClient),
+            new LastFmAdapter('local-test-token', $logger, $encoder, $httpClient, ProviderSwitches::allEnabled()),
             self::unlimited(),
         );
 
@@ -82,7 +84,7 @@ final class MetadataResponseTest extends TestCase
 
     private static function musicBrainz(NullLogger $logger, JsonEncoder $encoder, PublicHttpClient $httpClient): MusicBrainzAdapter
     {
-        return new MusicBrainzAdapter($logger, $encoder, $httpClient, self::unlimited(), new CoverArtArchiveAdapter($logger, $encoder, $httpClient));
+        return new MusicBrainzAdapter($logger, $encoder, $httpClient, self::unlimited(), new CoverArtArchiveAdapter($logger, $encoder, $httpClient, ProviderSwitches::allEnabled()), ProviderSwitches::allEnabled());
     }
 
     private static function unlimited(): RateLimiterFactory

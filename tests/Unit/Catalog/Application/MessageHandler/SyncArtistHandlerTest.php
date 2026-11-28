@@ -17,6 +17,9 @@ use App\Metadata\Application\DTO\MusicBrainz\MusicBrainzArtist;
 use App\Metadata\Application\DTO\MusicBrainz\MusicBrainzMerged;
 use App\Metadata\Application\DTO\MusicBrainz\MusicBrainzRejected;
 use App\Metadata\Application\DTO\MusicBrainz\MusicBrainzUnavailable;
+use App\Metadata\Application\DTO\MusicBrainz\MusicBrainzDisabled;
+use App\Metadata\Application\DTO\ImdbPersonLookupDisabled;
+use App\Metadata\Application\Port\ImdbPersonLookupInterface;
 use App\Metadata\Application\Message\SyncArtistMessage;
 use App\Shared\Domain\Model\Uuid;
 use App\Tests\Fixtures\Catalog\InMemoryQueuedArtistSyncs;
@@ -105,6 +108,35 @@ final class SyncArtistHandlerTest extends TestCase
         self::assertSame([], $this->musicBrainz->calls);
         self::assertSame([], $this->saved);
         self::assertSame([], $this->marks->answered);
+    }
+
+    public function testADisabledMusicBrainzLookupWritesNothingAndQueuesNoOutageRetry(): void
+    {
+        $artist = $this->store(Artist::create('Post Malone', mbid: self::POST_MALONE_ID));
+        $this->musicBrainz->artists[self::POST_MALONE_ID] = new MusicBrainzDisabled();
+
+        $this->sync($artist);
+
+        self::assertSame([], $this->saved);
+        self::assertSame([], $this->marks->answered);
+        self::assertSame([], $this->sent);
+    }
+
+    public function testADisabledImdbBridgeStillFillsTheMusicBrainzDetailsWithoutAnOutageRetry(): void
+    {
+        $artist = $this->store(Artist::create('Post Malone', mbid: self::POST_MALONE_ID));
+        $this->musicBrainz->artists[self::POST_MALONE_ID] = new MusicBrainzArtist(
+            self::POST_MALONE_ID, 'Post Malone', 0, null, 'Person', 'US', null, null, null, false,
+            personIdentifiers: ['imdb_name' => 'nm0000001'],
+        );
+        $imdb = $this->createStub(ImdbPersonLookupInterface::class);
+        $imdb->method('findTmdbPersonId')->willReturn(new ImdbPersonLookupDisabled());
+
+        $this->handler($imdb)(new SyncArtistMessage($artist->getId()));
+
+        self::assertSame('US', $this->stored($artist)->getCountry());
+        self::assertSame([$artist->getId()->toString()], $this->saved);
+        self::assertSame([], $this->sent);
     }
 
     /** @return iterable<string, array{MusicBrainzRejected|MusicBrainzUnavailable|null, bool}> the answer, and whether it is an answer that counts */
@@ -330,7 +362,7 @@ final class SyncArtistHandlerTest extends TestCase
         $this->handler()(new SyncArtistMessage($artist->getId()));
     }
 
-    private function handler(): SyncArtistHandler
+    private function handler(?ImdbPersonLookupInterface $imdb = null): SyncArtistHandler
     {
         $artists = $this->artistPort();
         $merges = $this->createStub(ArtistMergePortInterface::class);
@@ -360,6 +392,7 @@ final class SyncArtistHandlerTest extends TestCase
             new ArtistSyncQueue($this->marks, $bus),
             $this->transaction,
             $this->logger,
+            imdb: $imdb,
         );
     }
 

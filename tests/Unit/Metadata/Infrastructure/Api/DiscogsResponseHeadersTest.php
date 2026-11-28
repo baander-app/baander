@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Metadata\Infrastructure\Api;
 
+use App\Tests\Fixtures\Metadata\ProviderSwitches;
+
 use App\Metadata\Infrastructure\Api\Discogs\DiscogsAdapter;
 use App\Metadata\Infrastructure\Api\Tmdb\TmdbAdapter;
 use Baander\HttpClient\PublicDestinationPolicy;
@@ -24,7 +26,7 @@ final class DiscogsResponseHeadersTest extends TestCase
                 ? new MockResponse('{}', ['http_code' => 429, 'response_headers' => ['Retry-After: 0']])
                 : new MockResponse('{"results":[{"id":1,"title":"Artist"}],"pagination":{"items":1}}');
         });
-        $adapter = new DiscogsAdapter('private-token', new NullLogger(), new JsonEncoder(), $this->client($raw));
+        $adapter = new DiscogsAdapter('private-token', new NullLogger(), new JsonEncoder(), $this->client($raw), ProviderSwitches::allEnabled());
         self::assertSame('Artist', $adapter->searchArtist('Artist')->artists[0]->name);
         self::assertSame(2, $calls);
     }
@@ -37,7 +39,7 @@ final class DiscogsResponseHeadersTest extends TestCase
 
             return new MockResponse('{}', ['http_code' => 429, 'response_headers' => ['Retry-After: 60']]);
         });
-        $adapter = new DiscogsAdapter('private-token', new NullLogger(), new JsonEncoder(), $this->client($raw));
+        $adapter = new DiscogsAdapter('private-token', new NullLogger(), new JsonEncoder(), $this->client($raw), ProviderSwitches::allEnabled());
 
         $started = hrtime(true);
         $result = $adapter->searchArtist('Artist');
@@ -57,7 +59,7 @@ final class DiscogsResponseHeadersTest extends TestCase
 
             return new MockResponse('{"results":[],"pagination":{"items":0}}');
         });
-        $adapter = new DiscogsAdapter('private-token', new NullLogger(), new JsonEncoder(), $this->client($raw));
+        $adapter = new DiscogsAdapter('private-token', new NullLogger(), new JsonEncoder(), $this->client($raw), ProviderSwitches::allEnabled());
 
         $adapter->searchArtist('Artist', 100);
         $adapter->searchRelease('Album', 'Artist', 100);
@@ -79,7 +81,7 @@ final class DiscogsResponseHeadersTest extends TestCase
 
             return new MockResponse('', ['http_code' => 302, 'response_headers' => ['Location: https://unapproved.baander.app/', 'Retry-After: 0']]);
         });
-        $adapter = new DiscogsAdapter('private-token', new NullLogger(), new JsonEncoder(), $this->client($raw));
+        $adapter = new DiscogsAdapter('private-token', new NullLogger(), new JsonEncoder(), $this->client($raw), ProviderSwitches::allEnabled());
         self::assertSame([], $adapter->searchArtist('Artist')->artists);
         self::assertSame(1, $calls);
     }
@@ -92,7 +94,7 @@ final class DiscogsResponseHeadersTest extends TestCase
                 ? new MockResponse('{}', ['http_code' => 429, 'response_headers' => ['Retry-After: 0']])
                 : new MockResponse('{"results":[{"id":1,"title":"Film"}],"total_results":1}');
         });
-        $adapter = new TmdbAdapter('private-token', new NullLogger(), new JsonEncoder(), $this->client($raw));
+        $adapter = new TmdbAdapter('private-token', new NullLogger(), new JsonEncoder(), $this->client($raw), ProviderSwitches::allEnabled());
         self::assertSame('Film', $adapter->searchMovie('Film')->first()?->title);
         self::assertSame(2, $calls);
     }

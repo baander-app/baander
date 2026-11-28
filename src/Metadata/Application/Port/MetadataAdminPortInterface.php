@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Metadata\Application\Port;
 
+use App\Metadata\Application\Settings\MetadataProvider;
+
 /**
  * The metadata administration reads behind GET /api/admin/metadata/* and the
  * `app:metadata:status` and `app:metadata:providers` commands. Syncs start through
@@ -17,7 +19,10 @@ interface MetadataAdminPortInterface
     public function getSyncStatus(): array;
 
     /**
-     * @return array<array{name: string, enabled: bool, configured: bool}>
+     * @return list<array{id: string, name: string, enabled: bool, configured: bool, attributionText: string, attributionUrl: string}>
      */
     public function getProviders(): array;
+
+    /** @return array{id: string, name: string, enabled: bool, configured: bool, attributionText: string, attributionUrl: string} */
+    public function getProvider(MetadataProvider $provider): array;
 }

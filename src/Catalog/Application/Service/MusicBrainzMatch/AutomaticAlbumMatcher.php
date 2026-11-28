@@ -70,6 +70,9 @@ final readonly class AutomaticAlbumMatcher implements AutomaticAlbumMatcherInter
     #[\Override]
     public function match(Uuid $albumId): AutomaticMatchOutcome
     {
+        if (!$this->musicBrainz->isEnabled()) {
+            return AutomaticMatchOutcome::disabled();
+        }
         $album = $this->albums->findFreshByUuid($albumId);
         if ($album === null) {
             return AutomaticMatchOutcome::albumGone();
@@ -82,9 +85,11 @@ final readonly class AutomaticAlbumMatcher implements AutomaticAlbumMatcherInter
         } catch (ServiceUnavailableException) {
             return AutomaticMatchOutcome::unavailable();
         } catch (ConflictException $refused) {
-            return ($refused->details['reason'] ?? null) === MusicBrainzAnswer::REJECTED_REASON
-                ? AutomaticMatchOutcome::retryLater(self::RETRY_AFTER_REFUSAL_SECONDS)
-                : throw $refused;
+            return match ($refused->details['reason'] ?? null) {
+                MusicBrainzAnswer::DISABLED_REASON => AutomaticMatchOutcome::disabled(),
+                MusicBrainzAnswer::REJECTED_REASON => AutomaticMatchOutcome::retryLater(self::RETRY_AFTER_REFUSAL_SECONDS),
+                default => throw $refused,
+            };
         }
 
         if (!$decision->isConfident()) {
@@ -166,6 +171,10 @@ final readonly class AutomaticAlbumMatcher implements AutomaticAlbumMatcherInter
         } catch (HandlerFailedException $failed) {
             $cause = HandlerFailure::cause($failed);
 
+            if ($cause instanceof ConflictException && ($cause->details['reason'] ?? null) === MusicBrainzAnswer::DISABLED_REASON) {
+                return AutomaticMatchOutcome::disabled();
+            }
+
             // The apply wrote nothing; another writer held the same rows.
             return $cause instanceof TransactionDeadlockException ? AutomaticMatchOutcome::retryLater(self::RETRY_AFTER_CONFLICT_SECONDS) : throw $cause;
         }
@@ -179,6 +188,7 @@ final readonly class AutomaticAlbumMatcher implements AutomaticAlbumMatcherInter
             MatchApplyOutcome::AlbumGone => AutomaticMatchOutcome::albumGone(),
             MatchApplyOutcome::Stale => AutomaticMatchOutcome::retryLater(self::RETRY_AFTER_CONFLICT_SECONDS),
             MatchApplyOutcome::Unavailable => AutomaticMatchOutcome::unavailable(),
+            MatchApplyOutcome::Disabled => AutomaticMatchOutcome::disabled(),
         };
     }
 }

@@ -31,6 +31,9 @@ enum AutomaticMatchOutcomeKind: string
      */
     case Unavailable = 'unavailable';
 
+    /** The provider was switched off and the unchanged request waits for recovery. */
+    case Disabled = 'disabled';
+
     /** The album no longer exists. */
     case AlbumGone = 'album_gone';
 }

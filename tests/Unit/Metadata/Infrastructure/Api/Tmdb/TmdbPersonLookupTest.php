@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Metadata\Infrastructure\Api\Tmdb;
 
+use App\Tests\Fixtures\Metadata\ProviderSwitches;
+
 use App\Metadata\Infrastructure\Api\Tmdb\TmdbAdapter;
 use Baander\HttpClient\PublicDestinationPolicy;
 use Baander\HttpClient\PublicHttpClient;
@@ -104,6 +106,6 @@ final class TmdbPersonLookupTest extends TestCase
         return new TmdbAdapter($token, new NullLogger(), new JsonEncoder(), new PublicHttpClient(
             $http,
             new PublicDestinationPolicy(static fn(string $host): array => ['1.1.1.1']),
-        ), $cache);
+        ), ProviderSwitches::allEnabled(), $cache);
     }
 }

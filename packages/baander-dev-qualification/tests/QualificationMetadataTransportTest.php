@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Baander\DevQualification\Tests;
 
+use App\Tests\Fixtures\Metadata\ProviderSwitches;
 use App\Metadata\Application\DTO\MusicBrainz\MusicBrainzArtist;
 use App\Metadata\Application\DTO\MusicBrainz\MusicBrainzRelease;
 use App\Metadata\Infrastructure\Api\CoverArtArchive\CoverArtArchiveAdapter;
@@ -97,13 +98,14 @@ final class QualificationMetadataTransportTest extends TestCase
             $encoder,
             $client,
             new RateLimiterFactory(['id' => 'musicbrainz', 'policy' => 'no_limit'], new InMemoryStorage()),
-            new CoverArtArchiveAdapter($logger, $encoder, $client),
+            new CoverArtArchiveAdapter($logger, $encoder, $client, ProviderSwitches::allEnabled()),
+            ProviderSwitches::allEnabled(),
         );
         $song = $plan['files'][0];
         self::assertSame($song['metadata']['id'], $music->searchRecording($song['title'], limit: 5)->recordings[0]->id);
         self::assertSame($plan['albums'][$song['album']], $music->searchReleaseGroup($song['album'], limit: 5)->releaseGroups[0]->id);
         self::assertSame($plan['artists'][$song['artist']], $music->searchArtist($song['artist'], limit: 5)->artists[0]->id);
-        $tmdb = new TmdbAdapter('fixture-token', $logger, $encoder, $client);
+        $tmdb = new TmdbAdapter('fixture-token', $logger, $encoder, $client, ProviderSwitches::allEnabled());
         $movie = $plan['files'][2000];
         self::assertSame($movie['metadata']['tmdbId'], $tmdb->searchMovie($movie['title'], limit: 1)->first()->id);
         self::assertSame($movie['title'], $tmdb->lookupMovie($movie['metadata']['tmdbId'])->title);
@@ -253,7 +255,8 @@ final class QualificationMetadataTransportTest extends TestCase
             $encoder,
             $client,
             new RateLimiterFactory(['id' => 'musicbrainz', 'policy' => 'no_limit'], new InMemoryStorage()),
-            new CoverArtArchiveAdapter($logger, $encoder, $client),
+            new CoverArtArchiveAdapter($logger, $encoder, $client, ProviderSwitches::allEnabled()),
+            ProviderSwitches::allEnabled(),
         );
     }
 

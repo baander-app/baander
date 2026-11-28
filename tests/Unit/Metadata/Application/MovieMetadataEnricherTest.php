@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Metadata\Application;
 
+use App\Tests\Fixtures\Metadata\ProviderSwitches;
+
 use App\Catalog\Application\Port\PersonCreditPortInterface;
 use App\Catalog\Application\Port\GenrePortInterface;
 use App\Catalog\Application\Port\MoviePortInterface;
@@ -11,6 +13,8 @@ use App\Catalog\Domain\Model\Movie;
 use App\Metadata\Application\Message\SyncMovieMessage;
 use App\Metadata\Application\MessageHandler\SyncMovieHandler;
 use App\Metadata\Application\MovieMetadataEnricher;
+use App\Metadata\Application\Settings\MetadataProvider;
+use App\Metadata\Application\Settings\MetadataProviderSwitches;
 use App\Metadata\Infrastructure\Api\Tmdb\TmdbAdapter;
 use App\Shared\Application\Exception\ServiceUnavailableException;
 use App\Shared\Application\Port\TransactionPortInterface;
@@ -161,13 +165,35 @@ final class MovieMetadataEnricherTest extends TestCase
         self::assertSame(12, $movie->getTmdbId());
     }
 
-    private function enricher(MockHttpClient $http, MoviePortInterface $movies, PersonCreditPortInterface $people): MovieMetadataEnricher
+    public function testDisabledMovieProviderPreservesMetadataAndReportsItsOutcome(): void
+    {
+        $movie = Movie::create(Uuid::v7(), 'Film', 2026);
+        $movie->updateMetadata(overview: 'Kept overview');
+        $movies = $this->createMock(MoviePortInterface::class);
+        $movies->method('findByUuid')->willReturn($movie);
+        $movies->expects(self::never())->method('saveMetadata');
+        $people = $this->createMock(PersonCreditPortInterface::class);
+        $people->expects(self::never())->method('syncMovieCredits');
+        $http = new MockHttpClient(static function (): never {
+            self::fail('A disabled movie provider must make no request.');
+        });
+        $enricher = $this->enricher($http, $movies, $people, ProviderSwitches::withDisabled(MetadataProvider::Tmdb));
+        $result = $enricher->enrich($movie, true);
+        self::assertTrue($result->isDisabled());
+        self::assertFalse($result->isFailure());
+        self::assertFalse($result->isSuccess());
+        self::assertSame('Kept overview', $movie->getOverview());
+        (new SyncMovieHandler($movies, $enricher))(new SyncMovieMessage($movie->getId(), true));
+        self::assertSame(0, $http->getRequestsCount());
+    }
+
+    private function enricher(MockHttpClient $http, MoviePortInterface $movies, PersonCreditPortInterface $people, ?MetadataProviderSwitches $switches = null): MovieMetadataEnricher
     {
         $logger = new NullLogger();
         $adapter = new TmdbAdapter('fixture-token', $logger, new JsonEncoder(), new PublicHttpClient(
             $http,
             new PublicDestinationPolicy(static fn(string $host): array => ['1.1.1.1']),
-        ));
+        ), $switches ?? ProviderSwitches::allEnabled());
         $transaction = new class implements TransactionPortInterface {
             public function run(callable $operation): mixed
             {

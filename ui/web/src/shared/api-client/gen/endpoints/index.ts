@@ -930,6 +930,10 @@ export interface DeliveryRequest {
   qualityTier?: DeliveryRequestQualityTier;
 }
 
+export interface SetMetadataProviderEnabledRequest {
+  enabled: boolean;
+}
+
 export interface SearchMetadataRequest {
   /** Search query */
   q: string;
@@ -4090,6 +4094,15 @@ export interface ImageResource {
   createdAt: string;
   /** Last update timestamp */
   updatedAt: string;
+}
+
+export interface MetadataProviderResource {
+  id: string;
+  name: string;
+  enabled: boolean;
+  configured: boolean;
+  attributionText: string;
+  attributionUrl: string;
 }
 
 /**
@@ -7561,14 +7574,12 @@ export type PostAdminMetadataTriggerSync200 = {
   data?: PostAdminMetadataTriggerSync200Data;
 };
 
-export type GetAdminMetadataProviders200DataItem = {
-  name?: string;
-  enabled?: boolean;
-  configured?: boolean;
+export type GetAdminMetadataProviders200 = {
+  data?: MetadataProviderResource[];
 };
 
-export type GetAdminMetadataProviders200 = {
-  data?: GetAdminMetadataProviders200DataItem[];
+export type PatchAdminMetadataProviderUpdate200 = {
+  data?: MetadataProviderResource;
 };
 
 /**
@@ -26556,6 +26567,79 @@ export function useGetAdminMetadataProviders<TData = Awaited<ReturnType<typeof g
 
 
 
+
+export const getPatchAdminMetadataProviderUpdateUrl = (provider: string,) => {
+
+
+
+
+  return `/api/admin/metadata/providers/${encodeURIComponent(String(provider))}`
+}
+
+/**
+ * @summary Switch a metadata provider on or off for the server
+ */
+export const patchAdminMetadataProviderUpdate = async (provider: string,
+    setMetadataProviderEnabledRequest: SetMetadataProviderEnabledRequest, options?: Parameters<typeof customInstance>[1]): Promise<PatchAdminMetadataProviderUpdate200> => {
+
+  return customInstance<PatchAdminMetadataProviderUpdate200>(getPatchAdminMetadataProviderUpdateUrl(provider),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: getHeaders({ 'Content-Type': 'application/json' }, options?.headers),
+    body: JSON.stringify(setMetadataProviderEnabledRequest)
+  }
+);}
+
+
+
+
+
+export const getPatchAdminMetadataProviderUpdateMutationKey = () => ['patchAdminMetadataProviderUpdate'] as const;
+
+export const getPatchAdminMetadataProviderUpdateMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof patchAdminMetadataProviderUpdate>>, TError,PatchAdminMetadataProviderUpdateMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
+): UseMutationOptions<Awaited<ReturnType<typeof patchAdminMetadataProviderUpdate>>, TError,PatchAdminMetadataProviderUpdateMutationVariables, TContext> => {
+
+const mutationKey = getPatchAdminMetadataProviderUpdateMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof patchAdminMetadataProviderUpdate>>, PatchAdminMetadataProviderUpdateMutationVariables> = (props) => {
+          const {provider,data} = props ?? {};
+
+          return  patchAdminMetadataProviderUpdate(provider,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type PatchAdminMetadataProviderUpdateMutationResult = NonNullable<Awaited<ReturnType<typeof patchAdminMetadataProviderUpdate>>>
+    export type PatchAdminMetadataProviderUpdateMutationBody = BodyType<SetMetadataProviderEnabledRequest>
+    export type PatchAdminMetadataProviderUpdateMutationError = ErrorType<void>
+    export type PatchAdminMetadataProviderUpdateMutationVariables = {provider: string;data: BodyType<SetMetadataProviderEnabledRequest>}
+
+    /** @summary Switch a metadata provider on or off for the server */
+export const usePatchAdminMetadataProviderUpdate = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof patchAdminMetadataProviderUpdate>>, TError,PatchAdminMetadataProviderUpdateMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof patchAdminMetadataProviderUpdate>>,
+        TError,
+        PatchAdminMetadataProviderUpdateMutationVariables,
+        TContext
+      > => {
+      return useMutation(getPatchAdminMetadataProviderUpdateMutationOptions(options), queryClient);
+    }
 
 export const getGetMetadataBrowseArtistUrl = (mbid: string,) => {
 

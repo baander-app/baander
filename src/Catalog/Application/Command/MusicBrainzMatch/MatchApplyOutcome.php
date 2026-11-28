@@ -27,4 +27,7 @@ enum MatchApplyOutcome: string
 
     /** The Cover Art Archive did not answer or throttled the request for the cover; nothing was written. */
     case Unavailable = 'musicbrainz_unavailable';
+
+    /** A provider was switched off before the apply could finish; nothing was written. */
+    case Disabled = 'provider_disabled';
 }

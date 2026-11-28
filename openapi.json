@@ -13604,18 +13604,7 @@
                                         "data": {
                                             "type": "array",
                                             "items": {
-                                                "type": "object",
-                                                "properties": {
-                                                    "name": {
-                                                        "type": "string"
-                                                    },
-                                                    "enabled": {
-                                                        "type": "boolean"
-                                                    },
-                                                    "configured": {
-                                                        "type": "boolean"
-                                                    }
-                                                }
+                                                "$ref": "#/components/schemas/MetadataProviderResource"
                                             }
                                         }
                                     }
@@ -13632,6 +13621,58 @@
                                 }
                             }
                         }
+                    }
+                }
+            }
+        },
+        "/api/admin/metadata/providers/{provider}": {
+            "patch": {
+                "tags": [
+                    "Admin"
+                ],
+                "summary": "Switch a metadata provider on or off for the server",
+                "operationId": "patch_admin_metadata_provider_update",
+                "parameters": [
+                    {
+                        "name": "provider",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/SetMetadataProviderEnabledRequest"
+                            }
+                        }
+                    },
+                    "required": true
+                },
+                "responses": {
+                    "200": {
+                        "description": "Updated metadata provider",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/MetadataProviderResource"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden"
+                    },
+                    "422": {
+                        "description": "Unknown provider or invalid enabled value"
                     }
                 }
             }
@@ -28089,6 +28130,17 @@
                     "containers"
                 ]
             },
+            "SetMetadataProviderEnabledRequest": {
+                "type": "object",
+                "properties": {
+                    "enabled": {
+                        "type": "boolean"
+                    }
+                },
+                "required": [
+                    "enabled"
+                ]
+            },
             "SearchMetadataRequest": {
                 "type": "object",
                 "properties": {
@@ -32564,6 +32616,37 @@
                     "imageableType",
                     "createdAt",
                     "updatedAt"
+                ]
+            },
+            "MetadataProviderResource": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "type": "string"
+                    },
+                    "name": {
+                        "type": "string"
+                    },
+                    "enabled": {
+                        "type": "boolean"
+                    },
+                    "configured": {
+                        "type": "boolean"
+                    },
+                    "attributionText": {
+                        "type": "string"
+                    },
+                    "attributionUrl": {
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "id",
+                    "name",
+                    "enabled",
+                    "configured",
+                    "attributionText",
+                    "attributionUrl"
                 ]
             },
             "NotificationResource": {

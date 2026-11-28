@@ -10,6 +10,7 @@ use App\Catalog\Application\Service\MusicBrainzMatch\AutomaticAlbumMatcherInterf
 use App\Catalog\Application\Service\MusicBrainzMatch\AutomaticMatchOutcome;
 use App\Catalog\Application\Service\MusicBrainzMatch\AutomaticMatchOutcomeKind;
 use App\Catalog\Domain\Repository\AlbumMatchStateRepositoryInterface;
+use App\Metadata\Application\Port\MusicBrainzLookupInterface;
 use App\Catalog\Domain\ValueObject\AlbumMatchSource;
 use App\Catalog\Domain\ValueObject\AlbumMatchState;
 use App\Catalog\Domain\ValueObject\AlbumMatchStatus;
@@ -80,12 +81,20 @@ final readonly class DrainAlbumMatchesHandler
         private MessageBusInterface $bus,
         private ClockInterface $clock,
         private LoggerInterface $logger,
+        private MusicBrainzLookupInterface $musicBrainz,
     ) {
     }
 
     #[AsMessageHandler(fromTransport: 'async', sign: true)]
     public function __invoke(DrainAlbumMatchesMessage $message): void
     {
+        if (!$this->musicBrainz->isEnabled()) {
+            if ($message->chain !== null) {
+                $this->chains->release($message->chain);
+            }
+
+            return;
+        }
         $chain = $message->chain;
         if ($chain === null) {
             $chain = $this->chains->start(self::CLAIM_SECONDS);
@@ -102,6 +111,12 @@ final readonly class DrainAlbumMatchesHandler
             return;
         }
 
+        if (!$this->musicBrainz->isEnabled()) {
+            $this->states->releaseClaim($request->albumId, $claimId);
+            $this->chains->release($chain);
+
+            return;
+        }
         if ($request->source === AlbumMatchSource::Ingest && $this->settings->get(MetadataSettingDefinitions::AUTO_SYNC) !== true) {
             $this->states->removeIngestRequests();
             // An admin request made during the claim turned this request into an admin request,
@@ -113,6 +128,11 @@ final readonly class DrainAlbumMatchesHandler
 
         $outcome = $this->match($request->albumId);
         $left = $this->endClaim($request->albumId, $claimId, $outcome);
+        if ($outcome?->kind === AutomaticMatchOutcomeKind::Disabled) {
+            $this->chains->release($chain);
+
+            return;
+        }
         if ($outcome?->kind === AutomaticMatchOutcomeKind::Unavailable) {
             $this->queueRun(new DrainAlbumMatchesMessage($chain, $message->outages + 1), self::outageDelay($message->outages));
 
@@ -161,7 +181,7 @@ final readonly class DrainAlbumMatchesHandler
                 $claimId,
                 $this->after($outcome->retryAfterSeconds ?? throw new \LogicException('An album to retry later has a delay.')),
             ),
-            AutomaticMatchOutcomeKind::Unavailable => $this->states->releaseClaim($albumId, $claimId),
+            AutomaticMatchOutcomeKind::Unavailable, AutomaticMatchOutcomeKind::Disabled => $this->states->releaseClaim($albumId, $claimId),
             null => $this->states->postponeClaimedRequest($albumId, $claimId, $this->after(self::FAILURE_RETRY_SECONDS)),
         };
     }
