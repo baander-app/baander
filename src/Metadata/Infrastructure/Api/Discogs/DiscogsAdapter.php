@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 namespace App\Metadata\Infrastructure\Api\Discogs;
 
+use App\Metadata\Application\Settings\MetadataProvider;
+use App\Metadata\Application\Settings\MetadataProviderSwitches;
+
 use App\Metadata\Infrastructure\Api\Discogs\DTO\DiscogsArtistDto;
 use App\Metadata\Infrastructure\Api\Discogs\DTO\DiscogsMasterDto;
 use App\Metadata\Infrastructure\Api\Discogs\DTO\DiscogsReleaseDto;
@@ -31,6 +34,7 @@ final class DiscogsAdapter
         private readonly LoggerInterface $logger,
         private readonly JsonEncoder $jsonEncoder,
         private readonly PublicHttpClient $httpClient,
+        private readonly MetadataProviderSwitches $switches,
     ) {}
 
     public function searchArtist(string $query, int $limit = 25): DiscogsSearchResultDto
@@ -191,6 +195,7 @@ final class DiscogsAdapter
         $this->logger->debug('Discogs API request', ['service' => 'discogs', 'endpoint' => $endpoint]);
         $retried = false;
         while (true) {
+            $this->switches->requireEnabled(MetadataProvider::Discogs);
             $response = null;
             try {
                 $response = $this->httpClient->request('GET', $url, ['api.discogs.com'], [

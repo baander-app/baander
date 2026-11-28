@@ -14,10 +14,11 @@ use App\Catalog\Application\Port\ArtistSyncRequestInterface;
 use App\Catalog\Application\Port\GenrePortInterface;
 use App\Catalog\Application\Port\IdentifiedArtist;
 use App\Catalog\Application\Port\MetadataContentReaderPortInterface;
-use App\Catalog\Application\Port\MoviePortInterface;
+use App\Catalog\Domain\Repository\MovieRepositoryInterface;
 use App\Catalog\Application\Port\SongPortInterface;
 use App\Catalog\Application\Service\ArtistSyncQueue;
 use App\Catalog\Application\Service\ArtistSyncRequester;
+use App\Catalog\Application\Service\VideoFileIngest;
 use App\Catalog\Domain\Model\Album;
 use App\Catalog\Domain\Model\Song;
 use App\Catalog\Domain\Repository\VideoRepositoryInterface;
@@ -435,23 +436,31 @@ final class FilesDiscoveredArtistCreditTest extends TestCase
         $bus = $this->createStub(MessageBusInterface::class);
         $bus->method('dispatch')->willReturnCallback(static fn (object $message): Envelope => new Envelope($message));
 
+        $videoIngestLogger = new NullLogger();
+        $videoIngestMedia = $this->observedMediaFiles($this->createStub(LibraryMediaFilesInterface::class));
         return new FilesDiscoveredHandler(
             $albums,
             $genres,
             $songs,
-            $this->createStub(MoviePortInterface::class),
-            $this->createStub(VideoRepositoryInterface::class),
+            $this->movieIngest($this->createStub(MovieRepositoryInterface::class), $this->createStub(VideoRepositoryInterface::class), $videoIngestMedia),
+            new VideoFileIngest(
+                $this->createStub(VideoRepositoryInterface::class),
+                new FFprobeAdapter(new JsonEncoder()),
+                $videoIngestMedia,
+                $transaction,
+                $videoIngestLogger,
+            ),
             $metadata,
-            new FFprobeAdapter(new JsonEncoder()),
             $bus,
             $this->createStub(LyricsFetchRequestInterface::class),
             $this->createStub(AlbumMatchRequestInterface::class),
-            new NullLogger(),
-            $this->observedMediaFiles($this->createStub(LibraryMediaFilesInterface::class)),
+            $videoIngestLogger,
+            $videoIngestMedia,
             $transaction,
             audioProbe: $this->audioProbeStub(),
             artistIdentities: $resolver,
             artistSyncs: $this->artistSyncs(),
+            tvLibraryIngest: $this->unusedTvIngest(),
         );
     }
 

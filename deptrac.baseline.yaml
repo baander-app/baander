@@ -97,12 +97,6 @@ deptrac:
       - App\Filesystem\Application\Port\MimeDetectorPortInterface
     App\Filesystem\Watcher\FileWatcher:
       - App\Shared\Infrastructure\Swoole\Async
-    App\Library\Application\MovieScanner:
-      - App\Library\Infrastructure\Scanner\MediaFile
-    App\Library\Application\MusicScanner:
-      - App\Library\Infrastructure\Scanner\MediaFile
-    App\Library\Application\Port\DirectoryScannerPortInterface:
-      - App\Library\Infrastructure\Scanner\MediaFile
     App\Media\Infrastructure\Doctrine\Entity\ImageEntity:
       - App\Catalog\Infrastructure\Doctrine\Entity\AlbumEntity
       - App\Catalog\Infrastructure\Doctrine\Entity\ArtistEntity

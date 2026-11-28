@@ -11,9 +11,10 @@ use App\Catalog\Application\Port\AlbumPortInterface;
 use App\Catalog\Application\Port\ArtistSyncRequestInterface;
 use App\Catalog\Application\Port\GenrePortInterface;
 use App\Catalog\Application\Port\MetadataContentReaderPortInterface;
-use App\Catalog\Application\Port\MoviePortInterface;
+use App\Catalog\Domain\Repository\MovieRepositoryInterface;
 use App\Catalog\Application\Port\SongPortInterface;
 use App\Catalog\Application\Service\MusicBrainzMatch\AlbumMatchRequester;
+use App\Catalog\Application\Service\VideoFileIngest;
 use App\Catalog\Domain\Model\Album;
 use App\Catalog\Domain\Model\Song;
 use App\Catalog\Domain\Repository\VideoRepositoryInterface;
@@ -270,23 +271,32 @@ final class FilesDiscoveredAlbumSyncRequestTest extends TestCase
         $settings = $this->createStub(SystemSettingsPortInterface::class);
         $settings->method('get')->willReturnCallback(fn (string $key): bool => $key === MetadataSettingDefinitions::AUTO_SYNC && $this->automaticMatching);
 
+        $videoIngestLogger = $logger ?? new NullLogger();
+        $videoIngestMedia = $this->observedMediaFiles($this->createStub(LibraryMediaFilesInterface::class));
+        $videoIngestTransaction = new PassThroughTransaction();
         return new FilesDiscoveredHandler(
             $albums,
             $this->createStub(GenrePortInterface::class),
             $songs,
-            $this->createStub(MoviePortInterface::class),
-            $this->createStub(VideoRepositoryInterface::class),
+            $this->movieIngest($this->createStub(MovieRepositoryInterface::class), $this->createStub(VideoRepositoryInterface::class), $videoIngestMedia),
+            new VideoFileIngest(
+                $this->createStub(VideoRepositoryInterface::class),
+                new FFprobeAdapter(new JsonEncoder()),
+                $videoIngestMedia,
+                $videoIngestTransaction,
+                $videoIngestLogger,
+            ),
             $metadata,
-            new FFprobeAdapter(new JsonEncoder()),
             $bus,
             $this->createStub(LyricsFetchRequestInterface::class),
             $requests ?? new AlbumMatchRequester($this->states, $albums, $songs, $settings, $bus, new MockClock(self::NOW)),
-            $logger ?? new NullLogger(),
-            $this->observedMediaFiles($this->createStub(LibraryMediaFilesInterface::class)),
-            new PassThroughTransaction(),
+            $videoIngestLogger,
+            $videoIngestMedia,
+            $videoIngestTransaction,
             audioProbe: $this->audioProbeStub(),
             artistIdentities: $this->artistIdentitiesStub(),
             artistSyncs: $this->createStub(ArtistSyncRequestInterface::class),
+            tvLibraryIngest: $this->unusedTvIngest(),
         );
     }
 

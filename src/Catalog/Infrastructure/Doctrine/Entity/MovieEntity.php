@@ -70,6 +70,10 @@ class MovieEntity
     #[ORM\Column(type: 'text', nullable: true)]
     private ?string $collectionName = null;
 
+    /** @var list<string> */
+    #[ORM\Column(type: 'json', options: ['jsonb' => true, 'default' => '[]'])]
+    private array $lockedFields = [];
+
     #[ORM\Column(type: 'datetime_immutable')]
     private \DateTimeImmutable $createdAt;
 
@@ -90,6 +94,10 @@ class MovieEntity
         $this->updatedAt = new \DateTimeImmutable();
     }
 
+    /** @return list<string> */
+    public function getLockedFields(): array { return $this->lockedFields; }
+    /** @param list<string> $fields */
+    public function setLockedFields(array $fields): void { $this->lockedFields = $fields; }
     public function getId(): Uuid { return $this->id; }
     public function getPublicId(): PublicId { return $this->publicId; }
     public function getLibrary(): LibraryEntity { return $this->library; }

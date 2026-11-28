@@ -10,9 +10,10 @@ use App\Catalog\Application\Port\AlbumPortInterface;
 use App\Catalog\Application\Port\ArtistSyncRequestInterface;
 use App\Catalog\Application\Port\GenrePortInterface;
 use App\Catalog\Application\Port\MetadataContentReaderPortInterface;
-use App\Catalog\Application\Port\MoviePortInterface;
+use App\Catalog\Domain\Repository\MovieRepositoryInterface;
 use App\Catalog\Application\Port\SongPortInterface;
 use App\Catalog\Application\Service\MovieLibraryIngest;
+use App\Catalog\Application\Service\VideoFileIngest;
 use App\Catalog\Domain\Model\Video;
 use App\Catalog\Domain\Repository\VideoRepositoryInterface;
 use App\Catalog\Interface\Console\IngestTestVideoCommand;
@@ -109,16 +110,32 @@ final class IngestTestVideoCommandTest extends TestCase
     private function command(LibraryProvisioningInterface $provisioning, VideoRepositoryInterface $videos): IngestTestVideoCommand
     {
         $bus = $this->createStub(MessageBusInterface::class);
+        $videoIngestLogger = new NullLogger();
+        $videoIngestMedia = $this->createStub(LibraryMediaFilesInterface::class);
+        $videoIngestTransaction = new PassThroughTransaction();
         $handler = new FilesDiscoveredHandler(
-            $this->createStub(AlbumPortInterface::class), $this->createStub(GenrePortInterface::class),
-            $this->createStub(SongPortInterface::class), $this->createStub(MoviePortInterface::class),
-            $videos, $this->createStub(MetadataContentReaderPortInterface::class), new FFprobeAdapter(new JsonEncoder()), $bus,
-            $this->createStub(LyricsFetchRequestInterface::class), $this->createStub(AlbumMatchRequestInterface::class), new NullLogger(),
-            $this->createStub(LibraryMediaFilesInterface::class),
-            new PassThroughTransaction(),
+            $this->createStub(AlbumPortInterface::class),
+            $this->createStub(GenrePortInterface::class),
+            $this->createStub(SongPortInterface::class),
+            $this->movieIngest($this->createStub(MovieRepositoryInterface::class), $videos, $videoIngestMedia),
+            new VideoFileIngest(
+                $videos,
+                new FFprobeAdapter(new JsonEncoder()),
+                $videoIngestMedia,
+                $videoIngestTransaction,
+                $videoIngestLogger,
+            ),
+            $this->createStub(MetadataContentReaderPortInterface::class),
+            $bus,
+            $this->createStub(LyricsFetchRequestInterface::class),
+            $this->createStub(AlbumMatchRequestInterface::class),
+            $videoIngestLogger,
+            $videoIngestMedia,
+            $videoIngestTransaction,
             audioProbe: $this->audioProbeStub(),
             artistIdentities: $this->artistIdentitiesStub(),
             artistSyncs: $this->createStub(ArtistSyncRequestInterface::class),
+            tvLibraryIngest: $this->unusedTvIngest(),
         );
 
         return new IngestTestVideoCommand(new MovieLibraryIngest($provisioning, $handler, $videos));

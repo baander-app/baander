@@ -40,4 +40,28 @@ SOURCE);
             $violations,
         );
     }
+
+    public function testOnlyCatalogApplicationMayUseTheVideoProviderContractOutsideMetadata(): void
+    {
+        $violations = self::deptracViolations(<<<'SOURCE'
+<?php
+namespace App\Metadata\Application\Port;
+interface VideoMetadataPortInterface {}
+namespace App\Metadata\Application\DTO\Video;
+final class VideoTitle {}
+namespace App\Catalog\Application;
+final class MatchTitle {
+    public function apply(\App\Metadata\Application\Port\VideoMetadataPortInterface $port, \App\Metadata\Application\DTO\Video\VideoTitle $title): void {}
+}
+namespace App\Catalog\Infrastructure;
+final class VideoReader {
+    public function fetch(\App\Metadata\Application\Port\VideoMetadataPortInterface $port): void {}
+}
+SOURCE);
+
+        self::assertSame(
+            ['App\Catalog\Infrastructure\VideoReader must not depend on App\Metadata\Application\Port\VideoMetadataPortInterface'],
+            $violations,
+        );
+    }
 }

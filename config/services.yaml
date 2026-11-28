@@ -8,6 +8,7 @@ parameters:
     env(BAANDER_DEPLOYMENT_PROFILE): ''
     env(BAANDER_LOG_NODES): '[]'
     env(WEBHOOK_LAN_ALLOWLIST): ''
+    env(TVDB_API_KEY): ''
     app.domain: '%env(APP_DOMAIN)%'
     app.name: 'Bånder'
     swoole_bundle.cache_dir: '%kernel.cache_dir%/swoole_bundle'
@@ -756,6 +757,8 @@ services:
         alias: App\Catalog\Infrastructure\Doctrine\Repository\VideoRepository
     App\Catalog\Domain\Repository\AlbumMatchStateRepositoryInterface:
         alias: App\Catalog\Infrastructure\Doctrine\Repository\AlbumMatchStateRepository
+    App\Catalog\Domain\Repository\LibraryProviderOrderRepositoryInterface:
+        alias: App\Catalog\Infrastructure\Doctrine\Repository\LibraryProviderOrderRepository
 
     App\Shared\Application\Port\OpenApiExporterInterface:
         alias: App\Shared\Infrastructure\OpenApi\NativeOpenApiExporter
@@ -779,6 +782,8 @@ services:
         alias: App\Catalog\Infrastructure\Doctrine\Query\MatchReviewReadQuery
     App\Catalog\Application\Port\SongAvailabilityPortInterface:
         alias: App\Catalog\Infrastructure\SongAvailability
+    App\Catalog\Application\Port\VideoAvailabilityPortInterface:
+        alias: App\Catalog\Infrastructure\VideoAvailability
     App\Catalog\Application\Port\SongPortInterface:
         alias: App\Catalog\Infrastructure\SongService
     App\Catalog\Application\Port\SongLookupInterface:
@@ -1111,6 +1116,8 @@ services:
             $spotifyClientId: '%env(SPOTIFY_CLIENT_ID)%'
             $spotifyClientSecret: '%env(SPOTIFY_CLIENT_SECRET)%'
             $tasteDiveApiKey: '%env(TASTE_DIVE_API_KEY)%'
+            $tmdbBearerToken: '%env(TMDB_BEARER_TOKEN)%'
+            $tvdbApiKey: '%env(TVDB_API_KEY)%'
 
     App\Shared\Infrastructure\Messenger\ResultStampMiddleware:
         arguments:
@@ -1267,9 +1274,24 @@ services:
     App\Transcode\Application\Port\VideoProbePortInterface:
         alias: App\Transcode\Infrastructure\FFmpeg\FFprobeAdapter
 
+    App\Metadata\Application\Port\VideoMetadataPortInterface:
+        alias: App\Metadata\Infrastructure\Video\VideoMetadataProviders
+
+    App\Metadata\Infrastructure\Video\VideoMetadataProviders:
+        arguments:
+            $adapters:
+                - '@App\Metadata\Infrastructure\Video\TvdbVideoMetadata'
+                - '@App\Metadata\Infrastructure\Video\TmdbVideoMetadata'
+                - '@App\Metadata\Infrastructure\Local\LocalVideoMetadata'
+
     App\Metadata\Infrastructure\Api\Tmdb\TmdbAdapter:
         arguments:
             $bearerToken: '%env(TMDB_BEARER_TOKEN)%'
+
+    App\Metadata\Infrastructure\Api\Tvdb\TvdbAdapter:
+        arguments:
+            $apiKey: '%env(TVDB_API_KEY)%'
+            $cache: '@cache.app'
 
     App\Catalog\Application\Port\PeopleReadPortInterface:
         alias: App\Catalog\Infrastructure\Doctrine\Repository\PeopleReadRepository
@@ -1289,11 +1311,8 @@ services:
     App\Catalog\Application\Port\PersonAdministrationPortInterface:
         alias: App\Catalog\Infrastructure\Doctrine\Repository\PersonAdministrationRepository
 
-    App\Catalog\Application\Port\TvCatalogPortInterface:
+    App\Catalog\Domain\Repository\TvCatalogRepositoryInterface:
         alias: App\Catalog\Infrastructure\Doctrine\Repository\TvCatalogRepository
-
-    App\Metadata\Application\Port\TvMetadataPortInterface:
-        alias: App\Metadata\Infrastructure\Tv\TvMetadataProvider
 
     App\Metadata\Application\Port\TmdbPersonLookupInterface:
         alias: App\Metadata\Infrastructure\Api\Tmdb\TmdbAdapter
@@ -1833,6 +1852,9 @@ when@test:
     parameters:
         notification.push.allowed_domains: ['push.baander.app']
     services:
+        test.tvdb_adapter:
+            alias: App\Metadata\Infrastructure\Api\Tvdb\TvdbAdapter
+            public: true
         # A message whose handler fails on demand, for failure transport tests.
         App\Tests\Fixtures\Messaging\FailureTransportProbeCodec:
             tags: ['baander.message_payload_codec']

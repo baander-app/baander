@@ -4,13 +4,16 @@ declare(strict_types=1);
 
 namespace App\Library\Infrastructure\Scanner;
 
+use App\Library\Application\DTO\MediaFile;
 use App\Library\Application\Port\DirectoryScannerPortInterface;
 use App\Library\Domain\ValueObject\LibraryPath;
 use App\Shared\Domain\ValueObject\MediaContainer;
+use Closure;
 use Psr\Log\LoggerInterface;
 use RecursiveDirectoryIterator;
 use RecursiveIteratorIterator;
 use SplFileInfo;
+use UnexpectedValueException;
 
 final class DirectoryScanner implements DirectoryScannerPortInterface
 {
@@ -24,7 +27,7 @@ final class DirectoryScanner implements DirectoryScannerPortInterface
      *
      * @return MediaFile[]
      */
-    public function scan(LibraryPath $path): array
+    public function scan(LibraryPath $path, ?Closure $checkpoint = null, bool $unreadableRootIsEmpty = false): array
     {
         // A long-running worker must not judge a retargeted link by PHP's cached real path.
         clearstatcache(true);
@@ -36,20 +39,27 @@ final class DirectoryScanner implements DirectoryScannerPortInterface
 
         $files = [];
 
-        $iterator = new RecursiveIteratorIterator(
-            new RecursiveDirectoryIterator($realPath, RecursiveDirectoryIterator::SKIP_DOTS),
-            RecursiveIteratorIterator::SELF_FIRST,
-        );
+        try {
+            $root = new RecursiveDirectoryIterator($realPath, RecursiveDirectoryIterator::SKIP_DOTS);
+        } catch (UnexpectedValueException $error) {
+            if (!$unreadableRootIsEmpty) {
+                throw $error;
+            }
+
+            return [];
+        }
+        $iterator = new RecursiveIteratorIterator($root, RecursiveIteratorIterator::SELF_FIRST);
 
         /** @var SplFileInfo $file */
         foreach ($iterator as $file) {
+            $checkpoint?->__invoke();
             if (!$file->isFile()) {
                 continue;
             }
 
             $extension = strtolower($file->getExtension());
 
-            if (MediaContainer::forExtension($extension) === null) {
+            if (MediaContainer::forExtension($extension) === null && !MediaFile::isVideoSidecarExtension($extension)) {
                 continue;
             }
 

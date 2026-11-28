@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 namespace App\Metadata\Infrastructure\Api\TasteDive;
 
+use App\Metadata\Application\Settings\MetadataProvider;
+use App\Metadata\Application\Settings\MetadataProviderSwitches;
+
 use Baander\HttpClient\PublicHttpClient;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\Serializer\Encoder\JsonEncoder;
@@ -17,6 +20,7 @@ final readonly class TasteDiveAdapter
         private readonly LoggerInterface $logger,
         private readonly JsonEncoder $jsonEncoder,
         private readonly PublicHttpClient $httpClient,
+        private readonly MetadataProviderSwitches $switches,
     ) {
     }
 
@@ -54,6 +58,7 @@ final readonly class TasteDiveAdapter
      */
     private function request(array $params): array
     {
+        $this->switches->requireEnabled(MetadataProvider::TasteDive);
         $params['k'] = $this->apiKey;
         $url = self::BASE_URL . '?' . http_build_query($params);
         $this->logger->debug('TasteDive API request', ['service' => 'tastedive']);

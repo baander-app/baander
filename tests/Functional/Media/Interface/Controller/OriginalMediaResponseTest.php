@@ -8,6 +8,10 @@ use App\Auth\Domain\Model\User;
 use App\Catalog\Infrastructure\Doctrine\Entity\MovieEntity;
 use App\Catalog\Infrastructure\Doctrine\Entity\MovieVideoEntity;
 use App\Catalog\Infrastructure\Doctrine\Entity\VideoEntity;
+use App\Catalog\Domain\Model\VideoPlacement;
+use App\Catalog\Infrastructure\Doctrine\Entity\VideoPlacementEntity;
+use App\Library\Infrastructure\Doctrine\Entity\LibraryFileIndexEntity;
+use App\Shared\Domain\Model\Uuid;
 use App\Library\Application\Port\LibraryAccessPortInterface;
 use App\Library\Infrastructure\Doctrine\Entity\LibraryEntity;
 use App\Shared\Application\Http\BaanderHeader;
@@ -52,6 +56,14 @@ final class OriginalMediaResponseTest extends TestCase
         $this->entityManager->persist($video);
         $this->entityManager->persist($movie);
         $this->entityManager->persist(new MovieVideoEntity($movie, $video));
+        $placement = VideoPlacement::create($library->getId(), $video->getId(), self::NAME, [], movieId: $movie->getId());
+        $row = new VideoPlacementEntity($library, $video, $placement->getState());
+        $row->movie = $movie;
+        $this->entityManager->persist($row);
+        $this->entityManager->persist(new LibraryFileIndexEntity(
+            Uuid::v7(), $library->getId(), $video->getPath(), $video->getHash(),
+            (int) filesize($video->getPath()), 'mkv', (int) filemtime($video->getPath()), new \DateTimeImmutable(),
+        ));
         $this->entityManager->flush();
         $this->videoId = $video->getPublicId();
 

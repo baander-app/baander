@@ -13,13 +13,13 @@ use App\Catalog\Application\Port\ArtistSyncRequestInterface;
 use App\Catalog\Application\Port\GenrePortInterface;
 use App\Catalog\Application\Port\IdentifiedArtist;
 use App\Catalog\Application\Port\MetadataContentReaderPortInterface;
-use App\Catalog\Application\Port\MoviePortInterface;
 use App\Catalog\Application\Port\SongPortInterface;
+use App\Catalog\Application\Service\MovieFileIngest;
+use App\Catalog\Application\Service\TvLibraryIngest;
+use App\Catalog\Application\Service\VideoFileIngest;
 use App\Catalog\Domain\Model\Album;
-use App\Catalog\Domain\Model\Movie;
 use App\Catalog\Domain\Model\Song;
 use App\Catalog\Domain\Model\Video;
-use App\Catalog\Domain\Repository\VideoRepositoryInterface;
 use App\Catalog\Domain\ValueObject\AlbumType;
 use App\Catalog\Domain\ValueObject\ArtistRole;
 use App\Catalog\Domain\ValueObject\MatchedSongField;
@@ -33,11 +33,9 @@ use App\Metadata\Application\Command\ExtractAlbumCoverCommand;
 use App\Shared\Application\Port\TransactionPortInterface;
 use App\Shared\Domain\Model\Uuid;
 use App\Shared\Domain\ValueObject\MediaContainer;
-use App\Shared\Domain\ValueObject\MediaKind;
 use App\Transcode\Application\DTO\AudioProbeResult;
 use App\Transcode\Application\Exception\UnsupportedMediaContainerException;
 use App\Transcode\Application\Port\AudioProbePortInterface;
-use App\Transcode\Application\Port\VideoProbePortInterface;
 use Psr\Log\LoggerInterface;
 use RuntimeException;
 use Symfony\Component\Messenger\Attribute\AsMessageHandler;
@@ -67,10 +65,9 @@ final class FilesDiscoveredHandler
         private readonly AlbumPortInterface $albumService,
         private readonly GenrePortInterface $genreService,
         private readonly SongPortInterface $songService,
-        private readonly MoviePortInterface $movieService,
-        private readonly VideoRepositoryInterface $videoRepository,
+        private readonly MovieFileIngest $movieFileIngest,
+        private readonly VideoFileIngest $videoFileIngest,
         private readonly MetadataContentReaderPortInterface $metadataReader,
-        private readonly VideoProbePortInterface $ffprobeAdapter,
         private readonly MessageBusInterface $messageBus,
         private readonly LyricsFetchRequestInterface $lyricsFetch,
         private readonly AlbumMatchRequestInterface $albumMatches,
@@ -80,6 +77,7 @@ final class FilesDiscoveredHandler
         private readonly AudioProbePortInterface $audioProbe,
         private readonly ArtistIdentityResolverInterface $artistIdentities,
         private readonly ArtistSyncRequestInterface $artistSyncs,
+        private readonly TvLibraryIngest $tvLibraryIngest,
     ) {
     }
 
@@ -103,7 +101,7 @@ final class FilesDiscoveredHandler
 
         match ($message->libraryType) {
             'music' => $this->processMusicFiles($message, $files),
-            'movie' => $this->processMovieFiles($message, $files),
+            'movie', 'tv_show' => $this->processVideoFiles($message, $files),
             default => throw new RuntimeException(sprintf('Unknown library type: %s', $message->libraryType)),
         };
     }
@@ -1157,97 +1155,28 @@ final class FilesDiscoveredHandler
     }
 
     /** @param list<DiscoveredFile> $files the message's files that still exist */
-    private function processMovieFiles(FilesDiscovered $message, array $files): void
+    private function processVideoFiles(FilesDiscovered $message, array $files): void
     {
         $failures = [];
         $committedPaths = [];
-        $videoFiles = array_filter($files, static fn(DiscoveredFile $file): bool => $file->isVideo()) |> array_values(...);
+        $ingest = $message->libraryType === 'tv_show' ? $this->tvLibraryIngest : $this->movieFileIngest;
+        $library = $message->libraryId;
+        $videoFiles = array_filter(
+            $files,
+            static fn (DiscoveredFile $file): bool => $file->isVideo() && $ingest->accepts($file),
+        ) |> array_values(...);
         foreach (array_chunk($videoFiles, self::BATCH_SIZE) as $batch) {
-            $prepared = [];
-            $refused = [];
-            foreach ($this->currentFiles($message->libraryId, $batch) as $file) {
-                try {
-                    $video = $this->videoRepository->findByHash($file->hash);
-                    $isNew = $video === null;
-                    $probe = $video === null || $this->videoNeedsProbe($video, $file)
-                        ? $this->ffprobeAdapter->probeVideo($file->absolutePath) : null;
-                    if ($video === null) {
-                        $video = Video::create(
-                            path: $file->absolutePath,
-                            hash: $file->hash,
-                            duration: (int) $probe->duration,
-                            height: $probe->height,
-                            width: $probe->width,
-                            videoBitrate: $probe->videoBitrate,
-                            framerate: (int) $probe->framerate,
-                        );
-                        $video->updateProbe($probe->jsonSerialize());
-                    }
-                    $prepared[] = ['file' => $file, 'video' => $video, 'isNew' => $isNew, 'probe' => $probe];
-                } catch (UnsupportedMediaContainerException $error) {
-                    $refused[] = $file->absolutePath;
-                    $failures[] = $this->fileFailed($file, $error);
-                } catch (\Throwable $error) {
-                    $failures[] = $this->fileFailed($file, $error);
-                }
-            }
-            $this->markRefusedUnavailable($message->libraryId, $refused);
-            if ($prepared === []) {
-                continue;
-            }
-            $written = $this->transaction->run(function () use ($message, $prepared, &$failures): ?array {
-                if ($this->mediaFiles->isHeldByDeleteForImport($message->libraryId)) {
-                    return null;
-                }
-                $hashes = $this->mediaFiles->lockAvailableHashesByPathsForImport($message->libraryId, array_map(
-                    static fn(array $entry): string => $entry['file']->absolutePath,
-                    $prepared,
-                ));
-                $current = array_filter(
-                    $prepared,
-                    static fn(array $entry): bool => ($hashes[$entry['file']->absolutePath] ?? null) === $entry['file']->hash,
-                );
-                if ($current === []) {
-                    return [];
-                }
-                $movie = null;
-                $written = [];
-                foreach ($current as $entry) {
-                    try {
-                        $video = $entry['video'];
-                        if ($entry['isNew']) {
-                            $existing = $this->videoRepository->findByHash($entry['file']->hash);
-                            if ($existing !== null) {
-                                $video = $existing;
-                            } else {
-                                $this->videoRepository->save($video);
-                            }
-                        }
-                        if (!$entry['isNew'] && $entry['probe'] !== null) {
-                            $video = $this->videoRepository->findFreshByUuid($video->getId());
-                            if (
-                                $video === null || $video->getHash() !== $entry['file']->hash
-                                || $video->getPath() !== $entry['file']->absolutePath
-                            ) {
-                                continue;
-                            }
-                            $video->updateProbe($entry['probe']->jsonSerialize());
-                            $this->videoRepository->save($video);
-                        }
-                        $movie ??= $this->resolveMovie($message->libraryId, basename($message->directory));
-                        if (!in_array($video->getId()->toString(), $movie->getVideoIds(), true)) {
-                            $movie->addVideo($video->getId());
-                            $this->movieService->persist($movie);
-                        }
-                        $written[] = $entry['file']->absolutePath;
-                    } catch (\Throwable $error) {
-                        $failures[] = $this->fileFailed($entry['file'], $error);
-                    }
-                }
-                $this->movieService->flush();
-
-                return $written;
-            });
+            $result = $this->videoFileIngest->importBatch(
+                $library,
+                $batch,
+                static fn (array $files): array => $ingest->prepareBatch($library, $files),
+                static function (DiscoveredFile $file, Video $video, array $known) use ($ingest, $library): void {
+                    $ingest->ingestFile($library, $file, $video, $known);
+                },
+                $ingest->flush(...),
+            );
+            array_push($failures, ...$result['failures']);
+            $written = $result['writtenPaths'];
             if ($written === null) {
                 $this->requeueWhileHeld(new FilesDiscovered(
                     $message->libraryId,
@@ -1268,28 +1197,6 @@ final class FilesDiscoveredHandler
         if ($failures !== []) {
             throw new RuntimeException($this->buildFailureMessage($failures));
         }
-    }
-
-    /**
-     * Whether a known video's stored probe is incomplete, or names a format that is not a video
-     * container of the table, as one imported before imports checked the container does.
-     */
-    private function videoNeedsProbe(Video $video, DiscoveredFile $file): bool
-    {
-        $probe = $video->getProbe();
-        if (!array_key_exists('chapters', $probe) || !isset($probe['containerFormat'], $probe['videoStreamIndex'])) {
-            return true;
-        }
-        if (MediaContainer::identify(MediaKind::Video, (string) $probe['containerFormat'], $file->extension) === null) {
-            return true;
-        }
-        foreach ($probe['audioStreams'] ?? [] as $stream) {
-            if (!isset($stream['streamIndex'])) {
-                return true;
-            }
-        }
-
-        return false;
     }
 
     /**
@@ -1358,19 +1265,6 @@ final class FilesDiscoveredHandler
         }
 
         return [null];
-    }
-
-    private function resolveMovie(Uuid $libraryId, string $title): Movie
-    {
-        $existing = $this->movieService->findByTitleAndLibrary($title, $libraryId);
-        if ($existing !== null) {
-            return $existing;
-        }
-
-        $movie = Movie::create(libraryId: $libraryId, title: $title);
-        $this->movieService->persist($movie);
-
-        return $movie;
     }
 
     /**

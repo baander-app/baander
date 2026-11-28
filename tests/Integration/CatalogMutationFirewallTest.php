@@ -30,6 +30,7 @@ use App\Media\Infrastructure\Doctrine\Entity\ImageEntity;
 use App\Shared\Domain\Model\Email;
 use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
+use App\Shared\Infrastructure\Doctrine\Repository\SystemSettingRepository;
 use App\Shared\Infrastructure\Redis\RedisClientFactory;
 use App\Tests\Fixtures\Auth\FirstPartyOAuthClient;
 use App\Tests\Fixtures\Auth\CatalogMutationOAuthKernel;
@@ -96,6 +97,7 @@ final class CatalogMutationFirewallTest extends TestCase
         'admin_song_delete',
         'admin_song_delete_preview',
         'admin_albums_duplicates',
+        'admin_metadata_provider_update',
         'library_store',
         'library_update',
         'library_delete',
@@ -112,6 +114,7 @@ final class CatalogMutationFirewallTest extends TestCase
     /** A one-pixel transparent PNG; the cover handler reads its signature and its dimensions. */
     private const string PIXEL_PNG = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=';
     private const string SEED_SLUG_PREFIX = 'catalog-mutation-';
+    private const string DISCOGS_SETTING = 'metadata.provider.discogs.enabled';
 
     private static string $directory;
     private static string $privateKey;
@@ -122,6 +125,7 @@ final class CatalogMutationFirewallTest extends TestCase
     private RedisClientFactory $redis;
     private TransportInterface $asyncTransport;
     private StoragePortInterface&MockObject $storage;
+    private ?SystemSettingRepository $providerSettings = null;
     private SignedDpopProof $proof;
     private int $redisEntriesBefore;
     private string $suffix;
@@ -220,6 +224,10 @@ final class CatalogMutationFirewallTest extends TestCase
     protected function tearDown(): void
     {
         if (isset($this->manager) && $this->manager->isOpen()) {
+            if ($this->providerSettings !== null) {
+                $this->manager->getConnection()->rollBack();
+                $this->providerSettings = null;
+            }
             // The claim columns are written by SQL, so a managed library row is stale.
             $this->manager->clear();
             foreach (array_reverse($this->rows) as [$class, $id]) {
@@ -277,7 +285,7 @@ final class CatalogMutationFirewallTest extends TestCase
                 self::assertSame([AccessDeniedException::class, self::ROLE_REFUSED], $this->refusal);
                 self::assertSame(403, $this->json($response)['error']['code'] ?? null);
             }
-            self::assertSame($before, $this->state(), 'A refused mutation must leave the catalog, the libraries and the files as they were.');
+            self::assertSame($before, $this->state(), 'A refused mutation must leave the catalog, libraries, files and provider settings unchanged.');
             self::assertSame([], $this->sent($this->asyncTransport));
             self::assertSame(0, $this->redisEntries() - $this->redisEntriesBefore);
 
@@ -601,7 +609,7 @@ final class CatalogMutationFirewallTest extends TestCase
         $this->manager->flush();
     }
 
-    /** Puts in place what a row removes: a genre link, a cover, or the directory a path check reads. */
+    /** Prepares the state that a matrix request changes or reads. */
     private function prepare(string $route): void
     {
         switch ($route) {
@@ -622,6 +630,12 @@ final class CatalogMutationFirewallTest extends TestCase
                 break;
             case 'artist_cover_delete':
                 $this->seedCover($this->artist);
+                break;
+            case 'admin_metadata_provider_update':
+                $connection = $this->manager->getConnection();
+                $connection->beginTransaction();
+                $this->providerSettings = new SystemSettingRepository($connection);
+                $this->providerSettings->save([self::DISCOGS_SETTING => true]);
                 break;
             case 'library_validate_path':
                 $this->createDirectory();
@@ -666,6 +680,7 @@ final class CatalogMutationFirewallTest extends TestCase
             'admin_song_delete' => $this->row('DELETE', '/api/admin/songs/' . $song, [], 200),
             'admin_song_delete_preview' => $this->row('GET', '/api/admin/songs/' . $song . '/delete-preview', [], 200),
             'admin_albums_duplicates' => $this->row('GET', '/api/admin/albums/duplicates?libraryId=' . $this->library->getPublicId()->toString(), [], 200),
+            'admin_metadata_provider_update' => $this->row('PATCH', '/api/admin/metadata/providers/discogs', ['enabled' => false], 200),
             'library_store' => $this->row('POST', '/api/libraries', ['name' => 'Created library ' . $this->suffix, 'path' => self::$directory . '/created-' . $this->suffix, 'type' => 'music', 'slug' => $this->createdSlug()], 201),
             'library_update' => $this->row('PATCH', $library, ['name' => 'Modified library'], 200),
             'library_delete' => $this->row('DELETE', $library, [], 200),
@@ -839,6 +854,13 @@ final class CatalogMutationFirewallTest extends TestCase
             case 'admin_albums_duplicates':
                 self::assertSame($before, $after, 'A listing changes nothing.');
                 self::assertIsArray($data);
+                $this->assertNothingQueued();
+                break;
+            case 'admin_metadata_provider_update':
+                self::assertTrue($before['discogsEnabled']);
+                self::assertFalse($after['discogsEnabled']);
+                self::assertSame('discogs', $data['id'] ?? null);
+                self::assertFalse($data['enabled'] ?? null);
                 $this->assertNothingQueued();
                 break;
             case 'library_store':
@@ -1047,6 +1069,7 @@ final class CatalogMutationFirewallTest extends TestCase
                 ['ids' => ArrayParameterType::STRING],
             ),
             'files' => $files,
+            'discogsEnabled' => $this->providerSettings?->find(self::DISCOGS_SETTING),
         ];
     }
 

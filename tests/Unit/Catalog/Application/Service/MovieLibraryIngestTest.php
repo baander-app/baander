@@ -10,9 +10,10 @@ use App\Catalog\Application\Port\AlbumPortInterface;
 use App\Catalog\Application\Port\ArtistSyncRequestInterface;
 use App\Catalog\Application\Port\GenrePortInterface;
 use App\Catalog\Application\Port\MetadataContentReaderPortInterface;
-use App\Catalog\Application\Port\MoviePortInterface;
+use App\Catalog\Domain\Repository\MovieRepositoryInterface;
 use App\Catalog\Application\Port\SongPortInterface;
 use App\Catalog\Application\Service\MovieLibraryIngest;
+use App\Catalog\Application\Service\VideoFileIngest;
 use App\Catalog\Domain\Model\Movie;
 use App\Catalog\Domain\Model\Video;
 use App\Catalog\Domain\Repository\VideoRepositoryInterface;
@@ -38,7 +39,7 @@ final class MovieLibraryIngestTest extends TestCase
     {
         $provisioning = $this->createMock(LibraryProvisioningInterface::class);
         $provisioning->expects($this->once())->method('scanExistingLibrary')->with('e2e-test-movies')->willReturn(null);
-        $movies = $this->createMock(MoviePortInterface::class);
+        $movies = $this->createMock(MovieRepositoryInterface::class);
         $movies->expects($this->never())->method('persist');
 
         self::assertNull($this->ingest($provisioning, $movies, $this->createStub(VideoRepositoryInterface::class))->ingestExistingLibrary('e2e-test-movies'));
@@ -57,9 +58,13 @@ final class MovieLibraryIngestTest extends TestCase
         $videos = $this->createStub(VideoRepositoryInterface::class);
         $videos->method('findByHash')->willReturnMap([['fixture-hash', $video]]);
         $persisted = [];
-        $movies = $this->createStub(MoviePortInterface::class);
+        $linked = [];
+        $movies = $this->createStub(MovieRepositoryInterface::class);
         $movies->method('persist')->willReturnCallback(static function (Movie $movie) use (&$persisted): void {
             $persisted[] = $movie;
+        });
+        $movies->method('addVideoForImport')->willReturnCallback(static function (Uuid $movie, Uuid $video) use (&$linked): void {
+            $linked[] = [$movie->toString(), $video->toString()];
         });
 
         $result = $this->ingest($provisioning, $movies, $videos)->ingestExistingLibrary('e2e-test-movies');
@@ -70,21 +75,37 @@ final class MovieLibraryIngestTest extends TestCase
         self::assertSame([$video->getId()->toString()], $result->videoIds);
         self::assertNotSame([], $persisted, 'The discovered directory must reach the Catalog handler.');
         self::assertSame('Fixture Movie', $persisted[0]->getTitle());
-        self::assertSame([$video->getId()->toString()], $persisted[0]->getVideoIds());
+        self::assertSame([[$persisted[0]->getId()->toString(), $video->getId()->toString()]], $linked);
     }
 
-    private function ingest(LibraryProvisioningInterface $provisioning, MoviePortInterface $movies, VideoRepositoryInterface $videos): MovieLibraryIngest
+    private function ingest(LibraryProvisioningInterface $provisioning, MovieRepositoryInterface $movies, VideoRepositoryInterface $videos): MovieLibraryIngest
     {
+        $videoIngestLogger = new NullLogger();
+        $videoIngestMedia = $this->observedMediaFiles($this->createStub(LibraryMediaFilesInterface::class));
+        $videoIngestTransaction = new PassThroughTransaction();
         $handler = new FilesDiscoveredHandler(
-            $this->createStub(AlbumPortInterface::class), $this->createStub(GenrePortInterface::class),
-            $this->createStub(SongPortInterface::class), $movies,
-            $videos, $this->createStub(MetadataContentReaderPortInterface::class), new FFprobeAdapter(new JsonEncoder()),
-            $this->createStub(MessageBusInterface::class), $this->createStub(LyricsFetchRequestInterface::class), $this->createStub(AlbumMatchRequestInterface::class), new NullLogger(),
-            $this->observedMediaFiles($this->createStub(LibraryMediaFilesInterface::class)),
-            new PassThroughTransaction(),
+            $this->createStub(AlbumPortInterface::class),
+            $this->createStub(GenrePortInterface::class),
+            $this->createStub(SongPortInterface::class),
+            $this->movieIngest($movies, $videos, $videoIngestMedia),
+            new VideoFileIngest(
+                $videos,
+                new FFprobeAdapter(new JsonEncoder()),
+                $videoIngestMedia,
+                $videoIngestTransaction,
+                $videoIngestLogger,
+            ),
+            $this->createStub(MetadataContentReaderPortInterface::class),
+            $this->createStub(MessageBusInterface::class),
+            $this->createStub(LyricsFetchRequestInterface::class),
+            $this->createStub(AlbumMatchRequestInterface::class),
+            $videoIngestLogger,
+            $videoIngestMedia,
+            $videoIngestTransaction,
             audioProbe: $this->audioProbeStub(),
             artistIdentities: $this->artistIdentitiesStub(),
             artistSyncs: $this->createStub(ArtistSyncRequestInterface::class),
+            tvLibraryIngest: $this->unusedTvIngest(),
         );
 
         return new MovieLibraryIngest($provisioning, $handler, $videos);

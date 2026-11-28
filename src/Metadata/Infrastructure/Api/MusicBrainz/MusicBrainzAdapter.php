@@ -5,6 +5,10 @@ declare(strict_types=1);
 namespace App\Metadata\Infrastructure\Api\MusicBrainz;
 
 use App\Metadata\Application\DTO\MusicBrainz\MusicBrainzArtist;
+use App\Metadata\Application\DTO\MusicBrainz\MusicBrainzDisabled;
+use App\Metadata\Application\Exception\MetadataProviderDisabled;
+use App\Metadata\Application\Settings\MetadataProvider;
+use App\Metadata\Application\Settings\MetadataProviderSwitches;
 use App\Metadata\Application\DTO\MusicBrainz\MusicBrainzArtistCredit;
 use App\Metadata\Application\DTO\MusicBrainz\MusicBrainzCoverImage;
 use App\Metadata\Application\DTO\MusicBrainz\MusicBrainzCreditedArtist;
@@ -89,8 +93,15 @@ final readonly class MusicBrainzAdapter implements MusicBrainzLookupInterface
         private PublicHttpClient $httpClient,
         private RateLimiterFactoryInterface $musicbrainzLimiter,
         private CoverArtArchiveAdapter $coverArtArchive,
+        private MetadataProviderSwitches $switches,
         private array $retryBackOffSeconds = self::RETRY_BACK_OFF_SECONDS,
     ) {
+    }
+
+    /** @phpstan-impure */
+    public function isEnabled(): bool
+    {
+        return $this->switches->enabled(MetadataProvider::MusicBrainz);
     }
 
     #[\Override]
@@ -98,7 +109,7 @@ final readonly class MusicBrainzAdapter implements MusicBrainzLookupInterface
         string $title,
         ?string $artist,
         MusicBrainzSlotWait $wait = MusicBrainzSlotWait::Bounded,
-    ): array|MusicBrainzRejected|MusicBrainzUnavailable {
+    ): array|MusicBrainzRejected|MusicBrainzUnavailable|MusicBrainzDisabled {
         return $this->search('/release', 'releases', self::fieldQuery(['release' => $title, 'artist' => $artist]), self::releaseSummary(...), $wait);
     }
 
@@ -106,7 +117,7 @@ final readonly class MusicBrainzAdapter implements MusicBrainzLookupInterface
     public function fetchRelease(
         string $releaseId,
         MusicBrainzSlotWait $wait = MusicBrainzSlotWait::Bounded,
-    ): MusicBrainzRelease|MusicBrainzRejected|MusicBrainzUnavailable|null {
+    ): MusicBrainzRelease|MusicBrainzRejected|MusicBrainzUnavailable|MusicBrainzDisabled|null {
         return $this->lookup('/release/' . rawurlencode($releaseId), self::RELEASE_INCLUDES, self::release(...), $wait);
     }
 
@@ -115,7 +126,7 @@ final readonly class MusicBrainzAdapter implements MusicBrainzLookupInterface
         string $title,
         ?string $artist,
         MusicBrainzSlotWait $wait = MusicBrainzSlotWait::Bounded,
-    ): array|MusicBrainzRejected|MusicBrainzUnavailable {
+    ): array|MusicBrainzRejected|MusicBrainzUnavailable|MusicBrainzDisabled {
         return $this->search('/recording', 'recordings', self::fieldQuery(['recording' => $title, 'artist' => $artist]), self::recording(...), $wait);
     }
 
@@ -123,7 +134,7 @@ final readonly class MusicBrainzAdapter implements MusicBrainzLookupInterface
     public function fetchRecording(
         string $recordingId,
         MusicBrainzSlotWait $wait = MusicBrainzSlotWait::Bounded,
-    ): MusicBrainzRecording|MusicBrainzRejected|MusicBrainzUnavailable|null {
+    ): MusicBrainzRecording|MusicBrainzRejected|MusicBrainzUnavailable|MusicBrainzDisabled|null {
         return $this->lookup('/recording/' . rawurlencode($recordingId), self::RECORDING_INCLUDES, self::recording(...), $wait);
     }
 
@@ -131,7 +142,7 @@ final readonly class MusicBrainzAdapter implements MusicBrainzLookupInterface
     public function findArtists(
         string $name,
         MusicBrainzSlotWait $wait = MusicBrainzSlotWait::Bounded,
-    ): array|MusicBrainzRejected|MusicBrainzUnavailable {
+    ): array|MusicBrainzRejected|MusicBrainzUnavailable|MusicBrainzDisabled {
         return $this->search('/artist', 'artists', self::fieldQuery(['artist' => $name]), self::artist(...), $wait);
     }
 
@@ -139,7 +150,7 @@ final readonly class MusicBrainzAdapter implements MusicBrainzLookupInterface
     public function fetchArtist(
         string $artistId,
         MusicBrainzSlotWait $wait = MusicBrainzSlotWait::Bounded,
-    ): MusicBrainzArtist|MusicBrainzMerged|MusicBrainzRejected|MusicBrainzUnavailable|null {
+    ): MusicBrainzArtist|MusicBrainzMerged|MusicBrainzRejected|MusicBrainzUnavailable|MusicBrainzDisabled|null {
         return $this->lookup('/artist/' . rawurlencode($artistId), 'aliases+url-rels', self::artist(...), $wait, reportsMerges: true);
     }
 
@@ -147,7 +158,14 @@ final readonly class MusicBrainzAdapter implements MusicBrainzLookupInterface
     public function fetchFrontCover(
         string $releaseId,
         MusicBrainzSlotWait $wait = MusicBrainzSlotWait::Bounded,
-    ): MusicBrainzCoverImage|MusicBrainzRejected|MusicBrainzUnavailable|null {
+    ): MusicBrainzCoverImage|MusicBrainzRejected|MusicBrainzUnavailable|MusicBrainzDisabled|null {
+        if (!$this->isEnabled()) {
+            return new MusicBrainzDisabled();
+        }
+        if (!$this->switches->enabled(MetadataProvider::CoverArtArchive)) {
+            return new MusicBrainzDisabled('coverartarchive');
+        }
+
         return $this->takeTurn($wait, self::deadline($wait)) ?? $this->coverArtArchive->fetchFrontCover($releaseId);
     }
 
@@ -240,9 +258,9 @@ final readonly class MusicBrainzAdapter implements MusicBrainzLookupInterface
      *
      * @param \Closure(array<array-key, mixed>): T $map
      *
-     * @return list<T>|MusicBrainzRejected|MusicBrainzUnavailable
+     * @return list<T>|MusicBrainzRejected|MusicBrainzUnavailable|MusicBrainzDisabled
      */
-    private function search(string $endpoint, string $hits, string $query, \Closure $map, MusicBrainzSlotWait $wait): array|MusicBrainzRejected|MusicBrainzUnavailable
+    private function search(string $endpoint, string $hits, string $query, \Closure $map, MusicBrainzSlotWait $wait): array|MusicBrainzRejected|MusicBrainzUnavailable|MusicBrainzDisabled
     {
         $data = $this->fetch($endpoint, ['query' => $query, 'limit' => self::SEARCH_LIMIT], $wait);
 
@@ -261,7 +279,7 @@ final readonly class MusicBrainzAdapter implements MusicBrainzLookupInterface
      * @param bool $reportsMerges whether a redirect to the lookup of another record of the same kind is
      *                            reported as a merge into that record; any other redirect is unavailable
      *
-     * @return T|MusicBrainzMerged|MusicBrainzRejected|MusicBrainzUnavailable|null
+     * @return T|MusicBrainzMerged|MusicBrainzRejected|MusicBrainzUnavailable|MusicBrainzDisabled|null
      */
     private function lookup(string $endpoint, ?string $includes, \Closure $map, MusicBrainzSlotWait $wait, bool $reportsMerges = false): mixed
     {
@@ -279,9 +297,9 @@ final readonly class MusicBrainzAdapter implements MusicBrainzLookupInterface
      *
      * @param array<string, string|int> $params query parameters besides the response format
      *
-     * @return array<array-key, mixed>|MusicBrainzMerged|MusicBrainzRejected|MusicBrainzUnavailable|null null on 404
+     * @return array<array-key, mixed>|MusicBrainzMerged|MusicBrainzRejected|MusicBrainzUnavailable|MusicBrainzDisabled|null null on 404
      */
-    private function fetch(string $endpoint, array $params, MusicBrainzSlotWait $wait, bool $reportsMerges = false): array|MusicBrainzMerged|MusicBrainzRejected|MusicBrainzUnavailable|null
+    private function fetch(string $endpoint, array $params, MusicBrainzSlotWait $wait, bool $reportsMerges = false): array|MusicBrainzMerged|MusicBrainzRejected|MusicBrainzUnavailable|MusicBrainzDisabled|null
     {
         $deadline = self::deadline($wait);
 
@@ -302,10 +320,17 @@ final readonly class MusicBrainzAdapter implements MusicBrainzLookupInterface
     {
         $deadline = self::deadline($wait);
         $noTurn = $this->takeTurn($wait, $deadline);
+        if ($noTurn instanceof MusicBrainzDisabled) {
+            throw new MetadataProviderDisabled(MetadataProvider::MusicBrainz);
+        }
         if ($noTurn !== null) {
             throw new ServiceUnavailableException('MusicBrainz cannot take another request now. Try again shortly.', ['reason' => $noTurn->reason]);
         }
         $data = $this->get($endpoint, $params, $wait, $deadline, $this->retryBackOffSeconds);
+
+        if ($data instanceof MusicBrainzDisabled) {
+            throw new MetadataProviderDisabled(MetadataProvider::MusicBrainz);
+        }
 
         return is_array($data) ? $data : [];
     }
@@ -324,15 +349,22 @@ final readonly class MusicBrainzAdapter implements MusicBrainzLookupInterface
      * keeps serving other requests meanwhile. No signal ends the wait early, so a queue worker
      * waits its full time although its keepalive alarm arrives.
      */
-    private function takeTurn(MusicBrainzSlotWait $wait, ?float $deadline): ?MusicBrainzUnavailable
+    private function takeTurn(MusicBrainzSlotWait $wait, ?float $deadline): MusicBrainzUnavailable|MusicBrainzDisabled|null
     {
+        if (!$this->isEnabled()) {
+            return new MusicBrainzDisabled();
+        }
         $maxTime = $deadline === null ? null : max(0.0, $deadline - microtime(true));
         try {
             $reservation = $this->musicbrainzLimiter->create(self::LIMITER_KEY)->reserve(1, $maxTime);
         } catch (MaxWaitDurationExceededException) {
-            return $this->unavailable('rate limit', sprintf('no turn within %d seconds', $wait->maxSeconds()));
+            return $this->isEnabled()
+                ? $this->unavailable('rate limit', sprintf('no turn within %d seconds', $wait->maxSeconds()))
+                : new MusicBrainzDisabled();
         } catch (RateLimiterUnavailableException) {
-            return $this->unavailable('rate limit', 'the shared rate limiter is unavailable');
+            return $this->isEnabled()
+                ? $this->unavailable('rate limit', 'the shared rate limiter is unavailable')
+                : new MusicBrainzDisabled();
         }
         Async::sleepThroughSignals($reservation->getWaitDuration());
 
@@ -347,9 +379,9 @@ final readonly class MusicBrainzAdapter implements MusicBrainzLookupInterface
      * @param array<string, string|int> $params
      * @param list<float> $backOffs seconds to wait before each retry still allowed
      *
-     * @return array<array-key, mixed>|MusicBrainzMerged|MusicBrainzRejected|MusicBrainzUnavailable|null null on 404
+     * @return array<array-key, mixed>|MusicBrainzMerged|MusicBrainzRejected|MusicBrainzUnavailable|MusicBrainzDisabled|null null on 404
      */
-    private function get(string $endpoint, array $params, MusicBrainzSlotWait $wait, ?float $deadline, array $backOffs, bool $reportsMerges = false): array|MusicBrainzMerged|MusicBrainzRejected|MusicBrainzUnavailable|null
+    private function get(string $endpoint, array $params, MusicBrainzSlotWait $wait, ?float $deadline, array $backOffs, bool $reportsMerges = false): array|MusicBrainzMerged|MusicBrainzRejected|MusicBrainzUnavailable|MusicBrainzDisabled|null
     {
         $response = $this->send($endpoint, $params, $reportsMerges);
         if (!is_array($response) || $response[0] !== self::SLOW_DOWN || $backOffs === []) {
@@ -381,10 +413,13 @@ final readonly class MusicBrainzAdapter implements MusicBrainzLookupInterface
      *
      * @param array<string, string|int> $params
      *
-     * @return array{int, string, string|null}|MusicBrainzUnavailable the status, body and Location of a redirect
+     * @return array{int, string, string|null}|MusicBrainzUnavailable|MusicBrainzDisabled the status, body and Location of a redirect
      */
-    private function send(string $endpoint, array $params, bool $returnRedirects = false): array|MusicBrainzUnavailable
+    private function send(string $endpoint, array $params, bool $returnRedirects = false): array|MusicBrainzUnavailable|MusicBrainzDisabled
     {
+        if (!$this->isEnabled()) {
+            return new MusicBrainzDisabled();
+        }
         $url = self::BASE_URL . $endpoint . '?' . http_build_query([...$params, 'fmt' => 'json'], encoding_type: PHP_QUERY_RFC3986);
         $response = null;
         try {

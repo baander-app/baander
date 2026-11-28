@@ -21,6 +21,7 @@ use App\Metadata\Application\DTO\MusicBrainz\MusicBrainzMerged;
 use App\Metadata\Application\DTO\MusicBrainz\MusicBrainzRejected;
 use App\Metadata\Application\DTO\MusicBrainz\MusicBrainzSlotWait;
 use App\Metadata\Application\DTO\MusicBrainz\MusicBrainzUnavailable;
+use App\Metadata\Application\DTO\MusicBrainz\MusicBrainzDisabled;
 use App\Metadata\Application\Message\SyncArtistMessage;
 use App\Metadata\Application\Port\ImdbPersonLookupInterface;
 use App\Metadata\Application\Port\MusicBrainzLookupInterface;
@@ -108,6 +109,7 @@ final readonly class SyncArtistHandler
         $context = ['artist_id' => $artistId->toString(), 'mbid' => $musicbrainzId];
 
         return match (true) {
+            $answer instanceof MusicBrainzDisabled => false,
             $answer instanceof MusicBrainzUnavailable => $this->afterOutage($message, $context + ['reason' => $answer->reason]),
             $answer instanceof MusicBrainzRejected => $this->rejected($context + ['status' => $answer->status]),
             $answer === null => $this->notFound($artistId, $musicbrainzId, $context),
@@ -132,7 +134,7 @@ final readonly class SyncArtistHandler
         if ($answer->type === 'Person' && $imdb !== null) {
             try {
                 $tmdb = $this->imdb?->findTmdbPersonId($imdb);
-                if ($tmdb !== null) {
+                if (is_string($tmdb)) {
                     $ids['tmdb_person'] = $tmdb;
                 }
             } catch (\RuntimeException) {

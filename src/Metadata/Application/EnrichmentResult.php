@@ -16,6 +16,7 @@ final readonly class EnrichmentResult
         private array $updatedFields = [],
         private bool $identifiersUpdated = false,
         private bool $failed = false,
+        private bool $disabled = false,
     ) {}
 
     public function isSuccess(): bool
@@ -26,6 +27,11 @@ final readonly class EnrichmentResult
     public function isFailure(): bool
     {
         return $this->failed;
+    }
+
+    public function isDisabled(): bool
+    {
+        return $this->disabled;
     }
 
     public function getSource(): string
@@ -49,6 +55,11 @@ final readonly class EnrichmentResult
     public function hasIdentifiersUpdated(): bool
     {
         return $this->identifiersUpdated;
+    }
+
+    public static function disabled(string $source): self
+    {
+        return new self(false, $source, 0.0, disabled: true);
     }
 
     public static function noMatch(string $source, float $qualityScore): self

@@ -123,7 +123,7 @@ final class PeopleReadRepositoryTest extends TestCase
         $episodePublic = new PublicId();
         $this->connection->insert('tv_series', ['id' => $series, 'public_id' => $seriesPublic->toString(), 'library_id' => $this->library, 'name' => 'A series']);
         $this->connection->insert('tv_seasons', ['id' => $season, 'public_id' => (string) new PublicId(), 'series_id' => $series, 'season_number' => 0]);
-        $this->connection->insert('tv_episodes', ['id' => $episode, 'public_id' => $episodePublic->toString(), 'season_id' => $season, 'name' => 'A special', 'episode_number' => 2]);
+        $this->connection->insert('tv_episodes', ['id' => $episode, 'public_id' => $episodePublic->toString(), 'series_id' => $series, 'season_id' => $season, 'name' => 'A special', 'episode_number' => 2]);
         self::assertSame('A series', $this->reads->seriesDetail($seriesPublic, $this->scope())['name']);
         self::assertSame('A special', $this->reads->episodeDetail($episodePublic, $this->scope())['name']);
         self::assertSame(1, $this->reads->series(SearchOptions::create(''), $this->scope())->getTotal());

@@ -18,6 +18,7 @@ use App\Catalog\Domain\ValueObject\AlbumMatchStatus;
 use App\Metadata\Application\Settings\MetadataSettingDefinitions;
 use App\Shared\Application\Port\SystemSettingsPortInterface;
 use App\Shared\Domain\Model\Uuid;
+use App\Metadata\Application\Port\MusicBrainzLookupInterface;
 use App\Tests\Fixtures\Catalog\InMemoryAlbumMatchStates;
 use DateTimeImmutable;
 use PHPUnit\Framework\Attributes\DataProvider;
@@ -41,6 +42,9 @@ final class DrainAlbumMatchesHandlerTest extends TestCase
     private const string NOW = '2026-11-14 12:00:00.000000 UTC';
 
     private InMemoryAlbumMatchStates $states;
+    private bool $musicBrainzEnabled = true;
+    /** @var (\Closure(): bool)|null */
+    private ?\Closure $providerEnabled = null;
     private MockClock $clock;
     private AlbumMatchQueueChain $chains;
     /** @var list<array{int, int}> each queued run's outage count and its delay in milliseconds */
@@ -61,6 +65,68 @@ final class DrainAlbumMatchesHandlerTest extends TestCase
         $this->states = new InMemoryAlbumMatchStates($this->clock);
         $this->chains = new AlbumMatchQueueChain(new ArrayAdapter(clock: $this->clock));
         $this->outcome = static fn (): AutomaticMatchOutcome => AutomaticMatchOutcome::matched();
+    }
+
+    public function testADisabledProviderClaimsNothingAndEndsItsChainUntilRecovery(): void
+    {
+        $album = Uuid::v7();
+        $state = $this->request($album, AlbumMatchSource::Admin, '-1 minute');
+        $this->states->has($state);
+        $chain = $this->chains->start(60);
+        $this->musicBrainzEnabled = false;
+
+        $this->drain(new DrainAlbumMatchesMessage($chain));
+
+        self::assertSame([], $this->matched);
+        self::assertSame([], $this->queued);
+        self::assertSame($state, $this->states->stateOf($album));
+        self::assertSame($state->dueAt, $this->states->nextRequestDueAt());
+        self::assertFalse($this->chains->isRunning());
+        self::assertSame('provider disabled', $this->recover());
+
+        $this->musicBrainzEnabled = true;
+        self::assertSame('queue started', $this->recover());
+        $this->drain();
+        self::assertSame([$album->toString()], $this->matched);
+    }
+
+    public function testAProviderDisabledAfterClaimingReturnsTheRequestWithoutCallingTheMatcher(): void
+    {
+        $album = Uuid::v7();
+        $state = $this->request($album, AlbumMatchSource::Ingest, '-1 minute');
+        $this->states->has($state);
+        $reads = 0;
+        $this->providerEnabled = static function () use (&$reads): bool {
+            return ++$reads === 1;
+        };
+
+        $this->drain();
+
+        self::assertSame(2, $reads);
+        self::assertSame([], $this->matched);
+        self::assertSame([], $this->queued);
+        self::assertSame($state, $this->states->stateOf($album));
+        self::assertSame($state->dueAt, $this->states->nextRequestDueAt());
+        self::assertFalse($this->chains->isRunning());
+    }
+
+    public function testAProviderDisabledDuringMatchingReturnsItsClaimWithTheOriginalDueTime(): void
+    {
+        $album = Uuid::v7();
+        $state = $this->request($album, AlbumMatchSource::Ingest, '-2 minutes');
+        $this->states->has($state);
+        $this->outcome = function (): AutomaticMatchOutcome {
+            $this->musicBrainzEnabled = false;
+
+            return AutomaticMatchOutcome::disabled();
+        };
+
+        $this->drain();
+
+        self::assertSame($state, $this->states->stateOf($album));
+        self::assertSame($state->dueAt, $this->states->nextRequestDueAt());
+        self::assertSame([], $this->queued);
+        self::assertFalse($this->chains->isRunning());
     }
 
     public function testAConfidentAlbumIsMatchedAndItsRequestIsGone(): void
@@ -578,7 +644,7 @@ final class DrainAlbumMatchesHandlerTest extends TestCase
         $bus = $this->createStub(MessageBusInterface::class);
         $bus->method('dispatch')->willReturnCallback(static fn (object $message): Envelope => new Envelope($message));
 
-        return new RecoverAlbumMatchQueueHandler($this->states, $this->chains, $bus, $this->clock, new NullLogger())(
+        return new RecoverAlbumMatchQueueHandler($this->states, $this->chains, $bus, $this->clock, new NullLogger(), $this->lookup())(
             new RecoverAlbumMatchQueueCommand(),
         );
     }
@@ -612,7 +678,7 @@ final class DrainAlbumMatchesHandlerTest extends TestCase
             return new Envelope($message, $stamps);
         });
 
-        new DrainAlbumMatchesHandler($this->states, $matcher, $this->chains, $settings, $bus, $this->clock, $logger ?? new NullLogger())($message);
+        new DrainAlbumMatchesHandler($this->states, $matcher, $this->chains, $settings, $bus, $this->clock, $logger ?? new NullLogger(), $this->lookup())($message);
     }
 
     /** @internal called by the fake matcher */
@@ -621,6 +687,14 @@ final class DrainAlbumMatchesHandlerTest extends TestCase
         $this->matched[] = $albumId->toString();
 
         return ($this->outcome)($albumId);
+    }
+
+    private function lookup(): MusicBrainzLookupInterface
+    {
+        $lookup = $this->createStub(MusicBrainzLookupInterface::class);
+        $lookup->method('isEnabled')->willReturnCallback(fn (): bool => $this->providerEnabled === null ? $this->musicBrainzEnabled : ($this->providerEnabled)());
+
+        return $lookup;
     }
 
     private function request(Uuid $albumId, AlbumMatchSource $source, string $due): AlbumMatchState

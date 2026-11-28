@@ -12,12 +12,8 @@ use App\Catalog\Domain\Repository\VideoRepositoryInterface;
 use App\Shared\Application\Exception\InvalidInputException;
 use App\Shared\Application\Exception\NotFoundException;
 use App\Shared\Application\Port\TransactionPortInterface;
-use App\Shared\Domain\Model\Uuid;
 use Symfony\Component\Messenger\Attribute\AsMessageHandler;
 
-/**
- * Deletes a movie, then, in the same transaction, those of its videos that no other movie uses.
- */
 final readonly class DeleteMovieHandler
 {
     public function __construct(
@@ -36,10 +32,8 @@ final readonly class DeleteMovieHandler
     {
         $movie = $this->movies->findByPublicId(CatalogInput::publicId($command->publicId))
             ?? throw new NotFoundException(sprintf('Movie "%s" not found.', $command->publicId));
-        $storedVideoIds = $movie->getVideoIds() |> array_values(...);
-        $videoIds = array_map(static fn (string $id): Uuid => Uuid::fromString($id), $storedVideoIds);
-
-        $videos = $this->transaction->run(function () use ($movie, $videoIds): int {
+        $videos = $this->transaction->run(function () use ($movie): int {
+            $videoIds = $this->videos->movieVideoIdsForDelete($movie->getId());
             $this->movies->delete($movie);
 
             return $this->videos->deleteUnlinked($videoIds);

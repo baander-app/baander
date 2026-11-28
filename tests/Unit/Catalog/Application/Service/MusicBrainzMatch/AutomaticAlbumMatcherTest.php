@@ -20,6 +20,7 @@ use App\Catalog\Domain\ValueObject\AlbumMatchReviewReason;
 use App\Catalog\Domain\ValueObject\ArtistRole;
 use App\Catalog\Domain\ValueObject\MusicbrainzId;
 use App\Metadata\Application\DTO\MusicBrainz\MusicBrainzRejected;
+use App\Metadata\Application\DTO\MusicBrainz\MusicBrainzDisabled;
 use App\Metadata\Application\DTO\MusicBrainz\MusicBrainzRelease;
 use App\Metadata\Application\DTO\MusicBrainz\MusicBrainzReleaseSummary;
 use App\Metadata\Application\DTO\MusicBrainz\MusicBrainzUnavailable;
@@ -58,6 +59,35 @@ final class AutomaticAlbumMatcherTest extends TestCase
     protected function setUp(): void
     {
         $this->setUpLibrary();
+    }
+
+    public function testADisabledProviderDoesNoLookupAndAppliesNothing(): void
+    {
+        $album = $this->longBed();
+        $this->musicBrainz->enabled = false;
+
+        self::assertSame(AutomaticMatchOutcomeKind::Disabled, $this->match($album)->kind);
+        self::assertSame([], $this->musicBrainz->calls);
+        self::assertSame([], $this->applied);
+    }
+
+    public function testADisabledSearchIsDistinctFromNoCandidatesAndAnOutage(): void
+    {
+        $album = $this->longBed();
+        $this->musicBrainz->releaseSearches[self::SEARCH] = new MusicBrainzDisabled();
+
+        self::assertSame(AutomaticMatchOutcomeKind::Disabled, $this->match($album)->kind);
+        self::assertSame([], $this->applied);
+    }
+
+    public function testAnApplyThatFindsTheProviderDisabledLeavesTheAlbumWaiting(): void
+    {
+        $album = $this->longBed();
+        $release = self::release(self::releaseId(1));
+        $this->found($release);
+        $this->applyResult = static fn (ApplyMatchCommand $command): MatchApplyResult => MatchApplyResult::notApplied(MatchApplyOutcome::Disabled, null, $command->candidateId);
+
+        self::assertSame(AutomaticMatchOutcomeKind::Disabled, $this->match($album)->kind);
     }
 
     public function testAConfidentAlbumIsAppliedInAutomaticModeAndMatched(): void

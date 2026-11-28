@@ -200,18 +200,24 @@ final class CatalogDeleteHandlersTest extends TestCase
         self::assertSame(['/music/a.flac'], $result->removed);
     }
 
-    public function testAMovieDeleteRemovesTheVideosNoOtherMovieUsesInTheSameTransaction(): void
+    public function testAMovieDeleteCollectsItsFeaturesAndExtrasBeforeDeletingUnlinkedVideos(): void
     {
         $movie = Movie::create(new Uuid(), 'Movie');
         $first = new Uuid();
         $second = new Uuid();
-        $movie->getState()->videoIds = [$first->toString(), $second->toString()];
         $movies = $this->createStub(MoviePortInterface::class);
         $movies->method('findByPublicId')->willReturn($movie);
         $movies->method('delete')->willReturnCallback(function (): void {
             $this->log[] = 'delete movie';
         });
         $videos = $this->createMock(VideoRepositoryInterface::class);
+        $videos->expects(self::once())->method('movieVideoIdsForDelete')
+            ->with($movie->getId())
+            ->willReturnCallback(function () use ($first, $second): array {
+                $this->log[] = 'collect movie videos';
+
+                return [$first, $second];
+            });
         $videos->expects(self::once())->method('deleteUnlinked')
             ->with(self::callback(static fn (array $ids): bool => $ids == [$first, $second]))
             ->willReturnCallback(function (): int {
@@ -222,7 +228,7 @@ final class CatalogDeleteHandlersTest extends TestCase
 
         $result = (new DeleteMovieHandler($movies, $videos, $this->transaction()))(new DeleteMovieCommand($movie->getPublicId()->toString()));
 
-        self::assertSame(['begin', 'delete movie', 'delete unlinked videos', 'commit'], $this->log);
+        self::assertSame(['begin', 'collect movie videos', 'delete movie', 'delete unlinked videos', 'commit'], $this->log);
         self::assertSame(['movies' => 1, 'videos' => 1], $result->deleted);
     }
 

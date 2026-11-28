@@ -4,6 +4,10 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Metadata\Application;
 
+use App\Tests\Fixtures\Metadata\ProviderSwitches;
+use App\Metadata\Application\Settings\MetadataProvider;
+use App\Metadata\Application\Settings\MetadataProviderSwitches;
+
 use App\Catalog\Application\Port\GenrePortInterface;
 use App\Catalog\Application\Port\SongPortInterface;
 use App\Catalog\Domain\Model\Genre;
@@ -67,18 +71,38 @@ final class SongMetadataEnricherTest extends TestCase
         self::assertFalse($result->isSuccess());
     }
 
-    private function enricher(SongPortInterface $songs, GenrePortInterface $genres): SongMetadataEnricher
+    public function testDisabledMusicBrainzPreservesTheSongAndReportsDisabledWithoutRequestsOrWrites(): void
+    {
+        $song = Song::create(new Uuid(), 'Kept title', '/music/album/track.flac', 1024, 'audio/flac');
+        $song->recordMatchedFields(MatchedSongField::Title);
+        $songs = $this->createMock(SongPortInterface::class);
+        $songs->expects(self::never())->method('findFreshByUuid');
+        $songs->expects(self::never())->method('save');
+        $genres = $this->createMock(GenrePortInterface::class);
+        $genres->expects(self::never())->method('findOrCreateByName');
+        $genres->expects(self::never())->method('addSongToGenre');
+        $http = new MockHttpClient(static fn () => throw new \LogicException('No provider request is expected.'));
+
+        $result = $this->enricher($songs, $genres, ProviderSwitches::withDisabled(MetadataProvider::MusicBrainz), $http)->enrich($song, true);
+
+        self::assertTrue($result->isDisabled());
+        self::assertSame('Kept title', $song->getTitle());
+        self::assertSame([MatchedSongField::Title], $song->getMatchedFields());
+        self::assertSame(0, $http->getRequestsCount());
+    }
+
+    private function enricher(SongPortInterface $songs, GenrePortInterface $genres, ?MetadataProviderSwitches $switches = null, ?MockHttpClient $raw = null): SongMetadataEnricher
     {
         $logger = new NullLogger();
         $encoder = new JsonEncoder();
         $http = new PublicHttpClient(
-            new MockHttpClient(static fn (): MockResponse => new MockResponse(self::SEARCH_HIT)),
+            $raw ?? new MockHttpClient(static fn (): MockResponse => new MockResponse(self::SEARCH_HIT)),
             new PublicDestinationPolicy(static fn (string $host): array => ['1.1.1.1']),
         );
         $limiter = new RateLimiterFactory(['id' => 'musicbrainz', 'policy' => 'no_limit'], new InMemoryStorage());
 
         return new SongMetadataEnricher(
-            new MusicBrainzAdapter($logger, $encoder, $http, $limiter, new CoverArtArchiveAdapter($logger, $encoder, $http)),
+            new MusicBrainzAdapter($logger, $encoder, $http, $limiter, new CoverArtArchiveAdapter($logger, $encoder, $http, $switches ?? ProviderSwitches::allEnabled()), $switches ?? ProviderSwitches::allEnabled()),
             $songs,
             $genres,
             $logger,

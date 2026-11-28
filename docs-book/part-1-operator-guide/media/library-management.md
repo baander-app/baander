@@ -74,10 +74,6 @@ music Artist also links to their Person profile. **Directors** still opens the
 directory of people with directing credits in your accessible movies.
 
 To fill movie cast and crew, run [metadata sync](../commands/app-metadata-sync.md).
-To add television credits, register a [series](../commands/app-tv-series-register.md)
-in a TV library, then register the [episodes](../commands/app-tv-episode-register.md)
-you want in the catalog. Registration imports title metadata and credits. TV
-file scanning and playback are separate workflows.
 
 TMDB person IDs keep same-name people distinct. An individual MusicBrainz
 Artist can link to the same Person through verified provider IDs. Use

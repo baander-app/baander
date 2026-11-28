@@ -42,6 +42,10 @@ final class MovieLibraryIngestQueueTest extends KernelTestCase
         ]);
         $ffmpeg->setTimeout(120);
         $ffmpeg->mustRun();
+        (new Filesystem())->copy(
+            $this->directory . '/Fixture Movie/clip.mp4',
+            $this->directory . '/Fixture Movie/movie.nfo',
+        );
     }
 
     protected function tearDown(): void
@@ -51,6 +55,7 @@ final class MovieLibraryIngestQueueTest extends KernelTestCase
             self::assertInstanceOf(Connection::class, $database);
             $libraryId = $database->fetchOne('SELECT id FROM libraries WHERE slug = ?', [self::SLUG]);
             if ($libraryId !== false) {
+                $database->executeStatement('DELETE FROM video_placements WHERE library_id = ?', [$libraryId]);
                 $database->executeStatement(
                     'DELETE FROM videos WHERE id IN (SELECT mv.video_id FROM movie_video mv JOIN movies m ON m.id = mv.movie_id WHERE m.library_id = ?)',
                     [$libraryId],
@@ -72,7 +77,13 @@ final class MovieLibraryIngestQueueTest extends KernelTestCase
 
         $result = $ingest->ingestMovieLibrary('Ingest Queue Test', self::SLUG, $this->directory);
 
-        self::assertCount(1, $result->videoIds);
+        $database = self::getContainer()->get(Connection::class);
+        self::assertInstanceOf(Connection::class, $database);
+        self::assertSame('nfo', $database->fetchOne(
+            'SELECT extension FROM library_file_index WHERE library_id = ? AND path = ? AND available',
+            [$result->libraryId, $this->directory . '/Fixture Movie/movie.nfo'],
+        ));
+        self::assertCount(1, $result->videoIds, 'Only the playable video is returned.');
         $queued = array_filter(
             $async->getSent(),
             static fn ($envelope): bool => $envelope->getMessage() instanceof FilesDiscovered,

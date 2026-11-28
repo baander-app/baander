@@ -80,8 +80,6 @@ Application console commands run inside `web`. The control and execution worker 
 | [app:artist:cover:remove](app-artist-cover-remove.md) | Remove an artist cover and delete its image files |
 | [app:artist:cover:set](app-artist-cover-set.md) | Set or replace an artist cover from an image file in the container |
 | [app:artist:create](app-artist-create.md) | Create an artist, such as a performer to credit by hand |
-| [app:tv:series:register](app-tv-series-register.md) | Register a TV series and import its Person credits from TMDB |
-| [app:tv:episode:register](app-tv-episode-register.md) | Register a TV episode and import its Person credits from TMDB |
 | [app:artist:delete](app-artist-delete.md) | Delete an artist, its credits, favorites, recommendations and cover image |
 | [app:artist:song:add](app-artist-song-add.md) | Credit an artist on a song with a role |
 | [app:artist:song:remove](app-artist-song-remove.md) | Remove every one of an artist's credits on a song |
@@ -111,6 +109,7 @@ Application console commands run inside `web`. The control and execution worker 
 | [app:movie:update](app-movie-update.md) | Change a movie's title, year or summary |
 | [app:song:delete](app-song-delete.md) | Delete a song, optionally with its audio file |
 | [app:song:update](app-song-update.md) | Change a song's metadata, or lock and unlock its fields |
+| [app:video:providers:order](app-video-providers-order.md) | Read or replace the metadata provider order of a TV or movie library |
 | [app:watch-files](app-watch-files.md) | Watch directories for filesystem changes |
 
 ## Media & Lyrics
@@ -136,7 +135,8 @@ Application console commands run inside `web`. The control and execution worker 
 | [app:metadata:match:compare](app-metadata-match-compare.md) | Compare an album, song or artist with a MusicBrainz candidate: what a match would set, row by row |
 | [app:metadata:match:reviews](app-metadata-match-reviews.md) | List the albums that need a MusicBrainz match review, the most recently checked first |
 | [app:metadata:match:search](app-metadata-match-search.md) | List the MusicBrainz candidates for an album, song or artist, best first |
-| [app:metadata:providers](app-metadata-providers.md) | List the metadata providers and whether each one is configured |
+| [app:metadata:provider:set](app-metadata-provider-set.md) | Switch a metadata provider on or off for the server |
+| [app:metadata:providers](app-metadata-providers.md) | List metadata providers, their enabled state, credential status and attribution |
 | [app:metadata:status](app-metadata-status.md) | Show track coverage, the last sync and the sync jobs by type |
 | [app:metadata:sync](app-metadata-sync.md) | Queue a metadata sync for every library and an artist sync, or only the genre sync |
 

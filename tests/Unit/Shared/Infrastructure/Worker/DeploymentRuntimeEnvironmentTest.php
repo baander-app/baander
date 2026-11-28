@@ -137,6 +137,17 @@ final class DeploymentRuntimeEnvironmentTest extends TestCase
         self::assertStringNotContainsString('fixture-tmdb-token', json_encode($environment, JSON_THROW_ON_ERROR));
     }
 
+    public function testPassesTheTvdbKeyWithoutExposingItInDiagnostics(): void
+    {
+        $environment = new DeploymentRuntimeEnvironment(['TVDB_API_KEY' => 'fixture-tvdb-key']);
+
+        $environment->withFile(static function (string $path): void {
+            self::assertSame("TVDB_API_KEY=fixture-tvdb-key\n", file_get_contents($path));
+        });
+        self::assertSame(['variables' => ['TVDB_API_KEY' => '[redacted]']], $environment->__debugInfo());
+        self::assertStringNotContainsString('fixture-tvdb-key', json_encode($environment, JSON_THROW_ON_ERROR));
+    }
+
     public function testPreservesApplicationSigningIdentityAndOriginWithRedaction(): void
     {
         $variables = ['VAPID_PRIVATE_KEY' => 'private-vapid', 'VAPID_PUBLIC_KEY' => 'public-vapid',

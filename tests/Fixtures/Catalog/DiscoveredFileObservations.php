@@ -7,6 +7,13 @@ namespace App\Tests\Fixtures\Catalog;
 use App\Catalog\Application\Port\ArtistIdentityResolverInterface;
 use App\Catalog\Application\Port\ArtistResolution;
 use App\Catalog\Application\Port\IdentifiedArtist;
+use App\Catalog\Application\Service\MovieFileIngest;
+use App\Catalog\Application\Service\TvLibraryIngest;
+use App\Catalog\Domain\Repository\MovieRepositoryInterface;
+use App\Catalog\Domain\Repository\TvCatalogRepositoryInterface;
+use App\Catalog\Domain\Repository\VideoRepositoryInterface;
+use App\Catalog\Domain\Service\VideoName\EpisodeNameParser;
+use App\Catalog\Domain\Service\VideoName\MovieNameParser;
 use App\Library\Application\Message\DiscoveredFile;
 use App\Library\Application\Port\LibraryMediaFilesInterface;
 use App\Shared\Domain\Model\Uuid;
@@ -18,6 +25,30 @@ trait DiscoveredFileObservations
 {
     /** @var array<string, string> */
     private array $availableHashes = [];
+
+    private function movieIngest(
+        MovieRepositoryInterface $movies,
+        VideoRepositoryInterface $videos,
+        LibraryMediaFilesInterface $media,
+    ): MovieFileIngest {
+        return new MovieFileIngest(
+            $movies,
+            $this->createStub(TvCatalogRepositoryInterface::class),
+            $videos,
+            new MovieNameParser(),
+            $media,
+        );
+    }
+
+    private function unusedTvIngest(): TvLibraryIngest
+    {
+        return new TvLibraryIngest(
+            $this->createStub(TvCatalogRepositoryInterface::class),
+            $this->createStub(VideoRepositoryInterface::class),
+            $this->createStub(LibraryMediaFilesInterface::class),
+            new EpisodeNameParser(),
+        );
+    }
 
     private function audioProbeStub(): AudioProbePortInterface
     {

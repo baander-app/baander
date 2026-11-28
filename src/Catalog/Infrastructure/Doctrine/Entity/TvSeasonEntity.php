@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Catalog\Infrastructure\Doctrine\Entity;
 
+use App\Catalog\Domain\Model\TvSeasonState;
 use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
 use Doctrine\ORM\Mapping as ORM;
@@ -25,14 +26,44 @@ class TvSeasonEntity
     #[ORM\JoinColumn(name: 'series_id', nullable: false, onDelete: 'CASCADE')]
     public TvSeriesEntity $series;
 
-    #[ORM\Column(name: 'season_number', type: 'integer')]
+    #[ORM\Column(type: 'integer')]
     public int $seasonNumber;
 
-    public function __construct(TvSeriesEntity $series, int $seasonNumber)
+    #[ORM\Column(type: 'text', nullable: true)]
+    public ?string $name = null;
+
+    #[ORM\Column(type: 'text', nullable: true)]
+    public ?string $overview = null;
+
+    #[ORM\Column(type: 'text', nullable: true)]
+    public ?string $posterUrl = null;
+
+    public function __construct(TvSeriesEntity $series, TvSeasonState $state)
     {
-        $this->id = Uuid::v7();
-        $this->publicId = new PublicId();
+        $this->id = $state->id;
+        $this->publicId = $state->publicId;
         $this->series = $series;
-        $this->seasonNumber = $seasonNumber;
+        $this->apply($state);
+    }
+
+    public function state(): TvSeasonState
+    {
+        return new TvSeasonState(
+            id: $this->id,
+            publicId: $this->publicId,
+            seriesId: $this->series->id,
+            seasonNumber: $this->seasonNumber,
+            name: $this->name,
+            overview: $this->overview,
+            posterUrl: $this->posterUrl,
+        );
+    }
+
+    public function apply(TvSeasonState $state): void
+    {
+        $this->seasonNumber = $state->seasonNumber;
+        $this->name = $state->name;
+        $this->overview = $state->overview;
+        $this->posterUrl = $state->posterUrl;
     }
 }

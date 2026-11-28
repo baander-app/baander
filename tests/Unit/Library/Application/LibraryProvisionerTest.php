@@ -10,6 +10,7 @@ use App\Library\Application\Exception\LibraryBusyException;
 use App\Library\Application\LibraryDiscovery;
 use App\Library\Application\LibraryProvisioner;
 use App\Library\Application\MovieScanner;
+use App\Library\Application\TvScanner;
 use App\Library\Application\MusicScanner;
 use App\Library\Application\Port\DirectoryScannerPortInterface;
 use App\Library\Application\Port\LibraryAccessPortInterface;
@@ -20,7 +21,7 @@ use App\Shared\Application\Port\TransactionPortInterface;
 use App\Library\Domain\Repository\LibraryFileIndexRepositoryInterface;
 use App\Library\Domain\Repository\LibraryRepositoryInterface;
 use App\Library\Domain\ValueObject\LibraryType;
-use App\Library\Infrastructure\Scanner\MediaFile;
+use App\Library\Application\DTO\MediaFile;
 use App\Shared\Domain\ValueObject\FilesystemType;
 use App\Tests\Fixtures\Library\InMemoryLibraryRepository;
 use App\Tests\Fixtures\Messaging\CancelAtCheckpoint;
@@ -129,7 +130,13 @@ final class LibraryProvisionerTest extends TestCase
                 }
             }),
             new LibraryScanClaims(new LibraryLookup($libraries), $libraries, new MockClock()),
-            new LibraryDiscovery(new MusicScanner($directoryScanner, $fileIndex, $logger, new CancelAtCheckpoint(), new PassThroughTransaction()), $movieScanner, $events, $logger),
+            new LibraryDiscovery(
+                new MusicScanner($directoryScanner, $fileIndex, $logger, new CancelAtCheckpoint(), new PassThroughTransaction()),
+                $movieScanner,
+                new TvScanner($movieScanner),
+                $events,
+                $logger,
+            ),
             $movieScanner,
         );
     }

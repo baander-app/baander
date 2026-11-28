@@ -6,9 +6,12 @@ namespace App\Tests\Integration\Library;
 
 use App\Catalog\Application\CommandHandler\FilesDiscoveredHandler;
 use App\Catalog\Application\Port\MetadataContentReaderPortInterface;
+use App\Catalog\Application\Service\VideoFileIngest;
+use App\Catalog\Domain\Repository\VideoRepositoryInterface;
 use App\Kernel;
 use App\Library\Application\Message\DiscoveredFile;
 use App\Library\Application\Message\FilesDiscovered;
+use App\Library\Application\Port\LibraryMediaFilesInterface;
 use App\Library\Domain\Model\Library;
 use App\Library\Domain\ValueObject\LibraryPath;
 use App\Library\Domain\ValueObject\LibrarySlug;
@@ -21,6 +24,7 @@ use App\Shared\Domain\ValueObject\FilesystemType;
 use App\Tests\Fixtures\Library\LibraryDiscoveryObservationRace as Race;
 use App\Tests\Fixtures\Library\LibraryScanClaimRace;
 use App\Tests\Support\FinalSchemaBootstrap;
+use App\Transcode\Application\Port\VideoProbePortInterface;
 use Closure;
 use DAMA\DoctrineTestBundle\PHPUnit\SkipDatabaseRollback;
 use Doctrine\DBAL\Connection;
@@ -28,6 +32,7 @@ use Doctrine\DBAL\Exception\DriverException;
 use Doctrine\ORM\EntityManagerInterface;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
+use Psr\Log\LoggerInterface;
 use Symfony\Component\Clock\NativeClock;
 use Symfony\Component\Filesystem\Filesystem;
 use Symfony\Component\Process\Process;
@@ -418,7 +423,8 @@ SQL);
 
     private function consumer(?TransactionPortInterface $transaction = null, ?MetadataContentReaderPortInterface $metadataReader = null): FilesDiscoveredHandler
     {
-        $handler = $this->kernel->getContainer()->get('test.service_container')->get(FilesDiscoveredHandler::class);
+        $container = $this->kernel->getContainer()->get('test.service_container');
+        $handler = $container->get(FilesDiscoveredHandler::class);
         if ($transaction === null && $metadataReader === null) {
             return $handler;
         }
@@ -427,6 +433,15 @@ SQL);
         foreach ($reflection->getConstructor()->getParameters() as $parameter) {
             $arguments[] = match ($parameter->getName()) {
                 'transaction' => $transaction ?? $reflection->getProperty('transaction')->getValue($handler),
+                'videoFileIngest' => $transaction === null
+                    ? $reflection->getProperty('videoFileIngest')->getValue($handler)
+                    : new VideoFileIngest(
+                        $container->get(VideoRepositoryInterface::class),
+                        $container->get(VideoProbePortInterface::class),
+                        $container->get(LibraryMediaFilesInterface::class),
+                        $transaction,
+                        $container->get(LoggerInterface::class),
+                    ),
                 'metadataReader' => $metadataReader ?? $reflection->getProperty('metadataReader')->getValue($handler),
                 default => $reflection->getProperty($parameter->getName())->getValue($handler),
             };

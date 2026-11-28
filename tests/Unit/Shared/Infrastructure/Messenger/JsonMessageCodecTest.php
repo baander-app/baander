@@ -21,7 +21,6 @@ use App\Metadata\Application\Message\SyncLibraryMessage;
 use App\Metadata\Application\Message\SyncMovieMessage;
 use App\Metadata\Application\Message\SyncPeopleMessage;
 use App\Metadata\Application\Message\SyncSongMessage;
-use App\Metadata\Application\Message\SyncTvLibraryMessage;
 use App\Notification\Application\DTO\SendEmailCommand;
 use App\Notification\Application\DTO\SendPushCommand;
 use App\Notification\Application\DTO\SendPushToSubscriptionCommand;
@@ -72,7 +71,6 @@ final class JsonMessageCodecTest extends TestCase
         yield [new SyncMovieMessage($id, true)];
         yield [new SyncPeopleMessage()];
         yield [new SyncPeopleMessage('42')];
-        yield [new SyncTvLibraryMessage($id, true)];
         yield [new SyncAlbumMessage($id)];
         yield [new SyncLibraryMessage($id, true, true)];
         yield [new SyncArtistsMessage()];

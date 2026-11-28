@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Tests\Functional\Metadata\Application;
 
+use App\Tests\Fixtures\Metadata\ProviderSwitches;
+
 use App\Catalog\Application\Port\AlbumPortInterface;
 use App\Catalog\Application\Port\DirectorPortInterface;
 use App\Catalog\Application\Port\GenrePortInterface;
@@ -60,7 +62,7 @@ final class MovieMetadataSyncTest extends TestCase
             $movies,
         );
         $libraryHandler(new SyncLibraryMessage($library->getId()));
-        self::assertCount(2, $messages);
+        self::assertCount(1, $messages);
         self::assertInstanceOf(SyncMovieMessage::class, $messages[0]);
         self::assertFalse($messages[0]->forceUpdate);
         $codec = new MetadataMessagePayloadCodec();
@@ -88,7 +90,7 @@ final class MovieMetadataSyncTest extends TestCase
             new TmdbAdapter('fixture-token', new NullLogger(), new JsonEncoder(), new PublicHttpClient(
                 $http,
                 new PublicDestinationPolicy(static fn(string $host): array => ['1.1.1.1']),
-            )),
+            ), ProviderSwitches::allEnabled()),
             $movies,
             $container->get(GenrePortInterface::class),
             new NullLogger(),

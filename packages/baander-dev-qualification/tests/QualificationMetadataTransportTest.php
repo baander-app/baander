@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Baander\DevQualification\Tests;
 
+use App\Tests\Fixtures\Metadata\ProviderSwitches;
 use App\Metadata\Application\DTO\MusicBrainz\MusicBrainzArtist;
 use App\Metadata\Application\DTO\MusicBrainz\MusicBrainzRelease;
 use App\Metadata\Infrastructure\Api\CoverArtArchive\CoverArtArchiveAdapter;
@@ -75,6 +76,32 @@ final class QualificationMetadataTransportTest extends TestCase
         self::assertStringContainsString('unmatched', $audit);
     }
 
+    public function testTvdbLoginAndEmptySeriesSearchStayInsideQualificationTransport(): void
+    {
+        $transport = MetadataTransport::create($this->directory . '/manifest.json', $this->directory . '/audit.jsonl');
+        $login = $transport->request('POST', 'https://api4.thetvdb.com/v4/login', ['json' => ['apikey' => 'qualification-tvdb-key']]);
+
+        self::assertSame(['status' => 'success', 'data' => ['token' => 'qualification-tvdb-token']], $login->toArray());
+        $search = $transport->request('GET', 'https://api4.thetvdb.com/v4/search?' . http_build_query([
+            'query' => 'Qualification metadata-test Show', 'type' => 'series', 'year' => 2020,
+        ]), ['headers' => ['Authorization' => 'Bearer qualification-tvdb-token']]);
+        self::assertSame(['status' => 'success', 'data' => []], $search->toArray());
+        $audit = file_get_contents($this->directory . '/audit.jsonl');
+        self::assertStringNotContainsString('qualification-tvdb-key', $audit);
+        self::assertStringNotContainsString('qualification-tvdb-token', $audit);
+        self::assertCount(2, $this->audited());
+        self::assertSame(['1.1.1.1'], MetadataTransport::dnsResolver()('api4.thetvdb.com', hrtime(true) / 1e9 + 1));
+    }
+
+    public function testTvdbFixtureRejectsRequestsOutsideItsQualificationShape(): void
+    {
+        $transport = MetadataTransport::create($this->directory . '/manifest.json', $this->directory . '/audit.jsonl');
+
+        $this->expectException(\Throwable::class);
+        $this->expectExceptionMessage('Unmatched qualification metadata request.');
+        $transport->request('GET', 'https://api4.thetvdb.com/v4/search?query=Unknown&type=series')->toArray();
+    }
+
     public function testKnownTitleDoesNotAuthorizeAnUnknownQueryShape(): void
     {
         $plan = Dataset::plan('metadata-test');
@@ -97,13 +124,14 @@ final class QualificationMetadataTransportTest extends TestCase
             $encoder,
             $client,
             new RateLimiterFactory(['id' => 'musicbrainz', 'policy' => 'no_limit'], new InMemoryStorage()),
-            new CoverArtArchiveAdapter($logger, $encoder, $client),
+            new CoverArtArchiveAdapter($logger, $encoder, $client, ProviderSwitches::allEnabled()),
+            ProviderSwitches::allEnabled(),
         );
         $song = $plan['files'][0];
         self::assertSame($song['metadata']['id'], $music->searchRecording($song['title'], limit: 5)->recordings[0]->id);
         self::assertSame($plan['albums'][$song['album']], $music->searchReleaseGroup($song['album'], limit: 5)->releaseGroups[0]->id);
         self::assertSame($plan['artists'][$song['artist']], $music->searchArtist($song['artist'], limit: 5)->artists[0]->id);
-        $tmdb = new TmdbAdapter('fixture-token', $logger, $encoder, $client);
+        $tmdb = new TmdbAdapter('fixture-token', $logger, $encoder, $client, ProviderSwitches::allEnabled());
         $movie = $plan['files'][2000];
         self::assertSame($movie['metadata']['tmdbId'], $tmdb->searchMovie($movie['title'], limit: 1)->first()->id);
         self::assertSame($movie['title'], $tmdb->lookupMovie($movie['metadata']['tmdbId'])->title);
@@ -253,7 +281,8 @@ final class QualificationMetadataTransportTest extends TestCase
             $encoder,
             $client,
             new RateLimiterFactory(['id' => 'musicbrainz', 'policy' => 'no_limit'], new InMemoryStorage()),
-            new CoverArtArchiveAdapter($logger, $encoder, $client),
+            new CoverArtArchiveAdapter($logger, $encoder, $client, ProviderSwitches::allEnabled()),
+            ProviderSwitches::allEnabled(),
         );
     }
 

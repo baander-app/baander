@@ -104,6 +104,8 @@ final class PlaybackVideoFixture
             'path' => $mediaDirectory . '/owned.' . $extension,
         ];
         $manifest['movieVideoId'] = (string) new Uuid();
+        $manifest['videoPlacementId'] = (string) new Uuid();
+        $manifest['videoIndexId'] = (string) new Uuid();
         // Persist exact ownership before creating files or rows, including failed runs.
         $this->save($run, $manifest);
         if ($cinema) {
@@ -166,6 +168,24 @@ final class PlaybackVideoFixture
                 'id' => $manifest['movieVideoId'], 'movie_id' => $manifest['movie']['id'],
                 'video_id' => $manifest['video']['id'], 'sort_order' => 0,
             ]);
+            $libraryPath = $this->connection->fetchOne('SELECT path FROM libraries WHERE id = ?', [$manifest['library']['id']]);
+            if (!is_string($libraryPath) || !str_starts_with($manifest['video']['path'], rtrim($libraryPath, '/') . '/')) {
+                throw new RuntimeException('The fixture video must be inside its library.');
+            }
+            $this->connection->insert('video_placements', [
+                'id' => $manifest['videoPlacementId'], 'public_id' => (string) new PublicId(),
+                'library_id' => $manifest['library']['id'], 'video_id' => $manifest['video']['id'],
+                'movie_id' => $manifest['movie']['id'],
+                'relative_path' => substr($manifest['video']['path'], strlen(rtrim($libraryPath, '/')) + 1),
+                'raw_parse' => '[]', 'created_at' => $now,
+            ]);
+            $this->connection->insert('library_file_index', [
+                'id' => $manifest['videoIndexId'], 'library_id' => $manifest['library']['id'],
+                'path' => $manifest['video']['path'], 'hash' => $hash,
+                'size' => (int) filesize($manifest['video']['path']),
+                'extension' => pathinfo($manifest['video']['path'], PATHINFO_EXTENSION),
+                'modified_at' => (int) filemtime($manifest['video']['path']), 'discovered_at' => $now,
+            ]);
         });
         if ($directors) {
             $manifest = $this->seedDirectors($run, $manifest);
@@ -205,13 +225,16 @@ final class PlaybackVideoFixture
                 throw new RuntimeException('The director for the cross-media fixture is missing.');
             }
             $this->connection->insert('tv_series', $credits['series'] + [
-                'library_id' => $manifest['library']['id'], 'tmdb_id' => 1, 'name' => 'Owned series ' . $run,
+                'library_id' => $manifest['library']['id'], 'folder_path' => 'Owned series ' . $run,
+                'name' => 'Owned series ' . $run, 'created_at' => (new DateTimeImmutable())->format('Y-m-d H:i:s.uP'),
+                'updated_at' => (new DateTimeImmutable())->format('Y-m-d H:i:s.uP'),
             ]);
             $this->connection->insert('tv_seasons', $credits['season'] + [
                 'series_id' => $credits['series']['id'], 'season_number' => 1,
             ]);
             $this->connection->insert('tv_episodes', $credits['episode'] + [
-                'season_id' => $credits['season']['id'], 'episode_number' => 1, 'tmdb_id' => 2, 'name' => 'Owned episode ' . $run,
+                'series_id' => $credits['series']['id'], 'season_id' => $credits['season']['id'],
+                'episode_number' => 1, 'name' => 'Owned episode ' . $run,
             ]);
             foreach (['series', 'episode'] as $kind) {
                 $this->connection->insert($kind . '_person_credits', [
@@ -487,6 +510,9 @@ SQL, ['video' => $videoId]);
                 );
                 if ($live > 0) {
                     throw new RuntimeException('An owned encoder reclaimed work during cleanup; manifest retained.');
+                }
+                if (isset($manifest['videoIndexId'])) {
+                    $this->connection->delete('library_file_index', ['id' => $manifest['videoIndexId']]);
                 }
                 $this->connection->delete('movie_video', ['id' => $manifest['movieVideoId']]);
                 $this->connection->delete('movies', ['id' => $manifest['movie']['id']]);

@@ -9,6 +9,7 @@ use App\Catalog\Application\Port\MoviePortInterface;
 use App\Catalog\Application\Port\PersonCreditPortInterface;
 use App\Catalog\Domain\Model\Movie;
 use App\Metadata\Application\Port\PersonProfileSyncRequestInterface;
+use App\Metadata\Application\Exception\MetadataProviderDisabled;
 use App\Metadata\Infrastructure\Api\Tmdb\DTO\TmdbMovieDto;
 use App\Metadata\Infrastructure\Api\Tmdb\TmdbAdapter;
 use App\Shared\Application\Port\TransactionPortInterface;
@@ -30,6 +31,9 @@ final class MovieMetadataEnricher
 
     public function enrich(Movie $movie, bool $forceUpdate = false): EnrichmentResult
     {
+        if (!$this->tmdbAdapter->isEnabled()) {
+            return EnrichmentResult::disabled('tmdb');
+        }
         if (!$this->tmdbAdapter->isConfigured()) {
             return EnrichmentResult::noMatch('tmdb', 0.0);
         }
@@ -57,6 +61,8 @@ final class MovieMetadataEnricher
             }
 
             return $this->applyData($movie, $data, $forceUpdate);
+        } catch (MetadataProviderDisabled) {
+            return EnrichmentResult::disabled('tmdb');
         } catch (\Throwable $e) {
             $this->logger->error('Movie enrichment failed', [
                 'movie_id' => $movie->getId()->toString(),

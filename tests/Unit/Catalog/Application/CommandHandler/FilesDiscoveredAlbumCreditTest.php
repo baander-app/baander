@@ -11,9 +11,10 @@ use App\Catalog\Application\Port\ArtistResolution;
 use App\Catalog\Application\Port\ArtistSyncRequestInterface;
 use App\Catalog\Application\Port\GenrePortInterface;
 use App\Catalog\Application\Port\MetadataContentReaderPortInterface;
-use App\Catalog\Application\Port\MoviePortInterface;
+use App\Catalog\Domain\Repository\MovieRepositoryInterface;
 use App\Catalog\Application\Port\SongPortInterface;
 use App\Catalog\Application\Service\CoverImageDiscarder;
+use App\Catalog\Application\Service\VideoFileIngest;
 use App\Catalog\Domain\Model\Album;
 use App\Catalog\Domain\Model\Song;
 use App\Catalog\Domain\Repository\AlbumRepositoryInterface;
@@ -364,23 +365,31 @@ final class FilesDiscoveredAlbumCreditTest extends TestCase
             $resolver,
         );
 
+        $videoIngestLogger = new NullLogger();
+        $videoIngestMedia = $this->observedMediaFiles($media);
         return new FilesDiscoveredHandler(
             $albumService,
             $this->createStub(GenrePortInterface::class),
             $songs,
-            $this->createStub(MoviePortInterface::class),
-            $this->createStub(VideoRepositoryInterface::class),
+            $this->movieIngest($this->createStub(MovieRepositoryInterface::class), $this->createStub(VideoRepositoryInterface::class), $videoIngestMedia),
+            new VideoFileIngest(
+                $this->createStub(VideoRepositoryInterface::class),
+                new FFprobeAdapter(new JsonEncoder()),
+                $videoIngestMedia,
+                $transaction,
+                $videoIngestLogger,
+            ),
             $metadata,
-            new FFprobeAdapter(new JsonEncoder()),
             $bus,
             $this->createStub(LyricsFetchRequestInterface::class),
             $this->createStub(AlbumMatchRequestInterface::class),
-            new NullLogger(),
-            $this->observedMediaFiles($media),
+            $videoIngestLogger,
+            $videoIngestMedia,
             $transaction,
             audioProbe: $this->audioProbeStub(),
             artistIdentities: $resolver,
             artistSyncs: $this->createStub(ArtistSyncRequestInterface::class),
+            tvLibraryIngest: $this->unusedTvIngest(),
         );
     }
 

@@ -12,6 +12,7 @@ use App\Catalog\Domain\ValueObject\AlbumMatchSource;
 use App\Catalog\Domain\ValueObject\AlbumMatchState;
 use App\Catalog\Domain\ValueObject\AlbumMatchStatus;
 use App\Shared\Domain\Model\Uuid;
+use App\Metadata\Application\Port\MusicBrainzLookupInterface;
 use App\Tests\Fixtures\Catalog\InMemoryAlbumMatchStates;
 use DateTimeImmutable;
 use PHPUnit\Framework\TestCase;
@@ -30,6 +31,7 @@ final class RecoverAlbumMatchQueueHandlerTest extends TestCase
 {
     private const string NOW = '2026-11-14 12:00:00.000000 UTC';
 
+    private bool $musicBrainzEnabled = true;
     private MockClock $clock;
     private InMemoryAlbumMatchStates $states;
     private AlbumMatchQueueChain $chains;
@@ -41,6 +43,21 @@ final class RecoverAlbumMatchQueueHandlerTest extends TestCase
         $this->clock = new MockClock(self::NOW);
         $this->states = new InMemoryAlbumMatchStates($this->clock);
         $this->chains = new AlbumMatchQueueChain(new ArrayAdapter());
+    }
+
+    public function testDisabledMusicBrainzLeavesDueRequestsWaitingUntilItIsEnabled(): void
+    {
+        $state = $this->request('-30 minutes');
+        $this->states->has($state);
+        $this->musicBrainzEnabled = false;
+
+        self::assertSame('provider disabled', $this->recover());
+        self::assertSame([], $this->dispatched);
+        self::assertSame($state->dueAt, $this->states->nextRequestDueAt());
+
+        $this->musicBrainzEnabled = true;
+        self::assertSame('queue started', $this->recover());
+        self::assertEquals([new DrainAlbumMatchesMessage()], $this->dispatched);
     }
 
     public function testADueRequestThatNoChainHoldsStartsTheQueueAgain(): void
@@ -90,9 +107,17 @@ final class RecoverAlbumMatchQueueHandlerTest extends TestCase
             return new Envelope($message);
         });
 
-        return new RecoverAlbumMatchQueueHandler($this->states, $this->chains, $bus, $this->clock, new NullLogger())(
+        return new RecoverAlbumMatchQueueHandler($this->states, $this->chains, $bus, $this->clock, new NullLogger(), $this->lookup())(
             new RecoverAlbumMatchQueueCommand(),
         );
+    }
+
+    private function lookup(): MusicBrainzLookupInterface
+    {
+        $lookup = $this->createStub(MusicBrainzLookupInterface::class);
+        $lookup->method('isEnabled')->willReturnCallback(fn (): bool => $this->musicBrainzEnabled);
+
+        return $lookup;
     }
 
     private function request(string $due): AlbumMatchState

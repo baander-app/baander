@@ -8,6 +8,7 @@ use App\Catalog\Application\Port\GenrePortInterface;
 use App\Catalog\Application\Port\SongPortInterface;
 use App\Catalog\Domain\Model\Song;
 use App\Metadata\Infrastructure\Api\MusicBrainz\MusicBrainzAdapter;
+use App\Metadata\Application\Exception\MetadataProviderDisabled;
 use Psr\Log\LoggerInterface;
 
 /**
@@ -28,6 +29,9 @@ final class SongMetadataEnricher
     /** A forced enrichment fills genres the same way: genres are only ever added. */
     public function enrich(Song $song, bool $forceUpdate = false): EnrichmentResult
     {
+        if (!$this->musicBrainz->isEnabled()) {
+            return EnrichmentResult::disabled('musicbrainz');
+        }
         $this->logger->info('Starting song enrichment', [
             'song_id' => $song->getId(),
             'title' => $song->getTitle(),
@@ -41,6 +45,8 @@ final class SongMetadataEnricher
             }
 
             return $this->applyData($song, $data);
+        } catch (MetadataProviderDisabled) {
+            return EnrichmentResult::disabled('musicbrainz');
         } catch (\Throwable $e) {
             $this->logger->error('Song enrichment failed', [
                 'song_id' => $song->getId(),

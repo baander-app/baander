@@ -44,12 +44,14 @@ final class MetadataProvidersCommand extends Command
         return AdminCommandSupport::list(
             $input,
             $io,
-            array_values($providers),
-            ['Provider', 'Enabled', 'Configured'],
+            $providers,
+            ['Provider', 'Enabled', 'Configured', 'Attribution', 'Link'],
             static fn (array $provider): array => [
                 $provider['name'],
                 AdminCommandSupport::yesNo($provider['enabled'] === true),
                 AdminCommandSupport::yesNo($provider['configured'] === true),
+                $provider['attributionText'],
+                $provider['attributionUrl'] ?? '',
             ],
             'No metadata providers are registered.',
         );

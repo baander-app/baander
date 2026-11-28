@@ -50,7 +50,25 @@ final readonly class RecommendationPublicIdentity implements RecommendationPubli
             'album', 'movie' => 'EXISTS (SELECT 1 FROM user_library_access access WHERE access.library_id = entity.library_id AND access.user_id = :actor)',
             'song' => 'EXISTS (SELECT 1 FROM albums album JOIN user_library_access access ON access.library_id = album.library_id WHERE album.id = entity.album_id AND access.user_id = :actor)',
             'artist' => '(EXISTS (SELECT 1 FROM artist_album relation JOIN albums album ON album.id = relation.album_id JOIN user_library_access access ON access.library_id = album.library_id WHERE relation.artist_id = entity.id AND access.user_id = :actor) OR EXISTS (SELECT 1 FROM artist_song relation JOIN songs song ON song.id = relation.song_id JOIN albums album ON album.id = song.album_id JOIN user_library_access access ON access.library_id = album.library_id WHERE relation.artist_id = entity.id AND access.user_id = :actor))',
-            'video' => 'EXISTS (SELECT 1 FROM movie_video relation JOIN movies movie ON movie.id = relation.movie_id JOIN user_library_access access ON access.library_id = movie.library_id WHERE relation.video_id = entity.id AND access.user_id = :actor)',
+            'video' => <<<'SQL'
+                (EXISTS (
+                    SELECT 1 FROM movie_video relation
+                    JOIN movies movie ON movie.id = relation.movie_id
+                    JOIN user_library_access access ON access.library_id = movie.library_id
+                    WHERE relation.video_id = entity.id AND access.user_id = :actor
+                ) OR EXISTS (
+                    SELECT 1 FROM video_placements placement
+                    JOIN user_library_access access ON access.library_id = placement.library_id
+                    WHERE placement.video_id = entity.id AND access.user_id = :actor
+                      AND (
+                        placement.movie_id IS NOT NULL OR placement.extra_kind IS NOT NULL
+                        OR EXISTS (
+                            SELECT 1 FROM video_placement_episode episode
+                            WHERE episode.placement_id = placement.id
+                        )
+                      )
+                ))
+                SQL,
         };
         $parameters = ['identity' => $value];
         if (!$administrator) {

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Integration;
 
+use App\Tests\Fixtures\Metadata\ProviderSwitches;
 use App\Catalog\Application\Message\DrainAlbumMatchesMessage;
 use App\Catalog\Application\MessageHandler\DrainAlbumMatchesHandler;
 use App\Catalog\Application\MessageHandler\QueueArtistSyncsHandler;
@@ -35,7 +36,6 @@ use App\Metadata\Application\Message\SyncArtistsMessage;
 use App\Metadata\Application\Message\SyncLibraryMessage;
 use App\Metadata\Application\Message\SyncMovieMessage;
 use App\Metadata\Application\Message\SyncSongMessage;
-use App\Metadata\Application\Message\SyncTvLibraryMessage;
 use App\Metadata\Application\MessageHandler\SyncLibraryHandler;
 use App\Metadata\Application\MessageHandler\SyncMovieHandler;
 use App\Metadata\Application\MessageHandler\SyncSongHandler;
@@ -259,7 +259,8 @@ final class MessengerJsonDeliveryTest extends TestCase
             $encoder,
             $httpClient,
             new RateLimiterFactory(['id' => 'musicbrainz', 'policy' => 'no_limit'], new InMemoryStorage()),
-            new CoverArtArchiveAdapter($logger, $encoder, $httpClient),
+            new CoverArtArchiveAdapter($logger, $encoder, $httpClient, ProviderSwitches::allEnabled()),
+            ProviderSwitches::allEnabled(),
         );
         $genres = $this->createStub(GenrePortInterface::class);
         if ($messageType === SyncSongMessage::class) {
@@ -283,7 +284,7 @@ final class MessengerJsonDeliveryTest extends TestCase
                     return null;
                 });
             $enricher = new MovieMetadataEnricher(
-                new TmdbAdapter('fixture-token', $logger, $encoder, $httpClient),
+                new TmdbAdapter('fixture-token', $logger, $encoder, $httpClient, ProviderSwitches::allEnabled()),
                 $movies,
                 $genres,
                 $logger,
@@ -312,7 +313,7 @@ final class MessengerJsonDeliveryTest extends TestCase
                 });
             $nestedBus = $this->createMock(MessageBusInterface::class);
             $nestedBus->expects($this->never())->method('dispatch');
-            $handler = new DrainAlbumMatchesHandler($states, $matcher, new AlbumMatchQueueChain(new ArrayAdapter()), $this->createStub(SystemSettingsPortInterface::class), $nestedBus, $clock, $logger);
+            $handler = new DrainAlbumMatchesHandler($states, $matcher, new AlbumMatchQueueChain(new ArrayAdapter()), $this->createStub(SystemSettingsPortInterface::class), $nestedBus, $clock, $logger, $musicBrainz);
         } elseif ($messageType === SyncLibraryMessage::class) {
             $message = new SyncLibraryMessage($id, true, true);
             $albums = $this->createMock(AlbumPortInterface::class);
@@ -321,11 +322,8 @@ final class MessengerJsonDeliveryTest extends TestCase
                     ++$effects;
                     return [];
                 });
-            // An empty library still queues the refresh of its registered TV records.
-            $tvSync = new SyncTvLibraryMessage($id, true);
             $nestedBus = $this->createMock(MessageBusInterface::class);
-            $nestedBus->expects($this->once())->method('dispatch')->with($this->equalTo($tvSync))
-                ->willReturn(new Envelope($tvSync));
+            $nestedBus->expects($this->never())->method('dispatch');
             $handler = new SyncLibraryHandler($albums, $nestedBus, $logger, new CancelAtCheckpoint(), $this->createStub(MoviePortInterface::class));
         } elseif ($messageType === SyncArtistsMessage::class) {
             $message = new SyncArtistsMessage();

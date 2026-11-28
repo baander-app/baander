@@ -8,6 +8,7 @@ use App\Catalog\Application\Command\RecoverAlbumMatchQueueCommand;
 use App\Catalog\Application\Message\DrainAlbumMatchesMessage;
 use App\Catalog\Application\Service\MusicBrainzMatch\AlbumMatchQueueChain;
 use App\Catalog\Domain\Repository\AlbumMatchStateRepositoryInterface;
+use App\Metadata\Application\Port\MusicBrainzLookupInterface;
 use Psr\Clock\ClockInterface;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\Messenger\Attribute\AsMessageHandler;
@@ -31,6 +32,7 @@ final readonly class RecoverAlbumMatchQueueHandler
         private MessageBusInterface $bus,
         private ClockInterface $clock,
         private LoggerInterface $logger,
+        private MusicBrainzLookupInterface $musicBrainz,
     ) {
     }
 
@@ -38,6 +40,9 @@ final readonly class RecoverAlbumMatchQueueHandler
     #[AsMessageHandler]
     public function __invoke(RecoverAlbumMatchQueueCommand $command): string
     {
+        if (!$this->musicBrainz->isEnabled()) {
+            return 'provider disabled';
+        }
         $nextDueAt = $this->states->nextRequestDueAt();
         if ($nextDueAt === null || $nextDueAt > $this->clock->now()) {
             return 'no match due';

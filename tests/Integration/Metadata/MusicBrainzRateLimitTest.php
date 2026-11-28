@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Tests\Integration\Metadata;
 
+use App\Tests\Fixtures\Metadata\ProviderSwitches;
+
 use App\Metadata\Application\DTO\MusicBrainz\MusicBrainzRelease;
 use App\Metadata\Application\DTO\MusicBrainz\MusicBrainzSlotWait;
 use App\Metadata\Application\DTO\MusicBrainz\MusicBrainzUnavailable;
@@ -245,7 +247,7 @@ final class MusicBrainzRateLimitTest extends TestCase
         );
         $logger = new NullLogger();
 
-        return new MusicBrainzAdapter($logger, new JsonEncoder(), $client, $limiter, new CoverArtArchiveAdapter($logger, new JsonEncoder(), $client));
+        return new MusicBrainzAdapter($logger, new JsonEncoder(), $client, $limiter, new CoverArtArchiveAdapter($logger, new JsonEncoder(), $client, ProviderSwitches::allEnabled()), ProviderSwitches::allEnabled());
     }
 
     /**

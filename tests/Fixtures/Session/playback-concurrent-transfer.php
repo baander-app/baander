@@ -8,6 +8,8 @@ use App\Auth\Infrastructure\LiveUpdates\DoctrineCurrentUserAuthorityReader;
 use App\Catalog\Infrastructure\Doctrine\Repository\SongRepository;
 use App\Catalog\Infrastructure\Doctrine\Repository\VideoRepository;
 use App\Catalog\Infrastructure\VideoService;
+use App\Catalog\Application\Port\VideoAvailabilityPortInterface;
+use App\Shared\Domain\ValueObject\LibraryReadScope;
 use App\Library\Application\Port\LibraryMediaFileResolverInterface;
 use App\Library\Infrastructure\Doctrine\Repository\LibraryAccessRepository;
 use App\Library\Infrastructure\LibraryReadScopeProvider;
@@ -131,10 +133,21 @@ final class PlaybackPersistenceFixture
             new CursorPaginator(),
             new CursorCodec(new JsonEncoder()),
         );
+        $availability = new class implements VideoAvailabilityPortInterface {
+            public function availablePaths(array $videoIds, LibraryReadScope $scope): array
+            {
+                throw new \LogicException('Playback authorization must not probe media files.');
+            }
+
+            public function forVideos(array $videoIds, LibraryReadScope $scope): array
+            {
+                throw new \LogicException('Playback authorization must not probe media files.');
+            }
+        };
         return new PlaybackMediaAccess(
             new MediaReadScopeProvider($security, $libraries),
             new StreamService($songs, $files),
-            new VideoService(new VideoRepository($manager), $files),
+            new VideoService(new VideoRepository($manager), $files, $availability),
         );
     }
 

@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Tests\Fixtures\Metadata;
 
+use App\Tests\Fixtures\Metadata\ProviderSwitches;
+
 use App\Catalog\Infrastructure\Doctrine\Repository\PersonCreditRepository;
 use App\Catalog\Infrastructure\Doctrine\Repository\PersonIdentityRepository;
 use App\Catalog\Infrastructure\Doctrine\Repository\GenreMovieRepository;
@@ -68,7 +70,7 @@ final class MovieMetadataRace
         $adapter = new TmdbAdapter('fixture-token', $logger, new JsonEncoder(), new PublicHttpClient(
             $http,
             new PublicDestinationPolicy(static fn(string $host): array => ['1.1.1.1']),
-        ));
+        ), ProviderSwitches::allEnabled());
 
         $transaction = new DoctrineTransaction($registry, new Swoole());
 

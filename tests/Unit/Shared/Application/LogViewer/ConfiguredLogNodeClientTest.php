@@ -4,11 +4,8 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Shared\Application\LogViewer;
 
-use App\Shared\Infrastructure\LogViewer\Http\ConfiguredLogNodeClient;
-use App\Shared\Infrastructure\Swoole\HookFlags;
+use App\Tests\Fixtures\Swoole\CoroutineProbe;
 use PHPUnit\Framework\TestCase;
-use Swoole\Coroutine;
-use Swoole\Runtime;
 
 final class ConfiguredLogNodeClientTest extends TestCase
 {
@@ -46,25 +43,32 @@ final class ConfiguredLogNodeClientTest extends TestCase
             exit(0);
         }
         fclose($listener);
-        $originalHooks = Runtime::getHookFlags();
         try {
-            $client = new ConfiguredLogNodeClient(json_encode([['id' => 'local', 'url' => 'http://'.$address, 'tokenFile' => $tokenFile]], JSON_THROW_ON_ERROR));
-            Runtime::enableCoroutine(HookFlags::logQuery());
-            $yielded = false;
-            $response = null;
-            \Swoole\Coroutine\run(static function () use ($client, &$yielded, &$response): void {
-                Coroutine::create(static function () use (&$yielded): void {
-                    Coroutine::sleep(0.01);
-                    $yielded = true;
+            $script = <<<'PHP'
+                require $argv[1];
+
+                $client = new App\Shared\Infrastructure\LogViewer\Http\ConfiguredLogNodeClient($argv[2]);
+                Swoole\Runtime::enableCoroutine(App\Shared\Infrastructure\Swoole\HookFlags::logQuery());
+                Swoole\Coroutine\run(static function () use ($client): void {
+                    $yielded = false;
+                    Swoole\Coroutine::create(static function () use (&$yielded): void {
+                        Swoole\Coroutine::sleep(0.01);
+                        $yielded = true;
+                    });
+                    $response = $client->get('local', '/entries', ['channels' => ['app', 'security,audit']]);
+                    echo json_encode(['yielded' => $yielded, 'response' => $response], JSON_THROW_ON_ERROR);
                 });
-                $response = $client->get('local', '/entries', ['channels' => ['app', 'security,audit']]);
-                self::assertTrue($yielded, 'HTTP must yield to other request coroutines while the node responds.');
-            });
-            self::assertSame(['channels' => ['app', 'security,audit'], 'authenticated' => true], $response);
+                PHP;
+            $nodes = json_encode([['id' => 'local', 'url' => 'http://'.$address, 'tokenFile' => $tokenFile]], JSON_THROW_ON_ERROR);
+            $probe = CoroutineProbe::create(['-r', $script, dirname(__DIR__, 5).'/vendor/autoload.php', $nodes]);
+            $probe->setTimeout(5);
+            self::assertSame(0, $probe->run(), $probe->getErrorOutput());
+            $result = json_decode($probe->getOutput(), true, flags: JSON_THROW_ON_ERROR);
+            self::assertTrue($result['yielded'], 'HTTP must yield to other request coroutines while the node responds.');
+            self::assertSame(['channels' => ['app', 'security,audit'], 'authenticated' => true], $result['response']);
             pcntl_waitpid($pid, $status);
             self::assertSame(0, pcntl_wexitstatus($status));
         } finally {
-            Runtime::setHookFlags($originalHooks);
             if (pcntl_waitpid($pid, $status, WNOHANG) === 0) {
                 posix_kill($pid, SIGTERM);
                 pcntl_waitpid($pid, $status);

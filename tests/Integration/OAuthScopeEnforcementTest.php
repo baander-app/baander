@@ -14,6 +14,9 @@ use App\Catalog\Infrastructure\Doctrine\Entity\AlbumEntity;
 use App\Catalog\Infrastructure\Doctrine\Entity\MovieEntity;
 use App\Catalog\Infrastructure\Doctrine\Entity\MovieVideoEntity;
 use App\Catalog\Infrastructure\Doctrine\Entity\VideoEntity;
+use App\Catalog\Infrastructure\Doctrine\Entity\VideoPlacementEntity;
+use App\Catalog\Domain\Model\VideoPlacement;
+use App\Library\Infrastructure\Doctrine\Entity\LibraryFileIndexEntity;
 use App\Library\Infrastructure\Doctrine\Entity\LibraryEntity;
 use App\Library\Infrastructure\Doctrine\Entity\UserLibraryAccessEntity;
 use App\Playlist\Infrastructure\Doctrine\Entity\PlaylistEntity;
@@ -93,7 +96,8 @@ final class OAuthScopeEnforcementTest extends TestCase
         if (isset($this->manager) && $this->manager->isOpen()) {
             $this->manager->clear();
             foreach (array_reverse($this->rows) as $row) {
-                $managed = $this->manager->find($row::class, $row->getId());
+                $id = $this->manager->getClassMetadata($row::class)->getIdentifierValues($row);
+                $managed = $this->manager->find($row::class, $id);
                 if ($managed !== null) {
                     $this->manager->remove($managed);
                 }
@@ -272,6 +276,14 @@ final class OAuthScopeEnforcementTest extends TestCase
         $video->setProbe(['chapters' => [['start' => 0.0, 'end' => 10.0, 'title' => 'Opening']]]);
         $this->persist($video);
         $this->persist(new MovieVideoEntity($movie, $video));
+        $placement = VideoPlacement::create($library->getId(), $video->getId(), 'source.mkv', [], movieId: $movie->getId());
+        $placed = new VideoPlacementEntity($library, $video, $placement->getState());
+        $placed->movie = $movie;
+        $this->persist($placed);
+        $this->persist(new LibraryFileIndexEntity(
+            Uuid::v7(), $library->getId(), $path, $video->getHash(), strlen($contents),
+            'mkv', (int) filemtime($path), new \DateTimeImmutable(),
+        ));
         if ($grantee !== null) {
             $this->manager->persist(new UserLibraryAccessEntity($grantee->getId(), $library, new \DateTimeImmutable()));
             $this->manager->flush();

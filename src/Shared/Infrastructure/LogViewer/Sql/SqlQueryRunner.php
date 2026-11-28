@@ -23,9 +23,12 @@ final readonly class SqlQueryRunner
      */
     public function run(string $sql, array $records): array
     {
-        if (Async::inCoroutine() && (Runtime::getHookFlags() & SWOOLE_HOOK_PROC) === 0) {
+        $inCoroutine = Async::inCoroutine();
+        if ($inCoroutine && (Runtime::getHookFlags() & SWOOLE_HOOK_PROC) === 0) {
             throw new ServiceUnavailableException('SQL process hooks are unavailable.');
         }
+        // Restoring configured hooks outside the scheduler can hook an open native process.
+        $fileHook = $inCoroutine && defined('SWOOLE_HOOK_FILE') ? SWOOLE_HOOK_FILE : 0;
         try {
             SqlStatement::validate($sql);
         } catch (\InvalidArgumentException $e) {
@@ -64,11 +67,11 @@ final readonly class SqlQueryRunner
                     throw new ServiceUnavailableException('SQL query exceeded five seconds.', ['reason' => 'timeout']);
                 }
                 // These bounded local metadata reads must not yield into uncancellable file I/O.
-                $memory = SwooleHooks::without(defined('SWOOLE_HOOK_FILE') ? SWOOLE_HOOK_FILE : 0, static fn (): string|false => @file_get_contents('/proc/'.$status['pid'].'/status'));
+                $memory = SwooleHooks::without($fileHook, static fn (): string|false => @file_get_contents('/proc/'.$status['pid'].'/status'));
                 if (is_string($memory) && preg_match('/^VmRSS:\s+(\d+) kB/m', $memory, $match) === 1 && (int) $match[1] > 262144) {
                     throw new ServiceUnavailableException('SQL query exceeded 256 MiB.', ['reason' => 'memory']);
                 }
-                $size = SwooleHooks::without(defined('SWOOLE_HOOK_FILE') ? SWOOLE_HOOK_FILE : 0, static function () use ($response): int|false {
+                $size = SwooleHooks::without($fileHook, static function () use ($response): int|false {
                     clearstatcache(true, $response);
                     return filesize($response);
                 });

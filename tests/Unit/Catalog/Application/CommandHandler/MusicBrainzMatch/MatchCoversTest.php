@@ -10,6 +10,8 @@ use App\Media\Application\Port\StoragePortInterface;
 use App\Media\Domain\Model\Image;
 use App\Media\Domain\Model\StoredFile;
 use App\Metadata\Application\DTO\MusicBrainz\MusicBrainzCoverImage;
+use App\Metadata\Application\DTO\MusicBrainz\MusicBrainzDisabled;
+use App\Shared\Application\Exception\ConflictException;
 use App\Metadata\Application\DTO\MusicBrainz\MusicBrainzSlotWait;
 use App\Metadata\Application\Port\MusicBrainzLookupInterface;
 use App\Shared\Domain\Model\Uuid;
@@ -46,7 +48,19 @@ final class MatchCoversTest extends TestCase
         self::assertStringEndsWith('.png', $this->stored[0]);
     }
 
-    private function fetch(MusicBrainzCoverImage $cover): ?Image
+    public function testAnExplicitCoverRequestReportsTheDisabledProviderWithoutStoringAFile(): void
+    {
+        try {
+            $this->fetch(new MusicBrainzDisabled('coverartarchive'));
+            self::fail('The disabled cover provider must be reported.');
+        } catch (ConflictException $disabled) {
+            self::assertSame('provider_disabled', $disabled->details['reason']);
+            self::assertSame('coverartarchive', $disabled->details['provider']);
+            self::assertSame([], $this->stored);
+        }
+    }
+
+    private function fetch(MusicBrainzCoverImage|MusicBrainzDisabled $cover): ?Image
     {
         $lookup = $this->createStub(MusicBrainzLookupInterface::class);
         $lookup->method('fetchFrontCover')->willReturn($cover);

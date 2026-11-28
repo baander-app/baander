@@ -7,11 +7,30 @@ namespace App\Tests\Unit\Shared\Infrastructure\LogViewer\Sql;
 use App\Shared\Application\Exception\InvalidInputException;
 use App\Shared\Application\Exception\ServiceUnavailableException;
 use App\Shared\Infrastructure\LogViewer\Sql\SqlQueryRunner;
+use App\Tests\Fixtures\Swoole\CoroutineProbe;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
 final class SqlQueryRunnerTest extends TestCase
 {
+    public function testSynchronousQueriesStillWorkAfterTheCoroutineSchedulerStops(): void
+    {
+        if (!extension_loaded('swoole')) {
+            self::markTestSkipped('Requires the Swoole coroutine runtime.');
+        }
+        $script = <<<'PHP'
+            require $argv[1];
+
+            Swoole\Coroutine\run(static function (): void {});
+            $runner = new App\Shared\Infrastructure\LogViewer\Sql\SqlQueryRunner();
+            echo json_encode([$runner->run('SELECT 1', [])['rows'], $runner->run('SELECT 2', [])['rows']], JSON_THROW_ON_ERROR);
+            PHP;
+        $probe = CoroutineProbe::create(['-r', $script, dirname(__DIR__, 6).'/vendor/autoload.php']);
+        $probe->setTimeout(5);
+        self::assertSame(0, $probe->run(), $probe->getErrorOutput());
+        self::assertSame([[[1]], [[2]]], json_decode($probe->getOutput(), true, flags: JSON_THROW_ON_ERROR));
+    }
+
     public function testCommonTableExpressionsJoinsAndWindows(): void
     {
         $result = new SqlQueryRunner()->run('WITH selected AS (SELECT * FROM logs) SELECT a.level, count(*) AS total, row_number() OVER (ORDER BY a.level) AS position FROM selected a JOIN logs b ON a.id=b.id GROUP BY a.level', [['id' => 'one', 'level' => 'ERROR'], ['id' => 'two', 'level' => 'ERROR']]);

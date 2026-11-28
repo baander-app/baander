@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 namespace App\Metadata\Infrastructure\Api\Spotify;
 
+use App\Metadata\Application\Settings\MetadataProvider;
+use App\Metadata\Application\Settings\MetadataProviderSwitches;
+
 use App\Shared\Infrastructure\Swoole\Async;
 use Baander\HttpClient\PublicHttpClient;
 use Psr\Log\LoggerInterface;
@@ -24,6 +27,7 @@ final class SpotifyAdapter
         private readonly LoggerInterface $logger,
         private readonly JsonEncoder $jsonEncoder,
         private readonly PublicHttpClient $httpClient,
+        private readonly MetadataProviderSwitches $switches,
     ) {}
 
     /**
@@ -166,10 +170,12 @@ final class SpotifyAdapter
      */
     private function request(string $method, string $endpoint, array $params = []): array
     {
+        $this->switches->requireEnabled(MetadataProvider::Spotify);
         $url = self::BASE_URL . $endpoint . ($params !== [] ? '?' . http_build_query($params) : '');
         $token = $this->authenticate();
         $retried = false;
         while (true) {
+            $this->switches->requireEnabled(MetadataProvider::Spotify);
             $this->logger->debug('Spotify API request', ['service' => 'spotify', 'method' => $method, 'endpoint' => $endpoint]);
             $response = null;
             try {

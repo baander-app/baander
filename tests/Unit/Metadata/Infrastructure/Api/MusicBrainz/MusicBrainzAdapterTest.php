@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Metadata\Infrastructure\Api\MusicBrainz;
 
+use App\Tests\Fixtures\Metadata\ProviderSwitches;
 use App\Metadata\Application\DTO\MusicBrainz\MusicBrainzArtist;
 use App\Metadata\Application\DTO\MusicBrainz\MusicBrainzCoverImage;
 use App\Metadata\Application\DTO\MusicBrainz\MusicBrainzCreditedArtist;
@@ -536,7 +537,8 @@ final class MusicBrainzAdapterTest extends TestCase
             new JsonEncoder(),
             $client,
             $limiter ?? new RateLimiterFactory(['id' => 'musicbrainz', 'policy' => 'no_limit'], new InMemoryStorage()),
-            new CoverArtArchiveAdapter($logger, new JsonEncoder(), $client),
+            new CoverArtArchiveAdapter($logger, new JsonEncoder(), $client, ProviderSwitches::allEnabled()),
+            ProviderSwitches::allEnabled(),
             $retryBackOffs,
         );
     }

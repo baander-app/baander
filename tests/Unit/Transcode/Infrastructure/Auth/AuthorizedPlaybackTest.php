@@ -58,6 +58,8 @@ final class AuthorizedPlaybackTest extends TestCase
         $connection->executeStatement('CREATE TABLE videos (id TEXT PRIMARY KEY, height INTEGER, width INTEGER)');
         $connection->executeStatement('CREATE TABLE movies (id TEXT PRIMARY KEY, library_id TEXT)');
         $connection->executeStatement('CREATE TABLE movie_video (video_id TEXT, movie_id TEXT)');
+        $connection->executeStatement('CREATE TABLE video_placements (id TEXT PRIMARY KEY, library_id TEXT, video_id TEXT, movie_id TEXT, extra_kind TEXT)');
+        $connection->executeStatement('CREATE TABLE video_placement_episode (placement_id TEXT, episode_id TEXT)');
         $connection->executeStatement('CREATE TABLE user_library_access (user_id TEXT, library_id TEXT)');
         $connection->executeStatement('CREATE TABLE transcode_jobs (id TEXT PRIMARY KEY, public_id TEXT, owner_user_id TEXT, video_id TEXT, height INTEGER, status TEXT, request_id TEXT)');
         $connection->executeStatement("CREATE TABLE transcode_sessions (id TEXT PRIMARY KEY, public_id TEXT, user_id TEXT, video_id TEXT, job_id TEXT, updated_at TEXT, state TEXT NOT NULL DEFAULT 'active')");

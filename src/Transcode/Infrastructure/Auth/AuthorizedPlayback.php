@@ -62,10 +62,27 @@ final readonly class AuthorizedPlayback implements PlaybackPortInterface
         $params = ['videoId' => $videoId->toString()];
         $sql = 'SELECT 1 FROM videos v WHERE v.id = :videoId';
         if (!$this->security->isGranted('ROLE_ADMIN')) {
-            $sql .= ' AND EXISTS (SELECT 1 FROM movie_video mv'
-                . ' JOIN movies m ON m.id = mv.movie_id'
-                . ' JOIN user_library_access a ON a.library_id = m.library_id'
-                . ' WHERE mv.video_id = v.id AND a.user_id = :userId)';
+            $sql .= <<<'SQL'
+                 AND (
+                    EXISTS (
+                        SELECT 1 FROM movie_video mv
+                        JOIN movies m ON m.id = mv.movie_id
+                        JOIN user_library_access a ON a.library_id = m.library_id
+                        WHERE mv.video_id = v.id AND a.user_id = :userId
+                    ) OR EXISTS (
+                        SELECT 1 FROM video_placements placement
+                        JOIN user_library_access access ON access.library_id = placement.library_id
+                        WHERE placement.video_id = v.id AND access.user_id = :userId
+                          AND (
+                            placement.movie_id IS NOT NULL OR placement.extra_kind IS NOT NULL
+                            OR EXISTS (
+                                SELECT 1 FROM video_placement_episode episode
+                                WHERE episode.placement_id = placement.id
+                            )
+                          )
+                    )
+                )
+                SQL;
             $params['userId'] = $user->getId();
         }
         if ($this->connection->fetchOne($sql, $params) === false) {

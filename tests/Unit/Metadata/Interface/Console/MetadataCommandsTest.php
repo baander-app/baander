@@ -6,6 +6,10 @@ namespace App\Tests\Unit\Metadata\Interface\Console;
 
 use App\Metadata\Application\Command\SyncMetadataCommand;
 use App\Metadata\Application\Port\MetadataAdminPortInterface;
+use App\Metadata\Application\Settings\MetadataProvider;
+use App\Metadata\Interface\Console\MetadataProviderSetCommand;
+use App\Metadata\Interface\Request\SetMetadataProviderEnabledRequest;
+use App\Shared\Application\Command\UpdateSystemSettingsCommand;
 use App\Metadata\Interface\Console\MetadataProvidersCommand;
 use App\Metadata\Interface\Console\MetadataStatusCommand;
 use App\Metadata\Interface\Console\MetadataSyncCommand;
@@ -13,6 +17,7 @@ use App\Metadata\Interface\Controller\MetadataAdminController;
 use App\Shared\Application\DTO\InlineJobRun;
 use App\Shared\Application\Exception\InvalidInputException;
 use App\Shared\Application\Port\JobMonitorAdministrationInterface;
+use PHPUnit\Framework\MockObject\Stub;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Tester\CommandTester;
@@ -34,8 +39,8 @@ final class MetadataCommandsTest extends TestCase
         'sources' => [['name' => 'SyncAlbumMessage', 'synced' => 10, 'failed' => 2]],
     ];
     private const array PROVIDERS = [
-        ['name' => 'MusicBrainz', 'enabled' => true, 'configured' => true],
-        ['name' => 'Discogs', 'enabled' => true, 'configured' => false],
+        ['id' => 'musicbrainz', 'name' => 'MusicBrainz', 'enabled' => true, 'configured' => true, 'attributionText' => 'Metadata provided by MusicBrainz.', 'attributionUrl' => 'https://musicbrainz.org/'],
+        ['id' => 'discogs', 'name' => 'Discogs', 'enabled' => true, 'configured' => false, 'attributionText' => 'Metadata provided by Discogs.', 'attributionUrl' => 'https://www.discogs.com/'],
     ];
 
     /** @var list<object> */
@@ -72,6 +77,40 @@ final class MetadataCommandsTest extends TestCase
 
         self::assertSame($endpoint, json_decode($tester->getDisplay(), true, flags: JSON_THROW_ON_ERROR));
         self::assertSame(self::PROVIDERS, $endpoint);
+    }
+
+    public function testProviderTableIncludesTheAttribution(): void
+    {
+        $tester = new CommandTester(new MetadataProvidersCommand($this->port()));
+
+        self::assertSame(Command::SUCCESS, $tester->execute([]));
+        self::assertStringContainsString('Metadata provided by MusicBrainz.', $tester->getDisplay());
+        self::assertStringContainsString('https://musicbrainz.org/', $tester->getDisplay());
+    }
+
+    public function testProviderSwitchCommandAndRouteDispatchTheSameSettingAndReturnTheSameRow(): void
+    {
+        $port = $this->port();
+        $state = self::PROVIDERS[1];
+        $port->method('getProvider')->willReturn($state);
+        $endpoint = $this->data($this->controller($port)->setProviderEnabled('discogs', new SetMetadataProviderEnabledRequest(true)));
+        $tester = new CommandTester(new MetadataProviderSetCommand($this->bus(), $port));
+
+        self::assertSame(Command::SUCCESS, $tester->execute(['provider' => 'discogs', 'enabled' => 'true', '--json' => true]));
+        self::assertSame($endpoint, json_decode($tester->getDisplay(), true, flags: JSON_THROW_ON_ERROR));
+        self::assertEquals([
+            new UpdateSystemSettingsCommand([MetadataProvider::Discogs->settingKey() => true]),
+            new UpdateSystemSettingsCommand([MetadataProvider::Discogs->settingKey() => true]),
+        ], $this->dispatched);
+    }
+
+    public function testUnknownProviderAndInvalidEnabledValueNeverDispatchAWrite(): void
+    {
+        $tester = new CommandTester(new MetadataProviderSetCommand($this->bus(), $this->port()));
+
+        self::assertSame(Command::INVALID, $tester->execute(['provider' => 'missing', 'enabled' => 'false']));
+        self::assertSame(Command::INVALID, $tester->execute(['provider' => 'discogs', 'enabled' => 'yes']));
+        self::assertSame([], $this->dispatched);
     }
 
     public function testSyncWithoutASourceRunsTheSameCommandAsTheWebSyncAllInline(): void
@@ -131,7 +170,7 @@ final class MetadataCommandsTest extends TestCase
         $this->controller($this->port())->triggerSync(Request::create('/', 'POST', content: '{"source":5}'));
     }
 
-    private function port(): MetadataAdminPortInterface
+    private function port(): MetadataAdminPortInterface&Stub
     {
         $port = $this->createStub(MetadataAdminPortInterface::class);
         $port->method('getSyncStatus')->willReturn(self::STATUS);
@@ -142,6 +181,11 @@ final class MetadataCommandsTest extends TestCase
 
     private function controller(MetadataAdminPortInterface $port, int $result = 0): MetadataAdminController
     {
+        return new MetadataAdminController($port, $this->bus($result));
+    }
+
+    private function bus(int $result = 0): MessageBusInterface
+    {
         $bus = $this->createStub(MessageBusInterface::class);
         $bus->method('dispatch')->willReturnCallback(function (object $message) use ($result): Envelope {
             $this->dispatched[] = $message;
@@ -149,7 +193,7 @@ final class MetadataCommandsTest extends TestCase
             return (new Envelope($message))->with(new HandledStamp($result, 'handler'));
         });
 
-        return new MetadataAdminController($port, $bus);
+        return $bus;
     }
 
     /** @param list<object> $inline */

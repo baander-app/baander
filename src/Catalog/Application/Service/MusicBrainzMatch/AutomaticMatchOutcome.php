@@ -66,6 +66,11 @@ final readonly class AutomaticMatchOutcome
         return new self(AutomaticMatchOutcomeKind::Unavailable);
     }
 
+    public static function disabled(): self
+    {
+        return new self(AutomaticMatchOutcomeKind::Disabled);
+    }
+
     public static function albumGone(): self
     {
         return new self(AutomaticMatchOutcomeKind::AlbumGone);

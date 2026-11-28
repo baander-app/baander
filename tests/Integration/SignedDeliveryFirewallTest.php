@@ -12,6 +12,10 @@ use App\Auth\Infrastructure\Doctrine\Entity\UserEntity;
 use App\Catalog\Infrastructure\Doctrine\Entity\MovieEntity;
 use App\Catalog\Infrastructure\Doctrine\Entity\MovieVideoEntity;
 use App\Catalog\Infrastructure\Doctrine\Entity\VideoEntity;
+use App\Catalog\Domain\Model\VideoPlacement;
+use App\Tests\Fixtures\Catalog\TvPlaybackPlacement;
+use App\Catalog\Infrastructure\Doctrine\Entity\VideoPlacementEntity;
+use App\Library\Infrastructure\Doctrine\Entity\LibraryFileIndexEntity;
 use App\Library\Infrastructure\Doctrine\Entity\LibraryEntity;
 use App\Library\Infrastructure\Doctrine\Entity\UserLibraryAccessEntity;
 use App\Shared\Application\Exception\ConflictException;
@@ -126,6 +130,7 @@ final class SignedDeliveryFirewallTest extends TestCase
     private array $bodies = [];
     private bool $signedUrlRequested = false;
     private string $mediaTrack = 'video';
+    private string $placementKind = 'movie';
 
     public static function setUpBeforeClass(): void
     {
@@ -261,6 +266,42 @@ final class SignedDeliveryFirewallTest extends TestCase
             $this->assertSignatureRefused($this->request('GET', 'https://baander.app' . $path, $jwt), $route);
         }
         $this->assertNoCredentialInResponsesOrLogs();
+    }
+
+    /** @return iterable<string, array{string, bool}> */
+    public static function televisionPlacements(): iterable
+    {
+        yield 'episode member' => ['episode', true];
+        yield 'episode denied' => ['episode', false];
+        yield 'extra member' => ['extra', true];
+        yield 'extra denied' => ['extra', false];
+        yield 'review denied to member' => ['review', true];
+    }
+
+    #[DataProvider('televisionPlacements')]
+    public function testTelevisionLinksAuthorizeSigningSessionsAndLiveManifests(string $kind, bool $grant): void
+    {
+        $jwt = $this->actorToken('member');
+        $this->placementKind = $kind;
+        $video = $this->createVideoLibrary($grant);
+        $allowed = $grant && $kind !== 'review';
+        $this->streaming->expects($allowed ? self::once() : self::never())->method('getMasterManifest');
+        $this->bus->expects($allowed ? self::exactly(4) : self::never())->method('dispatch')
+            ->willReturnCallback($this->admittedSession(...));
+        $manifest = '/api/transcode/' . $video->getPublicId()->toString() . '/master.m3u8';
+        $signing = $this->request('POST', self::SIGN_URL, $jwt, true, $this->signingBody($manifest));
+        $this->assertDecidedBy($signing, $allowed ? 200 : 403, $allowed ? null : self::VIDEO_NOT_ACCESSIBLE, 'TV signing');
+        $session = $this->request('POST', 'https://baander.app/api/transcode/sessions/', $jwt, true, [
+            'videoId' => $video->getPublicId()->toString(), 'requestId' => $this->requestId, 'qualityTier' => '360p',
+        ]);
+        $this->assertDecidedBy($session, $allowed ? 201 : 403, $allowed ? null : self::VIDEO_NOT_ACCESSIBLE, 'TV session');
+        $job = $this->admittedJobs[$video->getId()->toString()][0];
+        $response = $this->request('GET', $this->signedUrl($manifest, setJob: $job));
+        if ($allowed) {
+            self::assertSame(200, $response->getStatusCode(), $this->responseDetails($response));
+        } else {
+            $this->assertOwnerAccessRefused($response, 'TV manifest');
+        }
     }
 
     public function testManifestControllersReceiveTheVerifiedCapabilityExpiryThroughTheFirewall(): void
@@ -862,7 +903,21 @@ final class SignedDeliveryFirewallTest extends TestCase
         $this->persist($library);
         $this->persist($movie);
         $this->persist($video);
-        $this->persist(new MovieVideoEntity($movie, $video));
+        if ($this->placementKind === 'movie') {
+            $this->persist(new MovieVideoEntity($movie, $video));
+            $placement = VideoPlacement::create($library->getId(), $video->getId(), 'segment.mp4', [], movieId: $movie->getId());
+            $row = new VideoPlacementEntity($library, $video, $placement->getState());
+            $row->movie = $movie;
+            $this->persist($row);
+        } else {
+            foreach (TvPlaybackPlacement::entities($library, $video, $this->placementKind, 'segment.mp4') as $entity) {
+                $this->persist($entity);
+            }
+        }
+        $this->persist(new LibraryFileIndexEntity(
+            Uuid::v7(), $library->getId(), $video->getPath(), $video->getHash(),
+            13, 'mp4', (int) filemtime($video->getPath()), new \DateTimeImmutable(),
+        ));
         $membership = $member === null ? null : new UserLibraryAccessEntity($member->getId(), $library, new \DateTimeImmutable());
         if ($membership !== null) {
             $this->persist($membership);

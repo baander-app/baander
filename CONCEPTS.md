@@ -441,6 +441,46 @@ and favorites move to the kept song, and its lyrics do when the kept song has no
 duplicate's own row is deleted with its credits and genres, and its file stays on disk.
 A song without a file hash is never a duplicate.
 
+## Video library
+
+These terms come from the [TV series libraries plan](docs/plans/2026-11-27-1827-feat-tv-series-libraries-plan.md) and describe planned behavior until that plan is delivered.
+
+### Provider order
+
+The metadata providers a TV or movie library tries, in the order its admin sets. A new TV library ranks TheTVDB, TMDB and the [local provider](#local-provider), and a new movie library TMDB and the local provider; provider IDs in a title's NFO identify it at the online providers as folder tags do. Matching skips a provider that is switched off with its [provider switch](#provider-switch) or has no configured key; an outage pauses matching instead. A series or movie keeps the provider that matched it when the order changes, until an admin re-matches that title or the whole library.
+
+### Local provider
+
+The metadata provider that reads Kodi-style NFO files and artwork stored beside the media, such as `tvshow.nfo`, `movie.nfo` and `poster.jpg`. It needs no key, never goes online and never writes files. It identifies only a title with an NFO beside it; a title without one, or with an NFO it cannot read, falls to the next provider in the [provider order](#provider-order). Its cast members become credits only when they carry an IMDb, TMDB or TheTVDB ID.
+
+### Provider switch
+
+The server-wide setting that turns one metadata provider on or off, for every provider on the admin providers list. A switched-off provider is never contacted, and what it already supplied stays.
+
+### Video match
+
+The link between a series or movie and one provider's entry for it. A provider-ID tag in the folder name, such as `{tvdb-121361}` or `{tmdb-603}`, identifies the title without a search; otherwise each provider in the [provider order](#provider-order) is searched. Matching runs after a scan whenever a provider in the library's order can be used. A confident match is applied on its own, and anything else goes to the admin review list, as with a [MusicBrainz match](#musicbrainz-match). A match, an [episode ordering](#episode-ordering) choice and a file assignment an admin made all outlive rescans, and none of them writes the media file.
+
+### Episode ordering
+
+The numbering a matched provider gives a series' episodes, such as aired, absolute or DVD order. A file named by absolute number or air date is placed through it, and an admin can switch a series to another ordering the provider offers. Season 0 holds the specials in every ordering.
+
+### Multi-episode file
+
+One video file that holds several consecutive episodes, named like `S01E01-E02`. Each of those episodes plays the file, the file has one [resume position](#resume-position), and finishing it marks each of its episodes watched.
+
+### Extra
+
+A video beside a series or movie that is not an episode or the feature, such as a trailer or featurette, recognized by the extras folder names and file suffixes Plex and Jellyfin use. Extras play in their own row on the series or movie page and never count toward episode counts or [watched state](#watched-state).
+
+### Resume position
+
+A member's own playback position in an episode or movie, from which reopening it resumes. It is kept with the file the member played, so it survives rescans, re-matches and ordering changes that move the file to another episode.
+
+### Watched state
+
+Whether an episode or movie counts as watched for one member. Playback past 90% of the runtime sets it, and a member can set or clear it by hand for an episode, a season or a whole series. Marking a season or series covers the episodes it has files for; episodes added later start unwatched. A file an upgrade replaces leaves the mark in place, and when a fix moves a file to other episodes, the marks on its old episodes move to its new ones.
+
 ## Recommendations
 
 ### Recommendation origin

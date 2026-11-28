@@ -10,7 +10,7 @@ use App\Library\Application\Message\DiscoveredFile;
 use App\Library\Application\Service\LibraryScanLease;
 use App\Library\Domain\Model\Library;
 use App\Library\Domain\Repository\LibraryFileIndexRepositoryInterface;
-use App\Library\Infrastructure\Scanner\MediaFile;
+use App\Library\Application\DTO\MediaFile;
 use App\Shared\Application\JobCancelledException;
 use App\Shared\Application\Port\JobCancellationCheckpointInterface;
 use App\Shared\Application\Port\TransactionPortInterface;

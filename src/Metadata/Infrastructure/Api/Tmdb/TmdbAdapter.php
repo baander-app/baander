@@ -4,6 +4,11 @@ declare(strict_types=1);
 
 namespace App\Metadata\Infrastructure\Api\Tmdb;
 
+use App\Metadata\Application\Settings\MetadataProvider;
+use App\Metadata\Application\DTO\ImdbPersonLookupDisabled;
+use App\Metadata\Application\Exception\MetadataProviderDisabled;
+use App\Metadata\Application\Settings\MetadataProviderSwitches;
+
 use App\Metadata\Application\Port\ImdbPersonLookupInterface;
 use App\Metadata\Application\Port\TmdbPersonLookupInterface;
 use App\Metadata\Infrastructure\Api\Tmdb\DTO\TmdbCollectionDto;
@@ -32,6 +37,7 @@ final class TmdbAdapter implements ImdbPersonLookupInterface, TmdbPersonLookupIn
         private readonly LoggerInterface $logger,
         private readonly JsonEncoder $jsonEncoder,
         private readonly PublicHttpClient $httpClient,
+        private readonly MetadataProviderSwitches $switches,
         #[Autowire(service: 'cache.app')]
         private readonly ?CacheInterface $cache = null,
     ) {}
@@ -62,6 +68,11 @@ final class TmdbAdapter implements ImdbPersonLookupInterface, TmdbPersonLookupIn
         return TmdbMovieDto::fromApiResponse($data);
     }
 
+    public function isEnabled(): bool
+    {
+        return $this->switches->enabled(MetadataProvider::Tmdb);
+    }
+
     public function isConfigured(): bool
     {
         return trim($this->bearerToken) !== '';
@@ -70,6 +81,7 @@ final class TmdbAdapter implements ImdbPersonLookupInterface, TmdbPersonLookupIn
     /** @return array<string, mixed>|null */
     public function lookupPerson(int $tmdbId): ?array
     {
+        $this->switches->requireEnabled(MetadataProvider::Tmdb);
         if (!$this->isConfigured()) {
             return null;
         }
@@ -78,22 +90,31 @@ final class TmdbAdapter implements ImdbPersonLookupInterface, TmdbPersonLookupIn
         return ($data['id'] ?? null) === $tmdbId ? $data : null;
     }
 
-    public function findTmdbPersonId(string $imdbNameId): ?string
+    public function findTmdbPersonId(string $imdbNameId): string|ImdbPersonLookupDisabled|null
     {
+        if (!$this->isEnabled()) {
+            return new ImdbPersonLookupDisabled();
+        }
         if (!$this->isConfigured() || preg_match('/^nm[0-9]+$/D', $imdbNameId) !== 1) {
             return null;
         }
-        $result = $this->cache === null
-            ? $this->lookupImdbPerson($imdbNameId)
-            : $this->cache->get('tmdb.imdb_person.' . $imdbNameId, function (ItemInterface $item) use ($imdbNameId): ?string {
-                try {
-                    return $this->lookupImdbPerson($imdbNameId, $item);
-                } catch (\RuntimeException) {
-                    // Share a short outage marker while keeping temporary failure distinct from no match.
-                    $item->expiresAfter(30);
-                    return 'unavailable';
-                }
-            });
+        try {
+            $result = $this->cache === null
+                ? $this->lookupImdbPerson($imdbNameId)
+                : $this->cache->get('tmdb.imdb_person.' . $imdbNameId, function (ItemInterface $item) use ($imdbNameId): ?string {
+                    try {
+                        return $this->lookupImdbPerson($imdbNameId, $item);
+                    } catch (MetadataProviderDisabled $exception) {
+                        throw $exception;
+                    } catch (\RuntimeException) {
+                        // Share a short outage marker while keeping temporary failure distinct from no match.
+                        $item->expiresAfter(30);
+                        return 'unavailable';
+                    }
+                });
+        } catch (MetadataProviderDisabled) {
+            return new ImdbPersonLookupDisabled();
+        }
         if ($result === 'unavailable') {
             throw new \RuntimeException('TMDB identity bridge is temporarily unavailable.');
         }
@@ -118,6 +139,7 @@ final class TmdbAdapter implements ImdbPersonLookupInterface, TmdbPersonLookupIn
     /** @return array<string, mixed>|null */
     public function lookupTvSeries(int $tmdbId): ?array
     {
+        $this->switches->requireEnabled(MetadataProvider::Tmdb);
         if (!$this->isConfigured()) {
             return null;
         }
@@ -129,6 +151,7 @@ final class TmdbAdapter implements ImdbPersonLookupInterface, TmdbPersonLookupIn
     /** @return array<string, mixed>|null */
     public function lookupTvEpisode(int $seriesId, int $seasonNumber, int $episodeNumber): ?array
     {
+        $this->switches->requireEnabled(MetadataProvider::Tmdb);
         if (!$this->isConfigured()) {
             return null;
         }
@@ -163,16 +186,79 @@ final class TmdbAdapter implements ImdbPersonLookupInterface, TmdbPersonLookupIn
         );
     }
 
+    /** @return array<string, mixed> */
+    public function searchTvSeries(string $query, ?int $year = null): array
+    {
+        $params = ['query' => $query, 'page' => 1];
+        if ($year !== null) {
+            $params['first_air_date_year'] = $year;
+        }
+
+        return $this->request('/search/tv', $params, allowNotFound: false);
+    }
+
+    /** @return array<string, mixed> */
+    public function searchMovieRecords(string $query, ?int $year = null): array
+    {
+        $params = ['query' => $query, 'page' => 1];
+        if ($year !== null) {
+            $params['year'] = $year;
+        }
+
+        return $this->request('/search/movie', $params, allowNotFound: false);
+    }
+
+    /** @return array<string, mixed> */
+    public function findVideo(string $externalId, string $source): array
+    {
+        if (!in_array($source, ['tvdb_id', 'imdb_id'], true)) {
+            throw new \InvalidArgumentException('Unsupported TMDB external identifier source.');
+        }
+
+        return $this->request('/find/' . rawurlencode($externalId), ['external_source' => $source], allowNotFound: false);
+    }
+
+    /** @return array<string, mixed> */
+    public function lookupMovieDetails(int $id): array
+    {
+        return $this->request('/movie/' . $id, ['append_to_response' => 'credits,external_ids'], allowNotFound: false);
+    }
+
+    /** @return array<string, mixed> */
+    public function lookupTvSeriesDetails(int $id): array
+    {
+        return $this->request('/tv/' . $id, ['append_to_response' => 'aggregate_credits,external_ids,episode_groups'], allowNotFound: false);
+    }
+
+    /** @return array<string, mixed> */
+    public function lookupTvSeason(int $seriesId, int $season): array
+    {
+        return $this->request('/tv/' . $seriesId . '/season/' . $season, allowNotFound: false);
+    }
+
+    /** @return array<string, mixed> */
+    public function lookupTvEpisodeGroups(int $seriesId): array
+    {
+        return $this->request('/tv/' . $seriesId . '/episode_groups', allowNotFound: false);
+    }
+
+    /** @return array<string, mixed> */
+    public function lookupTvEpisodeGroup(string $groupId): array
+    {
+        return $this->request('/tv/episode_group/' . rawurlencode($groupId), allowNotFound: false);
+    }
+
     /**
      * @return array<string, mixed>
      * @param array<string, mixed> $params
      */
-    private function request(string $endpoint, array $params = [], int $timeout = self::REQUEST_TIMEOUT): array
+    private function request(string $endpoint, array $params = [], int $timeout = self::REQUEST_TIMEOUT, bool $allowNotFound = true): array
     {
         $url = self::BASE_URL . $endpoint . '?' . http_build_query($params);
         $this->logger->debug('TMDB API request', ['service' => 'tmdb', 'endpoint' => $endpoint]);
         $retried = false;
         while (true) {
+            $this->switches->requireEnabled(MetadataProvider::Tmdb);
             $response = null;
             try {
                 $response = $this->httpClient->request('GET', $url, ['api.themoviedb.org'], [
@@ -200,13 +286,13 @@ final class TmdbAdapter implements ImdbPersonLookupInterface, TmdbPersonLookupIn
                 $retried = true;
                 continue;
             }
-            if ($status === 404) {
+            if ($status === 404 && $allowNotFound) {
                 return [];
             }
             if ($status >= 300) {
                 $this->logger->warning('TMDB API error response', ['service' => 'tmdb', 'status' => $status]);
 
-                throw new \RuntimeException('TMDB API returned an unsuccessful response.');
+                throw new TmdbHttpException($status);
             }
             try {
                 $data = $this->jsonEncoder->decode($body, 'json');

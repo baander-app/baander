@@ -4,8 +4,11 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Metadata\Application\MessageHandler;
 
+use App\Tests\Fixtures\Metadata\ProviderSwitches;
+
 use App\Catalog\Application\Port\PersonIdentityPortInterface;
 use App\Metadata\Application\Message\SyncPeopleMessage;
+use App\Metadata\Application\Settings\MetadataProvider;
 use App\Metadata\Application\MessageHandler\SyncPeopleHandler;
 use App\Metadata\Application\Port\TmdbPersonLookupInterface;
 use App\Shared\Application\JobCancelledException;
@@ -85,6 +88,24 @@ final class SyncPeopleHandlerTest extends TestCase
         (new SyncPeopleHandler($people, $this->adapter($http, ''), $bus, new CancelAtCheckpoint()))(new SyncPeopleMessage());
     }
 
+    public function testDisabledProviderLeavesPendingPeopleUnclaimed(): void
+    {
+        $people = $this->createMock(PersonIdentityPortInterface::class);
+        $people->expects(self::never())->method('pendingTmdbPeople');
+        $people->expects(self::never())->method('enrichTmdbPerson');
+        $http = new MockHttpClient(static function (): never {
+            self::fail('A disabled person provider must make no request.');
+        });
+        $tmdb = new TmdbAdapter('fixture-token', new NullLogger(), new JsonEncoder(), new PublicHttpClient(
+            $http,
+            new PublicDestinationPolicy(static fn (string $host): array => ['1.1.1.1']),
+        ), ProviderSwitches::withDisabled(MetadataProvider::Tmdb));
+        $bus = $this->createMock(MessageBusInterface::class);
+        $bus->expects(self::never())->method('dispatch');
+        (new SyncPeopleHandler($people, $tmdb, $bus, new CancelAtCheckpoint()))(new SyncPeopleMessage());
+        self::assertSame(0, $http->getRequestsCount());
+    }
+
     public function testCancellationLeavesClaimRecoveryToTheLeaseWithoutCallingTheProvider(): void
     {
         $people = $this->createMock(PersonIdentityPortInterface::class);
@@ -92,6 +113,7 @@ final class SyncPeopleHandlerTest extends TestCase
         $people->expects(self::never())->method('enrichTmdbPerson');
         $tmdb = $this->createMock(TmdbPersonLookupInterface::class);
         $tmdb->method('isConfigured')->willReturn(true);
+        $tmdb->method('isEnabled')->willReturn(true);
         $tmdb->expects(self::never())->method('lookupPerson');
         $bus = $this->createMock(MessageBusInterface::class);
         $bus->expects(self::never())->method('dispatch');
@@ -107,6 +129,7 @@ final class SyncPeopleHandlerTest extends TestCase
         $people->expects(self::never())->method('enrichTmdbPerson');
         $tmdb = $this->createMock(TmdbPersonLookupInterface::class);
         $tmdb->method('isConfigured')->willReturn(true);
+        $tmdb->method('isEnabled')->willReturn(true);
         $tmdb->expects(self::once())->method('lookupPerson')->with(42)->willThrowException(new \RuntimeException('Provider unavailable.'));
         $bus = $this->createMock(MessageBusInterface::class);
         $bus->expects(self::never())->method('dispatch');
@@ -125,6 +148,6 @@ final class SyncPeopleHandlerTest extends TestCase
         return new TmdbAdapter($token, new NullLogger(), new JsonEncoder(), new PublicHttpClient(
             $http,
             new PublicDestinationPolicy(static fn(string $host): array => ['1.1.1.1']),
-        ));
+        ), ProviderSwitches::allEnabled());
     }
 }

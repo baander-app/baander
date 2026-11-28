@@ -31,7 +31,7 @@ final readonly class UpdateMovieHandler
             ?? throw new NotFoundException(sprintf('Movie "%s" not found.', $command->publicId));
 
         try {
-            $movie->updateMetadata(
+            $movie->edit(
                 title: $command->title,
                 year: $command->year,
                 summary: $command->summary,

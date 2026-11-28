@@ -6,6 +6,7 @@ namespace App\Catalog\Application\QueryHandler\MusicBrainzMatch;
 
 use App\Catalog\Application\Query\MusicBrainzMatch\MatchItemType;
 use App\Metadata\Application\DTO\MusicBrainz\MusicBrainzMerged;
+use App\Metadata\Application\DTO\MusicBrainz\MusicBrainzDisabled;
 use App\Metadata\Application\DTO\MusicBrainz\MusicBrainzRejected;
 use App\Metadata\Application\DTO\MusicBrainz\MusicBrainzUnavailable;
 use App\Shared\Application\Exception\ConflictException;
@@ -21,6 +22,7 @@ use App\Shared\Application\Exception\ServiceUnavailableException;
  */
 final class MusicBrainzAnswer
 {
+    public const string DISABLED_REASON = 'provider_disabled';
     public const string UNAVAILABLE_REASON = 'musicbrainz_unavailable';
     public const string REJECTED_REASON = 'musicbrainz_rejected';
     public const string CANDIDATE_NOT_FOUND_REASON = 'candidate_not_found';
@@ -28,7 +30,7 @@ final class MusicBrainzAnswer
     /**
      * @template T
      *
-     * @param T|MusicBrainzMerged|MusicBrainzRejected|MusicBrainzUnavailable $answer
+     * @param T|MusicBrainzMerged|MusicBrainzRejected|MusicBrainzUnavailable|MusicBrainzDisabled $answer
      *
      * @return T|null the answer itself when MusicBrainz gave one; null for an ID it merged into another
      *
@@ -38,6 +40,10 @@ final class MusicBrainzAnswer
     public static function unwrap(mixed $answer): mixed
     {
         return match (true) {
+            $answer instanceof MusicBrainzDisabled => throw new ConflictException(
+                'The metadata provider is disabled.',
+                ['reason' => self::DISABLED_REASON, 'provider' => $answer->provider],
+            ),
             $answer instanceof MusicBrainzUnavailable => throw new ServiceUnavailableException(
                 'MusicBrainz is unavailable. Try again later.',
                 ['reason' => self::UNAVAILABLE_REASON],

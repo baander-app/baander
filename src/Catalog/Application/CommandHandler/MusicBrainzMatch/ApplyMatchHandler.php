@@ -208,6 +208,7 @@ final readonly class ApplyMatchHandler
             return match ($conflict->details['reason'] ?? null) {
                 self::ALREADY_MATCHED_REASON => $notApplied(MatchApplyOutcome::AlbumMatchedMeanwhile),
                 MatchTicks::STALE_REASON => $notApplied(MatchApplyOutcome::Stale),
+                MusicBrainzAnswer::DISABLED_REASON => $notApplied(MatchApplyOutcome::Disabled),
                 default => throw $conflict,
             };
         }
@@ -320,7 +321,16 @@ final readonly class ApplyMatchHandler
         try {
             return [$this->covers->fetch($albumId, $releaseId, $wait), false];
         } catch (ConflictException $conflict) {
-            return $automatic && ($conflict->details['reason'] ?? null) === MatchCovers::REFUSED_REASON ? [null, true] : throw $conflict;
+            if (!$automatic) {
+                throw $conflict;
+            }
+
+            return match (true) {
+                ($conflict->details['reason'] ?? null) === MatchCovers::REFUSED_REASON => [null, true],
+                ($conflict->details['reason'] ?? null) === MusicBrainzAnswer::DISABLED_REASON
+                    && ($conflict->details['provider'] ?? null) === 'coverartarchive' => [null, false],
+                default => throw $conflict,
+            };
         }
     }
 

@@ -10,8 +10,9 @@ use App\Catalog\Application\Port\AlbumPortInterface;
 use App\Catalog\Application\Port\ArtistSyncRequestInterface;
 use App\Catalog\Application\Port\GenrePortInterface;
 use App\Catalog\Application\Port\MetadataContentReaderPortInterface;
-use App\Catalog\Application\Port\MoviePortInterface;
+use App\Catalog\Domain\Repository\MovieRepositoryInterface;
 use App\Catalog\Application\Port\SongPortInterface;
+use App\Catalog\Application\Service\VideoFileIngest;
 use App\Catalog\Domain\Model\Album;
 use App\Catalog\Domain\Model\Song;
 use App\Catalog\Domain\Repository\VideoRepositoryInterface;
@@ -213,23 +214,31 @@ final class FilesDiscoveredRenameTest extends TestCase
             $bus->method('dispatch')->willReturnCallback(static fn (object $message): Envelope => new Envelope($message));
         }
 
+        $videoIngestLogger = new NullLogger();
+        $videoIngestTransaction = new PassThroughTransaction();
         return new FilesDiscoveredHandler(
             $albums,
             $genres,
             $songs,
-            $this->createStub(MoviePortInterface::class),
-            $this->createStub(VideoRepositoryInterface::class),
+            $this->movieIngest($this->createStub(MovieRepositoryInterface::class), $this->createStub(VideoRepositoryInterface::class), $media),
+            new VideoFileIngest(
+                $this->createStub(VideoRepositoryInterface::class),
+                new FFprobeAdapter(new JsonEncoder()),
+                $media,
+                $videoIngestTransaction,
+                $videoIngestLogger,
+            ),
             $metadata,
-            new FFprobeAdapter(new JsonEncoder()),
             $bus,
             $lyrics,
             $sync,
-            new NullLogger(),
+            $videoIngestLogger,
             $media,
-            new PassThroughTransaction(),
+            $videoIngestTransaction,
             audioProbe: $this->audioProbeStub(),
             artistIdentities: $this->artistIdentitiesStub(),
             artistSyncs: $this->createStub(ArtistSyncRequestInterface::class),
+            tvLibraryIngest: $this->unusedTvIngest(),
         );
     }
 }

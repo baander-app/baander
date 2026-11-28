@@ -10,8 +10,9 @@ use App\Catalog\Application\Port\AlbumPortInterface;
 use App\Catalog\Application\Port\ArtistSyncRequestInterface;
 use App\Catalog\Application\Port\GenrePortInterface;
 use App\Catalog\Application\Port\MetadataContentReaderPortInterface;
-use App\Catalog\Application\Port\MoviePortInterface;
+use App\Catalog\Domain\Repository\MovieRepositoryInterface;
 use App\Catalog\Application\Port\SongPortInterface;
+use App\Catalog\Application\Service\VideoFileIngest;
 use App\Catalog\Domain\Model\Album;
 use App\Catalog\Domain\Model\Song;
 use App\Catalog\Domain\Repository\VideoRepositoryInterface;
@@ -136,7 +137,7 @@ final class FilesDiscoveredMissingFilesTest extends TestCase
         ]);
         $mediaFiles = $this->observedMediaFiles($this->createStub(LibraryMediaFilesInterface::class));
         $mediaFiles->method('markMissingUnavailable')->willReturn(['/movies/Gone Movie/movie.mkv']);
-        $movies = $this->createMock(MoviePortInterface::class);
+        $movies = $this->createMock(MovieRepositoryInterface::class);
         $movies->expects($this->never())->method('persist');
         $videos = $this->createMock(VideoRepositoryInterface::class);
         $videos->expects($this->never())->method('save');
@@ -226,7 +227,7 @@ final class FilesDiscoveredMissingFilesTest extends TestCase
         ?AlbumPortInterface $albums = null,
         ?SongPortInterface $songs = null,
         ?MetadataContentReaderPortInterface $metadata = null,
-        ?MoviePortInterface $movies = null,
+        ?MovieRepositoryInterface $movies = null,
         ?VideoRepositoryInterface $videos = null,
         ?MessageBusInterface $bus = null,
         ?PassThroughTransaction $transaction = null,
@@ -244,23 +245,31 @@ final class FilesDiscoveredMissingFilesTest extends TestCase
             $bus->method('dispatch')->willReturnCallback(static fn (object $message): Envelope => new Envelope($message));
         }
 
+        $videoIngestLogger = new NullLogger();
+        $videoIngestTransaction = $transaction ?? new PassThroughTransaction();
         return new FilesDiscoveredHandler(
             $albums,
             $this->createStub(GenrePortInterface::class),
             $songs ?? $this->createStub(SongPortInterface::class),
-            $movies ?? $this->createStub(MoviePortInterface::class),
-            $videos ?? $this->createStub(VideoRepositoryInterface::class),
+            $this->movieIngest($movies ?? $this->createStub(MovieRepositoryInterface::class), $videos ?? $this->createStub(VideoRepositoryInterface::class), $mediaFiles),
+            new VideoFileIngest(
+                $videos ?? $this->createStub(VideoRepositoryInterface::class),
+                new FFprobeAdapter(new JsonEncoder()),
+                $mediaFiles,
+                $videoIngestTransaction,
+                $videoIngestLogger,
+            ),
             $metadata,
-            new FFprobeAdapter(new JsonEncoder()),
             $bus,
             $this->createStub(LyricsFetchRequestInterface::class),
             $this->createStub(AlbumMatchRequestInterface::class),
-            new NullLogger(),
+            $videoIngestLogger,
             $mediaFiles,
-            $transaction ?? new PassThroughTransaction(),
+            $videoIngestTransaction,
             audioProbe: $this->audioProbeStub(),
             artistIdentities: $this->artistIdentitiesStub(),
             artistSyncs: $this->createStub(ArtistSyncRequestInterface::class),
+            tvLibraryIngest: $this->unusedTvIngest(),
         );
     }
 

@@ -10,8 +10,9 @@ use App\Catalog\Application\Port\AlbumPortInterface;
 use App\Catalog\Application\Port\ArtistSyncRequestInterface;
 use App\Catalog\Application\Port\GenrePortInterface;
 use App\Catalog\Application\Port\MetadataContentReaderPortInterface;
-use App\Catalog\Application\Port\MoviePortInterface;
+use App\Catalog\Domain\Repository\MovieRepositoryInterface;
 use App\Catalog\Application\Port\SongPortInterface;
+use App\Catalog\Application\Service\VideoFileIngest;
 use App\Catalog\Domain\Model\Album;
 use App\Catalog\Domain\Model\Song;
 use App\Catalog\Domain\Repository\VideoRepositoryInterface;
@@ -73,7 +74,7 @@ final class FilesDiscoveredHandlerReliabilityTest extends TestCase
         $songPort->method('persist')->willThrowException(new RuntimeException('Database write failed'));
 
         $genrePort = $this->createMock(GenrePortInterface::class);
-        $moviePort = $this->createMock(MoviePortInterface::class);
+        $moviePort = $this->createMock(MovieRepositoryInterface::class);
         $videoRepository = $this->createMock(VideoRepositoryInterface::class);
 
         $metadataReader = $this->createMock(MetadataContentReaderPortInterface::class);
@@ -83,23 +84,31 @@ final class FilesDiscoveredHandlerReliabilityTest extends TestCase
         $messageBus = $this->createMock(MessageBusInterface::class);
         $logger = new NullLogger();
 
+        $videoIngestMedia = $this->observedMediaFiles($this->createStub(LibraryMediaFilesInterface::class));
+        $videoIngestTransaction = new PassThroughTransaction();
         $handler = new FilesDiscoveredHandler(
             $albumPort,
             $genrePort,
             $songPort,
-            $moviePort,
-            $videoRepository,
+            $this->movieIngest($moviePort, $videoRepository, $videoIngestMedia),
+            new VideoFileIngest(
+                $videoRepository,
+                $ffprobe,
+                $videoIngestMedia,
+                $videoIngestTransaction,
+                $logger,
+            ),
             $metadataReader,
-            $ffprobe,
             $messageBus,
             $this->createStub(LyricsFetchRequestInterface::class),
             $this->createStub(AlbumMatchRequestInterface::class),
             $logger,
-            $this->observedMediaFiles($this->createStub(LibraryMediaFilesInterface::class)),
-            new PassThroughTransaction(),
+            $videoIngestMedia,
+            $videoIngestTransaction,
             audioProbe: $this->audioProbeStub(),
             artistIdentities: $this->artistIdentitiesStub(),
             artistSyncs: $this->createStub(ArtistSyncRequestInterface::class),
+            tvLibraryIngest: $this->unusedTvIngest(),
         );
 
         $message = new FilesDiscovered($libraryId, 'music', $directory, [$file]);
@@ -149,7 +158,7 @@ final class FilesDiscoveredHandlerReliabilityTest extends TestCase
         $songPort->method('persist')->willThrowException(new RuntimeException('Database write failed'));
 
         $genrePort = $this->createMock(GenrePortInterface::class);
-        $moviePort = $this->createMock(MoviePortInterface::class);
+        $moviePort = $this->createMock(MovieRepositoryInterface::class);
         $videoRepository = $this->createMock(VideoRepositoryInterface::class);
 
         $metadataReader = $this->createMock(MetadataContentReaderPortInterface::class);
@@ -159,23 +168,31 @@ final class FilesDiscoveredHandlerReliabilityTest extends TestCase
         $messageBus = $this->createMock(MessageBusInterface::class);
         $logger = new NullLogger();
 
+        $videoIngestMedia = $this->observedMediaFiles($this->createStub(LibraryMediaFilesInterface::class));
+        $videoIngestTransaction = new PassThroughTransaction();
         $handler = new FilesDiscoveredHandler(
             $albumPort,
             $genrePort,
             $songPort,
-            $moviePort,
-            $videoRepository,
+            $this->movieIngest($moviePort, $videoRepository, $videoIngestMedia),
+            new VideoFileIngest(
+                $videoRepository,
+                $ffprobe,
+                $videoIngestMedia,
+                $videoIngestTransaction,
+                $logger,
+            ),
             $metadataReader,
-            $ffprobe,
             $messageBus,
             $this->createStub(LyricsFetchRequestInterface::class),
             $this->createStub(AlbumMatchRequestInterface::class),
             $logger,
-            $this->observedMediaFiles($this->createStub(LibraryMediaFilesInterface::class)),
-            new PassThroughTransaction(),
+            $videoIngestMedia,
+            $videoIngestTransaction,
             audioProbe: $this->audioProbeStub(),
             artistIdentities: $this->artistIdentitiesStub(),
             artistSyncs: $this->createStub(ArtistSyncRequestInterface::class),
+            tvLibraryIngest: $this->unusedTvIngest(),
         );
 
         $message = new FilesDiscovered($libraryId, 'music', $directory, [$fileOne, $fileTwo]);
@@ -336,23 +353,32 @@ final class FilesDiscoveredHandlerReliabilityTest extends TestCase
         $metadataReader = $this->createStub(MetadataContentReaderPortInterface::class);
         $metadataReader->method('readMetadata')->willReturn((new ExtractedMetadata())->setTitle('Track One')->setAlbum('Test Album')->setDuration(180.0));
         $bus = $this->createMock(MessageBusInterface::class);
+        $videoIngestLogger = $logger ?? new NullLogger();
+        $videoIngestMedia = $this->observedMediaFiles($this->createStub(LibraryMediaFilesInterface::class));
+        $videoIngestTransaction = new PassThroughTransaction();
         $handler = new FilesDiscoveredHandler(
             $albumPort,
             $genrePort,
             $songPort,
-            $this->createStub(MoviePortInterface::class),
-            $this->createStub(VideoRepositoryInterface::class),
+            $this->movieIngest($this->createStub(MovieRepositoryInterface::class), $this->createStub(VideoRepositoryInterface::class), $videoIngestMedia),
+            new VideoFileIngest(
+                $this->createStub(VideoRepositoryInterface::class),
+                new FFprobeAdapter(new JsonEncoder()),
+                $videoIngestMedia,
+                $videoIngestTransaction,
+                $videoIngestLogger,
+            ),
             $metadataReader,
-            new FFprobeAdapter(new JsonEncoder()),
             $bus,
             $this->createStub(LyricsFetchRequestInterface::class),
             $this->createStub(AlbumMatchRequestInterface::class),
-            $logger ?? new NullLogger(),
-            $this->observedMediaFiles($this->createStub(LibraryMediaFilesInterface::class)),
-            new PassThroughTransaction(),
+            $videoIngestLogger,
+            $videoIngestMedia,
+            $videoIngestTransaction,
             audioProbe: $this->audioProbeStub(),
             artistIdentities: $this->artistIdentitiesStub(),
             artistSyncs: $this->createStub(ArtistSyncRequestInterface::class),
+            tvLibraryIngest: $this->unusedTvIngest(),
         );
         $file = $this->observedFile(new DiscoveredFile('/music/Test Album/01-track.mp3', 'Test Album/01-track.mp3', 'mp3', 1_000_000, time(), 'cover-fanout-hash'));
         $message = new FilesDiscovered($libraryId, 'music', '/music/Test Album', [$file]);

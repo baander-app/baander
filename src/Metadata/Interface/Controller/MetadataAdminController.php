@@ -6,6 +6,10 @@ namespace App\Metadata\Interface\Controller;
 
 use App\Metadata\Application\Command\SyncMetadataCommand;
 use App\Metadata\Application\Port\MetadataAdminPortInterface;
+use App\Metadata\Application\Settings\MetadataProvider;
+use App\Metadata\Interface\Request\SetMetadataProviderEnabledRequest;
+use App\Metadata\Interface\Resource\MetadataProviderResource;
+use App\Shared\Application\Command\UpdateSystemSettingsCommand;
 use App\Shared\Application\Exception\InvalidInputException;
 use App\Shared\Interface\Attribute\CliCounterpart;
 use App\Shared\Interface\Controller\ApiResponsesTrait;
@@ -13,6 +17,7 @@ use App\Shared\Interface\DTO\ApiError;
 use OpenApi\Spec as OA;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
+use Symfony\Component\HttpKernel\Attribute\MapRequestPayload;
 use Symfony\Component\Messenger\MessageBusInterface;
 use Symfony\Component\Messenger\Stamp\HandledStamp;
 use Symfony\Component\Routing\Attribute\Route;
@@ -167,14 +172,7 @@ final class MetadataAdminController
                         properties: [
                             'data' => new OA\Schema(
                                 type: 'array',
-                                items: new OA\Schema(
-                                    type: 'object',
-                                    properties: [
-                                        'name' => new OA\Schema(type: 'string'),
-                                        'enabled' => new OA\Schema(type: 'boolean'),
-                                        'configured' => new OA\Schema(type: 'boolean'),
-                                    ],
-                                ),
+                                items: new OA\Schema(ref: MetadataProviderResource::class),
                             ),
                         ],
                     ),
@@ -194,5 +192,39 @@ final class MetadataAdminController
     public function providers(): JsonResponse
     {
         return $this->successResponse($this->metadataAdmin->getProviders());
+    }
+
+    #[OA\Operation\Patch(
+        path: '/api/admin/metadata/providers/{provider}',
+        summary: 'Switch a metadata provider on or off for the server',
+        parameters: [
+            new OA\Parameter(name: 'provider', in: 'path', required: true, schema: new OA\Schema(type: 'string')),
+        ],
+        requestBody: new OA\RequestBody(
+            required: true,
+            content: new OA\MediaType\Json(schema: new OA\Schema(ref: SetMetadataProviderEnabledRequest::class)),
+        ),
+        responses: [
+            new OA\Response(
+                response: '200',
+                description: 'Updated metadata provider',
+                content: new OA\MediaType\Json(schema: new OA\Schema(
+                    type: 'object',
+                    properties: ['data' => new OA\Schema(ref: MetadataProviderResource::class)],
+                )),
+            ),
+            new OA\Response(response: '403', description: 'Forbidden'),
+            new OA\Response(response: '422', description: 'Unknown provider or invalid enabled value'),
+        ],
+    )]
+    #[Route('/providers/{provider}', name: 'provider_update', methods: ['PATCH'])]
+    #[CliCounterpart('app:metadata:provider:set')]
+    public function setProviderEnabled(string $provider, #[MapRequestPayload] SetMetadataProviderEnabledRequest $payload): JsonResponse
+    {
+        $id = MetadataProvider::tryFrom($provider)
+            ?? throw new InvalidInputException('Unknown metadata provider.', ['provider' => $provider]);
+        $this->bus->dispatch(new UpdateSystemSettingsCommand([$id->settingKey() => $payload->enabled]));
+
+        return $this->successResponse($this->metadataAdmin->getProvider($id));
     }
 }
