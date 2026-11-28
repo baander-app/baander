@@ -291,17 +291,25 @@ The entries below cover scanning, matching, member playback and their verificati
   The public site build generated 304 manual pages and 332 HTML files. All
   378 Chromium cases, 76 design token tests and 35 renderer tests passed.
   The guide links to the clock tolerance setting and retains the design system
-  navigation. The local
-  build instructions now install the website builder’s Composer dependencies
-  with the same command as the website workflow.
+  navigation. The local build instructions now use the same Composer install
+  command as the website workflow.
 - The full U8 run counted 15,653 tests and 156,814 assertions, with two
   errors and four failures. U9 corrected the ingest, playback access,
   workload and log-retention fixtures, and U13 corrected the sleep test’s
   signal timer.
 
+The [published video matching guide](https://baander.app/docs/operator-guide/media/video-matching/)
+includes the progress clock setting. The site uses the CI archive from
+`b67344508`, verified against SHA-256
+`1aae5327ef1e02fe43b82e09f4f93729f646faa517afd834612c2bcc2e549443`.
+The preview and public site both passed browser checks for the guide’s source
+revision, manual links, search, the design system, the theme switch, mobile
+navigation and HTTP 404. [Website CI](https://github.com/baander-app/baander/actions/runs/46170300921) and
+[Vercel deployment](https://vercel.com/martin-juuls-projects/baander/DSrgTPnhb93TSo3CkaEHT6mYYpFJ).
+
 ## Website design system section, 2026-11-27
 
-The 2026-11-28 production deployment serves the website from `841a82782` at
+The earlier 2026-11-28 deployment served the website from `841a82782` at
 [baander.app](https://baander.app). The release built 297 manual pages and
 passed 76 design-token checks, 35 rendering checks and all 378 Chromium tests.
 The deployed CI archive’s SHA-256 is
