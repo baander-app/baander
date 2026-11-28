@@ -34,6 +34,12 @@ Chromium and Firefox playback and admin cases passed with retries disabled.
 The fresh database applied 62 migrations, and both fresh and upgraded preview
 databases passed schema validation.
 
+On November 28, the development controller initialized the persistent instance
+at `455808baa`. It had no existing database registered. All 62 migrations
+applied through `Version20261128160000`, and Doctrine validated the schema.
+The Movies and Music scans processed 2 and 77 files respectively, with none
+skipped. The catalog contained 2 movies, 5 albums and 77 songs.
+
 The owner accepted the focused checks and merged release for U4, U5, U12–U16,
 U22 and U23. The nine historical replays were cancelled. U19 and U11 did run.
 Their failures were in tests corrected in `cb6ba9ba1` and verified on the
