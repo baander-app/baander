@@ -22,6 +22,7 @@ use App\Shared\Application\Exception\NotFoundException;
 use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
 use DateTimeImmutable;
+use Doctrine\DBAL\ArrayParameterType;
 use Doctrine\ORM\EntityManagerInterface;
 use Doctrine\ORM\Query;
 use InvalidArgumentException;
@@ -146,14 +147,47 @@ final readonly class TvCatalogRepository implements TvCatalogRepositoryInterface
             ->findBy(['movie' => $movieId], ['sortOrder' => 'ASC', 'id' => 'ASC']));
     }
 
+    public function latestAssignedPlacementBySeriesAtPath(Uuid $seriesId, string $relativePath): ?VideoPlacement
+    {
+        return $this->latestAssignedPlacementAtPath('series', $seriesId, $relativePath);
+    }
+
+    public function latestAssignedPlacementByMovieAtPath(Uuid $movieId, string $relativePath): ?VideoPlacement
+    {
+        return $this->latestAssignedPlacementAtPath('movie', $movieId, $relativePath);
+    }
+
+    public function unassignedPlacementsByEpisodes(Uuid $seriesId, array $episodeIds): array
+    {
+        if ($episodeIds === []) {
+            return [];
+        }
+        $entities = $this->manager->createQueryBuilder()
+            ->select('DISTINCT placement')
+            ->from(VideoPlacementEntity::class, 'placement')
+            ->join('placement.episodes', 'link')
+            ->where('IDENTITY(placement.series) = :series')
+            ->andWhere('placement.assigned = false')
+            ->andWhere('IDENTITY(link.episode) IN (:episodes)')
+            ->setParameter('series', $seriesId, 'uuid')
+            ->setParameter('episodes', array_map(static fn (Uuid $id): string => $id->toString(), $episodeIds), ArrayParameterType::STRING)
+            ->orderBy('placement.sortOrder', 'ASC')
+            ->addOrderBy('placement.id', 'ASC')
+            ->getQuery()
+            ->getResult();
+
+        return $this->placementModels($entities);
+    }
+
     public function saveSeries(TvSeries $series): void
     {
         $state = $series->getState();
         $entity = $this->manager->find(TvSeriesEntity::class, $state->id);
         if ($entity === null) {
             $entity = new TvSeriesEntity($this->required(LibraryEntity::class, $state->libraryId), $state);
+        } else {
+            $entity->apply($state);
         }
-        $entity->apply($state);
         $this->manager->persist($entity);
     }
 
@@ -163,8 +197,9 @@ final readonly class TvCatalogRepository implements TvCatalogRepositoryInterface
         $entity = $this->manager->find(TvSeasonEntity::class, $state->id);
         if ($entity === null) {
             $entity = new TvSeasonEntity($this->required(TvSeriesEntity::class, $state->seriesId), $state);
+        } else {
+            $entity->apply($state);
         }
-        $entity->apply($state);
         $this->manager->persist($entity);
     }
 
@@ -179,9 +214,10 @@ final readonly class TvCatalogRepository implements TvCatalogRepositoryInterface
         $entity = $this->manager->find(TvEpisodeEntity::class, $state->id);
         if ($entity === null) {
             $entity = new TvEpisodeEntity($series, $season, $state);
+        } else {
+            $entity->season = $season;
+            $entity->apply($state);
         }
-        $entity->season = $season;
-        $entity->apply($state);
         $this->manager->persist($entity);
     }
 
@@ -262,6 +298,30 @@ final readonly class TvCatalogRepository implements TvCatalogRepositoryInterface
     {
         return $this->manager->find($class, $id)
             ?? throw new NotFoundException('The video catalog parent was removed before import.');
+    }
+
+    private function latestAssignedPlacementAtPath(string $owner, Uuid $ownerId, string $relativePath): ?VideoPlacement
+    {
+        $entity = $this->manager->createQueryBuilder()
+            ->select('placement')
+            ->from(VideoPlacementEntity::class, 'placement')
+            ->where('IDENTITY(placement.' . $owner . ') = :owner')
+            ->andWhere('placement.relativePath = :path')
+            ->andWhere('placement.assigned = true')
+            ->setParameter('owner', $ownerId, 'uuid')
+            ->setParameter('path', $relativePath)
+            ->orderBy('placement.createdAt', 'DESC')
+            ->addOrderBy('placement.sortOrder', 'ASC')
+            ->addOrderBy('placement.id', 'ASC')
+            ->setMaxResults(1)
+            ->getQuery()
+            ->getOneOrNullResult();
+        if (!$entity instanceof VideoPlacementEntity) {
+            return null;
+        }
+        $this->manager->refresh($entity);
+
+        return VideoPlacement::reconstitute($entity->state());
     }
 
     /** @param list<TvEpisodeEntity> $entities

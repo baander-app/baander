@@ -39,7 +39,7 @@ final readonly class TvLibraryIngest
      * videos whose observations are under different folders or libraries.
      *
      * @param list<DiscoveredFile> $files
-     * @return array<string, string>
+     * @return array<string, Uuid>
      */
     public function prepareBatch(Uuid $library, array $files): array
     {
@@ -61,16 +61,17 @@ final readonly class TvLibraryIngest
             if ($placement === null || $this->isDuplicate($placement, $file)) {
                 continue;
             }
-            $series = $this->catalog->findSeriesByVideo($library, $video->getId());
+            $seriesId = $placement->getSeriesId();
+            $series = $seriesId === null ? null : $this->catalog->findSeriesByUuid($seriesId);
             if ($series !== null) {
-                $known[$this->folder($this->parser->parse($file->relativePath))] = $series->getId()->toString();
+                $known[$this->folder($this->parser->parse($file->relativePath))] = $series->getId();
             }
         }
 
         return $known;
     }
 
-    /** @param array<string, string> $known */
+    /** @param array<string, Uuid> $known */
     public function ingestFile(Uuid $library, DiscoveredFile $file, Video $video, array $known): void
     {
         $name = $this->parser->parse($file->relativePath);
@@ -82,8 +83,9 @@ final readonly class TvLibraryIngest
             return;
         }
 
-        $series = isset($known[$folder]) ? $this->catalog->findSeriesByUuid(Uuid::fromString($known[$folder])) : null;
-        $series ??= $this->catalog->findSeriesByVideo($library, $video->getId())
+        $series = isset($known[$folder]) ? $this->catalog->findSeriesByUuid($known[$folder]) : null;
+        $existingSeriesId = $existing?->getSeriesId();
+        $series ??= ($existingSeriesId === null ? null : $this->catalog->findSeriesByUuid($existingSeriesId))
             ?? $this->catalog->findSeriesByFolder($library, $folder);
         if ($series === null) {
             $series = TvSeries::create($library, $folder, $name->title, $name->year);
@@ -134,18 +136,13 @@ final readonly class TvLibraryIngest
         $episodeIds = array_map(static fn (TvEpisode $episode): Uuid => $episode->getId(), $episodes);
         $route = $this->route($name->jsonSerialize());
         $collision = false;
-        foreach ($this->catalog->placementsBySeries($series->getId()) as $other) {
-            if ($other->isAssigned() || $this->route($other->getRawParse()) === $route) {
+        foreach ($this->catalog->unassignedPlacementsByEpisodes($series->getId(), $episodeIds) as $other) {
+            if ($this->route($other->getRawParse()) === $route) {
                 continue;
             }
-            foreach ($episodeIds as $episodeId) {
-                if (array_any($other->getEpisodeIds(), $episodeId->equals(...))) {
-                    $other->review('episode_collision');
-                    $this->catalog->savePlacement($other);
-                    $collision = true;
-                    break;
-                }
-            }
+            $other->review('episode_collision');
+            $this->catalog->savePlacement($other);
+            $collision = true;
         }
         if ($collision) {
             $placement->review('episode_collision');
@@ -301,15 +298,7 @@ final readonly class TvLibraryIngest
 
     private function replacedAssignment(TvSeries $series, DiscoveredFile $file): ?VideoPlacement
     {
-        $latest = null;
-        foreach ($this->catalog->placementsBySeries($series->getId()) as $placement) {
-            if (!$placement->isAssigned() || $placement->getRelativePath() !== $file->relativePath) {
-                continue;
-            }
-            if ($latest === null || $placement->getState()->createdAt > $latest->getState()->createdAt) {
-                $latest = $placement;
-            }
-        }
+        $latest = $this->catalog->latestAssignedPlacementBySeriesAtPath($series->getId(), $file->relativePath);
         if ($latest === null) {
             return null;
         }

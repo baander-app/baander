@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace App\Tests\Unit\Catalog\Infrastructure;
 
 use App\Catalog\Domain\Model\Video;
+use App\Catalog\Application\Port\VideoAvailabilityPortInterface;
+use App\Catalog\Domain\ReadModel\VideoPlacementPath;
 use App\Catalog\Domain\Repository\VideoRepositoryInterface;
 use App\Catalog\Infrastructure\VideoService;
 use App\Library\Application\Port\LibraryMediaFileResolverInterface;
@@ -23,11 +25,11 @@ final class VideoServiceTest extends TestCase
         $files = $this->createMock(LibraryMediaFileResolverInterface::class);
         $id = new PublicId();
         $scope = LibraryReadScope::none();
-        $videos->expects(self::once())->method('getLibraryIdsByPublicId')->with($id, $scope)->willReturn([]);
+        $videos->expects(self::once())->method('isVisibleByPublicId')->with($id, $scope)->willReturn(false);
         $videos->expects(self::never())->method('findByPublicId');
         $files->expects(self::never())->method('resolve');
 
-        self::assertNull(new VideoService($videos, $files)->getSourceMetadata($id, $scope));
+        self::assertNull(new VideoService($videos, $files, $this->createStub(VideoAvailabilityPortInterface::class))->getSourceMetadata($id, $scope));
     }
 
     public function testSourceRequiresConfinementWithinOneOfItsScopedLibraries(): void
@@ -36,12 +38,12 @@ final class VideoServiceTest extends TestCase
         $files = $this->createMock(LibraryMediaFileResolverInterface::class);
         $video = Video::create('/outside/video.mkv', 'source-hash');
         $library = new Uuid();
-        $videos->method('getLibraryIdsByPublicId')->willReturn([$library]);
+        $videos->method('isVisibleByPublicId')->willReturn(true);
         $videos->method('findByPublicId')->willReturn($video);
         $files->expects(self::once())->method('resolve')->with($library, '/outside/video.mkv')
             ->willThrowException(new InvalidArgumentException('Path is outside library.'));
 
-        self::assertNull(new VideoService($videos, $files)->getSourceMetadata($video->getPublicId(), LibraryReadScope::restricted([$library])));
+        self::assertNull(new VideoService($videos, $files, $this->availability($video, [$library]))->getSourceMetadata($video->getPublicId(), LibraryReadScope::restricted([$library])));
     }
 
     /** @return iterable<string, array{string, array<string, mixed>, string}> */
@@ -79,11 +81,12 @@ final class VideoServiceTest extends TestCase
             if ($probe !== []) {
                 $video->updateProbe($probe);
             }
-            $videos->method('getLibraryIdsByPublicId')->willReturn([new Uuid()]);
+            $library = new Uuid();
+            $videos->method('isVisibleByPublicId')->willReturn(true);
             $videos->method('findByPublicId')->willReturn($video);
             $files->method('resolve')->willReturn($path);
 
-            $source = new VideoService($videos, $files)->getSourceMetadata($video->getPublicId(), LibraryReadScope::unrestricted());
+            $source = new VideoService($videos, $files, $this->availability($video, [$library]))->getSourceMetadata($video->getPublicId(), LibraryReadScope::unrestricted());
 
             self::assertNotNull($source);
             self::assertSame($type, $source->mimeType);
@@ -112,7 +115,7 @@ final class VideoServiceTest extends TestCase
             ]);
             $first = new Uuid();
             $second = new Uuid();
-            $videos->method('getLibraryIdsByPublicId')->willReturn([$first, $second]);
+            $videos->method('isVisibleByPublicId')->willReturn(true);
             $videos->method('findByPublicId')->willReturn($video);
             $files->expects(self::exactly(2))->method('resolve')->willReturnCallback(
                 static function (Uuid $library, string $source) use ($first, $path): string {
@@ -124,7 +127,7 @@ final class VideoServiceTest extends TestCase
                 },
             );
 
-            $source = new VideoService($videos, $files)->getSourceMetadata($video->getPublicId(), LibraryReadScope::restricted([$first, $second]));
+            $source = new VideoService($videos, $files, $this->availability($video, [$first, $second]))->getSourceMetadata($video->getPublicId(), LibraryReadScope::restricted([$first, $second]));
             self::assertNotNull($source);
             self::assertSame($path, $source->filePath);
             self::assertSame(6, $source->size);
@@ -140,5 +143,17 @@ final class VideoServiceTest extends TestCase
         } finally {
             unlink($path);
         }
+    }
+    /** @param list<Uuid> $libraries */
+    private function availability(Video $video, array $libraries): VideoAvailabilityPortInterface
+    {
+        $availability = $this->createStub(VideoAvailabilityPortInterface::class);
+        $paths = array_map(
+            static fn (Uuid $library): VideoPlacementPath => new VideoPlacementPath($video->getId(), $library, $video->getPath(), $video->getHash()),
+            $libraries,
+        );
+        $availability->method('availablePaths')->willReturn([$video->getId()->toString() => $paths]);
+
+        return $availability;
     }
 }

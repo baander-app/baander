@@ -48,7 +48,7 @@ final class MovieScanner
 
         $mediaFiles = $this->directoryScanner->scan($library->getPath(), static function () use ($lease): void {
             $lease?->renew();
-        });
+        }, unreadableRootIsEmpty: true);
         $lease?->renew();
         $videoAndSidecarFiles = array_filter($mediaFiles, fn (MediaFile $f) => $f->isVideo() || $f->isVideoSidecar());
         $filesDiscovered = count($videoAndSidecarFiles);
@@ -65,7 +65,6 @@ final class MovieScanner
             ? []
             : $this->fileIndexRepository->findAvailableIndexPathMapByLibrary($library->getId());
 
-        // Each directory commits its observations and publication together.
         $filesByDirectory = [];
         foreach ($videoAndSidecarFiles as $file) {
             $filesByDirectory[dirname($file->getAbsolutePath())][] = $file;

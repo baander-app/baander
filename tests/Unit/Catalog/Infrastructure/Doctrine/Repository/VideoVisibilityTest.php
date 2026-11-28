@@ -24,6 +24,8 @@ final class VideoVisibilityTest extends TestCase
         $this->connection->executeStatement('CREATE TABLE videos (id TEXT PRIMARY KEY, public_id TEXT UNIQUE NOT NULL)');
         $this->connection->executeStatement('CREATE TABLE movies (id TEXT PRIMARY KEY, library_id TEXT)');
         $this->connection->executeStatement('CREATE TABLE movie_video (movie_id TEXT NOT NULL, video_id TEXT NOT NULL)');
+        $this->connection->executeStatement('CREATE TABLE video_placements (id TEXT PRIMARY KEY, library_id TEXT, video_id TEXT, movie_id TEXT, extra_kind TEXT)');
+        $this->connection->executeStatement('CREATE TABLE video_placement_episode (placement_id TEXT, episode_id TEXT)');
         $em = $this->createStub(EntityManagerInterface::class);
         $em->method('getConnection')->willReturn($this->connection);
         $this->videos = new VideoRepository($em);
@@ -62,6 +64,24 @@ final class VideoVisibilityTest extends TestCase
         $this->linkMovie($video, null);
         self::assertFalse($this->videos->isVisibleByPublicId($video, LibraryReadScope::restricted([new Uuid()])));
         self::assertTrue($this->videos->isVisibleByPublicId($video, LibraryReadScope::unrestricted()));
+    }
+
+    public function testEpisodeAndExtraPlacementsGrantOnlyTheirLibraryAccess(): void
+    {
+        $video = $this->addVideo();
+        $library = new Uuid();
+        $id = new Uuid()->toString();
+        $videoId = $this->connection->fetchOne('SELECT id FROM videos WHERE public_id = ?', [$video->toString()]);
+        $this->connection->insert('video_placements', ['id' => $id, 'library_id' => $library->toString(), 'video_id' => $videoId]);
+        $scope = LibraryReadScope::restricted([$library]);
+        self::assertFalse($this->videos->isVisibleByPublicId($video, $scope));
+        $this->connection->insert('video_placement_episode', ['placement_id' => $id, 'episode_id' => new Uuid()->toString()]);
+        self::assertTrue($this->videos->isVisibleByPublicId($video, $scope));
+        self::assertEquals([$library], $this->videos->getLibraryIdsByPublicId($video, $scope));
+        self::assertFalse($this->videos->isVisibleByPublicId($video, LibraryReadScope::restricted([new Uuid()])));
+        $this->connection->executeStatement('DELETE FROM video_placement_episode');
+        $this->connection->update('video_placements', ['extra_kind' => 'trailer'], ['id' => $id]);
+        self::assertTrue($this->videos->isVisibleByPublicId($video, $scope));
     }
 
     private function addVideo(): PublicId

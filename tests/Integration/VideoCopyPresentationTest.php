@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace App\Tests\Integration;
 
 use App\Catalog\Domain\Model\Video;
+use App\Catalog\Application\Port\VideoAvailabilityPortInterface;
+use App\Catalog\Domain\ReadModel\VideoPlacementPath;
 use App\Catalog\Domain\Repository\VideoRepositoryInterface;
 use App\Catalog\Infrastructure\VideoService;
 use App\Library\Domain\Model\Library;
@@ -94,11 +96,16 @@ final class VideoCopyPresentationTest extends TestCase
             $rows = $this->createStub(VideoRepositoryInterface::class);
             $rows->method('findByUuid')->willReturn($video);
             $rows->method('findByPublicId')->willReturn($video);
-            $rows->method('getLibraryIdsByPublicId')->willReturn([Uuid::generate()]);
+            $libraryId = Uuid::generate();
+            $rows->method('isVisibleByPublicId')->willReturn(true);
             $libraries = $this->createStub(LibraryRepositoryInterface::class);
             $libraries->method('findByUuid')->willReturn(Library::create('Copied films', new LibrarySlug('copied-films'),
                 new LibraryPath($root), LibraryType::Movie, FilesystemType::Local));
-            $videos = new VideoService($rows, new LibraryMediaFileResolver($libraries));
+            $availability = $this->createStub(VideoAvailabilityPortInterface::class);
+            $availability->method('availablePaths')->willReturn([
+                $video->getId()->toString() => [new VideoPlacementPath($video->getId(), $libraryId, $video->getPath(), $video->getHash())],
+            ]);
+            $videos = new VideoService($rows, new LibraryMediaFileResolver($libraries), $availability);
             $ownership = $this->createStub(TranscodeExecutionOwnershipPort::class);
             $ownership->method('refresh')->willReturnCallback(static function () use (&$claim): TranscodeExecutionClaim { return $claim; });
             $ownership->method('renew')->willReturn(true);

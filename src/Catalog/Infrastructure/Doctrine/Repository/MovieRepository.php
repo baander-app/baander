@@ -12,6 +12,7 @@ use App\Catalog\Infrastructure\Doctrine\Entity\MoviePersonCreditEntity;
 use App\Catalog\Infrastructure\Doctrine\Entity\MoviePersonCreditStateEntity;
 use App\Catalog\Infrastructure\Doctrine\Entity\MovieVideoEntity;
 use App\Catalog\Infrastructure\Doctrine\Entity\VideoEntity;
+use App\Catalog\Infrastructure\Doctrine\Entity\VideoPlacementEntity;
 use App\Catalog\Infrastructure\Doctrine\Query\CatalogReadScopeQuery;
 use App\Library\Infrastructure\Doctrine\Entity\LibraryEntity;
 use App\Shared\Domain\Model\PublicId;
@@ -353,10 +354,15 @@ final class MovieRepository implements MovieRepositoryInterface
         $this->entityManager->remove($entity);
         $this->entityManager->flush();
 
-        // The database deletes the movie's video and person credit links (ON DELETE CASCADE). A link this manager
-        // still holds would point at the deleted movie and fail the next flush that writes anything.
+        // ON DELETE CASCADE removes these rows behind the Unit of Work.
+        $managed = $this->entityManager->getUnitOfWork()->getIdentityMap();
+        foreach ($managed[VideoPlacementEntity::class] ?? [] as $placement) {
+            if ($placement->movie === $entity) {
+                $this->entityManager->detach($placement);
+            }
+        }
         foreach ([MovieVideoEntity::class, MoviePersonCreditEntity::class, MoviePersonCreditStateEntity::class] as $linkClass) {
-            foreach ($this->entityManager->getUnitOfWork()->getIdentityMap()[$linkClass] ?? [] as $link) {
+            foreach ($managed[$linkClass] ?? [] as $link) {
                 if ($link->getMovie() === $entity) {
                     $this->entityManager->detach($link);
                 }

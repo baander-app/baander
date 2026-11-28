@@ -6,6 +6,7 @@ namespace App\Catalog\Infrastructure;
 
 use App\Catalog\Application\Dto\VideoSourceMetadata;
 use App\Catalog\Application\Port\VideoPortInterface;
+use App\Catalog\Application\Port\VideoAvailabilityPortInterface;
 use App\Catalog\Domain\Model\Video;
 use App\Catalog\Domain\Repository\VideoRepositoryInterface;
 use App\Library\Application\Port\LibraryMediaFileResolverInterface;
@@ -21,12 +22,12 @@ final readonly class VideoService implements VideoPortInterface
     public function __construct(
         private VideoRepositoryInterface $videos,
         private LibraryMediaFileResolverInterface $mediaFiles,
+        private VideoAvailabilityPortInterface $availability,
     ) {}
 
     public function getSourceMetadata(PublicId $publicId, LibraryReadScope $scope): ?VideoSourceMetadata
     {
-        $libraries = $this->videos->getLibraryIdsByPublicId($publicId, $scope);
-        if ($libraries === []) {
+        if (!$this->videos->isVisibleByPublicId($publicId, $scope)) {
             return null;
         }
         $video = $this->videos->findByPublicId($publicId);
@@ -34,15 +35,16 @@ final readonly class VideoService implements VideoPortInterface
             return null;
         }
 
-        foreach ($libraries as $library) {
+        $paths = $this->availability->availablePaths([$video->getId()], $scope);
+        foreach ($paths[$video->getId()->toString()] ?? [] as $placement) {
             try {
-                $path = $this->mediaFiles->resolve($library, $video->getPath());
+                $path = $this->mediaFiles->resolve($placement->libraryId, $placement->absolutePath);
             } catch (InvalidArgumentException) {
                 continue;
             }
             $probe = $video->getProbe();
             $size = filesize($path);
-            $filename = basename($video->getPath());
+            $filename = basename($placement->absolutePath);
             $containerFormat = $probe['containerFormat'] ?? null;
 
             return new VideoSourceMetadata(

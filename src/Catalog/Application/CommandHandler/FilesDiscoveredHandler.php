@@ -1166,17 +1166,14 @@ final class FilesDiscoveredHandler
             static fn (DiscoveredFile $file): bool => $file->isVideo() && $ingest->accepts($file),
         ) |> array_values(...);
         foreach (array_chunk($videoFiles, self::BATCH_SIZE) as $batch) {
-            $known = [];
             $result = $this->videoFileIngest->importBatch(
                 $library,
                 $batch,
-                static function (DiscoveredFile $file, Video $video) use ($ingest, $library, &$known): void {
+                static fn (array $files): array => $ingest->prepareBatch($library, $files),
+                static function (DiscoveredFile $file, Video $video, array $known) use ($ingest, $library): void {
                     $ingest->ingestFile($library, $file, $video, $known);
                 },
                 $ingest->flush(...),
-                static function (array $files) use ($ingest, $library, &$known): void {
-                    $known = $ingest->prepareBatch($library, $files);
-                },
             );
             array_push($failures, ...$result['failures']);
             $written = $result['writtenPaths'];

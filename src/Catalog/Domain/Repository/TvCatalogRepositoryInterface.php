@@ -46,6 +46,15 @@ interface TvCatalogRepositoryInterface
     /** @return list<VideoPlacement> */
     public function placementsByMovie(Uuid $movieId): array;
 
+    public function latestAssignedPlacementBySeriesAtPath(Uuid $seriesId, string $relativePath): ?VideoPlacement;
+
+    public function latestAssignedPlacementByMovieAtPath(Uuid $movieId, string $relativePath): ?VideoPlacement;
+
+    /** @param list<Uuid> $episodeIds
+     * @return list<VideoPlacement>
+     */
+    public function unassignedPlacementsByEpisodes(Uuid $seriesId, array $episodeIds): array;
+
     public function saveSeries(TvSeries $series): void;
 
     public function saveSeason(TvSeason $season): void;

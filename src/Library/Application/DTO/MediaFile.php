@@ -45,7 +45,12 @@ final readonly class MediaFile
 
     public function isVideoSidecar(): bool
     {
-        return in_array($this->extension, ['nfo', 'jpg', 'jpeg', 'png', 'webp'], true);
+        return self::isVideoSidecarExtension($this->extension);
+    }
+
+    public static function isVideoSidecarExtension(string $extension): bool
+    {
+        return in_array($extension, ['nfo', 'jpg', 'jpeg', 'png', 'webp'], true);
     }
 
     public function isAudio(): bool

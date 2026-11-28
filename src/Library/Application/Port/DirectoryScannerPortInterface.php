@@ -14,5 +14,5 @@ interface DirectoryScannerPortInterface
      * @param (Closure(): void)|null $checkpoint Called for each visited entry, including directories.
      * @return MediaFile[]
      */
-    public function scan(LibraryPath $path, ?Closure $checkpoint = null): array;
+    public function scan(LibraryPath $path, ?Closure $checkpoint = null, bool $unreadableRootIsEmpty = false): array;
 }

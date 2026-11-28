@@ -26,7 +26,7 @@ final class LibraryDiscoveryObservationRace
         $directory = new class ($paths) implements DirectoryScannerPortInterface {
             /** @param list<string> $paths */
             public function __construct(private array $paths) {}
-            public function scan(LibraryPath $path, ?\Closure $checkpoint = null): array
+            public function scan(LibraryPath $path, ?\Closure $checkpoint = null, bool $unreadableRootIsEmpty = false): array
             {
                 return array_map(static fn(string $file): MediaFile => new MediaFile($file, basename($file), pathinfo($file, PATHINFO_EXTENSION), (int) filesize($file), (int) filemtime($file)), $this->paths);
             }

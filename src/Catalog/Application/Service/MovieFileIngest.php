@@ -34,7 +34,7 @@ final readonly class MovieFileIngest
 
     /**
      * @param list<DiscoveredFile> $files Current observations locked by the caller.
-     * @return array<string, string> Existing movie IDs by the folder identity now observed.
+     * @return array<string, Uuid> Existing movie IDs by the folder identity now observed.
      */
     public function prepareBatch(Uuid $libraryId, array $files): array
     {
@@ -58,14 +58,14 @@ final readonly class MovieFileIngest
                 && !$this->isDuplicate($libraryId, $placement, $file, $video, $this->libraryRoot($file))
             ) {
                 $identity = $this->folderIdentity($file, $this->names->parse($file->relativePath));
-                $owners[$identity] = $movieId->toString();
+                $owners[$identity] = $movieId;
             }
         }
 
         return $owners;
     }
 
-    /** @param array<string, string> $context Existing movie IDs by observed folder identity. */
+    /** @param array<string, Uuid> $context Existing movie IDs by observed folder identity. */
     public function ingestFile(Uuid $libraryId, DiscoveredFile $file, Video $video, array $context): void
     {
         $name = $this->names->parse($file->relativePath);
@@ -77,7 +77,7 @@ final readonly class MovieFileIngest
         $movieId = $placement?->getMovieId();
         $movie = $movieId === null ? null : $this->movies->findByUuid($movieId);
         if ($movie === null && isset($context[$identity])) {
-            $movie = $this->movies->findByUuid(Uuid::fromString($context[$identity]));
+            $movie = $this->movies->findByUuid($context[$identity]);
         }
         $movie ??= $this->movies->findByPlacementFolder($libraryId, $identity);
         if ($movie === null) {
@@ -211,15 +211,7 @@ final readonly class MovieFileIngest
 
     private function preserveReplacementAssignment(Movie $movie, VideoPlacement $placement, DiscoveredFile $file): void
     {
-        $latest = null;
-        foreach ($this->placements->placementsByMovie($movie->getId()) as $previous) {
-            if (!$previous->isAssigned() || $previous->getRelativePath() !== $file->relativePath) {
-                continue;
-            }
-            if ($latest === null || $previous->getState()->createdAt > $latest->getState()->createdAt) {
-                $latest = $previous;
-            }
-        }
+        $latest = $this->placements->latestAssignedPlacementByMovieAtPath($movie->getId(), $file->relativePath);
         if ($latest === null) {
             return;
         }

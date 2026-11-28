@@ -779,6 +779,8 @@ services:
         alias: App\Catalog\Infrastructure\Doctrine\Query\MatchReviewReadQuery
     App\Catalog\Application\Port\SongAvailabilityPortInterface:
         alias: App\Catalog\Infrastructure\SongAvailability
+    App\Catalog\Application\Port\VideoAvailabilityPortInterface:
+        alias: App\Catalog\Infrastructure\VideoAvailability
     App\Catalog\Application\Port\SongPortInterface:
         alias: App\Catalog\Infrastructure\SongService
     App\Catalog\Application\Port\SongLookupInterface:

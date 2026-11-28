@@ -104,6 +104,8 @@ final class PlaybackVideoFixture
             'path' => $mediaDirectory . '/owned.' . $extension,
         ];
         $manifest['movieVideoId'] = (string) new Uuid();
+        $manifest['videoPlacementId'] = (string) new Uuid();
+        $manifest['videoIndexId'] = (string) new Uuid();
         // Persist exact ownership before creating files or rows, including failed runs.
         $this->save($run, $manifest);
         if ($cinema) {
@@ -165,6 +167,24 @@ final class PlaybackVideoFixture
             $this->connection->insert('movie_video', [
                 'id' => $manifest['movieVideoId'], 'movie_id' => $manifest['movie']['id'],
                 'video_id' => $manifest['video']['id'], 'sort_order' => 0,
+            ]);
+            $libraryPath = $this->connection->fetchOne('SELECT path FROM libraries WHERE id = ?', [$manifest['library']['id']]);
+            if (!is_string($libraryPath) || !str_starts_with($manifest['video']['path'], rtrim($libraryPath, '/') . '/')) {
+                throw new RuntimeException('The fixture video must be inside its library.');
+            }
+            $this->connection->insert('video_placements', [
+                'id' => $manifest['videoPlacementId'], 'public_id' => (string) new PublicId(),
+                'library_id' => $manifest['library']['id'], 'video_id' => $manifest['video']['id'],
+                'movie_id' => $manifest['movie']['id'],
+                'relative_path' => substr($manifest['video']['path'], strlen(rtrim($libraryPath, '/')) + 1),
+                'raw_parse' => '[]', 'created_at' => $now,
+            ]);
+            $this->connection->insert('library_file_index', [
+                'id' => $manifest['videoIndexId'], 'library_id' => $manifest['library']['id'],
+                'path' => $manifest['video']['path'], 'hash' => $hash,
+                'size' => (int) filesize($manifest['video']['path']),
+                'extension' => pathinfo($manifest['video']['path'], PATHINFO_EXTENSION),
+                'modified_at' => (int) filemtime($manifest['video']['path']), 'discovered_at' => $now,
             ]);
         });
         if ($directors) {
@@ -490,6 +510,9 @@ SQL, ['video' => $videoId]);
                 );
                 if ($live > 0) {
                     throw new RuntimeException('An owned encoder reclaimed work during cleanup; manifest retained.');
+                }
+                if (isset($manifest['videoIndexId'])) {
+                    $this->connection->delete('library_file_index', ['id' => $manifest['videoIndexId']]);
                 }
                 $this->connection->delete('movie_video', ['id' => $manifest['movieVideoId']]);
                 $this->connection->delete('movies', ['id' => $manifest['movie']['id']]);

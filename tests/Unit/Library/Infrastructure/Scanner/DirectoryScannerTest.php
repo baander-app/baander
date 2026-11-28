@@ -7,6 +7,7 @@ namespace App\Tests\Unit\Library\Infrastructure\Scanner;
 use App\Library\Domain\ValueObject\LibraryPath;
 use App\Library\Infrastructure\Scanner\DirectoryScanner;
 use App\Library\Application\DTO\MediaFile;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\AbstractLogger;
 use Stringable;
@@ -33,6 +34,41 @@ final class DirectoryScannerTest extends TestCase
     protected function tearDown(): void
     {
         new Filesystem()->remove($this->directory);
+    }
+
+    /** @return iterable<string, array{bool, bool, bool}> */
+    public static function inaccessibleDirectories(): iterable
+    {
+        yield 'unreadable video root' => [true, true, true];
+        yield 'unreadable music root' => [false, true, false];
+        yield 'unreadable directory below a video root' => [true, false, false];
+    }
+
+    #[DataProvider('inaccessibleDirectories')]
+    public function testOnlyAnUnreadableVideoRootScansAsEmpty(bool $video, bool $root, bool $empty): void
+    {
+        $scanner = new DirectoryScanner($this->logger);
+        $path = new LibraryPath($this->root);
+        chmod($this->directory, 0711);
+        chmod($this->root . '/album', 0000);
+        chmod($this->root, $root ? 0000 : 0755);
+        $uid = posix_geteuid();
+        if (!$empty) {
+            $this->expectException(\UnexpectedValueException::class);
+        }
+        try {
+            if ($uid === 0) {
+                self::assertTrue(posix_seteuid(65534));
+            }
+            $files = $scanner->scan($path, unreadableRootIsEmpty: $video);
+        } finally {
+            if ($uid === 0) {
+                posix_seteuid($uid);
+            }
+            chmod($this->root, 0700);
+            chmod($this->root . '/album', 0700);
+        }
+        self::assertSame([], $files);
     }
 
     public function testALinkWhoseTargetLeavesTheLibraryIsSkippedAndReported(): void

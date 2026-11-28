@@ -674,6 +674,7 @@ Deferred to implementation:
   2. The access checks named in KTD11 accept all three link kinds.
   3. The availability read backs every member listing in U15.
   4. `deleteUnlinked` checks every link table, and the movie delete includes its extras' videos (KTD12).
+  5. If a movie or TV scan cannot open the library root, it records the indexed files as unavailable. A failure partway through traversal preserves their availability. Music scans retain their existing error handling. (session-settled: user-approved)
 - **Patterns to follow:** `src/Catalog/Infrastructure/SongAvailability.php`; the existing non-admin branch of `AuthorizedPlayback::assertAccess`.
 - **Test scenarios:**
   - Covers AE13. A non-admin without access to the TV library is refused on manifest, signing, session start and original delivery for an episode video; with access, all succeed.

@@ -38,17 +38,18 @@ final readonly class VideoFileIngest
      * Probe outside the write transaction, then lock and recheck the indexed observations before linking.
      *
      * @param list<DiscoveredFile> $batch
-     * @param Closure(DiscoveredFile, Video): void $link
+     * @template T
+     * @param Closure(list<DiscoveredFile>): T $prepareLink
+     * @param Closure(DiscoveredFile, Video, T): void $link
      * @param Closure(): void $flush
-     * @param (Closure(list<DiscoveredFile>): void)|null $prepareLink
      * @return VideoBatchImportResult Null paths mean a delete holds the library.
      */
     public function importBatch(
         Uuid $libraryId,
         array $batch,
+        Closure $prepareLink,
         Closure $link,
         Closure $flush,
-        ?Closure $prepareLink = null,
     ): array {
         $prepared = [];
         $refused = [];
@@ -94,9 +95,7 @@ final readonly class VideoFileIngest
                 return [];
             }
 
-            $prepareLink?->__invoke(
-                array_map(static fn (array $entry): DiscoveredFile => $entry['file'], $current) |> array_values(...),
-            );
+            $context = $prepareLink(array_column($current, 'file'));
             $written = [];
             foreach ($current as $entry) {
                 try {
@@ -104,7 +103,7 @@ final readonly class VideoFileIngest
                     if ($video === null) {
                         continue;
                     }
-                    $link($entry['file'], $video);
+                    $link($entry['file'], $video, $context);
                     $written[] = $entry['file']->absolutePath;
                 } catch (Throwable $error) {
                     $failures[] = $this->failure($entry['file'], $error);

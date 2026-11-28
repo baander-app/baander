@@ -95,6 +95,8 @@ final class AdaptiveDeliveryTest extends TestCase
             'CREATE TABLE videos (id TEXT PRIMARY KEY, height INTEGER)',
             'CREATE TABLE movies (id TEXT, library_id TEXT)',
             'CREATE TABLE movie_video (movie_id TEXT, video_id TEXT)',
+            'CREATE TABLE video_placements (id TEXT PRIMARY KEY, library_id TEXT, video_id TEXT, movie_id TEXT, extra_kind TEXT)',
+            'CREATE TABLE video_placement_episode (placement_id TEXT, episode_id TEXT)',
             'CREATE TABLE user_library_access (user_id TEXT, library_id TEXT)',
             'CREATE TABLE transcode_jobs (id TEXT PRIMARY KEY, public_id TEXT, owner_user_id TEXT, video_id TEXT, height INTEGER, status TEXT, request_id TEXT, presentation_selection TEXT)',
             "CREATE TABLE transcode_sessions (id TEXT PRIMARY KEY, public_id TEXT, user_id TEXT, video_id TEXT, job_id TEXT, updated_at TEXT, state TEXT NOT NULL DEFAULT 'active')",
