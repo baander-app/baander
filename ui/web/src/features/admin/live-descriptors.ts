@@ -28,7 +28,21 @@ export const adminLiveDescriptors: readonly LiveQueryDescriptor[] = [
       'admin-album-duplicates',
       'admin-genres',
       'admin-metadata-match-reviews',
+      'admin-metadata-providers',
     ].some(prefix => keyStartsWith(key, prefix)),
+  },
+  {
+    family: 'admin-metadata',
+    refreshPolicy: 'stored',
+    matches: key => keyStartsWith(key, 'admin-video-matches', 'reviews')
+      || (keyStartsWith(key, 'admin-video-matches', 'choices') && (key[4] === 'episodes' || key[4] === 'files'))
+      || firstKeyMatches(key, /^\/api\/admin\/video-matches\/libraries\/[^/]+\/(provider-order|rematch-preview)$/),
+  },
+  {
+    family: 'admin-metadata',
+    refreshPolicy: 'demand',
+    matches: key => keyStartsWith(key, 'admin-video-matches', 'candidates')
+      || (keyStartsWith(key, 'admin-video-matches', 'choices') && key[4] === 'orderings'),
   },
   {
     family: 'admin-metadata',
@@ -48,7 +62,6 @@ export const adminLiveDescriptors: readonly LiveQueryDescriptor[] = [
     family: 'deployment-definitions',
     deploymentFixed: true,
     matches: key => [
-      'admin-metadata-providers',
       'admin-scheduler-commands',
       '/api/admin/settings/definitions',
     ].some(prefix => keyStartsWith(key, prefix)),

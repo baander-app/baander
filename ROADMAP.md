@@ -75,6 +75,10 @@ The entries below cover scanning, matching, member playback and their verificati
   browser receiving a playback handoff retains the opened title and its library
   context. Movie and series pages list playable extras and credit the metadata
   provider.
+- U17 places album and video reviews on the Metadata tab. Admins can switch
+  providers, search and apply a match, choose an ordering or assign a file.
+  Each library has a keyboard-accessible provider order and a re-match preview
+  that counts existing manual decisions before confirmation.
 
 ### Verification
 
@@ -184,6 +188,11 @@ The entries below cover scanning, matching, member playback and their verificati
   10,000-row fixture evaluated each candidate once. The movie search kept its
   previous ranking across a batch boundary, and the credit feeds kept their
   totals and tie order.
+- The integrated web suite passed all 4,014 tests in 341 files after the theme
+  timer was tied to its window. TypeScript and Orval drift checks passed.
+  ESLint reported zero errors and 13 warnings. The Phase D preview migrated
+  a fresh database through `Version20261128140000`, repeated the migration
+  and passed Doctrine mapping and schema validation.
 - The full U8 run counted 15,653 tests and 156,814 assertions, with two
   errors and four failures. U9 corrected the ingest, playback access,
   workload and log-retention fixtures, and U13 corrected the sleep test’s

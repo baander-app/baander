@@ -169,7 +169,10 @@ describe('match review table', () => {
     await user.click(await screen.findByRole('button', { name: 'Match Basement Tapes' }))
 
     expect(onMatchAlbum).toHaveBeenCalledTimes(1)
-    expect(onMatchAlbum).toHaveBeenCalledWith(expect.objectContaining({ albumPublicId: 'album-unknown', title: 'Basement Tapes' }))
+    expect(onMatchAlbum).toHaveBeenCalledWith(
+      expect.objectContaining({ albumPublicId: 'album-unknown', title: 'Basement Tapes' }),
+      screen.getByRole('button', { name: 'Match Basement Tapes' }),
+    )
   })
 
   it('reads the list under one stored admin-metadata live descriptor', async () => {

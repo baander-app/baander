@@ -1,11 +1,24 @@
+import { useId, useRef, useState } from 'react'
 import styled from 'styled-components'
 import { textRole } from '@/shared/theme'
-import { useMetadataSyncStatus, useMetadataProviders, useTriggerMetadataSync, useTriggerGenreSync } from '../hooks/use-metadata-admin'
+import {
+  useMetadataSyncStatus,
+  useMetadataProviders,
+  useSetMetadataProviderEnabled,
+  useTriggerMetadataSync,
+  useTriggerGenreSync,
+} from '../hooks/use-metadata-admin'
 import { useGenres } from '../hooks/use-genre-admin'
-import { useAuthStore } from '@/features/auth/stores/auth-store'
+import { useAdminCheck } from '@/features/auth/hooks/use-admin-check'
 import { Database, RefreshCw, CheckCircle2, XCircle, Clock, AlertTriangle, Tags } from 'lucide-react'
 import { Button } from '@/shared/components/ui/button'
+import { Switch } from '@/shared/components/ui/switch'
 import { StatCard } from '@/shared/components/stat-card'
+import { MusicBrainzMatchDialog } from '@/features/catalog/components/metadata/MusicBrainzMatchDialog'
+import { MatchReviewTable } from '../components/matching/MatchReviewTable'
+import { VideoMatchReviewTable } from '../components/matching/VideoMatchReviewTable'
+import type { MatchReview } from '../api/match-reviews-api'
+import type { MetadataProvider } from '../api/metadata-admin-api'
 
 const Container = styled.div`
   display: flex;
@@ -80,8 +93,10 @@ const StatNum = styled.span`
 
 const ConfigRow = styled.div`
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
+  gap: 1rem;
   padding: 0.75rem 1rem;
 `
 
@@ -92,7 +107,7 @@ const ConfigName = styled.span`
 const ConfigStatus = styled.div`
   display: flex;
   align-items: center;
-  gap: 0.75rem;
+  gap: 1rem;
 `
 
 const ConfigLabel = styled.span<{ $ok?: boolean }>`
@@ -100,12 +115,29 @@ const ConfigLabel = styled.span<{ $ok?: boolean }>`
   ${({ $ok }) => $ok ? 'color: var(--color-success);' : 'color: var(--color-muted-foreground);'}
 `
 
-const ConfigDot = styled.span<{ $active?: boolean }>`
-  display: inline-block;
-  height: 0.375rem;
-  width: 0.375rem;
-  border-radius: 50%;
-  ${({ $active }) => $active ? 'background: var(--color-success);' : 'background: color-mix(in srgb, var(--color-muted-foreground) 30%, transparent);'}
+const ProviderNote = styled.p`
+  ${textRole('caption')}
+  color: var(--color-muted-foreground);
+`
+
+const ReviewsGrid = styled.div`
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 1.5rem;
+
+  @media (min-width: 1280px) {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    align-items: start;
+  }
+`
+
+const ReviewSection = styled.section`
+  min-width: 0;
+`
+
+const ReviewTitle = styled.h2`
+  ${textRole('subtitle')}
+  margin-bottom: 1rem;
 `
 
 const LoadingCard = styled.div`
@@ -152,37 +184,56 @@ function formatTime(iso: string | null): string {
   return d.toLocaleDateString()
 }
 
-export function MetadataPage() {
-  const { data: syncStatus, isPending: isLoading, error } = useMetadataSyncStatus()
-  const { data: providers } = useMetadataProviders()
+function SyncActions() {
   const triggerSync = useTriggerMetadataSync()
   const triggerGenreSync = useTriggerGenreSync()
-  const { data: genres } = useGenres()
-  const roles = useAuthStore((s) => s.user?.roles) ?? []
-  const isSuperAdmin = roles.includes('ROLE_SUPER_ADMIN')
+  return (
+    <ActionsRow>
+      <Button
+        variant="ghost"
+        size="sm"
+        onClick={() => triggerSync.mutate(undefined)}
+        disabled={triggerSync.isPending}
+      >
+        <RefreshCw size={14} strokeWidth={1.5} style={{ animation: triggerSync.isPending ? 'spin 1s linear infinite' : 'none' }} />
+        <span style={{ marginLeft: '0.375rem' }}>Trigger Sync</span>
+      </Button>
+      <Button
+        variant="ghost"
+        size="sm"
+        onClick={() => triggerGenreSync.mutate()}
+        disabled={triggerGenreSync.isPending}
+      >
+        <Tags size={14} strokeWidth={1.5} style={{ animation: triggerGenreSync.isPending ? 'spin 1s linear infinite' : 'none' }} />
+        <span style={{ marginLeft: '0.375rem' }}>Sync Genres</span>
+      </Button>
+    </ActionsRow>
+  )
+}
 
-  if (isLoading) {
+function SyncSummary() {
+  const { data: syncStatus, isPending, error, refetch, isFetching } = useMetadataSyncStatus()
+  const { data: genres } = useGenres()
+
+  if (isPending) {
     return (
-      <Container>
-        <StatsGrid>
-          {Array.from({ length: 4 }).map((_, i) => (
-            <LoadingCard key={i} />
-          ))}
-        </StatsGrid>
-      </Container>
+      <StatsGrid role="status" aria-label="Loading metadata sync status">
+        {Array.from({ length: 4 }).map((_, i) => (
+          <LoadingCard key={i} />
+        ))}
+      </StatsGrid>
     )
   }
 
-  if (error) {
+  if (error && !syncStatus) {
     return (
-      <Container>
-        <ErrorCard>
-          <ErrorText>Failed to load metadata status.</ErrorText>
-          <ErrorDetail>
-            {error instanceof Error ? error.message : 'Unknown error'}
-          </ErrorDetail>
-        </ErrorCard>
-      </Container>
+      <ErrorCard role="alert">
+        <ErrorText>Failed to load metadata status.</ErrorText>
+        <ErrorDetail>{error.message}</ErrorDetail>
+        <Button size="sm" variant="ghost" disabled={isFetching} onClick={() => refetch()}>
+          Retry sync status
+        </Button>
+      </ErrorCard>
     )
   }
 
@@ -193,30 +244,7 @@ export function MetadataPage() {
   const coverage = total > 0 ? ((synced / total) * 100).toFixed(1) : '0.0'
 
   return (
-    <Container>
-      {isSuperAdmin && (
-        <ActionsRow>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => triggerSync.mutate(undefined)}
-            disabled={triggerSync.isPending}
-          >
-            <RefreshCw size={14} strokeWidth={1.5} style={{ animation: triggerSync.isPending ? 'spin 1s linear infinite' : 'none' }} />
-            <span style={{ marginLeft: '0.375rem' }}>Trigger Sync</span>
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => triggerGenreSync.mutate()}
-            disabled={triggerGenreSync.isPending}
-          >
-            <Tags size={14} strokeWidth={1.5} style={{ animation: triggerGenreSync.isPending ? 'spin 1s linear infinite' : 'none' }} />
-            <span style={{ marginLeft: '0.375rem' }}>Sync Genres</span>
-          </Button>
-        </ActionsRow>
-      )}
-
+    <>
       {/* Coverage stats */}
       <StatsGrid>
         <StatCard label="Total Tracks" value={total.toLocaleString()} icon={Database} />
@@ -266,27 +294,128 @@ export function MetadataPage() {
         </Card>
       )}
 
-      {/* Provider configuration */}
-      {providers && providers.length > 0 && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Configuration</CardTitle>
-          </CardHeader>
-          <Divider>
-            {providers!.map((provider: { name: string; enabled: boolean; configured: boolean }) => (
-              <ConfigRow key={provider.name}>
-                <ConfigName>{provider.name}</ConfigName>
-                <ConfigStatus>
-                  <ConfigLabel $ok={provider.configured}>
-                    {provider.configured ? 'Configured' : 'Not configured'}
-                  </ConfigLabel>
-                  <ConfigDot $active={provider.enabled && provider.configured} />
-                </ConfigStatus>
-              </ConfigRow>
-            ))}
-          </Divider>
-        </Card>
+    </>
+  )
+}
+
+function providerWaitDescription(id: string) {
+  switch (id) {
+    case 'musicbrainz':
+      return 'Automatic album matching waits while MusicBrainz is off.'
+    case 'tvdb':
+    case 'tmdb':
+    case 'local':
+      return 'Refreshes for titles matched with this provider wait while it is off.'
+    default:
+      return 'Metadata updates from this provider wait while it is off.'
+  }
+}
+
+function ProviderSwitch({ provider, canManage }: { provider: MetadataProvider; canManage: boolean }) {
+  const nameId = useId()
+  const descriptionId = useId()
+  const setEnabled = useSetMetadataProviderEnabled(provider.id)
+  return (
+    <ConfigRow>
+      <div>
+        <ConfigName id={nameId}>{provider.name}</ConfigName>
+        <ProviderNote id={descriptionId}>{providerWaitDescription(provider.id)}</ProviderNote>
+        {setEnabled.isError && (
+          <ErrorText role="alert">Could not change {provider.name}. {setEnabled.error.message}</ErrorText>
+        )}
+      </div>
+      <ConfigStatus>
+        <ConfigLabel $ok={provider.configured}>
+          {provider.configured ? 'Configured' : 'Not configured'}
+        </ConfigLabel>
+        <ConfigLabel $ok={provider.enabled}>{provider.enabled ? 'On' : 'Off'}</ConfigLabel>
+        {canManage && (
+          <Switch
+            checked={provider.enabled}
+            disabled={setEnabled.isPending}
+            aria-labelledby={nameId}
+            aria-describedby={descriptionId}
+            onCheckedChange={(enabled) => setEnabled.mutate(enabled)}
+          />
+        )}
+      </ConfigStatus>
+    </ConfigRow>
+  )
+}
+
+function MetadataProviders() {
+  const { isAdmin } = useAdminCheck()
+  const { data, isPending, isError, isFetching, refetch } = useMetadataProviders()
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Providers</CardTitle>
+      </CardHeader>
+      {isPending && <ConfigRow role="status">Loading metadata providers…</ConfigRow>}
+      {isError && (
+        <ConfigRow role="alert">
+          <ErrorText>Unable to load metadata providers.</ErrorText>
+          <Button size="sm" variant="ghost" disabled={isFetching} onClick={() => refetch()}>
+            Retry providers
+          </Button>
+        </ConfigRow>
       )}
+      {data && (
+        <Divider>
+          {data.map((provider) => <ProviderSwitch key={provider.id} provider={provider} canManage={isAdmin} />)}
+        </Divider>
+      )}
+    </Card>
+  )
+}
+
+function AlbumReviews() {
+  const [matching, setMatching] = useState<MatchReview | null>(null)
+  const headingId = useId()
+  const heading = useRef<HTMLHeadingElement>(null)
+  const trigger = useRef<HTMLButtonElement>(null)
+
+  return (
+    <ReviewSection aria-labelledby={headingId}>
+      <ReviewTitle id={headingId} ref={heading} tabIndex={-1}>Album reviews</ReviewTitle>
+      <MatchReviewTable onMatchAlbum={(review, button) => {
+        trigger.current = button
+        setMatching(review)
+      }} />
+      {matching !== null && (
+        <MusicBrainzMatchDialog
+          key={matching.albumPublicId}
+          open
+          onOpenChange={(open) => {
+            if (!open) {
+              setMatching(null)
+              requestAnimationFrame(() => {
+                if (trigger.current?.isConnected) trigger.current.focus()
+                else heading.current?.focus()
+              })
+            }
+          }}
+          type="album"
+          publicId={matching.albumPublicId}
+          title={matching.title}
+        />
+      )}
+    </ReviewSection>
+  )
+}
+
+export function MetadataPage() {
+  const { isSuperAdmin } = useAdminCheck()
+  return (
+    <Container>
+      {isSuperAdmin && <SyncActions />}
+      <SyncSummary />
+      <MetadataProviders />
+      <ReviewsGrid>
+        <AlbumReviews />
+        <VideoMatchReviewTable />
+      </ReviewsGrid>
     </Container>
   )
 }
