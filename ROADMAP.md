@@ -18,7 +18,7 @@ runners and verification boundaries. Historical suite counts apply to their own 
 
 ## TV series libraries, checkpoint 2026-11-28
 
-Implementation follows the [TV series libraries plan](docs/plans/2026-11-27-1827-feat-tv-series-libraries-plan.md).
+Implementation follows the [TV series libraries plan](https://github.com/baander-app/baander/blob/455808baa77b566085aebcd40b00c511413be954/docs/plans/2026-11-27-1827-feat-tv-series-libraries-plan.md).
 The entries below cover scanning, matching, member playback and their verification.
 
 - Phase A is committed through `8509b7f06`, covering U20, U1, U2, U3, U21, U4 and
@@ -333,7 +333,7 @@ and [Vercel deployment](https://vercel.com/martin-juuls-projects/baander/9oDJKvM
 
 The website publishes Bånder's design system in ten pages under `/design-system/`,
 built from `ui/DESIGN.md`, `ui/ICON-GUIDE.md` and the design tokens when the site
-builds. The [plan](docs/plans/2026-11-27-1843-feat-website-design-system-page-plan.md)
+builds. The [plan](https://github.com/baander-app/baander/blob/455808baa77b566085aebcd40b00c511413be954/docs/plans/2026-11-27-1843-feat-website-design-system-page-plan.md)
 records the design and the decisions.
 
 Owner decisions, 2026-11-27: `ui/DESIGN.md` gains a Writing section with the rules
@@ -744,7 +744,7 @@ Open:
 
 ## Pipe-operator inspection check, 2026-11-26
 
-PHPStan now reports what PhpStorm 2026.3's pipe-operator inspection reports, and the tree has none of those findings left. Two rules in `packages/baander-phpstan-rules` mirror the inspection's two messages: nested call chains of three to ten levels, and three to ten consecutive assignments to one variable. Both PHPStan configurations load them, so `make phpstan`, `composer analyse:tooling`, `make ci` and CI fail on a new finding. The [plan](docs/plans/2026-11-25-2138-refactor-pipe-operator-inspection-check-plan.md) records the design; the developer guide's [Pipe Operator](docs-book/part-2-developer-guide/development/coding-conventions.md#pipe-operator) section gives the house fix and the parity check.
+PHPStan now reports what PhpStorm 2026.3's pipe-operator inspection reports, and the tree has none of those findings left. Two rules in `packages/baander-phpstan-rules` mirror the inspection's two messages: nested call chains of three to ten levels, and three to ten consecutive assignments to one variable. Both PHPStan configurations load them, so `make phpstan`, `composer analyse:tooling`, `make ci` and CI fail on a new finding. The [plan](https://github.com/baander-app/baander/blob/455808baa77b566085aebcd40b00c511413be954/docs/plans/2026-11-25-2138-refactor-pipe-operator-inspection-check-plan.md) records the design; the developer guide's [Pipe Operator](docs-book/part-2-developer-guide/development/coding-conventions.md#pipe-operator) section gives the house fix and the parity check.
 
 Owner decisions: the rules match PhpStorm exactly, not the two-level shape the earlier passes converted; they cover the assignment-chain message too; multi-argument steps become named locals or helpers, never PhpStorm's quick fix.
 
@@ -824,7 +824,7 @@ Opening claim ledger:
 
 The security audit of `9524a6fd9` read the whole repository and attacked a
 disposable worktree preview. The
-[fix plan](docs/plans/2026-11-24-1754-fix-security-audit-findings-plan.md) resolved
+[fix plan](https://github.com/baander-app/baander/blob/455808baa77b566085aebcd40b00c511413be954/docs/plans/2026-11-24-1754-fix-security-audit-findings-plan.md) resolved
 every finding in three phases, all on `master`. The audit document is retired; read
 it with `git show adb9526fa:SECURITY_FINDINGS.md`. The
 [application threat model](docs-book/part-2-developer-guide/architecture/application-threat-model.md)
@@ -1405,7 +1405,7 @@ Open items:
 ## Small-host household deployment
 
 The user confirmed the
-[small-host household deployment plan](docs/plans/2026-11-02-1819-feat-small-host-household-deployment-plan.md).
+[small-host household deployment plan](https://github.com/baander-app/baander/blob/455808baa77b566085aebcd40b00c511413be954/docs/plans/2026-11-02-1819-feat-small-host-household-deployment-plan.md).
 It defines a separate profile for 2,000 songs, 50 movies and 250 TV episodes, with 1–2 simultaneous streams alongside normal scanning and metadata updates.
 [System Requirements](docs-book/part-1-operator-guide/getting-started/system-requirements.md) publishes the measured figures and their limits.
 

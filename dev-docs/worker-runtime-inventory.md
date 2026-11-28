@@ -230,7 +230,7 @@ and completion statements are retained as historical evidence. Use the current
 ownership section and operator recipe above for present deployment decisions.
 
 Verified against source on 2026-10-03 for stage 1 of the
-[web and worker runtime redesign](../docs/plans/2026-07-17-001-feat-messenger-enterprise-hardening-plan.md).
+[web and worker runtime redesign](https://github.com/baander-app/baander/blob/455808baa77b566085aebcd40b00c511413be954/docs/plans/2026-07-17-001-feat-messenger-enterprise-hardening-plan.md).
 `app:serve` now names the existing foreground web server, and `app:worker` runs a
 fixed consumer/outbox-relay/scheduler supervisor. Broader queue families, autoscaling,
 media ownership transfers and external deployment orchestration remain planned. This inventory

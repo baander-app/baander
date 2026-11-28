@@ -131,7 +131,7 @@ The breakdown below is the current understanding, not a committed roadmap.
 ### Dependencies and Assumptions
 
 - A 4 GiB VM counts as a 4 GB host for the claim; a physical 4 GB machine is not required.
-- This plan supersedes the profile structure of `docs/plans/2026-11-02-1819-feat-small-host-household-deployment-plan.md` (its R1 and R7) and closes that plan's open qualification items as part of R13, including requalification after the connection pooler and the removal of container limits.
+- This plan supersedes the profile structure of the [small-host household deployment plan](https://github.com/baander-app/baander/blob/455808baa77b566085aebcd40b00c511413be954/docs/plans/2026-11-02-1819-feat-small-host-household-deployment-plan.md) (its R1 and R7) and closes that plan's open qualification items as part of R13, including requalification after the connection pooler and the removal of container limits.
 - The preset inherits `OTEL_ENABLED=true` from `.env` with an unreachable endpoint; fixing this defect is in scope because it distorts the measurement.
 
 ### Outstanding Questions
