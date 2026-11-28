@@ -5,6 +5,7 @@ declare(strict_types=1);
 use App\Catalog\Application\Command\BatchExtractCoversCommand;
 use App\Catalog\Application\Message\DrainAlbumMatchesMessage;
 use App\Catalog\Application\Message\DrainVideoMatchesMessage;
+use App\Catalog\Application\Message\RefreshVideoMatchMessage;
 use App\Library\Application\Command\ScanLibraryCommand;
 use App\Library\Application\Message\FilesDiscovered;
 use App\Lyrics\Application\Command\FetchLyricsCommand;
@@ -53,6 +54,11 @@ return static function (ContainerConfigurator $container): void {
             'default' => true,
         ],
         DrainVideoMatchesMessage::class => [
+            'transport' => 'async',
+            'resource_class' => 'io',
+            'default' => true,
+        ],
+        RefreshVideoMatchMessage::class => [
             'transport' => 'async',
             'resource_class' => 'io',
             'default' => true,

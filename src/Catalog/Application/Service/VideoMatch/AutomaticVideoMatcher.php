@@ -27,6 +27,7 @@ final readonly class AutomaticVideoMatcher implements AutomaticVideoMatcherInter
         private VideoMatchConfidence $confidence,
         private VideoMatchApplyInterface $apply,
         private ClockInterface $clock,
+        private VideoMatchStructureLookup $structures,
     ) {}
 
     public function match(VideoMatchState $claim): VideoMatchOutcome
@@ -68,10 +69,10 @@ final readonly class AutomaticVideoMatcher implements AutomaticVideoMatcherInter
                     continue;
                 }
                 $attempted = true;
-                $this->pauses->clear($provider->value);
                 if ($identified !== null) {
                     return $this->apply($claim, $target, $provider, $identified);
                 }
+                $this->pauses->clear($provider->value);
                 continue;
             }
             $hits = $this->providers->search($provider, $request);
@@ -97,12 +98,12 @@ final readonly class AutomaticVideoMatcher implements AutomaticVideoMatcherInter
                     $ranked[] = ['title' => $details, 'score' => $this->confidence->score($request, $details, $target->parses)];
                 }
             }
-            $this->pauses->clear($provider->value);
             array_push($scored, ...$ranked);
             $decision = $this->confidence->decide($ranked);
             if ($decision['match'] !== null) {
                 return $this->apply($claim, $target, $provider, $decision['match']);
             }
+            $this->pauses->clear($provider->value);
         }
         if (!$attempted) {
             return new VideoMatchOutcome(VideoMatchOutcomeKind::AwaitingProvider);
@@ -114,7 +115,14 @@ final readonly class AutomaticVideoMatcher implements AutomaticVideoMatcherInter
 
     private function apply(VideoMatchState $claim, VideoMatchTarget $target, VideoProviderId $provider, VideoTitle $metadata): VideoMatchOutcome
     {
-        if (!$this->apply->apply($claim, $target, $provider, $metadata)) {
+        $match = $this->structures->resolve($provider, $target->request, $metadata, allowDefault: true);
+        if ($match === null) {
+            return new VideoMatchOutcome(VideoMatchOutcomeKind::NeedsReview, $provider, reason: 'ordering_unavailable');
+        }
+        if ($match instanceof VideoProviderProblem) {
+            return $this->problem($provider, $match) ?? new VideoMatchOutcome(VideoMatchOutcomeKind::AwaitingProvider);
+        }
+        if (!$this->apply->apply($claim, $target, $provider, $match)) {
             return new VideoMatchOutcome(VideoMatchOutcomeKind::RetryLater, $provider, retryAt: $this->clock->now()->modify('+15 seconds'));
         }
         $this->pauses->clear($provider->value);

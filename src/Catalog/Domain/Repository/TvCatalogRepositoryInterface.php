@@ -18,6 +18,8 @@ interface TvCatalogRepositoryInterface
 
     public function findSeriesByUuid(Uuid $id): ?TvSeries;
 
+    public function lockSeriesForPlacement(Uuid $id): ?TvSeries;
+
     public function findSeriesByPublicId(PublicId $id): ?TvSeries;
 
     public function findSeriesByFolder(Uuid $libraryId, string $folderPath): ?TvSeries;
@@ -25,6 +27,9 @@ interface TvCatalogRepositoryInterface
     public function findSeriesByVideo(Uuid $libraryId, Uuid $videoId): ?TvSeries;
 
     public function findSeason(Uuid $seriesId, int $seasonNumber): ?TvSeason;
+
+    /** @return list<TvSeason> */
+    public function seasonsBySeries(Uuid $seriesId): array;
 
     public function findEpisodeByUuid(Uuid $id): ?TvEpisode;
 
@@ -60,6 +65,8 @@ interface TvCatalogRepositoryInterface
     public function saveSeason(TvSeason $season): void;
 
     public function saveEpisode(TvEpisode $episode): void;
+
+    public function removeMergedEpisode(TvEpisode $episode): void;
 
     public function savePlacement(VideoPlacement $placement): void;
 

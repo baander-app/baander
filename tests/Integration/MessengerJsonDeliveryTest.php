@@ -21,6 +21,7 @@ use App\Catalog\Application\Port\GenrePortInterface;
 use App\Catalog\Application\Port\MoviePortInterface;
 use App\Catalog\Application\Port\PersonCreditPortInterface;
 use App\Catalog\Application\Port\SongPortInterface;
+use App\Catalog\Application\Port\VideoMatchRefreshInterface;
 use App\Catalog\Application\Query\MusicBrainzMatch\MatchCatalogReadInterface;
 use App\Catalog\Application\QueryHandler\MusicBrainzMatch\MatchComparisonBuilder;
 use App\Catalog\Application\Service\ArtistSyncQueue;
@@ -349,7 +350,7 @@ final class MessengerJsonDeliveryTest extends TestCase
                 });
             $nestedBus = $this->createMock(MessageBusInterface::class);
             $nestedBus->expects($this->never())->method('dispatch');
-            $handler = new SyncLibraryHandler($albums, $nestedBus, $logger, new CancelAtCheckpoint(), $this->createStub(MoviePortInterface::class));
+            $handler = new SyncLibraryHandler($albums, $nestedBus, $logger, new CancelAtCheckpoint(), $this->createStub(VideoMatchRefreshInterface::class));
         } elseif ($messageType === SyncArtistsMessage::class) {
             $message = new SyncArtistsMessage();
             $artists = $this->createMock(ArtistPortInterface::class);

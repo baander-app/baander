@@ -36,7 +36,7 @@ deptrac:
         Shared: ['Shared Domain', 'Shared Application', 'Shared Infrastructure', 'Shared Live Snapshot Infrastructure', 'Shared Interface']
         Activity: ['Activity Watched Mark Move Contract', 'Activity Artist Merge Contract', 'Activity Album Merge Contract', 'Activity Domain', 'Activity Application', 'Activity Infrastructure', 'Activity Resources', 'Activity Interface']
         Auth: ['Auth Live Authority Contract', 'Auth Domain', 'Auth Identity Contract', 'Auth User Identifier Contract', 'Auth Device Approval Event Contract', 'Auth WebSocket Contract', 'Auth Self-Registration Contract', 'Auth Application', 'Auth Infrastructure', 'Auth Resources', 'Auth Interface']
-        Catalog: ['Catalog Video Contract', 'Catalog Song Availability Contract', 'Catalog Song Lookup Contract', 'Catalog Movie Contract', 'Catalog Director Contract', 'Catalog Person Contract', 'Catalog Domain', 'Catalog Application', 'Catalog Infrastructure', 'Catalog Video Match Adapters', 'Catalog Persistence Associations', 'Catalog Resources', 'Catalog Interface']
+        Catalog: ['Catalog Video Contract', 'Catalog Video Refresh Contract', 'Catalog Song Availability Contract', 'Catalog Song Lookup Contract', 'Catalog Movie Contract', 'Catalog Director Contract', 'Catalog Person Contract', 'Catalog Domain', 'Catalog Application', 'Catalog Infrastructure', 'Catalog Video Match Adapters', 'Catalog Persistence Associations', 'Catalog Resources', 'Catalog Interface']
         Filesystem: ['Filesystem Infrastructure', 'Filesystem Application', 'Filesystem Command', 'Filesystem Mime', 'Filesystem Watcher']
         Library: ['Library Live Audience Contract', 'Library File Availability Contract', 'Library Type Lookup Contract', 'Library Read Scope Contract', 'Library Content Stats Contract', 'Library Files Discovered Contract', 'Library Provisioning Contract', 'Library Media Files Contract', 'Library Domain', 'Library Application', 'Library Infrastructure', 'Library Resources', 'Library Interface']
         Lyrics: ['Lyrics Fetch Request Contract', 'Lyrics Album Merge Contract', 'Lyrics Domain', 'Lyrics Application', 'Lyrics Infrastructure', 'Lyrics Resources', 'Lyrics Interface']
@@ -306,6 +306,11 @@ deptrac:
         - type: classLike
           value: '^App\\Catalog\\Application\\(Port\\VideoPortInterface|Dto\\VideoSourceMetadata)$'
 
+    - name: 'Catalog Video Refresh Contract'
+      collectors:
+        - type: classLike
+          value: '^App\\Catalog\\Application\\Port\\VideoMatchRefreshInterface$'
+
     - name: 'Catalog Movie Contract'
       collectors:
         - type: classLike
@@ -329,6 +334,8 @@ deptrac:
               value: '^App\\Catalog\\Application\\'
           must_not:
             - type: classLike
+              value: '^App\\Catalog\\Application\\Port\\VideoMatchRefreshInterface$'
+            - type: classLike
               value: '^App\\Catalog\\Application\\(Port\\VideoPortInterface|Dto\\VideoSourceMetadata)$'
             - type: classLike
               value: '^App\\Catalog\\Application\\Port\\SongAvailabilityPortInterface$'
@@ -349,7 +356,7 @@ deptrac:
     - name: 'Catalog Video Match Adapters'
       collectors:
         - type: classLike
-          value: '^App\\Catalog\\Infrastructure\\VideoMatch\\(VideoMatchApply|VideoMatchTargetLoader)$'
+          value: '^App\\Catalog\\Infrastructure\\(VideoMatch\\(VideoMatchApply|VideoMatchTargetLoader|VideoMatchRefresher|VideoMatchRefreshReview|VideoMatchRefreshRequester)|VideoPlacementService)$'
 
     - name: 'Catalog Infrastructure'
       collectors:
@@ -359,7 +366,7 @@ deptrac:
               value: '^App\\Catalog\\Infrastructure\\'
           must_not:
             - type: classLike
-              value: '^App\\Catalog\\Infrastructure\\VideoMatch\\(VideoMatchApply|VideoMatchTargetLoader)$'
+              value: '^App\\Catalog\\Infrastructure\\(VideoMatch\\(VideoMatchApply|VideoMatchTargetLoader|VideoMatchRefresher|VideoMatchRefreshReview|VideoMatchRefreshRequester)|VideoPlacementService)$'
             - type: classLike
               value: '^App\\Catalog\\Infrastructure\\Doctrine\\(Entity\\(PersonEntity|TvSeriesEntity|VideoPlacementEntity)|Repository\\(PersonAdministrationRepository|TvCatalogRepository))$'
 
@@ -1442,7 +1449,10 @@ deptrac:
       - 'Shared Domain'
     'Catalog Person Contract':
       - 'Shared Domain'
+    'Catalog Video Refresh Contract':
+      - 'Shared Domain'
     'Catalog Application':
+      - 'Catalog Video Refresh Contract'
       - 'Metadata Video Provider Contract'
       - 'Metadata Video Provider Data'
       - 'Library Type Lookup Contract'
@@ -1480,6 +1490,8 @@ deptrac:
       - 'Shared Application'
       - 'Shared Domain'
     'Catalog Video Match Adapters':
+      - 'Catalog Video Refresh Contract'
+      - 'Activity Watched Mark Move Contract'
       - 'Metadata Video Provider Data'
       - 'Catalog Application'
       - 'Catalog Domain'
@@ -1730,6 +1742,7 @@ deptrac:
     'Metadata Person Provider Contract':
       - 'Catalog Person Contract'
     'Metadata Application':
+      - 'Catalog Video Refresh Contract'
       - 'Catalog Person Contract'
       - 'Metadata Person Provider Contract'
       - 'Catalog Movie Contract'

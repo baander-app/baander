@@ -6,13 +6,16 @@ namespace App\Tests\Unit\Shared\Infrastructure\Messenger;
 
 use App\Catalog\Application\Message\DrainAlbumMatchesMessage;
 use App\Catalog\Application\Message\DrainVideoMatchesMessage;
+use App\Catalog\Application\Message\RefreshVideoMatchMessage;
 use App\Catalog\Application\MessageHandler\DrainAlbumMatchesHandler;
 use App\Catalog\Application\MessageHandler\DrainVideoMatchesHandler;
+use App\Catalog\Application\MessageHandler\RefreshVideoMatchHandler;
 use App\Catalog\Application\MessageHandler\QueueArtistSyncsHandler;
 use App\Catalog\Application\MessageHandler\RequestAlbumMatchHandler;
 use App\Catalog\Application\MessageHandler\SyncArtistHandler;
 use App\Media\Application\Command\GenerateImageDerivativeCommand;
 use App\Media\Application\CommandHandler\GenerateImageDerivativeHandler;
+use App\Metadata\Application\DTO\Video\VideoKind;
 use App\Metadata\Application\Message\SyncAlbumMessage;
 use App\Metadata\Application\Message\SyncArtistMessage;
 use App\Metadata\Application\Message\SyncArtistsMessage;
@@ -77,6 +80,7 @@ final class SwooleFallbackHandlerRegistrationTest extends TestCase
             RequestAlbumMatchHandler::class => new SyncAlbumMessage(Uuid::v7()),
             DrainAlbumMatchesHandler::class => new DrainAlbumMatchesMessage(),
             DrainVideoMatchesHandler::class => new DrainVideoMatchesMessage(),
+            RefreshVideoMatchHandler::class => new RefreshVideoMatchMessage(VideoKind::Movie, Uuid::v7(), Uuid::v7(), new \DateTimeImmutable()),
             SyncLibraryHandler::class => new SyncLibraryMessage(Uuid::v7()),
             QueueArtistSyncsHandler::class => new SyncArtistsMessage(),
             SyncArtistHandler::class => new SyncArtistMessage(Uuid::v7()),

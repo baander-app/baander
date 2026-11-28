@@ -141,7 +141,7 @@ final class TvLibraryIngestTest extends TestCase
         $series = $repository->findSeriesByFolder($this->fixture->library->getId(), 'Show');
         self::assertNotNull($series);
         $series->match('tvdb', '121361', ['tvdb' => '121361'], true);
-        $series->setOrdering('dvd');
+        $series->setOrdering('dvd', ['aired', 'dvd']);
         $repository->saveSeries($series);
         $repository->flush();
         (new Filesystem())->rename($this->fixture->root . '/Show', $this->fixture->root . '/Show (2011)');

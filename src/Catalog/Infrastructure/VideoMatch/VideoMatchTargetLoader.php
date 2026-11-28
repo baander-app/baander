@@ -47,7 +47,7 @@ final readonly class VideoMatchTargetLoader implements VideoMatchTargetLoaderInt
             $title = $state->movieId === null ? null : $this->movies->findByUuid($state->movieId);
         }
 
-        return $title === null ? null : $this->target($title);
+        return $title === null ? null : $this->forTitle($title);
     }
 
     public function forObservations(Uuid $libraryId, array $relativePaths): array
@@ -80,7 +80,7 @@ final readonly class VideoMatchTargetLoader implements VideoMatchTargetLoaderInt
             $titles[$title->getId()->toString()] = $title;
         }
 
-        return array_values(array_map($this->target(...), $titles));
+        return array_values(array_map($this->forTitle(...), $titles));
     }
 
     /**
@@ -160,7 +160,7 @@ final readonly class VideoMatchTargetLoader implements VideoMatchTargetLoaderInt
         return array_map(Uuid::fromString(...), $ids);
     }
 
-    private function target(Movie|TvSeries $title): VideoMatchTarget
+    public function forTitle(Movie|TvSeries $title): VideoMatchTarget
     {
         $series = $title instanceof TvSeries;
         $id = $title->getId();

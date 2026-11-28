@@ -41,7 +41,8 @@ These jobs have checkpoints:
 
 | Job (monitor name) | Started by | Stops before |
 |--------------------|------------|--------------|
-| `SyncLibraryMessage` | A metadata sync, one job per library | Its next album |
+| `SyncLibraryMessage` | A metadata sync, one job per library | Before the next album or matched video title |
+| `RefreshVideoMatchesCommand` | The scheduled refresh of matched movies and TV series | Before queuing the next title |
 | `SyncPeopleMessage` | A TMDB profile metadata sync | Its next Person profile. [Person sync handler](../../../src/Metadata/Application/MessageHandler/SyncPeopleHandler.php) |
 | `SyncMetadataCommand` | [app:metadata:sync](app-metadata-sync.md) with `--source genres` | Its next album |
 | `SyncArtistsMessage` | A metadata sync without a source, one job | Its next artist. The fills it already queued end without a request when they come due, also when the job is cancelled after it finished |

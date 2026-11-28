@@ -57,10 +57,11 @@ final class TvSeries
         $this->state->updatedAt = new DateTimeImmutable();
     }
 
-    public function setOrdering(string $ordering): void
+    /** @param list<string> $offeredOrderings */
+    public function setOrdering(string $ordering, array $offeredOrderings): void
     {
-        if (!in_array($ordering, ['aired', 'absolute', 'dvd'], true)) {
-            throw new InvalidArgumentException('Unknown TV episode ordering.');
+        if (trim($ordering) === '' || !in_array($ordering, $offeredOrderings, true)) {
+            throw new InvalidArgumentException('The matched series does not offer that episode ordering.');
         }
         $this->state->ordering = $ordering;
         $this->state->updatedAt = new DateTimeImmutable();

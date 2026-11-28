@@ -23,8 +23,10 @@ use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
 use DateTimeImmutable;
 use Doctrine\DBAL\ArrayParameterType;
+use Doctrine\DBAL\LockMode;
 use Doctrine\ORM\EntityManagerInterface;
 use Doctrine\ORM\Query;
+use Doctrine\ORM\QueryBuilder;
 use InvalidArgumentException;
 
 final readonly class TvCatalogRepository implements TvCatalogRepositoryInterface
@@ -41,6 +43,21 @@ final readonly class TvCatalogRepository implements TvCatalogRepositoryInterface
         $entity = $this->one(TvSeriesEntity::class, ['id' => $id]);
 
         return $entity === null ? null : TvSeries::reconstitute($entity->state());
+    }
+
+    public function lockSeriesForPlacement(Uuid $id): ?TvSeries
+    {
+        $entity = $this->manager->createQueryBuilder()
+            ->select('series')
+            ->from(TvSeriesEntity::class, 'series')
+            ->where('series.id = :id')
+            ->setParameter('id', $id, 'uuid')
+            ->getQuery()
+            ->setHint(Query::HINT_REFRESH, true)
+            ->setLockMode(LockMode::PESSIMISTIC_WRITE)
+            ->getOneOrNullResult();
+
+        return $entity instanceof TvSeriesEntity ? TvSeries::reconstitute($entity->state()) : null;
     }
 
     public function findSeriesByPublicId(PublicId $id): ?TvSeries
@@ -69,6 +86,22 @@ final readonly class TvCatalogRepository implements TvCatalogRepositoryInterface
         $entity = $this->one(TvSeasonEntity::class, ['series' => $seriesId, 'seasonNumber' => $seasonNumber]);
 
         return $entity === null ? null : TvSeason::reconstitute($entity->state());
+    }
+
+    public function seasonsBySeries(Uuid $seriesId): array
+    {
+        /** @var list<TvSeasonEntity> $entities */
+        $entities = $this->manager->createQueryBuilder()
+            ->select('season')
+            ->from(TvSeasonEntity::class, 'season')
+            ->where('IDENTITY(season.series) = :series')
+            ->setParameter('series', $seriesId, 'uuid')
+            ->orderBy('season.seasonNumber', 'ASC')
+            ->getQuery()
+            ->setHint(Query::HINT_REFRESH, true)
+            ->getResult();
+
+        return array_map(static fn (TvSeasonEntity $entity): TvSeason => TvSeason::reconstitute($entity->state()), $entities);
     }
 
     public function findEpisodeByUuid(Uuid $id): ?TvEpisode
@@ -100,13 +133,13 @@ final readonly class TvCatalogRepository implements TvCatalogRepositoryInterface
 
     public function findEpisodeByAbsoluteNumber(Uuid $seriesId, int $absoluteNumber): ?TvEpisode
     {
-        $entity = $this->one(TvEpisodeEntity::class, [
+        $entities = $this->manager->getRepository(TvEpisodeEntity::class)->findBy([
             'series' => $seriesId,
             'absoluteNumber' => $absoluteNumber,
             'retired' => false,
-        ]);
+        ], limit: 2);
 
-        return $entity === null ? null : TvEpisode::reconstitute($entity->state());
+        return count($entities) === 1 ? $this->episodeModels($entities)[0] : null;
     }
 
     public function episodesByAirDate(Uuid $seriesId, string $airDate): array
@@ -122,23 +155,49 @@ final readonly class TvCatalogRepository implements TvCatalogRepositoryInterface
 
     public function episodesBySeries(Uuid $seriesId): array
     {
-        $entities = $this->manager->getRepository(TvEpisodeEntity::class)
-            ->findBy(['series' => $seriesId], ['id' => 'ASC']);
+        /** @var list<TvEpisodeEntity> $entities */
+        $entities = $this->manager->createQueryBuilder()
+            ->select('episode')
+            ->from(TvEpisodeEntity::class, 'episode')
+            ->where('IDENTITY(episode.series) = :series')
+            ->setParameter('series', $seriesId, 'uuid')
+            ->orderBy('episode.id', 'ASC')
+            ->getQuery()
+            ->setHint(Query::HINT_REFRESH, true)
+            ->getResult();
 
-        return $this->episodeModels($entities);
+        return array_map(static fn (TvEpisodeEntity $entity): TvEpisode => TvEpisode::reconstitute($entity->state()), $entities);
     }
 
     public function findPlacement(Uuid $libraryId, Uuid $videoId): ?VideoPlacement
     {
-        $entity = $this->one(VideoPlacementEntity::class, ['library' => $libraryId, 'video' => $videoId]);
+        $entity = $this->placementQuery()
+            ->where('IDENTITY(placement.library) = :library')
+            ->andWhere('IDENTITY(placement.video) = :video')
+            ->setParameter('library', $libraryId, 'uuid')
+            ->setParameter('video', $videoId, 'uuid')
+            ->orderBy('link.sortOrder', 'ASC')
+            ->getQuery()
+            ->setHint(Query::HINT_REFRESH, true)
+            ->getOneOrNullResult();
 
-        return $entity === null ? null : VideoPlacement::reconstitute($entity->state());
+        return $entity instanceof VideoPlacementEntity ? VideoPlacement::reconstitute($entity->state()) : null;
     }
 
     public function placementsBySeries(Uuid $seriesId): array
     {
-        return $this->placementModels($this->manager->getRepository(VideoPlacementEntity::class)
-            ->findBy(['series' => $seriesId], ['sortOrder' => 'ASC', 'id' => 'ASC']));
+        /** @var list<VideoPlacementEntity> $entities */
+        $entities = $this->placementQuery()
+            ->where('IDENTITY(placement.series) = :series')
+            ->setParameter('series', $seriesId, 'uuid')
+            ->orderBy('placement.sortOrder', 'ASC')
+            ->addOrderBy('placement.id', 'ASC')
+            ->addOrderBy('link.sortOrder', 'ASC')
+            ->getQuery()
+            ->setHint(Query::HINT_REFRESH, true)
+            ->getResult();
+
+        return array_map(static fn (VideoPlacementEntity $entity): VideoPlacement => VideoPlacement::reconstitute($entity->state()), $entities);
     }
 
     public function placementsByMovie(Uuid $movieId): array
@@ -219,6 +278,11 @@ final readonly class TvCatalogRepository implements TvCatalogRepositoryInterface
             $entity->apply($state);
         }
         $this->manager->persist($entity);
+    }
+
+    public function removeMergedEpisode(TvEpisode $episode): void
+    {
+        $this->manager->remove($this->required(TvEpisodeEntity::class, $episode->getId()));
     }
 
     public function savePlacement(VideoPlacement $placement): void
@@ -346,5 +410,13 @@ final readonly class TvCatalogRepository implements TvCatalogRepositoryInterface
 
             return VideoPlacement::reconstitute($placement->state());
         }, $entities);
+    }
+
+    private function placementQuery(): QueryBuilder
+    {
+        return $this->manager->createQueryBuilder()
+            ->select('placement', 'link')
+            ->from(VideoPlacementEntity::class, 'placement')
+            ->leftJoin('placement.episodes', 'link');
     }
 }

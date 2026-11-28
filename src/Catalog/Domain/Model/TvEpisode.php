@@ -66,6 +66,19 @@ final class TvEpisode
         $this->state->externalIds = $externalIds;
     }
 
+    public function clearMatch(): void
+    {
+        $this->state->providerId = null;
+        $this->state->externalIds = [];
+    }
+
+    public function applyStructure(?DateTimeImmutable $airDate, ?int $absoluteNumber): void
+    {
+        self::assertNumbering($this->state->seasonId, $this->state->episodeNumber, $absoluteNumber);
+        $this->state->airDate = $airDate;
+        $this->state->absoluteNumber = $absoluteNumber;
+    }
+
     public function updateMetadata(
         string $name,
         ?string $overview,

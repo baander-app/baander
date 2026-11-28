@@ -51,7 +51,10 @@ This checkpoint covers the catalog foundation and video metadata providers.
 - U23 stores watched marks per member and episode or movie. Placement changes
   move marks in the same transaction and preserve a mark on an old episode
   that still has a file. Replaying the same move leaves the marks intact.
-  Phase C units U22, U12 and U13 remain pending. Phase D member
+- U22 places files against the matched provider’s structure and keeps the exact
+  ordering selected for the series. A refresh preserves hand assignments, native
+  episode identities and the last mapping when an ordering disappears.
+  Phase C units U12 and U13 remain pending. Phase D member
   progress, read API and web units U14–U17 and Phase E documentation and browser
   verification units U18–U19 remain pending.
 
@@ -101,6 +104,13 @@ This checkpoint covers the catalog foundation and video metadata providers.
 - U23 passed 66 CI-image tests with 3,144 assertions, including the move,
   member-scoped capture and fresh-install suites. Scoped PHPStan and imports
   passed. Deptrac reported zero violations and 451 existing skipped violations.
+- U22 passed 38 focused CI-image tests with 403 assertions for placement,
+  fenced apply, refresh, confidence and the message codec. The initial combined
+  run also exercised fresh installation, ingestion and routing. Six errors
+  exposed metadata ownership methods from the following unit in the isolated
+  snapshot. The 38-test rerun covered all six after the unit was separated.
+  Scoped PHPStan and imports passed. Deptrac reported zero violations and 451
+  existing skipped violations.
 
 ## Roadmap open items, 2026-11-26
 

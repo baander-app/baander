@@ -4,7 +4,10 @@ declare(strict_types=1);
 
 namespace App\Tests\Integration;
 
+use App\Activity\Application\Port\WatchedMarkMovePortInterface;
+use App\Catalog\Application\Dto\ResolvedVideoMatch;
 use App\Catalog\Application\Port\VideoAvailabilityPortInterface;
+use App\Catalog\Application\Service\VideoMatch\EpisodePlacer;
 use App\Catalog\Domain\Model\Movie;
 use App\Catalog\Domain\Model\TvSeries;
 use App\Catalog\Domain\Model\Video;
@@ -19,10 +22,14 @@ use App\Catalog\Infrastructure\Doctrine\Repository\VideoMatchStateRepository;
 use App\Catalog\Infrastructure\Doctrine\Repository\VideoRepository;
 use App\Catalog\Infrastructure\VideoMatch\VideoMatchApply;
 use App\Catalog\Infrastructure\VideoMatch\VideoMatchTargetLoader;
+use App\Catalog\Infrastructure\VideoPlacementService;
 use App\Library\Application\Port\VideoSidecarIndexInterface;
 use App\Library\Infrastructure\Doctrine\Entity\LibraryEntity;
 use App\Metadata\Application\DTO\Video\VideoCandidate;
+use App\Metadata\Application\DTO\Video\VideoEpisode;
 use App\Metadata\Application\DTO\Video\VideoProviderId;
+use App\Metadata\Application\DTO\Video\VideoOrdering;
+use App\Metadata\Application\DTO\Video\VideoSeason;
 use App\Metadata\Application\DTO\Video\VideoSidecarKind;
 use App\Metadata\Application\DTO\Video\VideoTitle;
 use App\Shared\Application\Port\TransactionPortInterface;
@@ -57,7 +64,7 @@ final class VideoMatchInfrastructureTest extends TestCase
         $this->writer->executeStatement('CREATE SCHEMA ' . $this->schema);
         $this->writer->executeStatement('SET search_path TO ' . $this->schema . ', public');
         foreach ([
-            'libraries', 'movies', 'movie_video', 'tv_series', 'videos',
+            'libraries', 'movies', 'movie_video', 'tv_series', 'tv_seasons', 'tv_episodes', 'videos',
             'video_placements', 'video_placement_episode', 'video_match_states',
         ] as $table) {
             ArtistImportIdentityRace::copyTableWithoutPgroonga($this->writer, $table);
@@ -165,13 +172,13 @@ final class VideoMatchInfrastructureTest extends TestCase
         $live = $this->claim($now);
         $target = $this->loader([])->load($live);
         self::assertNotNull($target);
-        $answer = new VideoTitle(new VideoCandidate('2', 'Movie', externalIds: ['imdb' => 'tt0000002']));
+        $answer = new ResolvedVideoMatch(new VideoTitle(new VideoCandidate('2', 'Movie', externalIds: ['imdb' => 'tt0000002'])), 'aired');
         $apply = $this->apply($now);
 
         self::assertFalse($apply->apply($expired, $target, VideoProviderId::Tmdb, $answer));
         self::assertNull($this->observer->fetchOne('SELECT matched_provider FROM movies'));
         try {
-            $apply->apply($live, $target, VideoProviderId::Tmdb, new VideoTitle(new VideoCandidate('', 'Movie')));
+            $apply->apply($live, $target, VideoProviderId::Tmdb, new ResolvedVideoMatch(new VideoTitle(new VideoCandidate('', 'Movie')), 'aired'));
             self::fail('An empty provider entry must roll back the claim completion.');
         } catch (InvalidArgumentException) {
             self::assertSame($live->claimId?->toString(), $this->observer->fetchOne('SELECT claim_id FROM video_match_states'));
@@ -201,13 +208,47 @@ final class VideoMatchInfrastructureTest extends TestCase
         self::assertTrue($target->matched);
         self::assertSame(['imdb' => 'tt0000003', 'local' => 'local-fixture'], $target->request->externalIds);
 
-        $answer = new VideoTitle(new VideoCandidate('10', 'Show', externalIds: ['tmdb' => '2']));
+        $answer = new ResolvedVideoMatch(new VideoTitle(new VideoCandidate('10', 'Show', externalIds: ['tmdb' => '2']), orderings: [new VideoOrdering('aired', 'Aired', 'aired')]), 'aired');
         self::assertTrue($this->apply($now)->apply($claim, $target, VideoProviderId::Tvdb, $answer));
         self::assertSame('tvdb', $this->observer->fetchOne('SELECT matched_provider FROM tv_series'));
         self::assertSame('10', $this->observer->fetchOne('SELECT provider_id FROM tv_series'));
         self::assertSame('tt0000003', $this->observer->fetchOne("SELECT external_ids->>'imdb' FROM tv_series"));
         self::assertSame('2', $this->observer->fetchOne("SELECT external_ids->>'tmdb' FROM tv_series"));
         self::assertSame('matched', $this->observer->fetchOne('SELECT status FROM video_match_states'));
+    }
+
+    public function testAutomaticClaimPlacesAnAbsoluteFileUnderTheSelectedOrdering(): void
+    {
+        $library = $this->library('tv_show');
+        $series = TvSeries::create($library, 'Show', 'Show');
+        $series->setOrdering('dvd-group', ['dvd-group']);
+        $this->catalog->saveSeries($series);
+        $this->catalog->flush();
+        $relative = 'Show/Show - 2.mkv';
+        $video = $this->video($relative);
+        $parse = new EpisodeNameParser()->parse($relative)->jsonSerialize();
+        $this->catalog->savePlacement(VideoPlacement::create($library, $video->getId(), $relative, $parse, seriesId: $series->getId()));
+        $this->catalog->flush();
+        $now = new DateTimeImmutable();
+        $this->states->requestSeries($series->getId(), 'ingest', $now);
+        $claim = $this->claim($now);
+        $target = $this->loader([])->load($claim);
+        self::assertNotNull($target);
+        $candidate = new VideoCandidate('10', 'Show');
+        $offers = [new VideoOrdering('dvd-group', 'DVD', 'dvd'), new VideoOrdering('aired', 'Aired', 'aired')];
+        $alternate = new VideoTitle($candidate, orderings: $offers, seasons: [
+            new VideoSeason(5, episodes: [new VideoEpisode('11', 4, 'First'), new VideoEpisode('12', 8, 'Second')]),
+        ]);
+        $aired = new VideoTitle($candidate, orderings: $offers, seasons: [
+            new VideoSeason(1, episodes: [new VideoEpisode('11', 1, 'First'), new VideoEpisode('12', 2, 'Second')]),
+        ]);
+
+        self::assertTrue($this->apply($now)->apply($claim, $target, VideoProviderId::Tvdb, new ResolvedVideoMatch($alternate, 'dvd-group', $aired)));
+        self::assertSame('matched', $this->observer->fetchOne('SELECT status FROM video_match_states'));
+        $linked = $this->observer->fetchAssociative(
+            'SELECT episode.provider_id, episode.episode_number FROM video_placement_episode link JOIN tv_episodes episode ON episode.id = link.episode_id',
+        );
+        self::assertSame(['provider_id' => '12', 'episode_number' => 8], $linked);
     }
 
     private function library(string $type): Uuid
@@ -281,6 +322,10 @@ final class VideoMatchInfrastructureTest extends TestCase
             }
         };
 
-        return new VideoMatchApply($this->manager, $transaction, $this->states, $this->movies, $this->catalog, new MockClock($now));
+        $placement = new VideoPlacementService(
+            $this->catalog, new EpisodePlacer(), $this->createStub(WatchedMarkMovePortInterface::class), $transaction,
+        );
+
+        return new VideoMatchApply($this->manager, $transaction, $this->states, $this->movies, $this->catalog, new MockClock($now), $placement);
     }
 }
