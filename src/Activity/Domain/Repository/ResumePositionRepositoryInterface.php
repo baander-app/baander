@@ -16,6 +16,7 @@ interface ResumePositionRepositoryInterface
         ?float $positionSeconds,
         DateTimeImmutable $reportedAt,
         bool $force,
+        int $clockSkewSeconds = 0,
     ): bool;
 
     /** @param list<Uuid> $videoIds */

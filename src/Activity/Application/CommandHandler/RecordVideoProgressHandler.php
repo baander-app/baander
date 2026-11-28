@@ -6,6 +6,7 @@ namespace App\Activity\Application\CommandHandler;
 
 use App\Activity\Application\Command\RecordVideoProgressCommand;
 use App\Activity\Application\DTO\VideoProgressResult;
+use App\Activity\Application\Settings\ActivitySettingDefinitions;
 use App\Activity\Domain\Model\WatchedMark;
 use App\Activity\Domain\Repository\ResumePositionRepositoryInterface;
 use App\Activity\Domain\Repository\WatchedMarkRepositoryInterface;
@@ -15,6 +16,7 @@ use App\Catalog\Application\Port\WatchableTitlePortInterface;
 use App\Party\Application\Port\WatchMembershipPortInterface;
 use App\Shared\Application\Exception\InvalidInputException;
 use App\Shared\Application\Exception\NotFoundException;
+use App\Shared\Application\Port\SystemSettingsPortInterface;
 use App\Shared\Application\Port\TransactionPortInterface;
 use Psr\Clock\ClockInterface;
 use Symfony\Component\Messenger\Attribute\AsMessageHandler;
@@ -28,6 +30,7 @@ final readonly class RecordVideoProgressHandler
         private WatchedMarkRepositoryInterface $marks,
         private TransactionPortInterface $transaction,
         private ClockInterface $clock,
+        private SystemSettingsPortInterface $settings,
     ) {}
 
     #[AsMessageHandler]
@@ -61,6 +64,7 @@ final readonly class RecordVideoProgressHandler
                 $complete ? null : $position,
                 $reportedAt,
                 $complete || $command->action !== VideoProgressAction::Progress,
+                clockSkewSeconds: (int) $this->settings->get(ActivitySettingDefinitions::PROGRESS_CLOCK_SKEW_SECONDS),
             );
             if ($recorded && $complete && $video->targets !== []) {
                 $now = $this->clock->now();

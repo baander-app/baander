@@ -84,6 +84,11 @@ The entries below cover scanning, matching, member playback and their verificati
   development database and rescan its libraries. The rewritten migration does
   not convert existing catalog rows. All migration checks ran on isolated preview
   and CI databases.
+- U24 adds the server setting `activity.progress_clock_skew_seconds`. Its
+  default, zero, accepts only a newer observation. A positive value accepts
+  a late report within that many seconds of the latest saved time. Updating
+  the position keeps that latest time in place. Future reports use receipt
+  time, and manual clears and completions protect the position on rewatch.
 
 ### Verification
 
@@ -247,6 +252,26 @@ The entries below cover scanning, matching, member playback and their verificati
   reported zero violations with 439 skipped, and imports passed across 5,283
   files. The regenerated OpenAPI specification and Orval client passed both
   drift checks.
+- The full U10 run counted 15,714 tests and 157,152 assertions. Its database
+  restart fixture selected a PostgreSQL autovacuum worker along with the
+  application connections. PostgreSQL denied the operation. The two restart
+  fixtures now select only client connections owned by the test role in the
+  disposable test database. The corrected OAuth and DPoP suites passed 68
+  tests with 1,712 assertions.
+- U24’s progress handler passed 23 tests with 260 assertions. The member HTTP
+  and system settings suites passed 22 tests with 311 assertions against the
+  new migration. They exercise the super administrator’s live change from zero
+  to five seconds and back, member permissions, and reports at and outside
+  the microsecond boundary. The PostgreSQL, migration, timestamp and capture
+  checks passed 25 tests with 2,095 assertions. A fresh database applied 62
+  migrations and contained 116 tables. The migration preserved played and
+  cleared positions without publishing a change to members. Full PHPStan
+  passed across 4,606 files, Deptrac found zero violations with 439 skipped,
+  and the import check passed across 5,285 files. The upgraded checkout
+  preview and a second, freshly migrated database passed schema verification
+  through `Version20261128160000`. All six Chromium and Firefox cases passed
+  against that preview with retries disabled. The U24 simplification and code
+  reviews found no additional changes.
 - The full U8 run counted 15,653 tests and 156,814 assertions, with two
   errors and four failures. U9 corrected the ingest, playback access,
   workload and log-retention fixtures, and U13 corrected the sleep test’s

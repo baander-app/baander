@@ -2006,7 +2006,7 @@
       "classification": "capture",
       "operations": ["INSERT", "UPDATE", "DELETE"],
       "relevant_columns": ["id", "user_id", "video_id", "position_seconds", "reported_at", "last_played_at"],
-      "excluded_columns": [],
+      "excluded_columns": ["protected_through_at"],
       "families": ["activity", "catalog"],
       "scope_routes": ["user"],
       "readers": ["src/Activity/Infrastructure/Doctrine/ViewingState.php"],

@@ -21,7 +21,7 @@ use Symfony\Component\Validator\Constraints as Assert;
         'titleId' => new OA\Schema(type: 'string', description: 'Episode or movie public ID, or the placement public ID for an extra', minLength: PublicId::LENGTH, maxLength: PublicId::LENGTH, pattern: PublicId::SCHEMA_PATTERN),
         'positionSeconds' => new OA\Schema(type: 'number', format: 'double', minimum: 0),
         'action' => new OA\Schema(type: 'string', enum: [VideoProgressAction::class]),
-        'reportedAt' => new OA\Schema(type: 'string', format: 'date-time', description: 'Time the player observed the event, with a timezone and at most six fractional digits. Future reports use the server receipt time. Only observations newer than the stored time can update progress.'),
+        'reportedAt' => new OA\Schema(type: 'string', format: 'date-time', description: 'Time the player observed the event, with a timezone and at most six fractional digits. Future reports use server receipt time. By default, observations must be newer than the saved time. The server can allow an older observation within its configured clock tolerance. Reports at or before a manual clear or completion cannot restore the position.'),
     ],
     required: ['titleKind', 'titleId', 'positionSeconds', 'action', 'reportedAt'],
     component: 'RecordVideoProgressRequest',

@@ -105,7 +105,7 @@ export interface RecordVideoProgressRequest {
   /** @minimum 0 */
   positionSeconds: number;
   action: RecordVideoProgressRequestAction;
-  /** Time the player observed the event, with a timezone and at most six fractional digits. Future reports use the server receipt time. Only observations newer than the stored time can update progress. */
+  /** Time the player observed the event, with a timezone and at most six fractional digits. Future reports use server receipt time. By default, observations must be newer than the saved time. The server can allow an older observation within its configured clock tolerance. Reports at or before a manual clear or completion cannot restore the position. */
   reportedAt: string;
 }
 

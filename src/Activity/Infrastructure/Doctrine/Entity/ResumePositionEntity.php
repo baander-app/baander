@@ -33,4 +33,7 @@ class ResumePositionEntity
 
     #[ORM\Column(type: 'datetime_immutable', nullable: true)]
     private ?DateTimeImmutable $lastPlayedAt;
+
+    #[ORM\Column(type: 'datetime_immutable', nullable: true)]
+    private ?DateTimeImmutable $protectedThroughAt;
 }

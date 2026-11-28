@@ -7,6 +7,7 @@ namespace App\Tests\Functional\Activity;
 use App\Activity\Application\CommandHandler\RecordVideoProgressHandler;
 use App\Activity\Application\CommandHandler\SetWatchedHandler;
 use App\Activity\Application\Port\ViewingStatePortInterface;
+use App\Activity\Application\Settings\ActivitySettingDefinitions;
 use App\Activity\Domain\Repository\ResumePositionRepositoryInterface;
 use App\Activity\Domain\Repository\WatchedMarkRepositoryInterface;
 use App\Auth\Domain\Model\User;
@@ -27,11 +28,15 @@ use App\Library\Infrastructure\Doctrine\Entity\LibraryEntity;
 use App\Library\Infrastructure\Doctrine\Entity\LibraryFileIndexEntity;
 use App\Party\Infrastructure\Doctrine\Entity\SyncedPartySessionEntity;
 use App\Party\Application\Port\WatchMembershipPortInterface;
+use App\Shared\Application\Port\SystemSettingsPortInterface;
 use App\Shared\Application\Port\TransactionPortInterface;
 use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
 use App\Tests\Functional\TestCase;
 use DateTimeImmutable;
+use Symfony\Bundle\FrameworkBundle\Console\Application;
+use Symfony\Component\Console\Command\Command;
+use Symfony\Component\Console\Tester\CommandTester;
 use Symfony\Component\Filesystem\Filesystem;
 use Symfony\Component\Clock\MockClock;
 
@@ -99,6 +104,93 @@ final class WatchedControllerTest extends TestCase
         $this->assertObservationTimes($member, $video, $clock->now(), $clock->now());
     }
 
+    public function testOperatorCanChangeClockToleranceWithoutWeakeningWatchedActions(): void
+    {
+        $latest = new DateTimeImmutable('2026-11-28T12:00:00.123456+00:00');
+        $clock = new MockClock($latest);
+        $this->useViewingClock($clock);
+        $member = $this->createTestUser();
+        $operator = $this->createSuperAdminUser();
+        [$library, $video, , $episodes] = $this->catalog();
+        $this->grant($member, $library);
+        $uri = '/api/activity/videos/' . $video->getPublicId() . '/progress';
+        $title = $episodes[0]->publicId->toString();
+        $report = function (float $position, DateTimeImmutable $time, string $action = 'pause', ?int $requestedTolerance = null) use ($member, $uri, $title): bool {
+            $body = [
+                'titleKind' => 'episode',
+                'titleId' => $title,
+                'positionSeconds' => $position,
+                'action' => $action,
+                'reportedAt' => $time->format('Y-m-d\TH:i:s.uP'),
+            ];
+            if ($requestedTolerance !== null) {
+                $body['clockSkewSeconds'] = $requestedTolerance;
+            }
+
+            return $this->assertJsonResponse($this->authenticatedRequest('POST', $uri, $member, $body), 200)['data']['recorded'];
+        };
+        $key = ActivitySettingDefinitions::PROGRESS_CLOCK_SKEW_SECONDS;
+        $definition = $this->assertJsonResponse($this->authenticatedRequest('GET', '/api/admin/settings/definitions', $operator), 200)['data'];
+        $definition = array_column($definition, null, 'key')[$key];
+        self::assertSame('integer', $definition['type']);
+        self::assertSame('system', $definition['scope']);
+        self::assertSame(0, $definition['default']);
+        self::assertSame(0, $definition['min']);
+        self::assertSame('ROLE_SUPER_ADMIN', $definition['editRole']);
+        $application = new Application($this->client->getKernel());
+        $definitions = new CommandTester($application->find('app:settings:definitions'));
+        self::assertSame(Command::SUCCESS, $definitions->execute(['--scope' => 'system', '--json' => true]));
+        $consoleDefinitions = json_decode($definitions->getDisplay(), true, flags: JSON_THROW_ON_ERROR);
+        self::assertSame($definition, array_column($consoleDefinitions, null, 'key')[$key]);
+
+        self::assertTrue($report(40.0, $latest->modify('+1 day')));
+        $this->assertObservationTimes($member, $video, $latest, $latest);
+        $boundary = $latest->modify('-5 seconds');
+        self::assertFalse($report(50.0, $boundary, requestedTolerance: 5));
+        self::assertSame(40.0, $this->position($member, $video));
+
+        $patch = ['settings' => [$key => 5]];
+        $this->assertJsonResponse($this->authenticatedRequest('PATCH', '/api/admin/settings', $member, $patch), 403);
+        $this->assertJsonResponse($this->authenticatedRequest('PATCH', '/api/admin/settings', $operator, ['settings' => [$key => -1]]), 422);
+        $settings = $this->assertJsonResponse($this->authenticatedRequest('PATCH', '/api/admin/settings', $operator, $patch), 200)['data'];
+        self::assertSame(5, array_column($settings, 'value', 'key')[$key]);
+        self::assertFalse($report(50.0, $latest));
+        self::assertFalse($report(50.0, $boundary->modify('-1 microsecond')));
+        self::assertFalse($report(50.0, $boundary, 'progress'));
+        self::assertFalse($report(100.0, $boundary->modify('-1 microsecond'), 'end'));
+        self::assertSame(0, $this->markCount($member));
+        self::assertTrue($report(50.0, $boundary));
+        self::assertSame(50.0, $this->position($member, $video));
+        $this->assertObservationTimes($member, $video, $latest, $latest);
+
+        self::assertTrue($report(100.0, $boundary->modify('+1 microsecond'), 'end'));
+        self::assertSame(2, $this->markCount($member));
+        self::assertFalse($report(60.0, $latest->modify('-1 microsecond')));
+        self::assertNull($this->position($member, $video));
+        $this->assertObservationTimes($member, $video, $latest, $latest);
+
+        $clock->sleep(1);
+        $markedAt = $clock->now();
+        $this->assertJsonResponse($this->authenticatedRequest('PUT', '/api/activity/watched/episode/' . $title, $member, ['watched' => false]), 200);
+        $beforeMark = $markedAt->modify('-1 microsecond');
+        self::assertFalse($report(60.0, $beforeMark));
+        self::assertNull($this->position($member, $video));
+        $this->assertObservationTimes($member, $video, $markedAt, $latest);
+        $clock->sleep(1);
+        $rewatchedAt = $clock->now();
+        self::assertTrue($report(60.0, $rewatchedAt));
+        self::assertFalse($report(70.0, $beforeMark));
+        self::assertSame(1, $this->markCount($member));
+
+        $settingsCommand = new CommandTester($application->find('app:settings:set'));
+        self::assertSame(Command::SUCCESS, $settingsCommand->execute(['key' => $key, 'value' => '0']));
+        $settings = $this->assertJsonResponse($this->authenticatedRequest('GET', '/api/admin/settings', $operator), 200)['data'];
+        self::assertSame(0, array_column($settings, 'value', 'key')[$key]);
+        self::assertFalse($report(70.0, $rewatchedAt->modify('-1 microsecond')));
+        self::assertSame(60.0, $this->position($member, $video));
+        $this->assertObservationTimes($member, $video, $rewatchedAt, $rewatchedAt);
+    }
+
     private function useViewingClock(MockClock $clock): void
     {
         $container = static::getContainer();
@@ -113,6 +205,7 @@ final class WatchedControllerTest extends TestCase
             $marks,
             $transaction,
             $clock,
+            $container->get(SystemSettingsPortInterface::class),
         ));
         $container->set(SetWatchedHandler::class, new SetWatchedHandler($titles, $positions, $marks, $transaction, $clock));
     }

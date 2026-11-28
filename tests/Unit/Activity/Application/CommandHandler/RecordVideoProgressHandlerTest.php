@@ -7,6 +7,7 @@ namespace App\Tests\Unit\Activity\Application\CommandHandler;
 use App\Activity\Application\Command\RecordVideoProgressCommand;
 use App\Activity\Application\Command\VideoProgressAction;
 use App\Activity\Application\CommandHandler\RecordVideoProgressHandler;
+use App\Activity\Application\Settings\ActivitySettingDefinitions;
 use App\Activity\Domain\Model\WatchedMark;
 use App\Activity\Domain\Repository\ResumePositionRepositoryInterface;
 use App\Activity\Domain\Repository\WatchedMarkRepositoryInterface;
@@ -16,6 +17,7 @@ use App\Catalog\Application\Port\WatchableTitlePortInterface;
 use App\Party\Application\Port\WatchMembershipPortInterface;
 use App\Shared\Application\Exception\InvalidInputException;
 use App\Shared\Application\Exception\NotFoundException;
+use App\Shared\Application\Port\SystemSettingsPortInterface;
 use App\Shared\Application\Port\TransactionPortInterface;
 use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
@@ -31,6 +33,7 @@ final class RecordVideoProgressHandlerTest extends TestCase
     private WatchMembershipPortInterface&MockObject $parties;
     private ResumePositionRepositoryInterface&MockObject $positions;
     private WatchedMarkRepositoryInterface&MockObject $marks;
+    private SystemSettingsPortInterface $settings;
     private Uuid $memberId;
     private Uuid $videoId;
     private PublicId $videoPublicId;
@@ -43,6 +46,9 @@ final class RecordVideoProgressHandlerTest extends TestCase
         $this->parties = $this->createMock(WatchMembershipPortInterface::class);
         $this->positions = $this->createMock(ResumePositionRepositoryInterface::class);
         $this->marks = $this->createMock(WatchedMarkRepositoryInterface::class);
+        $settings = $this->createStub(SystemSettingsPortInterface::class);
+        $settings->method('get')->willReturn(0);
+        $this->settings = $settings;
         $this->memberId = Uuid::v7();
         $this->videoId = Uuid::v7();
         $this->videoPublicId = new PublicId();
@@ -70,6 +76,7 @@ final class RecordVideoProgressHandlerTest extends TestCase
             40.0,
             $this->now->modify($effectiveOffset),
             true,
+            0,
         )->willReturn(true);
 
         self::assertTrue($this->handler()(new RecordVideoProgressCommand(
@@ -99,9 +106,11 @@ final class RecordVideoProgressHandlerTest extends TestCase
             return new WatchableVideo($this->videoId, 100.0, []);
         });
         $this->parties->expects(self::once())->method('isWatching')->willReturn(false);
+        $settings = $this->createMock(SystemSettingsPortInterface::class);
+        $settings->expects(self::once())->method('get')->with(ActivitySettingDefinitions::PROGRESS_CLOCK_SKEW_SECONDS)->willReturn(5);
         $this->positions->expects(self::once())->method('record')
-            ->with($this->memberId, $this->videoId, 40.0, $this->now, true)->willReturn(true);
-        $handler = new RecordVideoProgressHandler($this->titles, $this->parties, $this->positions, $this->marks, $transaction, $clock);
+            ->with($this->memberId, $this->videoId, 40.0, $this->now, true, 5)->willReturn(true);
+        $handler = new RecordVideoProgressHandler($this->titles, $this->parties, $this->positions, $this->marks, $transaction, $clock, $settings);
 
         self::assertTrue($handler(new RecordVideoProgressCommand(
             $this->memberId,
@@ -196,6 +205,9 @@ final class RecordVideoProgressHandlerTest extends TestCase
 
     public function testAPartyReportWritesNoViewingState(): void
     {
+        $settings = $this->createMock(SystemSettingsPortInterface::class);
+        $settings->expects(self::never())->method('get');
+        $this->settings = $settings;
         $this->titles->expects(self::once())->method('forProgress')->willReturn(new WatchableVideo($this->videoId, 100.0, [new WatchableTarget('episode', Uuid::v7())]));
         $this->parties->expects(self::once())->method('isWatching')->with($this->memberId, $this->videoId)->willReturn(true);
         $this->positions->expects(self::never())->method('record');
@@ -248,6 +260,9 @@ final class RecordVideoProgressHandlerTest extends TestCase
 
     public function testAnUnavailableTitleWritesNothing(): void
     {
+        $settings = $this->createMock(SystemSettingsPortInterface::class);
+        $settings->expects(self::never())->method('get');
+        $this->settings = $settings;
         $this->titles->expects(self::once())->method('forProgress')->willReturn(null);
         $this->parties->expects(self::never())->method('isWatching');
         $this->positions->expects(self::never())->method('record');
@@ -289,6 +304,6 @@ final class RecordVideoProgressHandlerTest extends TestCase
             public function run(callable $operation): mixed { return $operation(); }
         };
 
-        return new RecordVideoProgressHandler($this->titles, $this->parties, $this->positions, $this->marks, $transaction, new MockClock($this->now));
+        return new RecordVideoProgressHandler($this->titles, $this->parties, $this->positions, $this->marks, $transaction, new MockClock($this->now), $this->settings);
     }
 }
