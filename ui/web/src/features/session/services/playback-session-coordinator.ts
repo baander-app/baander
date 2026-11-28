@@ -18,6 +18,7 @@ import { PlaybackCommandRunner, type PlaybackAcknowledgement } from './playback-
 import { hasUnconfirmedPlayback, UNCONFIRMED_PLAYBACK_REFUSAL } from './playback-status'
 import { playbackPageId } from './playback-page-identity'
 import { CLOSE_REPORT_PATH, PlaybackCloseReporter } from './playback-close-reporter'
+import { observePlaybackDate, playbackClock } from './playback-clock'
 import { MediaCompatibilityError } from '@/features/player/services/media-delivery'
 
 type RequestResult = NonNullable<PlaybackSnapshotResource['requestResult']>
@@ -294,10 +295,12 @@ export class PlaybackSessionCoordinator {
   }
 
   private async post(path: string, body: object, endpoint?: PlaybackEndpointResource): Promise<ControlSnapshot> {
+    const startedAt = playbackClock.elapsed()
     const response = await this.withRequest(signal => AXIOS_INSTANCE.post(path, body, {
       signal,
       ...(endpoint?.capability ? { headers: { 'X-Baander-Playback-Endpoint': endpoint.capability } } : {}),
     }))
+    if (this.current()) observePlaybackDate(response.headers?.date, startedAt, response.config?.baseURL)
     return this.apply(response.data?.data ?? response.data)
   }
 
@@ -468,8 +471,14 @@ export class PlaybackSessionCoordinator {
     }
     this.clientRequestId = this.localRecovery?.tabId ?? this.endpointId
     for (const waiter of this.identityWaiters) waiter.resolve(this.clientRequestId)
-    await this.withRequest(signal => AXIOS_INSTANCE.post('/api/devices', { deviceId: getDeviceId(), name: getDeviceName() }, { signal }))
+    const startedAt = playbackClock.elapsed()
+    const response = await this.withRequest(signal => AXIOS_INSTANCE.post(
+      '/api/devices',
+      { deviceId: getDeviceId(), name: getDeviceName() },
+      { signal }
+    ))
     if (!current()) return
+    observePlaybackDate(response.headers?.date, startedAt, response.config?.baseURL)
     const adapters = (['song', 'video'] as const).map(kind => getPlaybackAdapter(kind)).filter(adapter => adapter !== undefined)
     const capabilities: string[] = adapters.map(adapter => adapter.kind)
     if (adapters.length > 0 && adapters.every(adapter => adapter.supportsVolume)) capabilities.push('volume')

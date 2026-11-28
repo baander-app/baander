@@ -46,6 +46,13 @@ final class VideoMatchCandidatesResource extends AbstractResource
             return VideoMatchChoicesResource::from($source);
         }
 
-        return ['kind' => $source['kind'], 'publicId' => $source['publicId'], 'providers' => $source['providers']];
+        $providers = $source['providers'];
+        foreach ($providers as $providerIndex => $provider) {
+            foreach ($provider['candidates'] as $candidateIndex => $candidate) {
+                $providers[$providerIndex]['candidates'][$candidateIndex]['externalIds'] = (object) $candidate['externalIds'];
+            }
+        }
+
+        return ['kind' => $source['kind'], 'publicId' => $source['publicId'], 'providers' => $providers];
     }
 }

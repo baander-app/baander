@@ -1,6 +1,7 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import {
+  act,
   cleanup,
   fireEvent,
   screen,
@@ -182,6 +183,38 @@ describe('movie player launcher', () => {
       position: 12,
       desiredState: 'playing',
     })
+  })
+
+  it('queues the movie behind an outstanding extra even when the movie is still active', async () => {
+    let completeExtra!: () => void
+    const extraLoad = new Promise<void>(resolve => {
+      completeExtra = resolve
+    })
+    request.mockReturnValueOnce(extraLoad).mockImplementationOnce(async () => {
+      await extraLoad
+    })
+    renderMovie()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Resume Behind the scenes' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Play' }))
+
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    expect(request).toHaveBeenCalledTimes(2)
+    expect(request).toHaveBeenLastCalledWith({
+      action: 'load',
+      media: {
+        kind: 'video',
+        publicId: 'last-video',
+        viewing: { titleKind: 'movie', titleId: 'movie' },
+      },
+      position: 3,
+      desiredState: 'playing',
+    })
+
+    await act(async () => completeExtra())
+
+    expect(screen.getByRole('dialog', { name: 'Fixture movie' })).toBeInTheDocument()
+    expect(screen.queryByRole('dialog', { name: 'Behind the scenes' })).not.toBeInTheDocument()
   })
 
   it('opens the same file under a different title without losing the current position', async () => {

@@ -107,12 +107,102 @@ final class AutomaticVideoMatcherTest extends TestCase
         self::assertSame($retry, $outcome->retryAt);
     }
 
+    public function testThePausedProviderMatchesAgainAtItsRetryDeadline(): void
+    {
+        $retry = $this->clock->now()->modify('+15 minutes');
+        $this->clock->sleep(15 * 60);
+        $metadata = new VideoTitle(new VideoCandidate('121361', 'Heat', 1995), orderings: [new VideoOrdering('aired', 'Aired', 'aired')]);
+        $this->pauses->expects(self::once())->method('find')->with('tvdb')->willReturn(new VideoProviderPause('tvdb', 'unavailable', 1, $retry));
+        $this->pauses->expects(self::once())->method('clear')->with('tvdb');
+        $this->providers->method('usableProviders')->willReturn([VideoProviderId::Tvdb, VideoProviderId::Tmdb]);
+        $this->providers->expects(self::once())->method('search')->with(VideoProviderId::Tvdb)->willReturn([$metadata->entry]);
+        $this->providers->expects(self::once())->method('identify')->with(VideoProviderId::Tvdb)->willReturn($metadata);
+        $this->apply->expects(self::once())->method('apply')->with(self::anything(), self::anything(), VideoProviderId::Tvdb, new ResolvedVideoMatch($metadata, 'aired'))->willReturn(true);
+
+        $outcome = $this->matcher(VideoKind::Series)->match($this->claim(VideoKind::Series));
+
+        self::assertEquals($retry, $this->clock->now());
+        self::assertSame(VideoMatchOutcomeKind::Matched, $outcome->kind);
+        self::assertSame(VideoProviderId::Tvdb, $outcome->provider);
+    }
+
+    public function testUsableProvidersWithNoResultsLeaveTheSeriesForReview(): void
+    {
+        $calls = [];
+        $this->providers->method('usableProviders')->willReturn([VideoProviderId::Tvdb, VideoProviderId::Tmdb]);
+        $this->pauses->expects(self::exactly(2))->method('find')->willReturn(null);
+        $this->pauses->expects(self::exactly(2))->method('clear');
+        $this->providers->expects(self::exactly(2))->method('search')->willReturnCallback(static function (VideoProviderId $provider, VideoRequest $request) use (&$calls): array {
+            $calls[] = $provider;
+            self::assertSame(VideoKind::Series, $request->kind);
+            self::assertSame('New Show', $request->title);
+
+            return [];
+        });
+        $this->providers->expects(self::never())->method('identify');
+        $this->apply->expects(self::never())->method('apply');
+        $request = new VideoRequest(VideoKind::Series, 'New Show', libraryId: $this->library, titleId: $this->title);
+
+        $outcome = $this->matcher(VideoKind::Series, request: $request)->match($this->claim(VideoKind::Series));
+
+        self::assertSame([VideoProviderId::Tvdb, VideoProviderId::Tmdb], $calls);
+        self::assertSame(VideoMatchOutcomeKind::NeedsReview, $outcome->kind);
+        self::assertSame('no_candidates', $outcome->reason);
+        self::assertNull($outcome->score);
+    }
+
+    public function testAnUnusableLocalSidecarFallsThroughToTheNextProvider(): void
+    {
+        $metadata = new VideoTitle(new VideoCandidate('121361', 'Heat', 1995), orderings: [new VideoOrdering('aired', 'Aired', 'aired')]);
+        $this->providers->method('usableProviders')->willReturn([VideoProviderId::Local, VideoProviderId::Tvdb, VideoProviderId::Tmdb]);
+        $this->pauses->expects(self::once())->method('find')->with('tvdb')->willReturn(null);
+        $this->providers->expects(self::once())->method('search')->with(VideoProviderId::Tvdb)->willReturn([$metadata->entry]);
+        $identified = [];
+        $this->providers->expects(self::exactly(2))->method('identify')->willReturnCallback(static function (VideoProviderId $provider, VideoRequest $request) use ($metadata, &$identified): ?VideoTitle {
+            $identified[] = $provider;
+            if ($provider === VideoProviderId::Local) {
+                self::assertCount(1, $request->sidecars);
+
+                return null;
+            }
+            self::assertSame(VideoProviderId::Tvdb, $provider);
+
+            return $metadata;
+        });
+        $this->apply->expects(self::once())->method('apply')->with(self::anything(), self::anything(), VideoProviderId::Tvdb, new ResolvedVideoMatch($metadata, 'aired'))->willReturn(true);
+        $sidecars = [new VideoSidecar(VideoSidecarKind::SeriesNfo, '/library/tvshow.nfo')];
+
+        $outcome = $this->matcher(VideoKind::Series, order: ['local', 'tvdb', 'tmdb'], sidecars: $sidecars)->match($this->claim(VideoKind::Series));
+
+        self::assertSame(VideoMatchOutcomeKind::Matched, $outcome->kind);
+        self::assertSame([VideoProviderId::Local, VideoProviderId::Tvdb], $identified);
+    }
+
+    public function testTheMovieProviderTagIdentifiesTheMatrixWithoutSearching(): void
+    {
+        $metadata = new VideoTitle(new VideoCandidate('603', 'The Matrix', 1999));
+        $request = new VideoRequest(VideoKind::Movie, 'The Matrix', 1999, ['tmdb' => '603'], libraryId: $this->library, titleId: $this->title);
+        $this->providers->method('usableProviders')->willReturn([VideoProviderId::Tmdb]);
+        $this->pauses->expects(self::once())->method('find')->with('tmdb')->willReturn(null);
+        $this->providers->expects(self::never())->method('search');
+        $this->providers->expects(self::once())->method('identify')->with(VideoProviderId::Tmdb, $request)->willReturn($metadata);
+        $this->apply->expects(self::once())->method('apply')->with(self::anything(), self::anything(), VideoProviderId::Tmdb, new ResolvedVideoMatch($metadata, 'aired'))->willReturn(true);
+
+        $outcome = $this->matcher(VideoKind::Movie, request: $request)->match($this->claim(VideoKind::Movie));
+
+        self::assertSame(VideoMatchOutcomeKind::Matched, $outcome->kind);
+        self::assertSame(VideoProviderId::Tmdb, $outcome->provider);
+    }
+
     public function testAMovieStillMatchesWhileTheTvProviderIsPaused(): void
     {
         $candidate = new VideoCandidate('949', 'Heat', 1995);
         $metadata = new VideoTitle($candidate);
         $this->providers->method('usableProviders')->willReturn([VideoProviderId::Local, VideoProviderId::Tmdb]);
-        $this->providers->expects(self::once())->method('search')->with(VideoProviderId::Tmdb)->willReturn([$candidate]);
+        $this->providers->expects(self::once())->method('search')->with(
+            VideoProviderId::Tmdb,
+            self::callback(static fn (VideoRequest $request): bool => $request->kind === VideoKind::Movie && $request->title === 'Heat' && $request->year === 1995),
+        )->willReturn([$candidate]);
         $this->providers->expects(self::once())->method('identify')->with(VideoProviderId::Tmdb)->willReturn($metadata);
         $this->pauses->expects(self::once())->method('find')->willReturnCallback(static fn (string $provider): ?VideoProviderPause => $provider === 'tvdb'
             ? new VideoProviderPause('tvdb', 'unavailable', 2, new DateTimeImmutable('+1 hour')) : null);
@@ -284,11 +374,11 @@ final class AutomaticVideoMatcherTest extends TestCase
      * @param array<string, string> $ids
      * @param list<VideoSidecar> $sidecars
      */
-    private function matcher(VideoKind $kind, ?array $order = null, array $ids = [], array $sidecars = [], bool $matched = false, string $ordering = 'aired'): AutomaticVideoMatcher
+    private function matcher(VideoKind $kind, ?array $order = null, array $ids = [], array $sidecars = [], bool $matched = false, string $ordering = 'aired', ?VideoRequest $request = null): AutomaticVideoMatcher
     {
         $default = $kind === VideoKind::Series ? [VideoProviderId::Tvdb, VideoProviderId::Tmdb, VideoProviderId::Local] : [VideoProviderId::Tmdb, VideoProviderId::Local];
         $this->providers->method('providers')->willReturn($default);
-        $request = new VideoRequest($kind, 'Heat', 1995, $ids, $ordering, libraryId: $this->library, sidecars: $sidecars, titleId: $this->title);
+        $request ??= new VideoRequest($kind, 'Heat', 1995, $ids, $ordering, libraryId: $this->library, sidecars: $sidecars, titleId: $this->title);
         $this->targets->expects(self::once())->method('load')->willReturn(new VideoMatchTarget($this->title, $request, [], $matched));
         $libraries = $this->createStub(LibraryTypeLookupInterface::class);
         $libraries->method('findType')->willReturn($kind === VideoKind::Series ? LibraryType::TvShow : LibraryType::Movie);

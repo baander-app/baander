@@ -105,7 +105,7 @@ export interface RecordVideoProgressRequest {
   /** @minimum 0 */
   positionSeconds: number;
   action: RecordVideoProgressRequestAction;
-  /** Client-reported instant with a timezone and at most six fractional digits */
+  /** Time the player observed the event, with a timezone and at most six fractional digits. Future reports use the server receipt time. Only observations newer than the stored time can update progress. */
   reportedAt: string;
 }
 

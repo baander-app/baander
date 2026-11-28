@@ -90,6 +90,11 @@ The entries below cover scanning, matching, member playback and their verificati
 - The isolated preview migrated a fresh database through
   `Version20261127194100`. A second migration run reported the current version,
   and `doctrine:schema:validate` reported valid mappings and a synchronized schema.
+- U4’s capture and movie import tests passed 53 tests with 2,967 assertions.
+  The movie metadata sync regression passed separately with 16 assertions.
+  U5’s signed-playback checks passed 192 tests with 8,137 assertions, its
+  ingestion checks passed 51 with 418, and scanner deletion passed 65 with
+  374. The original full runs at U4 and U5 were interrupted.
 - U6 passed the CI-image static gates from `make ci`, covering Composer validation
   and normalization, PHPStan, Deptrac, imports, tooling architecture, tooling format
   and tooling PHPStan. Its ordinary PHPUnit lane passed 10,041 tests with 57,577
@@ -202,6 +207,46 @@ The entries below cover scanning, matching, member playback and their verificati
   tests with 69 assertions. The documentation check compared 11 command
   definitions and 50 inputs with their reference pages. The public site build
   generated 304 manual pages, including Video Matching.
+- U19 added four PostgreSQL acceptance tests with 164 assertions. They cover an
+  episode ordering change, a library re-match, two files added after a season
+  mark and a drive remount. The matcher and placement suites passed 37 tests
+  with 198 assertions. The fresh preview migrated through
+  `Version20261128140000`, repeated the migration with no changes and passed
+  Doctrine schema validation.
+- The historical U9 full run counted 15,685 tests and 157,037 assertions. The
+  file-stability test and the concurrent worker reservation test failed. The
+  file-stability case passed after the U16 timing correction. The reservation
+  test reproduced the PostgreSQL lock timeout with two waiting processes.
+  Giving those test processes time to finish the race kept the production
+  timeout intact. All 22 inventory tests passed with 184 assertions.
+- The final Chromium and Firefox preview run passed all six Playwright cases
+  in five minutes with one worker and retries disabled. Both engines resumed original and encoded video,
+  reopened the last-played movie version and showed the matched series after
+  an administrator resolved its review.
+- The candidate HTTP and CLI suite passed 25 tests with 359 assertions,
+  including the empty external-ID object returned for a local candidate.
+  The playback-detail suite passed 28 tests, including a user switching back
+  to the active video while another load was pending.
+- Resolving one or 200 credits sharing three provider IDs took five SQL
+  statements in both cases. Forty new people took one identity read, one
+  claim insert, 40 locks and 40 person inserts. The nine identity persistence
+  tests passed with 60 assertions, and the wider credit, profile and race
+  suite passed 22 tests with 127 assertions.
+- The player timestamps observations before sending them. A browser with a
+  skewed clock uses the HTTP date from device registration or a playback
+  request. That date has one-second precision. A pause immediately after a
+  manual mark can fall before the mark’s timestamp until the next observation.
+  The server caps future timestamps at receipt and keeps the stored time as
+  the lower bound for subsequent reports. The progress handler, HTTP endpoint
+  and PostgreSQL write tests passed 37 tests with 448 assertions. They cover a
+  correctly timed handoff after a future report, a delayed completion after a
+  manual mark, and the next accepted pause.
+- After the four review fixes, the web suite passed 4,025 tests in 342 files.
+  TypeScript passed. ESLint reported zero errors and ten warnings in the clean
+  verification checkout. Full PHPStan passed across 4,605 files. Deptrac
+  reported zero violations with 439 skipped, and imports passed across 5,283
+  files. The regenerated OpenAPI specification and Orval client passed both
+  drift checks.
 - The full U8 run counted 15,653 tests and 156,814 assertions, with two
   errors and four failures. U9 corrected the ingest, playback access,
   workload and log-retention fixtures, and U13 corrected the sleep test’s

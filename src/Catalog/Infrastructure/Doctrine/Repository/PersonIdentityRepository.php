@@ -37,24 +37,109 @@ final readonly class PersonIdentityRepository implements PersonIdentityPortInter
     public function resolveCredits(array $credits): ?array
     {
         PersonWriteLock::shared($this->connection);
-        $keys = [];
-        foreach ($credits as $credit) {
-            foreach (self::normalize($credit->identifiers) as $namespace => $value) {
-                $keys[] = self::identifierLock($namespace, $value);
+        $claims = [];
+        $normalized = [];
+        foreach ($credits as $index => $credit) {
+            $normalized[$index] = self::normalize($credit->identifiers);
+            foreach ($normalized[$index] as $namespace => $value) {
+                $key = self::identifierLock($namespace, $value);
+                $claims[$key] = ['namespace' => $namespace, 'external_id' => $value];
             }
         }
-        ImportIdentityLock::acquire($this->connection, $keys);
+        ImportIdentityLock::acquire($this->connection, array_keys($claims));
+
+        $known = [];
+        $blocked = [];
+        if ($claims !== []) {
+            // DBAL projects the locked identity pairs without loading a managed entity per claim.
+            $rows = $this->connection->fetchAllAssociative(
+                <<<'SQL'
+                    SELECT input.namespace, input.external_id, ids.person_id, blocks.namespace IS NOT NULL AS blocked
+                    FROM jsonb_to_recordset(CAST(:claims AS jsonb)) AS input(namespace text, external_id text)
+                    LEFT JOIN person_external_ids ids USING (namespace, external_id)
+                    LEFT JOIN person_identifier_blocks blocks USING (namespace, external_id)
+                    SQL,
+                ['claims' => json_encode(array_values($claims), JSON_THROW_ON_ERROR)],
+            );
+            foreach ($rows as $row) {
+                $key = self::identifierLock($row['namespace'], $row['external_id']);
+                if ($row['person_id'] !== null) {
+                    $known[$key] = $row['person_id'];
+                }
+                if ($row['blocked']) {
+                    $blocked[$key] = true;
+                }
+            }
+        }
 
         $owners = [];
+        $attachments = [];
+        $created = false;
         foreach ($credits as $index => $credit) {
-            $owner = $this->resolve($credit->identifiers, $credit->name, $credit->source, profileUrl: $credit->profileUrl);
-            if ($owner === null) {
+            $ids = $normalized[$index];
+            $candidates = [];
+            foreach ($ids as $namespace => $value) {
+                $key = self::identifierLock($namespace, $value);
+                if (isset($blocked[$key])) {
+                    $this->flushCreditIdentities($created, $attachments);
+                    return null;
+                }
+                if (isset($known[$key])) {
+                    $candidates[] = $known[$key];
+                }
+            }
+            $candidates = array_values(array_unique($candidates));
+            sort($candidates);
+            if ($ids === [] || count($candidates) > 1) {
+                $this->flushCreditIdentities($created, $attachments);
+                if (count($candidates) > 1) {
+                    $this->recordConflict($ids, $candidates, $credit->source);
+                }
                 return null;
+            }
+
+            $owner = $candidates[0] ?? null;
+            if ($owner === null) {
+                $entity = PersonEntity::fromPerson(Person::create($credit->name), self::portraitUrl($credit->profileUrl));
+                $this->entityManager->persist($entity);
+                $owner = $entity->getId()->toString();
+                $created = true;
+            }
+            foreach ($ids as $namespace => $value) {
+                $key = self::identifierLock($namespace, $value);
+                if (!isset($known[$key])) {
+                    $attachments[] = ['person_id' => $owner, 'namespace' => $namespace, 'external_id' => $value, 'source' => $credit->source];
+                    $known[$key] = $owner;
+                }
             }
             $owners[$index] = $owner;
         }
+        $this->flushCreditIdentities($created, $attachments);
 
         return $owners;
+    }
+
+    /** @param list<array{person_id: string, namespace: string, external_id: string, source: string}> $attachments */
+    private function flushCreditIdentities(bool $created, array $attachments): void
+    {
+        if ($created) {
+            $this->entityManager->flush();
+        }
+        if ($attachments === []) {
+            return;
+        }
+        // PostgreSQL recordset insertion batches claims while preserving first-claim provenance.
+        $this->connection->executeStatement(
+            <<<'SQL'
+                INSERT INTO person_external_ids (person_id, namespace, external_id, source)
+                SELECT person_id, namespace, external_id, source
+                FROM jsonb_to_recordset(CAST(:rows AS jsonb)) AS input(
+                    person_id uuid, namespace text, external_id text, source text
+                )
+                ON CONFLICT (namespace, external_id) DO NOTHING
+                SQL,
+            ['rows' => json_encode($attachments, JSON_THROW_ON_ERROR)],
+        );
     }
 
     /**

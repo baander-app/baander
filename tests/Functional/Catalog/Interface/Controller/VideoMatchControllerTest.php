@@ -195,6 +195,39 @@ final class VideoMatchControllerTest extends TestCase
         self::assertSame($data, $this->console('search', ['kind' => 'series', 'public-id' => $this->publicId, '--query' => 'Orbit again']));
     }
 
+    public function testCandidateExternalIdsAreJsonObjectsInHttpAndConsole(): void
+    {
+        $this->expectNoVideoWrites();
+        $this->read->expects(self::exactly(2))->method('findTarget')->with('tv', $this->series->getPublicId())->willReturn($this->identity);
+        $this->providers->method('usableProviders')->willReturn([VideoProviderId::Local, VideoProviderId::Tmdb]);
+        $this->providers->method('identify')->willReturn(new VideoTitle(new VideoCandidate('local-orbit', 'Orbit')));
+        $this->providers->method('search')->willReturn([new VideoCandidate('42', 'Orbit', externalIds: ['imdb' => 'tt12345', 'tmdb' => '42'])]);
+
+        $path = '/api/admin/video-matches/series/' . $this->publicId . '/candidates';
+        $response = $this->authenticatedRequest('GET', $path, $this->createAdminUser());
+        self::assertSame(200, $response->getStatusCode());
+        $body = $response->getContent();
+        self::assertIsString($body);
+
+        $console = $this->command('search');
+        self::assertSame(Command::SUCCESS, $console->execute([
+            'kind' => 'series',
+            'public-id' => $this->publicId,
+            '--json' => true,
+        ], ['capture_stderr_separately' => true]), $console->getErrorOutput());
+
+        $httpData = json_decode($body, associative: false, flags: JSON_THROW_ON_ERROR)->data;
+        $cliData = json_decode($console->getDisplay(), associative: false, flags: JSON_THROW_ON_ERROR);
+        foreach ([$httpData, $cliData] as $data) {
+            $localIds = $data->providers[0]->candidates[0]->externalIds;
+            $remoteIds = $data->providers[1]->candidates[0]->externalIds;
+            self::assertInstanceOf(\stdClass::class, $localIds);
+            self::assertSame([], get_object_vars($localIds));
+            self::assertInstanceOf(\stdClass::class, $remoteIds);
+            self::assertSame(['imdb' => 'tt12345', 'tmdb' => '42'], get_object_vars($remoteIds));
+        }
+    }
+
     public function testExplicitRematchAndOfferedOrderingUseTheSameWriteInHttpAndConsole(): void
     {
         $this->read->expects(self::exactly(5))->method('findTarget')->with('tv', $this->series->getPublicId())->willReturn($this->identity);

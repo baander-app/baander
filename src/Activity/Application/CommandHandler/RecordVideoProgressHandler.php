@@ -33,6 +33,8 @@ final readonly class RecordVideoProgressHandler
     #[AsMessageHandler]
     public function __invoke(RecordVideoProgressCommand $command): VideoProgressResult
     {
+        $receivedAt = $this->clock->now();
+        $reportedAt = $command->reportedAt > $receivedAt ? $receivedAt : $command->reportedAt;
         if (!in_array($command->titleKind, ['episode', 'movie', 'extra'], true)) {
             throw new InvalidInputException('Progress requires an episode, movie or extra.');
         }
@@ -40,7 +42,7 @@ final readonly class RecordVideoProgressHandler
             throw new InvalidInputException('The playback position must be a finite nonnegative number.');
         }
 
-        return $this->transaction->run(function () use ($command): VideoProgressResult {
+        return $this->transaction->run(function () use ($command, $reportedAt): VideoProgressResult {
             $video = $this->titles->forProgress($command->memberId, $command->videoPublicId, $command->titleKind, $command->titlePublicId)
                 ?? throw new NotFoundException('Video title not found.');
             if ($this->parties->isWatching($command->memberId, $video->videoId)) {
@@ -57,7 +59,7 @@ final readonly class RecordVideoProgressHandler
                 $command->memberId,
                 $video->videoId,
                 $complete ? null : $position,
-                $command->reportedAt,
+                $reportedAt,
                 $complete || $command->action !== VideoProgressAction::Progress,
             );
             if ($recorded && $complete && $video->targets !== []) {

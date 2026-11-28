@@ -20,8 +20,13 @@ use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
 use App\Tests\Fixtures\Catalog\ArtistImportIdentityRace;
 use Doctrine\DBAL\Connection;
+use Doctrine\DBAL\Configuration;
+use Doctrine\DBAL\DriverManager;
+use Doctrine\DBAL\Logging\Middleware;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
+use Psr\Log\AbstractLogger;
+use Stringable;
 
 final class PersonIdentityPersistenceTest extends TestCase
 {
@@ -80,6 +85,86 @@ final class PersonIdentityPersistenceTest extends TestCase
         }
         $this->connection->executeStatement('DROP SCHEMA ' . $this->schema . ' CASCADE');
         $this->connection->close();
+    }
+
+    public function testCreditIdentityStatementsScaleWithDistinctIdentitiesInsteadOfRoles(): void
+    {
+        $logger = new class extends AbstractLogger {
+            /** @var list<string> */
+            public array $queries = [];
+
+            public function log($level, string|Stringable $message, array $context = []): void
+            {
+                if (isset($context['sql'])) {
+                    $this->queries[] = $context['sql'];
+                }
+            }
+        };
+        $configuration = new Configuration();
+        $configuration->setMiddlewares([new Middleware($logger)]);
+        $connection = DriverManager::getConnection($this->connection->getParams(), $configuration);
+        try {
+            $connection->executeStatement('SET search_path TO ' . $this->schema . ', public');
+            $identities = new PersonIdentityRepository($connection, $this->transaction, ArtistImportIdentityRace::entityManager($connection));
+            $credit = new PersonCreditInput(
+                ['tmdb_person' => '700', 'imdb_name' => 'nm0000700', 'tvdb_person' => '700'],
+                'Shared Person', 'cast', 'actor', 'Actor',
+            );
+            $connection->transactional(fn () => $identities->resolveCredits([$credit]));
+            $counts = [];
+            foreach ([1, 200] as $roles) {
+                $logger->queries = [];
+                $owners = $connection->transactional(fn () => $identities->resolveCredits(array_fill(0, $roles, $credit)));
+                self::assertIsArray($owners);
+                self::assertCount($roles, $owners);
+                self::assertCount(1, array_unique($owners));
+                $counts[] = count($logger->queries);
+                self::assertCount(3, array_filter($logger->queries, static fn (string $sql): bool => str_contains($sql, 'hashtextextended')));
+                self::assertCount(1, array_filter($logger->queries, static fn (string $sql): bool => str_contains($sql, 'LEFT JOIN person_external_ids')));
+                self::assertCount(0, array_filter($logger->queries, static fn (string $sql): bool => str_contains($sql, 'INSERT INTO')));
+            }
+            self::assertSame([5, 5], $counts);
+
+            $newCredits = [];
+            for ($index = 0; $index < 40; ++$index) {
+                $newCredits[] = new PersonCreditInput(['tvdb_person' => (string) (800 + $index)], 'Person ' . $index, 'cast', 'actor', 'Actor', source: 'tvdb');
+            }
+            $logger->queries = [];
+            $owners = $connection->transactional(fn () => $identities->resolveCredits($newCredits));
+            self::assertIsArray($owners);
+            self::assertCount(40, array_unique($owners));
+            self::assertCount(40, array_filter($logger->queries, static fn (string $sql): bool => str_contains($sql, 'hashtextextended')));
+            self::assertCount(40, array_filter($logger->queries, static fn (string $sql): bool => str_contains($sql, 'INSERT INTO people')));
+            self::assertCount(1, array_filter($logger->queries, static fn (string $sql): bool => str_contains($sql, 'INSERT INTO person_external_ids')));
+            self::assertCount(1, array_filter($logger->queries, static fn (string $sql): bool => str_contains($sql, 'LEFT JOIN person_external_ids')));
+        } finally {
+            $connection->close();
+        }
+    }
+
+    public function testCreditBatchUsesEarlierClaimsAndPreservesConflictOwners(): void
+    {
+        $first = new PersonCreditInput(['tmdb_person' => '701'], 'First', 'cast', 'actor', 'Actor');
+        $second = new PersonCreditInput(['imdb_name' => 'nm0000702'], 'Second', 'cast', 'actor', 'Actor');
+        $bridge = new PersonCreditInput(['tmdb_person' => '701', 'imdb_name' => 'nm0000702', 'tvdb_person' => '703'], 'Bridge', 'cast', 'actor', 'Actor');
+        self::assertNull($this->transaction->run(fn () => $this->identities->resolveCredits([$first, $second, $bridge])));
+        $owners = [$this->identities->owner('tmdb_person', '701'), $this->identities->owner('imdb_name', 'nm0000702')];
+        self::assertNotSame($owners[0], $owners[1]);
+        self::assertNull($this->identities->owner('tvdb_person', '703'));
+        $conflict = $this->connection->fetchAssociative('SELECT claims, owners FROM person_identity_conflicts');
+        self::assertIsArray($conflict);
+        self::assertEqualsCanonicalizing($owners, json_decode($conflict['owners'], true, flags: JSON_THROW_ON_ERROR));
+        self::assertSame(['imdb_name' => 'nm0000702', 'tmdb_person' => '701', 'tvdb_person' => '703'], json_decode($conflict['claims'], true, flags: JSON_THROW_ON_ERROR));
+    }
+
+    public function testBlockedIdentifierRejectsTheWholeClaimWithoutAttachingOtherIds(): void
+    {
+        $this->connection->executeStatement("INSERT INTO person_identifier_blocks (namespace, external_id) VALUES ('tvdb_person', '704')");
+        $credit = new PersonCreditInput(['tvdb_person' => '704', 'imdb_name' => 'nm0000704'], 'Blocked Person', 'cast', 'actor', 'Actor');
+        self::assertNull($this->transaction->run(fn () => $this->identities->resolveCredits([$credit])));
+        self::assertNull($this->identities->owner('imdb_name', 'nm0000704'));
+        self::assertSame(0, (int) $this->connection->fetchOne('SELECT count(*) FROM people'));
+        self::assertSame(0, (int) $this->connection->fetchOne('SELECT count(*) FROM person_identity_conflicts'));
     }
 
     public function testCastAndCrewReplaceIndependentlyWithoutDuplicatingAProfile(): void

@@ -1,9 +1,13 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { RecordVideoProgressRequest } from '@/shared/api-client/gen/endpoints'
+import { PlaybackClock } from '@/features/session/services/playback-clock'
 import { VideoViewingReporter, VIEWING_FLUSH_TIMEOUT_MS } from '../video-viewing-reporter'
 
-function fixture() {
-  let clock = Date.parse('2026-11-28T13:00:00Z')
+const epoch = Date.parse('2026-11-28T13:00:00Z')
+
+function fixture(skew = 0) {
+  let elapsed = 0
+  const clock = new PlaybackClock(() => epoch + skew + elapsed, () => elapsed)
   let current = true
   const report = vi.fn<
     (videoId: string, body: RecordVideoProgressRequest, signal: AbortSignal) => Promise<void>
@@ -14,7 +18,7 @@ function fixture() {
     titleId: 'selectedEpisode000001'
   }, {
     current: () => current,
-    now: () => clock,
+    clock,
     isWatching,
     report
   })
@@ -22,7 +26,8 @@ function fixture() {
     reporter,
     report,
     isWatching,
-    advance: (milliseconds: number) => { clock += milliseconds },
+    clock,
+    advance: (milliseconds: number) => { elapsed += milliseconds },
     replace: () => { current = false }
   }
 }
@@ -87,6 +92,58 @@ describe('video viewing reports', () => {
         reportedAt: '2026-11-28T13:00:00.002Z'
       }
     ])
+  })
+
+  it('keeps a queued observation unchanged when registration corrects the current reporter backwards', async () => {
+    const value = fixture(20_000)
+    let finishFirst!: (watching: boolean) => void
+    value.isWatching.mockImplementationOnce(() => new Promise(resolve => { finishFirst = resolve }))
+    value.reporter.action('seek', 40)
+    await Promise.resolve()
+    expect(value.report).not.toHaveBeenCalled()
+
+    value.advance(1_000)
+    value.clock.observe(new Date(epoch + 1_000).toUTCString(), value.clock.elapsed())
+    value.reporter.action('pause', 41)
+    finishFirst(false)
+    await value.reporter.settled()
+
+    expect(value.report.mock.calls.map(call => [call[1].positionSeconds, call[1].reportedAt])).toEqual([
+      [40, '2026-11-28T13:00:20.000Z'],
+      [41, '2026-11-28T13:00:01.000Z']
+    ])
+  })
+
+  it('dates a queued completion before a manual mark and a behind-clock handoff pause after it', async () => {
+    const source = fixture(20_000)
+    const receiver = fixture(-20_000)
+    source.advance(50)
+    source.clock.observe(new Date(epoch).toUTCString(), 0)
+    let finishCompletion!: (watching: boolean) => void
+    source.isWatching.mockImplementationOnce(() => new Promise(resolve => { finishCompletion = resolve }))
+    source.advance(100)
+    source.reporter.action('end', 180)
+    await Promise.resolve()
+    expect(source.report).not.toHaveBeenCalled()
+
+    const manualMark = epoch + 200
+    receiver.advance(3_000)
+    receiver.clock.observe(new Date(epoch + 3_000).toUTCString(), receiver.clock.elapsed())
+    receiver.advance(2_000)
+    receiver.reporter.action('pause', 45)
+    await receiver.reporter.settled()
+    expect(receiver.report).toHaveBeenCalledExactlyOnceWith('selectedVideo00000001',
+      expect.objectContaining({ action: 'pause', positionSeconds: 45, reportedAt: '2026-11-28T13:00:05.000Z' }),
+      expect.any(AbortSignal))
+    expect(Date.parse(receiver.report.mock.calls[0][1].reportedAt)).toBeGreaterThan(manualMark)
+
+    source.advance(6_000)
+    finishCompletion(false)
+    await source.reporter.settled()
+    expect(source.report).toHaveBeenCalledExactlyOnceWith('selectedVideo00000001',
+      expect.objectContaining({ action: 'end', positionSeconds: 180, reportedAt: '2026-11-28T13:00:00.100Z' }),
+      expect.any(AbortSignal))
+    expect(Date.parse(source.report.mock.calls[0][1].reportedAt)).toBeLessThan(manualMark)
   })
 
   it('checks fresh party membership for every action and never replays suppressed reports after leaving', async () => {

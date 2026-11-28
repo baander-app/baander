@@ -2,6 +2,7 @@ import type {
   PlaybackViewingContextResource,
   RecordVideoProgressRequest
 } from '@/shared/api-client/gen/endpoints'
+import { playbackClock, type PlaybackClock } from '@/features/session/services/playback-clock'
 
 export type ViewingAction = RecordVideoProgressRequest['action']
 export const VIEWING_FLUSH_TIMEOUT_MS = 500
@@ -10,7 +11,7 @@ interface ViewingReporterPorts {
   current(): boolean
   isWatching(videoId: string, signal: AbortSignal): Promise<boolean>
   report(videoId: string, report: RecordVideoProgressRequest, signal: AbortSignal): Promise<unknown>
-  now?(): number
+  clock?: Pick<PlaybackClock, 'read' | 'elapsed'>
 }
 
 export class VideoViewingReporter {
@@ -20,12 +21,12 @@ export class VideoViewingReporter {
   private pending = new AbortController()
   private disposed = false
   private readonly flushes = new Set<() => void>()
-  private readonly now: () => number
+  private readonly clock: Pick<PlaybackClock, 'read' | 'elapsed'>
   private tail: Promise<void> = Promise.resolve()
   private lastSample: number | null = null
   private wasPlaying = false
   private playedMilliseconds = 0
-  private reportedAt = 0
+  private reportedAt: ReturnType<PlaybackClock['read']> | null = null
 
   constructor(
     videoId: string,
@@ -35,7 +36,7 @@ export class VideoViewingReporter {
     this.videoId = videoId
     this.viewing = viewing
     this.ports = ports
-    this.now = ports.now ?? Date.now
+    this.clock = ports.clock ?? playbackClock
   }
 
   tick(positionSeconds: number, playing: boolean): void {
@@ -45,7 +46,7 @@ export class VideoViewingReporter {
       this.playedMilliseconds = 0
       return
     }
-    const now = this.now()
+    const now = this.clock.elapsed()
     if (this.lastSample !== null && this.wasPlaying && playing) {
       this.playedMilliseconds += Math.max(0, now - this.lastSample)
     }
@@ -60,12 +61,17 @@ export class VideoViewingReporter {
   action(action: ViewingAction, positionSeconds: number): void {
     if (!this.current() || !Number.isFinite(positionSeconds) || positionSeconds < 0) return
     if (action !== 'progress') this.playedMilliseconds = 0
-    this.reportedAt = Math.max(this.now(), this.reportedAt + 1)
+    const { milliseconds, generation } = this.clock.read()
+    const previous = this.reportedAt
+    const reportedAt = previous?.generation === generation
+      ? Math.max(milliseconds, previous.milliseconds + 1)
+      : milliseconds
+    this.reportedAt = { milliseconds: reportedAt, generation }
     const report: RecordVideoProgressRequest = {
       ...this.viewing,
       positionSeconds,
       action,
-      reportedAt: new Date(this.reportedAt).toISOString()
+      reportedAt: new Date(reportedAt).toISOString()
     }
     const signal = this.pending.signal
     this.tail = this.tail.then(async () => {

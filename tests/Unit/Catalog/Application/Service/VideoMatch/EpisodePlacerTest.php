@@ -102,6 +102,17 @@ final class EpisodePlacerTest extends TestCase
         );
     }
 
+    public function testADateWithoutAMatchingEpisodeNeedsReview(): void
+    {
+        $placement = $this->placement(['airDate' => '2024-03-14']);
+        $episode = new VideoEpisode('previous-day', 4, 'Previous day', airDate: '2024-03-13');
+
+        self::assertSame(
+            ['targets' => [], 'reviewReason' => 'no_candidates'],
+            $this->place([new VideoSeason(2, episodes: [$episode])], $placement),
+        );
+    }
+
     public function testAnAmbiguousAirDateNeedsReview(): void
     {
         $placement = $this->placement(['airDate' => '2026-11-28']);

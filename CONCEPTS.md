@@ -512,8 +512,10 @@ The last playback position for one member and one video file. Each version has
 its own position. Reopening a title uses the last played available version when
 possible, and the player offers Start Over. Browser handoffs carry the opened
 title together with the file. A re-match or reassignment keeps that file's
-position. Playing past 90% clears it. Watch-party playback leaves personal
-progress unchanged.
+position. Playing past 90% clears it. Reports must have a timestamp later than the
+saved observation. If a device reports a time in the future, the server uses
+the time it received the report. Watch-party playback leaves
+personal progress unchanged.
 
 ### Watched state
 

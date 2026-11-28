@@ -5,6 +5,7 @@ import type { LiveTransportListener, SharedLiveTransport } from '@/shared/live/t
 import { advanceAuthorization, synchronizeOwnership } from '@/shared/live/ownership'
 import { AXIOS_INSTANCE } from '@/shared/api-client/axios-instance'
 import { PlaybackLocalRecovery } from '../services/playback-local-recovery'
+import { playbackClock } from '../services/playback-clock'
 import type { PlaybackRecoveryRecord } from '../services/playback-recovery-store'
 import { registerPlaybackAdapter, requestPlayback, type PlaybackObservation } from '../services/playback-execution'
 import { PlaybackSessionCoordinator, getPlaybackClientRequestId, overridePlayback, registerPlaybackCoordinator, transferPlayback, PLAYBACK_CONNECTION_KEY, PLAYBACK_SESSION_KEY } from '../services/playback-session-coordinator'
@@ -170,6 +171,45 @@ function failControlAttempts(...failures: { error: Error; recorded?: boolean }[]
 }
 
 describe('browser playback coordination', () => {
+  it.each([
+    { baseURL: undefined, samples: true },
+    { baseURL: window.location.origin, samples: true },
+    { baseURL: 'https://api.baander.app', samples: false }
+  ])('samples registration and control dates according to the Axios base URL $baseURL', async ({ baseURL, samples }) => {
+    const observe = vi.spyOn(playbackClock, 'observe').mockImplementation(() => {})
+    cleanup.push(() => observe.mockRestore())
+    const registrationDate = 'Sat, 28 Nov 2026 13:00:00 GMT'
+    const controlDate = 'Sat, 28 Nov 2026 13:00:02 GMT'
+    vi.mocked(AXIOS_INSTANCE.post).mockImplementation(async (path, body) => ({
+      config: { baseURL },
+      headers: { date: path === '/api/devices' ? registrationDate : controlDate },
+      data: {
+        data: snapshot({
+          activeIncarnationId: 'remote',
+          ...(path === '/api/session/control' ? {
+            requestResult: {
+              requestId: (body as { requestId: string }).requestId,
+              commandId: 'command',
+              outcome: 'retained',
+              rejectionReason: null
+            }
+          } : {})
+        })
+      }
+    }))
+
+    const h = harness()
+    cleanup.push(h.stop)
+    await vi.waitFor(() => expect(h.transport.send).toHaveBeenCalledOnce())
+    h.receive(snapshot({ endpoint, activeIncarnationId: 'remote' }))
+    await requestPlayback({ action: 'pause' })
+
+    expect(observe.mock.calls).toEqual(samples ? [
+      [registrationDate, expect.any(Number)],
+      [controlDate, expect.any(Number)]
+    ] : [])
+  })
+
   it('shows the receiving browser compatibility reason for its exact control request', async () => {
     const h = controlledServer()
     const result = requestPlayback({ action: 'play' }).then(() => null, error => error as Error)

@@ -4,6 +4,11 @@ declare(strict_types=1);
 
 namespace App\Tests\Functional\Activity;
 
+use App\Activity\Application\CommandHandler\RecordVideoProgressHandler;
+use App\Activity\Application\CommandHandler\SetWatchedHandler;
+use App\Activity\Application\Port\ViewingStatePortInterface;
+use App\Activity\Domain\Repository\ResumePositionRepositoryInterface;
+use App\Activity\Domain\Repository\WatchedMarkRepositoryInterface;
 use App\Auth\Domain\Model\User;
 use App\Catalog\Domain\Model\TvEpisode;
 use App\Catalog\Domain\Model\TvSeason;
@@ -16,15 +21,19 @@ use App\Catalog\Infrastructure\Doctrine\Entity\TvSeriesEntity;
 use App\Catalog\Infrastructure\Doctrine\Entity\VideoEntity;
 use App\Catalog\Infrastructure\Doctrine\Entity\VideoPlacementEntity;
 use App\Catalog\Infrastructure\Doctrine\Entity\VideoPlacementEpisodeEntity;
+use App\Catalog\Application\Port\WatchableTitlePortInterface;
 use App\Library\Application\Port\LibraryAccessPortInterface;
 use App\Library\Infrastructure\Doctrine\Entity\LibraryEntity;
 use App\Library\Infrastructure\Doctrine\Entity\LibraryFileIndexEntity;
 use App\Party\Infrastructure\Doctrine\Entity\SyncedPartySessionEntity;
+use App\Party\Application\Port\WatchMembershipPortInterface;
+use App\Shared\Application\Port\TransactionPortInterface;
 use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
 use App\Tests\Functional\TestCase;
 use DateTimeImmutable;
 use Symfony\Component\Filesystem\Filesystem;
+use Symfony\Component\Clock\MockClock;
 
 final class WatchedControllerTest extends TestCase
 {
@@ -41,6 +50,84 @@ final class WatchedControllerTest extends TestCase
     {
         (new Filesystem())->remove($this->rootPath);
         parent::tearDown();
+    }
+
+    public function testClockHandoffAndManualMarkKeepEffectiveObservationOrdering(): void
+    {
+        $start = new DateTimeImmutable('2026-11-28T12:00:00.123456+00:00');
+        $clock = new MockClock($start);
+        $this->useViewingClock($clock);
+        $member = $this->createTestUser();
+        [$library, $video, $placement, $episodes] = $this->catalog();
+        $this->grant($member, $library);
+        $report = function (float $position, DateTimeImmutable $reportedAt, string $action = 'pause') use ($member, $video, $episodes): array {
+            return $this->assertJsonResponse($this->authenticatedRequest('POST', '/api/activity/videos/' . $video->getPublicId() . '/progress', $member, [
+                'titleKind' => 'episode',
+                'titleId' => $episodes[0]->publicId->toString(),
+                'positionSeconds' => $position,
+                'action' => $action,
+                'reportedAt' => $reportedAt->format('Y-m-d\TH:i:s.uP'),
+            ]), 200)['data'];
+        };
+
+        self::assertSame(['recorded' => true], $report(30.0, $start->modify('+1 day')));
+        $this->assertObservationTimes($member, $video, $start, $start);
+        self::assertSame(['recorded' => false], $report(100.0, $start->modify('+2 days'), 'end'));
+        self::assertSame(0, $this->markCount($member));
+
+        $clock->sleep(10);
+        self::assertSame(['recorded' => true], $report(40.0, $clock->now()));
+        $handoff = $clock->now();
+        $this->assertObservationTimes($member, $video, $handoff, $handoff);
+
+        $clock->sleep(10);
+        $this->assertJsonResponse($this->authenticatedRequest('PUT', '/api/activity/watched/episode/' . $episodes[0]->publicId, $member, ['watched' => true]), 200);
+        $marked = $clock->now();
+        self::assertNull($this->position($member, $video));
+        $this->assertObservationTimes($member, $video, $marked, $handoff);
+
+        $clock->sleep(10);
+        self::assertSame(['recorded' => false], $report(100.0, $start->modify('+15 seconds'), 'end'));
+        self::assertSame(1, $this->markCount($member));
+        self::assertNull($this->position($member, $video));
+        $this->assertObservationTimes($member, $video, $marked, $handoff);
+
+        $clock->sleep(1);
+        self::assertSame(['recorded' => true], $report(50.0, $clock->now()));
+        self::assertSame(50.0, $this->position($member, $video));
+        self::assertSame(1, $this->markCount($member));
+        $this->assertObservationTimes($member, $video, $clock->now(), $clock->now());
+    }
+
+    private function useViewingClock(MockClock $clock): void
+    {
+        $container = static::getContainer();
+        $titles = $container->get(WatchableTitlePortInterface::class);
+        $positions = $container->get(ResumePositionRepositoryInterface::class);
+        $marks = $container->get(WatchedMarkRepositoryInterface::class);
+        $transaction = $container->get(TransactionPortInterface::class);
+        $container->set(RecordVideoProgressHandler::class, new RecordVideoProgressHandler(
+            $titles,
+            $container->get(WatchMembershipPortInterface::class),
+            $positions,
+            $marks,
+            $transaction,
+            $clock,
+        ));
+        $container->set(SetWatchedHandler::class, new SetWatchedHandler($titles, $positions, $marks, $transaction, $clock));
+    }
+
+    private function assertObservationTimes(User $member, VideoEntity $video, DateTimeImmutable $reportedAt, DateTimeImmutable $lastPlayedAt): void
+    {
+        $row = $this->entityManager->getConnection()->fetchAssociative(
+            'SELECT reported_at, last_played_at FROM resume_positions WHERE user_id = :user AND video_id = :video',
+            ['user' => $member->getId()->toString(), 'video' => $video->getId()->toString()],
+        );
+        self::assertIsArray($row);
+        self::assertEquals($reportedAt, new DateTimeImmutable($row['reported_at']));
+        self::assertEquals($lastPlayedAt, new DateTimeImmutable($row['last_played_at']));
+        $state = static::getContainer()->get(ViewingStatePortInterface::class)->forMember($member->getId(), videoIds: [$video->getId()]);
+        self::assertEquals($lastPlayedAt, $state->resumes[$video->getId()->toString()]->lastPlayedAt);
     }
 
     public function testSpanCompletionRewatchAndManualUnmarkStayMemberSpecific(): void

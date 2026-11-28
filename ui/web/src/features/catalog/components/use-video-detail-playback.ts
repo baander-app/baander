@@ -14,6 +14,7 @@ export interface DetailPlaybackOptions extends PlayIntent {
 export function useVideoDetailPlayback() {
   const [active, setActive] = useState<DetailPlaybackOptions | null>(null)
   const sequence = useRef(0)
+  const pendingLoads = useRef(0)
   const { snapshot } = usePlaybackSession()
   const error = useVideoPresentationError(snapshot)
 
@@ -29,17 +30,22 @@ export function useVideoDetailPlayback() {
       && (snapshot.observedState === 'playing' || snapshot.observedState === 'paused')
     const startSeconds = activeFile ? snapshot.position : options.startSeconds
     const opened = { ...options, startSeconds }
-    if (activeFile && media.viewing?.titleKind === titleKind && media.viewing.titleId === titleId) {
+    if (pendingLoads.current === 0 && activeFile
+      && media.viewing?.titleKind === titleKind && media.viewing.titleId === titleId) {
       setActive(opened)
       return
     }
 
+    ++pendingLoads.current
     requestVideoPlayback({ titleKind, titleId, videoId, startSeconds })
       .then(() => {
         if (current === sequence.current) setActive(opened)
       })
       .catch(failure => {
         if (current === sequence.current) useVideoPresentation.getState().reportError(failure)
+      })
+      .finally(() => {
+        --pendingLoads.current
       })
   }
 
