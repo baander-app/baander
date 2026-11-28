@@ -1581,6 +1581,7 @@ deptrac:
       - 'Shared Domain'
       - 'Shared Interface'
     'Catalog Interface':
+      - 'Auth Identity Contract'
       - 'Catalog Artist Role Contract'
       - 'Catalog Movie Contract'
       - 'Catalog Director Contract'

@@ -24,6 +24,7 @@ use Doctrine\DBAL\DriverManager;
 use Doctrine\DBAL\Tools\DsnParser;
 use Symfony\Component\Dotenv\Dotenv;
 use Symfony\Component\Process\Process;
+use App\Tests\Fixtures\Catalog\IndexedMovie;
 
 require_once dirname(__DIR__) . '/LiveUpdates/capacity-fixture.php';
 
@@ -280,7 +281,7 @@ final class PlaybackVideoFixture
         try {
             $manager = $kernel->getContainer()->get('doctrine')->getManager();
             $directors = new DirectorService(
-                new DirectorRepository($manager),
+                new DirectorRepository($manager, IndexedMovie::availability($manager)),
                 new MovieRepository($manager),
             );
             $credits = array_map(static fn(array $person): DirectorCredit => new DirectorCredit(

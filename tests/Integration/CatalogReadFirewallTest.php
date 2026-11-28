@@ -18,6 +18,10 @@ use App\Catalog\Infrastructure\Doctrine\Entity\ArtistEntity;
 use App\Catalog\Infrastructure\Doctrine\Entity\ArtistSongEntity;
 use App\Catalog\Infrastructure\Doctrine\Entity\SongEntity;
 use App\Catalog\Infrastructure\Doctrine\Entity\MovieEntity;
+use App\Catalog\Infrastructure\Doctrine\Entity\VideoPlacementEntity;
+use App\Catalog\Domain\Model\VideoPlacement;
+use App\Library\Infrastructure\Doctrine\Entity\LibraryFileIndexEntity;
+use DateTimeImmutable;
 use App\Catalog\Infrastructure\Doctrine\Entity\MovieVideoEntity;
 use App\Catalog\Infrastructure\Doctrine\Entity\VideoEntity;
 use App\Catalog\Infrastructure\Doctrine\Repository\VideoRepository;
@@ -133,6 +137,18 @@ final class CatalogReadFirewallTest extends TestCase
             }
             $this->manager->persist(new ArtistSongEntity($artist, $song, 'primary', $artist->getName()));
             $this->manager->persist(new ArtistAlbumEntity($artist, $album, 'primary', $artist->getName()));
+            $relativePath = 'Feature.mkv';
+            $hash = 'catalog-video-' . $visibility . '-' . $suffix;
+            $video = new VideoEntity(new PublicId(), $library->getPath() . '/' . $relativePath, $hash);
+            $this->persistFixture($video, $video->getId());
+            $placement = VideoPlacement::create($library->getId(), $video->getId(), $relativePath, [], movieId: $movie->getId());
+            $placed = new VideoPlacementEntity($library, $video, $placement->getState());
+            $placed->movie = $movie;
+            $this->persistFixture($placed, $placed->id);
+            $indexed = new LibraryFileIndexEntity(Uuid::v7(), $library->getId(), $library->getPath() . '/' . $relativePath, $hash, 1, 'mkv', time(), new DateTimeImmutable());
+            $this->persistFixture($indexed, $indexed->getId());
+            $this->manager->persist(new MovieVideoEntity($movie, $video));
+
         }
         $this->sharedArtist = new ArtistEntity(new PublicId(), 'Acceptance shared artist');
         $this->unlinkedArtist = new ArtistEntity(new PublicId(), 'Acceptance unlinked artist');
@@ -183,6 +199,25 @@ final class CatalogReadFirewallTest extends TestCase
         $all = $repository->getLibraryIdsByPublicId($video->getPublicId(), LibraryReadScope::unrestricted());
         self::assertEqualsCanonicalizing([$allowed->toString(), $denied->toString()], array_map(static fn (Uuid $id): string => $id->toString(), $all));
         self::assertSame([], $repository->getLibraryIdsByPublicId(new PublicId(), LibraryReadScope::unrestricted()));
+    }
+
+    public function testMissingMoviesAreFilteredBeforePagingAndReturnWithTheSamePublicIdentity(): void
+    {
+        $this->authenticate('admin');
+        $missing = $this->catalog['denied'];
+        $connection = $this->manager->getConnection();
+        $connection->executeStatement('UPDATE library_file_index SET available = FALSE WHERE library_id = :library', ['library' => $missing['library']->getId()->toString()]);
+        $response = $this->request('/api/movies/?limit=1&q=Acceptance');
+        self::assertSame(200, $response->getStatusCode());
+        $body = json_decode((string) $response->getContent(), true, flags: JSON_THROW_ON_ERROR);
+        self::assertSame(1, $body['meta']['total']);
+        self::assertSame($this->catalog['allowed']['movie']->getPublicId()->toString(), $body['data'][0]['publicId']);
+        self::assertSame(404, $this->request('/api/movies/' . $missing['movie']->getPublicId()->toString())->getStatusCode());
+        $connection->executeStatement('UPDATE library_file_index SET available = TRUE WHERE library_id = :library', ['library' => $missing['library']->getId()->toString()]);
+        $restored = $this->request('/api/movies/' . $missing['movie']->getPublicId()->toString());
+        self::assertSame(200, $restored->getStatusCode());
+        $body = json_decode((string) $restored->getContent(), true, flags: JSON_THROW_ON_ERROR);
+        self::assertSame($missing['movie']->getPublicId()->toString(), $body['data']['publicId']);
     }
 
     /** @return iterable<string, array{string, string, string}> */
@@ -678,7 +713,7 @@ final class CatalogReadFirewallTest extends TestCase
             $this->proof->thumbprint(),
         );
         if ($actor === 'member') {
-            $this->manager->persist(new UserLibraryAccessEntity($entity->getId(), $this->catalog['allowed']['library'], new \DateTimeImmutable()));
+            $this->manager->persist(new UserLibraryAccessEntity($entity->getId(), $this->catalog['allowed']['library'], new DateTimeImmutable()));
         }
         $this->persistFixture($entity, $entity->getId());
         $this->persistFixture($token, $token->getId());

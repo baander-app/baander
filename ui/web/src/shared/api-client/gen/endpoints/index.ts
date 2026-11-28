@@ -1900,7 +1900,90 @@ export type MovieResourcePosterImage = { [key: string]: unknown } | null;
 
 export type MovieResourceGenresItem = { [key: string]: unknown };
 
-export type MovieResourceVideosItem = { [key: string]: unknown };
+/**
+ * @nullable
+ */
+export type MovieResourceMetadataSource = typeof MovieResourceMetadataSource[keyof typeof MovieResourceMetadataSource] | null;
+
+
+export const MovieResourceMetadataSource = {
+  tvdb: 'tvdb',
+  tmdb: 'tmdb',
+  local: 'local',
+} as const;
+
+export interface VideoVersionResource {
+  /**
+     * @minLength 21
+     * @maxLength 21
+     * @pattern ^[0-9a-zA-Z_-]{21}$
+     */
+  publicId: string;
+  /** @nullable */
+  width: number | null;
+  /** @nullable */
+  height: number | null;
+  /** @nullable */
+  duration: number | null;
+  /** @nullable */
+  videoBitrate: number | null;
+  /** @nullable */
+  positionSeconds: number | null;
+  /** @nullable */
+  lastPlayedAt: string | null;
+}
+
+export type VideoExtraResourceKind = typeof VideoExtraResourceKind[keyof typeof VideoExtraResourceKind];
+
+
+export const VideoExtraResourceKind = {
+  behind_the_scenes: 'behind_the_scenes',
+  deleted_scene: 'deleted_scene',
+  featurette: 'featurette',
+  interview: 'interview',
+  scene: 'scene',
+  short: 'short',
+  trailer: 'trailer',
+  clip: 'clip',
+  sample: 'sample',
+  theme_music: 'theme_music',
+  backdrop: 'backdrop',
+  other: 'other',
+} as const;
+
+export interface VideoExtraResource {
+  /**
+     * @minLength 21
+     * @maxLength 21
+     * @pattern ^[0-9a-zA-Z_-]{21}$
+     */
+  publicId: string;
+  /** @nullable */
+  width: number | null;
+  /** @nullable */
+  height: number | null;
+  /** @nullable */
+  duration: number | null;
+  /** @nullable */
+  videoBitrate: number | null;
+  /** @nullable */
+  positionSeconds: number | null;
+  /** @nullable */
+  lastPlayedAt: string | null;
+  /**
+     * @minLength 21
+     * @maxLength 21
+     * @pattern ^[0-9a-zA-Z_-]{21}$
+     */
+  placementPublicId: string;
+  /**
+     * @minLength 21
+     * @maxLength 21
+     * @pattern ^[0-9a-zA-Z_-]{21}$
+     */
+  videoPublicId: string;
+  kind: VideoExtraResourceKind;
+}
 
 export interface MovieResource {
   /**
@@ -1991,8 +2074,20 @@ export interface MovieResource {
   posterImage?: MovieResourcePosterImage;
   /** Genre list */
   genres: MovieResourceGenresItem[];
-  /** Video variants */
-  videos: MovieResourceVideosItem[];
+  videos: VideoVersionResource[];
+  extras?: VideoExtraResource[];
+  libraryPublicId?: string;
+  /** @nullable */
+  metadataSource?: MovieResourceMetadataSource;
+  watched?: boolean;
+  /**
+     * @minimum 0
+     * @maximum 1
+     * @nullable
+     */
+  progress?: number | null;
+  /** @nullable */
+  defaultVideoPublicId?: string | null;
   /** Creation timestamp */
   createdAt: string;
   /** Update timestamp */
@@ -3736,6 +3831,33 @@ export interface CursorPaginatedResponse {
   meta: CursorPaginatedResponseMeta;
 }
 
+/**
+ * @nullable
+ */
+export type TvSeriesResourceMetadataSource = typeof TvSeriesResourceMetadataSource[keyof typeof TvSeriesResourceMetadataSource] | null;
+
+
+export const TvSeriesResourceMetadataSource = {
+  tvdb: 'tvdb',
+  tmdb: 'tmdb',
+  local: 'local',
+} as const;
+
+export interface TvSeasonResource {
+  /**
+     * @minLength 21
+     * @maxLength 21
+     * @pattern ^[0-9a-zA-Z_-]{21}$
+     */
+  publicId: string;
+  number: number;
+  /** @nullable */
+  name: string | null;
+  ownedCount: number;
+  totalCount: number;
+  watchedCount: number;
+}
+
 export interface TvSeriesResource {
   /**
      * @minLength 21
@@ -3748,7 +3870,30 @@ export interface TvSeriesResource {
   overview: string | null;
   /** @nullable */
   posterUrl: string | null;
+  /**
+     * @minLength 21
+     * @maxLength 21
+     * @pattern ^[0-9a-zA-Z_-]{21}$
+     */
+  libraryPublicId: string;
+  /** @nullable */
+  metadataSource: TvSeriesResourceMetadataSource;
+  seasons?: TvSeasonResource[];
+  unseasonedCount?: number;
+  extras?: VideoExtraResource[];
 }
+
+/**
+ * @nullable
+ */
+export type TvEpisodeResourceMetadataSource = typeof TvEpisodeResourceMetadataSource[keyof typeof TvEpisodeResourceMetadataSource] | null;
+
+
+export const TvEpisodeResourceMetadataSource = {
+  tvdb: 'tvdb',
+  tmdb: 'tmdb',
+  local: 'local',
+} as const;
 
 export interface TvEpisodeResource {
   /**
@@ -3764,8 +3909,10 @@ export interface TvEpisodeResource {
   stillUrl: string | null;
   /** @nullable */
   airDate: string | null;
-  seasonNumber: number;
-  episodeNumber: number;
+  /** @nullable */
+  seasonNumber: number | null;
+  /** @nullable */
+  episodeNumber: number | null;
   /**
      * @minLength 21
      * @maxLength 21
@@ -3773,6 +3920,38 @@ export interface TvEpisodeResource {
      */
   seriesPublicId: string;
   seriesName: string;
+  /**
+     * @minLength 21
+     * @maxLength 21
+     * @nullable
+     * @pattern ^[0-9a-zA-Z_-]{21}$
+     */
+  seasonPublicId: string | null;
+  /** @nullable */
+  absoluteNumber: number | null;
+  /**
+     * @minLength 21
+     * @maxLength 21
+     * @pattern ^[0-9a-zA-Z_-]{21}$
+     */
+  libraryPublicId: string;
+  /** @nullable */
+  metadataSource: TvEpisodeResourceMetadataSource;
+  watched: boolean;
+  /**
+     * @minimum 0
+     * @maximum 1
+     * @nullable
+     */
+  progress: number | null;
+  /**
+     * @minLength 21
+     * @maxLength 21
+     * @nullable
+     * @pattern ^[0-9a-zA-Z_-]{21}$
+     */
+  defaultVideoPublicId: string | null;
+  videos: VideoVersionResource[];
 }
 
 export interface LibraryProviderOrderResource {
@@ -7105,6 +7284,10 @@ export type GetMovieIndexParams = {
   q?: string;
 };
 
+export type GetMovieIndex200 = PaginatedResponse & {
+  data: MovieResource[];
+};
+
 export type GetMovieShow200 = {
   data?: MovieResource;
 };
@@ -7369,6 +7552,8 @@ export type TvSeriesIndexParams = {
    */
   limit?: number;
   q?: string;
+  /** @pattern ^[0-9a-zA-Z_-]{21}$ */
+  library?: string;
 };
 
 export type TvSeriesIndex200 = PaginatedResponse & {
@@ -7388,6 +7573,9 @@ export type TvSeriesEpisodesParams = {
    */
   limit?: number;
   q?: string;
+  /** @pattern ^[0-9a-zA-Z_-]{21}$ */
+  season?: string;
+  unseasoned?: boolean;
 };
 
 export type TvSeriesEpisodes200 = PaginatedResponse & {
@@ -8595,17 +8783,8 @@ export type PostPartySessionCreate201 = {
   data?: PartySessionResource;
 };
 
-export type GetPartySessionIndex200DataItem = {
-  /**
-     * @minLength 21
-     * @maxLength 21
-     * @pattern ^[0-9a-zA-Z_-]{21}$
-     */
-  publicId?: string;
-};
-
 export type GetPartySessionIndex200 = {
-  data?: GetPartySessionIndex200DataItem[];
+  data?: PartySessionResource[];
 };
 
 export type GetPartySessionShow200DataMembersItem = {
@@ -21014,9 +21193,9 @@ export const getGetMovieIndexUrl = (params?: GetMovieIndexParams,) => {
 /**
  * @summary List movies (paginated)
  */
-export const getMovieIndex = async (params?: GetMovieIndexParams, options?: Parameters<typeof customInstance>[1]): Promise<PaginatedResponse> => {
+export const getMovieIndex = async (params?: GetMovieIndexParams, options?: Parameters<typeof customInstance>[1]): Promise<GetMovieIndex200> => {
 
-  return customInstance<PaginatedResponse>(getGetMovieIndexUrl(params),
+  return customInstance<GetMovieIndex200>(getGetMovieIndexUrl(params),
   {
     ...options,
     method: 'GET'

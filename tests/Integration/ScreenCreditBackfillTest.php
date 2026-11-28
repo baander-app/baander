@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Tests\Integration;
 
+use App\Tests\Fixtures\Catalog\IndexedMovie;
+
 use App\Catalog\Application\Port\PersonCreditInput;
 use App\Catalog\Domain\ValueObject\DirectorCredit;
 use App\Catalog\Infrastructure\Doctrine\Entity\MovieEntity;
@@ -55,7 +57,7 @@ final class ScreenCreditBackfillTest extends TestCase
         $this->manager->persist($library);
         $this->manager->persist($movie);
         $this->manager->flush();
-        $directors = new DirectorRepository($this->manager);
+        $directors = new DirectorRepository($this->manager, IndexedMovie::availability($this->manager));
         $this->connection->transactional(fn () => $directors->syncMovieDirectors($movie->getId(), [
             new DirectorCredit(41, 'Existing Director', null),
             new DirectorCredit(42, 'Retained Director', null),

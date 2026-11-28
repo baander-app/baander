@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Tests\Functional\Catalog\Interface\Controller;
 
+use App\Tests\Fixtures\Catalog\IndexedMovie;
+
 use App\Catalog\Application\Port\DirectorCredit;
 use App\Catalog\Application\Port\DirectorPortInterface;
 use App\Catalog\Infrastructure\Doctrine\Entity\MovieEntity;
@@ -24,6 +26,8 @@ final class MovieDirectorControllerTest extends TestCase
         $movie = new MovieEntity(new PublicId(), $library, 'Owned Director Movie');
         $this->entityManager->persist($library);
         $this->entityManager->persist($movie);
+        $this->entityManager->flush();
+        IndexedMovie::add($this->entityManager, $movie);
         $this->entityManager->flush();
         $directors = static::getContainer()->get(DirectorPortInterface::class);
         static::getContainer()->get(TransactionPortInterface::class)->run(

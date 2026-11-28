@@ -66,8 +66,12 @@ This checkpoint covers the catalog foundation and video metadata providers.
   plays in the opened library. An extra resumes without marking a title.
   Watch-party reports leave personal viewing state alone, and a stale report
   cannot restore a cleared position.
-  Phase D read API and web units U15–U17 and Phase E documentation and browser
-  verification units U18–U19 remain pending.
+- U15 lists available series, seasons, episodes and movies, with owned counts,
+  metadata source, file versions, extras and the requesting member’s progress.
+  Filmographies and Person credit feeds use the same availability check before
+  paging. The Party API documents the session and video IDs it already returns.
+  Phase D web units U16–U17 and Phase E documentation and browser verification
+  units U18–U19 remain pending.
 
 ### Verification
 
@@ -159,6 +163,16 @@ This checkpoint covers the catalog foundation and video metadata providers.
   fresh-install and rollback suite passed 26 tests with 470 assertions.
   Scoped PHPStan and imports passed. Deptrac reported zero violations and
   439 existing skipped violations. The OpenAPI and Orval drift checks passed.
+
+- U15’s member read API, PostgreSQL queries and authorization suite passed
+  74 CI-image tests with 865 assertions. The credit-feed and director suites
+  passed all 19 distinct cases across the corrected runs, with 255 assertions.
+  Scoped PHPStan, imports, OpenAPI drift and Orval drift passed. Deptrac
+  reported zero violations and 439 existing skipped violations.
+- The full U8 run counted 15,653 tests and 156,814 assertions, with two
+  errors and four failures. U9 corrected the ingest, playback access,
+  workload and log-retention fixtures, and U13 corrected the sleep test’s
+  signal timer.
 
 ## Roadmap open items, 2026-11-26
 

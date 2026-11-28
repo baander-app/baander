@@ -8967,7 +8967,25 @@
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/PaginatedResponse"
+                                    "allOf": [
+                                        {
+                                            "$ref": "#/components/schemas/PaginatedResponse"
+                                        },
+                                        {
+                                            "type": "object",
+                                            "properties": {
+                                                "data": {
+                                                    "type": "array",
+                                                    "items": {
+                                                        "$ref": "#/components/schemas/MovieResource"
+                                                    }
+                                                }
+                                            },
+                                            "required": [
+                                                "data"
+                                            ]
+                                        }
+                                    ]
                                 }
                             }
                         }
@@ -10403,6 +10421,14 @@
                         "schema": {
                             "type": "string"
                         }
+                    },
+                    {
+                        "name": "library",
+                        "in": "query",
+                        "schema": {
+                            "type": "string",
+                            "pattern": "^[0-9a-zA-Z_-]{21}$"
+                        }
                     }
                 ],
                 "responses": {
@@ -10534,6 +10560,22 @@
                         "in": "query",
                         "schema": {
                             "type": "string"
+                        }
+                    },
+                    {
+                        "name": "season",
+                        "in": "query",
+                        "schema": {
+                            "type": "string",
+                            "pattern": "^[0-9a-zA-Z_-]{21}$"
+                        }
+                    },
+                    {
+                        "name": "unseasoned",
+                        "in": "query",
+                        "schema": {
+                            "type": "boolean",
+                            "default": false
                         }
                     }
                 ],
@@ -17113,15 +17155,7 @@
                                         "data": {
                                             "type": "array",
                                             "items": {
-                                                "type": "object",
-                                                "properties": {
-                                                    "publicId": {
-                                                        "type": "string",
-                                                        "minLength": 21,
-                                                        "maxLength": 21,
-                                                        "pattern": "^[0-9a-zA-Z_-]{21}$"
-                                                    }
-                                                }
+                                                "$ref": "#/components/schemas/PartySessionResource"
                                             }
                                         }
                                     }
@@ -31092,10 +31126,40 @@
                     },
                     "videos": {
                         "type": "array",
-                        "description": "Video variants",
                         "items": {
-                            "type": "object"
+                            "$ref": "#/components/schemas/VideoVersionResource"
                         }
+                    },
+                    "extras": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/VideoExtraResource"
+                        }
+                    },
+                    "libraryPublicId": {
+                        "type": "string"
+                    },
+                    "metadataSource": {
+                        "type": "string",
+                        "nullable": true,
+                        "enum": [
+                            "tvdb",
+                            "tmdb",
+                            "local"
+                        ]
+                    },
+                    "watched": {
+                        "type": "boolean"
+                    },
+                    "progress": {
+                        "type": "number",
+                        "nullable": true,
+                        "minimum": 0,
+                        "maximum": 1
+                    },
+                    "defaultVideoPublicId": {
+                        "type": "string",
+                        "nullable": true
                     },
                     "createdAt": {
                         "type": "string",
@@ -33272,13 +33336,45 @@
                     "posterUrl": {
                         "type": "string",
                         "nullable": true
+                    },
+                    "libraryPublicId": {
+                        "type": "string",
+                        "minLength": 21,
+                        "maxLength": 21,
+                        "pattern": "^[0-9a-zA-Z_-]{21}$"
+                    },
+                    "metadataSource": {
+                        "type": "string",
+                        "nullable": true,
+                        "enum": [
+                            "tvdb",
+                            "tmdb",
+                            "local"
+                        ]
+                    },
+                    "seasons": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/TvSeasonResource"
+                        }
+                    },
+                    "unseasonedCount": {
+                        "type": "integer"
+                    },
+                    "extras": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/VideoExtraResource"
+                        }
                     }
                 },
                 "required": [
                     "publicId",
                     "name",
                     "overview",
-                    "posterUrl"
+                    "posterUrl",
+                    "libraryPublicId",
+                    "metadataSource"
                 ]
             },
             "TvEpisodeResource": {
@@ -33306,10 +33402,12 @@
                         "nullable": true
                     },
                     "seasonNumber": {
-                        "type": "integer"
+                        "type": "integer",
+                        "nullable": true
                     },
                     "episodeNumber": {
-                        "type": "integer"
+                        "type": "integer",
+                        "nullable": true
                     },
                     "seriesPublicId": {
                         "type": "string",
@@ -33319,6 +33417,54 @@
                     },
                     "seriesName": {
                         "type": "string"
+                    },
+                    "seasonPublicId": {
+                        "type": "string",
+                        "nullable": true,
+                        "minLength": 21,
+                        "maxLength": 21,
+                        "pattern": "^[0-9a-zA-Z_-]{21}$"
+                    },
+                    "absoluteNumber": {
+                        "type": "integer",
+                        "nullable": true
+                    },
+                    "libraryPublicId": {
+                        "type": "string",
+                        "minLength": 21,
+                        "maxLength": 21,
+                        "pattern": "^[0-9a-zA-Z_-]{21}$"
+                    },
+                    "metadataSource": {
+                        "type": "string",
+                        "nullable": true,
+                        "enum": [
+                            "tvdb",
+                            "tmdb",
+                            "local"
+                        ]
+                    },
+                    "watched": {
+                        "type": "boolean"
+                    },
+                    "progress": {
+                        "type": "number",
+                        "nullable": true,
+                        "minimum": 0,
+                        "maximum": 1
+                    },
+                    "defaultVideoPublicId": {
+                        "type": "string",
+                        "nullable": true,
+                        "minLength": 21,
+                        "maxLength": 21,
+                        "pattern": "^[0-9a-zA-Z_-]{21}$"
+                    },
+                    "videos": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/VideoVersionResource"
+                        }
                     }
                 },
                 "required": [
@@ -33330,7 +33476,15 @@
                     "seasonNumber",
                     "episodeNumber",
                     "seriesPublicId",
-                    "seriesName"
+                    "seriesName",
+                    "seasonPublicId",
+                    "absoluteNumber",
+                    "libraryPublicId",
+                    "metadataSource",
+                    "watched",
+                    "progress",
+                    "defaultVideoPublicId",
+                    "videos"
                 ]
             },
             "LibraryProviderOrderResource": {
@@ -36076,6 +36230,128 @@
                     }
                 }
             },
+            "VideoVersionResource": {
+                "type": "object",
+                "properties": {
+                    "publicId": {
+                        "type": "string",
+                        "minLength": 21,
+                        "maxLength": 21,
+                        "pattern": "^[0-9a-zA-Z_-]{21}$"
+                    },
+                    "width": {
+                        "type": "integer",
+                        "nullable": true
+                    },
+                    "height": {
+                        "type": "integer",
+                        "nullable": true
+                    },
+                    "duration": {
+                        "type": "number",
+                        "nullable": true
+                    },
+                    "videoBitrate": {
+                        "type": "integer",
+                        "nullable": true
+                    },
+                    "positionSeconds": {
+                        "type": "number",
+                        "nullable": true
+                    },
+                    "lastPlayedAt": {
+                        "type": "string",
+                        "format": "date-time",
+                        "nullable": true
+                    }
+                },
+                "required": [
+                    "publicId",
+                    "width",
+                    "height",
+                    "duration",
+                    "videoBitrate",
+                    "positionSeconds",
+                    "lastPlayedAt"
+                ]
+            },
+            "VideoExtraResource": {
+                "type": "object",
+                "properties": {
+                    "publicId": {
+                        "type": "string",
+                        "minLength": 21,
+                        "maxLength": 21,
+                        "pattern": "^[0-9a-zA-Z_-]{21}$"
+                    },
+                    "width": {
+                        "type": "integer",
+                        "nullable": true
+                    },
+                    "height": {
+                        "type": "integer",
+                        "nullable": true
+                    },
+                    "duration": {
+                        "type": "number",
+                        "nullable": true
+                    },
+                    "videoBitrate": {
+                        "type": "integer",
+                        "nullable": true
+                    },
+                    "positionSeconds": {
+                        "type": "number",
+                        "nullable": true
+                    },
+                    "lastPlayedAt": {
+                        "type": "string",
+                        "format": "date-time",
+                        "nullable": true
+                    },
+                    "placementPublicId": {
+                        "type": "string",
+                        "minLength": 21,
+                        "maxLength": 21,
+                        "pattern": "^[0-9a-zA-Z_-]{21}$"
+                    },
+                    "videoPublicId": {
+                        "type": "string",
+                        "minLength": 21,
+                        "maxLength": 21,
+                        "pattern": "^[0-9a-zA-Z_-]{21}$"
+                    },
+                    "kind": {
+                        "type": "string",
+                        "enum": [
+                            "behind_the_scenes",
+                            "deleted_scene",
+                            "featurette",
+                            "interview",
+                            "scene",
+                            "short",
+                            "trailer",
+                            "clip",
+                            "sample",
+                            "theme_music",
+                            "backdrop",
+                            "other"
+                        ]
+                    }
+                },
+                "required": [
+                    "publicId",
+                    "width",
+                    "height",
+                    "duration",
+                    "videoBitrate",
+                    "positionSeconds",
+                    "lastPlayedAt",
+                    "placementPublicId",
+                    "videoPublicId",
+                    "kind"
+                ]
+            },
             "LiveFamily": {
                 "type": "string",
                 "enum": [
@@ -36820,6 +37096,41 @@
                     "department",
                     "creditedName",
                     "billingOrder"
+                ]
+            },
+            "TvSeasonResource": {
+                "type": "object",
+                "properties": {
+                    "publicId": {
+                        "type": "string",
+                        "minLength": 21,
+                        "maxLength": 21,
+                        "pattern": "^[0-9a-zA-Z_-]{21}$"
+                    },
+                    "number": {
+                        "type": "integer"
+                    },
+                    "name": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "ownedCount": {
+                        "type": "integer"
+                    },
+                    "totalCount": {
+                        "type": "integer"
+                    },
+                    "watchedCount": {
+                        "type": "integer"
+                    }
+                },
+                "required": [
+                    "publicId",
+                    "number",
+                    "name",
+                    "ownedCount",
+                    "totalCount",
+                    "watchedCount"
                 ]
             },
             "PlaybackMediaResource": {

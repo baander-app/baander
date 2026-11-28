@@ -749,6 +749,8 @@ services:
         alias: App\Catalog\Infrastructure\Doctrine\Repository\ArtistRepository
     App\Catalog\Domain\Repository\GenreRepositoryInterface:
         alias: App\Catalog\Infrastructure\Doctrine\Repository\GenreRepository
+    App\Catalog\Application\Port\MemberVideoCatalogReadInterface:
+        alias: App\Catalog\Infrastructure\Doctrine\Query\MemberVideoCatalogReadQuery
     App\Catalog\Application\Port\WatchableTitlePortInterface:
         alias: App\Catalog\Infrastructure\Doctrine\WatchableTitleLookup
     App\Catalog\Domain\Repository\MovieRepositoryInterface:

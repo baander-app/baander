@@ -13,6 +13,7 @@ use App\Catalog\Infrastructure\Doctrine\Entity\PersonArtistLinkEntity;
 use App\Catalog\Infrastructure\Doctrine\Entity\TvEpisodeEntity;
 use App\Catalog\Infrastructure\Doctrine\Entity\TvSeriesEntity;
 use App\Catalog\Infrastructure\Doctrine\Query\CatalogReadScopeQuery;
+use App\Catalog\Infrastructure\Doctrine\Query\VideoWorkAvailability;
 use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\SearchOptions;
 use App\Shared\Domain\Model\SearchResult;
@@ -25,9 +26,14 @@ use Doctrine\ORM\QueryBuilder;
 
 final readonly class PeopleReadRepository implements PeopleReadPortInterface, PersonPortraitAccessPortInterface
 {
+    private const int AVAILABILITY_BATCH_SIZE = 250;
+
     private Connection $connection;
 
-    public function __construct(private EntityManagerInterface $entityManager)
+    public function __construct(
+        private EntityManagerInterface $entityManager,
+        private VideoWorkAvailability $availability,
+    )
     {
         $this->connection = $entityManager->getConnection();
     }
@@ -67,23 +73,39 @@ final readonly class PeopleReadRepository implements PeopleReadPortInterface, Pe
 
     public function credits(PublicId $id, SearchOptions $options, LibraryReadScope $scope, ?string $kind = null, ?string $role = null): SearchResult
     {
-        [$cte, $parameters, $types] = $this->visibleCredits($scope, role: $role, personPublicId: $id->toString(), workKind: $kind);
+        [$cte, $parameters, $types] = $this->visibleCredits($scope, role: $role, personPublicId: $id->toString(), workKind: $kind, includeWorkIdentity: true);
         $parameters['query'] = $options->getQuery();
         // Each union branch applies the Person, medium and library filters before grouping.
-        $group = ' FROM visible_credits WHERE strpos(lower(title), lower(:query)) > 0 GROUP BY kind, public_id, title';
-        $total = (int) $this->connection->fetchOne($cte . ' SELECT COUNT(*) FROM (SELECT kind, public_id' . $group . ') grouped', $parameters, $types);
-        $rows = $this->connection->fetchAllAssociative(
-            $cte . <<<'SQL'
-                 SELECT kind, public_id AS "publicId", title,
-                    jsonb_agg(DISTINCT jsonb_build_object(
-                        'role', role, 'job', job, 'characterName', character_name,
-                        'department', department, 'creditedName', credited_name, 'billingOrder', billing_order
-                    )) AS roles
-                SQL
-                . $group . ' ORDER BY lower(title), kind, public_id LIMIT :limit OFFSET :offset',
-            $parameters + self::page($options),
-            $types + self::pageTypes(),
-        );
+        $group = ' FROM visible_credits WHERE strpos(lower(title), lower(:query)) > 0 GROUP BY kind, public_id, title, work_id, library_id';
+        $musicOnly = in_array($kind, ['song', 'album'], true);
+        $rows = [];
+        $total = $musicOnly ? (int) $this->connection->fetchOne($cte . ' SELECT COUNT(*) FROM (SELECT kind, public_id' . $group . ') grouped', $parameters, $types) : 0;
+        $offset = $musicOnly ? $options->getOffset() : 0;
+        $batchSize = $musicOnly ? $options->getLimit() : self::AVAILABILITY_BATCH_SIZE;
+        do {
+            $batch = $this->connection->fetchAllAssociative(
+                $cte . <<<'SQL'
+                     SELECT kind, public_id AS "publicId", title, work_id, library_id,
+                        jsonb_agg(DISTINCT jsonb_build_object(
+                            'role', role, 'job', job, 'characterName', character_name,
+                            'department', department, 'creditedName', credited_name, 'billingOrder', billing_order
+                        )) AS roles
+                    SQL
+                    . $group . ' ORDER BY lower(title), kind, public_id LIMIT :limit OFFSET :offset',
+                $parameters + ['limit' => $batchSize, 'offset' => $offset],
+                $types + self::pageTypes(),
+            );
+            foreach ($this->visibleCreditRows($batch) as $row) {
+                if (($musicOnly || $total >= $options->getOffset()) && count($rows) < $options->getLimit()) {
+                    unset($row['work_id'], $row['library_id']);
+                    $rows[] = $row;
+                }
+                if (!$musicOnly) {
+                    ++$total;
+                }
+            }
+            $offset += count($batch);
+        } while (!$musicOnly && count($batch) === self::AVAILABILITY_BATCH_SIZE);
         foreach ($rows as &$row) {
             $row['roles'] = json_decode((string) $row['roles'], true, flags: JSON_THROW_ON_ERROR);
             usort($row['roles'], static fn(array $left, array $right): int => [
@@ -98,13 +120,7 @@ final readonly class PeopleReadRepository implements PeopleReadPortInterface, Pe
 
     public function workCredits(string $kind, PublicId $id, SearchOptions $options, LibraryReadScope $scope): ?SearchResult
     {
-        $target = match ($kind) {
-            'movie' => $this->movieExists($id, $scope),
-            'series' => $this->seriesDetail($id, $scope) !== null,
-            'episode' => $this->episodeDetail($id, $scope) !== null,
-            default => false,
-        };
-        if (!$target) {
+        if (!$this->workExists($kind, $id, $scope)) {
             return null;
         }
         [$cte, $parameters, $types] = $this->visibleCredits($scope, workKind: $kind, workPublicId: $id->toString());
@@ -231,13 +247,49 @@ final readonly class PeopleReadRepository implements PeopleReadPortInterface, Pe
         ) !== false;
     }
 
-    private function movieExists(PublicId $id, LibraryReadScope $scope): bool
+    private function workExists(string $kind, PublicId $id, LibraryReadScope $scope): bool
     {
-        $query = $this->entityManager->createQueryBuilder()->select('s.id')->from(MovieEntity::class, 's')
-            ->where('s.publicId = :publicId')->setParameter('publicId', $id);
-        CatalogReadScopeQuery::apply($query, $scope, 'movie', 's');
+        if (!in_array($kind, ['movie', 'series', 'episode'], true)) {
+            return false;
+        }
+        $entity = match ($kind) {
+            'movie' => MovieEntity::class,
+            'series' => TvSeriesEntity::class,
+            'episode' => TvEpisodeEntity::class,
+        };
+        $owner = $kind === 'episode' ? 'owner' : 'work';
+        $query = $this->entityManager->createQueryBuilder()->select('work.id', "IDENTITY({$owner}.library) AS libraryId")
+            ->from($entity, 'work')->where('work.publicId = :publicId')->setParameter('publicId', $id);
+        if ($kind === 'episode') {
+            $query->join('work.series', 'owner')->andWhere('work.retired = false');
+        }
+        CatalogReadScopeQuery::apply($query, $scope, 'movie', $owner);
+        $row = $query->getQuery()->getOneOrNullResult();
 
-        return $query->getQuery()->getOneOrNullResult() !== null;
+        return $row !== null && $this->availability->visibleWorks([[
+            'kind' => $kind, 'id' => (string) $row['id'], 'libraryId' => (string) $row['libraryId'],
+        ]]) !== [];
+    }
+
+    /**
+     * @param list<array<string, mixed>> $rows
+     * @return list<array<string, mixed>>
+     */
+    private function visibleCreditRows(array $rows): array
+    {
+        $works = [];
+        foreach ($rows as $row) {
+            if (in_array($row['kind'], ['movie', 'series', 'episode'], true)) {
+                $works[] = ['kind' => $row['kind'], 'id' => (string) $row['work_id'], 'libraryId' => (string) $row['library_id']];
+            }
+        }
+        $visible = [];
+        foreach ($this->availability->visibleWorks($works) as $work) {
+            $visible[$work['kind'] . ':' . $work['id'] . ':' . $work['libraryId']] = true;
+        }
+
+        return array_values(array_filter($rows, static fn (array $row): bool => in_array($row['kind'], ['song', 'album'], true)
+            || isset($visible[$row['kind'] . ':' . $row['work_id'] . ':' . $row['library_id']])));
     }
 
     /** @return array{string, array<string, mixed>, array<string, mixed>} */
@@ -248,6 +300,7 @@ final readonly class PeopleReadRepository implements PeopleReadPortInterface, Pe
         ?string $workKind = null,
         ?string $workPublicId = null,
         ?string $portraitPublicId = null,
+        bool $includeWorkIdentity = false,
     ): array
     {
         // DQL has no UNION. Each SQL branch applies the same native Catalog scope
@@ -282,6 +335,7 @@ final readonly class PeopleReadRepository implements PeopleReadPortInterface, Pe
                 $branches[] = "SELECT links.person_id, '{$kind}'::text AS kind, s.public_id, s.title, credits.id::text AS credit_id,"
                     . " COALESCE(credits.role, 'other') AS role, COALESCE(credits.role, 'other') AS job, NULL::text AS character_name,"
                     . ' NULL::text AS department, credits.credited_name, NULL::integer AS billing_order'
+                    . ($includeWorkIdentity ? ', NULL::uuid AS work_id, NULL::uuid AS library_id' : '')
                     . " FROM {$table} s JOIN artist_{$kind} credits ON credits.{$kind}_id = s.id"
                     . ' JOIN artists artist ON artist.id = credits.artist_id JOIN person_artist_links links ON links.artist_id = artist.id'
                     . ' WHERE links.person_id IS NOT NULL AND ' . self::validArtistLink('artist') . ' AND (' . $access['predicate'] . ')' . $filter;
@@ -295,6 +349,7 @@ final readonly class PeopleReadRepository implements PeopleReadPortInterface, Pe
                 $title = $kind === 'movie' ? 's.title' : $targetAlias . '.name';
                 $branches[] = "SELECT credits.person_id, '{$kind}'::text AS kind, {$targetAlias}.public_id, {$title} AS title,"
                     . ' credits.id::text AS credit_id, credits.role, credits.job, credits.character_name, credits.department, credits.credited_name, credits.billing_order'
+                    . ($includeWorkIdentity ? ", {$targetAlias}.id AS work_id, s.library_id AS library_id" : '')
                     . " FROM {$target} JOIN {$kind}_person_credits credits ON credits.{$kind}_id = {$targetAlias}.id"
                     . ' WHERE (' . $access['predicate'] . ')' . $filter;
             }

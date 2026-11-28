@@ -6,8 +6,9 @@ namespace App\Catalog\Interface\Controller;
 
 use App\Catalog\Application\Command\Movie\DeleteMovieCommand;
 use App\Catalog\Application\Command\Movie\UpdateMovieCommand;
-use App\Catalog\Application\Port\MoviePortInterface;
-use App\Catalog\Application\Port\VideoPortInterface;
+use App\Catalog\Application\Port\MemberVideoCatalogReadInterface;
+use App\Auth\Application\Port\AuthenticatedUserIdentityInterface;
+use Symfony\Bundle\SecurityBundle\Security;
 use App\Catalog\Interface\Request\UpdateMovieRequest;
 use App\Catalog\Interface\Resource\CatalogDeletionResource;
 use App\Catalog\Interface\Resource\MovieResource;
@@ -43,9 +44,9 @@ final class MovieController
     use ApiResponsesTrait;
     use DispatchesMessagesTrait;
     public function __construct(
-        private readonly MoviePortInterface $movieService,
+        private readonly MemberVideoCatalogReadInterface $videos,
+        private readonly Security $security,
         private readonly LibraryReadScopeProviderInterface $libraryReadScopeProvider,
-        private readonly VideoPortInterface $videoRepository,
         private readonly MessageBusInterface $bus,
     ) {}
 
@@ -60,7 +61,7 @@ final class MovieController
                 response: '200',
                 description: 'Paginated list of movies',
                 content: new OA\MediaType\Json(
-                    schema: new ParameterSchema(ref: PaginatedResponse::class),
+                    schema: new ParameterSchema(allOf: [new ParameterSchema(ref: PaginatedResponse::class), new ParameterSchema(type: 'object', properties: ['data' => new ParameterSchema(type: 'array', items: new ParameterSchema(ref: MovieResource::class))], required: ['data'])]),
                 ),
             ),
             new OA\Response(
@@ -98,18 +99,21 @@ final class MovieController
         $query = (string) $request->query->get('q', '');
 
         $options = SearchOptions::create($query, $pagination->limit, $pagination->offset);
-        $searchResult = $this->movieService->searchVisible($options, $scope);
+        $searchResult = $this->videos->movies($options, $scope, $this->memberId());
 
         $results = MovieResource::collection($searchResult->getItems());
         $total = $searchResult->getTotal();
 
-        return $this->paginatedResponse(new PaginatedResponse(
+        $response = $this->paginatedResponse(new PaginatedResponse(
             data: $results,
             currentPage: $pagination->page,
             lastPage: $pagination->lastPage($total),
             perPage: $pagination->limit,
             total: $total,
         ));
+        $response->headers->set('Cache-Control', 'private, no-store');
+
+        return $response;
     }
 
     /**
@@ -163,34 +167,16 @@ final class MovieController
             return $this->notFound();
         }
 
-        $movie = $this->movieService->findVisibleByPublicId($resolvedPublicId, $scope);
+        $movie = $this->videos->movieDetail($resolvedPublicId, $scope, $this->memberId());
 
         if ($movie === null) {
             return $this->notFound();
         }
 
-        $videos = [];
-        foreach ($movie->getVideoIds() as $videoIdStr) {
-            $video = $this->videoRepository->findByUuid(Uuid::fromString($videoIdStr));
-            if ($video !== null) {
-                $videos[] = [
-                    'publicId' => $video->getPublicId()->toString(),
-                    'height' => $video->getHeight(),
-                    'width' => $video->getWidth(),
-                    'duration' => $video->getDuration(),
-                    'videoBitrate' => $video->getVideoBitrate(),
-                ];
-            }
-        }
+        $response = $this->successResponse(MovieResource::from($movie));
+        $response->headers->set('Cache-Control', 'private, no-store');
 
-        $data = MovieResource::fromWithPoster(
-            $movie,
-            posterImage: $movie->getPosterUrl() !== null ? ['url' => $movie->getPosterUrl()] : null,
-            genres: [],
-            videos: $videos,
-        );
-
-        return $this->successResponse($data);
+        return $response;
     }
 
     /**
@@ -321,4 +307,11 @@ final class MovieController
 
         return $this->successResponse(CatalogDeletionResource::from($result));
     }
+    private function memberId(): ?Uuid
+    {
+        $member = $this->security->getUser();
+
+        return $member instanceof AuthenticatedUserIdentityInterface ? Uuid::fromString($member->getId()) : null;
+    }
+
 }

@@ -5,6 +5,11 @@ declare(strict_types=1);
 namespace App\Catalog\Interface\Controller;
 
 use App\Catalog\Application\Port\PeopleReadPortInterface;
+use App\Catalog\Application\Port\MemberVideoCatalogReadInterface;
+use App\Auth\Application\Port\AuthenticatedUserIdentityInterface;
+use App\Shared\Domain\Model\Uuid;
+use App\Shared\Interface\Exception\InvalidQueryParameter;
+use Symfony\Bundle\SecurityBundle\Security;
 use App\Catalog\Interface\Resource\TvEpisodeResource;
 use App\Catalog\Interface\Resource\TvSeriesResource;
 use App\Catalog\Interface\Resource\WorkPersonResource;
@@ -30,6 +35,8 @@ final readonly class TvReadController
 
     public function __construct(
         private PeopleReadPortInterface $people,
+        private MemberVideoCatalogReadInterface $videos,
+        private Security $security,
         private LibraryReadScopeProviderInterface $scopes,
     ) {}
 
@@ -53,6 +60,7 @@ final readonly class TvReadController
                 in: 'query',
                 schema: new OA\Schema(type: 'string'),
             ),
+            new OA\Parameter(name: 'library', in: 'query', schema: new OA\Schema(type: 'string', pattern: PublicId::SCHEMA_PATTERN)),
         ],
         responses: [
             new OA\Response(
@@ -89,7 +97,7 @@ final readonly class TvReadController
     #[Route('/series', name: 'tv_series_index', methods: ['GET'])]
     public function series(Request $request): JsonResponse
     {
-        return $this->page($request, $this->people->series(self::options($request), $this->scopes->current()), TvSeriesResource::class);
+        return $this->page($request, $this->videos->series(self::options($request), $this->scopes->current(), QueryParameters::optionalPublicId($request->query, 'library')), TvSeriesResource::class);
     }
 
     #[OA\Operation\Get(
@@ -124,9 +132,9 @@ final readonly class TvReadController
     #[Route('/series/{publicId}', name: 'tv_series_show', methods: ['GET'])]
     public function seriesDetail(string $publicId): JsonResponse
     {
-        $series = $this->people->seriesDetail(PublicId::fromString($publicId), $this->scopes->current());
+        $series = $this->videos->seriesDetail(PublicId::fromString($publicId), $this->scopes->current(), $this->memberId());
 
-        return $series === null ? $this->notFound() : $this->successResponse(TvSeriesResource::from($series));
+        return $series === null ? $this->notFound() : $this->privateResponse($this->successResponse(TvSeriesResource::from($series)));
     }
 
     #[OA\Operation\Get(
@@ -155,6 +163,8 @@ final readonly class TvReadController
                 in: 'query',
                 schema: new OA\Schema(type: 'string'),
             ),
+            new OA\Parameter(name: 'season', in: 'query', schema: new OA\Schema(type: 'string', pattern: PublicId::SCHEMA_PATTERN)),
+            new OA\Parameter(name: 'unseasoned', in: 'query', schema: new OA\Schema(type: 'boolean', default: false)),
         ],
         responses: [
             new OA\Response(
@@ -191,7 +201,12 @@ final readonly class TvReadController
     #[Route('/series/{publicId}/episodes', name: 'tv_series_episodes', methods: ['GET'])]
     public function episodes(string $publicId, Request $request): JsonResponse
     {
-        $episodes = $this->people->episodes(PublicId::fromString($publicId), self::options($request), $this->scopes->current());
+        $season = QueryParameters::optionalPublicId($request->query, 'season');
+        $unseasoned = QueryParameters::optionalBoolean($request->query, 'unseasoned') ?? false;
+        if ($season !== null && $unseasoned) {
+            throw new InvalidQueryParameter('season', 'Choose a season or unseasoned episodes.');
+        }
+        $episodes = $this->videos->episodes(PublicId::fromString($publicId), self::options($request), $this->scopes->current(), $this->memberId(), $season, $unseasoned);
 
         return $episodes === null ? $this->notFound() : $this->page($request, $episodes, TvEpisodeResource::class);
     }
@@ -228,9 +243,9 @@ final readonly class TvReadController
     #[Route('/episodes/{publicId}', name: 'tv_episode_show', methods: ['GET'])]
     public function episode(string $publicId): JsonResponse
     {
-        $episode = $this->people->episodeDetail(PublicId::fromString($publicId), $this->scopes->current());
+        $episode = $this->videos->episodeDetail(PublicId::fromString($publicId), $this->scopes->current(), $this->memberId());
 
-        return $episode === null ? $this->notFound() : $this->successResponse(TvEpisodeResource::from($episode));
+        return $episode === null ? $this->notFound() : $this->privateResponse($this->successResponse(TvEpisodeResource::from($episode)));
     }
 
     #[OA\Operation\Get(
@@ -375,13 +390,27 @@ final readonly class TvReadController
     {
         $pagination = QueryParameters::page($request->query);
 
-        return $this->paginatedResponse(new PaginatedResponse(
+        return $this->privateResponse($this->paginatedResponse(new PaginatedResponse(
             data: $resource::collection($result->getItems()),
             currentPage: $pagination->page,
             lastPage: $pagination->lastPage($result->getTotal()),
             perPage: $pagination->limit,
             total: $result->getTotal(),
-        ));
+        )));
+    }
+
+    private function memberId(): ?Uuid
+    {
+        $member = $this->security->getUser();
+
+        return $member instanceof AuthenticatedUserIdentityInterface ? Uuid::fromString($member->getId()) : null;
+    }
+
+    private function privateResponse(JsonResponse $response): JsonResponse
+    {
+        $response->headers->set('Cache-Control', 'private, no-store');
+
+        return $response;
     }
 
     private static function options(Request $request): SearchOptions
