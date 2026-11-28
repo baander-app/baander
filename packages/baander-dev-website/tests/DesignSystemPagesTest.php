@@ -7,6 +7,7 @@ namespace Baander\DevWebsite\Tests;
 use Baander\DevWebsite\Content\DesignSystemPages;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
+use Baander\DevWebsite\Content\Contrast;
 
 final class DesignSystemPagesTest extends TestCase
 {
@@ -185,8 +186,8 @@ final class DesignSystemPagesTest extends TestCase
         foreach ($accents['derivations'] as $mood => $derivations) {
             foreach ($derivations as $accent => $derivation) {
                 $surfaces = $accents['surfaces'][$mood][$accent];
-                self::assertSame($derivation['text']['ratio'], \Baander\DevWebsite\Content\Contrast::ratio($derivation['accentText'], $surfaces[$derivation['text']['surface']]), $mood . ' ' . $accent);
-                self::assertSame($derivation['ringContrast']['ratio'], \Baander\DevWebsite\Content\Contrast::ratio($derivation['ring'], $surfaces[$derivation['ringContrast']['surface']]), $mood . ' ' . $accent);
+                self::assertSame($derivation['text']['ratio'], Contrast::ratio($derivation['accentText'], $surfaces[$derivation['text']['surface']]), $mood . ' ' . $accent);
+                self::assertSame($derivation['ringContrast']['ratio'], Contrast::ratio($derivation['ring'], $surfaces[$derivation['ringContrast']['surface']]), $mood . ' ' . $accent);
             }
         }
         self::assertSame('#6e5ca5', $accents['derivations']['warm']['violet']['accentText']);
