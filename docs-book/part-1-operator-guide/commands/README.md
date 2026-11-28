@@ -105,7 +105,7 @@ Application console commands run inside `web`. The control and execution worker 
 | [app:library:stats](app-library-stats.md) | Show the content counts of one media library |
 | [app:library:update](app-library-update.md) | Rename a media library or change its sort order |
 | [app:library:validate-path](app-library-validate-path.md) | Check that a directory can serve as a media library |
-| [app:movie:delete](app-movie-delete.md) | Delete a movie and the videos no other movie uses |
+| [app:movie:delete](app-movie-delete.md) | Delete a movie and its unlinked video records |
 | [app:movie:update](app-movie-update.md) | Change a movie's title, year or summary |
 | [app:song:delete](app-song-delete.md) | Delete a song, optionally with its audio file |
 | [app:song:update](app-song-update.md) | Change a song's metadata, or lock and unlock its fields |
@@ -114,7 +114,7 @@ Application console commands run inside `web`. The control and execution worker 
 | [app:video:match:order](app-video-match-order.md) | Select an offered episode ordering |
 | [app:video:match:rematch](app-video-match-rematch.md) | Preview or queue a library rematch |
 | [app:video:match:reviews](app-video-match-reviews.md) | Read video match reviews and provider pauses |
-| [app:video:match:search](app-video-match-search.md) | Search usable video metadata providers |
+| [app:video:match:search](app-video-match-search.md) | Search video metadata providers or list ordering and assignment choices |
 | [app:video:providers:order](app-video-providers-order.md) | Read or replace the metadata provider order of a TV or movie library |
 | [app:watch-files](app-watch-files.md) | Watch directories for filesystem changes |
 

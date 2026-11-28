@@ -1,6 +1,6 @@
 # Baander roadmap
 
-Updated 2026-11-27. The roadmap records remaining work, decisions and acceptance
+Updated 2026-11-28. The roadmap records remaining work, decisions and acceptance
 gates. The linked guides describe current operating contracts. Git history
 keeps completed milestones and their verification evidence.
 
@@ -79,6 +79,11 @@ The entries below cover scanning, matching, member playback and their verificati
   providers, search and apply a match, choose an ordering or assign a file.
   Each library has a keyboard-accessible provider order and a re-match preview
   that counts existing manual decisions before confirmation.
+- U18 updates the operator guide, command reference and video library vocabulary.
+  After the full feature is merged, the owner must reset or repair the persistent
+  development database and rescan its libraries. The rewritten migration does
+  not convert existing catalog rows. All migration checks ran on isolated preview
+  and CI databases.
 
 ### Verification
 
@@ -193,6 +198,10 @@ The entries below cover scanning, matching, member playback and their verificati
   ESLint reported zero errors and 13 warnings. The Phase D preview migrated
   a fresh database through `Version20261128140000`, repeated the migration
   and passed Doctrine mapping and schema validation.
+- U18’s command documentation coverage and admin CLI parity passed 14 CI-image
+  tests with 69 assertions. The documentation check compared 11 command
+  definitions and 50 inputs with their reference pages. The public site build
+  generated 304 manual pages, including Video Matching.
 - The full U8 run counted 15,653 tests and 156,814 assertions, with two
   errors and four failures. U9 corrected the ingest, playback access,
   workload and log-retention fixtures, and U13 corrected the sleep test’s

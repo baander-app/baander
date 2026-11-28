@@ -8,6 +8,7 @@ configured separately.
 | Guide | Scope |
 |-------|-------|
 | [Library Management](library-management.md) | Creating libraries, scanning media, inotify file watching, supported audio and video formats, and cover art extraction |
+| [Video Matching](video-matching.md) | TV and movie naming, NFO metadata, provider order, review, ordering, extras and member state |
 | [External APIs](external-apis.md) | Configure providers and understand enrichment failures |
 | [MusicBrainz Matching](musicbrainz-matching.md) | Compare candidates, apply matches and follow queued matching work |
 | [Transcoding](transcoding.md) | Identify original or converted delivery, worker capacity and troubleshooting steps |

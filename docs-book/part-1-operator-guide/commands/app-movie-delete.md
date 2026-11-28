@@ -1,6 +1,6 @@
 # app:movie:delete
 
-Delete a movie and the videos no other movie uses. The command does what `DELETE /api/movies/{publicId}` does in the API, through the same use case.
+Delete a movie and the video records left without catalog links. The [command](../../../src/Catalog/Interface/Console/MovieDeleteCommand.php) runs the same use case as `DELETE /api/movies/{publicId}`.
 
 ## Quick start
 
@@ -31,7 +31,7 @@ make exec cmd="php bin/console app:movie:delete V1StGXR8_Z5jdHi6B-myT --force"
 
 On a terminal the command asks before it deletes anything. Without a terminal and without `--force` it deletes nothing and exits with code 2. `--json` does not stand in for `--force`.
 
-The movie and, in the same transaction, the video records that no other movie links are deleted. A video another movie uses stays. The video files stay on disk. This cannot be undone.
+The [delete handler](../../../src/Catalog/Application/CommandHandler/Movie/DeleteMovieHandler.php) considers the movie's features and extras in the same transaction. A video record survives if any movie or placement still links it, including a placement for a television episode or extra. The source files stay on disk. The record deletion cannot be undone.
 
 ## Exit codes
 

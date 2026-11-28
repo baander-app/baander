@@ -16,9 +16,9 @@ dc exec web php bin/console app:library:create 'My Music' /storage/media/music m
 |----------|-------------|
 | `name` | Human-readable library name |
 | `path` | Absolute path to the media directory on disk |
-| `type` | Use `music` or `movie` for the supported scan and ingestion workflows |
+| `type` | Use `music`, `movie` or `tv_show` for the supported scan and ingestion workflows |
 
-The command also accepts `podcast`, `audiobook` and `tv_show` as type values, but their scanners and catalog ingestion are not implemented. Creating one does not provide a working import workflow.
+The command also accepts `podcast` and `audiobook` as type values, but their scanners and catalog ingestion are not implemented. Creating one does not provide a working import workflow.
 
 The slug is auto-generated from the name: lowercased, with each run of characters other than `a`–`z` and `0`–`9` replaced by one hyphen and hyphens trimmed from both ends, so "AC/DC" becomes `ac-dc`. Provide `--slug` to override it:
 
@@ -43,12 +43,14 @@ The console runs discovery inline and records that job in the job monitor. Start
 Both routes then follow the same stages:
 
 1. **Discovery** walks the directory, filters recognized extensions, hashes files and updates the file index. It records changed directories for later ingestion. A file symlink is followed only while its target stays inside the library. A link whose target leaves the library is skipped with a warning in the log, and a track or video imported through it earlier is marked unavailable. Directory symlinks are not followed.
-2. **Catalog ingestion** consumes those directory messages in the background. Music ingestion reads tags and creates albums and tracks; movie ingestion creates movie and video records.
-3. **Optional enrichment** queues MusicBrainz matching of the albums an import or rescan touches, and lyrics work for newly created tracks and for tracks a rescan repairs, when the corresponding setting is enabled.
+2. **Catalog ingestion** consumes those directory messages in the background. Music ingestion reads tags and creates albums and tracks. Movie ingestion parses titles, years, provider tags and extras; TV ingestion creates series, seasons, episodes and file placements from names. See [Video Matching](video-matching.md#arrange-the-files) for the accepted forms.
+3. **Optional enrichment** queues MusicBrainz matching of the albums an import or rescan touches, and lyrics work for newly created tracks and for tracks a rescan repairs, when the corresponding setting is enabled. Video ingestion queues unmatched titles for provider matching independently of the music settings.
 
-The scan's file totals and completed library status describe discovery. They do not prove that every queued directory has reached the catalog. Check the resulting albums, tracks or movies separately, and use [Monitoring](../operations/README.md) to investigate pending or failed background work. [Background Work](../workers/background-work.md) explains the delivery stages and worker requirements.
+The scan's file totals and completed library status describe discovery. They do not prove that every queued directory has reached the catalog. Check the resulting albums, tracks, movies or series separately, and use [Monitoring](../operations/README.md) to investigate pending or failed background work. [Background Work](../workers/background-work.md) explains the delivery stages and worker requirements.
 
-Incremental scans skip unchanged indexed files. A full rescan reprocesses discovery and repairs tracks Baander already has, filling in a missing artist credit and measuring the length again (see [What a rescan repairs](../commands/app-library-scan.md#what-a-rescan-repairs)); it is not a request to erase and rebuild the catalog. A rescan keeps what a [MusicBrainz match](musicbrainz-matching.md#musicbrainz-matching) set. A retag keeps it too, except where the new tags carry a value for a field or credit the artist by MusicBrainz ID; see [Retagged files](../commands/app-library-scan.md#retagged-files). Missing sources retain file-index records marked unavailable. A scan does not promise blanket removal of catalog entries for deleted files. Restore a missing mount before scanning: an unavailable directory can look like an empty library to discovery.
+Incremental scans skip unchanged indexed files. A full rescan reprocesses discovery and repairs tracks Baander already has, filling in a missing artist credit and measuring the length again (see [What a rescan repairs](../commands/app-library-scan.md#what-a-rescan-repairs)); it is not a request to erase and rebuild the catalog. A rescan keeps what a [MusicBrainz match](musicbrainz-matching.md#musicbrainz-matching) set. A retag keeps it too, except where the new tags carry a value for a field or credit the artist by MusicBrainz ID; see [Retagged files](../commands/app-library-scan.md#retagged-files). Missing sources retain file-index records marked unavailable. A scan does not promise blanket removal of catalog entries for deleted files.
+
+For movie and TV libraries, an unreadable root is treated as empty and marks indexed files unavailable; a failure partway through traversal preserves their previous availability. Music keeps its existing scan error handling. Restore the mount or read permissions and scan again; unavailable video works return with their metadata and member state. See [Missing files and member state](video-matching.md#missing-files-and-member-state).
 
 Only one scan of a library runs at a time. Starting a scan claims the library, and while the claim holds, the admin panel and the command refuse a second scan of it. `app:library:scan --all` scans every library that is not already scanning. A running scan renews its claim as it works. A claim that nobody renews for 15 minutes lapses, for example after a scan process was killed. The library then reads as `failed` and can be scanned again. To free a library sooner, release its claim with `app:library:scan my-music --release --force` once you know its scan is gone.
 
@@ -65,6 +67,19 @@ After discovery, background ingestion adds new albums and tracks to the catalog.
 
 `metadata.auto_sync` also acts on albums Baander already has, so a rescan with the setting on queues every album it touches that has no match yet; an album left for review is queued again only when its number of songs has changed. `lyrics.auto_fetch` acts on new tracks and on the tracks a rescan repairs; see [What a rescan repairs](../commands/app-library-scan.md#what-a-rescan-repairs). The bulk lyrics fetch, [`app:lyrics:fetch`](../commands/app-lyrics-fetch.md), and the syncs and fetches an administrator starts are not affected by either setting.
 
+### TV and movie libraries
+
+Create and scan a TV library using the same workflow as music:
+
+```bash
+dc exec web php bin/console app:library:create 'TV Shows' /storage/media/tv tv_show
+dc exec web php bin/console app:library:scan tv-shows
+```
+
+Each series has its own folder below that root. Season folders, specials, multi-episode files, absolute numbering, air dates, extras and local NFO metadata are described in [Video Matching](video-matching.md). Movies use the same provider-order and review workflow.
+
+Open **Metadata → Video reviews** to resolve a title or file that needs review. The library's **Video matching** settings control provider order and offer a confirmed library rematch. Rescanning preserves existing title matches and hand-assigned files; changing provider order affects new matches until an administrator requests a rematch. Missing files are hidden from member video lists, director filmography and video credits without deleting their records. [Video Matching](video-matching.md#review-and-fix-a-match) explains ordering, assignment and member resume behavior.
+
 ### People and credits
 
 Open **People** under Movies to search names and aliases. Each profile shows the
@@ -73,7 +88,7 @@ the credits on a movie, series or episode to reach the same profile. A linked
 music Artist also links to their Person profile. **Directors** still opens the
 directory of people with directing credits in your accessible movies.
 
-To fill movie cast and crew, run [metadata sync](../commands/app-metadata-sync.md).
+Video matching fills cast and crew when the selected provider supplies them. [Metadata sync](../commands/app-metadata-sync.md) refreshes matched videos through their saved providers; [Video Matching](video-matching.md#choose-providers) explains automatic matching and refresh.
 
 TMDB person IDs keep same-name people distinct. An individual MusicBrainz
 Artist can link to the same Person through verified provider IDs. Use
@@ -169,6 +184,7 @@ See the [command reference](../commands/app-album-extract-covers.md) for details
 
 ## Next Steps
 
-- [External APIs](external-apis.md) -- understand optional music metadata and lyrics lookups
+- [Video Matching](video-matching.md) -- name files, configure video providers and fix matches
+- [External APIs](external-apis.md) -- understand optional metadata and lyrics lookups
 - [Transcoding](transcoding.md) -- set up on-demand media conversion for streaming and quality tiers
 - [CLI Reference](../commands/README.md) -- full list of available console commands

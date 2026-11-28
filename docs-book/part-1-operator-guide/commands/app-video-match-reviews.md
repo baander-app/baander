@@ -6,7 +6,7 @@ Read the video match review queue, including file paths and provider pauses. Use
 
 ```bash
 make exec cmd="php bin/console app:video:match:reviews --limit=25 --json"
-make exec cmd="php bin/console app:video:match:reviews --kind=file --library=television --reason=episode_not_found"
+make exec cmd="php bin/console app:video:match:reviews --kind=file --library=television --reason=duplicate_file"
 ```
 
 ## Options
@@ -26,7 +26,7 @@ make exec cmd="php bin/console app:video:match:reviews --kind=file --library=tel
 
 ## API and output
 
-The command runs with full authority. Its admin API counterpart requires a first-party administrator. `--json` writes the API response's `data` object to stdout. Errors and confirmation prompts go to stderr.
+The command runs with full authority. Its admin API counterpart requires a first-party administrator. `--json` writes the API response's `data` object to stdout. Errors go to stderr.
 
 The [command](../../../src/Catalog/Interface/Console/VideoMatchReviewsCommand.php) and [controller](../../../src/Catalog/Interface/Controller/VideoMatchController.php) use the same [video match administration service](../../../src/Catalog/Application/Service/VideoMatch/VideoMatchAdminService.php).
 
@@ -34,6 +34,6 @@ The [command](../../../src/Catalog/Interface/Console/VideoMatchReviewsCommand.ph
 
 | Code | Meaning |
 |------|---------|
-| 0 | Operation completed |
-| 1 | Target missing, conflicting state, provider unavailable, or confirmation declined |
-| 2 | Invalid input, or a change needs confirmation without a terminal |
+| 0 | Review page returned, even when it has no rows |
+| 1 | Library not found or the page could not be read |
+| 2 | Invalid input, such as a malformed cursor or a limit outside the accepted range |
