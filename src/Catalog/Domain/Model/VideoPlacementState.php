@@ -30,5 +30,6 @@ final class VideoPlacementState
         public ?string $reviewReason = null,
         public int $sortOrder = 0,
         public readonly DateTimeImmutable $createdAt = new DateTimeImmutable(),
+        public ?DateTimeImmutable $reviewCheckedAt = null,
     ) {}
 }

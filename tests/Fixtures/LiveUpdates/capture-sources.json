@@ -2019,8 +2019,14 @@
     {
       "table": "video_placements",
       "mapping": "src/Catalog/Infrastructure/Doctrine/Entity/VideoPlacementEntity.php",
-      "classification": "excluded",
-      "reason": "Video placement storage; library-scoped video views refresh through catalog hints and visible sampling."
+      "classification": "capture",
+      "operations": ["INSERT", "UPDATE", "DELETE"],
+      "relevant_columns": ["id", "public_id", "library_id", "video_id", "series_id", "movie_id", "relative_path", "raw_parse", "extra_kind", "assigned", "review_reason", "sort_order", "created_at", "review_checked_at"],
+      "excluded_columns": [],
+      "families": ["admin-metadata"],
+      "scope_routes": ["admin"],
+      "readers": ["src/Catalog/Infrastructure/Doctrine/Query/VideoMatchReviewReadQuery.php"],
+      "response_cache": "authoritative-read"
     },
     {
       "table": "video_placement_episode",

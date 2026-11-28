@@ -105,16 +105,19 @@ final class VideoMatchInfrastructureTest extends TestCase
         $library = $this->library('movie');
         $movie = $this->movie($library, 'Title {tmdb-1399}.mkv');
         $this->movie($library, 'Other Title.mkv');
-        $loader = $this->loader(['Other Title.nfo', 'movie.nfo', 'Title {tmdb-1399}.nfo', 'poster.jpg']);
+        $loader = $this->loader(
+            ['Other Title.nfo', 'movie.nfo', 'title {tmdb-1399}.nfo', 'Title {tmdb-1399}.NfO', 'poster.jpg'],
+            expectedRootStems: ['Title {tmdb-1399}'],
+        );
 
-        $targets = $loader->forObservations($library, ['Title {tmdb-1399}.nfo']);
+        $targets = $loader->forObservations($library, ['Title {tmdb-1399}.NfO']);
         self::assertCount(1, $targets);
         self::assertTrue($targets[0]->id->equals($movie->getId()));
         self::assertEquals($movie->getId(), $targets[0]->request->titleId);
         self::assertSame(['tmdb' => '1399'], $targets[0]->request->externalIds);
         self::assertCount(1, $targets[0]->request->sidecars);
         self::assertSame(VideoSidecarKind::MovieNfo, $targets[0]->request->sidecars[0]->kind);
-        self::assertSame('/media/video/Title {tmdb-1399}.nfo', $targets[0]->request->sidecars[0]->path);
+        self::assertSame('/media/video/Title {tmdb-1399}.NfO', $targets[0]->request->sidecars[0]->path);
         self::assertFalse($targets[0]->matched);
         self::assertSame([], $loader->forObservations($library, ['movie.nfo']));
     }
@@ -293,11 +296,28 @@ final class VideoMatchInfrastructureTest extends TestCase
     /**
      * @param list<string> $files
      * @param array<string, bool> $available
+     * @param list<string>|null $expectedRootStems
      */
-    private function loader(array $files, array $available = []): VideoMatchTargetLoader
+    private function loader(array $files, array $available = [], ?array $expectedRootStems = null): VideoMatchTargetLoader
     {
-        $sidecars = $this->createStub(VideoSidecarIndexInterface::class);
-        $sidecars->method('forFolder')->willReturnCallback(
+        if ($expectedRootStems === null) {
+            $sidecars = $this->createStub(VideoSidecarIndexInterface::class);
+            $rootNfos = $sidecars->method('forRootNfoStems');
+            $folders = $sidecars->method('forFolder');
+        } else {
+            $sidecars = $this->createMock(VideoSidecarIndexInterface::class);
+            $rootNfos = $sidecars->expects(self::once())->method('forRootNfoStems')->with(self::isInstanceOf(Uuid::class), $expectedRootStems);
+            $folders = $sidecars->expects(self::never())->method('forFolder');
+        }
+        $rootNfos->willReturnCallback(static function (Uuid $library, array $stems) use ($files): array {
+            $contents = array_filter($files, static fn (string $file): bool => dirname($file) === '.'
+                && strtolower(pathinfo($file, PATHINFO_EXTENSION)) === 'nfo'
+                && in_array(pathinfo($file, PATHINFO_FILENAME), $stems, true));
+            sort($contents, SORT_STRING);
+
+            return array_map(static fn (string $file): array => ['path' => '/media/video/' . $file, 'relativePath' => $file], $contents);
+        });
+        $folders->willReturnCallback(
             static function (Uuid $library, string $folder) use ($files): array {
                 $contents = array_filter($files, static fn (string $file): bool => $folder === ''
                     ? dirname($file) === '.' : str_starts_with($file, $folder . '/'));
@@ -332,7 +352,7 @@ final class VideoMatchInfrastructureTest extends TestCase
         };
 
         $placement = new VideoPlacementService(
-            $this->catalog, new EpisodePlacer(), $this->createStub(WatchedMarkMovePortInterface::class), $transaction,
+            $this->catalog, new EpisodePlacer(), $this->createStub(WatchedMarkMovePortInterface::class), $transaction, $this->movies,
         );
 
         $metadata = new ApplyVideoMatchHandler(
@@ -344,6 +364,6 @@ final class VideoMatchInfrastructureTest extends TestCase
             $this->createStub(PersonProfileSyncRequestInterface::class),
         );
 
-        return new VideoMatchApply($this->manager, $transaction, $this->states, $this->movies, $this->catalog, new MockClock($now), $placement, $metadata);
+        return new VideoMatchApply($transaction, $this->states, $this->movies, $this->catalog, new MockClock($now), $placement, $metadata);
     }
 }

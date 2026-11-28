@@ -13,22 +13,16 @@ use App\Catalog\Domain\Model\Movie;
 use App\Catalog\Domain\Model\TvSeries;
 use App\Catalog\Domain\Repository\MovieRepositoryInterface;
 use App\Catalog\Domain\Repository\TvCatalogRepositoryInterface;
-use App\Catalog\Infrastructure\Doctrine\Entity\MovieEntity;
 use App\Catalog\Infrastructure\VideoPlacementService;
 use App\Metadata\Application\DTO\Video\VideoKind;
 use App\Metadata\Application\DTO\Video\VideoProviderId;
 use App\Metadata\Application\DTO\Video\VideoRequest;
 use App\Shared\Application\Port\TransactionPortInterface;
-use App\Shared\Domain\Model\Uuid;
-use Doctrine\DBAL\LockMode;
-use Doctrine\ORM\EntityManagerInterface;
-use Doctrine\ORM\Query;
 use Psr\Clock\ClockInterface;
 
 final readonly class VideoMatchRefresher implements VideoMatchRefreshStoreInterface
 {
     public function __construct(
-        private EntityManagerInterface $manager,
         private MovieRepositoryInterface $movies,
         private TvCatalogRepositoryInterface $catalog,
         private VideoPlacementService $placements,
@@ -58,7 +52,7 @@ final readonly class VideoMatchRefresher implements VideoMatchRefreshStoreInterf
         return $this->transaction->run(function () use ($message, $request, $provider, $match, $entry, $prepared): bool {
             $titleId = $message->titleId;
             $kind = $message->kind;
-            $title = $kind === VideoKind::Series ? $this->catalog->lockSeriesForPlacement($titleId) : $this->lockMovie($titleId);
+            $title = $kind === VideoKind::Series ? $this->catalog->lockSeriesForPlacement($titleId) : $this->movies->lockForPlacement($titleId);
             if ($title === null || $request->libraryId?->equals($title->getLibraryId()) !== true
                 || $title->getMatchedProvider() !== $provider->value || $title->getProviderId() !== $entry->id
                 || ($title instanceof TvSeries && $title->getOrdering() !== $request->ordering)
@@ -87,20 +81,5 @@ final readonly class VideoMatchRefresher implements VideoMatchRefreshStoreInterf
 
             return true;
         });
-    }
-
-    private function lockMovie(Uuid $titleId): ?Movie
-    {
-        $entity = $this->manager->createQueryBuilder()
-            ->select('movie')
-            ->from(MovieEntity::class, 'movie')
-            ->where('movie.id = :id')
-            ->setParameter('id', $titleId, 'uuid')
-            ->getQuery()
-            ->setHint(Query::HINT_REFRESH, true)
-            ->setLockMode(LockMode::PESSIMISTIC_WRITE)
-            ->getOneOrNullResult();
-
-        return $entity === null ? null : $this->movies->findByUuid($titleId);
     }
 }

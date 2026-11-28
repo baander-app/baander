@@ -22,6 +22,14 @@ interface VideoMatchStateRepositoryInterface
 
     public function markAwaitingMovie(Uuid $movieId, string $source, DateTimeImmutable $dueAt): bool;
 
+    public function recordAdminSeriesMatched(Uuid $seriesId, DateTimeImmutable $checkedAt): void;
+
+    public function recordAdminMovieMatched(Uuid $movieId, DateTimeImmutable $checkedAt): void;
+
+    public function cancelSeriesRematch(Uuid $seriesId, DateTimeImmutable $checkedAt, bool $matched = true): ?VideoMatchState;
+
+    public function cancelMovieRematch(Uuid $movieId, DateTimeImmutable $checkedAt, bool $matched = true): ?VideoMatchState;
+
     /** @param int<1, max> $leaseSeconds */
     public function claimOldestDueRequest(DateTimeImmutable $now, Uuid $claimId, int $leaseSeconds): ?VideoMatchState;
 

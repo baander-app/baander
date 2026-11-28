@@ -62,6 +62,9 @@ class VideoPlacementEntity
     #[ORM\Column(type: 'text', nullable: true)]
     public ?string $reviewReason = null;
 
+    #[ORM\Column(type: 'datetime_immutable', nullable: true)]
+    public ?DateTimeImmutable $reviewCheckedAt = null;
+
     #[ORM\Column(type: 'integer', options: ['default' => 0])]
     public int $sortOrder = 0;
 
@@ -104,6 +107,7 @@ class VideoPlacementEntity
             reviewReason: $this->reviewReason,
             sortOrder: $this->sortOrder,
             createdAt: $this->createdAt,
+            reviewCheckedAt: $this->reviewCheckedAt,
         );
     }
 
@@ -114,6 +118,7 @@ class VideoPlacementEntity
         $this->extraKind = $state->extraKind;
         $this->assigned = $state->assigned;
         $this->reviewReason = $state->reviewReason;
+        $this->reviewCheckedAt = $state->reviewCheckedAt;
         $this->sortOrder = $state->sortOrder;
     }
 }

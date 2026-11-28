@@ -784,6 +784,10 @@ services:
         alias: App\Catalog\Infrastructure\VideoMatch\VideoMatchRefresher
     App\Media\Application\Port\VideoArtworkImportInterface:
         alias: App\Media\Infrastructure\ManagedVideoArtworkImporter
+    App\Catalog\Application\Port\VideoMatchAdminWriteInterface:
+        alias: App\Catalog\Infrastructure\VideoMatch\VideoMatchAdminWriter
+    App\Catalog\Application\Query\VideoMatch\VideoMatchReviewReadInterface:
+        alias: App\Catalog\Infrastructure\Doctrine\Query\VideoMatchReviewReadQuery
     App\Catalog\Application\Port\ArtistPortInterface:
         alias: App\Catalog\Infrastructure\ArtistService
     App\Catalog\Application\Port\ArtistIdentityResolverInterface:

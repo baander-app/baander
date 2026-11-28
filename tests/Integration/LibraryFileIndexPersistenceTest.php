@@ -45,6 +45,30 @@ final class LibraryFileIndexPersistenceTest extends TestCase
         self::assertSame([['path' => $root . '/Été_1/season/episode.nfo', 'relativePath' => 'Été_1/season/episode.nfo']], $sidecars->forFolder($libraryId, 'Été_1'));
     }
 
+    public function testRootNfosMatchOnlyLiteralCaseSensitiveMovieStems(): void
+    {
+        $library = $this->createLibrary();
+        $id = $library->getId();
+        $root = $library->getPath()->toString();
+        $index = new LibraryFileIndexRepository($this->manager);
+        $files = [
+            'Zulu.nfo', 'Movie_100%[cut].NfO', 'movie_100%[cut].nfo', 'MovieX100 anything[cut].nfo',
+            'Another.nfo', 'Movie_100%[cut].jpg', 'nested/Movie_100%[cut].nfo', 'Unavailable.nfo',
+        ];
+        foreach ($files as $path) {
+            $index->upsert($id, $root . '/' . $path, 'hash', 1, pathinfo($path, PATHINFO_EXTENSION) |> strtolower(...), 1);
+        }
+        $index->markUnavailableByPaths($id, [$root . '/Unavailable.nfo']);
+        $index->upsert($this->createLibrary()->getId(), $root . '/Foreign.nfo', 'hash', 1, 'nfo', 1);
+        $sidecars = new VideoSidecarIndex($this->manager->getConnection(), new LibraryRepository($this->manager, new NativeClock()));
+
+        self::assertSame([
+            ['path' => $root . '/Movie_100%[cut].NfO', 'relativePath' => 'Movie_100%[cut].NfO'],
+            ['path' => $root . '/Zulu.nfo', 'relativePath' => 'Zulu.nfo'],
+        ], $sidecars->forRootNfoStems($id, ['Zulu', 'Movie_100%[cut]', 'Movie_100%[cut]', 'Unavailable', 'Foreign', 'nested/Movie_100%[cut]']));
+        self::assertSame([], $sidecars->forRootNfoStems($id, []));
+    }
+
     public function testAvailableHashReadsOmitUnavailableAndAbsentPathsAndScopeTheLibrary(): void
     {
         $library = $this->createLibrary();

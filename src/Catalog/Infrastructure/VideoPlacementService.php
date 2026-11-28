@@ -12,6 +12,7 @@ use App\Catalog\Domain\Model\TvEpisode;
 use App\Catalog\Domain\Model\TvSeason;
 use App\Catalog\Domain\Model\TvSeries;
 use App\Catalog\Domain\Model\VideoPlacement;
+use App\Catalog\Domain\Repository\MovieRepositoryInterface;
 use App\Catalog\Domain\Repository\TvCatalogRepositoryInterface;
 use App\Catalog\Domain\ValueObject\VideoName\ExtraKind;
 use App\Metadata\Application\DTO\Video\VideoEpisode;
@@ -36,7 +37,29 @@ final readonly class VideoPlacementService
         private EpisodePlacer $placer,
         private WatchedMarkMovePortInterface $marks,
         private TransactionPortInterface $transaction,
+        private MovieRepositoryInterface $movies,
     ) {}
+
+    /** The caller holds the movie row lock in the match transaction. */
+    public function resetMovieAssignments(Uuid $movieId): void
+    {
+        foreach ($this->catalog->placementsByMovie($movieId) as $placement) {
+            if (!$placement->isAssigned()) {
+                continue;
+            }
+            $placement->resetAssignment();
+            $raw = $placement->getRawParse()['extraKind'] ?? null;
+            $placement->applyParsedExtraKind(is_string($raw) ? ExtraKind::tryFrom($raw) : null);
+            $placement->review('assignment_reset');
+            $this->catalog->savePlacement($placement);
+            if ($placement->getExtraKind() === null) {
+                $this->movies->addVideoForImport($movieId, $placement->getVideoId());
+            } else {
+                $this->movies->removeVideoForImport($movieId, $placement->getVideoId());
+            }
+        }
+        $this->catalog->flush();
+    }
 
     /**
      * The caller holds the series row lock in the match transaction. Run this before updating its provider identity.
@@ -48,6 +71,7 @@ final readonly class VideoPlacementService
         VideoProviderId $provider,
         VideoTitle $metadata,
         ?VideoTitle $aired = null,
+        bool $resetAssignments = false,
     ): bool {
         $ordering = $series->getOrdering();
         if (!$metadata->hasOrdering($ordering)) {
@@ -60,11 +84,9 @@ final readonly class VideoPlacementService
         $placements = $this->catalog->placementsBySeries($seriesId);
         [$existingCoordinates, $nativeIds] = self::existingIdentities($seasons, $episodes, $sameEntry);
         $airedSeasons = $ordering === 'aired' ? $metadata->seasons : $aired?->seasons;
-        $automatic = array_values(array_filter(
-            $placements,
-            static fn (VideoPlacement $placement): bool => !$placement->isAssigned() && $placement->getExtraKind() === null,
-        ));
-        $decisions = $this->placer->place($metadata->seasons, $automatic, $nativeIds, $airedSeasons);
+        [$automatic, $resets] = self::automaticPlacements($placements, $resetAssignments);
+        $plan = $this->placer->plan($metadata->seasons, $automatic, $nativeIds, $airedSeasons);
+        $decisions = $plan['placements'];
         [$coordinates, $providerCoordinates] = self::desiredStructure($metadata, $decisions);
         [$candidates, $absorbable] = self::episodeCandidates(
             $coordinates,
@@ -76,7 +98,7 @@ final readonly class VideoPlacementService
         );
         $seasons = $this->addSeasons($seriesId, $seasons, $metadata, $coordinates);
         [$targets, $merges] = self::structureEpisodes($seriesId, $seasons, $coordinates, $episodes, $candidates, $absorbable);
-        $assignments = self::placementAssignments($placements, $decisions, $targets, $nativeIds, $providerCoordinates, $merges);
+        $assignments = self::placementAssignments($placements, $decisions, $targets, $nativeIds, $providerCoordinates, $merges, $resets);
 
         $this->saveStructure(
             $seasons,
@@ -86,16 +108,45 @@ final readonly class VideoPlacementService
             $existingCoordinates,
             $assignments,
             $merges,
-            $this->placer->absoluteNumbers($metadata->seasons, $airedSeasons),
+            $plan['absoluteNumbers'],
             $sameEntry,
         );
-        $this->writePlacementChanges($operationId, $placements, $assignments, $decisions, $merges);
+        $this->writePlacementChanges($operationId, $placements, $assignments, $decisions, $merges, $resets);
         foreach (array_keys($merges) as $source) {
             $this->catalog->removeMergedEpisode($episodes[$source]);
         }
         $this->catalog->flush();
 
         return true;
+    }
+
+    /**
+     * @param list<VideoPlacement> $placements
+     * @return array{list<VideoPlacement>, array<string, ExtraKind|null>}
+     */
+    private static function automaticPlacements(array $placements, bool $resetAssignments): array
+    {
+        $automatic = [];
+        $resets = [];
+        foreach ($placements as $placement) {
+            if ($placement->isAssigned()) {
+                if (!$resetAssignments) {
+                    continue;
+                }
+                $rawExtra = $placement->getRawParse()['extraKind'] ?? null;
+                $extra = is_string($rawExtra) ? ExtraKind::tryFrom($rawExtra) : null;
+                $resets[$placement->getId()->toString()] = $extra;
+                if ($extra === null) {
+                    $copy = VideoPlacement::reconstitute(clone $placement->getState());
+                    $copy->assignEpisodes([]);
+                    $automatic[] = $copy;
+                }
+            } elseif ($placement->getExtraKind() === null) {
+                $automatic[] = $placement;
+            }
+        }
+
+        return [$automatic, $resets];
     }
 
     /** @param list<Uuid> $episodeIds */
@@ -365,6 +416,7 @@ final readonly class VideoPlacementService
      * @param array<string, string> $nativeIds
      * @param array<string, string> $providerCoordinates
      * @param array<string, Uuid> $merges
+     * @param array<string, ExtraKind|null> $resets
      * @return array<string, list<Uuid>>
      */
     private static function placementAssignments(
@@ -374,10 +426,15 @@ final readonly class VideoPlacementService
         array $nativeIds,
         array $providerCoordinates,
         array $merges,
+        array $resets,
     ): array {
         $assignments = [];
         foreach ($placements as $placement) {
             $id = $placement->getId()->toString();
+            if (isset($resets[$id])) {
+                $assignments[$id] = [];
+                continue;
+            }
             if (!isset($decisions[$id])) {
                 $assignments[$id] = self::remap($placement->getEpisodeIds(), $merges);
                 continue;
@@ -386,10 +443,12 @@ final readonly class VideoPlacementService
             foreach ($decisions[$id]['targets'] as $target) {
                 $next[] = $targets[self::coordinate($target['seasonNumber'], $target['episodeNumber'])]->getId();
             }
-            foreach ($placement->getEpisodeIds() as $previous) {
-                $nativeId = $nativeIds[$previous->toString()] ?? null;
-                if ($nativeId !== null && !isset($providerCoordinates[$nativeId])) {
-                    $next[] = $previous;
+            if (!array_key_exists($id, $resets)) {
+                foreach ($placement->getEpisodeIds() as $previous) {
+                    $nativeId = $nativeIds[$previous->toString()] ?? null;
+                    if ($nativeId !== null && !isset($providerCoordinates[$nativeId])) {
+                        $next[] = $previous;
+                    }
                 }
             }
             $assignments[$id] = self::remap($next, $merges);
@@ -466,6 +525,7 @@ final readonly class VideoPlacementService
      * @param array<string, list<Uuid>> $assignments
      * @param array<string, PlacementDecision> $decisions
      * @param array<string, Uuid> $merges
+     * @param array<string, ExtraKind|null> $resets
      */
     private function writePlacementChanges(
         Uuid $operationId,
@@ -473,6 +533,7 @@ final readonly class VideoPlacementService
         array $assignments,
         array $decisions,
         array $merges,
+        array $resets,
     ): void {
         $retained = self::retainedEpisodeIds($placements, $assignments);
         $moves = [];
@@ -481,17 +542,26 @@ final readonly class VideoPlacementService
             $before = $placement->getEpisodeIds();
             $after = $assignments[$id];
             $reason = $placement->getReviewReason();
-            if (isset($decisions[$id]) && $reason !== 'duplicate_file') {
+            $placementRechecked = isset($decisions[$id]) && !in_array($reason, ['duplicate_file', 'assignment_reset'], true);
+            $reset = array_key_exists($id, $resets);
+            if ($reset) {
+                $reason = 'assignment_reset';
+                if ($resets[$id] === null) {
+                    $placement->assignEpisodes($after);
+                } else {
+                    $placement->assignExtra($resets[$id]);
+                }
+            } elseif ($placementRechecked) {
                 $reason = $decisions[$id]['reviewReason'];
             }
             $changed = !self::sameEpisodeIds($before, $after);
-            if ($changed) {
+            if ($changed && !$reset) {
                 $placement->assignEpisodes($after, $placement->isAssigned());
             }
             if (!self::sameEpisodeSet($before, $after)) {
                 $moves[] = new WatchedMarkVideoMove($placement->getVideoId(), $before, $after);
             }
-            if ($changed || $reason !== $placement->getReviewReason()) {
+            if ($reset || $changed || $reason !== $placement->getReviewReason() || ($reason !== null && $placementRechecked)) {
                 $placement->review($reason);
                 $this->catalog->savePlacement($placement);
             }

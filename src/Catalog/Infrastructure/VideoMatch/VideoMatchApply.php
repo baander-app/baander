@@ -15,21 +15,16 @@ use App\Catalog\Domain\Model\VideoMatchState;
 use App\Catalog\Domain\Repository\MovieRepositoryInterface;
 use App\Catalog\Domain\Repository\TvCatalogRepositoryInterface;
 use App\Catalog\Domain\Repository\VideoMatchStateRepositoryInterface;
-use App\Catalog\Infrastructure\Doctrine\Entity\MovieEntity;
 use App\Catalog\Infrastructure\VideoPlacementService;
 use App\Metadata\Application\DTO\Video\VideoKind;
 use App\Metadata\Application\DTO\Video\VideoProviderId;
 use App\Shared\Application\Port\TransactionPortInterface;
-use Doctrine\DBAL\LockMode;
-use Doctrine\ORM\EntityManagerInterface;
-use Doctrine\ORM\Query;
 use LogicException;
 use Psr\Clock\ClockInterface;
 
 final readonly class VideoMatchApply implements VideoMatchApplyInterface
 {
     public function __construct(
-        private EntityManagerInterface $manager,
         private TransactionPortInterface $transaction,
         private VideoMatchStateRepositoryInterface $states,
         private MovieRepositoryInterface $movies,
@@ -56,7 +51,9 @@ final readonly class VideoMatchApply implements VideoMatchApplyInterface
 
         return $this->transaction->run(function () use ($claim, $claimId, $target, $provider, $match, $prepared, $library): bool {
             // Lock the title before its FK-dependent claim row, as a title delete does.
-            $title = $this->lockTitle($target);
+            $title = $target->request->kind === VideoKind::Series
+                ? $this->catalog->lockSeriesForPlacement($target->id)
+                : $this->movies->lockForPlacement($target->id);
             if ($title === null || !$library->equals($title->getLibraryId())
                 || ($title instanceof TvSeries && ($title->getOrdering() !== $target->request->ordering
                     || !$match->metadata->hasOrdering($match->ordering)))
@@ -74,19 +71,22 @@ final readonly class VideoMatchApply implements VideoMatchApplyInterface
                 if ($title->getOrdering() !== $match->ordering) {
                     $title->setOrdering($match->ordering, array_column($match->metadata->orderings, 'id'));
                 }
-                if (!$this->placements->apply($claimId, $title, $provider, $match->metadata, $match->aired)) {
+                if (!$this->placements->apply($claimId, $title, $provider, $match->metadata, $match->aired, resetAssignments: $live->source === 'admin')) {
                     throw new LogicException('The validated video ordering became unavailable during apply.');
                 }
             }
+            if ($title instanceof Movie && $live->source === 'admin') {
+                $this->placements->resetMovieAssignments($title->getId());
+            }
             $entry = $match->metadata->entry;
             $externalIds = array_replace($title->getExternalIds(), $entry->externalIds, [$provider->value => $entry->id]);
-            $title->match($provider->value, $entry->id, $externalIds, $title->isHandMatched());
+            $title->match($provider->value, $entry->id, $externalIds, $live->source === 'admin' ? false : $title->isHandMatched());
             if ($title instanceof Movie) {
                 $this->movies->saveMatchIdentity($title);
             } else {
                 $this->catalog->saveSeries($title);
             }
-            $this->metadata->apply($title, $provider, $prepared);
+            $this->metadata->apply($title, $provider, $prepared, force: $live->source === 'admin');
             $this->catalog->flush();
 
             return true;
@@ -98,26 +98,5 @@ final readonly class VideoMatchApply implements VideoMatchApplyInterface
         $owner = $target->request->kind === VideoKind::Series ? $state->seriesId : $state->movieId;
 
         return $owner?->equals($target->id) === true;
-    }
-
-    private function lockTitle(VideoMatchTarget $target): Movie|TvSeries|null
-    {
-        if ($target->request->kind === VideoKind::Series) {
-            return $this->catalog->lockSeriesForPlacement($target->id);
-        }
-        $entity = $this->manager->createQueryBuilder()
-            ->select('title')
-            ->from(MovieEntity::class, 'title')
-            ->where('title.id = :id')
-            ->setParameter('id', $target->id, 'uuid')
-            ->getQuery()
-            ->setHint(Query::HINT_REFRESH, true)
-            ->setLockMode(LockMode::PESSIMISTIC_WRITE)
-            ->getOneOrNullResult();
-        if ($entity === null) {
-            return null;
-        }
-
-        return $this->movies->findByUuid($target->id);
     }
 }

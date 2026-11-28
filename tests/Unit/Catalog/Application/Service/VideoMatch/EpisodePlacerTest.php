@@ -230,8 +230,15 @@ final class EpisodePlacerTest extends TestCase
             new VideoSeason(1, episodes: [$this->episode('second', 2), $this->episode('first', 1)]),
         ];
         $selected = [new VideoSeason(3, episodes: [$this->episode('third', 7), $this->episode('second', 8)])];
+        $placement = $this->placement(['absoluteNumber' => 2]);
+        $plan = new EpisodePlacer()->plan($selected, [$placement], [], $aired);
 
         self::assertSame(['second' => 2, 'third' => 3], new EpisodePlacer()->absoluteNumbers($selected, $aired));
+        self::assertSame(['second' => 2, 'third' => 3], $plan['absoluteNumbers']);
+        self::assertSame([
+            'targets' => [$this->target('second', 3, 8)],
+            'reviewReason' => null,
+        ], $plan['placements'][$placement->getId()->toString()]);
     }
 
     public function testComputedAbsoluteNumbersKeepTheExplicitMappingAndExcludeSpecials(): void

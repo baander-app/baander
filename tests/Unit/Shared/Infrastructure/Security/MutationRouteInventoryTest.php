@@ -46,6 +46,10 @@ final class MutationRouteInventoryTest extends TestCase
         'lyrics, LyricsFirewallTest' => ['lyrics_apply', 'lyrics_song_lyrics_fetch', 'admin_lyrics_bulk_fetch'],
         'MusicBrainz match apply, MusicBrainzMatchFirewallTest' => ['admin_metadata_match_apply'],
         'video provider order, LibraryProviderOrderTest' => ['admin_video_matches_provider_order_update'],
+        'video match administration, VideoMatchControllerTest' => [
+            'admin_video_matches_apply', 'admin_video_matches_library_rematch',
+            'admin_video_matches_ordering', 'admin_video_matches_assignment',
+        ],
         'user and library-access administration' => [
             'admin_user_libraries_grant', 'admin_user_libraries_revoke',
             'admin_users_create', 'admin_users_update', 'admin_users_delete', 'admin_users_disable', 'admin_users_enable',

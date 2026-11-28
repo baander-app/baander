@@ -109,6 +109,12 @@ Application console commands run inside `web`. The control and execution worker 
 | [app:movie:update](app-movie-update.md) | Change a movie's title, year or summary |
 | [app:song:delete](app-song-delete.md) | Delete a song, optionally with its audio file |
 | [app:song:update](app-song-update.md) | Change a song's metadata, or lock and unlock its fields |
+| [app:video:match:apply](app-video-match-apply.md) | Apply an explicit series or movie provider match |
+| [app:video:match:assign](app-video-match-assign.md) | Assign a video file to episodes or an extra kind |
+| [app:video:match:order](app-video-match-order.md) | Select an offered episode ordering |
+| [app:video:match:rematch](app-video-match-rematch.md) | Preview or queue a library rematch |
+| [app:video:match:reviews](app-video-match-reviews.md) | Read video match reviews and provider pauses |
+| [app:video:match:search](app-video-match-search.md) | Search usable video metadata providers |
 | [app:video:providers:order](app-video-providers-order.md) | Read or replace the metadata provider order of a TV or movie library |
 | [app:watch-files](app-watch-files.md) | Watch directories for filesystem changes |
 

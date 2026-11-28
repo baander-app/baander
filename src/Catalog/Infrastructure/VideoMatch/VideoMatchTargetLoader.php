@@ -245,20 +245,28 @@ final readonly class VideoMatchTargetLoader implements VideoMatchTargetLoaderInt
      */
     private function classify(Uuid $libraryId, string $folder, array $placements, bool $series): array
     {
+        $rootMovie = !$series && $folder === '';
         $videos = [];
+        $rootStems = [];
         foreach ($placements as $placement) {
             if ($placement->getExtraKind() !== null) {
                 continue;
             }
             $path = $placement->getRelativePath();
+            if ($rootMovie && dirname($path) === '.') {
+                $rootStems[] = pathinfo($path, PATHINFO_FILENAME);
+            }
             $stem = self::pathStem($path);
             if (!isset($videos[$stem]) || $placement->getState()->createdAt >= $videos[$stem]->getState()->createdAt) {
                 $videos[$stem] = $placement;
             }
         }
 
+        $rows = $rootMovie
+            ? $this->sidecars->forRootNfoStems($libraryId, array_unique($rootStems) |> array_values(...))
+            : $this->sidecars->forFolder($libraryId, $folder);
         $sidecars = [];
-        foreach ($this->sidecars->forFolder($libraryId, $folder) as $row) {
+        foreach ($rows as $row) {
             $relativePath = $row['relativePath'];
             $parsed = $this->sidecarNames->parse($relativePath);
             if ($parsed === null) {
@@ -266,7 +274,7 @@ final readonly class VideoMatchTargetLoader implements VideoMatchTargetLoaderInt
             }
             $kind = VideoSidecarKind::from($parsed->kind->value);
             $placement = $videos[self::pathStem($relativePath)] ?? null;
-            if (!$series && $folder === '') {
+            if ($rootMovie) {
                 if ($placement === null || !in_array($kind, [VideoSidecarKind::MovieNfo, VideoSidecarKind::VideoNfo], true)) {
                     continue;
                 }

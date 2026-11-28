@@ -38,7 +38,7 @@ final readonly class AutomaticVideoMatcher implements AutomaticVideoMatcherInter
         if ($target === null || ($target->matched && $claim->source === 'ingest')) {
             return new VideoMatchOutcome(VideoMatchOutcomeKind::Gone);
         }
-        $request = $target->request;
+        $request = $claim->source === 'admin' ? self::requestWithIds($target->request, $target->request->externalIds, 'aired') : $target->request;
         $usable = $this->providers->usableProviders($request->kind);
         $local = in_array(VideoProviderId::Local, $usable, true) && $target->hasTitleNfo()
             ? $this->providers->identify(VideoProviderId::Local, $request)
@@ -117,7 +117,22 @@ final readonly class AutomaticVideoMatcher implements AutomaticVideoMatcherInter
 
     private function apply(VideoMatchState $claim, VideoMatchTarget $target, VideoProviderId $provider, VideoTitle $metadata): VideoMatchOutcome
     {
-        $match = $this->structures->resolve($provider, $target->request, $metadata, allowDefault: true);
+        $request = $target->request;
+        if ($claim->source === 'admin') {
+            $ordering = $metadata->orderings[0]->id ?? 'aired';
+            $request = self::requestWithIds($request, $request->externalIds, $ordering);
+            if ($ordering !== 'aired') {
+                $default = $this->providers->identify($provider, self::requestWithIds($request, [$provider->value => $metadata->entry->id]));
+                if ($default instanceof VideoProviderProblem) {
+                    return $this->problem($provider, $default) ?? new VideoMatchOutcome(VideoMatchOutcomeKind::AwaitingProvider);
+                }
+                if ($default === null || $default->entry->id !== $metadata->entry->id) {
+                    return new VideoMatchOutcome(VideoMatchOutcomeKind::Unavailable, $provider, reason: 'unavailable');
+                }
+                $metadata = $default;
+            }
+        }
+        $match = $this->structures->resolve($provider, $request, $metadata, allowDefault: true);
         if ($match === null) {
             return new VideoMatchOutcome(VideoMatchOutcomeKind::NeedsReview, $provider, reason: 'ordering_unavailable');
         }
@@ -151,14 +166,14 @@ final readonly class AutomaticVideoMatcher implements AutomaticVideoMatcherInter
     }
 
     /** @param array<string, string> $externalIds */
-    private static function requestWithIds(VideoRequest $request, array $externalIds): VideoRequest
+    private static function requestWithIds(VideoRequest $request, array $externalIds, ?string $ordering = null): VideoRequest
     {
         return new VideoRequest(
             $request->kind,
             $request->title,
             $request->year,
             $externalIds,
-            $request->ordering,
+            $ordering ?? $request->ordering,
             $request->libraryId,
             $request->sidecars,
             $request->titleId,

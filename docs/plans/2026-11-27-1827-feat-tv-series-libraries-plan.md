@@ -896,7 +896,7 @@ Deferred to implementation:
 - **Files:** `src/Catalog/Interface/Controller/VideoMatchController.php`, `src/Catalog/Application/Query/VideoMatch/` (review page, candidates), `src/Catalog/Application/CommandHandler/VideoMatch/` (re-match title, re-match library, set ordering, assign file), console commands under `src/Catalog/Interface/Console/`, their docs pages under `docs-book/part-1-operator-guide/commands/`; tests `tests/Functional/Catalog/Interface/Controller/VideoMatchControllerTest.php`, `tests/Functional/Catalog/Interface/Console/VideoMatchCliParityTest.php`, `tests/Integration/AdminCliParityTest.php`.
 - **Approach:**
   1. The review list pages by checked time with a keyset cursor and refuses out-of-range limits with 400. Each entry names its kind (series, movie or file), library and review reason. The response also reports each paused provider with its next retry and last failure kind, so a failed TheTVDB login shows on the list.
-  2. Candidate search spans every usable provider.
+  2. Candidate search spans every usable provider. The same read endpoint and console command expose the matched provider’s ordering IDs and labels, the owner’s files and its active catalog episodes. Admins can assign the first file to an episode that has no file yet. Each review row identifies its owner by kind and public ID.
   3. Re-matching a title records an admin match.
   4. A library re-match first answers a preview with the counts of hand-matched titles and hand-assigned files, and applies only on confirmation, skipping hand-matched titles unless forced (R48).
   5. Setting an ordering and assigning a file go through the placement service, so marks move with them.
@@ -909,6 +909,8 @@ Deferred to implementation:
   - Assigning `finale.mkv` to S01E10 makes it visible as that episode, and a full rescan keeps the assignment.
   - Assigning a file to the series' extras moves it to the extras row.
   - A non-admin is refused on every route, and each console command matches its route's result.
+- **Preview migration rehearsal:** Production boot requires Redis credentials and a control database URL. Give the disposable rehearsal its own Redis identity and point its control connection at the restored scratch database. Verify the candidate migrates twice before the preview activates.
+- **Test fixture:** The interrupted-sleep test's repeating alarm could kill its child during shutdown after the deadline assertions succeeded. Limit the fixture to the two intended signals and cancel the timer after measuring the sleep.
 - **Verification:** the review and fix flows pass through both entry points, and the parity and docs coverage tests pass.
 
 **Phase D — Members and admins: U14, U15, U16, U17**

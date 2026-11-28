@@ -57,9 +57,12 @@ This checkpoint covers the catalog foundation and video metadata providers.
 - U12 applies provider metadata, imports managed artwork and resolves screen credits
   against every supplied person ID. TV refresh preserves manual edits and locks.
   Movie sync now uses the video match queue.
-  Phase C unit U13 remains pending. Phase D member
-  progress, read API and web units U14–U17 and Phase E documentation and browser
-  verification units U18–U19 remain pending.
+- U13 gives admins the same review, search, apply, ordering, assignment and
+  library re-match operations in the API and console. A review identifies the
+  owning title. Admins can assign a file to any active episode, including one
+  with no files. The re-match preview counts hand matches and assignments.
+  Phase D member progress, read API and web units U14–U17 and Phase E
+  documentation and browser verification units U18–U19 remain pending.
 
 ### Verification
 
@@ -119,6 +122,28 @@ This checkpoint covers the catalog foundation and video metadata providers.
   artwork and person identity. The fresh-install suite passed 26 tests with 468
   assertions. Scoped PHPStan and imports passed. Deptrac reported zero violations
   and 439 existing skipped violations.
+
+- The first U13 combined CI run passed 117 tests with 1,298 assertions for
+  review, assignment, CLI parity, route authorization, schema and placement.
+  OpenAPI and Orval drift checks passed. The isolated preview migrated a fresh
+  database through `Version20261128124500`, repeated the migration and passed
+  Doctrine schema validation.
+- The final admin dialog reads and their CLI counterparts passed 52 cases
+  across the corrected runs with 554 assertions. These included a provider
+  outage, separate DVD ordering IDs, cross-library selection and an episode
+  receiving its first file. Scoped PHPStan and imports passed. Deptrac reported
+  zero violations and 439 existing skipped violations. The web client typecheck,
+  OpenAPI export and Orval regeneration checks passed.
+- The Phase C simplification removed duplicate movie locking and placement
+  resets. The root-level movie NFO lookup used two index probes against 20,000
+  sibling NFOs. The placement and lock regression suite passed 17 tests with
+  260 assertions.
+- The preview migration rehearsal now gives its scratch application a Redis
+  identity and a control connection to its own database. Its 21 tests passed
+  with 172 assertions. Both rehearsal passes succeeded on the live preview.
+- A full-suite run at the U8 commit exposed an intermittent third alarm in the
+  interrupted-sleep test. The corrected fixture cancels its timer after two
+  signals. Its seven CI-image tests passed with 14 assertions.
 
 ## Roadmap open items, 2026-11-26
 

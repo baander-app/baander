@@ -408,9 +408,13 @@ SQL;
             . ':' . rawurlencode($env['DB_PASSWORD'])
             . '@database:5432/' . rawurlencode($env['DB_DATABASE'])
             . '?serverVersion=18&charset=utf8';
+        $redisPassword = bin2hex(random_bytes(32));
         $commandEnvironment = array_replace($this->connections->environment(), array_intersect_key($env, array_flip(['DB_USERNAME', 'DB_PASSWORD', 'DB_DATABASE', EnvironmentVariable::APP_SECRET, EnvironmentVariable::STREAM_URL_HMAC_SECRET, EnvironmentVariable::AUTH_TOTP_ENCRYPTION_KEY])), [
             'POSTGRES_PASSWORD' => $env['DB_PASSWORD'], 'POSTGRES_USER' => $env['DB_USERNAME'],
             'POSTGRES_DB' => $env['DB_DATABASE'], EnvironmentVariable::DATABASE_URL => $url,
+            EnvironmentVariable::DATABASE_CONTROL_URL => $url,
+            EnvironmentVariable::REDIS_PASSWORD => $redisPassword,
+            EnvironmentVariable::REDIS_URL => 'redis://default:' . $redisPassword . '@rehearsal-redis:6379',
         ]);
         $docker = new Client($docker->executor, $docker->target, $commandEnvironment);
         $ledger = new ResourceLedger($receipt, $docker, $this->connections->environment());
@@ -462,6 +466,12 @@ SQL;
                     'DB_HOST=database',
                     '--env',
                     EnvironmentVariable::DATABASE_URL,
+                    '--env',
+                    EnvironmentVariable::DATABASE_CONTROL_URL,
+                    '--env',
+                    EnvironmentVariable::REDIS_PASSWORD,
+                    '--env',
+                    EnvironmentVariable::REDIS_URL,
                     '--env',
                     'APP_ENV=prod',
                     '--env',

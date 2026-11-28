@@ -7,6 +7,7 @@ namespace App\Tests\Unit\Catalog\Domain\Model;
 use App\Catalog\Domain\Model\VideoPlacement;
 use App\Catalog\Domain\ValueObject\VideoName\ExtraKind;
 use App\Shared\Domain\Model\Uuid;
+use DateTimeImmutable;
 use PHPUnit\Framework\TestCase;
 
 final class VideoPlacementTest extends TestCase
@@ -61,6 +62,21 @@ final class VideoPlacementTest extends TestCase
 
         self::assertSame([$episode], $replacement->getEpisodeIds());
         self::assertTrue($replacement->isAssigned());
+    }
+
+    public function testReviewRecordsWhenThePlacementWasCheckedAndClearsItOnResolution(): void
+    {
+        $placement = $this->moviePlacement();
+        $before = new DateTimeImmutable();
+        $placement->review('duplicate_file');
+
+        self::assertSame('duplicate_file', $placement->getReviewReason());
+        self::assertGreaterThanOrEqual($before, $placement->getReviewCheckedAt());
+        self::assertLessThanOrEqual(new DateTimeImmutable(), $placement->getReviewCheckedAt());
+
+        $placement->review(null);
+        self::assertNull($placement->getReviewReason());
+        self::assertNull($placement->getReviewCheckedAt());
     }
 
     private function moviePlacement(): VideoPlacement

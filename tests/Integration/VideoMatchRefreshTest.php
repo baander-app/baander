@@ -336,10 +336,9 @@ final class VideoMatchRefreshTest extends TestCase
             $loader,
             new VideoMatchStructureLookup($provider),
             new VideoMatchRefresher(
-                $this->manager,
                 $this->movies,
                 $this->catalog,
-                new VideoPlacementService($this->catalog, new EpisodePlacer(), $marks, $transaction),
+                new VideoPlacementService($this->catalog, new EpisodePlacer(), $marks, $transaction, $this->movies),
                 new VideoMatchRefreshReview($this->connection),
                 $transaction,
                 new NativeClock(),

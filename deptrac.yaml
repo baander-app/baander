@@ -356,7 +356,7 @@ deptrac:
     - name: 'Catalog Video Match Adapters'
       collectors:
         - type: classLike
-          value: '^App\\Catalog\\Infrastructure\\(VideoMatch\\(VideoMatchApply|VideoMatchTargetLoader|VideoMatchRefresher|VideoMatchRefreshReview|VideoMatchRefreshRequester)|VideoPlacementService)$'
+          value: '^App\\Catalog\\Infrastructure\\(VideoMatch\\(VideoMatchApply|VideoMatchTargetLoader|VideoMatchRefresher|VideoMatchRefreshReview|VideoMatchRefreshRequester|VideoMatchAdminWriter)|VideoPlacementService)$'
 
     - name: 'Catalog Infrastructure'
       collectors:
@@ -366,7 +366,7 @@ deptrac:
               value: '^App\\Catalog\\Infrastructure\\'
           must_not:
             - type: classLike
-              value: '^App\\Catalog\\Infrastructure\\(VideoMatch\\(VideoMatchApply|VideoMatchTargetLoader|VideoMatchRefresher|VideoMatchRefreshReview|VideoMatchRefreshRequester)|VideoPlacementService)$'
+              value: '^App\\Catalog\\Infrastructure\\(VideoMatch\\(VideoMatchApply|VideoMatchTargetLoader|VideoMatchRefresher|VideoMatchRefreshReview|VideoMatchRefreshRequester|VideoMatchAdminWriter)|VideoPlacementService)$'
             - type: classLike
               value: '^App\\Catalog\\Infrastructure\\Doctrine\\(Entity\\(PersonEntity|TvSeriesEntity|VideoPlacementEntity)|Repository\\(PersonAdministrationRepository|TvCatalogRepository))$'
 

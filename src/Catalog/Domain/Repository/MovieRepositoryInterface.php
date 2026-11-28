@@ -46,6 +46,9 @@ interface MovieRepositoryInterface extends Searchable
 
     public function findByUuid(Uuid $uuid): ?Movie;
 
+    /** Loads the current movie and takes a write lock in the caller's placement transaction. */
+    public function lockForPlacement(Uuid $id): ?Movie;
+
     public function findByPublicId(PublicId $publicId): ?Movie;
 
     /**

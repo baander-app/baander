@@ -726,6 +726,58 @@ export interface LibraryProviderOrderRequest {
   providers: string[];
 }
 
+export type ApplyVideoMatchRequestProvider = typeof ApplyVideoMatchRequestProvider[keyof typeof ApplyVideoMatchRequestProvider];
+
+
+export const ApplyVideoMatchRequestProvider = {
+  tvdb: 'tvdb',
+  tmdb: 'tmdb',
+  local: 'local',
+} as const;
+
+export interface ApplyVideoMatchRequest {
+  provider: ApplyVideoMatchRequestProvider;
+  /** @minLength 1 */
+  candidateId: string;
+}
+
+export interface RematchVideoLibraryRequest {
+  confirmed?: boolean;
+  force?: boolean;
+}
+
+export interface SetVideoOrderingRequest {
+  /** @minLength 1 */
+  ordering: string;
+}
+
+/**
+ * @nullable
+ */
+export type AssignVideoFileRequestExtraKind = typeof AssignVideoFileRequestExtraKind[keyof typeof AssignVideoFileRequestExtraKind] | null;
+
+
+export const AssignVideoFileRequestExtraKind = {
+  behind_the_scenes: 'behind_the_scenes',
+  deleted_scene: 'deleted_scene',
+  featurette: 'featurette',
+  interview: 'interview',
+  scene: 'scene',
+  short: 'short',
+  trailer: 'trailer',
+  clip: 'clip',
+  sample: 'sample',
+  theme_music: 'theme_music',
+  backdrop: 'backdrop',
+  other: 'other',
+} as const;
+
+export interface AssignVideoFileRequest {
+  episodePublicIds?: string[];
+  /** @nullable */
+  extraKind?: AssignVideoFileRequestExtraKind;
+}
+
 export interface RegisterServerRequest {
   serverUrl: string;
   name: string;
@@ -3672,6 +3724,257 @@ export interface TvEpisodeResource {
 
 export interface LibraryProviderOrderResource {
   providers: string[];
+}
+
+export type VideoMatchReviewPageResourceItemsItemKind = typeof VideoMatchReviewPageResourceItemsItemKind[keyof typeof VideoMatchReviewPageResourceItemsItemKind];
+
+
+export const VideoMatchReviewPageResourceItemsItemKind = {
+  series: 'series',
+  movie: 'movie',
+  file: 'file',
+} as const;
+
+export type VideoMatchReviewPageResourceItemsItemOwnerKind = typeof VideoMatchReviewPageResourceItemsItemOwnerKind[keyof typeof VideoMatchReviewPageResourceItemsItemOwnerKind];
+
+
+export const VideoMatchReviewPageResourceItemsItemOwnerKind = {
+  series: 'series',
+  movie: 'movie',
+} as const;
+
+export type VideoMatchReviewPageResourceItemsItem = {
+  kind: VideoMatchReviewPageResourceItemsItemKind;
+  publicId: string;
+  ownerKind: VideoMatchReviewPageResourceItemsItemOwnerKind;
+  ownerPublicId: string;
+  title: string;
+  /** @nullable */
+  path: string | null;
+  libraryPublicId: string;
+  libraryName: string;
+  reason: string;
+  checkedAt: string;
+  /** @nullable */
+  bestScore: number | null;
+};
+
+export type VideoMatchReviewPageResourcePausedProvidersItemProvider = typeof VideoMatchReviewPageResourcePausedProvidersItemProvider[keyof typeof VideoMatchReviewPageResourcePausedProvidersItemProvider];
+
+
+export const VideoMatchReviewPageResourcePausedProvidersItemProvider = {
+  tvdb: 'tvdb',
+  tmdb: 'tmdb',
+  local: 'local',
+} as const;
+
+export type VideoMatchReviewPageResourcePausedProvidersItem = {
+  provider: VideoMatchReviewPageResourcePausedProvidersItemProvider;
+  retryAt: string;
+  failureKind: string;
+};
+
+export interface VideoMatchReviewPageResource {
+  items: VideoMatchReviewPageResourceItemsItem[];
+  /** @nullable */
+  nextCursor: string | null;
+  hasNextPage: boolean;
+  perPage: number;
+  pausedProviders: VideoMatchReviewPageResourcePausedProvidersItem[];
+}
+
+export type VideoMatchCandidatesResourceKind = typeof VideoMatchCandidatesResourceKind[keyof typeof VideoMatchCandidatesResourceKind];
+
+
+export const VideoMatchCandidatesResourceKind = {
+  series: 'series',
+  movie: 'movie',
+} as const;
+
+export type VideoMatchCandidatesResourceProvidersItemProvider = typeof VideoMatchCandidatesResourceProvidersItemProvider[keyof typeof VideoMatchCandidatesResourceProvidersItemProvider];
+
+
+export const VideoMatchCandidatesResourceProvidersItemProvider = {
+  tvdb: 'tvdb',
+  tmdb: 'tmdb',
+  local: 'local',
+} as const;
+
+export type VideoMatchCandidatesResourceProvidersItemCandidatesItemExternalIds = {[key: string]: string};
+
+export type VideoMatchCandidatesResourceProvidersItemCandidatesItem = {
+  id: string;
+  title: string;
+  /** @nullable */
+  year: number | null;
+  externalIds: VideoMatchCandidatesResourceProvidersItemCandidatesItemExternalIds;
+};
+
+export type VideoMatchCandidatesResourceProvidersItem = {
+  provider: VideoMatchCandidatesResourceProvidersItemProvider;
+  /** @nullable */
+  problem: string | null;
+  candidates: VideoMatchCandidatesResourceProvidersItemCandidatesItem[];
+};
+
+export interface VideoMatchCandidatesResource {
+  kind: VideoMatchCandidatesResourceKind;
+  publicId: string;
+  providers: VideoMatchCandidatesResourceProvidersItem[];
+}
+
+export type VideoMatchChoicesResourceKind = typeof VideoMatchChoicesResourceKind[keyof typeof VideoMatchChoicesResourceKind];
+
+
+export const VideoMatchChoicesResourceKind = {
+  series: 'series',
+  movie: 'movie',
+} as const;
+
+export type VideoMatchChoicesResourceView = typeof VideoMatchChoicesResourceView[keyof typeof VideoMatchChoicesResourceView];
+
+
+export const VideoMatchChoicesResourceView = {
+  choices: 'choices',
+} as const;
+
+export type VideoMatchChoicesResourceCollection = typeof VideoMatchChoicesResourceCollection[keyof typeof VideoMatchChoicesResourceCollection];
+
+
+export const VideoMatchChoicesResourceCollection = {
+  all: 'all',
+  orderings: 'orderings',
+  episodes: 'episodes',
+  files: 'files',
+} as const;
+
+/**
+ * @nullable
+ */
+export type VideoMatchChoicesResourceProvider = typeof VideoMatchChoicesResourceProvider[keyof typeof VideoMatchChoicesResourceProvider] | null;
+
+
+export const VideoMatchChoicesResourceProvider = {
+  tvdb: 'tvdb',
+  tmdb: 'tmdb',
+  local: 'local',
+} as const;
+
+/**
+ * @nullable
+ */
+export type VideoMatchChoicesResourceOrderingProblem = typeof VideoMatchChoicesResourceOrderingProblem[keyof typeof VideoMatchChoicesResourceOrderingProblem] | null;
+
+
+export const VideoMatchChoicesResourceOrderingProblem = {
+  disabled: 'disabled',
+  not_configured: 'not_configured',
+  unavailable: 'unavailable',
+  login_failed: 'login_failed',
+  refused: 'refused',
+  unmatched: 'unmatched',
+  not_found: 'not_found',
+} as const;
+
+export type VideoMatchChoicesResourceOrderingsItem = {
+  id: string;
+  label: string;
+  kind: string;
+};
+
+export type VideoMatchChoicesResourceEpisodesItemsItem = {
+  publicId: string;
+  /** @nullable */
+  seasonNumber: number | null;
+  /** @nullable */
+  episodeNumber: number | null;
+  title: string;
+  /** @nullable */
+  absoluteNumber: number | null;
+  /** @nullable */
+  airDate: string | null;
+};
+
+/**
+ * @nullable
+ */
+export type VideoMatchChoicesResourceEpisodes = {
+  items: VideoMatchChoicesResourceEpisodesItemsItem[];
+  total: number;
+  page: number;
+  perPage: number;
+  hasNextPage: boolean;
+} | null;
+
+/**
+ * @nullable
+ */
+export type VideoMatchChoicesResourceFilesItemsItemExtraKind = typeof VideoMatchChoicesResourceFilesItemsItemExtraKind[keyof typeof VideoMatchChoicesResourceFilesItemsItemExtraKind] | null;
+
+
+export const VideoMatchChoicesResourceFilesItemsItemExtraKind = {
+  behind_the_scenes: 'behind_the_scenes',
+  deleted_scene: 'deleted_scene',
+  featurette: 'featurette',
+  interview: 'interview',
+  scene: 'scene',
+  short: 'short',
+  trailer: 'trailer',
+  clip: 'clip',
+  sample: 'sample',
+  theme_music: 'theme_music',
+  backdrop: 'backdrop',
+  other: 'other',
+} as const;
+
+export type VideoMatchChoicesResourceFilesItemsItem = {
+  publicId: string;
+  path: string;
+  assigned: boolean;
+  episodePublicIds: string[];
+  /** @nullable */
+  extraKind: VideoMatchChoicesResourceFilesItemsItemExtraKind;
+};
+
+/**
+ * @nullable
+ */
+export type VideoMatchChoicesResourceFiles = {
+  items: VideoMatchChoicesResourceFilesItemsItem[];
+  total: number;
+  page: number;
+  perPage: number;
+  hasNextPage: boolean;
+} | null;
+
+export interface VideoMatchChoicesResource {
+  kind: VideoMatchChoicesResourceKind;
+  publicId: string;
+  view: VideoMatchChoicesResourceView;
+  collection: VideoMatchChoicesResourceCollection;
+  /** @nullable */
+  provider: VideoMatchChoicesResourceProvider;
+  /** @nullable */
+  currentOrdering: string | null;
+  /** @nullable */
+  orderingProblem: VideoMatchChoicesResourceOrderingProblem;
+  orderings: VideoMatchChoicesResourceOrderingsItem[];
+  /** @nullable */
+  episodes: VideoMatchChoicesResourceEpisodes;
+  /** @nullable */
+  files: VideoMatchChoicesResourceFiles;
+}
+
+export interface VideoLibraryRematchResource {
+  /** Library public ID */
+  libraryId: string;
+  totalTitles: number;
+  handMatchedTitles: number;
+  handAssignedFiles: number;
+  confirmed?: boolean;
+  force?: boolean;
+  queued?: number;
+  skipped?: number;
 }
 
 export type VideoPlaybackInformationResourceQualityChoicesItem = {
@@ -7070,6 +7373,139 @@ export type GetAdminVideoMatchesProviderOrder200 = {
 
 export type PutAdminVideoMatchesProviderOrderUpdate200 = {
   data?: LibraryProviderOrderResource;
+};
+
+export type GetAdminVideoMatchesReviewsParams = {
+  /**
+   * @minimum 1
+   * @maximum 100
+   */
+  limit?: number;
+  cursor?: string;
+  kind?: string;
+  library?: string;
+  reason?: string;
+};
+
+export type GetAdminVideoMatchesReviews200 = {
+  data?: VideoMatchReviewPageResource;
+};
+
+export type GetAdminVideoMatchesCandidatesParams = {
+  q?: string;
+  view?: GetAdminVideoMatchesCandidatesView;
+  collection?: GetAdminVideoMatchesCandidatesCollection;
+  /**
+   * @minimum 1
+   * @maximum 1000000
+   */
+  page?: number;
+  /**
+   * @minimum 1
+   * @maximum 100
+   */
+  limit?: number;
+};
+
+export type GetAdminVideoMatchesCandidatesView = typeof GetAdminVideoMatchesCandidatesView[keyof typeof GetAdminVideoMatchesCandidatesView];
+
+
+export const GetAdminVideoMatchesCandidatesView = {
+  search: 'search',
+  choices: 'choices',
+} as const;
+
+export type GetAdminVideoMatchesCandidatesCollection = typeof GetAdminVideoMatchesCandidatesCollection[keyof typeof GetAdminVideoMatchesCandidatesCollection];
+
+
+export const GetAdminVideoMatchesCandidatesCollection = {
+  all: 'all',
+  orderings: 'orderings',
+  episodes: 'episodes',
+  files: 'files',
+} as const;
+
+export type GetAdminVideoMatchesCandidates200 = {
+  data?: VideoMatchCandidatesResource | VideoMatchChoicesResource;
+};
+
+export type PostAdminVideoMatchesApply200DataKind = typeof PostAdminVideoMatchesApply200DataKind[keyof typeof PostAdminVideoMatchesApply200DataKind];
+
+
+export const PostAdminVideoMatchesApply200DataKind = {
+  series: 'series',
+  movie: 'movie',
+} as const;
+
+export type PostAdminVideoMatchesApply200DataProvider = typeof PostAdminVideoMatchesApply200DataProvider[keyof typeof PostAdminVideoMatchesApply200DataProvider];
+
+
+export const PostAdminVideoMatchesApply200DataProvider = {
+  tvdb: 'tvdb',
+  tmdb: 'tmdb',
+  local: 'local',
+} as const;
+
+export type PostAdminVideoMatchesApply200Data = {
+  kind: PostAdminVideoMatchesApply200DataKind;
+  publicId: string;
+  provider: PostAdminVideoMatchesApply200DataProvider;
+  providerId: string;
+  /** @nullable */
+  ordering: string | null;
+};
+
+export type PostAdminVideoMatchesApply200 = {
+  data?: PostAdminVideoMatchesApply200Data;
+};
+
+export type GetAdminVideoMatchesLibraryRematchPreview200 = {
+  data?: VideoLibraryRematchResource;
+};
+
+export type PostAdminVideoMatchesLibraryRematch200 = {
+  data?: VideoLibraryRematchResource;
+};
+
+export type PutAdminVideoMatchesOrdering200Data = {
+  publicId: string;
+  ordering: string;
+};
+
+export type PutAdminVideoMatchesOrdering200 = {
+  data?: PutAdminVideoMatchesOrdering200Data;
+};
+
+/**
+ * @nullable
+ */
+export type PutAdminVideoMatchesAssignment200DataExtraKind = typeof PutAdminVideoMatchesAssignment200DataExtraKind[keyof typeof PutAdminVideoMatchesAssignment200DataExtraKind] | null;
+
+
+export const PutAdminVideoMatchesAssignment200DataExtraKind = {
+  behind_the_scenes: 'behind_the_scenes',
+  deleted_scene: 'deleted_scene',
+  featurette: 'featurette',
+  interview: 'interview',
+  scene: 'scene',
+  short: 'short',
+  trailer: 'trailer',
+  clip: 'clip',
+  sample: 'sample',
+  theme_music: 'theme_music',
+  backdrop: 'backdrop',
+  other: 'other',
+} as const;
+
+export type PutAdminVideoMatchesAssignment200Data = {
+  publicId: string;
+  episodes: string[];
+  /** @nullable */
+  extraKind: PutAdminVideoMatchesAssignment200DataExtraKind;
+};
+
+export type PutAdminVideoMatchesAssignment200 = {
+  data?: PutAdminVideoMatchesAssignment200Data;
 };
 
 export type GetVideoPlaybackInformation200 = {
@@ -22905,6 +23341,633 @@ export const usePutAdminVideoMatchesProviderOrderUpdate = <TError = ErrorType<Ap
         TContext
       > => {
       return useMutation(getPutAdminVideoMatchesProviderOrderUpdateMutationOptions(options), queryClient);
+    }
+
+export const getGetAdminVideoMatchesReviewsUrl = (params?: GetAdminVideoMatchesReviewsParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/admin/video-matches/reviews?${stringifiedParams}` : `/api/admin/video-matches/reviews`
+}
+
+/**
+ * @summary List video matching reviews and paused providers
+ */
+export const getAdminVideoMatchesReviews = async (params?: GetAdminVideoMatchesReviewsParams, options?: Parameters<typeof customInstance>[1]): Promise<GetAdminVideoMatchesReviews200> => {
+
+  return customInstance<GetAdminVideoMatchesReviews200>(getGetAdminVideoMatchesReviewsUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetAdminVideoMatchesReviewsQueryKey = (params?: GetAdminVideoMatchesReviewsParams,) => {
+    return [
+    `/api/admin/video-matches/reviews`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getGetAdminVideoMatchesReviewsQueryOptions = <TData = Awaited<ReturnType<typeof getAdminVideoMatchesReviews>>, TError = ErrorType<ApiError | ValidationError>>(params?: GetAdminVideoMatchesReviewsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAdminVideoMatchesReviews>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetAdminVideoMatchesReviewsQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getAdminVideoMatchesReviews>>> = ({ signal }) => getAdminVideoMatchesReviews(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getAdminVideoMatchesReviews>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type GetAdminVideoMatchesReviewsQueryResult = NonNullable<Awaited<ReturnType<typeof getAdminVideoMatchesReviews>>>
+export type GetAdminVideoMatchesReviewsQueryError = ErrorType<ApiError | ValidationError>
+
+
+/** @summary List video matching reviews and paused providers */
+export function useGetAdminVideoMatchesReviews<TData = Awaited<ReturnType<typeof getAdminVideoMatchesReviews>>, TError = ErrorType<ApiError | ValidationError>>(
+ params: undefined |  GetAdminVideoMatchesReviewsParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAdminVideoMatchesReviews>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getAdminVideoMatchesReviews>>,
+          TError,
+          Awaited<ReturnType<typeof getAdminVideoMatchesReviews>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/** @summary List video matching reviews and paused providers */
+export function useGetAdminVideoMatchesReviews<TData = Awaited<ReturnType<typeof getAdminVideoMatchesReviews>>, TError = ErrorType<ApiError | ValidationError>>(
+ params?: GetAdminVideoMatchesReviewsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAdminVideoMatchesReviews>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getAdminVideoMatchesReviews>>,
+          TError,
+          Awaited<ReturnType<typeof getAdminVideoMatchesReviews>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/** @summary List video matching reviews and paused providers */
+export function useGetAdminVideoMatchesReviews<TData = Awaited<ReturnType<typeof getAdminVideoMatchesReviews>>, TError = ErrorType<ApiError | ValidationError>>(
+ params?: GetAdminVideoMatchesReviewsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAdminVideoMatchesReviews>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/** @summary List video matching reviews and paused providers */
+export function useGetAdminVideoMatchesReviews<TData = Awaited<ReturnType<typeof getAdminVideoMatchesReviews>>, TError = ErrorType<ApiError | ValidationError>>(
+ params?: GetAdminVideoMatchesReviewsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAdminVideoMatchesReviews>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getGetAdminVideoMatchesReviewsQueryOptions(params,options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getGetAdminVideoMatchesCandidatesUrl = (kind: string,
+    publicId: string,
+    params?: GetAdminVideoMatchesCandidatesParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/admin/video-matches/${encodeURIComponent(String(kind))}/${encodeURIComponent(String(publicId))}/candidates?${stringifiedParams}` : `/api/admin/video-matches/${encodeURIComponent(String(kind))}/${encodeURIComponent(String(publicId))}/candidates`
+}
+
+/**
+ * @summary Search metadata candidates or browse video edit choices
+ */
+export const getAdminVideoMatchesCandidates = async (kind: string,
+    publicId: string,
+    params?: GetAdminVideoMatchesCandidatesParams, options?: Parameters<typeof customInstance>[1]): Promise<GetAdminVideoMatchesCandidates200> => {
+
+  return customInstance<GetAdminVideoMatchesCandidates200>(getGetAdminVideoMatchesCandidatesUrl(kind,publicId,params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetAdminVideoMatchesCandidatesQueryKey = (kind: string,
+    publicId: string,
+    params?: GetAdminVideoMatchesCandidatesParams,) => {
+    return [
+    `/api/admin/video-matches/${kind}/${publicId}/candidates`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getGetAdminVideoMatchesCandidatesQueryOptions = <TData = Awaited<ReturnType<typeof getAdminVideoMatchesCandidates>>, TError = ErrorType<ApiError | ValidationError>>(kind: string,
+    publicId: string,
+    params?: GetAdminVideoMatchesCandidatesParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAdminVideoMatchesCandidates>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetAdminVideoMatchesCandidatesQueryKey(kind,publicId,params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getAdminVideoMatchesCandidates>>> = ({ signal }) => getAdminVideoMatchesCandidates(kind,publicId,params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: kind !== null && kind !== undefined && publicId !== null && publicId !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getAdminVideoMatchesCandidates>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type GetAdminVideoMatchesCandidatesQueryResult = NonNullable<Awaited<ReturnType<typeof getAdminVideoMatchesCandidates>>>
+export type GetAdminVideoMatchesCandidatesQueryError = ErrorType<ApiError | ValidationError>
+
+
+/** @summary Search metadata candidates or browse video edit choices */
+export function useGetAdminVideoMatchesCandidates<TData = Awaited<ReturnType<typeof getAdminVideoMatchesCandidates>>, TError = ErrorType<ApiError | ValidationError>>(
+ kind: string,
+    publicId: string,
+    params: undefined |  GetAdminVideoMatchesCandidatesParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAdminVideoMatchesCandidates>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getAdminVideoMatchesCandidates>>,
+          TError,
+          Awaited<ReturnType<typeof getAdminVideoMatchesCandidates>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/** @summary Search metadata candidates or browse video edit choices */
+export function useGetAdminVideoMatchesCandidates<TData = Awaited<ReturnType<typeof getAdminVideoMatchesCandidates>>, TError = ErrorType<ApiError | ValidationError>>(
+ kind: string,
+    publicId: string,
+    params?: GetAdminVideoMatchesCandidatesParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAdminVideoMatchesCandidates>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getAdminVideoMatchesCandidates>>,
+          TError,
+          Awaited<ReturnType<typeof getAdminVideoMatchesCandidates>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/** @summary Search metadata candidates or browse video edit choices */
+export function useGetAdminVideoMatchesCandidates<TData = Awaited<ReturnType<typeof getAdminVideoMatchesCandidates>>, TError = ErrorType<ApiError | ValidationError>>(
+ kind: string,
+    publicId: string,
+    params?: GetAdminVideoMatchesCandidatesParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAdminVideoMatchesCandidates>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/** @summary Search metadata candidates or browse video edit choices */
+export function useGetAdminVideoMatchesCandidates<TData = Awaited<ReturnType<typeof getAdminVideoMatchesCandidates>>, TError = ErrorType<ApiError | ValidationError>>(
+ kind: string,
+    publicId: string,
+    params?: GetAdminVideoMatchesCandidatesParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAdminVideoMatchesCandidates>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getGetAdminVideoMatchesCandidatesQueryOptions(kind,publicId,params,options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getPostAdminVideoMatchesApplyUrl = (kind: string,
+    publicId: string,) => {
+
+
+
+
+  return `/api/admin/video-matches/${encodeURIComponent(String(kind))}/${encodeURIComponent(String(publicId))}/apply`
+}
+
+/**
+ * @summary Apply an explicit provider match to a series or movie
+ */
+export const postAdminVideoMatchesApply = async (kind: string,
+    publicId: string,
+    applyVideoMatchRequest: ApplyVideoMatchRequest, options?: Parameters<typeof customInstance>[1]): Promise<PostAdminVideoMatchesApply200> => {
+
+  return customInstance<PostAdminVideoMatchesApply200>(getPostAdminVideoMatchesApplyUrl(kind,publicId),
+  {
+    ...options,
+    method: 'POST',
+    headers: getHeaders({ 'Content-Type': 'application/json' }, options?.headers),
+    body: JSON.stringify(applyVideoMatchRequest)
+  }
+);}
+
+
+
+
+
+export const getPostAdminVideoMatchesApplyMutationKey = () => ['postAdminVideoMatchesApply'] as const;
+
+export const getPostAdminVideoMatchesApplyMutationOptions = <TError = ErrorType<ApiError | ValidationError>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postAdminVideoMatchesApply>>, TError,PostAdminVideoMatchesApplyMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
+): UseMutationOptions<Awaited<ReturnType<typeof postAdminVideoMatchesApply>>, TError,PostAdminVideoMatchesApplyMutationVariables, TContext> => {
+
+const mutationKey = getPostAdminVideoMatchesApplyMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof postAdminVideoMatchesApply>>, PostAdminVideoMatchesApplyMutationVariables> = (props) => {
+          const {kind,publicId,data} = props ?? {};
+
+          return  postAdminVideoMatchesApply(kind,publicId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type PostAdminVideoMatchesApplyMutationResult = NonNullable<Awaited<ReturnType<typeof postAdminVideoMatchesApply>>>
+    export type PostAdminVideoMatchesApplyMutationBody = BodyType<ApplyVideoMatchRequest>
+    export type PostAdminVideoMatchesApplyMutationError = ErrorType<ApiError | ValidationError>
+    export type PostAdminVideoMatchesApplyMutationVariables = {kind: string;publicId: string;data: BodyType<ApplyVideoMatchRequest>}
+
+    /** @summary Apply an explicit provider match to a series or movie */
+export const usePostAdminVideoMatchesApply = <TError = ErrorType<ApiError | ValidationError>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postAdminVideoMatchesApply>>, TError,PostAdminVideoMatchesApplyMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof postAdminVideoMatchesApply>>,
+        TError,
+        PostAdminVideoMatchesApplyMutationVariables,
+        TContext
+      > => {
+      return useMutation(getPostAdminVideoMatchesApplyMutationOptions(options), queryClient);
+    }
+
+export const getGetAdminVideoMatchesLibraryRematchPreviewUrl = (library: string,) => {
+
+
+
+
+  return `/api/admin/video-matches/libraries/${encodeURIComponent(String(library))}/rematch-preview`
+}
+
+/**
+ * @summary Preview the titles and manual choices in a library rematch
+ */
+export const getAdminVideoMatchesLibraryRematchPreview = async (library: string, options?: Parameters<typeof customInstance>[1]): Promise<GetAdminVideoMatchesLibraryRematchPreview200> => {
+
+  return customInstance<GetAdminVideoMatchesLibraryRematchPreview200>(getGetAdminVideoMatchesLibraryRematchPreviewUrl(library),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetAdminVideoMatchesLibraryRematchPreviewQueryKey = (library: string,) => {
+    return [
+    `/api/admin/video-matches/libraries/${library}/rematch-preview`
+    ] as const;
+    }
+
+
+export const getGetAdminVideoMatchesLibraryRematchPreviewQueryOptions = <TData = Awaited<ReturnType<typeof getAdminVideoMatchesLibraryRematchPreview>>, TError = ErrorType<ApiError | ValidationError>>(library: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAdminVideoMatchesLibraryRematchPreview>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetAdminVideoMatchesLibraryRematchPreviewQueryKey(library);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getAdminVideoMatchesLibraryRematchPreview>>> = ({ signal }) => getAdminVideoMatchesLibraryRematchPreview(library, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: library !== null && library !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getAdminVideoMatchesLibraryRematchPreview>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type GetAdminVideoMatchesLibraryRematchPreviewQueryResult = NonNullable<Awaited<ReturnType<typeof getAdminVideoMatchesLibraryRematchPreview>>>
+export type GetAdminVideoMatchesLibraryRematchPreviewQueryError = ErrorType<ApiError | ValidationError>
+
+
+/** @summary Preview the titles and manual choices in a library rematch */
+export function useGetAdminVideoMatchesLibraryRematchPreview<TData = Awaited<ReturnType<typeof getAdminVideoMatchesLibraryRematchPreview>>, TError = ErrorType<ApiError | ValidationError>>(
+ library: string, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAdminVideoMatchesLibraryRematchPreview>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getAdminVideoMatchesLibraryRematchPreview>>,
+          TError,
+          Awaited<ReturnType<typeof getAdminVideoMatchesLibraryRematchPreview>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/** @summary Preview the titles and manual choices in a library rematch */
+export function useGetAdminVideoMatchesLibraryRematchPreview<TData = Awaited<ReturnType<typeof getAdminVideoMatchesLibraryRematchPreview>>, TError = ErrorType<ApiError | ValidationError>>(
+ library: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAdminVideoMatchesLibraryRematchPreview>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getAdminVideoMatchesLibraryRematchPreview>>,
+          TError,
+          Awaited<ReturnType<typeof getAdminVideoMatchesLibraryRematchPreview>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/** @summary Preview the titles and manual choices in a library rematch */
+export function useGetAdminVideoMatchesLibraryRematchPreview<TData = Awaited<ReturnType<typeof getAdminVideoMatchesLibraryRematchPreview>>, TError = ErrorType<ApiError | ValidationError>>(
+ library: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAdminVideoMatchesLibraryRematchPreview>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/** @summary Preview the titles and manual choices in a library rematch */
+export function useGetAdminVideoMatchesLibraryRematchPreview<TData = Awaited<ReturnType<typeof getAdminVideoMatchesLibraryRematchPreview>>, TError = ErrorType<ApiError | ValidationError>>(
+ library: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAdminVideoMatchesLibraryRematchPreview>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getGetAdminVideoMatchesLibraryRematchPreviewQueryOptions(library,options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getPostAdminVideoMatchesLibraryRematchUrl = (library: string,) => {
+
+
+
+
+  return `/api/admin/video-matches/libraries/${encodeURIComponent(String(library))}/rematch`
+}
+
+/**
+ * @summary Confirm a library rematch and choose whether to replace manual matches
+ */
+export const postAdminVideoMatchesLibraryRematch = async (library: string,
+    rematchVideoLibraryRequest: RematchVideoLibraryRequest, options?: Parameters<typeof customInstance>[1]): Promise<PostAdminVideoMatchesLibraryRematch200> => {
+
+  return customInstance<PostAdminVideoMatchesLibraryRematch200>(getPostAdminVideoMatchesLibraryRematchUrl(library),
+  {
+    ...options,
+    method: 'POST',
+    headers: getHeaders({ 'Content-Type': 'application/json' }, options?.headers),
+    body: JSON.stringify(rematchVideoLibraryRequest)
+  }
+);}
+
+
+
+
+
+export const getPostAdminVideoMatchesLibraryRematchMutationKey = () => ['postAdminVideoMatchesLibraryRematch'] as const;
+
+export const getPostAdminVideoMatchesLibraryRematchMutationOptions = <TError = ErrorType<ApiError | ValidationError>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postAdminVideoMatchesLibraryRematch>>, TError,PostAdminVideoMatchesLibraryRematchMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
+): UseMutationOptions<Awaited<ReturnType<typeof postAdminVideoMatchesLibraryRematch>>, TError,PostAdminVideoMatchesLibraryRematchMutationVariables, TContext> => {
+
+const mutationKey = getPostAdminVideoMatchesLibraryRematchMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof postAdminVideoMatchesLibraryRematch>>, PostAdminVideoMatchesLibraryRematchMutationVariables> = (props) => {
+          const {library,data} = props ?? {};
+
+          return  postAdminVideoMatchesLibraryRematch(library,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type PostAdminVideoMatchesLibraryRematchMutationResult = NonNullable<Awaited<ReturnType<typeof postAdminVideoMatchesLibraryRematch>>>
+    export type PostAdminVideoMatchesLibraryRematchMutationBody = BodyType<RematchVideoLibraryRequest>
+    export type PostAdminVideoMatchesLibraryRematchMutationError = ErrorType<ApiError | ValidationError>
+    export type PostAdminVideoMatchesLibraryRematchMutationVariables = {library: string;data: BodyType<RematchVideoLibraryRequest>}
+
+    /** @summary Confirm a library rematch and choose whether to replace manual matches */
+export const usePostAdminVideoMatchesLibraryRematch = <TError = ErrorType<ApiError | ValidationError>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postAdminVideoMatchesLibraryRematch>>, TError,PostAdminVideoMatchesLibraryRematchMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof postAdminVideoMatchesLibraryRematch>>,
+        TError,
+        PostAdminVideoMatchesLibraryRematchMutationVariables,
+        TContext
+      > => {
+      return useMutation(getPostAdminVideoMatchesLibraryRematchMutationOptions(options), queryClient);
+    }
+
+export const getPutAdminVideoMatchesOrderingUrl = (publicId: string,) => {
+
+
+
+
+  return `/api/admin/video-matches/series/${encodeURIComponent(String(publicId))}/ordering`
+}
+
+/**
+ * @summary Choose an ordering offered by the matched series provider
+ */
+export const putAdminVideoMatchesOrdering = async (publicId: string,
+    setVideoOrderingRequest: SetVideoOrderingRequest, options?: Parameters<typeof customInstance>[1]): Promise<PutAdminVideoMatchesOrdering200> => {
+
+  return customInstance<PutAdminVideoMatchesOrdering200>(getPutAdminVideoMatchesOrderingUrl(publicId),
+  {
+    ...options,
+    method: 'PUT',
+    headers: getHeaders({ 'Content-Type': 'application/json' }, options?.headers),
+    body: JSON.stringify(setVideoOrderingRequest)
+  }
+);}
+
+
+
+
+
+export const getPutAdminVideoMatchesOrderingMutationKey = () => ['putAdminVideoMatchesOrdering'] as const;
+
+export const getPutAdminVideoMatchesOrderingMutationOptions = <TError = ErrorType<ApiError | ValidationError>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof putAdminVideoMatchesOrdering>>, TError,PutAdminVideoMatchesOrderingMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
+): UseMutationOptions<Awaited<ReturnType<typeof putAdminVideoMatchesOrdering>>, TError,PutAdminVideoMatchesOrderingMutationVariables, TContext> => {
+
+const mutationKey = getPutAdminVideoMatchesOrderingMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof putAdminVideoMatchesOrdering>>, PutAdminVideoMatchesOrderingMutationVariables> = (props) => {
+          const {publicId,data} = props ?? {};
+
+          return  putAdminVideoMatchesOrdering(publicId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type PutAdminVideoMatchesOrderingMutationResult = NonNullable<Awaited<ReturnType<typeof putAdminVideoMatchesOrdering>>>
+    export type PutAdminVideoMatchesOrderingMutationBody = BodyType<SetVideoOrderingRequest>
+    export type PutAdminVideoMatchesOrderingMutationError = ErrorType<ApiError | ValidationError>
+    export type PutAdminVideoMatchesOrderingMutationVariables = {publicId: string;data: BodyType<SetVideoOrderingRequest>}
+
+    /** @summary Choose an ordering offered by the matched series provider */
+export const usePutAdminVideoMatchesOrdering = <TError = ErrorType<ApiError | ValidationError>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof putAdminVideoMatchesOrdering>>, TError,PutAdminVideoMatchesOrderingMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof putAdminVideoMatchesOrdering>>,
+        TError,
+        PutAdminVideoMatchesOrderingMutationVariables,
+        TContext
+      > => {
+      return useMutation(getPutAdminVideoMatchesOrderingMutationOptions(options), queryClient);
+    }
+
+export const getPutAdminVideoMatchesAssignmentUrl = (publicId: string,) => {
+
+
+
+
+  return `/api/admin/video-matches/files/${encodeURIComponent(String(publicId))}/assignment`
+}
+
+/**
+ * @summary Assign a video file to episodes or an extra kind
+ */
+export const putAdminVideoMatchesAssignment = async (publicId: string,
+    assignVideoFileRequest: AssignVideoFileRequest, options?: Parameters<typeof customInstance>[1]): Promise<PutAdminVideoMatchesAssignment200> => {
+
+  return customInstance<PutAdminVideoMatchesAssignment200>(getPutAdminVideoMatchesAssignmentUrl(publicId),
+  {
+    ...options,
+    method: 'PUT',
+    headers: getHeaders({ 'Content-Type': 'application/json' }, options?.headers),
+    body: JSON.stringify(assignVideoFileRequest)
+  }
+);}
+
+
+
+
+
+export const getPutAdminVideoMatchesAssignmentMutationKey = () => ['putAdminVideoMatchesAssignment'] as const;
+
+export const getPutAdminVideoMatchesAssignmentMutationOptions = <TError = ErrorType<ApiError | ValidationError>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof putAdminVideoMatchesAssignment>>, TError,PutAdminVideoMatchesAssignmentMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
+): UseMutationOptions<Awaited<ReturnType<typeof putAdminVideoMatchesAssignment>>, TError,PutAdminVideoMatchesAssignmentMutationVariables, TContext> => {
+
+const mutationKey = getPutAdminVideoMatchesAssignmentMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof putAdminVideoMatchesAssignment>>, PutAdminVideoMatchesAssignmentMutationVariables> = (props) => {
+          const {publicId,data} = props ?? {};
+
+          return  putAdminVideoMatchesAssignment(publicId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type PutAdminVideoMatchesAssignmentMutationResult = NonNullable<Awaited<ReturnType<typeof putAdminVideoMatchesAssignment>>>
+    export type PutAdminVideoMatchesAssignmentMutationBody = BodyType<AssignVideoFileRequest>
+    export type PutAdminVideoMatchesAssignmentMutationError = ErrorType<ApiError | ValidationError>
+    export type PutAdminVideoMatchesAssignmentMutationVariables = {publicId: string;data: BodyType<AssignVideoFileRequest>}
+
+    /** @summary Assign a video file to episodes or an extra kind */
+export const usePutAdminVideoMatchesAssignment = <TError = ErrorType<ApiError | ValidationError>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof putAdminVideoMatchesAssignment>>, TError,PutAdminVideoMatchesAssignmentMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof putAdminVideoMatchesAssignment>>,
+        TError,
+        PutAdminVideoMatchesAssignmentMutationVariables,
+        TContext
+      > => {
+      return useMutation(getPutAdminVideoMatchesAssignmentMutationOptions(options), queryClient);
     }
 
 export const getGetVideoPlaybackInformationUrl = (publicId: string,) => {

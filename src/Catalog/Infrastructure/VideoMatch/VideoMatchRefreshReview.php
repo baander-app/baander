@@ -37,7 +37,6 @@ final readonly class VideoMatchRefreshReview
 
     public function recordMissingOrdering(Uuid $seriesId, DateTimeImmutable $checkedAt): void
     {
-        // A pending rematch and an unrelated review each keep their state.
         $this->connection->executeStatement(
             <<<'SQL'
                 INSERT INTO video_match_states (id, series_id, status, source, due_at, reason, checked_at)

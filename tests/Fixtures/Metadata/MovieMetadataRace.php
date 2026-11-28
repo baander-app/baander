@@ -124,9 +124,9 @@ final class MovieMetadataRace
             new EpisodePlacer(),
             new WatchedMarkMove($connection, new WatchedMarkRepository($connection)),
             $transaction,
+            $movies,
         );
         $apply = new VideoMatchApply(
-            $manager,
             $transaction,
             $states,
             $movies,

@@ -58,7 +58,6 @@ final readonly class DrainVideoMatchesHandler
     {
         switch ($outcome->kind) {
             case VideoMatchOutcomeKind::Matched:
-                // The apply transaction completed the claim with the title's identity.
                 return;
             case VideoMatchOutcomeKind::Gone:
                 $this->states->completeClaim($claim->id, $claimId, $this->clock->now());

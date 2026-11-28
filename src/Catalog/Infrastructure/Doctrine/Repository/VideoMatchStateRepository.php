@@ -50,6 +50,26 @@ final readonly class VideoMatchStateRepository implements VideoMatchStateReposit
         return $this->request('movie_id', $movieId, 'awaiting_provider', $source, $dueAt);
     }
 
+    public function recordAdminSeriesMatched(Uuid $seriesId, DateTimeImmutable $checkedAt): void
+    {
+        $this->recordAdminMatched('series_id', $seriesId, $checkedAt);
+    }
+
+    public function recordAdminMovieMatched(Uuid $movieId, DateTimeImmutable $checkedAt): void
+    {
+        $this->recordAdminMatched('movie_id', $movieId, $checkedAt);
+    }
+
+    public function cancelSeriesRematch(Uuid $seriesId, DateTimeImmutable $checkedAt, bool $matched = true): ?VideoMatchState
+    {
+        return $this->cancelRematch('series_id', $seriesId, $checkedAt, $matched);
+    }
+
+    public function cancelMovieRematch(Uuid $movieId, DateTimeImmutable $checkedAt, bool $matched = true): ?VideoMatchState
+    {
+        return $this->cancelRematch('movie_id', $movieId, $checkedAt, $matched);
+    }
+
     public function claimOldestDueRequest(DateTimeImmutable $now, Uuid $claimId, int $leaseSeconds): ?VideoMatchState
     {
         $row = $this->connection->fetchAssociative(
@@ -195,6 +215,40 @@ final readonly class VideoMatchStateRepository implements VideoMatchStateReposit
                 SQL,
             ['id' => $stateId, 'claim' => $claimId, 'status' => $status, 'due' => $dueAt, 'reason' => $reason, 'score' => $bestScore, 'checked' => $checkedAt],
             ['id' => 'uuid', 'claim' => 'uuid', 'due' => Types::DATETIME_IMMUTABLE, 'checked' => Types::DATETIME_IMMUTABLE],
+        );
+
+        return $row === false ? null : $this->toDomain($row);
+    }
+
+    /** @param 'series_id'|'movie_id' $column */
+    private function recordAdminMatched(string $column, Uuid $titleId, DateTimeImmutable $checkedAt): void
+    {
+        $this->connection->executeStatement(
+            sprintf(<<<'SQL'
+                INSERT INTO video_match_states (id, %s, status, source, due_at, checked_at)
+                VALUES (:id, :title, 'matched', 'admin', :checked, :checked)
+                ON CONFLICT (%s) DO UPDATE
+                SET status = 'matched', source = 'admin', due_at = EXCLUDED.due_at, checked_at = EXCLUDED.checked_at,
+                    claim_id = NULL, claim_expires_at = NULL, next_due_at = NULL, reason = NULL, best_score = NULL
+                SQL, $column, $column),
+            ['id' => Uuid::v7(), 'title' => $titleId, 'checked' => $checkedAt],
+            ['id' => 'uuid', 'title' => 'uuid', 'checked' => Types::DATETIME_IMMUTABLE],
+        );
+    }
+
+    /** @param 'series_id'|'movie_id' $column */
+    private function cancelRematch(string $column, Uuid $titleId, DateTimeImmutable $checkedAt, bool $matched): ?VideoMatchState
+    {
+        $row = $this->connection->fetchAssociative(
+            sprintf(<<<'SQL'
+                UPDATE video_match_states
+                SET status = :status, source = :source, due_at = :checked, checked_at = :checked,
+                    claim_id = NULL, claim_expires_at = NULL, next_due_at = NULL, reason = NULL, best_score = NULL
+                WHERE %s = :title AND status = 'requested' AND source = 'admin'
+                RETURNING *
+                SQL, $column),
+            ['title' => $titleId, 'status' => $matched ? 'matched' : 'requested', 'source' => $matched ? 'admin' : 'ingest', 'checked' => $checkedAt],
+            ['title' => 'uuid', 'checked' => Types::DATETIME_IMMUTABLE],
         );
 
         return $row === false ? null : $this->toDomain($row);

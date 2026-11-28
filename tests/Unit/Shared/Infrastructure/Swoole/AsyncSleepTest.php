@@ -16,22 +16,22 @@ use Symfony\Component\Process\Process;
  */
 final class AsyncSleepTest extends TestCase
 {
-    /**
-     * Sleeps three seconds while an alarm arrives every second, as a Messenger consumer's
-     * keepalive alarm does, and tells how long the sleep took and how many alarms arrived.
-     */
+    /** A third alarm can arrive during PHP shutdown after the three-second sleep. */
     private const string CHILD = <<<'PHP'
         require $argv[1];
         pcntl_async_signals(true);
         $alarms = 0;
         pcntl_signal(SIGALRM, static function () use (&$alarms): void {
-            ++$alarms;
-            pcntl_alarm(1);
+            if (++$alarms < 2) {
+                pcntl_alarm(1);
+            }
         });
         pcntl_alarm(1);
         $started = hrtime(true);
         \App\Shared\Infrastructure\Swoole\Async::sleepThroughSignals(3.0);
-        echo json_encode(['seconds' => (hrtime(true) - $started) / 1e9, 'alarms' => $alarms], JSON_THROW_ON_ERROR);
+        $seconds = (hrtime(true) - $started) / 1e9;
+        pcntl_alarm(0);
+        echo json_encode(['seconds' => $seconds, 'alarms' => $alarms], JSON_THROW_ON_ERROR);
         PHP;
 
     public function testAThreeSecondSleepLastsThreeSecondsWhileAnAlarmArrivesEverySecond(): void

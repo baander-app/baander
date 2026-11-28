@@ -12,6 +12,7 @@ use App\Catalog\Domain\Model\TvEpisode;
 use App\Catalog\Domain\Model\TvSeason;
 use App\Catalog\Domain\Model\TvSeries;
 use App\Catalog\Domain\Model\VideoPlacement;
+use App\Catalog\Domain\Repository\MovieRepositoryInterface;
 use App\Catalog\Infrastructure\Doctrine\Entity\VideoEntity;
 use App\Catalog\Infrastructure\Doctrine\Repository\TvCatalogRepository;
 use App\Catalog\Infrastructure\VideoPlacementService;
@@ -33,6 +34,7 @@ use Doctrine\ORM\EntityManager;
 use DoctrineMigrations\Version20261121194700;
 use DoctrineMigrations\Version20261128123000;
 use DoctrineMigrations\Version20261128123600;
+use DoctrineMigrations\Version20261128124500;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
@@ -40,6 +42,7 @@ use Psr\Log\NullLogger;
 require_once dirname(__DIR__, 2) . '/migrations/Version20261121194700.php';
 require_once dirname(__DIR__, 2) . '/migrations/Version20261128123000.php';
 require_once dirname(__DIR__, 2) . '/migrations/Version20261128123600.php';
+require_once dirname(__DIR__, 2) . '/migrations/Version20261128124500.php';
 
 final class VideoMatchApplyStructureTest extends TestCase
 {
@@ -70,6 +73,7 @@ final class VideoMatchApplyStructureTest extends TestCase
             Version20261121194700::class,
             Version20261128123000::class,
             Version20261128123600::class,
+            Version20261128124500::class,
         ] as $migrationClass) {
             $migration = new $migrationClass($this->connection, new NullLogger());
             $migration->up(new Schema());
@@ -101,7 +105,7 @@ final class VideoMatchApplyStructureTest extends TestCase
                 });
             }
         };
-        $this->service = new VideoPlacementService($this->catalog, new EpisodePlacer(), $this->marks, $transaction);
+        $this->service = new VideoPlacementService($this->catalog, new EpisodePlacer(), $this->marks, $transaction, $this->createStub(MovieRepositoryInterface::class));
     }
 
     protected function tearDown(): void

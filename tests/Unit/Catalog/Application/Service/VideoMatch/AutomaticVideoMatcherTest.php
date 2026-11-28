@@ -195,25 +195,6 @@ final class AutomaticVideoMatcherTest extends TestCase
         ], $requests);
     }
 
-    public function testFailedAiredLookupKeepsTheProviderPauseHistory(): void
-    {
-        $this->pauses->expects(self::once())->method('find')->with('tvdb')->willReturn(null);
-        $this->pauses->expects(self::never())->method('clear');
-        $this->apply->expects(self::never())->method('apply');
-        $this->providers->method('usableProviders')->willReturn([VideoProviderId::Tvdb]);
-        $alternate = new VideoTitle(
-            new VideoCandidate('10', 'Heat', 1995),
-            orderings: [new VideoOrdering('aired', 'Aired', 'aired'), new VideoOrdering('dvd-group', 'DVD', 'dvd')],
-            seasons: [new VideoSeason(1, episodes: [new VideoEpisode('99', 7, 'Episode')])],
-        );
-        $this->providers->expects(self::exactly(2))->method('identify')->willReturn($alternate, VideoProviderProblem::Unavailable);
-
-        $result = $this->matcher(VideoKind::Series, ids: ['tvdb' => '10'], ordering: 'dvd-group')->match($this->claim(VideoKind::Series));
-
-        self::assertSame(VideoMatchOutcomeKind::Unavailable, $result->kind);
-        self::assertSame(VideoProviderId::Tvdb, $result->provider);
-    }
-
     public function testNfoIdentifiersAreUsedAtTheFirstOnlineProviderInTheLibraryOrder(): void
     {
         $this->pauses->expects(self::once())->method('find')->with('tvdb')->willReturn(null);
@@ -276,6 +257,28 @@ final class AutomaticVideoMatcherTest extends TestCase
         self::assertSame(VideoMatchOutcomeKind::Gone, $this->matcher(VideoKind::Movie, matched: true)->match($this->claim(VideoKind::Movie))->kind);
     }
 
+    public function testALibraryRematchUsesTheNewProvidersDefaultAndKeepsTheOldOrderingAsItsApplyGuard(): void
+    {
+        $this->pauses->expects(self::once())->method('find')->with('tvdb')->willReturn(null);
+        $metadata = new VideoTitle(new VideoCandidate('200', 'Heat', 1995), orderings: [new VideoOrdering('aired', 'Aired', 'aired')]);
+        $this->providers->method('usableProviders')->willReturn([VideoProviderId::Tvdb, VideoProviderId::Tmdb]);
+        $this->providers->expects(self::never())->method('search');
+        $this->providers->expects(self::once())->method('identify')->with(
+            VideoProviderId::Tvdb,
+            self::callback(static fn (VideoRequest $request): bool => $request->ordering === 'aired' && $request->externalIds === ['tmdb' => '100']),
+        )->willReturn($metadata);
+        $this->apply->expects(self::once())->method('apply')->with(
+            self::isInstanceOf(VideoMatchState::class),
+            self::callback(static fn (VideoMatchTarget $target): bool => $target->request->ordering === 'dvd'),
+            VideoProviderId::Tvdb,
+            new ResolvedVideoMatch($metadata, 'aired'),
+        )->willReturn(true);
+
+        $outcome = $this->matcher(VideoKind::Series, ids: ['tmdb' => '100'], matched: true, ordering: 'dvd')->match($this->claim(VideoKind::Series, 'admin'));
+
+        self::assertSame(VideoMatchOutcomeKind::Matched, $outcome->kind);
+    }
+
     /**
      * @param list<string>|null $order
      * @param array<string, string> $ids
@@ -309,8 +312,8 @@ final class AutomaticVideoMatcherTest extends TestCase
         );
     }
 
-    private function claim(VideoKind $kind): VideoMatchState
+    private function claim(VideoKind $kind, string $source = 'ingest'): VideoMatchState
     {
-        return new VideoMatchState(Uuid::v7(), $kind === VideoKind::Series ? $this->title : null, $kind === VideoKind::Movie ? $this->title : null, 'requested', 'ingest', $this->clock->now(), Uuid::v7(), $this->clock->now()->modify('+15 minutes'));
+        return new VideoMatchState(Uuid::v7(), $kind === VideoKind::Series ? $this->title : null, $kind === VideoKind::Movie ? $this->title : null, 'requested', $source, $this->clock->now(), Uuid::v7(), $this->clock->now()->modify('+15 minutes'));
     }
 }

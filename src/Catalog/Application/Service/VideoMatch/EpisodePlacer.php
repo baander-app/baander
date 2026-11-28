@@ -24,8 +24,21 @@ final readonly class EpisodePlacer
      */
     public function place(array $seasons, array $placements, array $providerIdsByEpisode, ?array $airedSeasons = null): array
     {
+        return $this->plan($seasons, $placements, $providerIdsByEpisode, $airedSeasons)['placements'];
+    }
+
+    /**
+     * @param list<VideoSeason> $seasons
+     * @param list<VideoPlacement> $placements
+     * @param array<string, string> $providerIdsByEpisode
+     * @param list<VideoSeason>|null $airedSeasons
+     * @return array{placements: array<string, PlacementResult>, absoluteNumbers: array<string, positive-int>}
+     */
+    public function plan(array $seasons, array $placements, array $providerIdsByEpisode, ?array $airedSeasons = null): array
+    {
         $index = $this->index($seasons);
-        foreach ($this->absoluteNumbers($seasons, $airedSeasons) as $id => $number) {
+        $absoluteNumbers = $this->absoluteNumbers($seasons, $airedSeasons);
+        foreach ($absoluteNumbers as $id => $number) {
             $index['absolute'][$number][] = $index['ids'][$id];
         }
         $results = [];
@@ -59,7 +72,7 @@ final readonly class EpisodePlacer
             $results[$placement->getId()->toString()] = ['targets' => $targets, 'reviewReason' => $reason];
         }
 
-        return $results;
+        return ['placements' => $results, 'absoluteNumbers' => $absoluteNumbers];
     }
 
     /**
