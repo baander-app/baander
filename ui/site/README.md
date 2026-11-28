@@ -4,7 +4,9 @@ The website publishes the maintained `docs-book/` manuals with a static homepage
 shared design tokens and local Pagefind search. Its reference pages publish four
 repository documents as they stand: `STRATEGY.md` at `/strategy/`, `CONCEPTS.md`
 at `/concepts/`, `THIRD_PARTY.md` at `/licensing/` and `deploy/preset/README.md`
-at `/deploy/`. The PHP builder writes a complete
+at `/deploy/`. Its design system pages under `/design-system/` publish the rules of
+`ui/DESIGN.md` and `ui/ICON-GUIDE.md` beside the generated design token values. The
+PHP builder writes a complete
 artifact to `var/website/`, including `.vercel/output/` for Vercel. Serving the site
 requires no application server, account, database or worker deployment.
 
@@ -28,16 +30,21 @@ credentials or other personal files under `var/website/`.
 
 Each build also writes `sitemap.xml` and `robots.txt` at the site root, so the
 sitemap follows every change without a separate step. It lists the homepage, the
-features overview, each feature page, the Bånder Audio Core page, the reference
-pages and every manual page at its `https://baander.app` URL, and never the 404
-page. Each `<lastmod>` is the date of the newest commit that touched the page's
-sources:
+features overview, each feature page, the Bånder Audio Core page, the typography
+page, the reference pages, the design system pages and every manual page at its
+`https://baander.app` URL, and never the 404 page. Each `<lastmod>` is the date of
+the newest commit that touched the page's sources:
 
 - **Manual page:** its Markdown file.
 - **Reference page:** its source document, its data file in `ui/site/reference/`
   and `ui/site/templates/reference.php`; for the deploy preset page, the whole
   `deploy/preset/` directory, whose example files fill its comparison table.
 - **Homepage and Bånder Audio Core page:** the template and the data it renders.
+- **Typography page:** `ui/site/templates/typography.php`, `site.css`,
+  `typography.css`, the type tokens and `ui/DESIGN.md`.
+- **Design system page:** the section's data file, `design-system.php`, the page's
+  body template, `design-system.css`, the documents it borrows from and the inputs
+  it reads (see [Design system pages](#design-system-pages)).
 - **Feature page:** its data file, the feature templates, its pictures and the
   manual pages it borrows blocks from.
 
@@ -70,10 +77,14 @@ Manual text belongs in `docs-book/`. Homepage text and layout belong in
 document; the page's title, search description and the short opening shown under
 its heading belong in its data file in `ui/site/reference/`. The top menu's titles
 and one-line descriptions belong in `ui/site/menu.php`, except the feature pages,
-which bring their own name and summary; the footer lists the same entries. Site
-styles and the pictures of the application belong in `ui/site/assets/`. The build
-copies shared token CSS, SVG branding and licensed fonts, then builds search from
-the rendered manual and reference pages, labelling each result with its page.
+which bring their own name and summary; the footer lists the same entries. The
+design system pages read their rules and values from their sources; only their
+titles, descriptions and openings belong in `ui/site/design-system/index.php`. Site styles and the pictures of the application
+belong in `ui/site/assets/`. The build copies shared token CSS, licensed fonts and
+the three cassette marks from `ui/web/public/` into `/assets/site/`: the header and
+footer show `logo.svg`, `favicon.svg` is the site icon, and the logo page shows all
+three. It then builds search from the rendered manual,
+reference and design system pages, labelling each result with its page.
 
 A link in a manual or reference document to a manual page or to one of the four
 published documents opens that page on the site, and the build fails when its
@@ -285,6 +296,74 @@ expects the application to list them as "Chrome on Linux" and "Firefox on Linux"
 On another operating system, change those two names in
 `ui/site/scripts/capture/scenes/destinations.mjs`. After retaking `library`,
 regenerate the link-preview card.
+
+## Design system pages
+
+`/design-system/` is an overview, and nine pages below it cover color, accents,
+type, layout, motion, iconography, writing, the logo and the website's own
+departures from the application. When the site builds, the pages read their rules
+from the design documents and their values from the design tokens, the site's
+stylesheets and the cassette marks; only each page's title, description and
+opening are written for the website. `DesignSystemPages` in the website tooling states the fields and loads the
+pages:
+
+- `ui/site/design-system/index.php` holds the overview, then the nine pages in the
+  order of the section navigation. Each entry has a `title`, a search
+  `description` of at most 155 characters, an `opening` shown under the heading,
+  and a `borrow` list of the document sections the page publishes. A page also has
+  a `slug` and the one-line `summary` that the overview lists. A borrowed section
+  names its `id`, its `document` and the heading path to it under `headings`;
+  `'tables' => false` leaves out the section's tables, which the page renders with
+  values instead, and `from` starts the section at the block that begins with that
+  text.
+- `ui/site/templates/design-system.php` lays out every page: the breadcrumb, the
+  section navigation with Typography under Related, and the article. It includes
+  the page's body from `ui/site/templates/design-system/<slug>.php`, and
+  `overview.php` for the overview.
+
+Each page reads these inputs and borrows these sections. DESIGN.md and
+ICON-GUIDE.md are the documents in `ui/`, paths under `tokens/` are in
+`ui/design-tokens/`, `theme.css` is the generated
+`ui/design-tokens/build/web/theme.css`, and `site.css` is in `ui/site/assets/`:
+
+| Page | Reads | Borrows |
+|---|---|---|
+| Overview | the data file's page list | DESIGN.md › Philosophy |
+| Color | the Surfaces list and the Token and Use table of DESIGN.md; the default accent's colors per mood from `theme.css`; the mood names from `tokens/web/semantic-colors.json`; the website's dark foreground from `ui/site/theme-tone.css` | DESIGN.md › Color › Token authority, without its table |
+| Accents | the identity colors from `tokens/accent/palette.json`; all 32 color blocks of `theme.css`; the contrast targets from `semantic-colors.json` | DESIGN.md › Color › Dynamic accent; Foreground-on-accent contrast |
+| Type | the Roles table of DESIGN.md joined with `tokens/base/type.json`; samples set in the role classes of `site.css` | DESIGN.md › Typography › Roles, without its table |
+| Layout | the spacing and radius scales of `theme.css`; the Border radius list of DESIGN.md, and the items of its Spacing list that describe a padding or a gap | DESIGN.md › Layout › App Shell; Footer player; Notification pane; Surfaces; Border radius; Spacing |
+| Motion | the Motion table and the anti-patterns' duration limit in DESIGN.md; the duration tokens of `theme.css`, with the files under `ui/site/assets/` and `ui/web/src/` that use each | DESIGN.md › Motion, without its table |
+| Iconography | nothing beyond the borrowed sections | ICON-GUIDE.md › When to Use Icons; Canonical Concept to Icon Assignments; DESIGN.md › Components › Icons in menu lists |
+| Writing | nothing beyond the borrowed sections | DESIGN.md › Writing; Components › Loading states; Error states; Empty states; Typography › Content language, from its last paragraph |
+| Logo | the size comment that opens `logo.svg`, `icon.svg` and `favicon.svg` in `ui/web/public/` | nothing |
+| Website | the `body` and `.eyebrow` declarations of `site.css`; the dark foreground of `theme-tone.css`; the moods of `semantic-colors.json` and the light mood in `AssetPublication::LIGHT_MOOD`, in `packages/baander-dev-website/src/Assets/AssetPublication.php`; the `body` and `label` roles of `tokens/base/type.json` | DESIGN.md › Static public website |
+
+The build fails, naming the cause, when a page's input is missing or disagrees with
+another:
+
+- a borrowed heading path that names no section or several, with the data file,
+  the document and the path; a renamed heading is fixed with a one-line edit to the
+  data file;
+- a borrowed section with a link or an image whose address is not `https:`, or
+  with raw HTML, because nothing rewrites a repository address for these pages;
+- a token, theme block, table column, type role or stylesheet declaration a page
+  reads, with the file and the missing part;
+- a documented color role that a mood and accent block does not set;
+- a Roles table value that differs from `type.json`, or a Hover state duration that
+  differs from `--duration-hover`, with both values;
+- an accent's label on its fill or accent text below 4.5:1, or its focus ring below
+  3:1, with the mood, the accent and the color it was measured against;
+- a mark without a size comment, an unknown key in the data file, a missing body
+  template, a repeated slug or description, a composed title over 60 characters or
+  a description over 155.
+
+The pages are indexed for search under the label "Design system". Swatches, hex
+codes, ratios, token values, type samples and logo figures carry
+`data-pagefind-ignore`, so results show sentences rather than value lists, and the
+search fonts stylesheet gains no slices for them. Each page's sitemap date follows
+the files in its row of the table above, the data file, `design-system.php`, its
+body template and `design-system.css`.
 
 ## CI artifact
 

@@ -1261,6 +1261,18 @@ The recessed surface treatment of the web interface: a face shaded darker toward
 
 The music footer's central display holds the well by default. The sidebar notification pane takes it while open and the footer display goes flat; the two fade over the same duration (the well handoff).
 
+## Interface color
+
+### Mood
+
+One of the four color sets of the interface: Dark, Warm, Cool and Balanced. A mood gives each semantic color role, such as primary text or a subtle surface, its value; the root element's `data-theme` attribute names the selected mood. Dark is the only mood with a dark background. The public website offers two moods, Dark and Balanced, behind its light and dark toggle.
+*Avoid: theme for the mood alone; each generated theme combines one mood with one accent.*
+
+### Accent
+
+One of eight identity colors the user chooses from, violet by default; the root element's `data-accent` attribute names it. Each mood derives the filled-action color, accent text and focus ring from it, mixing the identity color toward white in the dark mood and toward black in the others until it reaches the design tokens' contrast target against each of the seven surfaces the generator checks: 4.7:1 for the fill, 4.5:1 for accent text and 3:1 for the ring. Status colors do not follow the accent.
+*Avoid: dynamic accent, which a detail page derives from its cover art.*
+
 ## Public website
 
 ### Feature page
@@ -1274,6 +1286,10 @@ The generated, fictional music collection that website pictures show: invented a
 ### Reference page
 
 A page of the public website that publishes a tracked repository document as it stands, such as the strategy, the concepts glossary, the third-party licensing notes or the deploy preset guide. Only its title, search description and a short opening under its heading are written for the website; an edit to the document changes the page on the next build.
+
+### Design system page
+
+A page of the public website's design system section under `/design-system/`: the overview, or one part of the design language such as color, type or the logo. It publishes sections of `ui/DESIGN.md` and `ui/ICON-GUIDE.md` as they stand and shows values read from the design tokens, the site's stylesheets and the cassette marks when the site builds. Only its title, search description and opening are written for the website. A missing source, a renamed borrowed heading or a contrast below its target fails the build.
 
 ### Capture record
 

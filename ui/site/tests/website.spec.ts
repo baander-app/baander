@@ -152,11 +152,14 @@ test('the sitemap lists every published page at its canonical URL and robots.txt
       return {
         location, status: response.status, canonical: html.includes(`<link rel="canonical" href="${location}">`),
         title: head.title, description: head.querySelector('meta[name="description"]')?.getAttribute('content') ?? '',
+        icons: [...head.querySelectorAll('link[rel~="icon"]')].map((link) => link.getAttribute('href')),
       };
     }));
     const robots = await fetch('/robots.txt');
+    const favicon = await fetch('/assets/site/favicon.svg');
     return {
       status: sitemap.status, type: sitemap.headers.get('content-type'), locations, lastModified, pages,
+      favicon: { status: favicon.status, body: await favicon.text() },
       robots: { status: robots.status, body: await robots.text() },
     };
   });
@@ -172,6 +175,10 @@ test('the sitemap lists every published page at its canonical URL and robots.txt
   expect(repeated(result.pages.map((listed) => listed.title)), 'Every listed page has its own title').toEqual([]);
   expect(repeated(result.pages.map((listed) => listed.description)), 'Every listed page has its own description').toEqual([]);
   for (const listed of result.pages) expect(listed.description.length, listed.location).toBeLessThanOrEqual(160);
+  // The site icon is the cassette mark drawn for 16 to 32 pixels, not the full-detail logo.
+  for (const listed of result.pages) expect(listed.icons, listed.location).toEqual(['/assets/site/favicon.svg']);
+  expect(result.favicon.status).toBe(200);
+  expect(result.favicon.body).toContain('simplified for 16-32px');
   expect(result.robots.status).toBe(200);
   expect(result.robots.body).toContain('Sitemap: https://baander.app/sitemap.xml');
 });
@@ -308,7 +315,7 @@ test('unmatched and empty queries have distinct states', async ({ page }) => {
   await expect(page.getByRole('status')).toContainText('No matches');
   await expect(page.locator('#manual-search-results')).toBeHidden();
   await input.fill('');
-  await expect(page.getByRole('status')).toHaveText('Search the operator and developer guides and the reference pages.');
+  await expect(page.getByRole('status')).toHaveText('Search the operator and developer guides, the reference pages and the design system pages.');
   await expect(page.locator('#manual-search-results')).toHaveAttribute('aria-busy', 'false');
 });
 
@@ -339,7 +346,7 @@ test('late real index load cannot restore results after query is cleared', async
   const loaded = page.waitForResponse('**/pagefind/pagefind.js');
   release();
   await loaded;
-  await expect(page.getByRole('status')).toHaveText('Search the operator and developer guides and the reference pages.');
+  await expect(page.getByRole('status')).toHaveText('Search the operator and developer guides, the reference pages and the design system pages.');
   await expect(page.locator('#manual-search-results')).toBeHidden();
   await input.fill('scanning');
   await expect(page.locator('#manual-search-results')).toBeVisible();
@@ -467,6 +474,21 @@ async function fontCoverage(page: import('@playwright/test').Page, root: string)
   }, { root, siteWideLatin: SITE_WIDE_LATIN });
 }
 
+/** The font files the renderer drew each node's text with, as the browser names their families. */
+async function renderedFonts(page: import('@playwright/test').Page): Promise<{ familyName: string; isCustomFont: boolean }[]> {
+  const session = await page.context().newCDPSession(page);
+  await session.send('DOM.enable');
+  await session.send('CSS.enable');
+  const { root } = await session.send('DOM.getDocument', { depth: -1 });
+  const { nodeIds } = await session.send('DOM.querySelectorAll', { nodeId: root.nodeId, selector: 'body, body *' });
+  const used: { familyName: string; isCustomFont: boolean }[] = [];
+  for (const nodeId of nodeIds) {
+    const { fonts } = await session.send('CSS.getPlatformFontsForNode', { nodeId });
+    used.push(...fonts.map(({ familyName, isCustomFont }) => ({ familyName, isCustomFont })));
+  }
+  return used;
+}
+
 async function openTypography(page: import('@playwright/test').Page) {
   await page.goto('/typography/');
   await expect(page.getByRole('heading', { level: 1, name: 'Typography' })).toBeVisible();
@@ -515,6 +537,20 @@ test('visitors reach the typography page from the header and it describes itself
   await expect(page.locator('.typography-role')).toHaveCount(10);
 });
 
+test('the type scale states each role\'s use as the Roles table of the design language does', async ({ page }) => {
+  const design = readFileSync(fileURLToPath(new URL('../../DESIGN.md', import.meta.url)), 'utf8');
+  const roles = design.slice(design.indexOf('### Roles')).split('\n\n')
+    .find((block) => block.startsWith('| Role |'))!
+    .split('\n').slice(2)
+    .map((row) => row.split('|').map((cell) => cell.trim()))
+    .map((cells) => ({ role: cells[1].replaceAll('`', ''), use: cells[cells.length - 2] }));
+  expect(roles).toHaveLength(10);
+  await openTypography(page);
+  for (const { role, use } of roles) {
+    await expect(page.locator(`.typography-role[data-role="${role}"] .typography-role-meta > p`), role).toHaveText(use);
+  }
+});
+
 test('the glyph-form columns put their own Han family first', async ({ page }) => {
   await openTypography(page);
   const firstHan = async (lang: string) => (await families(page, `#glyph-forms [lang="${lang}"]`)).find((family) => HAN_FAMILY.test(family));
@@ -551,11 +587,12 @@ test('each script rule sample differs from its sample without the rule', async (
   expect(proportional.family).toMatch(/^"Geist Variable",/);
 });
 
-// The specs cannot read the site's data files, so the built sitemap says which feature pages exist.
+// The specs cannot read the site's data files, so the built sitemap says which feature and design system pages exist.
 const sitemap = readFileSync(fileURLToPath(new URL('../../../var/website/sitemap.xml', import.meta.url)), 'utf8');
 const featurePages = [...sitemap.matchAll(/<loc>https:\/\/baander\.app(\/features\/[^<]+)<\/loc>/g)].map((match) => match[1]);
+const designSystemPages = [...sitemap.matchAll(/<loc>https:\/\/baander\.app(\/design-system\/[^<]*)<\/loc>/g)].map((match) => match[1]);
 
-for (const path of ['/', '/docs/developer-guide/testing/', '/bac/', '/features/', ...featurePages]) {
+for (const path of ['/', '/docs/developer-guide/testing/', '/bac/', '/features/', ...featurePages, ...designSystemPages]) {
   test(`${path}: every character renders from a bundled face and only the slices the text reaches load`, async ({ page }) => {
     await page.goto(path);
     await expect(page.locator('main h1')).toBeVisible();
@@ -564,6 +601,20 @@ for (const path of ['/', '/docs/developer-guide/testing/', '/bac/', '/features/'
     expect(report.declaredUnreached, 'The page declares no slice its text does not reach first').toEqual([]);
     expect(report.requestedUnreached, 'The page requests no slice its text does not reach first').toEqual([]);
     expect(report.declared.length, 'The page has text beyond the shared Latin faces').toBeGreaterThan(0);
+  });
+}
+
+for (const path of designSystemPages) {
+  test(`${path}: the renderer draws every character from a bundled Geist or Noto file`, async ({ page }) => {
+    await page.goto(path);
+    await page.evaluate(async () => {
+      for (const details of document.querySelectorAll('details')) details.open = true;
+      await new Promise(requestAnimationFrame);
+      await document.fonts.ready;
+    });
+    const used = await renderedFonts(page);
+    expect(used.length).toBeGreaterThan(0);
+    expect(used.filter(({ familyName, isCustomFont }) => !isCustomFont || !BUNDLED_FAMILY.test(familyName))).toEqual([]);
   });
 }
 
@@ -593,16 +644,7 @@ test('every character on the typography page renders from a bundled Geist or Not
     await document.fonts.ready;
   });
 
-  const session = await page.context().newCDPSession(page);
-  await session.send('DOM.enable');
-  await session.send('CSS.enable');
-  const { root } = await session.send('DOM.getDocument', { depth: -1 });
-  const { nodeIds } = await session.send('DOM.querySelectorAll', { nodeId: root.nodeId, selector: 'body, body *' });
-  const used: { familyName: string; isCustomFont: boolean }[] = [];
-  for (const nodeId of nodeIds) {
-    const { fonts } = await session.send('CSS.getPlatformFontsForNode', { nodeId });
-    used.push(...fonts.map(({ familyName, isCustomFont }) => ({ familyName, isCustomFont })));
-  }
+  const used = await renderedFonts(page);
   expect(new Set(used.map(({ familyName }) => familyName.replace(/ Thin$/, '')))).toEqual(new Set([
     'Geist', 'Geist Mono', 'Noto Sans Thai', 'Noto Sans Myanmar', 'Noto Sans SC', 'Noto Sans TC', 'Noto Sans JP', 'Noto Sans KR',
   ]));

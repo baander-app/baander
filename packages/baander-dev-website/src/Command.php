@@ -8,6 +8,9 @@ use Baander\Configuration\ToolingConfiguration;
 use Baander\Process\Execution\EngineExecutor;
 use Baander\Process\Execution\ExecutionContext;
 use Baander\Process\Execution\ProcessSpec;
+use Baander\DevWebsite\Content\DesignDocument;
+use Baander\DevWebsite\Content\DesignSystemPages;
+use Baander\DevWebsite\Content\DesignTokens;
 use Baander\DevWebsite\Content\FeaturePages;
 use Baander\DevWebsite\Content\ReferencePages;
 use Baander\DevWebsite\Assets\Screenshots;
@@ -31,8 +34,10 @@ final class Command
         ReferencePages::DIRECTORY,
         ReferencePages::PRESETS,
         Screenshots::DIRECTORY,
-        'ui/site/assets/typography.css',
-        'ui/design-tokens/tokens/base/type.json',
+        'ui/design-tokens/tokens',
+        DesignTokens::THEME,
+        ...DesignSystemPages::DOCUMENTS,
+        ...DesignSystemPages::SOURCES,
         'packages/baander-audio-core/bench/results',
     ];
 
@@ -42,19 +47,7 @@ final class Command
      */
     private const string MONO_SELECTOR = '.step-number, .type-timecode:not(.typography-without-numerals), .type-mono-sm';
 
-    /** The type roles in scale order, with their use and a sample; sizes, weights and spacing come from the tokens. */
-    private const array TYPE_ROLES = [
-        'hero' => ['use' => 'Hero titles, large browse headers', 'sample' => 'Continue watching'],
-        'title-lg' => ['use' => 'Screen titles, shelf headers', 'sample' => 'Albums'],
-        'title' => ['use' => 'Card group headers, detail-page titles', 'sample' => 'Recently added'],
-        'subtitle' => ['use' => 'Lines under titles, credit rows', 'sample' => 'Season 2 · 8 episodes'],
-        'body' => ['use' => 'Descriptions, settings, menus', 'sample' => 'Scan your music folders to add new albums to the library.'],
-        'body-sm' => ['use' => 'Dense lists, metadata rows', 'sample' => '12 songs, 48 minutes'],
-        'caption' => ['use' => 'Timestamps, badges, helper text', 'sample' => 'Added 3 days ago'],
-        'label' => ['use' => 'Overline labels, category chips', 'sample' => 'New release'],
-        'timecode' => ['use' => 'Player timecodes, durations', 'sample' => '1:42:07', 'mono' => true],
-        'mono-sm' => ['use' => 'Codec and bitrate lines, file names', 'sample' => 'FLAC · 24-bit · 96 kHz', 'mono' => true],
-    ];
+    private const string DESIGN = 'ui/DESIGN.md';
 
     /** @param list<string> $arguments
      * @param array<string,string> $environment
@@ -77,6 +70,7 @@ final class Command
             $evidence = new AacEvidence()->load($root);
             $features = FeaturePages::load($root);
             $references = ReferencePages::load($root);
+            $designSystem = DesignSystemPages::load($root);
             $history = $executor->run(new ProcessSpec([...SourceHistory::GIT_LOG, '--', ...self::SITE_SOURCES, ...array_column($references, 'markdown')]))->stdout
                 |> SourceHistory::fromGitLog(...);
             $typography = [
@@ -85,7 +79,7 @@ final class Command
                 'title' => 'Typography',
                 'description' => 'How Bånder sets Latin, Vietnamese, Cyrillic, Thai, Burmese, Korean, Chinese and Japanese titles: fonts, glyph forms, script rules and type roles.',
                 'stylesheet' => 'typography.css',
-                'sources' => ['ui/site/templates/typography.php', 'ui/site/assets/typography.css', 'ui/design-tokens/tokens/base/type.json'],
+                'sources' => ['ui/site/templates/typography.php', 'ui/site/assets/site.css', 'ui/site/assets/typography.css', DesignTokens::TYPE, self::DESIGN],
                 'data' => ['typography' => self::typography($root)],
             ];
             $pages = new WebsiteBuilder($root, $revisionUrl, SiteMenu::load($root, $features))->build(
@@ -116,7 +110,7 @@ final class Command
                         'charts' => new AacCharts()->render($evidence),
                         'sourceBase' => 'https://github.com/baander-app/baander/blob/' . $codecRevision . '/packages/baander-audio-core/',
                     ]],
-                ], $typography, ...$features, ...$references],
+                ], $typography, ...$designSystem, ...$features, ...$references],
                 $history,
             );
             fwrite(STDOUT, 'Built ' . count($pages) . ' manual pages in var/website.' . "\n");
@@ -127,28 +121,14 @@ final class Command
     }
 
     /**
-     * The typography page's samples, in the order the page shows them, and its type roles read from the
-     * design tokens, so the scale it states is the scale the tokens build.
+     * The typography page's samples, in the order the page shows them, and its type roles as the design
+     * tokens and the Roles table of `ui/DESIGN.md` state them, so the scale it shows is the scale the tokens build.
      *
      * @return array<string,mixed>
      */
     private static function typography(string $root): array
     {
-        $tokens = json_decode((string) file_get_contents($root . '/ui/design-tokens/tokens/base/type.json'), true, flags: JSON_THROW_ON_ERROR)['text'];
-        $roles = [];
-        foreach (self::TYPE_ROLES as $role => $entry) {
-            $token = static fn(string $property): array => $tokens[(str_replace('-', '', ucwords($role, '-')) |> lcfirst(...)) . $property]
-                ?? throw new \RuntimeException('The type role ' . $role . ' has no ' . $property . ' token.');
-            $roles[$role] = $entry + [
-                'desktop' => $token('Size')['value'],
-                'phone' => $token('Size')['mobile'] ?? $token('Size')['value'],
-                'weight' => $token('Weight')['value'],
-                'tracking' => $token('Tracking')['value'],
-                'lineHeight' => $token('LineHeight')['value'],
-                'transform' => $role === 'label' ? $token('Transform')['value'] : null,
-                'mono' => $entry['mono'] ?? false,
-            ];
-        }
+        $roles = DesignSystemPages::typeRoles(DesignTokens::load($root), DesignDocument::load($root, self::DESIGN));
         $burmese = ['ဆက်ကြည့်ရန်', 'မြန်မာစာ စမ်းသပ်ခြင်း', 'နေကောင်းပါသလား'];
         return [
             'specimens' => [

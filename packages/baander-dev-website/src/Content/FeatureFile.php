@@ -149,6 +149,13 @@ final class FeatureFile
 
             return;
         }
+        if ($kind === FeatureField::Flag) {
+            if (!is_bool($value)) {
+                $this->fail($at, 'must be true or false');
+            }
+
+            return;
+        }
         if (!is_string($value) || trim($value) === '') {
             $this->fail($at, 'must be a non-empty string');
 

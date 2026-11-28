@@ -1,0 +1,132 @@
+/* The design system pages: the manual layout with the section's own navigation, value tables that
+   scroll inside their own region, and swatches whose code beside them carries the value. */
+.ds-opening { margin-bottom: 32px; color: var(--color-muted-foreground); font-size: 18px; line-height: 1.6; }
+.ds-borrowed h2 { scroll-margin-top: 32px; }
+
+.ds-pages { padding: 0; list-style: none; }
+.ds-pages li { display: grid; grid-template-columns: minmax(0, 160px) minmax(0, 1fr); gap: 4px 24px; margin: 0; padding: 16px 0; border-top: 1px solid var(--color-border); }
+.ds-pages li:last-child { border-bottom: 1px solid var(--color-border); }
+.ds-pages a { font-weight: 600; }
+.ds-pages span { color: var(--color-muted-foreground); }
+
+/* A value table keeps table layout and scrolls inside its region, which takes focus so a keyboard can
+   scroll it. */
+.ds-table { position: relative; max-width: 100%; margin-bottom: 24px; overflow-x: auto; overscroll-behavior-x: contain; }
+.ds-table:focus-visible { outline-offset: 2px; }
+.manual-article .ds-table table { display: table; width: 100%; margin: 0; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+.ds-table th, .ds-table td { padding: 8px 12px; border-bottom: 1px solid var(--color-border); text-align: left; vertical-align: top; }
+.ds-table thead th { color: var(--color-muted-foreground); font-size: 12px; font-weight: 600; white-space: nowrap; }
+
+/* A swatch has an edge, so a value close to the page background stays visible. */
+.ds-swatch { display: inline-block; width: 16px; height: 16px; margin-right: 8px; border: 1px solid var(--color-border); border-radius: var(--radius-sm); background: var(--swatch); vertical-align: -3px; }
+.ds-value { white-space: nowrap; }
+
+@media (max-width: 640px) {
+  .ds-pages li { grid-template-columns: minmax(0, 1fr); }
+  .ds-opening { font-size: 16px; }
+}
+
+/* Color and accents pages */
+.manual-article .ds-color-table th, .manual-article .ds-color-table td,
+.manual-article .ds-accents-table th, .manual-article .ds-accents-table td { min-width: 0; padding: 10px 8px; background: none; }
+.manual-article .ds-color-table thead th, .manual-article .ds-accents-table thead th { padding-top: 0; }
+.manual-article .ds-color-table code, .manual-article .ds-accents-table code { padding: 0; background: none; font-size: 12px; }
+.ds-color-table .ds-swatch, .ds-accents-table .ds-swatch { margin-right: 6px; }
+/* The color table lays out its columns from fixed widths, not from its text, so a fallback face wraps
+   each use label where Geist does. The use column sits clear of every label's wrap point in both. */
+.manual-article .ds-color-table table { table-layout: fixed; width: 760px; }
+.ds-color-table thead th:nth-child(1) { width: 176px; }
+.ds-color-table thead th:nth-child(2) { width: 236px; }
+.ds-color-table thead th:nth-child(n + 3) { width: 87px; }
+.ds-color-table tbody th[scope="rowgroup"] { font-weight: 600; }
+.ds-color-table tbody th[scope="row"] { font-weight: 400; white-space: nowrap; }
+.ds-color-table tbody tr:not(:last-child) > * { border-bottom-color: transparent; }
+.ds-color-table tbody tr:not(:last-child) > th[scope="rowgroup"] { border-bottom-color: var(--color-border); }
+/* Each foreground stands alone beside its label, so no value lands at the end of a wrapped line. */
+.ds-color-foregrounds { display: grid; grid-template-columns: max-content max-content; gap: 4px 16px; margin: 0 0 24px; }
+.ds-color-foregrounds dt { color: var(--color-muted-foreground); }
+.ds-color-foregrounds dd { margin: 0; }
+.ds-color-detail { display: block; margin-top: 4px; color: var(--color-muted-foreground); font-size: 13px; font-weight: 400; line-height: 1.45; }
+
+.manual-article .ds-accents-identities { display: grid; grid-template-columns: repeat(auto-fill, minmax(132px, 1fr)); gap: 16px; padding: 0; list-style: none; }
+.ds-accents-identities li { display: grid; gap: 8px; margin: 0; padding: 12px; border: 1px solid var(--color-border); border-radius: var(--radius-md); }
+.ds-accents-identities .ds-swatch { width: 24px; height: 24px; vertical-align: -7px; }
+.ds-accents-name { display: block; font-weight: 600; white-space: nowrap; }
+.ds-accents-default { margin-left: 4px; color: var(--color-muted-foreground); font-size: 12px; font-weight: 400; }
+.ds-accents-table tbody th .ds-value { display: block; margin-top: 4px; font-weight: 400; }
+.ds-accents-table td { white-space: nowrap; }
+.ds-accents-measure { display: block; margin-top: 4px; color: var(--color-muted-foreground); font-size: 13px; }
+.ds-accents-measure .ds-swatch { width: 12px; height: 12px; margin: 0 4px 0 2px; vertical-align: -1px; }
+.ds-accents-ratio { color: var(--color-foreground); font-weight: 600; }
+/* end color and accents */
+
+/* Type, layout and motion pages */
+.ds-type-roles th, .ds-type-roles td, .ds-layout-scale th, .ds-layout-scale td, .ds-motion-transitions th, .ds-motion-transitions td, .ds-motion-tokens th, .ds-motion-tokens td { min-width: 0; overflow-wrap: normal; }
+/* The roles table lays out its columns from fixed widths, not from its text, so a fallback face wraps
+   each use where Geist does: every use takes two lines in both. */
+.manual-article .ds-type-roles table { table-layout: fixed; width: 760px; }
+.ds-type-roles thead th:nth-child(1) { width: 96px; }
+.ds-type-roles thead th:nth-child(2) { width: 76px; }
+.ds-type-roles thead th:nth-child(3) { width: 64px; }
+.ds-type-roles thead th:nth-child(4), .ds-type-roles thead th:nth-child(6) { width: 92px; }
+.ds-type-roles thead th:nth-child(5) { width: 156px; }
+.ds-type-roles thead th:nth-child(7) { width: 184px; }
+.manual-article .ds-layout-scale table { min-width: 480px; }
+.manual-article .ds-motion-tokens table { min-width: 560px; }
+.ds-type-roles tbody th, .ds-layout-scale tbody th, .ds-motion-tokens tbody th { white-space: nowrap; overflow-wrap: normal; }
+.ds-motion-users code { overflow-wrap: anywhere; }
+.ds-motion-users p { margin: 0 0 8px; }
+.ds-motion-users p:last-child { margin: 0; }
+.ds-motion-users summary { cursor: pointer; }
+.ds-motion-users ul { margin: 8px 0 0; padding-left: 16px; }
+.ds-motion-users li { margin: 4px 0; }
+
+/* A sample sits beside its role's name; on phones the name goes above it. */
+.ds-type-samples { padding: 0; list-style: none; }
+.manual-article .ds-type-samples { padding-left: 0; }
+.ds-type-samples li { display: grid; grid-template-columns: minmax(0, 120px) minmax(0, 1fr); gap: 8px 24px; align-items: baseline; margin: 0; padding: 16px 0; border-top: 1px solid var(--color-border); }
+.ds-type-samples li:last-child { border-bottom: 1px solid var(--color-border); }
+.ds-type-samples p { margin: 0; }
+.ds-type-name { color: var(--color-muted-foreground); }
+.ds-type-links li { margin: 8px 0; }
+
+/* Live scale samples read the published tokens: a bar as wide as a spacing step, and the corner of a
+   square rounded by a radius step. */
+.ds-layout-space { display: block; width: var(--sample); height: 8px; border-radius: 2px; background: var(--color-primary); }
+.ds-layout-radius { display: block; width: 32px; height: 32px; border-top: 2px solid var(--color-muted-foreground); border-left: 2px solid var(--color-muted-foreground); border-top-left-radius: var(--sample); }
+
+@media (max-width: 640px) {
+  .ds-type-samples li { grid-template-columns: minmax(0, 1fr); }
+}
+/* end type, layout and motion */
+
+/* Iconography and writing pages */
+/* Fixed table layout takes the column widths from the table, not from the text, so a row wraps alike
+   in Geist and in the fallback faces. The first column has one width in every borrowed table, so
+   component names line up from table to table; on phones a three-column table keeps readable columns
+   and its region scrolls instead. */
+.manual-article .ds-iconography-table table { table-layout: fixed; width: 100%; }
+.manual-article .ds-iconography-table table:has(:is(th, td):nth-child(3)) { min-width: 560px; }
+.manual-article .ds-iconography-table th, .manual-article .ds-iconography-table td { min-width: 0; overflow-wrap: normal; }
+.ds-iconography-table thead :is(th, td):first-child { width: 33%; }
+.ds-iconography-table thead :is(th, td):nth-child(2):not(:last-child) { width: 24%; }
+.ds-iconography-table td code { white-space: nowrap; }
+/* end iconography and writing */
+
+/* Logo and website pages */
+/* Each mark sits on the card surface at the sizes its file names, aligned on a shared baseline so the
+   sizes compare at a glance. */
+.manual-article .ds-logo-figure { margin: 0 0 32px; }
+.ds-logo-sizes { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 24px 32px; padding: 24px; border: 1px solid var(--color-border); border-radius: var(--radius-lg); background: var(--color-card); }
+.ds-logo-size { display: grid; justify-items: center; gap: 8px; }
+.ds-logo-size img { max-width: none; }
+.ds-logo-label { color: var(--color-muted-foreground); font-size: 13px; font-variant-numeric: tabular-nums; }
+.ds-logo-figure figcaption { margin-top: 8px; color: var(--color-muted-foreground); font-size: 14px; }
+
+/* Four columns fit the article on desktop and scroll inside their region on phones. */
+.manual-article .ds-website-table table { min-width: 640px; }
+.manual-article .ds-website-table th, .manual-article .ds-website-table td { min-width: 0; padding: 10px 8px; background: none; overflow-wrap: normal; }
+.manual-article .ds-website-table thead th { padding-top: 0; }
+.manual-article .ds-website-table code { padding: 0; background: none; font-size: 12px; }
+.ds-website-table tbody th { white-space: nowrap; }
+/* end logo and website */

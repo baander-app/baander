@@ -34,7 +34,7 @@ $image = $site['origin'] . SearchMetadata::SOCIAL_IMAGE;
   <?php if ($meta->structuredData !== null): ?>
     <script type="application/ld+json"><?= $meta->structuredData ?></script>
   <?php endif; ?>
-  <link rel="icon" type="image/svg+xml" href="/assets/site/logo.svg">
+  <link rel="icon" type="image/svg+xml" href="/assets/site/favicon.svg">
   <!-- Hold the first paint until the whole header has parsed: its menu markup is long, and a paint
        part-way through it would show the header controls before the last of them arrives. -->
   <link rel="expect" href="#header-end" blocking="render">

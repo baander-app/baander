@@ -71,6 +71,12 @@ and gets its fonts the same way. It restates the application's language reorders
 and script rules in its stylesheet, because the site has no `ContentText`
 component, and reads the type roles from the design tokens.
 
+The design system section at `/design-system/` publishes the rules of this design
+language and the generated design tokens. It reads both when the site builds, so a
+changed rule or token reaches the section with the next build. Its color swatches
+show the application's values; the website's dark theme sets its text in a softer
+foreground, which the section states beside them.
+
 Codec comparison charts use a distinct color for each vendor, consistent across
 profiles and encoding or decoding views. These data colors have light and dark
 variants and do not replace the site's semantic colors. Keep vendor labels,
@@ -83,13 +89,13 @@ marker shapes and line patterns so color is not the only way to identify a serie
 Content is the interface. The UI gets out of the way. Progressive disclosure: simple by default, powerful on demand. Interactions are precise and immediate. Motion communicates spatial continuity, never decoration.
 
 The reference era is Apple's 2008–2014 Human Interface Guidelines: clear hierarchy,
-restrained controls, and precise interaction, adapted to Baander's responsive web
+restrained controls, and precise interaction, adapted to Bånder's responsive web
 interface and current accessibility requirements. The supplied
 [2018 macOS HIG archive](https://martin-juul.github.io/aslice/library/apple-macos-hig-2018/index.html#470c81114d39cd61d4ec2d2af0c4aa565d70ee758c5b4b6dff3be78c84700e2c.html)
 is supplementary Mojave-era material, not a 2014 source. Apple Music is not the
 visual reference.
 
-Baander is gradually combining restrained Aqua material cues with flat surfaces.
+Bånder is gradually combining restrained Aqua material cues with flat surfaces.
 The material is the well: a recessed face that one surface holds at a time. The
 web music footer's centerpiece holds it by default and the sidebar notification
 pane takes it while open; other surfaces retain their existing rules. Material
@@ -203,7 +209,7 @@ Sans JP and Noto Sans KR. In a mono context, such as a file name with Japanese o
 Thai characters, Noto Sans Mono comes first and the same chain follows, so the text
 never falls to a system font.
 
-Every font is bundled and served from Baander's own origin. A browser downloads a
+Every font is bundled and served from Bånder's own origin. A browser downloads a
 script's font only when text in that script appears on screen.
 
 ### Roles
@@ -226,8 +232,8 @@ Every text element uses one of the ten type roles. Phone sizes apply at
 
 - **Weights:** 400 to 700 only; never 100 to 300. Use 400 for body text, 500 for
   emphasis and secondary buttons, 600 for section headers, buttons and active
-  states, and 700 for titles and hero text. Every bundled family is variable, so
-  each weight has a real face and no browser synthesises bold.
+  states, and 700 for titles and hero text. Every bundled family is variable: each
+  weight has a real face, and no browser synthesises bold.
 - **Floor:** no text renders below 12px. Two surfaces are exempt and may use
   11px: admin tables and feature-level badges and chips. They apply their role and
   then set `font-size: var(--text-dense-size)`.
@@ -394,6 +400,27 @@ Keyboard shortcut help overlay: press `?`.
 
 ---
 
+## Writing
+
+Interface text tells the reader what is happening and what they can do next. The
+application's English strings in `ui/web/src/shared/i18n/locales/en/translation.json`
+follow these rules; loading, error and empty states have rules of their own.
+
+- **Plain and specific:** name the thing and the action in everyday words.
+- **Person:** the reader is *you*. The product says *we* only for what it sends:
+  "Open the link in the verification email we sent to this address, or send a new
+  one."
+- **Case:** titles, buttons and labels use sentence case. Text appears in uppercase
+  only through the `label` type role; the string itself stays in sentence case.
+- **Errors:** say what happened, then what to do next: "That code was not accepted.
+  Wait for the next code and try again."
+- **Progress:** text for work in progress ends with the ellipsis character (…), not
+  three periods: "Verifying your email address…"
+- **Tone:** no emoji and no exclamation marks.
+- **Product name:** write Bånder. Baander appears only in code and domains.
+
+---
+
 ## Motion
 
 Motion communicates *where things went*, not *how fancy the UI is*.
@@ -441,10 +468,12 @@ styled-components and their accessible interactions retain Radix primitives:
 - Hover on grid card: no visible change — content is the affordance.
 
 ### Icons in menu lists
-Icons in navigation menus, sidebar lists, and dropdown menus must be **extremely sparing**. Apply icons only to:
+Icons in navigation menus, sidebar lists, and dropdown menus must be **extremely sparing**. A menu holds **at most 3 icons**, chosen from:
 
 1. **Destructive actions** (delete, remove, disconnect) — visual warning
-2. **The 3 most frequently used actions** in that menu — scannability anchors
+2. **The most frequently used actions** in that menu — scannability anchors
+
+The icon of a destructive action counts toward the three: a menu with one destructive action has two icons left for its most-used actions.
 
 When every item has an icon, none of them stand out. A sea of icons is visual noise. **Default: no icon. Add one only when you can justify why that specific item needs to be noticed faster than its neighbors.**
 
@@ -520,7 +549,7 @@ View mode preference persists across sessions (Zustand + localStorage).
 | `any` type | Never. Define the type. |
 | Gradients on surfaces | Flat colors except the surface that holds the well |
 | Drop shadows on cards | No shadows except overlays and the well's shallow inset edge and faint lower lip |
-| Bounce/spring animations | ease-out only, <120ms |
+| Bounce/spring animations | ease-out only, 120ms or less |
 | "..." menu buttons on items | Native right-click only |
 | Full-page reloads for navigation | React Router `<Link>` / `useNavigate()` |
 | Client-side filtering on paginated data | Server-side filtering via API params |

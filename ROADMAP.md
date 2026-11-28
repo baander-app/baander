@@ -86,6 +86,118 @@ This checkpoint covers the catalog foundation and video metadata providers.
   fixture was updated for the new migration. OpenAPI drift, imports and scoped
   PHPStan passed. Deptrac reported zero violations and 451 baseline entries.
 
+## Website design system section, 2026-11-27
+
+The website publishes Bånder's design system in ten pages under `/design-system/`,
+built from `ui/DESIGN.md`, `ui/ICON-GUIDE.md` and the design tokens when the site
+builds. The [plan](docs/plans/2026-11-27-1843-feat-website-design-system-page-plan.md)
+records the design and the decisions.
+
+Owner decisions, 2026-11-27: `ui/DESIGN.md` gains a Writing section with the rules
+the application's English strings follow; a menu holds at most three icons, a
+destructive action's icon included; the site icon becomes `favicon.svg`; and
+`/typography/` stays where it is. Defaults taken, which the owner can still
+overrule: all four duration tokens stay, the iconography page names Lucide icons
+without drawing them, and both type presentations stay, reading one source.
+
+Delivered:
+
+- The overview at `/design-system/` and nine pages: `/design-system/color/`,
+  `/design-system/accents/`, `/design-system/type/`, `/design-system/layout/`,
+  `/design-system/motion/`, `/design-system/iconography/`,
+  `/design-system/writing/`, `/design-system/logo/` and `/design-system/website/`.
+  One data file, `ui/site/design-system/index.php`, lists them with their titles,
+  descriptions, openings and the document sections each borrows. Every page shares
+  the section navigation, with `/typography/` under Related, and Resources › Build
+  on it gains a Design system entry, marked on every page of the section.
+- `DesignTokens`, `DesignDocument` and `Contrast` in the website tooling read the 32
+  generated mood and accent themes, the scales, durations and type roles, the
+  design documents by heading path, and WCAG 2 contrast as the token generator
+  computes it. The build fails naming the file and the missing part, a renamed
+  borrowed heading included, and fails when an accent's label on its fill or accent
+  text falls below 4.5:1 or its focus ring below 3:1.
+- `ui/DESIGN.md` gains its Writing section, which the writing page publishes. Its
+  Icons in menu lists section now matches `ui/ICON-GUIDE.md`: at most three icons,
+  a destructive action's icon counting toward them. The motion anti-pattern row
+  allows 120ms, as the Motion table does, and the sections the website publishes
+  write the product name Bånder.
+- The site build publishes `logo.svg`, `icon.svg` and `favicon.svg` from
+  `ui/web/public/`, and every page links `favicon.svg`, the mark drawn for 16-32px,
+  as its icon instead of `logo.svg`.
+- One type-role reader serves `/typography/` and `/design-system/type/`: it joins
+  `tokens/base/type.json` with the Roles table of `ui/DESIGN.md`, and the build
+  fails when the two disagree. The typography page's hand-copied role uses are
+  removed; the role classes moved to `site.css`.
+- The pages are indexed for search under the label "Design system", with value
+  cells, samples and figures left out of the index.
+- `ui/site/README.md` documents the section's data file, templates, inputs, build
+  failures, search and sitemap sources; `ui/DESIGN.md` › Static public website
+  describes the section; `CONCEPTS.md` adds Mood, Accent and Design system page.
+
+Commits:
+
+- `0aa8abc` plan; `3dac4f5` Writing section, menu icon limit and 120ms wording;
+  `b802110` Bånder in published DESIGN.md prose; `9d5c2d2` Bånder in the marks'
+  comments.
+- `19cd8b2` three published marks and the favicon switch; `ed1d4fd` favicon checked
+  on every sitemap page (replaces a template test the source policy refused).
+- `43dbe83` design token, document and contrast readers; `f87672f` shared
+  type-role reader.
+- `2457f94` section, data file, navigation, menu entry and overview; `bff0f0f`,
+  `03ca3cd`, `f8d187d` work-in-progress snapshots pushed at the owner's request;
+  `1b7557e` the nine topic pages and their specs.
+- `eeefd09` README, DESIGN.md and CONCEPTS documentation.
+- `513b91b` section-wide search, containment, no-JavaScript, font and stability
+  checks, with the color and type tables and two DESIGN.md sentences fixed to wrap
+  alike in Geist and the fallback faces; `1315b27` the same for the iconography
+  tables.
+- `e18fbf6` code-review fixes: layout sections in document order, https-only borrowed
+  images, website page sitemap sources, contrast formatting, spacing uses limited
+  to padding and gap, and stronger layout and accents specs.
+
+Verification checkpoint:
+
+Run on 2026-11-27 in a cloud container with PHP 8.5.13 and Swoole from the
+ondrej/php archive and Chromium 1243 mapped to the 1248 name the site's Playwright
+expects:
+
+- Tooling tests (`phpunit-tooling.xml.dist`, `packages/baander-dev-website/tests`):
+  215 tests, 1,978 assertions, OK; 218 tests, 1,990 assertions after the review
+  fixes.
+- PHPStan (`phpstan-tooling.neon`): no errors. php-cs-fixer
+  (`.php-cs-fixer.tooling.php`): 0 of 548 files to fix. Tooling source policy:
+  passes. Design tokens: current.
+- Website build: 297 manual pages plus the ten `/design-system/` pages.
+- Site script tests: 35 of 35.
+- Site browser suite at `1b7557e`: 282 of 282. After the site-wide checks:
+  `design-system*.spec.ts`, `stability.spec.ts` and `website.spec.ts` 278 of 278 at
+  `513b91b`; the iconography, writing, section-wide and stability checks 94 of 94 at
+  `1315b27`; after the review fixes, `design-system*.spec.ts` and
+  `stability.spec.ts` 214 of 214 at `e18fbf6`.
+- The CI image's Chromium 1248 and its Composer scripts are authoritative and were
+  not run here.
+
+Open:
+
+- `--duration-normal` and `--duration-slow` are used by no stylesheet or
+  application file; the motion page lists them as unused. Removing them needs the
+  owner's consent.
+- Five English interface errors break the new Writing rule that an error says what
+  happened, then what to do next: `common.error` ("Something went wrong"),
+  `auth.stepUp.failed` ("Password or code is incorrect", which also lacks its
+  period), `auth.passwordMismatch`, `player.compatibility.audio_stream_unavailable`
+  and `auth.consent.unsafeRedirect`, all in
+  `ui/web/src/shared/i18n/locales/en/translation.json`.
+- The same file mixes straight and curly apostrophes.
+- The iconography page publishes `ui/ICON-GUIDE.md` as written, including its
+  `--` dashes, Title Case headings and rule 5's "Check this guide". The guide could
+  use a prose pass.
+- The browser suite ran locally against Chromium 1243 under the 1248 name; CI's
+  Chromium 1248 is authoritative.
+- A mark inside `<img>` follows the site's theme toggle through the page's
+  `color-scheme` in Chromium, as the logo page states and its spec checks for
+  `logo.svg`, `icon.svg` and the header logo. Firefox and Safari are unchecked.
+
 ## Roadmap open items, 2026-11-26
 
 The owner selected all four groups of open items on 2026-11-26: the day's leftovers

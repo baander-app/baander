@@ -62,6 +62,27 @@ code, kbd, samp, pre { font-family: var(--font-mono); }
 .menu-phone-source { display: block; margin-top: 24px; padding-top: 16px; border-top: 1px solid var(--color-border); color: var(--color-foreground); font-size: 14px; font-weight: 500; text-decoration: none; }
 @media (prefers-reduced-motion: reduce) { .site-header summary::after { transition: none; } }
 .eyebrow { color: var(--color-muted-foreground); font-size: 11px; line-height: 1.5; font-weight: 600; letter-spacing: .12em; text-transform: uppercase; }
+/* A type role from the design tokens. The typography page's script rules scale the tracking, raise the
+   line-height to a script minimum and add a size boost; elsewhere their defaults leave the role as set. */
+.type {
+  font-family: var(--font-ui);
+  font-size: calc(var(--role-size) + var(--script-size-boost, 0px));
+  font-weight: var(--role-weight);
+  letter-spacing: calc(var(--role-tracking) * var(--tracking-scale, 1));
+  line-height: max(var(--role-line-height), var(--script-line-height, 0));
+  overflow-wrap: anywhere;
+}
+.type-hero { --role-size: var(--text-hero-size); --role-weight: var(--text-hero-weight); --role-tracking: var(--text-hero-tracking); --role-line-height: var(--text-hero-line-height); }
+.type-title-lg { --role-size: var(--text-title-lg-size); --role-weight: var(--text-title-lg-weight); --role-tracking: var(--text-title-lg-tracking); --role-line-height: var(--text-title-lg-line-height); }
+.type-title { --role-size: var(--text-title-size); --role-weight: var(--text-title-weight); --role-tracking: var(--text-title-tracking); --role-line-height: var(--text-title-line-height); }
+.type-subtitle { --role-size: var(--text-subtitle-size); --role-weight: var(--text-subtitle-weight); --role-tracking: var(--text-subtitle-tracking); --role-line-height: var(--text-subtitle-line-height); }
+.type-body { --role-size: var(--text-body-size); --role-weight: var(--text-body-weight); --role-tracking: var(--text-body-tracking); --role-line-height: var(--text-body-line-height); }
+.type-body-sm { --role-size: var(--text-body-sm-size); --role-weight: var(--text-body-sm-weight); --role-tracking: var(--text-body-sm-tracking); --role-line-height: var(--text-body-sm-line-height); }
+.type-caption { --role-size: var(--text-caption-size); --role-weight: var(--text-caption-weight); --role-tracking: var(--text-caption-tracking); --role-line-height: var(--text-caption-line-height); }
+.type-label { --role-size: var(--text-label-size); --role-weight: var(--text-label-weight); --role-tracking: var(--text-label-tracking); --role-line-height: var(--text-label-line-height); text-transform: var(--text-label-transform); }
+.type-timecode { --role-size: var(--text-timecode-size); --role-weight: var(--text-timecode-weight); --role-tracking: var(--text-timecode-tracking); --role-line-height: var(--text-timecode-line-height); }
+.type-mono-sm { --role-size: var(--text-mono-sm-size); --role-weight: var(--text-mono-sm-weight); --role-tracking: var(--text-mono-sm-tracking); --role-line-height: var(--text-mono-sm-line-height); }
+.type-timecode, .type-mono-sm { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
 .homepage { max-width: 1200px; margin: auto; padding: 0 32px; }
 .hero { padding-top: 64px; }
 .hero-copy { text-align: center; }
