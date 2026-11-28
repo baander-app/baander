@@ -298,6 +298,11 @@ The entries below cover scanning, matching, member playback and their verificati
   workload and log-retention fixtures, and U13 corrected the sleep test’s
   signal timer.
 
+- The U11 replay at `94891539b` ran 15,781 tests with 157,651 assertions.
+  One reference inventory test failed because it lacked the reasons for
+  `movies.provider_id` and `video_match_states.claim_id` having no foreign
+  key. Commit `cb6ba9ba1` added both reasons. The test passed in the full
+  merged release run at `9fe714410`.
 - The U19 replay ran 15,993 tests with 170,456 assertions. Its four failures
   and two warnings came from the same four tests corrected before the merged
   release passed.
