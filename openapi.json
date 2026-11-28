@@ -10632,6 +10632,148 @@
                 }
             }
         },
+        "/api/admin/video-matches/libraries/{library}/provider-order": {
+            "get": {
+                "tags": [
+                    "Catalog"
+                ],
+                "summary": "Read the metadata provider order of a TV or movie library",
+                "operationId": "get_admin_video_matches_provider_order",
+                "parameters": [
+                    {
+                        "name": "library",
+                        "in": "path",
+                        "description": "Library public ID or slug",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Library provider order",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/LibraryProviderOrderResource"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Administrator access required",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Library not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Library is not a TV or movie library",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ValidationError"
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            "put": {
+                "tags": [
+                    "Catalog"
+                ],
+                "summary": "Replace the metadata provider order of a TV or movie library",
+                "operationId": "put_admin_video_matches_provider_order_update",
+                "parameters": [
+                    {
+                        "name": "library",
+                        "in": "path",
+                        "description": "Library public ID or slug",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/LibraryProviderOrderRequest"
+                            }
+                        }
+                    },
+                    "required": true
+                },
+                "responses": {
+                    "200": {
+                        "description": "Updated library provider order",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/LibraryProviderOrderResource"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Administrator access required",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Library not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Invalid provider order or library type",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ValidationError"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
         "/api/videos/{publicId}/playback-information": {
             "get": {
                 "tags": [
@@ -27798,6 +27940,20 @@
                     }
                 }
             },
+            "LibraryProviderOrderRequest": {
+                "type": "object",
+                "properties": {
+                    "providers": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        }
+                    }
+                },
+                "required": [
+                    "providers"
+                ]
+            },
             "RegisterServerRequest": {
                 "type": "object",
                 "properties": {
@@ -31986,6 +32142,20 @@
                     "episodeNumber",
                     "seriesPublicId",
                     "seriesName"
+                ]
+            },
+            "LibraryProviderOrderResource": {
+                "type": "object",
+                "properties": {
+                    "providers": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        }
+                    }
+                },
+                "required": [
+                    "providers"
                 ]
             },
             "VideoPlaybackInformationResource": {

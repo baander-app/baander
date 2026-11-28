@@ -60,6 +60,7 @@ final class ScopeRouteMap
         'admin_lyrics_bulk_fetch', 'admin_lyrics_sync_status', 'admin_media_storage_stats',
         'admin_media_prune_missing', 'admin_media_missing_check', 'admin_metadata_sync_status',
         'admin_metadata_trigger_sync', 'admin_metadata_providers', 'admin_metadata_provider_update',
+        'admin_video_matches_provider_order', 'admin_video_matches_provider_order_update',
         'admin_qol_status', 'admin_qol_streams',
         'admin_qol_profile', 'admin_qol_reset', 'admin_recommendations_coverage',
         'admin_recommendations_source_quality', 'admin_recommendations_freshness',

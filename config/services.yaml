@@ -757,6 +757,8 @@ services:
         alias: App\Catalog\Infrastructure\Doctrine\Repository\VideoRepository
     App\Catalog\Domain\Repository\AlbumMatchStateRepositoryInterface:
         alias: App\Catalog\Infrastructure\Doctrine\Repository\AlbumMatchStateRepository
+    App\Catalog\Domain\Repository\LibraryProviderOrderRepositoryInterface:
+        alias: App\Catalog\Infrastructure\Doctrine\Repository\LibraryProviderOrderRepository
 
     App\Shared\Application\Port\OpenApiExporterInterface:
         alias: App\Shared\Infrastructure\OpenApi\NativeOpenApiExporter

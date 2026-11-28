@@ -350,6 +350,13 @@
     },
     {
       "parent": "libraries",
+      "child": "library_provider_orders",
+      "foreign_key": "library_id",
+      "action": "CASCADE",
+      "capture": "child-row-or-exempt"
+    },
+    {
+      "parent": "libraries",
       "child": "library_file_index",
       "foreign_key": "library_id",
       "action": "CASCADE",
@@ -1275,6 +1282,18 @@
       "families": ["libraries", "catalog", "activity", "playlists", "recommendations", "admin-metadata"],
       "scope_routes": ["library-self", "admin"],
       "readers": ["src/Library/Infrastructure/Doctrine/Repository/LibraryRepository.php"],
+      "response_cache": "authoritative-read"
+    },
+    {
+      "table": "library_provider_orders",
+      "mapping": "src/Catalog/Infrastructure/Doctrine/Entity/LibraryProviderOrderEntity.php",
+      "classification": "capture",
+      "operations": ["INSERT", "UPDATE", "DELETE"],
+      "relevant_columns": ["library_id", "provider_ids"],
+      "excluded_columns": [],
+      "families": ["admin-metadata"],
+      "scope_routes": ["admin"],
+      "readers": ["src/Catalog/Infrastructure/Doctrine/Repository/LibraryProviderOrderRepository.php"],
       "response_cache": "authoritative-read"
     },
     {

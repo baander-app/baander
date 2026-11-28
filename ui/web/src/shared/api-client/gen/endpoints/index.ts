@@ -722,6 +722,10 @@ export interface UpdateSongRequest {
   lockedFields?: string[] | null;
 }
 
+export interface LibraryProviderOrderRequest {
+  providers: string[];
+}
+
 export interface RegisterServerRequest {
   serverUrl: string;
   name: string;
@@ -3664,6 +3668,10 @@ export interface TvEpisodeResource {
      */
   seriesPublicId: string;
   seriesName: string;
+}
+
+export interface LibraryProviderOrderResource {
+  providers: string[];
 }
 
 export type VideoPlaybackInformationResourceQualityChoicesItem = {
@@ -7054,6 +7062,14 @@ export type TvEpisodeCreditsParams = {
 
 export type TvEpisodeCredits200 = PaginatedResponse & {
   data: WorkPersonResource[];
+};
+
+export type GetAdminVideoMatchesProviderOrder200 = {
+  data?: LibraryProviderOrderResource;
+};
+
+export type PutAdminVideoMatchesProviderOrderUpdate200 = {
+  data?: LibraryProviderOrderResource;
 };
 
 export type GetVideoPlaybackInformation200 = {
@@ -22716,6 +22732,180 @@ export function useTvEpisodeCredits<TData = Awaited<ReturnType<typeof tvEpisodeC
 
 
 
+
+export const getGetAdminVideoMatchesProviderOrderUrl = (library: string,) => {
+
+
+
+
+  return `/api/admin/video-matches/libraries/${encodeURIComponent(String(library))}/provider-order`
+}
+
+/**
+ * @summary Read the metadata provider order of a TV or movie library
+ */
+export const getAdminVideoMatchesProviderOrder = async (library: string, options?: Parameters<typeof customInstance>[1]): Promise<GetAdminVideoMatchesProviderOrder200> => {
+
+  return customInstance<GetAdminVideoMatchesProviderOrder200>(getGetAdminVideoMatchesProviderOrderUrl(library),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetAdminVideoMatchesProviderOrderQueryKey = (library: string,) => {
+    return [
+    `/api/admin/video-matches/libraries/${library}/provider-order`
+    ] as const;
+    }
+
+
+export const getGetAdminVideoMatchesProviderOrderQueryOptions = <TData = Awaited<ReturnType<typeof getAdminVideoMatchesProviderOrder>>, TError = ErrorType<ApiError | ValidationError>>(library: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAdminVideoMatchesProviderOrder>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetAdminVideoMatchesProviderOrderQueryKey(library);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getAdminVideoMatchesProviderOrder>>> = ({ signal }) => getAdminVideoMatchesProviderOrder(library, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: library !== null && library !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getAdminVideoMatchesProviderOrder>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type GetAdminVideoMatchesProviderOrderQueryResult = NonNullable<Awaited<ReturnType<typeof getAdminVideoMatchesProviderOrder>>>
+export type GetAdminVideoMatchesProviderOrderQueryError = ErrorType<ApiError | ValidationError>
+
+
+/** @summary Read the metadata provider order of a TV or movie library */
+export function useGetAdminVideoMatchesProviderOrder<TData = Awaited<ReturnType<typeof getAdminVideoMatchesProviderOrder>>, TError = ErrorType<ApiError | ValidationError>>(
+ library: string, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAdminVideoMatchesProviderOrder>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getAdminVideoMatchesProviderOrder>>,
+          TError,
+          Awaited<ReturnType<typeof getAdminVideoMatchesProviderOrder>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/** @summary Read the metadata provider order of a TV or movie library */
+export function useGetAdminVideoMatchesProviderOrder<TData = Awaited<ReturnType<typeof getAdminVideoMatchesProviderOrder>>, TError = ErrorType<ApiError | ValidationError>>(
+ library: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAdminVideoMatchesProviderOrder>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getAdminVideoMatchesProviderOrder>>,
+          TError,
+          Awaited<ReturnType<typeof getAdminVideoMatchesProviderOrder>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/** @summary Read the metadata provider order of a TV or movie library */
+export function useGetAdminVideoMatchesProviderOrder<TData = Awaited<ReturnType<typeof getAdminVideoMatchesProviderOrder>>, TError = ErrorType<ApiError | ValidationError>>(
+ library: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAdminVideoMatchesProviderOrder>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/** @summary Read the metadata provider order of a TV or movie library */
+export function useGetAdminVideoMatchesProviderOrder<TData = Awaited<ReturnType<typeof getAdminVideoMatchesProviderOrder>>, TError = ErrorType<ApiError | ValidationError>>(
+ library: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAdminVideoMatchesProviderOrder>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getGetAdminVideoMatchesProviderOrderQueryOptions(library,options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getPutAdminVideoMatchesProviderOrderUpdateUrl = (library: string,) => {
+
+
+
+
+  return `/api/admin/video-matches/libraries/${encodeURIComponent(String(library))}/provider-order`
+}
+
+/**
+ * @summary Replace the metadata provider order of a TV or movie library
+ */
+export const putAdminVideoMatchesProviderOrderUpdate = async (library: string,
+    libraryProviderOrderRequest: LibraryProviderOrderRequest, options?: Parameters<typeof customInstance>[1]): Promise<PutAdminVideoMatchesProviderOrderUpdate200> => {
+
+  return customInstance<PutAdminVideoMatchesProviderOrderUpdate200>(getPutAdminVideoMatchesProviderOrderUpdateUrl(library),
+  {
+    ...options,
+    method: 'PUT',
+    headers: getHeaders({ 'Content-Type': 'application/json' }, options?.headers),
+    body: JSON.stringify(libraryProviderOrderRequest)
+  }
+);}
+
+
+
+
+
+export const getPutAdminVideoMatchesProviderOrderUpdateMutationKey = () => ['putAdminVideoMatchesProviderOrderUpdate'] as const;
+
+export const getPutAdminVideoMatchesProviderOrderUpdateMutationOptions = <TError = ErrorType<ApiError | ValidationError>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof putAdminVideoMatchesProviderOrderUpdate>>, TError,PutAdminVideoMatchesProviderOrderUpdateMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
+): UseMutationOptions<Awaited<ReturnType<typeof putAdminVideoMatchesProviderOrderUpdate>>, TError,PutAdminVideoMatchesProviderOrderUpdateMutationVariables, TContext> => {
+
+const mutationKey = getPutAdminVideoMatchesProviderOrderUpdateMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof putAdminVideoMatchesProviderOrderUpdate>>, PutAdminVideoMatchesProviderOrderUpdateMutationVariables> = (props) => {
+          const {library,data} = props ?? {};
+
+          return  putAdminVideoMatchesProviderOrderUpdate(library,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type PutAdminVideoMatchesProviderOrderUpdateMutationResult = NonNullable<Awaited<ReturnType<typeof putAdminVideoMatchesProviderOrderUpdate>>>
+    export type PutAdminVideoMatchesProviderOrderUpdateMutationBody = BodyType<LibraryProviderOrderRequest>
+    export type PutAdminVideoMatchesProviderOrderUpdateMutationError = ErrorType<ApiError | ValidationError>
+    export type PutAdminVideoMatchesProviderOrderUpdateMutationVariables = {library: string;data: BodyType<LibraryProviderOrderRequest>}
+
+    /** @summary Replace the metadata provider order of a TV or movie library */
+export const usePutAdminVideoMatchesProviderOrderUpdate = <TError = ErrorType<ApiError | ValidationError>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof putAdminVideoMatchesProviderOrderUpdate>>, TError,PutAdminVideoMatchesProviderOrderUpdateMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof putAdminVideoMatchesProviderOrderUpdate>>,
+        TError,
+        PutAdminVideoMatchesProviderOrderUpdateMutationVariables,
+        TContext
+      > => {
+      return useMutation(getPutAdminVideoMatchesProviderOrderUpdateMutationOptions(options), queryClient);
+    }
 
 export const getGetVideoPlaybackInformationUrl = (publicId: string,) => {
 

@@ -43,7 +43,9 @@ This checkpoint covers the catalog foundation and video metadata providers.
   record identified IMDb `tt0944947` and TMDB `1399`.
 - U9 reads movie, series, season and episode NFOs and local artwork. An NFO
   containing only a recognized provider ID supplies that identity for matching.
-- Phase C matching units U10, U11, U23, U22, U12 and U13 remain pending. Phase D member
+- U10 lets admins read and replace each TV or movie library's provider order
+  through the API and the console. The order retains disabled providers.
+  Phase C matching units U11, U23, U22, U12 and U13 remain pending. Phase D member
   progress, read API and web units U14–U17 and Phase E documentation and browser
   verification units U18–U19 remain pending.
 
@@ -78,6 +80,11 @@ This checkpoint covers the catalog foundation and video metadata providers.
   try the next supplied ID after a clean miss. TheTVDB reuses episode details
   for the listed revision for up to 24 hours. The three affected test files
   passed with 93 tests and 430 assertions, and scoped PHPStan passed.
+- U10 passed eight domain tests and six PostgreSQL persistence tests, including
+  concurrent first writes. The API, CLI, inventory and documentation checks
+  passed. The fresh-install and rollback check passed 96 assertions after its
+  fixture was updated for the new migration. OpenAPI drift, imports and scoped
+  PHPStan passed. Deptrac reported zero violations and 451 baseline entries.
 
 ## Roadmap open items, 2026-11-26
 
