@@ -310,7 +310,10 @@ final class DpopStoreOutageTest extends TestCase
         $admin = DriverManager::getConnection(['dbname' => 'postgres'] + $this->connection->getParams());
         try {
             $admin->executeStatement(sprintf('ALTER DATABASE %s WITH ALLOW_CONNECTIONS false', $admin->quoteSingleIdentifier($database)));
-            $admin->executeQuery('SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname = ?', [$database]);
+            $admin->executeQuery(
+                "SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname = ? AND backend_type = 'client backend' AND usename = CURRENT_USER",
+                [$database],
+            );
 
             $response = $this->tokenRequest($tv, $nonce, $form);
         } finally {
