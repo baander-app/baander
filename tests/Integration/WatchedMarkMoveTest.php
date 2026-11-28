@@ -51,7 +51,7 @@ final class WatchedMarkMoveTest extends TestCase
             }
         });
         $this->observer = ArtistImportIdentityRace::connect($this->schema);
-        $this->marks = new WatchedMarkRepository($this->connection);
+        $this->marks = new WatchedMarkRepository($this->connection, ArtistImportIdentityRace::entityManager($this->connection));
         $this->mover = new WatchedMarkMove($this->connection, $this->marks);
     }
 

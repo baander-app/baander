@@ -61,8 +61,13 @@ This checkpoint covers the catalog foundation and video metadata providers.
   library re-match operations in the API and console. A review identifies the
   owning title. Admins can assign a file to any active episode, including one
   with no files. The re-match preview counts hand matches and assignments.
-  Phase D member progress, read API and web units U14–U17 and Phase E
-  documentation and browser verification units U18–U19 remain pending.
+- U14 stores each member’s position per file and marks per episode or movie.
+  Passing 90% clears the position. A multi-episode file marks every episode it
+  plays in the opened library. An extra resumes without marking a title.
+  Watch-party reports leave personal viewing state alone, and a stale report
+  cannot restore a cleared position.
+  Phase D read API and web units U15–U17 and Phase E documentation and browser
+  verification units U18–U19 remain pending.
 
 ### Verification
 
@@ -144,6 +149,16 @@ This checkpoint covers the catalog foundation and video metadata providers.
 - A full-suite run at the U8 commit exposed an intermittent third alarm in the
   interrupted-sleep test. The corrected fixture cancels its timer after two
   signals. Its seven CI-image tests passed with 14 assertions.
+
+- U14’s guarded progress writes, watched-mark moves and private change
+  notifications passed 21 CI-image tests with 1,916 assertions. The command
+  handlers passed 23 tests with 272 assertions. The HTTP suite passed six
+  tests with 100 assertions against PostgreSQL, including active party
+  suppression, available versions, extra playback and member isolation.
+  Catalog and Party access passed 11 tests with 102 assertions. The full
+  fresh-install and rollback suite passed 26 tests with 470 assertions.
+  Scoped PHPStan and imports passed. Deptrac reported zero violations and
+  439 existing skipped violations. The OpenAPI and Orval drift checks passed.
 
 ## Roadmap open items, 2026-11-26
 

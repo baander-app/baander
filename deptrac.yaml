@@ -34,16 +34,16 @@ deptrac:
     graphviz:
       groups:
         Shared: ['Shared Domain', 'Shared Application', 'Shared Infrastructure', 'Shared Live Snapshot Infrastructure', 'Shared Interface']
-        Activity: ['Activity Watched Mark Move Contract', 'Activity Artist Merge Contract', 'Activity Album Merge Contract', 'Activity Domain', 'Activity Application', 'Activity Infrastructure', 'Activity Resources', 'Activity Interface']
+        Activity: ['Activity Viewing State Contract', 'Activity Watched Mark Move Contract', 'Activity Artist Merge Contract', 'Activity Album Merge Contract', 'Activity Domain', 'Activity Application', 'Activity Infrastructure', 'Activity Resources', 'Activity Interface']
         Auth: ['Auth Live Authority Contract', 'Auth Domain', 'Auth Identity Contract', 'Auth User Identifier Contract', 'Auth Device Approval Event Contract', 'Auth WebSocket Contract', 'Auth Self-Registration Contract', 'Auth Application', 'Auth Infrastructure', 'Auth Resources', 'Auth Interface']
-        Catalog: ['Catalog Video Contract', 'Catalog Video Refresh Contract', 'Catalog Song Availability Contract', 'Catalog Song Lookup Contract', 'Catalog Movie Contract', 'Catalog Director Contract', 'Catalog Person Contract', 'Catalog Domain', 'Catalog Application', 'Catalog Infrastructure', 'Catalog Video Match Adapters', 'Catalog Persistence Associations', 'Catalog Resources', 'Catalog Interface']
+        Catalog: ['Catalog Watchable Title Adapter', 'Catalog Watchable Title Contract', 'Catalog Video Contract', 'Catalog Video Refresh Contract', 'Catalog Song Availability Contract', 'Catalog Song Lookup Contract', 'Catalog Movie Contract', 'Catalog Director Contract', 'Catalog Person Contract', 'Catalog Domain', 'Catalog Application', 'Catalog Infrastructure', 'Catalog Video Match Adapters', 'Catalog Persistence Associations', 'Catalog Resources', 'Catalog Interface']
         Filesystem: ['Filesystem Infrastructure', 'Filesystem Application', 'Filesystem Command', 'Filesystem Mime', 'Filesystem Watcher']
         Library: ['Library Live Audience Contract', 'Library File Availability Contract', 'Library Type Lookup Contract', 'Library Read Scope Contract', 'Library Content Stats Contract', 'Library Files Discovered Contract', 'Library Provisioning Contract', 'Library Media Files Contract', 'Library Domain', 'Library Application', 'Library Infrastructure', 'Library Resources', 'Library Interface']
         Lyrics: ['Lyrics Fetch Request Contract', 'Lyrics Album Merge Contract', 'Lyrics Domain', 'Lyrics Application', 'Lyrics Infrastructure', 'Lyrics Resources', 'Lyrics Interface']
         Media: ['Media Video Quality Contract', 'Media Playback Access Contract', 'Media Image Contract', 'Media Domain', 'Media Application', 'Media Infrastructure', 'Media Resources', 'Media Interface']
         Metadata: ['Metadata Sync Contract', 'Metadata MusicBrainz Lookup Contract', 'Metadata Video Provider Contract', 'Metadata Video Provider Data', 'Metadata Person Provider Contract', 'Metadata Domain', 'Metadata Application', 'Metadata Infrastructure', 'Metadata Interface']
         Notification: ['Notification Domain', 'Notification Application', 'Notification Infrastructure', 'Notification Resources', 'Notification Interface']
-        Party: ['Party Domain', 'Party Application', 'Party Infrastructure', 'Party Resources', 'Party Interface']
+        Party: ['Party Watch Membership Contract', 'Party Domain', 'Party Application', 'Party Infrastructure', 'Party Resources', 'Party Interface']
         Playlist: ['Playlist Live Audience Contract', 'Playlist Deletion Preview Contract', 'Playlist Album Merge Contract', 'Playlist Domain', 'Playlist Application', 'Playlist Infrastructure', 'Playlist Resources', 'Playlist Interface']
         Recommendation: ['Recommendation Artist Merge Contract', 'Recommendation Domain', 'Recommendation Application', 'Recommendation Infrastructure', 'Recommendation Resources', 'Recommendation Interface']
         Transcode: ['Transcode Quality Contract', 'Transcode Timeline Preview Contract', 'Transcode Playback Access Contract', 'Transcode Audio Rendition Contract', 'Transcode Delivery Contract', 'Transcode Probe Contract', 'Transcode Domain', 'Transcode Application', 'Transcode Infrastructure', 'Transcode Resources', 'Transcode Interface']
@@ -151,6 +151,11 @@ deptrac:
         - type: classLike
           value: '^App\\Activity\\Application\\(Port\\WatchedMarkMovePortInterface|DTO\\WatchedMark(VideoMove|EpisodeMerge))$'
 
+    - name: 'Activity Viewing State Contract'
+      collectors:
+        - type: classLike
+          value: '^App\\Activity\\Application\\(Port\\ViewingStatePortInterface|DTO\\(ViewingState|VideoResumeState))$'
+
     - name: 'Activity Application'
       collectors:
         - type: bool
@@ -158,6 +163,8 @@ deptrac:
             - type: classLike
               value: '^App\\Activity\\Application\\'
           must_not:
+            - type: classLike
+              value: '^App\\Activity\\Application\\(Port\\ViewingStatePortInterface|DTO\\(ViewingState|VideoResumeState))$'
             - type: classLike
               value: '^App\\Activity\\Application\\Port\\ArtistActivityMergePortInterface$'
             - type: classLike
@@ -326,6 +333,11 @@ deptrac:
         - type: classLike
           value: '^App\\Catalog\\Application\\Port\\(PersonCreditInput|PersonCreditTargetInput|PersonCreditPortInterface|PersonIdentityPortInterface|PersonPortraitAccessPortInterface)$'
 
+    - name: 'Catalog Watchable Title Contract'
+      collectors:
+        - type: classLike
+          value: '^App\\Catalog\\Application\\(Port\\WatchableTitlePortInterface|Dto\\Watchable(Targets?|Video))$'
+
     - name: 'Catalog Application'
       collectors:
         - type: bool
@@ -333,6 +345,8 @@ deptrac:
             - type: classLike
               value: '^App\\Catalog\\Application\\'
           must_not:
+            - type: classLike
+              value: '^App\\Catalog\\Application\\(Port\\WatchableTitlePortInterface|Dto\\Watchable(Targets?|Video))$'
             - type: classLike
               value: '^App\\Catalog\\Application\\Port\\VideoMatchRefreshInterface$'
             - type: classLike
@@ -358,6 +372,11 @@ deptrac:
         - type: classLike
           value: '^App\\Catalog\\Infrastructure\\(VideoMatch\\(VideoMatchApply|VideoMatchTargetLoader|VideoMatchRefresher|VideoMatchRefreshReview|VideoMatchRefreshRequester|VideoMatchAdminWriter)|VideoPlacementService)$'
 
+    - name: 'Catalog Watchable Title Adapter'
+      collectors:
+        - type: classLike
+          value: '^App\\Catalog\\Infrastructure\\Doctrine\\WatchableTitleLookup$'
+
     - name: 'Catalog Infrastructure'
       collectors:
         - type: bool
@@ -365,6 +384,8 @@ deptrac:
             - type: classLike
               value: '^App\\Catalog\\Infrastructure\\'
           must_not:
+            - type: classLike
+              value: '^App\\Catalog\\Infrastructure\\Doctrine\\WatchableTitleLookup$'
             - type: classLike
               value: '^App\\Catalog\\Infrastructure\\(VideoMatch\\(VideoMatchApply|VideoMatchTargetLoader|VideoMatchRefresher|VideoMatchRefreshReview|VideoMatchRefreshRequester|VideoMatchAdminWriter)|VideoPlacementService)$'
             - type: classLike
@@ -699,10 +720,20 @@ deptrac:
         - type: classLike
           value: '^App\\Party\\Domain\\'
 
-    - name: 'Party Application'
+    - name: 'Party Watch Membership Contract'
       collectors:
         - type: classLike
-          value: '^App\\Party\\Application\\'
+          value: '^App\\Party\\Application\\Port\\WatchMembershipPortInterface$'
+
+    - name: 'Party Application'
+      collectors:
+        - type: bool
+          must:
+            - type: classLike
+              value: '^App\\Party\\Application\\'
+          must_not:
+            - type: classLike
+              value: '^App\\Party\\Application\\Port\\WatchMembershipPortInterface$'
 
     - name: 'Party Infrastructure'
       collectors:
@@ -1322,16 +1353,21 @@ deptrac:
       - 'Shared Domain'
     'Activity Watched Mark Move Contract':
       - 'Shared Domain'
+    'Activity Viewing State Contract':
+      - 'Shared Domain'
     'Activity Domain':
       - Core
       - 'Shared Domain'
     'Activity Application':
+      - 'Catalog Watchable Title Contract'
+      - 'Party Watch Membership Contract'
       - 'Activity Watched Mark Move Contract'
       - Core
       - 'Activity Domain'
       - 'Shared Domain'
       - 'Shared Application'
     'Activity Infrastructure':
+      - 'Activity Viewing State Contract'
       - Core
       - 'Activity Artist Merge Contract'
       - 'Activity Album Merge Contract'
@@ -1434,6 +1470,8 @@ deptrac:
     'Catalog Song Lookup Contract':
       - Core
       - 'Shared Domain'
+    'Catalog Watchable Title Contract':
+      - 'Shared Domain'
     'Catalog Domain':
       - Core
       - 'Shared Domain'
@@ -1500,7 +1538,13 @@ deptrac:
       - 'Library Media Files Contract'
       - 'Shared Domain'
       - 'Shared Application'
+    'Catalog Watchable Title Adapter':
+      - 'Catalog Watchable Title Contract'
+      - 'Catalog Application'
+      - 'Library Read Scope Contract'
+      - 'Shared Domain'
     'Catalog Infrastructure':
+      - 'Activity Viewing State Contract'
       - 'Catalog Persistence Associations'
       - 'Catalog Person Contract'
       - 'Catalog Artist Role Contract'
@@ -1819,6 +1863,8 @@ deptrac:
       - 'Shared Interface'
 
     # --- Party ---
+    'Party Watch Membership Contract':
+      - 'Shared Domain'
     'Party Domain':
       - Core
       - 'Shared Domain'
@@ -1828,6 +1874,7 @@ deptrac:
       - 'Shared Domain'
       - 'Shared Application'
     'Party Infrastructure':
+      - 'Party Watch Membership Contract'
       - Core
       - 'Transcode Playback Access Contract'
       - 'Shared Application'

@@ -749,6 +749,8 @@ services:
         alias: App\Catalog\Infrastructure\Doctrine\Repository\ArtistRepository
     App\Catalog\Domain\Repository\GenreRepositoryInterface:
         alias: App\Catalog\Infrastructure\Doctrine\Repository\GenreRepository
+    App\Catalog\Application\Port\WatchableTitlePortInterface:
+        alias: App\Catalog\Infrastructure\Doctrine\WatchableTitleLookup
     App\Catalog\Domain\Repository\MovieRepositoryInterface:
         alias: App\Catalog\Infrastructure\Doctrine\Repository\MovieRepository
     App\Catalog\Domain\Repository\DirectorRepositoryInterface:
@@ -981,6 +983,10 @@ services:
 
     App\Activity\Application\Port\AlbumActivityMergePortInterface:
         alias: App\Activity\Infrastructure\Doctrine\AlbumActivityMerge
+    App\Activity\Application\Port\ViewingStatePortInterface:
+        alias: App\Activity\Infrastructure\Doctrine\ViewingState
+    App\Activity\Domain\Repository\ResumePositionRepositoryInterface:
+        alias: App\Activity\Infrastructure\Doctrine\Repository\ResumePositionRepository
     App\Activity\Application\Port\WatchedMarkMovePortInterface:
         alias: App\Activity\Infrastructure\Doctrine\WatchedMarkMove
     App\Activity\Domain\Repository\WatchedMarkRepositoryInterface:
@@ -1467,6 +1473,8 @@ services:
     # --- Party Application Port Aliases ---
     App\Party\Application\Port\PlaybackSynchronizationPortInterface:
         alias: App\Party\Infrastructure\PlaybackSynchronizer
+    App\Party\Application\Port\WatchMembershipPortInterface:
+        alias: App\Party\Infrastructure\Doctrine\WatchMembershipLookup
     App\Party\Application\Port\PartySessionPortInterface:
         alias: App\Party\Infrastructure\PartySessionService
     App\Party\Application\Port\PartyMemberPortInterface:

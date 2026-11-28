@@ -1735,6 +1735,177 @@
                 }
             }
         },
+        "/api/activity/videos/{publicId}/progress": {
+            "post": {
+                "tags": [
+                    "Activity"
+                ],
+                "summary": "Report the current member's video progress",
+                "operationId": "post_activity_video_progress",
+                "parameters": [
+                    {
+                        "name": "publicId",
+                        "in": "path",
+                        "description": "Video public ID",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "pattern": "^[0-9a-zA-Z_-]{21}$"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/RecordVideoProgressRequest"
+                            }
+                        }
+                    },
+                    "required": true
+                },
+                "responses": {
+                    "200": {
+                        "description": "Report accepted or ignored",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/VideoProgressResource"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Authentication required",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Video or title unavailable",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Invalid progress report",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ValidationError"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/activity/watched/{kind}/{publicId}": {
+            "put": {
+                "tags": [
+                    "Activity"
+                ],
+                "summary": "Mark owned video titles watched or unwatched",
+                "operationId": "put_activity_watched_update",
+                "parameters": [
+                    {
+                        "name": "kind",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "enum": [
+                                "episode",
+                                "season",
+                                "series",
+                                "movie"
+                            ],
+                            "pattern": "episode|season|series|movie"
+                        }
+                    },
+                    {
+                        "name": "publicId",
+                        "in": "path",
+                        "description": "Episode, season, series or movie public ID",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "pattern": "^[0-9a-zA-Z_-]{21}$"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/SetWatchedRequest"
+                            }
+                        }
+                    },
+                    "required": true
+                },
+                "responses": {
+                    "200": {
+                        "description": "Updated watched state",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/WatchedStateResource"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Authentication required",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Title unavailable",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Invalid watched state",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ValidationError"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
         "/api/admin/login-blocks": {
             "get": {
                 "tags": [
@@ -27650,6 +27821,63 @@
                     }
                 }
             },
+            "RecordVideoProgressRequest": {
+                "type": "object",
+                "properties": {
+                    "titleKind": {
+                        "type": "string",
+                        "enum": [
+                            "episode",
+                            "movie",
+                            "extra"
+                        ]
+                    },
+                    "titleId": {
+                        "type": "string",
+                        "description": "Episode or movie public ID, or the placement public ID for an extra",
+                        "minLength": 21,
+                        "maxLength": 21,
+                        "pattern": "^[0-9a-zA-Z_-]{21}$"
+                    },
+                    "positionSeconds": {
+                        "type": "number",
+                        "format": "double",
+                        "minimum": 0
+                    },
+                    "action": {
+                        "type": "string",
+                        "enum": [
+                            "progress",
+                            "pause",
+                            "seek",
+                            "end"
+                        ]
+                    },
+                    "reportedAt": {
+                        "type": "string",
+                        "format": "date-time",
+                        "description": "Client-reported instant with a timezone and at most six fractional digits"
+                    }
+                },
+                "required": [
+                    "titleKind",
+                    "titleId",
+                    "positionSeconds",
+                    "action",
+                    "reportedAt"
+                ]
+            },
+            "SetWatchedRequest": {
+                "type": "object",
+                "properties": {
+                    "watched": {
+                        "type": "boolean"
+                    }
+                },
+                "required": [
+                    "watched"
+                ]
+            },
             "AdminCreateOAuthClientRequest": {
                 "type": "object",
                 "properties": {
@@ -31246,6 +31474,35 @@
                     "activityType",
                     "songAvailable",
                     "playCount"
+                ]
+            },
+            "VideoProgressResource": {
+                "type": "object",
+                "properties": {
+                    "recorded": {
+                        "type": "boolean",
+                        "description": "Whether the report advanced the stored viewing state"
+                    }
+                },
+                "required": [
+                    "recorded"
+                ]
+            },
+            "WatchedStateResource": {
+                "type": "object",
+                "properties": {
+                    "watched": {
+                        "type": "boolean"
+                    },
+                    "titles": {
+                        "type": "integer",
+                        "description": "Owned episode or movie targets included in the action",
+                        "minimum": 0
+                    }
+                },
+                "required": [
+                    "watched",
+                    "titles"
                 ]
             },
             "LoginBlockResource": {

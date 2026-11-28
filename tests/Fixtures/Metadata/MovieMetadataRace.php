@@ -122,7 +122,7 @@ final class MovieMetadataRace
         $placements = new VideoPlacementService(
             $catalog,
             new EpisodePlacer(),
-            new WatchedMarkMove($connection, new WatchedMarkRepository($connection)),
+            new WatchedMarkMove($connection, new WatchedMarkRepository($connection, $manager)),
             $transaction,
             $movies,
         );

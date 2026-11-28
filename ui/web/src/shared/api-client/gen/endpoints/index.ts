@@ -74,6 +74,45 @@ export interface PlayActivityRequest {
   player?: string | null;
 }
 
+export type RecordVideoProgressRequestTitleKind = typeof RecordVideoProgressRequestTitleKind[keyof typeof RecordVideoProgressRequestTitleKind];
+
+
+export const RecordVideoProgressRequestTitleKind = {
+  episode: 'episode',
+  movie: 'movie',
+  extra: 'extra',
+} as const;
+
+export type RecordVideoProgressRequestAction = typeof RecordVideoProgressRequestAction[keyof typeof RecordVideoProgressRequestAction];
+
+
+export const RecordVideoProgressRequestAction = {
+  progress: 'progress',
+  pause: 'pause',
+  seek: 'seek',
+  end: 'end',
+} as const;
+
+export interface RecordVideoProgressRequest {
+  titleKind: RecordVideoProgressRequestTitleKind;
+  /**
+     * Episode or movie public ID, or the placement public ID for an extra
+     * @minLength 21
+     * @maxLength 21
+     * @pattern ^[0-9a-zA-Z_-]{21}$
+     */
+  titleId: string;
+  /** @minimum 0 */
+  positionSeconds: number;
+  action: RecordVideoProgressRequestAction;
+  /** Client-reported instant with a timezone and at most six fractional digits */
+  reportedAt: string;
+}
+
+export interface SetWatchedRequest {
+  watched: boolean;
+}
+
 export type AdminCreateOAuthClientRequestType = typeof AdminCreateOAuthClientRequestType[keyof typeof AdminCreateOAuthClientRequestType];
 
 
@@ -2256,6 +2295,20 @@ export interface RecentItemResource {
   lastPlayedAt?: string | null;
   /** Number of plays */
   playCount: number;
+}
+
+export interface VideoProgressResource {
+  /** Whether the report advanced the stored viewing state */
+  recorded: boolean;
+}
+
+export interface WatchedStateResource {
+  watched: boolean;
+  /**
+     * Owned episode or movie targets included in the action
+     * @minimum 0
+     */
+  titles: number;
 }
 
 export interface LoginBlockResource {
@@ -5942,6 +5995,14 @@ export const GetUserRecentMediaType = {
 
 export type GetUserRecent200 = {
   data?: RecentItemResource[];
+};
+
+export type PostActivityVideoProgress200 = {
+  data?: VideoProgressResource;
+};
+
+export type PutActivityWatchedUpdate200 = {
+  data?: WatchedStateResource;
 };
 
 export type GetAdminLoginBlocksListParams = {
@@ -13050,6 +13111,154 @@ export function useGetUserRecent<TData = Awaited<ReturnType<typeof getUserRecent
 
 
 
+
+export const getPostActivityVideoProgressUrl = (publicId: string,) => {
+
+
+
+
+  return `/api/activity/videos/${encodeURIComponent(String(publicId))}/progress`
+}
+
+/**
+ * @summary Report the current member's video progress
+ */
+export const postActivityVideoProgress = async (publicId: string,
+    recordVideoProgressRequest: RecordVideoProgressRequest, options?: Parameters<typeof customInstance>[1]): Promise<PostActivityVideoProgress200> => {
+
+  return customInstance<PostActivityVideoProgress200>(getPostActivityVideoProgressUrl(publicId),
+  {
+    ...options,
+    method: 'POST',
+    headers: getHeaders({ 'Content-Type': 'application/json' }, options?.headers),
+    body: JSON.stringify(recordVideoProgressRequest)
+  }
+);}
+
+
+
+
+
+export const getPostActivityVideoProgressMutationKey = () => ['postActivityVideoProgress'] as const;
+
+export const getPostActivityVideoProgressMutationOptions = <TError = ErrorType<ApiError | ValidationError>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postActivityVideoProgress>>, TError,PostActivityVideoProgressMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
+): UseMutationOptions<Awaited<ReturnType<typeof postActivityVideoProgress>>, TError,PostActivityVideoProgressMutationVariables, TContext> => {
+
+const mutationKey = getPostActivityVideoProgressMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof postActivityVideoProgress>>, PostActivityVideoProgressMutationVariables> = (props) => {
+          const {publicId,data} = props ?? {};
+
+          return  postActivityVideoProgress(publicId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type PostActivityVideoProgressMutationResult = NonNullable<Awaited<ReturnType<typeof postActivityVideoProgress>>>
+    export type PostActivityVideoProgressMutationBody = BodyType<RecordVideoProgressRequest>
+    export type PostActivityVideoProgressMutationError = ErrorType<ApiError | ValidationError>
+    export type PostActivityVideoProgressMutationVariables = {publicId: string;data: BodyType<RecordVideoProgressRequest>}
+
+    /** @summary Report the current member's video progress */
+export const usePostActivityVideoProgress = <TError = ErrorType<ApiError | ValidationError>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postActivityVideoProgress>>, TError,PostActivityVideoProgressMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof postActivityVideoProgress>>,
+        TError,
+        PostActivityVideoProgressMutationVariables,
+        TContext
+      > => {
+      return useMutation(getPostActivityVideoProgressMutationOptions(options), queryClient);
+    }
+
+export const getPutActivityWatchedUpdateUrl = (kind: 'episode' | 'season' | 'series' | 'movie',
+    publicId: string,) => {
+
+
+
+
+  return `/api/activity/watched/${encodeURIComponent(String(kind))}/${encodeURIComponent(String(publicId))}`
+}
+
+/**
+ * @summary Mark owned video titles watched or unwatched
+ */
+export const putActivityWatchedUpdate = async (kind: 'episode' | 'season' | 'series' | 'movie',
+    publicId: string,
+    setWatchedRequest: SetWatchedRequest, options?: Parameters<typeof customInstance>[1]): Promise<PutActivityWatchedUpdate200> => {
+
+  return customInstance<PutActivityWatchedUpdate200>(getPutActivityWatchedUpdateUrl(kind,publicId),
+  {
+    ...options,
+    method: 'PUT',
+    headers: getHeaders({ 'Content-Type': 'application/json' }, options?.headers),
+    body: JSON.stringify(setWatchedRequest)
+  }
+);}
+
+
+
+
+
+export const getPutActivityWatchedUpdateMutationKey = () => ['putActivityWatchedUpdate'] as const;
+
+export const getPutActivityWatchedUpdateMutationOptions = <TError = ErrorType<ApiError | ValidationError>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof putActivityWatchedUpdate>>, TError,PutActivityWatchedUpdateMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
+): UseMutationOptions<Awaited<ReturnType<typeof putActivityWatchedUpdate>>, TError,PutActivityWatchedUpdateMutationVariables, TContext> => {
+
+const mutationKey = getPutActivityWatchedUpdateMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof putActivityWatchedUpdate>>, PutActivityWatchedUpdateMutationVariables> = (props) => {
+          const {kind,publicId,data} = props ?? {};
+
+          return  putActivityWatchedUpdate(kind,publicId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type PutActivityWatchedUpdateMutationResult = NonNullable<Awaited<ReturnType<typeof putActivityWatchedUpdate>>>
+    export type PutActivityWatchedUpdateMutationBody = BodyType<SetWatchedRequest>
+    export type PutActivityWatchedUpdateMutationError = ErrorType<ApiError | ValidationError>
+    export type PutActivityWatchedUpdateMutationVariables = {kind: 'episode' | 'season' | 'series' | 'movie';publicId: string;data: BodyType<SetWatchedRequest>}
+
+    /** @summary Mark owned video titles watched or unwatched */
+export const usePutActivityWatchedUpdate = <TError = ErrorType<ApiError | ValidationError>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof putActivityWatchedUpdate>>, TError,PutActivityWatchedUpdateMutationVariables, TContext>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof putActivityWatchedUpdate>>,
+        TError,
+        PutActivityWatchedUpdateMutationVariables,
+        TContext
+      > => {
+      return useMutation(getPutActivityWatchedUpdateMutationOptions(options), queryClient);
+    }
 
 export const getGetAdminLoginBlocksListUrl = (params?: GetAdminLoginBlocksListParams,) => {
   const normalizedParams = new URLSearchParams();

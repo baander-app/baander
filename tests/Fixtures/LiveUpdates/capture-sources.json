@@ -874,6 +874,20 @@
       "capture": "child-row-or-exempt"
     },
     {
+      "parent": "users",
+      "child": "resume_positions",
+      "foreign_key": "user_id",
+      "action": "CASCADE",
+      "capture": "child-row-or-exempt"
+    },
+    {
+      "parent": "videos",
+      "child": "resume_positions",
+      "foreign_key": "video_id",
+      "action": "CASCADE",
+      "capture": "child-row-or-exempt"
+    },
+    {
       "parent": "tv_episodes",
       "child": "watched_marks",
       "foreign_key": "episode_id",
@@ -1983,7 +1997,19 @@
       "excluded_columns": [],
       "families": ["activity", "catalog"],
       "scope_routes": ["user"],
-      "readers": ["src/Activity/Infrastructure/Doctrine/Repository/WatchedMarkRepository.php"],
+      "readers": ["src/Activity/Infrastructure/Doctrine/Repository/WatchedMarkRepository.php", "src/Activity/Infrastructure/Doctrine/ViewingState.php"],
+      "response_cache": "authoritative-read"
+    },
+    {
+      "table": "resume_positions",
+      "mapping": "src/Activity/Infrastructure/Doctrine/Entity/ResumePositionEntity.php",
+      "classification": "capture",
+      "operations": ["INSERT", "UPDATE", "DELETE"],
+      "relevant_columns": ["id", "user_id", "video_id", "position_seconds", "reported_at", "last_played_at"],
+      "excluded_columns": [],
+      "families": ["activity", "catalog"],
+      "scope_routes": ["user"],
+      "readers": ["src/Activity/Infrastructure/Doctrine/ViewingState.php"],
       "response_cache": "authoritative-read"
     },
     {

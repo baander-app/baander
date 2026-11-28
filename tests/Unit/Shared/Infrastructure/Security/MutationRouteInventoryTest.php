@@ -85,6 +85,7 @@ final class MutationRouteInventoryTest extends TestCase
         ],
         'favorites' => ['favorites_add', 'favorites_remove'],
         'activity' => ['activity_play', 'activity_love'],
+        'member viewing state, WatchedControllerTest' => ['activity_video_progress', 'activity_watched_update'],
         'notifications, push subscriptions and webhooks' => [
             'notification_mark_read', 'notification_mark_all_read', 'notification_delete', 'notification_preference_update',
             'push_subscribe', 'push_unsubscribe', 'push_remove_all',

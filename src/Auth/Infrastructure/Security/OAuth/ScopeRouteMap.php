@@ -138,6 +138,8 @@ final class ScopeRouteMap
         'transcode_session_list' => [self::LIBRARY],
         'activity_history' => [self::LIBRARY],
         'activity_play' => [self::LIBRARY],
+        'activity_video_progress' => [self::LIBRARY],
+        'activity_watched_update' => [self::LIBRARY],
         'activity_love' => [self::LIBRARY],
         'activity_loved' => [self::LIBRARY],
         'user_recent' => [self::LIBRARY],
