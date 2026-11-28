@@ -16,6 +16,7 @@ use Doctrine\ORM\Mapping as ORM;
 #[ORM\Index(name: 'idx_images_album_id', columns: ['album_id'])]
 #[ORM\Index(name: 'idx_images_artist_id', columns: ['artist_id'])]
 #[ORM\Index(name: 'idx_images_playlist_id', columns: ['playlist_id'])]
+#[ORM\Index(name: 'idx_images_library_id', columns: ['library_id'])]
 #[ORM\UniqueConstraint(name: 'uniq_images_public_id', columns: ['public_id'])]
 class ImageEntity
 {
@@ -62,6 +63,9 @@ class ImageEntity
     #[ORM\ManyToOne(targetEntity: PlaylistEntity::class)]
     #[ORM\JoinColumn(name: 'playlist_id', referencedColumnName: 'id', nullable: true, onDelete: 'SET NULL')]
     private ?PlaylistEntity $playlist = null;
+
+    #[ORM\Column(type: 'uuid', nullable: true)]
+    private ?Uuid $libraryId = null;
 
     #[ORM\Column(type: 'datetime_immutable')]
     private \DateTimeImmutable $createdAt;
@@ -172,6 +176,16 @@ class ImageEntity
     public function getImageableType(): string
     {
         return $this->imageableType;
+    }
+
+    public function getLibraryId(): ?Uuid
+    {
+        return $this->libraryId;
+    }
+
+    public function setLibraryId(?Uuid $libraryId): void
+    {
+        $this->libraryId = $libraryId;
     }
 
     public function getAlbum(): ?AlbumEntity

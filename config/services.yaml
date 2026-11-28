@@ -749,6 +749,10 @@ services:
         alias: App\Catalog\Infrastructure\Doctrine\Repository\ArtistRepository
     App\Catalog\Domain\Repository\GenreRepositoryInterface:
         alias: App\Catalog\Infrastructure\Doctrine\Repository\GenreRepository
+    App\Catalog\Application\Port\MemberVideoCatalogReadInterface:
+        alias: App\Catalog\Infrastructure\Doctrine\Query\MemberVideoCatalogReadQuery
+    App\Catalog\Application\Port\WatchableTitlePortInterface:
+        alias: App\Catalog\Infrastructure\Doctrine\WatchableTitleLookup
     App\Catalog\Domain\Repository\MovieRepositoryInterface:
         alias: App\Catalog\Infrastructure\Doctrine\Repository\MovieRepository
     App\Catalog\Domain\Repository\DirectorRepositoryInterface:
@@ -759,11 +763,35 @@ services:
         alias: App\Catalog\Infrastructure\Doctrine\Repository\AlbumMatchStateRepository
     App\Catalog\Domain\Repository\LibraryProviderOrderRepositoryInterface:
         alias: App\Catalog\Infrastructure\Doctrine\Repository\LibraryProviderOrderRepository
+    App\Catalog\Domain\Repository\VideoMatchStateRepositoryInterface:
+        alias: App\Catalog\Infrastructure\Doctrine\Repository\VideoMatchStateRepository
+    App\Catalog\Domain\Repository\VideoProviderPauseRepositoryInterface:
+        alias: App\Catalog\Infrastructure\Doctrine\Repository\VideoProviderPauseRepository
 
     App\Shared\Application\Port\OpenApiExporterInterface:
         alias: App\Shared\Infrastructure\OpenApi\NativeOpenApiExporter
 
     # --- Catalog Application Port Aliases ---
+    App\Catalog\Application\Port\VideoMatchRequestInterface:
+        alias: App\Catalog\Application\Service\VideoMatch\VideoMatchRequester
+    App\Catalog\Application\Service\VideoMatch\AutomaticVideoMatcherInterface:
+        alias: App\Catalog\Application\Service\VideoMatch\AutomaticVideoMatcher
+    App\Catalog\Application\Port\VideoMatchTargetLoaderInterface:
+        alias: App\Catalog\Infrastructure\VideoMatch\VideoMatchTargetLoader
+    App\Catalog\Application\Port\VideoMatchApplyInterface:
+        alias: App\Catalog\Infrastructure\VideoMatch\VideoMatchApply
+    App\Catalog\Application\Port\VideoMatchRefreshInterface:
+        alias: App\Catalog\Infrastructure\VideoMatch\VideoMatchRefreshRequester
+    App\Catalog\Application\Port\VideoMatchRefresherInterface:
+        alias: App\Catalog\Application\Service\VideoMatch\VideoMatchRefresh
+    App\Catalog\Application\Port\VideoMatchRefreshStoreInterface:
+        alias: App\Catalog\Infrastructure\VideoMatch\VideoMatchRefresher
+    App\Media\Application\Port\VideoArtworkImportInterface:
+        alias: App\Media\Infrastructure\ManagedVideoArtworkImporter
+    App\Catalog\Application\Port\VideoMatchAdminWriteInterface:
+        alias: App\Catalog\Infrastructure\VideoMatch\VideoMatchAdminWriter
+    App\Catalog\Application\Query\VideoMatch\VideoMatchReviewReadInterface:
+        alias: App\Catalog\Infrastructure\Doctrine\Query\VideoMatchReviewReadQuery
     App\Catalog\Application\Port\ArtistPortInterface:
         alias: App\Catalog\Infrastructure\ArtistService
     App\Catalog\Application\Port\ArtistIdentityResolverInterface:
@@ -815,6 +843,8 @@ services:
 
     App\Library\Application\Port\LibraryFileAvailabilityInterface:
         alias: App\Library\Infrastructure\LibraryFileAvailability
+    App\Library\Application\Port\VideoSidecarIndexInterface:
+        alias: App\Library\Infrastructure\Doctrine\Repository\VideoSidecarIndex
     App\Library\Application\Port\LibraryTypeLookupInterface:
         alias: App\Library\Infrastructure\LibraryTypeLookup
     App\Library\Application\Port\LibraryMediaFilesInterface:
@@ -955,6 +985,14 @@ services:
 
     App\Activity\Application\Port\AlbumActivityMergePortInterface:
         alias: App\Activity\Infrastructure\Doctrine\AlbumActivityMerge
+    App\Activity\Application\Port\ViewingStatePortInterface:
+        alias: App\Activity\Infrastructure\Doctrine\ViewingState
+    App\Activity\Domain\Repository\ResumePositionRepositoryInterface:
+        alias: App\Activity\Infrastructure\Doctrine\Repository\ResumePositionRepository
+    App\Activity\Application\Port\WatchedMarkMovePortInterface:
+        alias: App\Activity\Infrastructure\Doctrine\WatchedMarkMove
+    App\Activity\Domain\Repository\WatchedMarkRepositoryInterface:
+        alias: App\Activity\Infrastructure\Doctrine\Repository\WatchedMarkRepository
 
     # --- Playlist Application Ports ---
     App\Playlist\Application\Port\PlaylistPortInterface:
@@ -1437,6 +1475,8 @@ services:
     # --- Party Application Port Aliases ---
     App\Party\Application\Port\PlaybackSynchronizationPortInterface:
         alias: App\Party\Infrastructure\PlaybackSynchronizer
+    App\Party\Application\Port\WatchMembershipPortInterface:
+        alias: App\Party\Infrastructure\Doctrine\WatchMembershipLookup
     App\Party\Application\Port\PartySessionPortInterface:
         alias: App\Party\Infrastructure\PartySessionService
     App\Party\Application\Port\PartyMemberPortInterface:

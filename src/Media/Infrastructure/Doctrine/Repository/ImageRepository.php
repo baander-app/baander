@@ -142,6 +142,7 @@ final class ImageRepository implements ImageRepositoryInterface
                 'visible_album.id = IDENTITY(i.album) OR visible_album.coverImage = i.id',
             );
             $predicates[] = $this->artistVisibility('visible_artist', includeCover: true);
+            $predicates[] = 'i.libraryId IN (:image_libraries)';
             $qb->setParameter('image_libraries', $scope->getLibraries()->getLibraryIds(), ArrayParameterType::STRING);
         }
         $qb->andWhere('(' . implode(' OR ', $predicates) . ')');
@@ -298,6 +299,26 @@ final class ImageRepository implements ImageRepositoryInterface
         return array_map(fn (ImageEntity $entity) => $this->toDomain($entity), $entities);
     }
 
+    public function findManagedVideoArtwork(Uuid $libraryId, string $pathPrefix): array
+    {
+        $prefix = addcslashes($pathPrefix, '%_\\') . '%';
+        /** @var list<ImageEntity> $entities */
+        $entities = $this->entityManager->createQueryBuilder()
+            ->select('i')
+            ->from(ImageEntity::class, 'i')
+            ->where('i.imageableType = :type')
+            ->andWhere('i.libraryId = :library')
+            ->andWhere('i.path LIKE :prefix')
+            ->setParameter('type', 'video')
+            ->setParameter('library', $libraryId, 'uuid')
+            ->setParameter('prefix', $prefix)
+            ->orderBy('i.createdAt', 'ASC')
+            ->getQuery()
+            ->getResult();
+
+        return array_map($this->toDomain(...), $entities);
+    }
+
     public function findPrimaryForOwner(string $imageableType, Uuid $ownerId): ?Image
     {
         $qb = $this->entityManager
@@ -427,11 +448,13 @@ final class ImageRepository implements ImageRepositoryInterface
             playlistId: null, // playlist not mapped yet
             createdAt: $entity->getCreatedAt(),
             updatedAt: $entity->getUpdatedAt(),
+            libraryId: $entity->getLibraryId(),
         ));
     }
 
     private function syncToEntity(Image $image, ImageEntity $entity): void
     {
+        $entity->setLibraryId($image->getLibraryId());
         $entity->setPath($image->getPath());
         $entity->setBlurhash($image->getBlurhash());
         $entity->setSize($image->getSize());
@@ -456,6 +479,7 @@ final class ImageRepository implements ImageRepositoryInterface
             'album' => $qb->join('i.album', 'a')->andWhere('a.id = :ownerId'),
             'artist' => $qb->join('i.artist', 'ar')->andWhere('ar.id = :ownerId'),
             'playlist' => $qb->join('i.playlist', 'p')->andWhere('p.id = :ownerId'),
+            'video' => $qb->andWhere('i.libraryId = :ownerId'),
             default => $qb->andWhere('1 = 0'),
         };
 

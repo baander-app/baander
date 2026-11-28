@@ -6,7 +6,9 @@ namespace App\Tests\Integration;
 
 use App\Tests\Fixtures\Metadata\ProviderSwitches;
 use App\Catalog\Application\Message\DrainAlbumMatchesMessage;
+use App\Catalog\Application\Message\DrainVideoMatchesMessage;
 use App\Catalog\Application\MessageHandler\DrainAlbumMatchesHandler;
+use App\Catalog\Application\MessageHandler\DrainVideoMatchesHandler;
 use App\Catalog\Application\MessageHandler\QueueArtistSyncsHandler;
 use App\Catalog\Application\MessageHandler\RequestAlbumMatchHandler;
 use App\Catalog\Application\MessageHandler\SyncArtistHandler;
@@ -16,9 +18,8 @@ use App\Catalog\Application\Port\ArtistMergePortInterface;
 use App\Catalog\Application\Port\ArtistPortInterface;
 use App\Catalog\Application\Port\DirectorPortInterface;
 use App\Catalog\Application\Port\GenrePortInterface;
-use App\Catalog\Application\Port\MoviePortInterface;
-use App\Catalog\Application\Port\PersonCreditPortInterface;
 use App\Catalog\Application\Port\SongPortInterface;
+use App\Catalog\Application\Port\VideoMatchRefreshInterface;
 use App\Catalog\Application\Query\MusicBrainzMatch\MatchCatalogReadInterface;
 use App\Catalog\Application\QueryHandler\MusicBrainzMatch\MatchComparisonBuilder;
 use App\Catalog\Application\Service\ArtistSyncQueue;
@@ -26,6 +27,9 @@ use App\Catalog\Application\Service\MusicBrainzMatch\AlbumMatchQueueChain;
 use App\Catalog\Application\Service\MusicBrainzMatch\ArtistMatchWriter;
 use App\Catalog\Application\Service\MusicBrainzMatch\AutomaticAlbumMatcherInterface;
 use App\Catalog\Application\Service\MusicBrainzMatch\AutomaticMatchOutcome;
+use App\Catalog\Application\Service\VideoMatch\AutomaticVideoMatcherInterface;
+use App\Catalog\Domain\Repository\VideoMatchStateRepositoryInterface;
+use App\Catalog\Domain\Repository\VideoProviderPauseRepositoryInterface;
 use App\Catalog\Domain\ValueObject\AlbumMatchSource;
 use App\Catalog\Domain\ValueObject\AlbumMatchState;
 use App\Catalog\Domain\ValueObject\AlbumMatchStatus;
@@ -34,16 +38,12 @@ use App\Metadata\Application\Message\SyncAlbumMessage;
 use App\Metadata\Application\Message\SyncArtistMessage;
 use App\Metadata\Application\Message\SyncArtistsMessage;
 use App\Metadata\Application\Message\SyncLibraryMessage;
-use App\Metadata\Application\Message\SyncMovieMessage;
 use App\Metadata\Application\Message\SyncSongMessage;
 use App\Metadata\Application\MessageHandler\SyncLibraryHandler;
-use App\Metadata\Application\MessageHandler\SyncMovieHandler;
 use App\Metadata\Application\MessageHandler\SyncSongHandler;
-use App\Metadata\Application\MovieMetadataEnricher;
 use App\Metadata\Application\SongMetadataEnricher;
 use App\Metadata\Infrastructure\Api\CoverArtArchive\CoverArtArchiveAdapter;
 use App\Metadata\Infrastructure\Api\MusicBrainz\MusicBrainzAdapter;
-use App\Metadata\Infrastructure\Api\Tmdb\TmdbAdapter;
 use App\Radio\Application\Command\SyncCountryStationsCommand;
 use App\Radio\Application\CommandHandler\SyncCountryStationsHandler;
 use App\Radio\Application\Port\RadioStationPortInterface;
@@ -231,9 +231,9 @@ final class MessengerJsonDeliveryTest extends TestCase
     {
         $messages = [
             'song' => SyncSongMessage::class,
-            'movie' => SyncMovieMessage::class,
             'album' => SyncAlbumMessage::class,
             'album match queue' => DrainAlbumMatchesMessage::class,
+            'video match queue' => DrainVideoMatchesMessage::class,
             'library' => SyncLibraryMessage::class,
             'artists' => SyncArtistsMessage::class,
             'artist' => SyncArtistMessage::class,
@@ -275,23 +275,6 @@ final class MessengerJsonDeliveryTest extends TestCase
             // while this transport test never performs external metadata requests.
             $enricher = new SongMetadataEnricher($musicBrainz, $songs, $genres, $logger);
             $handler = new SyncSongHandler($songs, $enricher, $logger);
-        } elseif ($messageType === SyncMovieMessage::class) {
-            $message = new SyncMovieMessage($id, true);
-            $movies = $this->createMock(MoviePortInterface::class);
-            $movies->expects($this->once())->method('findByUuid')->with($id)
-                ->willReturnCallback(static function () use (&$effects): null {
-                    ++$effects;
-                    return null;
-                });
-            $enricher = new MovieMetadataEnricher(
-                new TmdbAdapter('fixture-token', $logger, $encoder, $httpClient, ProviderSwitches::allEnabled()),
-                $movies,
-                $genres,
-                $logger,
-                $this->createStub(PersonCreditPortInterface::class),
-                new PassThroughTransaction(),
-            );
-            $handler = new SyncMovieHandler($movies, $enricher);
         } elseif ($messageType === SyncAlbumMessage::class) {
             $message = new SyncAlbumMessage($id, true);
             $requests = $this->createMock(AlbumMatchRequestInterface::class);
@@ -314,6 +297,25 @@ final class MessengerJsonDeliveryTest extends TestCase
             $nestedBus = $this->createMock(MessageBusInterface::class);
             $nestedBus->expects($this->never())->method('dispatch');
             $handler = new DrainAlbumMatchesHandler($states, $matcher, new AlbumMatchQueueChain(new ArrayAdapter()), $this->createStub(SystemSettingsPortInterface::class), $nestedBus, $clock, $logger, $musicBrainz);
+        } elseif ($messageType === DrainVideoMatchesMessage::class) {
+            $message = new DrainVideoMatchesMessage();
+            $clock = new MockClock('2026-11-14 12:00:00 UTC');
+            $states = $this->createMock(VideoMatchStateRepositoryInterface::class);
+            $states->expects($this->once())->method('claimOldestDueRequest')->willReturnCallback(static function () use (&$effects): null {
+                ++$effects;
+                return null;
+            });
+            $nestedBus = $this->createMock(MessageBusInterface::class);
+            $nestedBus->expects($this->never())->method('dispatch');
+            $handler = new DrainVideoMatchesHandler(
+                $states,
+                $this->createStub(VideoProviderPauseRepositoryInterface::class),
+                $this->createStub(AutomaticVideoMatcherInterface::class),
+                $nestedBus,
+                $clock,
+                $logger,
+                new PassThroughTransaction(),
+            );
         } elseif ($messageType === SyncLibraryMessage::class) {
             $message = new SyncLibraryMessage($id, true, true);
             $albums = $this->createMock(AlbumPortInterface::class);
@@ -324,7 +326,7 @@ final class MessengerJsonDeliveryTest extends TestCase
                 });
             $nestedBus = $this->createMock(MessageBusInterface::class);
             $nestedBus->expects($this->never())->method('dispatch');
-            $handler = new SyncLibraryHandler($albums, $nestedBus, $logger, new CancelAtCheckpoint(), $this->createStub(MoviePortInterface::class));
+            $handler = new SyncLibraryHandler($albums, $nestedBus, $logger, new CancelAtCheckpoint(), $this->createStub(VideoMatchRefreshInterface::class));
         } elseif ($messageType === SyncArtistsMessage::class) {
             $message = new SyncArtistsMessage();
             $artists = $this->createMock(ArtistPortInterface::class);

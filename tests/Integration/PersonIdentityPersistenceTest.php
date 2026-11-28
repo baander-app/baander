@@ -20,8 +20,13 @@ use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
 use App\Tests\Fixtures\Catalog\ArtistImportIdentityRace;
 use Doctrine\DBAL\Connection;
+use Doctrine\DBAL\Configuration;
+use Doctrine\DBAL\DriverManager;
+use Doctrine\DBAL\Logging\Middleware;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
+use Psr\Log\AbstractLogger;
+use Stringable;
 
 final class PersonIdentityPersistenceTest extends TestCase
 {
@@ -82,14 +87,94 @@ final class PersonIdentityPersistenceTest extends TestCase
         $this->connection->close();
     }
 
+    public function testCreditIdentityStatementsScaleWithDistinctIdentitiesInsteadOfRoles(): void
+    {
+        $logger = new class extends AbstractLogger {
+            /** @var list<string> */
+            public array $queries = [];
+
+            public function log($level, string|Stringable $message, array $context = []): void
+            {
+                if (isset($context['sql'])) {
+                    $this->queries[] = $context['sql'];
+                }
+            }
+        };
+        $configuration = new Configuration();
+        $configuration->setMiddlewares([new Middleware($logger)]);
+        $connection = DriverManager::getConnection($this->connection->getParams(), $configuration);
+        try {
+            $connection->executeStatement('SET search_path TO ' . $this->schema . ', public');
+            $identities = new PersonIdentityRepository($connection, $this->transaction, ArtistImportIdentityRace::entityManager($connection));
+            $credit = new PersonCreditInput(
+                ['tmdb_person' => '700', 'imdb_name' => 'nm0000700', 'tvdb_person' => '700'],
+                'Shared Person', 'cast', 'actor', 'Actor',
+            );
+            $connection->transactional(fn () => $identities->resolveCredits([$credit]));
+            $counts = [];
+            foreach ([1, 200] as $roles) {
+                $logger->queries = [];
+                $owners = $connection->transactional(fn () => $identities->resolveCredits(array_fill(0, $roles, $credit)));
+                self::assertIsArray($owners);
+                self::assertCount($roles, $owners);
+                self::assertCount(1, array_unique($owners));
+                $counts[] = count($logger->queries);
+                self::assertCount(3, array_filter($logger->queries, static fn (string $sql): bool => str_contains($sql, 'hashtextextended')));
+                self::assertCount(1, array_filter($logger->queries, static fn (string $sql): bool => str_contains($sql, 'LEFT JOIN person_external_ids')));
+                self::assertCount(0, array_filter($logger->queries, static fn (string $sql): bool => str_contains($sql, 'INSERT INTO')));
+            }
+            self::assertSame([5, 5], $counts);
+
+            $newCredits = [];
+            for ($index = 0; $index < 40; ++$index) {
+                $newCredits[] = new PersonCreditInput(['tvdb_person' => (string) (800 + $index)], 'Person ' . $index, 'cast', 'actor', 'Actor', source: 'tvdb');
+            }
+            $logger->queries = [];
+            $owners = $connection->transactional(fn () => $identities->resolveCredits($newCredits));
+            self::assertIsArray($owners);
+            self::assertCount(40, array_unique($owners));
+            self::assertCount(40, array_filter($logger->queries, static fn (string $sql): bool => str_contains($sql, 'hashtextextended')));
+            self::assertCount(40, array_filter($logger->queries, static fn (string $sql): bool => str_contains($sql, 'INSERT INTO people')));
+            self::assertCount(1, array_filter($logger->queries, static fn (string $sql): bool => str_contains($sql, 'INSERT INTO person_external_ids')));
+            self::assertCount(1, array_filter($logger->queries, static fn (string $sql): bool => str_contains($sql, 'LEFT JOIN person_external_ids')));
+        } finally {
+            $connection->close();
+        }
+    }
+
+    public function testCreditBatchUsesEarlierClaimsAndPreservesConflictOwners(): void
+    {
+        $first = new PersonCreditInput(['tmdb_person' => '701'], 'First', 'cast', 'actor', 'Actor');
+        $second = new PersonCreditInput(['imdb_name' => 'nm0000702'], 'Second', 'cast', 'actor', 'Actor');
+        $bridge = new PersonCreditInput(['tmdb_person' => '701', 'imdb_name' => 'nm0000702', 'tvdb_person' => '703'], 'Bridge', 'cast', 'actor', 'Actor');
+        self::assertNull($this->transaction->run(fn () => $this->identities->resolveCredits([$first, $second, $bridge])));
+        $owners = [$this->identities->owner('tmdb_person', '701'), $this->identities->owner('imdb_name', 'nm0000702')];
+        self::assertNotSame($owners[0], $owners[1]);
+        self::assertNull($this->identities->owner('tvdb_person', '703'));
+        $conflict = $this->connection->fetchAssociative('SELECT claims, owners FROM person_identity_conflicts');
+        self::assertIsArray($conflict);
+        self::assertEqualsCanonicalizing($owners, json_decode($conflict['owners'], true, flags: JSON_THROW_ON_ERROR));
+        self::assertSame(['imdb_name' => 'nm0000702', 'tmdb_person' => '701', 'tvdb_person' => '703'], json_decode($conflict['claims'], true, flags: JSON_THROW_ON_ERROR));
+    }
+
+    public function testBlockedIdentifierRejectsTheWholeClaimWithoutAttachingOtherIds(): void
+    {
+        $this->connection->executeStatement("INSERT INTO person_identifier_blocks (namespace, external_id) VALUES ('tvdb_person', '704')");
+        $credit = new PersonCreditInput(['tvdb_person' => '704', 'imdb_name' => 'nm0000704'], 'Blocked Person', 'cast', 'actor', 'Actor');
+        self::assertNull($this->transaction->run(fn () => $this->identities->resolveCredits([$credit])));
+        self::assertNull($this->identities->owner('imdb_name', 'nm0000704'));
+        self::assertSame(0, (int) $this->connection->fetchOne('SELECT count(*) FROM people'));
+        self::assertSame(0, (int) $this->connection->fetchOne('SELECT count(*) FROM person_identity_conflicts'));
+    }
+
     public function testCastAndCrewReplaceIndependentlyWithoutDuplicatingAProfile(): void
     {
         $movie = $this->movie();
         $cast = [
-            new PersonCreditInput('22', 'Alex Fields', 'cast', 'actor', 'Actor', 'Pilot', providerCreditId: 'cast-1'),
-            new PersonCreditInput('22', 'Alex Fields', 'cast', 'actor', 'Actor', 'Navigator', providerCreditId: 'cast-2'),
+            new PersonCreditInput(['tmdb_person' => '22'], 'Alex Fields', 'cast', 'actor', 'Actor', 'Pilot', providerCreditId: 'cast-1'),
+            new PersonCreditInput(['tmdb_person' => '22'], 'Alex Fields', 'cast', 'actor', 'Actor', 'Navigator', providerCreditId: 'cast-2'),
         ];
-        $crew = [new PersonCreditInput('22', 'Alex Fields', 'crew', 'director', 'Director', providerCreditId: 'crew-1')];
+        $crew = [new PersonCreditInput(['tmdb_person' => '22'], 'Alex Fields', 'crew', 'director', 'Director', providerCreditId: 'crew-1')];
         self::assertTrue($this->transaction->run(fn() => $this->credits->syncMovieCredits($movie, $cast, $crew)));
         $credits = $this->connection->fetchFirstColumn('SELECT id FROM movie_person_credits ORDER BY credit_key');
         self::assertCount(3, $credits);
@@ -105,7 +190,7 @@ final class PersonIdentityPersistenceTest extends TestCase
     public function testProviderEvidenceAndOperatorCorrectionConvergeOnOneIdentity(): void
     {
         $movie = $this->movie();
-        $screenCredit = new PersonCreditInput('22', 'Alex Fields', 'crew', 'director', 'Director');
+        $screenCredit = new PersonCreditInput(['tmdb_person' => '22'], 'Alex Fields', 'crew', 'director', 'Director');
         $this->transaction->run(fn() => $this->credits->syncMovieCredits($movie, null, [$screenCredit]));
         $mbid = Uuid::v7()->toString();
         $matched = $this->transaction->run(fn() => $this->identities->resolve([
@@ -131,8 +216,8 @@ final class PersonIdentityPersistenceTest extends TestCase
     public function testLateIdentificationRecordsAConflictAndMergeRetainsBothPublicIds(): void
     {
         $movie = $this->movie();
-        $director = new PersonCreditInput('22', 'Alex Fields', 'crew', 'director', 'Director');
-        $writer = new PersonCreditInput('23', 'Alex Fields', 'crew', 'writer', 'Writer');
+        $director = new PersonCreditInput(['tmdb_person' => '22'], 'Alex Fields', 'crew', 'director', 'Director');
+        $writer = new PersonCreditInput(['tmdb_person' => '23'], 'Alex Fields', 'crew', 'writer', 'Writer');
         $this->transaction->run(fn() => $this->credits->syncMovieCredits($movie, null, [$director, $writer]));
         $source = $this->identities->owner('tmdb_person', '22');
         $survivor = $this->identities->owner('tmdb_person', '23');
@@ -204,7 +289,7 @@ final class PersonIdentityPersistenceTest extends TestCase
     {
         $movie = $this->movie();
         $this->transaction->run(fn () => $this->credits->syncMovieCredits($movie, null, [
-            new PersonCreditInput('22', 'Imported Person', 'crew', 'director', 'Director'),
+            new PersonCreditInput(['tmdb_person' => '22'], 'Imported Person', 'crew', 'director', 'Director'),
         ]));
         $source = $this->identities->owner('tmdb_person', '22');
         $sourcePublicId = $this->connection->fetchOne('SELECT public_id FROM people WHERE id = ?', [$source]);

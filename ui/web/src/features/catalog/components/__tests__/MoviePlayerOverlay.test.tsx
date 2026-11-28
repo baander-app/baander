@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import userEvent from '@testing-library/user-event'
 import { act, cleanup, fireEvent, screen } from '@testing-library/react'
 import { render } from '../../../../../tests/test-utils'
 import { MoviePlayerOverlay } from '../MoviePlayerOverlay'
@@ -77,11 +78,12 @@ beforeEach(() => {
   session.snapshot.destinations[0].capabilities = ['volume']
 })
 
-function renderOverlay(onClose: () => void = vi.fn()) {
+function renderOverlay(onClose: () => void = vi.fn(), startSeconds = 0) {
   render(
     <MoviePlayerOverlay
       title="Fixture movie"
       videoId="video"
+      startSeconds={startSeconds}
       onClose={onClose}
     />
   )
@@ -110,10 +112,10 @@ describe('movie overlay control layout', () => {
       .map((thumb) => thumb.closest('[data-slot="slider"]') as HTMLElement)
     expect(sliders).toHaveLength(2)
 
-    expect(getComputedStyle(sliderRoot('Seek movie')).width).toBe('100%')
+    expect(getComputedStyle(sliderRoot('Seek video')).width).toBe('100%')
 
     // the volume slider fills a fixed-width wrapper instead of the row
-    const volume = sliderRoot('Movie volume')
+    const volume = sliderRoot('Video volume')
     const wrapper = volume.parentElement as HTMLElement
     expect(wrapper).not.toBe(row)
     // the shared player volume width is 5rem, which resolves to 80px at the default 16px root font
@@ -124,8 +126,8 @@ describe('movie overlay control layout', () => {
   it('keeps labels and disabled states on the bounded controls while volume is unsupported', () => {
     session.snapshot.destinations[0].capabilities = []
     renderOverlay()
-    const volume = sliderRoot('Movie volume')
-    const seek = sliderRoot('Seek movie')
+    const volume = sliderRoot('Video volume')
+    const seek = sliderRoot('Seek video')
     expect(volume).toHaveAttribute('aria-disabled', 'true')
     expect(seek).toHaveAttribute('aria-disabled', 'false')
     // a destination without volume support still shows a bounded control, not a second full-width bar
@@ -240,5 +242,35 @@ describe('cinema navigation', () => {
     expect(parking).not.toContainElement(playback.host)
     view.unmount()
     expect(parking).toContainElement(playback.host)
+  })
+})
+
+
+describe('video resume choice', () => {
+  it('restarts from zero with the keyboard and dismisses the resume control after success', async () => {
+    const user = userEvent.setup()
+    renderOverlay(vi.fn(), 83)
+    const startOver = screen.getByRole('button', { name: 'Start Over' })
+    startOver.focus()
+    await user.keyboard('{Enter}')
+    expect(request).toHaveBeenCalledExactlyOnceWith({ action: 'seek', position: 0 })
+    expect(screen.queryByRole('button', { name: 'Start Over' })).not.toBeInTheDocument()
+  })
+
+  it('dismisses the resume notice without changing playback', async () => {
+    const user = userEvent.setup()
+    renderOverlay(vi.fn(), 83)
+    await user.click(screen.getByRole('button', { name: 'Dismiss resume notice' }))
+    expect(request).not.toHaveBeenCalled()
+    expect(screen.queryByRole('button', { name: 'Start Over' })).not.toBeInTheDocument()
+  })
+
+  it('keeps the resume choice when the seek is refused', async () => {
+    const user = userEvent.setup()
+    request.mockRejectedValueOnce(new Error('Seek refused'))
+    renderOverlay(vi.fn(), 83)
+    await user.click(screen.getByRole('button', { name: 'Start Over' }))
+    expect(screen.getByRole('button', { name: 'Start Over' })).toBeInTheDocument()
+    expect(playback.reportError).toHaveBeenCalledWith(expect.objectContaining({ message: 'Seek refused' }))
   })
 })

@@ -10,7 +10,11 @@ use DateTimeImmutable;
 
 final class TvSeriesState
 {
-    /** @param array<string, string> $externalIds */
+    /**
+     * @param array<string, string> $externalIds
+     * @param array<string, string|int|null> $providerFields
+     * @param list<string> $lockedFields
+     */
     public function __construct(
         public readonly Uuid $id,
         public readonly PublicId $publicId,
@@ -28,5 +32,7 @@ final class TvSeriesState
         public ?string $backdropUrl = null,
         public readonly DateTimeImmutable $createdAt = new DateTimeImmutable(),
         public DateTimeImmutable $updatedAt = new DateTimeImmutable(),
+        public array $providerFields = [],
+        public array $lockedFields = [],
     ) {}
 }

@@ -1,6 +1,6 @@
 # Baander roadmap
 
-Updated 2026-11-27. The roadmap records remaining work, decisions and acceptance
+Updated 2026-11-28. The roadmap records remaining work, decisions and acceptance
 gates. The linked guides describe current operating contracts. Git history
 keeps completed milestones and their verification evidence.
 
@@ -19,7 +19,7 @@ runners and verification boundaries. Historical suite counts apply to their own 
 ## TV series libraries, checkpoint 2026-11-28
 
 Implementation follows the [TV series libraries plan](docs/plans/2026-11-27-1827-feat-tv-series-libraries-plan.md).
-This checkpoint covers the catalog foundation and video metadata providers.
+The entries below cover scanning, matching, member playback and their verification.
 
 - Phase A is committed through `8509b7f06`, covering U20, U1, U2, U3, U21, U4 and
   U5. TV libraries scan into provider-neutral series, seasons, episodes and video
@@ -45,15 +45,61 @@ This checkpoint covers the catalog foundation and video metadata providers.
   containing only a recognized provider ID supplies that identity for matching.
 - U10 lets admins read and replace each TV or movie library's provider order
   through the API and the console. The order retains disabled providers.
-  Phase C matching units U11, U23, U22, U12 and U13 remain pending. Phase D member
-  progress, read API and web units U14–U17 and Phase E documentation and browser
-  verification units U18–U19 remain pending.
+- U11 queues matches after ingestion commits, claims one title at a time,
+  pauses failing providers and retries when a provider becomes usable. Folder
+  tags remain available when the local provider is off. NFO IDs follow its switch.
+- U23 stores watched marks per member and episode or movie. Placement changes
+  move marks in the same transaction and preserve a mark on an old episode
+  that still has a file. Replaying the same move leaves the marks intact.
+- U22 places files against the matched provider’s structure and keeps the exact
+  ordering selected for the series. A refresh preserves hand assignments, native
+  episode identities and the last mapping when an ordering disappears.
+- U12 applies provider metadata, imports managed artwork and resolves screen credits
+  against every supplied person ID. TV refresh preserves manual edits and locks.
+  Movie sync now uses the video match queue.
+- U13 gives admins the same review, search, apply, ordering, assignment and
+  library re-match operations in the API and console. A review identifies the
+  owning title. Admins can assign a file to any active episode, including one
+  with no files. The re-match preview counts hand matches and assignments.
+- U14 stores each member’s position per file and marks per episode or movie.
+  Passing 90% clears the position. A multi-episode file marks every episode it
+  plays in the opened library. An extra resumes without marking a title.
+  Watch-party reports leave personal viewing state alone, and a stale report
+  cannot restore a cleared position.
+- U15 lists available series, seasons, episodes and movies, with owned counts,
+  metadata source, file versions, extras and the requesting member’s progress.
+  Filmographies and Person credit feeds use the same availability check before
+  paging. The Party API documents the session and video IDs it already returns.
+- U16 lets members browse a TV library by season, resume the last played file
+  version or start over, and mark episodes, seasons and series watched. A
+  browser receiving a playback handoff retains the opened title and its library
+  context. Movie and series pages list playable extras and credit the metadata
+  provider.
+- U17 places album and video reviews on the Metadata tab. Admins can switch
+  providers, search and apply a match, choose an ordering or assign a file.
+  Each library has a keyboard-accessible provider order and a re-match preview
+  that counts existing manual decisions before confirmation.
+- U18 updates the operator guide, command reference and video library vocabulary.
+  After the full feature is merged, the owner must reset or repair the persistent
+  development database and rescan its libraries. The rewritten migration does
+  not convert existing catalog rows. All migration checks ran on isolated preview
+  and CI databases.
+- U24 adds the server setting `activity.progress_clock_skew_seconds`. Its
+  default, zero, accepts only a newer observation. A positive value accepts
+  a late report within that many seconds of the latest saved time. Updating
+  the position keeps that latest time in place. Future reports use receipt
+  time, and manual clears and completions protect the position on rewatch.
 
 ### Verification
 
 - The isolated preview migrated a fresh database through
   `Version20261127194100`. A second migration run reported the current version,
   and `doctrine:schema:validate` reported valid mappings and a synchronized schema.
+- U4’s capture and movie import tests passed 53 tests with 2,967 assertions.
+  The movie metadata sync regression passed separately with 16 assertions.
+  U5’s signed-playback checks passed 192 tests with 8,137 assertions, its
+  ingestion checks passed 51 with 418, and scanner deletion passed 65 with
+  374. The original full runs at U4 and U5 were interrupted.
 - U6 passed the CI-image static gates from `make ci`, covering Composer validation
   and normalization, PHPStan, Deptrac, imports, tooling architecture, tooling format
   and tooling PHPStan. Its ordinary PHPUnit lane passed 10,041 tests with 57,577
@@ -68,7 +114,9 @@ This checkpoint covers the catalog foundation and video metadata providers.
   inventory passed nine tests with 58 assertions. The OpenAPI specification and
   Orval client were regenerated together and their drift checks passed for U6.
 - U7 passed 61 focused CI-image tests, scoped PHPStan and Deptrac with zero
-  violations and 451 existing skipped violations.
+  violations and 451 existing skipped violations. The full run at that U7 commit
+  counted 15,599 tests and 156,581 assertions. It reproduced the same four
+  failures and one teardown error that the later fixture corrections addressed.
 - During U8 and U9, 114 provider tests passed with 548 assertions. Full PHPStan
   and import checks passed. Deptrac reported zero violations and 451 baseline
   entries. After adding support for an NFO containing only a provider ID, the
@@ -85,6 +133,149 @@ This checkpoint covers the catalog foundation and video metadata providers.
   passed. The fresh-install and rollback check passed 96 assertions after its
   fixture was updated for the new migration. OpenAPI drift, imports and scoped
   PHPStan passed. Deptrac reported zero violations and 451 baseline entries.
+- U11 passed 108 focused CI-image tests with 983 assertions after correcting
+  the schedule-count and JSON object comparison fixtures. The five storage
+  adapter tests passed 41 assertions covering stale claims, rollback, sidecar
+  scoping and retained identities. Scoped PHPStan and imports passed. Deptrac
+  reported zero violations and 451 existing skipped violations.
+- U23 passed 66 CI-image tests with 3,144 assertions, including the move,
+  member-scoped capture and fresh-install suites. Scoped PHPStan and imports
+  passed. Deptrac reported zero violations and 451 existing skipped violations.
+- U22 passed 38 focused CI-image tests with 403 assertions for placement,
+  fenced apply, refresh, confidence and the message codec. The initial combined
+  run also exercised fresh installation, ingestion and routing. Six errors
+  exposed metadata ownership methods from the following unit in the isolated
+  snapshot. The 38-test rerun covered all six after the unit was separated.
+  Scoped PHPStan and imports passed. Deptrac reported zero violations and 451
+  existing skipped violations.
+
+- U12 passed 70 focused CI-image tests with 1,055 assertions for metadata,
+  artwork and person identity. The fresh-install suite passed 26 tests with 468
+  assertions. Scoped PHPStan and imports passed. Deptrac reported zero violations
+  and 439 existing skipped violations.
+
+- The first U13 combined CI run passed 117 tests with 1,298 assertions for
+  review, assignment, CLI parity, route authorization, schema and placement.
+  OpenAPI and Orval drift checks passed. The isolated preview migrated a fresh
+  database through `Version20261128124500`, repeated the migration and passed
+  Doctrine schema validation.
+- The final admin dialog reads and their CLI counterparts passed 52 cases
+  across the corrected runs with 554 assertions. These included a provider
+  outage, separate DVD ordering IDs, cross-library selection and an episode
+  receiving its first file. Scoped PHPStan and imports passed. Deptrac reported
+  zero violations and 439 existing skipped violations. The web client typecheck,
+  OpenAPI export and Orval regeneration checks passed.
+- The Phase C simplification removed duplicate movie locking and placement
+  resets. The root-level movie NFO lookup used two index probes against 20,000
+  sibling NFOs. The placement and lock regression suite passed 17 tests with
+  260 assertions.
+- The preview migration rehearsal now gives its scratch application a Redis
+  identity and a control connection to its own database. Its 21 tests passed
+  with 172 assertions. Both rehearsal passes succeeded on the live preview.
+- A full-suite run at the U8 commit exposed an intermittent third alarm in the
+  interrupted-sleep test. The corrected fixture cancels its timer after two
+  signals. Its seven CI-image tests passed with 14 assertions.
+
+- U14’s guarded progress writes, watched-mark moves and private change
+  notifications passed 21 CI-image tests with 1,916 assertions. The command
+  handlers passed 23 tests with 272 assertions. The HTTP suite passed six
+  tests with 100 assertions against PostgreSQL, including active party
+  suppression, available versions, extra playback and member isolation.
+  Catalog and Party access passed 11 tests with 102 assertions. The full
+  fresh-install and rollback suite passed 26 tests with 470 assertions.
+  Scoped PHPStan and imports passed. Deptrac reported zero violations and
+  439 existing skipped violations. The OpenAPI and Orval drift checks passed.
+
+- U15’s member read API, PostgreSQL queries and authorization suite passed
+  74 CI-image tests with 865 assertions. The credit-feed and director suites
+  passed all 19 distinct cases across the corrected runs, with 255 assertions.
+  Scoped PHPStan, imports, OpenAPI drift and Orval drift passed. Deptrac
+  reported zero violations and 439 existing skipped violations.
+- U16 passed 3,980 web tests in 336 files. TypeScript and ESLint passed
+  (10 lint warnings). Session tests passed 198 cases with 1,181 assertions,
+  and the PostgreSQL handoff tests passed two cases with 12 assertions.
+  The file-stability suite passed eight tests with 32 assertions after the
+  writer was synchronized with the first file sample. Scoped PHPStan, imports
+  and both OpenAPI and Orval drift checks passed. Deptrac reported zero
+  violations and 439 existing skipped violations.
+- The Phase D availability review replaced repeated page offsets with bounded
+  reads. The PostgreSQL suites passed 23 tests with 10,823 assertions. The
+  10,000-row fixture evaluated each candidate once. The movie search kept its
+  previous ranking across a batch boundary, and the credit feeds kept their
+  totals and tie order.
+- The integrated web suite passed all 4,014 tests in 341 files after the theme
+  timer was tied to its window. TypeScript and Orval drift checks passed.
+  ESLint reported zero errors and 13 warnings. The Phase D preview migrated
+  a fresh database through `Version20261128140000`, repeated the migration
+  and passed Doctrine mapping and schema validation.
+- U18’s command documentation coverage and admin CLI parity passed 14 CI-image
+  tests with 69 assertions. The documentation check compared 11 command
+  definitions and 50 inputs with their reference pages. The public site build
+  generated 304 manual pages, including Video Matching.
+- U19 added four PostgreSQL acceptance tests with 164 assertions. They cover an
+  episode ordering change, a library re-match, two files added after a season
+  mark and a drive remount. The matcher and placement suites passed 37 tests
+  with 198 assertions. The fresh preview migrated through
+  `Version20261128140000`, repeated the migration with no changes and passed
+  Doctrine schema validation.
+- The historical U9 full run counted 15,685 tests and 157,037 assertions. The
+  file-stability test and the concurrent worker reservation test failed. The
+  file-stability case passed after the U16 timing correction. The reservation
+  test reproduced the PostgreSQL lock timeout with two waiting processes.
+  Giving those test processes time to finish the race kept the production
+  timeout intact. All 22 inventory tests passed with 184 assertions.
+- The final Chromium and Firefox preview run passed all six Playwright cases
+  in five minutes with one worker and retries disabled. Both engines resumed original and encoded video,
+  reopened the last-played movie version and showed the matched series after
+  an administrator resolved its review.
+- The candidate HTTP and CLI suite passed 25 tests with 359 assertions,
+  including the empty external-ID object returned for a local candidate.
+  The playback-detail suite passed 28 tests, including a user switching back
+  to the active video while another load was pending.
+- Resolving one or 200 credits sharing three provider IDs took five SQL
+  statements in both cases. Forty new people took one identity read, one
+  claim insert, 40 locks and 40 person inserts. The nine identity persistence
+  tests passed with 60 assertions, and the wider credit, profile and race
+  suite passed 22 tests with 127 assertions.
+- The player timestamps observations before sending them. A browser with a
+  skewed clock uses the HTTP date from device registration or a playback
+  request. That date has one-second precision. A pause immediately after a
+  manual mark can fall before the mark’s timestamp until the next observation.
+  The server caps future timestamps at receipt and keeps the stored time as
+  the lower bound for subsequent reports. The progress handler, HTTP endpoint
+  and PostgreSQL write tests passed 37 tests with 448 assertions. They cover a
+  correctly timed handoff after a future report, a delayed completion after a
+  manual mark, and the next accepted pause.
+- After the four review fixes, the web suite passed 4,025 tests in 342 files.
+  TypeScript passed. ESLint reported zero errors and ten warnings in the clean
+  verification checkout. Full PHPStan passed across 4,605 files. Deptrac
+  reported zero violations with 439 skipped, and imports passed across 5,283
+  files. The regenerated OpenAPI specification and Orval client passed both
+  drift checks.
+- The full U10 run counted 15,714 tests and 157,152 assertions. Its database
+  restart fixture selected a PostgreSQL autovacuum worker along with the
+  application connections. PostgreSQL denied the operation. The two restart
+  fixtures now select only client connections owned by the test role in the
+  disposable test database. The corrected OAuth and DPoP suites passed 68
+  tests with 1,712 assertions.
+- U24’s progress handler passed 23 tests with 260 assertions. The member HTTP
+  and system settings suites passed 22 tests with 311 assertions against the
+  new migration. They exercise the super administrator’s live change from zero
+  to five seconds and back, member permissions, and reports at and outside
+  the microsecond boundary. The PostgreSQL, migration, timestamp and capture
+  checks passed 25 tests with 2,095 assertions. A fresh database applied 62
+  migrations and contained 116 tables. The migration preserved played and
+  cleared positions without publishing a change to members. Full PHPStan
+  passed across 4,606 files, Deptrac found zero violations with 439 skipped,
+  and the import check passed across 5,285 files. The upgraded checkout
+  preview and a second, freshly migrated database passed schema verification
+  through `Version20261128160000`. All six Chromium and Firefox cases passed
+  against that preview with retries disabled. The U24 simplification and code
+  reviews found no additional changes.
+- The full U8 run counted 15,653 tests and 156,814 assertions, with two
+  errors and four failures. U9 corrected the ingest, playback access,
+  workload and log-retention fixtures, and U13 corrected the sleep test’s
+  signal timer.
 
 ## Website design system section, 2026-11-27
 

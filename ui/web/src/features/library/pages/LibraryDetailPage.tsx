@@ -6,6 +6,7 @@ import { useLibrary } from '../hooks/use-library'
 import { useLibraryStats } from '../hooks/use-library-stats'
 import { useScanLibrary, useDeleteLibrary } from '../hooks/use-library-mutations'
 import { LibraryStatsPanel } from '../components/LibraryStatsPanel'
+import { VideoLibrarySettingsPanel } from '../components/VideoLibrarySettingsPanel'
 import { DeleteLibraryDialog, ScanLibraryDialog } from '../components/LibraryDialogs'
 import { useState } from 'react'
 import { formatRelativeTime } from '../utils/format'
@@ -322,6 +323,7 @@ export function LibraryDetailPage() {
               </DetailCard>
             </DetailGrid>
           </section>
+          <VideoLibrarySettingsPanel libraryId={library.publicId} libraryType={library.type} />
         </ContentInner>
       </ContentArea>
 

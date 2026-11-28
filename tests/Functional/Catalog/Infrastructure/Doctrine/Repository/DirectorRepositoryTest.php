@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Tests\Functional\Catalog\Infrastructure\Doctrine\Repository;
 
+use App\Tests\Fixtures\Catalog\IndexedMovie;
+
 use App\Catalog\Application\Port\DirectorCredit;
 use App\Catalog\Application\Port\DirectorPortInterface;
 use App\Catalog\Infrastructure\Doctrine\Entity\MovieEntity;
@@ -52,6 +54,40 @@ final class DirectorRepositoryTest extends TestCase
         self::assertSame(2, $directors->searchVisible(SearchOptions::create(''), LibraryReadScope::unrestricted())->getTotal());
     }
 
+    public function testFilmographyFiltersUnavailableWorksBeforeCountingAndPaging(): void
+    {
+        [$owned, $hidden] = $this->movies();
+        $missing = new MovieEntity(new PublicId(), $owned->getLibrary(), 'A missing movie');
+        $last = new MovieEntity(new PublicId(), $owned->getLibrary(), 'Z available movie');
+        $this->entityManager->persist($missing);
+        $this->entityManager->persist($last);
+        IndexedMovie::add($this->entityManager, $missing, available: false);
+        IndexedMovie::add($this->entityManager, $last);
+        $this->entityManager->flush();
+        $directors = static::getContainer()->get(DirectorPortInterface::class);
+        $credit = new DirectorCredit(2_000_000_049, 'Availability Director');
+        foreach ([$owned, $hidden, $missing, $last] as $movie) {
+            $this->sync($directors, $movie->getId(), [$credit]);
+        }
+        $scope = LibraryReadScope::restricted([$owned->getLibrary()->getId()]);
+        $director = $directors->searchVisible(SearchOptions::create('Availability Director'), $scope)->getItems()[0];
+        $first = $directors->searchMoviesVisible($director->publicId, SearchOptions::create('', 1), $scope);
+        $second = $directors->searchMoviesVisible($director->publicId, SearchOptions::create('', 1, 1), $scope);
+        self::assertSame(2, $first->getTotal());
+        self::assertSame(2, $second->getTotal());
+        self::assertTrue($first->getItems()[0]->getPublicId()->equals($owned->getPublicId()));
+        self::assertTrue($second->getItems()[0]->getPublicId()->equals($last->getPublicId()));
+        self::assertSame(3, $director->movieCount);
+        self::assertSame(3, $directors->searchMoviesVisible($director->publicId, SearchOptions::create(''), LibraryReadScope::unrestricted())->getTotal());
+        $this->entityManager->getConnection()->executeStatement(
+            'UPDATE library_file_index SET hash = :hash WHERE library_id = :library AND path = :path',
+            ['hash' => hash('xxh3', 'changed'), 'library' => $owned->getLibrary()->getId()->toString(), 'path' => rtrim($owned->getLibrary()->getPath(), '/') . '/' . $owned->getId()->toString() . '.mp4'],
+        );
+        $filtered = $directors->searchMoviesVisible($director->publicId, SearchOptions::create('', 1), $scope);
+        self::assertSame(1, $filtered->getTotal());
+        self::assertTrue($filtered->getItems()[0]->getPublicId()->equals($last->getPublicId()));
+    }
+
     public function testDeletingACreditedMovieDoesNotLeaveManagedLinksThatBreakLaterWrites(): void
     {
         [$movie] = $this->movies();
@@ -84,6 +120,9 @@ final class DirectorRepositoryTest extends TestCase
         foreach ([$allowed, $denied, $first, $second] as $entity) {
             $this->entityManager->persist($entity);
         }
+        $this->entityManager->flush();
+        IndexedMovie::add($this->entityManager, $first);
+        IndexedMovie::add($this->entityManager, $second);
         $this->entityManager->flush();
 
         return [$first, $second];

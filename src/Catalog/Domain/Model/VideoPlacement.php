@@ -7,6 +7,7 @@ namespace App\Catalog\Domain\Model;
 use App\Catalog\Domain\ValueObject\VideoName\ExtraKind;
 use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
+use DateTimeImmutable;
 use InvalidArgumentException;
 
 final class VideoPlacement
@@ -76,6 +77,11 @@ final class VideoPlacement
         $this->state->assigned = $assigned;
     }
 
+    public function resetAssignment(): void
+    {
+        $this->state->assigned = false;
+    }
+
     public function applyParsedExtraKind(?ExtraKind $kind): void
     {
         if ($this->state->assigned) {
@@ -106,6 +112,7 @@ final class VideoPlacement
     public function review(?string $reason): void
     {
         $this->state->reviewReason = $reason;
+        $this->state->reviewCheckedAt = $reason === null ? null : new DateTimeImmutable();
     }
 
     private static function assertPath(string $path): void
@@ -129,5 +136,6 @@ final class VideoPlacement
     public function getEpisodeIds(): array { return $this->state->episodeIds; }
     public function isAssigned(): bool { return $this->state->assigned; }
     public function getReviewReason(): ?string { return $this->state->reviewReason; }
+    public function getReviewCheckedAt(): ?DateTimeImmutable { return $this->state->reviewCheckedAt; }
     public function getState(): VideoPlacementState { return $this->state; }
 }

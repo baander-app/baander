@@ -132,7 +132,7 @@ export function CinemaTimeline({
       />
       <Slider
         key={videoId}
-        aria-label="Seek movie"
+        aria-label="Seek video"
         aria-valuetext={`${formatVideoTime(displayed)} of ${formatVideoTime(duration)}`}
         min={0}
         max={duration || 1}
@@ -178,7 +178,7 @@ export function CinemaTimeline({
           {previewUrl && sprite && sprite.count > 0 ? (
             <div
               role="img"
-              aria-label={`Movie preview at ${formatVideoTime(previewTime)}`}
+              aria-label={`Video preview at ${formatVideoTime(previewTime)}`}
               style={{
                 width: sprite.width,
                 height: sprite.height,

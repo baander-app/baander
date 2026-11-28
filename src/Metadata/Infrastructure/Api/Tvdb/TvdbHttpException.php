@@ -8,7 +8,7 @@ use RuntimeException;
 
 final class TvdbHttpException extends RuntimeException
 {
-    public function __construct(public readonly int $status)
+    public function __construct(public readonly int $status, public readonly bool $login = false)
     {
         parent::__construct('TheTVDB API returned an unsuccessful response.');
     }

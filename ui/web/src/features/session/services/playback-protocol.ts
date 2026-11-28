@@ -34,8 +34,14 @@ function member(value: unknown, values: ReadonlySet<string>): boolean {
   return typeof value === 'string' && values.has(value)
 }
 
+function viewing(value: unknown): boolean {
+  return record(value) && (value.titleKind === 'episode' || value.titleKind === 'movie' || value.titleKind === 'extra')
+    && typeof value.titleId === 'string' && /^[0-9a-zA-Z_-]{21}$/.test(value.titleId)
+}
+
 function media(value: unknown): boolean {
-  return value === null || (record(value) && (value.kind === 'song' || value.kind === 'video') && identity(value.publicId))
+  return value === null || (record(value) && (value.kind === 'song' || value.kind === 'video') && identity(value.publicId)
+    && (value.viewing === undefined || (value.kind === 'video' && viewing(value.viewing))))
 }
 
 function playback(value: Record<string, unknown>): boolean {

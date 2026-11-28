@@ -35,15 +35,15 @@ dc exec web php bin/console app:library:scan my-music --release
 | Option | Default | Description |
 |--------|---------|-------------|
 | `--all` | — | Scan every library that is not already scanning, one after another |
-| `--rescan` | — | Read every file again, including files the index already knows, and repair the songs they belong to; see [What a rescan repairs](#what-a-rescan-repairs). Not combined with `--release` |
+| `--rescan` | — | Read every supported file again, including files the index already knows. See [What a rescan repairs](#what-a-rescan-repairs). Incompatible with `--release` |
 | `--release` | — | Only release the library's claim; a scan claim marks its scan failed, a delete claim leaves the scan status alone. Refused while the claim is live. Takes one library and no other option than `--force` |
 | `--force` | — | With `--release`, release a live claim too. Only valid with `--release` |
 | `--json` | — | After the run, print what the scan endpoint returns, in JSON: the library as it is after its scan, or with `--all` the `dispatched` and `skipped` counts of `scan-all`, where `dispatched` counts the scans the command started. Progress goes to stderr. Not combined with `--release` |
 
 ## Details
 
-Discovery supports `music` and `movie`; scans of other registered library types
-fail as unsupported. A successful scan confirms discovery and committed ingestion
+Discovery supports `music`, `movie` and `tv_show`. Scans of other registered library
+types fail as unsupported. A successful scan confirms discovery and committed ingestion
 intents, while catalog import continues in the worker pair. See
 [Library management](../media/library-management.md) for the stages and their observable
 results.
@@ -96,7 +96,12 @@ available files, including those whose earlier intent exhausted its retries.
 
 ### What a rescan repairs
 
-`--rescan` queues every file of the library again, unchanged files included. For each file
+`--rescan` queues the supported files in the library again, including unchanged ones.
+For a movie or TV library it rechecks the indexed video files and sidecars. Catalog
+keeps the title's saved provider and manual assignments during ingestion. Use
+[video matching](../media/video-matching.md) for provider changes and assignment repairs.
+
+For each music file
 whose content belongs to a song in the catalog, the worker reads the file's tags, measures its
 audio with ffprobe, and repairs that song in place. An ordinary scan repairs the song of a
 returning file the same way. A repair works as follows:
@@ -173,7 +178,10 @@ A completed scan retains catalog entries and file-index records when sources are
 missing, including when every file under a library root or mounted subtree has
 disappeared. It marks those sources unavailable. Music remains visible with an
 “Unavailable” label, and the web player skips it during bulk playback and disables
-individual playback actions. Explicit catalog deletion remains separate.
+individual playback actions. For video, the catalog hides unavailable titles,
+seasons, episodes and versions until a scan sees their files again. An unreadable
+movie or TV library root counts as empty. Matches, assignments and viewing state
+remain stored.
 
 Availability records the last discovery or ingestion observation. It cannot tell
 whether a mount failed or a file was permanently removed, and it is not a live

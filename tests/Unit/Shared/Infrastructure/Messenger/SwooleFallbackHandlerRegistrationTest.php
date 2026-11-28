@@ -5,20 +5,23 @@ declare(strict_types=1);
 namespace App\Tests\Unit\Shared\Infrastructure\Messenger;
 
 use App\Catalog\Application\Message\DrainAlbumMatchesMessage;
+use App\Catalog\Application\Message\DrainVideoMatchesMessage;
+use App\Catalog\Application\Message\RefreshVideoMatchMessage;
 use App\Catalog\Application\MessageHandler\DrainAlbumMatchesHandler;
+use App\Catalog\Application\MessageHandler\DrainVideoMatchesHandler;
+use App\Catalog\Application\MessageHandler\RefreshVideoMatchHandler;
 use App\Catalog\Application\MessageHandler\QueueArtistSyncsHandler;
 use App\Catalog\Application\MessageHandler\RequestAlbumMatchHandler;
 use App\Catalog\Application\MessageHandler\SyncArtistHandler;
 use App\Media\Application\Command\GenerateImageDerivativeCommand;
 use App\Media\Application\CommandHandler\GenerateImageDerivativeHandler;
+use App\Metadata\Application\DTO\Video\VideoKind;
 use App\Metadata\Application\Message\SyncAlbumMessage;
 use App\Metadata\Application\Message\SyncArtistMessage;
 use App\Metadata\Application\Message\SyncArtistsMessage;
 use App\Metadata\Application\Message\SyncLibraryMessage;
-use App\Metadata\Application\Message\SyncMovieMessage;
 use App\Metadata\Application\Message\SyncSongMessage;
 use App\Metadata\Application\MessageHandler\SyncLibraryHandler;
-use App\Metadata\Application\MessageHandler\SyncMovieHandler;
 use App\Metadata\Application\MessageHandler\SyncSongHandler;
 use App\Notification\Application\DTO\SendEmailCommand;
 use App\Notification\Application\DTO\SendPushCommand;
@@ -71,9 +74,10 @@ final class SwooleFallbackHandlerRegistrationTest extends TestCase
             SendPushToSubscriptionHandler::class => new SendPushToSubscriptionCommand(Uuid::v7(), Uuid::v7(), 'title', 'body', 'notification'),
             SendEmailHandler::class => new SendEmailCommand(Uuid::v7(), 'worker@baander.app', NotificationCategory::Security, 'title', [], 'body', [], new \DateTimeImmutable()),
             SyncSongHandler::class => new SyncSongMessage(Uuid::v7()),
-            SyncMovieHandler::class => new SyncMovieMessage(Uuid::v7()),
             RequestAlbumMatchHandler::class => new SyncAlbumMessage(Uuid::v7()),
             DrainAlbumMatchesHandler::class => new DrainAlbumMatchesMessage(),
+            DrainVideoMatchesHandler::class => new DrainVideoMatchesMessage(),
+            RefreshVideoMatchHandler::class => new RefreshVideoMatchMessage(VideoKind::Movie, Uuid::v7(), Uuid::v7(), new \DateTimeImmutable()),
             SyncLibraryHandler::class => new SyncLibraryMessage(Uuid::v7()),
             QueueArtistSyncsHandler::class => new SyncArtistsMessage(),
             SyncArtistHandler::class => new SyncArtistMessage(Uuid::v7()),

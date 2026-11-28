@@ -26,3 +26,13 @@ After the message's last batch, each album it touched that has no artist credit 
 
 Ingest then asks `AlbumMatchRequestInterface::requestAfterImport()` for automatic MusicBrainz matches of the albums the message touched (see [Album match queue](catalog-matching.md#album-match-queue)); when that call throws, ingest logs the error and carries on. Right after each batch commits, beside its lyrics request, ingest passes the artists that batch's resolver call reported to `ArtistSyncRequestInterface::requestAfterImport()`, which queues their [artist sync](catalog-matching.md#artist-sync) while `metadata.auto_sync` is on, so a later batch's failure keeps them. An album artist that only the album credit after the last batch creates is not reported; the next admin sync fills it.
 
+## Video Import and Rescan
+
+For a video library, [`FilesDiscoveredHandler`](../../../src/Catalog/Application/CommandHandler/FilesDiscoveredHandler.php) sends each batch through [`VideoFileIngest`](../../../src/Catalog/Application/Service/VideoFileIngest.php). The service probes before its write transaction. Inside the transaction it checks the library's delete claim and the scan's indexed path and hash before it writes a video and its placement. An older observation cannot replace a newer one.
+
+A video record is identified by its hash. A placement records its library, relative path, parse and owning title. [`MovieFileIngest`](../../../src/Catalog/Application/Service/MovieFileIngest.php) groups feature versions and extras by title folder. A movie file at the library root uses its relative path as the grouping key. [`TvLibraryIngest`](../../../src/Catalog/Application/Service/TvLibraryIngest.php) attaches a placement to its episodes or to the series as an extra. One placement can play several episodes, and an episode can have several versions. When a renamed file or folder is found through a known placement, the new path replaces the old one without changing the title's identity.
+
+When a video batch commits, the handler asks Catalog to match the affected titles. It also asks for titles affected by sidecar observations, without creating video records for the sidecars. A queue failure is logged after import so it cannot roll back a committed placement. See [Video Matching](catalog-matching.md#video-matching).
+
+[`VideoAvailability`](../../../src/Catalog/Infrastructure/VideoAvailability.php) compares the hash at the placement's resolved library path with the video's stored hash. Member queries apply that check within the owning library before counting or paging. When a file returns, its placement and viewing state are available again. Playback also resolves the file inside the library root and can try another available placement when a path has vanished.
+

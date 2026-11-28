@@ -60,6 +60,14 @@ class TvEpisodeEntity
     #[ORM\Column(type: 'boolean', options: ['default' => false])]
     public bool $retired = false;
 
+    /** @var array<string, string|int|null> */
+    #[ORM\Column(type: 'json', options: ['jsonb' => true, 'default' => '[]'])]
+    public array $providerFields = [];
+
+    /** @var list<string> */
+    #[ORM\Column(type: 'json', options: ['jsonb' => true, 'default' => '[]'])]
+    public array $lockedFields = [];
+
     public function __construct(TvSeriesEntity $series, ?TvSeasonEntity $season, TvEpisodeState $state)
     {
         $this->id = $state->id;
@@ -85,11 +93,15 @@ class TvEpisodeEntity
             overview: $this->overview,
             stillUrl: $this->stillUrl,
             retired: $this->retired,
+            providerFields: $this->providerFields,
+            lockedFields: $this->lockedFields,
         );
     }
 
     public function apply(TvEpisodeState $state): void
     {
+        $this->providerFields = $state->providerFields;
+        $this->lockedFields = $state->lockedFields;
         $this->episodeNumber = $state->episodeNumber;
         $this->absoluteNumber = $state->absoluteNumber;
         $this->providerId = $state->providerId;

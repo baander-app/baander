@@ -306,7 +306,7 @@ final class DevelopmentDatabaseTest extends DevDataTestCase
             'postgres_image' => 'recorded-postgres',
             'catalog' => $catalog,
         ];
-        $database = $this->resourceDatabase($catalog, ['migrationFailure' => $failure]);
+        $database = $this->resourceDatabase($catalog, ['migrationFailure' => $failure, 'requireRehearsalCredentials' => true]);
         try {
             $result = $database->rehearse($this->instance, $this->release, $checkpoint);
             self::assertFalse($failure, 'Failed migration was accepted');
@@ -324,6 +324,9 @@ final class DevelopmentDatabaseTest extends DevDataTestCase
         self::assertCount($failure ? 1 : 2, $creates);
         foreach ($creates as $arguments) {
             self::assertNotContains('--mount', $arguments);
+            foreach (['REDIS_PASSWORD', 'REDIS_URL', 'DATABASE_CONTROL_URL'] as $variable) {
+                self::assertContains($variable, $arguments);
+            }
             self::assertStringNotContainsString('private-password', implode(' ', $arguments));
             self::assertStringNotContainsString('private-secret', implode(' ', $arguments));
         }

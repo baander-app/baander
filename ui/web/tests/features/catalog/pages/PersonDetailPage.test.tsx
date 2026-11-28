@@ -8,7 +8,10 @@ import { TVSeriesDetailPage } from '@/features/tv/pages/TVDetailPage'
 import { ThemeProvider } from '@/shared/theme'
 
 const { read } = vi.hoisted(() => ({ read: vi.fn() }))
-vi.mock('@/shared/api-client/axios-instance', () => ({ customInstance: read }))
+vi.mock(import('@/shared/api-client/axios-instance'), async (importOriginal) => ({
+  ...await importOriginal(),
+  customInstance: read,
+}))
 const meta = { current_page: 1, last_page: 1, per_page: 50, total: 1 }
 const profile = {
   publicId: 'person', name: 'Agnès', profileUrl: null, biography: 'A filmmaker and musician.',
@@ -105,14 +108,18 @@ describe('Person profile', () => {
     warnings.mockRestore()
   })
 
-  it('opens a registered TV series even with no imported credits or episodes', async () => {
+  it('shows an extra-only series with no imported credits or available episodes', async () => {
     read.mockImplementation(async (url: string) => {
       if (url.includes('/credits') || url.includes('/episodes')) return { data: [], meta: { ...meta, total: 0 } }
-      return { data: { publicId: 'series', name: 'Registered show', overview: null, posterUrl: null } }
+      return { data: {
+        publicId: 'series', libraryPublicId: 'library', name: 'Registered show', overview: null,
+        posterUrl: null, metadataSource: null, seasons: [], unseasonedCount: 0,
+        extras: [{ placementPublicId: 'trailer-placement', publicId: 'trailer-video', videoPublicId: 'trailer-video', kind: 'trailer' }],
+      } }
     })
     mount('/tv/series/series', '/tv/series/:publicId', <TVSeriesDetailPage />)
     expect(await screen.findByRole('heading', { name: 'Registered show' })).toBeInTheDocument()
     expect(await screen.findByText('No credits available.')).toBeInTheDocument()
-    expect(await screen.findByText('No episodes registered yet.')).toBeInTheDocument()
+    expect(await screen.findByText('No available episodes.')).toBeInTheDocument()
   })
 })

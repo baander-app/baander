@@ -5,6 +5,15 @@ declare(strict_types=1);
 namespace App\Tests\Integration;
 
 use App\Catalog\Infrastructure\Doctrine\Repository\PeopleReadRepository;
+use App\Catalog\Infrastructure\Doctrine\Repository\VideoRepository;
+use App\Catalog\Infrastructure\Doctrine\Query\VideoWorkAvailability;
+use App\Catalog\Infrastructure\VideoAvailability;
+use App\Library\Infrastructure\Doctrine\Repository\LibraryFileIndexRepository;
+use App\Library\Infrastructure\Doctrine\Repository\LibraryRepository;
+use App\Library\Infrastructure\Filesystem\LibraryMediaFiles;
+use App\Library\Infrastructure\Filesystem\MediaFileGuard;
+use Symfony\Component\Clock\NativeClock;
+use Psr\Log\NullLogger;
 use App\Media\Infrastructure\Doctrine\Entity\ImageEntity;
 use App\Media\Infrastructure\Doctrine\Repository\ImageRepository;
 use App\Shared\Domain\Model\PublicId;
@@ -43,6 +52,7 @@ final class PeopleReadRepositoryTest extends TestCase
         $this->connection->executeStatement('SET search_path TO ' . $this->schema . ', public');
         foreach ([
             'people', 'images', 'movies', 'tv_series', 'tv_seasons', 'tv_episodes',
+            'libraries', 'videos', 'movie_video', 'video_placements', 'video_placement_episode', 'library_file_index',
             'albums', 'songs', 'artists', 'artist_song', 'artist_album',
             'person_artist_links', 'person_id_aliases', 'movie_person_credits',
             'series_person_credits', 'episode_person_credits',
@@ -51,9 +61,12 @@ final class PeopleReadRepositoryTest extends TestCase
             // write-side constraints so each fixture can isolate access behavior.
             $this->connection->executeStatement('CREATE TABLE ' . $table . ' AS TABLE public.' . $table . ' WITH NO DATA');
         }
-        $this->reads = new PeopleReadRepository(ArtistImportIdentityRace::entityManager($this->connection));
+        $this->reads = $this->reader($this->connection);
         $this->library = Uuid::v7()->toString();
         $this->hiddenLibrary = Uuid::v7()->toString();
+        foreach ([$this->library, $this->hiddenLibrary] as $library) {
+            $this->connection->insert('libraries', ['id' => $library, 'public_id' => (string) new PublicId(), 'path' => '/media/baander.app/' . $library]);
+        }
         $this->person = Uuid::v7()->toString();
         $this->personPublicId = new PublicId();
         $this->connection->insert('people', [
@@ -70,6 +83,29 @@ final class PeopleReadRepositoryTest extends TestCase
             $this->connection->executeStatement('DROP SCHEMA IF EXISTS ' . $this->schema . ' CASCADE');
             $this->connection->close();
         }
+    }
+
+    public function testMixedCreditsKeepTitleTiesAndAvailabilityAcrossTheScanBoundary(): void
+    {
+        for ($index = 0; $index < 253; ++$index) {
+            $movie = $this->movie('Shared title', $this->library, available: $index !== 249);
+            $this->credit('movie', $movie, 'actor');
+            if ($index === 250) {
+                $this->credit('movie', $movie, 'director');
+            }
+        }
+        $this->music();
+        $expected = $this->connection->fetchFirstColumn(
+            'SELECT movie.public_id FROM movies movie JOIN movie_video link ON link.movie_id = movie.id '
+            . 'JOIN video_placements placement ON placement.movie_id = movie.id '
+            . 'JOIN library_file_index file ON file.path = :prefix || placement.relative_path '
+            . 'WHERE file.available = TRUE ORDER BY lower(movie.title), movie.public_id',
+            ['prefix' => '/media/baander.app/' . $this->library . '/'],
+        );
+        $page = $this->reads->credits($this->personPublicId, SearchOptions::create('Shared title', limit: 5, offset: 247), $this->scope());
+        self::assertSame(252, $page->getTotal());
+        self::assertSame(array_slice($expected, 247, 5), array_column($page->getItems(), 'publicId'));
+        self::assertFalse($this->connection->isTransactionActive());
     }
 
     public function testScopeFiltersBeforeGroupingAndCountsAcrossMusicAndMovies(): void
@@ -101,6 +137,81 @@ final class PeopleReadRepositoryTest extends TestCase
         self::assertNull($this->reads->workCredits('movie', $this->moviePublicId($hidden), SearchOptions::create(''), $scope));
     }
 
+    public function testCreditFeedsFilterUnavailableVideoBeforePagingAndKeepMusicAndPublicIds(): void
+    {
+        $missing = $this->movie('A missing movie', $this->library, available: false);
+        $hidden = $this->movie('B hidden movie', $this->hiddenLibrary);
+        $mismatched = $this->movie('C replaced movie', $this->library);
+        $visible = $this->movie('Z visible movie', $this->library);
+        foreach ([$missing, $hidden, $mismatched, $visible] as $movie) {
+            $this->credit('movie', $movie, 'actor');
+        }
+        $this->connection->executeStatement(
+            'UPDATE library_file_index SET hash = :hash WHERE path = :path',
+            ['hash' => hash('xxh3', 'replacement'), 'path' => '/media/baander.app/' . $this->library . '/' . $mismatched . '.mp4'],
+        );
+        $series = Uuid::v7()->toString();
+        $seriesPublic = new PublicId();
+        $episode = Uuid::v7()->toString();
+        $episodePublic = new PublicId();
+        $this->connection->insert('tv_series', ['id' => $series, 'public_id' => $seriesPublic->toString(), 'library_id' => $this->library, 'name' => 'D visible series']);
+        $this->connection->insert('tv_episodes', [
+            'id' => $episode, 'public_id' => $episodePublic->toString(), 'series_id' => $series,
+            'name' => 'E seasonless episode', 'absolute_number' => 137, 'retired' => false,
+        ], ['retired' => ParameterType::BOOLEAN]);
+        $this->file('episode', $episode, $this->library);
+        $this->credit('series', $series, 'actor');
+        $this->credit('episode', $episode, 'actor');
+        $this->music();
+
+        $first = $this->reads->credits($this->personPublicId, SearchOptions::create('', 2), $this->scope());
+        $second = $this->reads->credits($this->personPublicId, SearchOptions::create('', 2, 2), $this->scope());
+        $last = $this->reads->credits($this->personPublicId, SearchOptions::create('', 2, 4), $this->scope());
+        self::assertSame(5, $first->getTotal());
+        self::assertSame(5, $second->getTotal());
+        self::assertSame(5, $last->getTotal());
+        self::assertSame(['Album', 'D visible series'], array_column($first->getItems(), 'title'));
+        self::assertSame(['E seasonless episode', 'Song'], array_column($second->getItems(), 'title'));
+        self::assertSame([$this->moviePublicId($visible)->toString()], array_column($last->getItems(), 'publicId'));
+        self::assertSame(['kind', 'publicId', 'title', 'roles'], array_keys($last->getItems()[0]));
+        self::assertSame(1, $this->reads->credits($this->personPublicId, SearchOptions::create(''), $this->scope(), 'movie')->getTotal());
+        self::assertSame(3, $this->reads->profile($this->personPublicId, $this->scope())['movieCount']);
+        $songs = $this->reads->credits($this->personPublicId, SearchOptions::create('', 1), $this->scope(), 'song');
+        self::assertSame(1, $songs->getTotal());
+        self::assertSame(['Song'], array_column($songs->getItems(), 'title'));
+        $pastAlbum = $this->reads->credits($this->personPublicId, SearchOptions::create('', 1, 1), $this->scope(), 'album');
+        self::assertSame(1, $pastAlbum->getTotal());
+        self::assertSame([], $pastAlbum->getItems());
+        self::assertNull($this->reads->workCredits('movie', $this->moviePublicId($missing), SearchOptions::create(''), $this->scope()));
+        self::assertNull($this->reads->workCredits('movie', $this->moviePublicId($mismatched), SearchOptions::create(''), $this->scope()));
+        self::assertNull($this->reads->workCredits('movie', $this->moviePublicId($hidden), SearchOptions::create(''), $this->scope()));
+        self::assertSame(1, $this->reads->workCredits('series', $seriesPublic, SearchOptions::create(''), $this->scope())->getTotal());
+        self::assertSame(1, $this->reads->workCredits('episode', $episodePublic, SearchOptions::create(''), $this->scope())->getTotal());
+        $this->connection->update('tv_episodes', ['retired' => true], ['id' => $episode], ['retired' => ParameterType::BOOLEAN]);
+        self::assertNull($this->reads->workCredits('episode', $episodePublic, SearchOptions::create(''), $this->scope()));
+        self::assertSame(3, $this->reads->credits($this->personPublicId, SearchOptions::create(''), $this->scope())->getTotal());
+    }
+
+    public function testAnotherLibraryCannotMakeAnUnavailableCreditedMovieVisible(): void
+    {
+        $movie = $this->movie('Unavailable here', $this->library, available: false);
+        $this->credit('movie', $movie, 'actor');
+        $video = $this->connection->fetchOne('SELECT video_id FROM movie_video WHERE movie_id = ?', [$movie]);
+        $hash = $this->connection->fetchOne('SELECT hash FROM videos WHERE id = ?', [$video]);
+        $this->connection->insert('video_placements', [
+            'id' => Uuid::v7()->toString(), 'public_id' => (string) new PublicId(), 'movie_id' => $movie,
+            'video_id' => $video, 'library_id' => $this->hiddenLibrary, 'relative_path' => 'foreign.mp4', 'raw_parse' => '{}',
+        ]);
+        $this->connection->insert('library_file_index', [
+            'id' => Uuid::v7()->toString(), 'library_id' => $this->hiddenLibrary,
+            'path' => '/media/baander.app/' . $this->hiddenLibrary . '/foreign.mp4', 'hash' => $hash, 'available' => true,
+        ], ['available' => ParameterType::BOOLEAN]);
+
+        self::assertSame(0, $this->reads->credits($this->personPublicId, SearchOptions::create(''), $this->scope())->getTotal());
+        self::assertSame(0, $this->reads->credits($this->personPublicId, SearchOptions::create(''), LibraryReadScope::unrestricted())->getTotal());
+        self::assertNull($this->reads->workCredits('movie', $this->moviePublicId($movie), SearchOptions::create(''), $this->scope()));
+    }
+
     public function testAliasesAndArtistLinksUseCurrentScopeAndIdentitySnapshot(): void
     {
         $artist = $this->music();
@@ -123,7 +234,8 @@ final class PeopleReadRepositoryTest extends TestCase
         $episodePublic = new PublicId();
         $this->connection->insert('tv_series', ['id' => $series, 'public_id' => $seriesPublic->toString(), 'library_id' => $this->library, 'name' => 'A series']);
         $this->connection->insert('tv_seasons', ['id' => $season, 'public_id' => (string) new PublicId(), 'series_id' => $series, 'season_number' => 0]);
-        $this->connection->insert('tv_episodes', ['id' => $episode, 'public_id' => $episodePublic->toString(), 'series_id' => $series, 'season_id' => $season, 'name' => 'A special', 'episode_number' => 2]);
+        $this->connection->insert('tv_episodes', ['id' => $episode, 'public_id' => $episodePublic->toString(), 'series_id' => $series, 'season_id' => $season, 'name' => 'A special', 'episode_number' => 2, 'retired' => false], ['retired' => ParameterType::BOOLEAN]);
+        $this->file('episode', $episode, $this->library);
         self::assertSame('A series', $this->reads->seriesDetail($seriesPublic, $this->scope())['name']);
         self::assertSame('A special', $this->reads->episodeDetail($episodePublic, $this->scope())['name']);
         self::assertSame(1, $this->reads->series(SearchOptions::create(''), $this->scope())->getTotal());
@@ -171,8 +283,11 @@ final class PeopleReadRepositoryTest extends TestCase
 
             public function log($level, string|Stringable $message, array $context = []): void
             {
-                if (isset($context['sql']) && str_starts_with($context['sql'], 'WITH visible_credits')) {
-                    $this->queries[] = ['sql' => $context['sql'], 'params' => $context['params'] ?? []];
+                if (isset($context['sql'])) {
+                    $sql = preg_replace('/\ADECLARE availability_scan_[0-9a-f]+ NO SCROLL CURSOR FOR /', '', $context['sql']) ?? $context['sql'];
+                    if (str_starts_with($sql, 'WITH visible_credits')) {
+                        $this->queries[] = ['sql' => $sql, 'params' => $context['params'] ?? []];
+                    }
                 }
             }
         };
@@ -181,10 +296,11 @@ final class PeopleReadRepositoryTest extends TestCase
         $connection = DriverManager::getConnection($this->connection->getParams(), $configuration);
         try {
             $connection->executeStatement('SET search_path TO ' . $this->schema . ', public');
-            $reads = new PeopleReadRepository(ArtistImportIdentityRace::entityManager($connection));
+            $reads = $this->reader($connection);
             self::assertCount(50, $reads->credits($this->personPublicId, SearchOptions::create(''), $this->scope())->getItems());
-            self::assertCount(2, $logger->queries);
-            $query = $logger->queries[1];
+            self::assertCount(1, $logger->queries);
+            $query = $logger->queries[0];
+            self::assertStringNotContainsString('OFFSET', $query['sql']);
             $plan = $connection->fetchOne('EXPLAIN (FORMAT JSON) ' . $query['sql'], array_values($query['params']));
             self::assertIsArray(json_decode($plan, true, flags: JSON_THROW_ON_ERROR)[0]['Plan']);
         } finally {
@@ -224,15 +340,58 @@ final class PeopleReadRepositoryTest extends TestCase
         self::assertNull($images->findVisibleByPublicId($publicId, MediaReadScope::none()));
     }
 
+    private function reader(Connection $connection): PeopleReadRepository
+    {
+        $manager = ArtistImportIdentityRace::entityManager($connection);
+        $clock = new NativeClock();
+        $files = new LibraryMediaFiles(
+            new LibraryRepository($manager, $clock),
+            new LibraryFileIndexRepository($manager),
+            new MediaFileGuard(),
+            $manager,
+            $clock,
+            new NullLogger(),
+        );
+
+        return new PeopleReadRepository($manager, new VideoWorkAvailability($connection, new VideoAvailability(new VideoRepository($manager), $files)));
+    }
+
+    private function file(string $kind, string $owner, string $library, bool $available = true): string
+    {
+        $video = Uuid::v7()->toString();
+        $placement = Uuid::v7()->toString();
+        $relative = $owner . '.mp4';
+        $path = '/media/baander.app/' . $library . '/' . $relative;
+        $hash = hash('xxh3', $video);
+        $this->connection->insert('videos', ['id' => $video, 'public_id' => (string) new PublicId(), 'path' => $path, 'hash' => $hash]);
+        $this->connection->insert('video_placements', [
+            'id' => $placement, 'public_id' => (string) new PublicId(), 'video_id' => $video,
+            'library_id' => $library, 'relative_path' => $relative, 'raw_parse' => '{}',
+            $kind === 'movie' ? 'movie_id' : 'series_id' => $kind === 'movie' ? $owner : $this->connection->fetchOne('SELECT series_id FROM tv_episodes WHERE id = ?', [$owner]),
+        ]);
+        if ($kind === 'movie') {
+            $this->connection->insert('movie_video', ['id' => Uuid::v7()->toString(), 'movie_id' => $owner, 'video_id' => $video]);
+        } else {
+            $this->connection->insert('video_placement_episode', ['id' => Uuid::v7()->toString(), 'placement_id' => $placement, 'episode_id' => $owner, 'sort_order' => 0]);
+        }
+        $this->connection->insert('library_file_index', [
+            'id' => Uuid::v7()->toString(), 'library_id' => $library, 'path' => $path, 'hash' => $hash,
+            'available' => $available,
+        ], ['available' => ParameterType::BOOLEAN]);
+
+        return $video;
+    }
+
     private function scope(): LibraryReadScope
     {
         return LibraryReadScope::restricted([Uuid::fromString($this->library)]);
     }
 
-    private function movie(string $title, string $library): string
+    private function movie(string $title, string $library, bool $available = true): string
     {
         $id = Uuid::v7()->toString();
         $this->connection->insert('movies', ['id' => $id, 'public_id' => (string) new PublicId(), 'library_id' => $library, 'title' => $title]);
+        $this->file('movie', $id, $library, $available);
 
         return $id;
     }

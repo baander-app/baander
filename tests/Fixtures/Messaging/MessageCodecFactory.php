@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Tests\Fixtures\Messaging;
 
 use App\Catalog\Infrastructure\Messaging\CatalogMessagePayloadCodec;
+use App\Catalog\Infrastructure\Messaging\VideoMatchRefreshMessagePayloadCodec;
 use App\Library\Infrastructure\Messaging\LibraryMessagePayloadCodec;
 use App\Lyrics\Infrastructure\Messaging\LyricsMessagePayloadCodec;
 use App\Media\Infrastructure\Messaging\MediaMessagePayloadCodec;
@@ -49,6 +50,7 @@ final class MessageCodecFactory
     {
         return [
             new CatalogMessagePayloadCodec(),
+            new VideoMatchRefreshMessagePayloadCodec(),
             new LibraryMessagePayloadCodec(),
             new LyricsMessagePayloadCodec(),
             new MediaMessagePayloadCodec(),

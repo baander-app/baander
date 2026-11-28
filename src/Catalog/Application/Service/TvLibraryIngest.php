@@ -77,16 +77,20 @@ final readonly class TvLibraryIngest
         $name = $this->parser->parse($file->relativePath);
         $folder = $this->folder($name);
         $existing = $this->catalog->findPlacement($library, $video->getId());
+        $ownerId = $existing?->getSeriesId();
+        $series = isset($known[$folder]) ? $this->catalog->findSeriesByUuid($known[$folder]) : null;
+        $series ??= ($ownerId === null ? null : $this->catalog->findSeriesByUuid($ownerId))
+            ?? $this->catalog->findSeriesByFolder($library, $folder);
+        $series = $this->lockPlacementOwners($series, $ownerId);
+        if ($existing !== null) {
+            $existing = $this->catalog->findPlacement($library, $video->getId());
+        }
         if ($existing !== null && $this->isDuplicate($existing, $file)) {
             $this->recordDuplicate($existing, $file);
 
             return;
         }
 
-        $series = isset($known[$folder]) ? $this->catalog->findSeriesByUuid($known[$folder]) : null;
-        $existingSeriesId = $existing?->getSeriesId();
-        $series ??= ($existingSeriesId === null ? null : $this->catalog->findSeriesByUuid($existingSeriesId))
-            ?? $this->catalog->findSeriesByFolder($library, $folder);
         if ($series === null) {
             $series = TvSeries::create($library, $folder, $name->title, $name->year);
             $this->catalog->saveSeries($series);
@@ -118,6 +122,23 @@ final readonly class TvLibraryIngest
     public function flush(): void
     {
         $this->catalog->flush();
+    }
+
+    private function lockPlacementOwners(?TvSeries $series, ?Uuid $ownerId): ?TvSeries
+    {
+        $ids = [];
+        foreach ([$ownerId, $series?->getId()] as $id) {
+            if ($id !== null) {
+                $ids[$id->toString()] = $id;
+            }
+        }
+        ksort($ids, SORT_STRING);
+        $locked = [];
+        foreach ($ids as $key => $id) {
+            $locked[$key] = $this->catalog->lockSeriesForPlacement($id);
+        }
+
+        return $series === null ? null : ($locked[$series->getId()->toString()] ?? null);
     }
 
     private function folder(EpisodeName $name): string

@@ -867,6 +867,55 @@
       "capture": "child-row-or-exempt"
     },
     {
+      "parent": "users",
+      "child": "watched_marks",
+      "foreign_key": "user_id",
+      "action": "CASCADE",
+      "capture": "child-row-or-exempt"
+    },
+    {
+      "parent": "users",
+      "child": "resume_positions",
+      "foreign_key": "user_id",
+      "action": "CASCADE",
+      "capture": "child-row-or-exempt"
+    },
+    {
+      "parent": "videos",
+      "child": "resume_positions",
+      "foreign_key": "video_id",
+      "action": "CASCADE",
+      "capture": "child-row-or-exempt"
+    },
+    {
+      "parent": "tv_episodes",
+      "child": "watched_marks",
+      "foreign_key": "episode_id",
+      "action": "CASCADE",
+      "capture": "child-row-or-exempt"
+    },
+    {
+      "parent": "movies",
+      "child": "watched_marks",
+      "foreign_key": "movie_id",
+      "action": "CASCADE",
+      "capture": "child-row-or-exempt"
+    },
+    {
+      "parent": "tv_series",
+      "child": "video_match_states",
+      "foreign_key": "series_id",
+      "action": "CASCADE",
+      "capture": "child-row-or-exempt"
+    },
+    {
+      "parent": "movies",
+      "child": "video_match_states",
+      "foreign_key": "movie_id",
+      "action": "CASCADE",
+      "capture": "child-row-or-exempt"
+    },
+    {
       "parent": "libraries",
       "child": "video_placements",
       "foreign_key": "library_id",
@@ -1003,6 +1052,13 @@
       "parent": "transcode_sessions",
       "child": "transcode_control_receipts",
       "foreign_key": "session_id",
+      "action": "CASCADE",
+      "capture": "child-row-or-exempt"
+    },
+    {
+      "parent": "libraries",
+      "child": "images",
+      "foreign_key": "library_id",
       "action": "CASCADE",
       "capture": "child-row-or-exempt"
     }
@@ -1241,10 +1297,10 @@
       "mapping": "src/Media/Infrastructure/Doctrine/Entity/ImageEntity.php",
       "classification": "capture",
       "operations": ["INSERT", "UPDATE", "DELETE"],
-      "relevant_columns": ["id", "path", "extension", "mime_type", "blurhash", "public_id", "size", "width", "height", "imageable_type", "album_id", "artist_id", "playlist_id", "created_at"],
+      "relevant_columns": ["id", "path", "extension", "mime_type", "blurhash", "public_id", "size", "width", "height", "imageable_type", "album_id", "artist_id", "playlist_id", "created_at", "library_id"],
       "excluded_columns": ["updated_at"],
       "families": ["catalog", "playlists", "activity", "admin-media"],
-      "scope_routes": ["image"],
+      "scope_routes": ["image", "library"],
       "readers": ["src/Media/Infrastructure/Doctrine/Repository/ImageRepository.php"],
       "response_cache": "authoritative-read"
     },
@@ -1409,7 +1465,7 @@
       "mapping": "src/Catalog/Infrastructure/Doctrine/Entity/MovieEntity.php",
       "classification": "capture",
       "operations": ["INSERT", "UPDATE", "DELETE"],
-      "relevant_columns": ["id", "public_id", "library_id", "title", "year", "summary", "tmdb_id", "imdb_id", "overview", "tagline", "poster_url", "backdrop_url", "runtime", "rating", "original_language", "tmdb_collection_id", "collection_name", "locked_fields", "created_at"],
+      "relevant_columns": ["id", "public_id", "library_id", "title", "year", "summary", "tmdb_id", "imdb_id", "overview", "tagline", "poster_url", "backdrop_url", "runtime", "rating", "original_language", "tmdb_collection_id", "collection_name", "locked_fields", "created_at", "matched_provider", "provider_id", "external_ids", "hand_matched"],
       "excluded_columns": ["updated_at"],
       "families": ["catalog", "libraries", "activity", "recommendations", "admin-media", "admin-metadata"],
       "scope_routes": ["library"],
@@ -1933,10 +1989,70 @@
       "reason": "TV series; the library-scoped TV and People views refresh them by 30-second visible sampling and catalog hints, without capture."
     },
     {
+      "table": "watched_marks",
+      "mapping": "src/Activity/Infrastructure/Doctrine/Entity/WatchedMarkEntity.php",
+      "classification": "capture",
+      "operations": ["INSERT", "UPDATE", "DELETE"],
+      "relevant_columns": ["id", "user_id", "episode_id", "movie_id", "watched_at"],
+      "excluded_columns": [],
+      "families": ["activity", "catalog"],
+      "scope_routes": ["user"],
+      "readers": ["src/Activity/Infrastructure/Doctrine/Repository/WatchedMarkRepository.php", "src/Activity/Infrastructure/Doctrine/ViewingState.php"],
+      "response_cache": "authoritative-read"
+    },
+    {
+      "table": "resume_positions",
+      "mapping": "src/Activity/Infrastructure/Doctrine/Entity/ResumePositionEntity.php",
+      "classification": "capture",
+      "operations": ["INSERT", "UPDATE", "DELETE"],
+      "relevant_columns": ["id", "user_id", "video_id", "position_seconds", "reported_at", "last_played_at"],
+      "excluded_columns": ["protected_through_at"],
+      "families": ["activity", "catalog"],
+      "scope_routes": ["user"],
+      "readers": ["src/Activity/Infrastructure/Doctrine/ViewingState.php"],
+      "response_cache": "authoritative-read"
+    },
+    {
+      "table": "watched_mark_moves",
+      "mapping": "src/Activity/Infrastructure/Doctrine/Entity/WatchedMarkMoveEntity.php",
+      "classification": "excluded",
+      "reason": "Transaction receipts prevent a retried placement from moving member marks twice. Member reads use watched_marks."
+    },
+    {
+      "table": "video_match_states",
+      "mapping": "src/Catalog/Infrastructure/Doctrine/Entity/VideoMatchStateEntity.php",
+      "classification": "capture",
+      "operations": ["INSERT", "UPDATE", "DELETE"],
+      "relevant_columns": ["id", "series_id", "movie_id", "status", "source", "due_at", "reason", "best_score", "checked_at"],
+      "excluded_columns": ["claim_id", "claim_expires_at", "next_due_at"],
+      "families": ["admin-metadata"],
+      "scope_routes": ["admin"],
+      "readers": ["src/Catalog/Infrastructure/Doctrine/Repository/VideoMatchStateRepository.php"],
+      "response_cache": "authoritative-read"
+    },
+    {
+      "table": "video_provider_pauses",
+      "mapping": "src/Catalog/Infrastructure/Doctrine/Entity/VideoProviderPauseEntity.php",
+      "classification": "capture",
+      "operations": ["INSERT", "UPDATE", "DELETE"],
+      "relevant_columns": ["provider", "failure_kind", "failure_count", "retry_at"],
+      "excluded_columns": [],
+      "families": ["admin-metadata"],
+      "scope_routes": ["admin"],
+      "readers": ["src/Catalog/Infrastructure/Doctrine/Repository/VideoProviderPauseRepository.php"],
+      "response_cache": "authoritative-read"
+    },
+    {
       "table": "video_placements",
       "mapping": "src/Catalog/Infrastructure/Doctrine/Entity/VideoPlacementEntity.php",
-      "classification": "excluded",
-      "reason": "Video placement storage; library-scoped video views refresh through catalog hints and visible sampling."
+      "classification": "capture",
+      "operations": ["INSERT", "UPDATE", "DELETE"],
+      "relevant_columns": ["id", "public_id", "library_id", "video_id", "series_id", "movie_id", "relative_path", "raw_parse", "extra_kind", "assigned", "review_reason", "sort_order", "created_at", "review_checked_at"],
+      "excluded_columns": [],
+      "families": ["admin-metadata"],
+      "scope_routes": ["admin"],
+      "readers": ["src/Catalog/Infrastructure/Doctrine/Query/VideoMatchReviewReadQuery.php"],
+      "response_cache": "authoritative-read"
     },
     {
       "table": "video_placement_episode",

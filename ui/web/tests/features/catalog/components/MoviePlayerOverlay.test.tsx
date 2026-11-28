@@ -110,7 +110,7 @@ function renderPlayer() {
       />
     </ThemeProvider>
   )
-  return screen.getByRole('slider', { name: 'Seek movie' })
+  return screen.getByRole('slider', { name: 'Seek video' })
 }
 
 function trackFor(slider: HTMLElement, width = 180) {
@@ -169,7 +169,7 @@ describe('movie source timeline', () => {
 
   it('previews volume throughout a drag and submits only its committed value', () => {
     renderPlayer()
-    const volume = screen.getByRole('slider', { name: 'Movie volume' })
+    const volume = screen.getByRole('slider', { name: 'Video volume' })
     const track = trackFor(volume, 100)
     fireEvent.pointerDown(track, { clientX: 70, pointerId: 1 })
     fireEvent.pointerMove(track, { clientX: 40, pointerId: 1 })
@@ -184,7 +184,7 @@ describe('movie source timeline', () => {
 
   it('commits keyboard volume access and discards a cancelled volume drag', () => {
     renderPlayer()
-    const volume = screen.getByRole('slider', { name: 'Movie volume' })
+    const volume = screen.getByRole('slider', { name: 'Video volume' })
     fireEvent.keyDown(volume, { key: 'ArrowLeft' })
     expect(request).toHaveBeenCalledExactlyOnceWith({
       action: 'volume',
@@ -291,7 +291,7 @@ describe('movie source timeline', () => {
         />
       </ThemeProvider>
     )
-    const timeline = screen.getByRole('slider', { name: 'Seek movie' })
+    const timeline = screen.getByRole('slider', { name: 'Seek video' })
     const track = trackFor(timeline)
     fireEvent.pointerDown(track, { clientX: 120, pointerId: 1 })
     playback.videoId = 'second'
@@ -305,7 +305,7 @@ describe('movie source timeline', () => {
         />
       </ThemeProvider>
     )
-    expect(screen.getByRole('slider', { name: 'Seek movie' })).toHaveAttribute(
+    expect(screen.getByRole('slider', { name: 'Seek video' })).toHaveAttribute(
       'aria-valuenow',
       '3'
     )

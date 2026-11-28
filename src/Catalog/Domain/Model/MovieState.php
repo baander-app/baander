@@ -20,6 +20,7 @@ final class MovieState
      * @param string[] $videoIds
      * @param list<string> $videoPublicIds
      * @param list<string> $lockedFields
+     * @param array<string, string> $externalIds
      */
     public function __construct(
         public readonly Uuid $id,
@@ -44,6 +45,10 @@ final class MovieState
         public DateTimeImmutable $updatedAt = new DateTimeImmutable(),
         public array $videoPublicIds = [],
         public array $lockedFields = [],
+        public ?string $matchedProvider = null,
+        public ?string $providerId = null,
+        public array $externalIds = [],
+        public bool $handMatched = false,
     ) {
     }
 }

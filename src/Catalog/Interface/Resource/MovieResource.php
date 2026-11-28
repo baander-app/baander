@@ -106,11 +106,13 @@ use OpenApi\Spec as OA;
             type: 'array',
             items: new OA\Schema(type: 'object'),
         ),
-        'videos' => new OA\Schema(
-            description: 'Video variants',
-            type: 'array',
-            items: new OA\Schema(type: 'object'),
-        ),
+        'videos' => new OA\Schema(type: 'array', items: new OA\Schema(ref: VideoVersionResource::class)),
+        'extras' => new OA\Schema(type: 'array', items: new OA\Schema(ref: VideoExtraResource::class)),
+        'libraryPublicId' => new OA\Schema(type: 'string'),
+        'metadataSource' => new OA\Schema(type: 'string', nullable: true, enum: VideoMatchCandidatesResource::PROVIDERS),
+        'watched' => new OA\Schema(type: 'boolean'),
+        'progress' => new OA\Schema(type: 'number', nullable: true, minimum: 0, maximum: 1),
+        'defaultVideoPublicId' => new OA\Schema(type: 'string', nullable: true),
         'createdAt' => new OA\Schema(
             description: 'Creation timestamp',
             type: 'string',
@@ -129,6 +131,9 @@ final class MovieResource extends AbstractResource
 {
     public static function from(mixed $source): array
     {
+        if (is_array($source)) {
+            return self::fromRead($source);
+        }
         assert($source instanceof Movie);
 
         return [
@@ -151,6 +156,28 @@ final class MovieResource extends AbstractResource
             'createdAt' => $source->getCreatedAt()->format(\DateTimeInterface::ATOM),
             'updatedAt' => $source->getUpdatedAt()->format(\DateTimeInterface::ATOM),
         ];
+    }
+
+    /** @param array<string, mixed> $source
+     * @return array<string, mixed>
+     */
+    private static function fromRead(array $source): array
+    {
+        assert($source['movie'] instanceof Movie);
+        $movie = $source['movie'];
+        $videos = VideoVersionResource::collection($source['videos']);
+        $data = self::fromWithPoster(
+            $movie,
+            $movie->getPosterUrl() === null ? null : ['url' => $movie->getPosterUrl()],
+            videos: $videos,
+        );
+        $data['videoIds'] = array_column($videos, 'publicId');
+        $data['extras'] = VideoExtraResource::collection($source['extras']);
+        foreach (['libraryPublicId', 'metadataSource', 'watched', 'progress', 'defaultVideoPublicId'] as $field) {
+            $data[$field] = $source[$field];
+        }
+
+        return $data;
     }
 
     /**

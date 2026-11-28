@@ -17,13 +17,10 @@ function getDefaultMood(): ThemeMood {
 }
 
 function applyMood(mood: ThemeMood): void {
-  document.documentElement.setAttribute('data-theme', mood)
-
-  // Toggle theme-transitioning class for smooth CSS transition
-  document.documentElement.classList.add('theme-transitioning')
-  setTimeout(() => {
-    document.documentElement.classList.remove('theme-transitioning')
-  }, 200)
+  const root = document.documentElement
+  root.setAttribute('data-theme', mood)
+  root.classList.add('theme-transitioning')
+  window.setTimeout(() => root.classList.remove('theme-transitioning'), 200)
 }
 
 function subscribe(callback: () => void): () => void {

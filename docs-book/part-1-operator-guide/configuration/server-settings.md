@@ -32,6 +32,7 @@ A stored value can stop being allowed, for example when a setting's allowed valu
 
 | Key | Default | What it controls |
 |-----|---------|------------------|
+| `activity.progress_clock_skew_seconds` | `0` | How many whole seconds a video progress report may lag behind the latest saved observation and still update the position. Zero requires a newer timestamp. Future reports use receipt time. See [Member progress](../media/video-matching.md#missing-files-and-member-state). |
 | `admin.can_view_users` | `true` | Whether administrators who are not super administrators may list users. See [Who can manage users](../administration/user-management.md#who-can-manage-users). |
 | `admin.can_create_users` | `false` | Whether those administrators may create users. They can create only users with the User role. |
 | `auth.registration_open` | `false` | Whether anyone may create an account on the sign-up page; labelled **Self-registration** in the admin panel. A new account confirms its address through an emailed link, so open it only when the server sends email. See [Registration and address changes](account-security.md#registration-and-address-changes). |

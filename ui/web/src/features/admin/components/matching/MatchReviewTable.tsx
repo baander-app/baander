@@ -141,7 +141,7 @@ const Footer = styled.div`
 
 interface MatchReviewTableProps {
   /** Starts matching the review's album by hand. */
-  onMatchAlbum: (review: MatchReview) => void
+  onMatchAlbum: (review: MatchReview, trigger: HTMLButtonElement) => void
 }
 
 /** The albums automatic matching could not match confidently, with the action that matches each one by hand. */
@@ -185,7 +185,7 @@ export function MatchReviewTable({ onMatchAlbum }: MatchReviewTableProps) {
 
 interface ReviewRowsProps {
   reviews: readonly MatchReview[]
-  onMatchAlbum: (review: MatchReview) => void
+  onMatchAlbum: MatchReviewTableProps['onMatchAlbum']
 }
 
 function ReviewRows({ reviews, onMatchAlbum }: ReviewRowsProps) {
@@ -220,7 +220,7 @@ function ReviewRows({ reviews, onMatchAlbum }: ReviewRowsProps) {
                 size="sm"
                 variant="outline"
                 aria-label={`Match ${review.title}`}
-                onClick={() => onMatchAlbum(review)}
+                onClick={(event) => onMatchAlbum(review, event.currentTarget)}
               >
                 Match
               </Button>

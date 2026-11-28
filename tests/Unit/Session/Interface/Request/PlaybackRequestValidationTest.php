@@ -11,6 +11,7 @@ use App\Session\Interface\Request\ObservePlaybackRequest;
 use App\Session\Interface\Request\OverridePlaybackRequest;
 use App\Session\Interface\Request\ReconcilePlaybackRequest;
 use App\Session\Interface\Request\RegisterPlaybackEndpointRequest;
+use App\Session\Interface\Request\RecoverLocalPlaybackRequest;
 use App\Session\Interface\Request\TransferPlaybackRequest;
 use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
@@ -19,6 +20,39 @@ use Symfony\Component\Validator\Validation;
 
 final class PlaybackRequestValidationTest extends TestCase
 {
+    public function testOptionalVideoViewingContextSurvivesLoadAndRecoveryValidation(): void
+    {
+        $validator = Validation::createValidatorBuilder()->enableAttributeMapping()->getValidator();
+        $id = Uuid::v7()->toString();
+        foreach (['episode', 'movie', 'extra'] as $kind) {
+            $media = [
+                'kind' => 'video',
+                'publicId' => new PublicId()->toString(),
+                'viewing' => ['titleKind' => $kind, 'titleId' => new PublicId()->toString()],
+            ];
+            $checkpoint = ['revision' => 1, 'media' => $media, 'currentTrackIndex' => 0, 'position' => 12.5];
+            foreach ([
+                new ControlPlaybackRequest($id, 0, 'load', media: $media),
+                new ClosePlaybackEndpointRequest($id, $checkpoint),
+                new RecoverLocalPlaybackRequest($id, $id, str_repeat('a', 64), $checkpoint),
+            ] as $request) {
+                self::assertCount(0, $validator->validate($request), $request::class);
+            }
+        }
+        foreach ([
+            ['titleKind' => 'season', 'titleId' => new PublicId()->toString()],
+            ['titleKind' => 'episode', 'titleId' => 'invalid'],
+            ['titleKind' => 'movie'],
+            null,
+        ] as $viewing) {
+            $media = ['kind' => 'video', 'publicId' => new PublicId()->toString(), 'viewing' => $viewing];
+            self::assertNotCount(0, $validator->validate(new ControlPlaybackRequest($id, 0, 'load', media: $media)));
+        }
+        $media['kind'] = 'song';
+        $media['viewing'] = ['titleKind' => 'episode', 'titleId' => new PublicId()->toString()];
+        self::assertNotCount(0, $validator->validate(new ControlPlaybackRequest($id, 0, 'load', media: $media)));
+    }
+
     public function testAllPlaybackRequestMetadataLoadsAndAcceptsValidTypedPayloads(): void
     {
         $validator = Validation::createValidatorBuilder()->enableAttributeMapping()->getValidator();

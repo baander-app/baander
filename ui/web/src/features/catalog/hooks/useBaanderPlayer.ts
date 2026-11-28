@@ -1,3 +1,4 @@
+import type { ViewingAction } from '../services/video-viewing-reporter'
 import { useEffect, useRef, useCallback, useState } from 'react'
 import { isAxiosError, isCancel } from 'axios'
 import { AXIOS_INSTANCE } from '@/shared/api-client/axios-instance'
@@ -38,6 +39,8 @@ interface UseBaanderPlayerOptions {
   autoPlay?: boolean
   coordinated?: boolean
   onTimeUpdate?: (currentTime: number, duration: number) => void
+  onViewingTick?: (position: number, playing: boolean, videoId: string) => void
+  onViewingAction?: (action: ViewingAction, position: number, videoId: string) => void
   onStateChange?: (state: string) => void
   onError?: (error: MediaError | null) => void
   /** The video played to its end. Called once per end, and again only after it was played again. */
@@ -183,6 +186,8 @@ export function useBaanderPlayer({
   autoPlay = false,
   coordinated = false,
   onTimeUpdate,
+  onViewingTick,
+  onViewingAction,
   onStateChange,
   onError,
   onCompleted,
@@ -198,6 +203,8 @@ export function useBaanderPlayer({
   const seekRef = useRef<((time: number) => void) | null>(null)
   const callbacks = useRef({
     onTimeUpdate,
+    onViewingTick,
+    onViewingAction,
     onStateChange,
     onError,
     onCompleted,
@@ -206,6 +213,8 @@ export function useBaanderPlayer({
   useEffect(() => {
     callbacks.current = {
       onTimeUpdate,
+      onViewingTick,
+      onViewingAction,
       onStateChange,
       onError,
       onCompleted,
@@ -213,6 +222,8 @@ export function useBaanderPlayer({
     }
   }, [
     onTimeUpdate,
+    onViewingTick,
+    onViewingAction,
     onStateChange,
     onError,
     onCompleted,
@@ -309,6 +320,7 @@ export function useBaanderPlayer({
     let deferredStatusRevision: number | null = null
     let statusReconciliation: StatusReconciliation | null = null
     let playbackStarted = autoPlay
+    let preparingPlayback = 0
     let executionPermitted =
       !recoveryFenced.current && (!coordinated || autoPlay)
     let executionEpoch = 0
@@ -382,6 +394,17 @@ export function useBaanderPlayer({
       setPendingSeekPosition(null)
     }
     const active = () => !abort.signal.aborted && videoRef.current === video
+    const viewingTick = () => {
+      if (!active()) return
+      const playing = !terminal && !video.paused && !video.seeking && !pendingLoad &&
+        attachmentReady && attachmentRestored && !completed() && video.readyState >= 3
+      callbacks.current.onViewingTick?.(playbackPosition(), playing, videoId)
+    }
+    const viewingAction = (action: ViewingAction, position = playbackPosition()) => {
+      if (active() && preparingPlayback === 0) {
+        callbacks.current.onViewingAction?.(action, position, videoId)
+      }
+    }
     const changeState = (next: string) => {
       if (!active() || (terminal && next !== 'error')) return
       setState(next)
@@ -1564,6 +1587,7 @@ export function useBaanderPlayer({
       changeState('ended')
       if (canControlStatus() && desiredStatus() === 'running')
         control('pause', sourceDuration)
+      viewingAction('end', sourceDuration)
       callbacks.current.onCompleted?.()
       return true
     }
@@ -1642,6 +1666,7 @@ export function useBaanderPlayer({
       }
       playbackStarted = true
       changeState('playing')
+      viewingTick()
       if (attachmentReady && canControlStatus() && desiredStatus() === 'paused')
         control('resume')
     })
@@ -1661,6 +1686,8 @@ export function useBaanderPlayer({
       if (finish()) return
       if (snapshot?.sessionId === null) playbackStarted = false
       changeState('paused')
+      viewingTick()
+      viewingAction('pause')
       if (
         attachmentReady &&
         canControlStatus() &&
@@ -1795,6 +1822,7 @@ export function useBaanderPlayer({
         // until the element plays again.
         if (snapshot.sessionId === null && !endReported) {
           endReported = true
+          viewingAction('end', sourceDuration)
           callbacks.current.onCompleted?.()
         }
       }
@@ -1939,17 +1967,21 @@ export function useBaanderPlayer({
       observe,
       prepare: async (position, playing, signal) => {
         signal.throwIfAborted()
-        await readyToSeek(signal)
-        // Playing from the source end is a replay; a paused cursor stays at the end.
-        const target =
-          playing && atSourceEnd(position)
-            ? 0
-            : sourceDuration > 0
-              ? Math.max(0, Math.min(sourceDuration, position))
-              : position
-        if (Math.abs(cursor() - target) > 0.05)
-          await execution.execute('seek', target, signal)
-        else await ready(signal)
+        preparingPlayback++
+        try {
+          await readyToSeek(signal)
+          const target =
+            playing && atSourceEnd(position)
+              ? 0
+              : sourceDuration > 0
+                ? Math.max(0, Math.min(sourceDuration, position))
+                : position
+          if (Math.abs(cursor() - target) > 0.05)
+            await execution.execute('seek', target, signal)
+          else await ready(signal)
+        } finally {
+          preparingPlayback--
+        }
       },
       execute: async (action, value, signal) => {
         signal.throwIfAborted()
@@ -2014,7 +2046,9 @@ export function useBaanderPlayer({
             signal,
             epoch
           )
-          return observe()
+          const observed = observe()
+          if (action === 'seek') viewingAction('seek', observed.position)
+          return observed
         } finally {
           signal.removeEventListener('abort', cancel)
         }
@@ -2282,6 +2316,7 @@ export function useBaanderPlayer({
     refresh(true).catch(() => fail())
     const timer = window.setInterval(() => {
       if (recoveryFenced.current || stopping) return
+      viewingTick()
       if (retryPresentationRecovery && pendingPresentationMutations === 0) {
         const recover = retryPresentationRecovery
         retryPresentationRecovery = null

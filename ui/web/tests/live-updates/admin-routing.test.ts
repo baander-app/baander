@@ -10,6 +10,10 @@ const rows: { name: string; family: LiveFamily; key: readonly unknown[] }[] = [
   { name: 'activity', family: 'activity', key: ['admin', 'activity', 'summary', 'week'] },
   { name: 'metadata', family: 'admin-metadata', key: ['admin-genres', { flat: true }] },
   { name: 'match reviews', family: 'admin-metadata', key: ['admin-metadata-match-reviews'] },
+  { name: 'metadata providers', family: 'admin-metadata', key: ['admin-metadata-providers'] },
+  { name: 'video match reviews', family: 'admin-metadata', key: ['admin-video-matches', 'reviews', { kind: 'series' }] },
+  { name: 'video file choices', family: 'admin-metadata', key: ['admin-video-matches', 'choices', 'series', 'show', 'files', 1] },
+  { name: 'video library provider order', family: 'admin-metadata', key: ['/api/admin/video-matches/libraries/library-a/provider-order'] },
   { name: 'recommendation jobs', family: 'admin-metadata', key: ['admin', 'recommendations', 'job', 'one'] },
   { name: 'configuration files', family: 'admin-runtime', key: ['config-check'] },
   { name: 'runtime', family: 'admin-runtime', key: ['server-stats'] },
@@ -61,14 +65,19 @@ it.each(rows)('routes $name hints through active queries and leaves inactive var
   client.clear()
 })
 
-it('keeps demand scans manual and assigns provider presence to deployment definitions', () => {
+it('keeps scans and remote video choices on demand', () => {
   const scan = adminLiveDescriptors.filter(row => row.matches(['admin-media-missing-check']))
   expect(scan).toHaveLength(1)
   expect(scan[0].refreshPolicy).toBe('demand')
-  const provider = adminLiveDescriptors.filter(row => row.matches(['admin-metadata-providers']))
-  expect(provider).toHaveLength(1)
-  expect(provider[0].family).toBe('deployment-definitions')
-  expect(provider[0].deploymentFixed).toBe(true)
+  const remoteKeys = [
+    ['admin-video-matches', 'candidates', 'series', 'show', 'title'],
+    ['admin-video-matches', 'choices', 'series', 'show', 'orderings', 1],
+  ]
+  for (const key of remoteKeys) {
+    const matches = adminLiveDescriptors.filter(row => row.matches(key))
+    expect(matches).toHaveLength(1)
+    expect(matches[0].refreshPolicy).toBe('demand')
+  }
   const config = adminLiveDescriptors.filter(row => row.matches(['config-check']))
   expect(config).toHaveLength(1)
   expect(config[0].sampleIntervalMs).toBe(30000)
@@ -78,7 +87,7 @@ it('reloads deployment definitions on a new server baseline while keeping missin
   vi.useFakeTimers()
   const client = new OwnedQueryClient()
   const snapshot: LiveSnapshot = {
-    status: 'current', authorityReady: true, families: ['deployment-definitions', 'admin-media'],
+    status: 'current', authorityReady: true, families: ['deployment-definitions', 'admin-media', 'admin-metadata'],
     authorizationFingerprint: 'a'.repeat(64), health: { state: 'current', oldestPendingAgeMs: null },
   }
   let emit!: Parameters<LiveRecovery['subscribeEvents']>[0]

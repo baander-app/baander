@@ -6,8 +6,9 @@ namespace App\Catalog\Application\Port;
 
 final readonly class PersonCreditInput
 {
+    /** @param array<string, string> $identifiers */
     public function __construct(
-        public string $tmdbId,
+        public array $identifiers,
         public string $name,
         public string $category,
         public string $role,
@@ -18,5 +19,6 @@ final readonly class PersonCreditInput
         public ?int $billingOrder = null,
         public ?string $providerCreditId = null,
         public ?string $profileUrl = null,
+        public string $source = 'tmdb',
     ) {}
 }

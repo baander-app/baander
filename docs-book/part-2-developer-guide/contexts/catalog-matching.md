@@ -1,4 +1,4 @@
-# Catalog MusicBrainz Matching
+# Catalog Matching
 
 A match writes catalog data, so Catalog owns comparison, application and the queues that request it. This page follows candidates through those stages and then describes artist synchronization. [Catalog](catalog.md) covers ordinary edits and merges.
 
@@ -139,3 +139,15 @@ Three producers queue `SyncArtistMessage` through `ArtistSyncQueue`:
 A fill whose run is recorded as cancelled ends without a request. `QueueArtistSyncsHandler` records its run cancelled when its job is cancelled while it queues, and records the run against its job when it finishes, so cancelling the finished job through the job monitor (`QueuedJobWorkInterface`) cancels the run until a day after its last fill was due. Cancelling a run sets the shared due time back to now, since the run's fills still queued make no request; a fill another producer queued meanwhile may then share a two-second step with a new one, which the shared MusicBrainz limit still spaces a second apart.
 
 MusicBrainz answers the lookup of an artist ID it merged into another artist with a permanent redirect to the surviving artist's lookup. `MusicBrainzAdapter::fetchArtist()` does not follow it and answers `MusicBrainzMerged`, naming both IDs. `MusicBrainzAnswer` turns that answer into the 404 `candidate_not_found` of the artist comparison and apply, so an admin re-identifies such an artist by searching in the match dialog.
+
+## Video Matching
+
+[`VideoMatchRequester`](../../../src/Catalog/Application/Service/VideoMatch/VideoMatchRequester.php) finds the titles affected by committed video imports or sidecar observations. It records work for unmatched titles in `video_match_states` and dispatches a drain message when work is ready. When no provider can serve a title, the request awaits a provider. [`RecoverVideoMatchQueueHandler`](../../../src/Catalog/Application/MessageHandler/RecoverVideoMatchQueueHandler.php) revisits waiting and overdue requests. A series can already show the episodes placed from its filenames while matching waits.
+
+[`AutomaticVideoMatcher`](../../../src/Catalog/Application/Service/VideoMatch/AutomaticVideoMatcher.php) tries the library's saved provider order. Folder tags and usable NFO IDs support direct identification. A search candidate needs a score of at least 90 and a lead of at least 10 points, when there is a runner-up. The score uses title and year, with episode fit for a series. A failed provider can pause matching until its retry time. The review queue records unresolved titles and files and reports provider pauses. See [`VideoMatchConfidence`](../../../src/Catalog/Application/Service/VideoMatch/VideoMatchConfidence.php) and [`DrainVideoMatchesHandler`](../../../src/Catalog/Application/MessageHandler/DrainVideoMatchesHandler.php).
+
+The matcher obtains provider data before [`VideoMatchApply`](../../../src/Catalog/Infrastructure/VideoMatch/VideoMatchApply.php) locks the live claim and its title. The guarded transaction writes match identity, placement changes and metadata. For series, placements keep the provider episode identity through renumbering. If episode rows merge, Activity moves their watched marks while the placements change. The watched mark belongs to the episode or movie. Resume belongs to the video file.
+
+[`VideoMatchRefresh`](../../../src/Catalog/Application/Service/VideoMatch/VideoMatchRefresh.php) loads the title using its saved provider and entry ID. Both the scheduled refresh and the admin metadata sync queue this operation. If the saved ordering disappears, refresh keeps the current placements and raises an ordering review. See the [scheduler entry](../../../migrations/Version20261128123100.php) and the [metadata sync handler](../../../src/Metadata/Application/MessageHandler/SyncLibraryHandler.php).
+
+[`VideoMatchAdminService`](../../../src/Catalog/Application/Service/VideoMatch/VideoMatchAdminService.php) serves the admin routes and console commands. A manual ordering change preserves hand-assigned files. An explicit re-match resets the ordering to the incoming provider's default and returns manual file assignments to review. A library re-match first reports affected counts and skips titles matched by hand unless the operator opts in. The [review command](../../part-1-operator-guide/commands/app-video-match-reviews.md) reads the review queue.

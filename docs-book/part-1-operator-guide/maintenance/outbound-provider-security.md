@@ -12,6 +12,10 @@ IPv4 address, such as a NAT64 (`64:ff9b::/96`) or 6to4 address, is judged by tha
 IPv4 address. Proxies and automatic redirects are disabled, and each request uses
 a fresh connection. No LAN exception applies.
 
+Video metadata uses fixed API origins: TheTVDB login and metadata requests go to `https://api4.thetvdb.com/v4`, and TMDB requests go to `https://api.themoviedb.org/3`. TheTVDB's key is sent in the login body, and later requests use its bearer token. Neither adapter accepts an API host from a filename, NFO or administrator request. The [TheTVDB adapter](../../../src/Metadata/Infrastructure/Api/Tvdb/TvdbAdapter.php) and [TMDB adapter](../../../src/Metadata/Infrastructure/Api/Tmdb/TmdbAdapter.php) supply exact host allowlists to the shared transport.
+
+A disabled metadata provider is checked before lookup, including before returning cached provider data. Configuration-status reads do not contact the provider. Local NFO metadata is separate: the [NFO reader](../../../src/Metadata/Infrastructure/Local/NfoReader.php) reads at most 1 MiB through the library file guard, disables network XML access and does not expand entity-reference text. Turning Local files off also disables its NFO identity hints. See [Video Matching](../media/video-matching.md#local-nfo-metadata-and-artwork) for supported sidecars and [provider switches](../media/external-apis.md#provider-switches-and-attribution).
+
 An answer is read only up to a size limit: 16 MiB for metadata answers, 10 MiB
 for a Cover Art Archive image and 64 MiB for the IPRD catalog. A longer answer
 fails the request, as an unreachable provider does. A cover's image type is read

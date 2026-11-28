@@ -10,12 +10,14 @@ import { VideoPlaybackRuntime } from '../VideoPlaybackRuntime'
 
 const {
   execution,
+  reports,
   adapters,
   playerOptions,
   session,
   request,
   presentationCommands
 } = vi.hoisted(() => ({
+  reports: { tick: vi.fn(), action: vi.fn(), flush: vi.fn(async () => {}) },
   adapters: [] as PlaybackExecutionAdapter[],
   playerOptions: [] as Array<{ onCompleted?: () => void }>,
   request: vi.fn(),
@@ -46,6 +48,9 @@ const {
     quiesce: vi.fn(),
     observe: vi.fn()
   }
+}))
+vi.mock('../../hooks/use-video-viewing-reporter', () => ({
+  useVideoViewingReporter: () => reports
 }))
 vi.mock('../../hooks/useBaanderPlayer', () => ({
   useBaanderPlayer: (options: { onCompleted?: () => void }) => {
@@ -104,6 +109,7 @@ describe('VideoPlaybackRuntime', () => {
   beforeEach(() => {
     useVideoPresentation.getState().select('')
     playerOptions.length = 0
+    reports.flush.mockReset().mockResolvedValue(undefined)
     request.mockReset().mockResolvedValue(undefined)
     session.snapshot = {
       activeIncarnationId: 'local',
@@ -146,6 +152,35 @@ describe('VideoPlaybackRuntime', () => {
     })
     return observation
   }
+
+  it('restores the opened title from the handoff command with its exact file cursor', async () => {
+    const supplied = command('start', 83, 'playing')
+    const viewing = { titleKind: 'extra' as const, titleId: 'selectedTitle00000001' }
+    supplied.payload.media = { kind: 'video', publicId: 'video-1', viewing }
+    await act(async () => {
+      await adapters[0].execute(supplied, AbortSignal.timeout(2000))
+    })
+    expect(useVideoPresentation.getState().viewing).toEqual(viewing)
+    expect(execution.prepare).toHaveBeenCalledWith(83, true, expect.any(AbortSignal))
+  })
+
+  it('flushes the final file observation before clearing the stopped viewing context', async () => {
+    await run('start', 0, 'playing')
+    let finish!: () => void
+    reports.flush.mockImplementationOnce(() => new Promise(resolve => { finish = resolve }))
+    let stopping!: Promise<PlaybackObservation>
+    await act(async () => {
+      stopping = adapters[0].execute(command('stop', 0, 'paused'), AbortSignal.timeout(2000))
+      await Promise.resolve()
+    })
+    expect(useVideoPresentation.getState().videoId).toBe('video-1')
+    await act(async () => {
+      finish()
+      await stopping
+    })
+    expect(useVideoPresentation.getState().videoId).toBe('')
+    expect(useVideoPresentation.getState().viewing).toBeNull()
+  })
 
   it('leaves reaching the cursor to the player, which may supersede a pending restore', async () => {
     const observation = await run('prepare', 223.59, 'playing')

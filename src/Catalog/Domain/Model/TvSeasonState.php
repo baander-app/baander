@@ -9,6 +9,10 @@ use App\Shared\Domain\Model\Uuid;
 
 final class TvSeasonState
 {
+    /**
+     * @param array<string, string|int|null> $providerFields
+     * @param list<string> $lockedFields
+     */
     public function __construct(
         public readonly Uuid $id,
         public readonly PublicId $publicId,
@@ -17,5 +21,7 @@ final class TvSeasonState
         public ?string $name = null,
         public ?string $overview = null,
         public ?string $posterUrl = null,
+        public array $providerFields = [],
+        public array $lockedFields = [],
     ) {}
 }

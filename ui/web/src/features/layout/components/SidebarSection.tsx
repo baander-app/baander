@@ -1,5 +1,5 @@
 import styled, { css } from 'styled-components'
-import { NavLink } from 'react-router-dom'
+import { NavLink, useSearchParams } from 'react-router-dom'
 import type { SidebarItemData } from '../stores/sidebar-store'
 import { getSidebarIcon } from '../schemas/icons'
 import { textRole } from '@/shared/theme'
@@ -36,7 +36,7 @@ const navLinkStyles = css`
     color: var(--color-highlight-foreground);
   }
 
-  &.active {
+  &[aria-current='page'] {
     background-color: var(--color-highlight);
     color: var(--color-highlight-foreground);
   }
@@ -82,6 +82,8 @@ interface SidebarSectionProps {
 }
 
 export function SidebarSection({ id, label, items, isFirst = false, onItemClick }: SidebarSectionProps) {
+  const [params] = useSearchParams()
+  const selectedLibrary = params.get('library')
   if (items.length === 0) return null
 
   return (
@@ -96,13 +98,17 @@ export function SidebarSection({ id, label, items, isFirst = false, onItemClick 
           if (item.type === 'page_link') {
             const route = item.config?.route as string | undefined
             if (!route) return null
+            const matchesLibrary = item.id === 'tv-shows'
+              ? selectedLibrary === null
+              : !item.config.library || item.config.library === selectedLibrary
             return (
               <StyledNavLink
                 key={item.id}
                 to={route}
-                end={route === '/' || route === '/music'}
+                end={route === '/' || route === '/music' || route === '/tv'}
+                aria-current={matchesLibrary ? 'page' : false}
               >
-                <NavIcon><Icon /></NavIcon>
+                {item.icon && <NavIcon><Icon /></NavIcon>}
                 <NavLinkLabel textRole="body" text={item.label} />
               </StyledNavLink>
             )

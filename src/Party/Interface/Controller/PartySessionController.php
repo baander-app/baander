@@ -143,17 +143,7 @@ final class PartySessionController
                         properties: [
                             'data' => new OA\Schema(
                                 type: 'array',
-                                items: new OA\Schema(
-                                    type: 'object',
-                                    properties: [
-                                        'publicId' => new OA\Schema(
-                                            type: 'string',
-                                            minLength: PublicId::LENGTH,
-                                            maxLength: PublicId::LENGTH,
-                                            pattern: PublicId::SCHEMA_PATTERN,
-                                        ),
-                                    ],
-                                ),
+                                items: new OA\Schema(ref: PartySessionResource::class),
                             ),
                         ],
                     ),

@@ -114,7 +114,7 @@ final class InitialSchemaMigrationTest extends TestCase
         );
         $factory = $this->factory();
         $factory->getMetadataStorage()->ensureInitialized();
-        self::assertCount(53, $factory->getMigrationRepository()->getMigrations());
+        self::assertCount(62, $factory->getMigrationRepository()->getMigrations());
         self::assertSame(0, $this->migrate($factory));
         self::assertSame([
             'DoctrineMigrations\\Version20261017000000',
@@ -170,8 +170,17 @@ final class InitialSchemaMigrationTest extends TestCase
             'DoctrineMigrations\\Version20261126220235',
             'DoctrineMigrations\\Version20261127194100',
             'DoctrineMigrations\\Version20261128121000',
+            'DoctrineMigrations\\Version20261128121100',
+            'DoctrineMigrations\\Version20261128122300',
+            'DoctrineMigrations\\Version20261128123000',
+            'DoctrineMigrations\\Version20261128123100',
+            'DoctrineMigrations\\Version20261128123500',
+            'DoctrineMigrations\\Version20261128123600',
+            'DoctrineMigrations\\Version20261128124500',
+            'DoctrineMigrations\\Version20261128140000',
+            'DoctrineMigrations\\Version20261128160000',
         ], $this->connection->fetchFirstColumn('SELECT version FROM doctrine_migration_versions ORDER BY version'));
-        self::assertSame(111, (int) $this->connection->fetchOne("SELECT count(*) FROM pg_tables WHERE schemaname = 'public' AND tablename <> 'doctrine_migration_versions'"));
+        self::assertSame(116, (int) $this->connection->fetchOne("SELECT count(*) FROM pg_tables WHERE schemaname = 'public' AND tablename <> 'doctrine_migration_versions'"));
         foreach (['video_placements', 'video_placement_episode', 'library_provider_orders'] as $table) {
             self::assertSame($table, $this->connection->fetchOne('SELECT to_regclass(?)::text', [$table]));
         }
@@ -187,13 +196,13 @@ final class InitialSchemaMigrationTest extends TestCase
         self::assertSame($history, $this->connection->fetchAllAssociative('SELECT * FROM doctrine_migration_versions'));
 
         $failure = $this->refused($this->factory(), '0');
-        self::assertStringContainsString('Removing provider orders would discard administrator choices', $failure);
+        self::assertStringContainsString('Removing progress protection would discard observation boundaries.', $failure);
         self::assertSame($catalog, $this->catalog('public'));
         self::assertSame($seeds, $this->connection->fetchAllAssociative('SELECT * FROM scheduled_jobs ORDER BY id'));
         self::assertSame($history, $this->connection->fetchAllAssociative('SELECT * FROM doctrine_migration_versions'));
 
         self::assertSame(0, $this->migrate($this->factory(true)));
-        self::assertSame(54, (int) $this->connection->fetchOne('SELECT count(*) FROM doctrine_migration_versions'));
+        self::assertSame(63, (int) $this->connection->fetchOne('SELECT count(*) FROM doctrine_migration_versions'));
         self::assertSame('future_migration_probe', $this->connection->fetchOne("SELECT to_regclass('future_migration_probe')::text"));
     }
 
@@ -649,14 +658,16 @@ SQL, [$jobs[0], $runtimeSession, $desired, str_repeat('a', 32)]);
     private function assertSchedules(): void
     {
         $jobs = $this->connection->fetchAllAssociative('SELECT * FROM scheduled_jobs ORDER BY id');
-        self::assertCount(4, $jobs);
         // The last field says whether the initial schema seeded the job.
         $expected = [
             ['0199bf3c-8a00-7000-8000-0a07c0de9e01', '30 3 * * *', 'App\\Auth\\Application\\Command\\OAuth\\PurgeExpiredOAuthCodesCommand', [], '03:30:00', true],
             ['0199bf3c-8a00-7000-8000-0a07c0de9e02', '0 4 * * *', 'App\\Recommendation\\Application\\Command\\GenerateRecommendationsCommand', ['mode' => 'incremental', 'automatic' => true], '04:00:00', true],
             ['0199bf3c-8a00-7000-8000-0a07c0de9e04', '*/10 * * * *', 'App\\Catalog\\Application\\Command\\RecoverAlbumMatchQueueCommand', [], null, false],
             ['0199bf3c-8a00-7000-8000-0a07c0de9e06', '45 3 * * *', 'App\\Auth\\Application\\Command\\OAuth\\PurgeRevokedPersonalAccessClientsCommand', [], '03:45:00', false],
+            ['01a2221e-ed3d-7870-a5e4-1944229e886f', '* * * * *', 'App\\Catalog\\Application\\Command\\RecoverVideoMatchQueueCommand', [], null, false],
+            ['01a22224-553b-7708-87b8-d410a61bab19', '15 4 * * *', 'App\\Catalog\\Application\\Command\\RefreshVideoMatchesCommand', [], '04:15:00', false],
         ];
+        self::assertCount(count($expected), $jobs);
         foreach ($jobs as $index => $job) {
             [$id, $expression, $command, $parameters, $time, $initial] = $expected[$index];
             self::assertSame($id, $job['id']);
@@ -675,10 +686,10 @@ SQL, [$jobs[0], $runtimeSession, $desired, str_repeat('a', 32)]);
             $next = new \DateTimeImmutable($job['next_run_at']);
             self::assertGreaterThan($sample, $next);
             if ($time === null) {
-                // Every ten minutes, from the next ten-minute mark.
-                self::assertSame(0, (int) $next->format('i') % 10);
+                $interval = $expression === '* * * * *' ? 1 : 10;
+                self::assertSame(0, (int) $next->format('i') % $interval);
                 self::assertSame('00.000000', $next->format('s.u'));
-                self::assertLessThanOrEqual($sample->modify('+10 minutes'), $next);
+                self::assertLessThanOrEqual($sample->modify('+' . $interval . ' minutes'), $next);
                 continue;
             }
             if ($initial) {
@@ -688,9 +699,9 @@ SQL, [$jobs[0], $runtimeSession, $desired, str_repeat('a', 32)]);
             self::assertSame($time, $next->setTimezone(new \DateTimeZone('UTC'))->format('H:i:s'));
             self::assertLessThanOrEqual($sample->modify('+1 day'), $next);
         }
-        self::assertSame(4, array_column($jobs, 'public_id') |> array_unique(...) |> count(...));
-        self::assertSame(4, array_column($jobs, 'revision') |> array_unique(...) |> count(...));
-        // The migrations that seed a schedule later turn the capture trigger off for their insert only.
+        self::assertSame(count($expected), array_column($jobs, 'public_id') |> array_unique(...) |> count(...));
+        self::assertSame(count($expected), array_column($jobs, 'revision') |> array_unique(...) |> count(...));
+        self::assertSame(0, (int) $this->connection->fetchOne("SELECT count(*) FROM query_change_inbox WHERE family = 'admin-jobs'"));
         self::assertSame('O', $this->connection->fetchOne("SELECT tgenabled FROM pg_trigger WHERE tgrelid = 'scheduled_jobs'::regclass AND tgname = 'query_capture_insert'"));
     }
 

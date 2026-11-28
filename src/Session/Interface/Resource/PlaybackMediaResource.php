@@ -15,6 +15,9 @@ use OpenApi\Spec as OA;
             enum: ['song', 'video'],
         ),
         'publicId' => new OA\Schema(type: 'string'),
+        'viewing' => new OA\Schema(
+            ref: PlaybackViewingContextResource::class,
+        ),
     ],
     required: ['kind', 'publicId'],
     component: 'PlaybackMediaResource',
@@ -25,6 +28,11 @@ final class PlaybackMediaResource extends AbstractResource
     {
         assert(is_array($source));
 
-        return ['kind' => $source['kind'], 'publicId' => $source['publicId']];
+        $media = ['kind' => $source['kind'], 'publicId' => $source['publicId']];
+        if (isset($source['viewing'])) {
+            $media['viewing'] = PlaybackViewingContextResource::from($source['viewing']);
+        }
+
+        return $media;
     }
 }

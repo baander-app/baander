@@ -20,7 +20,7 @@ final class TvSeriesTest extends TestCase
         $series = TvSeries::create(Uuid::v7(), 'Show', 'Show');
         $publicId = $series->getPublicId();
         $series->match('tvdb', '121361', ['tmdb' => '1399'], true);
-        $series->setOrdering('absolute');
+        $series->setOrdering('absolute', ['aired', 'absolute']);
         $series->relocate('Show (2011)');
 
         self::assertTrue($publicId->equals($series->getPublicId()));
@@ -28,6 +28,17 @@ final class TvSeriesTest extends TestCase
         self::assertSame('tvdb', $series->getMatchedProvider());
         self::assertTrue($series->isHandMatched());
         self::assertSame('absolute', $series->getOrdering());
+    }
+
+    public function testOrderingKeepsTheExactOfferedProviderId(): void
+    {
+        $series = TvSeries::create(Uuid::v7(), 'Show', 'Show');
+        $offered = ['aired', 'group-dvd-01', 'group-dvd-02'];
+        $series->setOrdering('group-dvd-02', $offered);
+        self::assertSame('group-dvd-02', $series->getOrdering());
+
+        $this->expectException(InvalidArgumentException::class);
+        $series->setOrdering('dvd', $offered);
     }
 
     public function testProvisionalEpisodeCanBePlacedWithoutChangingPublicIdentity(): void

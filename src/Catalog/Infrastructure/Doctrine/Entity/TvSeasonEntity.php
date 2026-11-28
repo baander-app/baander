@@ -38,6 +38,14 @@ class TvSeasonEntity
     #[ORM\Column(type: 'text', nullable: true)]
     public ?string $posterUrl = null;
 
+    /** @var array<string, string|int|null> */
+    #[ORM\Column(type: 'json', options: ['jsonb' => true, 'default' => '[]'])]
+    public array $providerFields = [];
+
+    /** @var list<string> */
+    #[ORM\Column(type: 'json', options: ['jsonb' => true, 'default' => '[]'])]
+    public array $lockedFields = [];
+
     public function __construct(TvSeriesEntity $series, TvSeasonState $state)
     {
         $this->id = $state->id;
@@ -56,11 +64,15 @@ class TvSeasonEntity
             name: $this->name,
             overview: $this->overview,
             posterUrl: $this->posterUrl,
+            providerFields: $this->providerFields,
+            lockedFields: $this->lockedFields,
         );
     }
 
     public function apply(TvSeasonState $state): void
     {
+        $this->providerFields = $state->providerFields;
+        $this->lockedFields = $state->lockedFields;
         $this->seasonNumber = $state->seasonNumber;
         $this->name = $state->name;
         $this->overview = $state->overview;

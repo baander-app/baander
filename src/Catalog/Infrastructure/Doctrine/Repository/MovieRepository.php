@@ -22,6 +22,7 @@ use App\Shared\Domain\Model\Uuid;
 use App\Shared\Domain\ValueObject\LibraryReadScope;
 use App\Shared\Infrastructure\Doctrine\Repository\PgroongaSearchTrait;
 use Doctrine\DBAL\ArrayParameterType;
+use Doctrine\DBAL\LockMode;
 use Doctrine\ORM\EntityManagerInterface;
 use Doctrine\ORM\Query;
 use Doctrine\ORM\QueryBuilder;
@@ -176,6 +177,19 @@ final class MovieRepository implements MovieRepositoryInterface
         $this->entityManager->flush();
     }
 
+    public function saveMatchIdentity(Movie $movie): void
+    {
+        $entity = $this->entityManager->find(MovieEntity::class, $movie->getId());
+        if ($entity === null) {
+            throw new \LogicException('Cannot record a match for a movie that has not been persisted.');
+        }
+        $entity->setMatchedProvider($movie->getMatchedProvider());
+        $entity->setProviderId($movie->getProviderId());
+        $entity->setExternalIds($movie->getExternalIds());
+        $entity->setHandMatched($movie->isHandMatched());
+        $this->entityManager->flush();
+    }
+
     public function flush(): void
     {
         $this->entityManager->flush();
@@ -188,6 +202,21 @@ final class MovieRepository implements MovieRepositoryInterface
             ->find($uuid);
 
         return $entity !== null ? $this->toDomain($entity) : null;
+    }
+
+    public function lockForPlacement(Uuid $id): ?Movie
+    {
+        $entity = $this->entityManager->createQueryBuilder()
+            ->select('movie')
+            ->from(MovieEntity::class, 'movie')
+            ->where('movie.id = :id')
+            ->setParameter('id', $id, 'uuid')
+            ->getQuery()
+            ->setHint(Query::HINT_REFRESH, true)
+            ->setLockMode(LockMode::PESSIMISTIC_WRITE)
+            ->getOneOrNullResult();
+
+        return $entity instanceof MovieEntity ? $this->toDomain($entity) : null;
     }
 
     public function findByPublicId(PublicId $publicId): ?Movie
@@ -432,6 +461,10 @@ final class MovieRepository implements MovieRepositoryInterface
             updatedAt: $entity->getUpdatedAt(),
             videoPublicIds: $videoPublicIds,
             lockedFields: $entity->getLockedFields(),
+            matchedProvider: $entity->getMatchedProvider(),
+            providerId: $entity->getProviderId(),
+            externalIds: $entity->getExternalIds(),
+            handMatched: $entity->isHandMatched(),
         ));
     }
 
@@ -441,11 +474,18 @@ final class MovieRepository implements MovieRepositoryInterface
         $entity->setYear($movie->getYear());
         $entity->setSummary($movie->getSummary());
         $entity->setLockedFields($movie->getLockedFields());
+        $entity->setMatchedProvider($movie->getMatchedProvider());
+        $entity->setProviderId($movie->getProviderId());
+        $entity->setExternalIds($movie->getExternalIds());
+        $entity->setHandMatched($movie->isHandMatched());
         $this->syncMetadataToEntity($movie, $entity);
     }
 
     private function syncMetadataToEntity(Movie $movie, MovieEntity $entity): void
     {
+        $entity->setTitle($movie->getTitle());
+        $entity->setYear($movie->getYear());
+        $entity->setSummary($movie->getSummary());
         $entity->setTmdbId($movie->getTmdbId());
         $entity->setImdbId($movie->getImdbId());
         $entity->setOverview($movie->getOverview());

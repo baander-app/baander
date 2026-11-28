@@ -9,6 +9,7 @@ use App\Session\Application\Port\PlaybackOperation;
 use App\Session\Infrastructure\Swoole\PlaybackCommandRelay;
 use App\Shared\Application\Port\ServerDrainStateInterface;
 use App\Shared\Domain\Model\Uuid;
+use App\Shared\Domain\Model\PublicId;
 use App\Shared\Infrastructure\Swoole\WebSocketConnectionRegistry;
 use App\Shared\Infrastructure\Swoole\WebSocketPusher;
 use PHPUnit\Framework\TestCase;
@@ -35,7 +36,12 @@ final class PlaybackCommandRelayTest extends TestCase
     {
         $owner = new Uuid();
         $incarnation = new Uuid()->toString();
-        $snapshot = ['revision' => 7, 'commands' => [['id' => new Uuid()->toString()]]];
+        $media = [
+            'kind' => 'video',
+            'publicId' => new PublicId()->toString(),
+            'viewing' => ['titleKind' => 'episode', 'titleId' => new PublicId()->toString()],
+        ];
+        $snapshot = ['revision' => 7, 'media' => $media, 'commands' => [['id' => new Uuid()->toString(), 'payload' => ['media' => $media]]]];
         $playback = $this->createMock(PlaybackCoordinationInterface::class);
         $requested = [];
         $playback->expects(self::exactly(2))->method('execute')->willReturnCallback(static function (...$arguments) use (&$requested, $snapshot): array {

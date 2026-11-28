@@ -54,7 +54,6 @@ final readonly class LibraryProviderOrderService
 
     private function adminLibraryId(string $identifier): Uuid
     {
-        // Provider order is administered across all libraries.
         return $this->libraries->resolveId($identifier, LibraryReadScope::unrestricted());
     }
 

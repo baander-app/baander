@@ -20,11 +20,15 @@ use Doctrine\DBAL\Exception\ForeignKeyConstraintViolationException;
 use Doctrine\DBAL\Schema\Schema;
 use Doctrine\ORM\EntityManager;
 use DoctrineMigrations\Version20261121194700;
+use DoctrineMigrations\Version20261128123600;
+use DoctrineMigrations\Version20261128124500;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
 use RuntimeException;
 
 require_once dirname(__DIR__, 2) . '/migrations/Version20261121194700.php';
+require_once dirname(__DIR__, 2) . '/migrations/Version20261128123600.php';
+require_once dirname(__DIR__, 2) . '/migrations/Version20261128124500.php';
 
 final class TvCatalogPersistenceTest extends TestCase
 {
@@ -46,13 +50,16 @@ final class TvCatalogPersistenceTest extends TestCase
             ArtistImportIdentityRace::copyTableWithoutPgroonga($this->connection, $table);
         }
         $this->connection->executeStatement('CREATE TABLE people (id UUID PRIMARY KEY)');
-        $migration = new Version20261121194700($this->connection, new NullLogger());
-        $migration->up(new Schema());
-        $this->connection->transactional(static function (Connection $connection) use ($migration): void {
-            foreach ($migration->getSql() as $query) {
-                $connection->executeStatement($query->getStatement(), $query->getParameters(), $query->getTypes());
-            }
-        });
+        $this->connection->executeStatement('CREATE TABLE images (id UUID PRIMARY KEY)');
+        foreach ([Version20261121194700::class, Version20261128123600::class, Version20261128124500::class] as $migrationClass) {
+            $migration = new $migrationClass($this->connection, new NullLogger());
+            $migration->up(new Schema());
+            $this->connection->transactional(static function (Connection $connection) use ($migration): void {
+                foreach ($migration->getSql() as $query) {
+                    $connection->executeStatement($query->getStatement(), $query->getParameters(), $query->getTypes());
+                }
+            });
+        }
         $this->manager = ArtistImportIdentityRace::entityManager($this->connection);
         $this->catalog = new TvCatalogRepository($this->manager);
     }

@@ -211,6 +211,19 @@ describe('browser-local recovery', () => {
 describe('recovery IndexedDB transactions', () => {
   let database: FakeIndexedDb
   beforeEach(() => { database = installIndexedDb().db })
+  it('retains the opened video title when its checkpoint is restored after reload', async () => {
+    const storage = new IndexedDbPlaybackRecoveryStorage()
+    const media = {
+      kind: 'video' as const,
+      publicId: 'selectedVideo00000001',
+      viewing: { titleKind: 'extra' as const, titleId: 'selectedTitle00000001' }
+    }
+    const saved = { ...record, checkpoint: { ...checkpoint, media, position: 83 } }
+    await storage.put(saved)
+    const afterReload = new IndexedDbPlaybackRecoveryStorage()
+    expect(await afterReload.list(record.server, record.account)).toEqual([saved])
+  })
+
   it('keeps account records isolated and preserves other incarnations on updates', async () => {
     const storage = new IndexedDbPlaybackRecoveryStorage()
     await storage.put(record)

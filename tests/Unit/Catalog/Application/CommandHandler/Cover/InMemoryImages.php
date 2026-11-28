@@ -10,6 +10,7 @@ use App\Media\Domain\ReadModel\ImageReadView;
 use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
 use App\Shared\Domain\ValueObject\MediaReadScope;
+use LogicException;
 
 /** Image records in memory. */
 final class InMemoryImages implements ImagePortInterface
@@ -19,12 +20,12 @@ final class InMemoryImages implements ImagePortInterface
 
     public function findVisibleByPublicId(PublicId $publicId, MediaReadScope $scope): ?ImageReadView
     {
-        throw new \LogicException('Not used by the cover use cases.');
+        throw new LogicException('Not used by the cover use cases.');
     }
 
     public function saveVisibleBlurhash(Uuid $imageId, string $blurhash, MediaReadScope $scope): bool
     {
-        throw new \LogicException('Not used by the cover use cases.');
+        throw new LogicException('Not used by the cover use cases.');
     }
 
     public function findByPublicId(PublicId $publicId): ?Image
@@ -45,17 +46,22 @@ final class InMemoryImages implements ImagePortInterface
 
     public function findByUuids(array $uuids): array
     {
-        throw new \LogicException('Not used by the cover use cases.');
+        throw new LogicException('Not used by the cover use cases.');
     }
 
     public function findByOwner(string $imageableType, Uuid $ownerId): array
     {
-        throw new \LogicException('Not used by the cover use cases.');
+        throw new LogicException('Not used by the cover use cases.');
+    }
+
+    public function findManagedVideoArtwork(Uuid $libraryId, string $pathPrefix): array
+    {
+        throw new LogicException('Not used by the cover use cases.');
     }
 
     public function findPrimaryForOwner(string $imageableType, Uuid $ownerId): ?Image
     {
-        throw new \LogicException('Not used by the cover use cases.');
+        throw new LogicException('Not used by the cover use cases.');
     }
 
     public function save(Image $image): void
@@ -65,7 +71,7 @@ final class InMemoryImages implements ImagePortInterface
 
     public function assignArtistOwner(Uuid $imageId, Uuid $artistId): bool
     {
-        throw new \LogicException('Not used by the cover use cases.');
+        throw new LogicException('Not used by the cover use cases.');
     }
 
     public function delete(Image $image): void

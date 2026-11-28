@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace App\Tests\Integration;
 
 use App\Catalog\Application\Message\DrainAlbumMatchesMessage;
+use App\Catalog\Application\Message\DrainVideoMatchesMessage;
+use App\Catalog\Application\Message\RefreshVideoMatchMessage;
 use App\Lyrics\Application\Command\FetchLyricsCommand;
 use App\Shared\Infrastructure\Messaging\AsyncWorkloadCatalog;
 use App\Shared\Infrastructure\Messenger\ValidatedSendersLocator;
@@ -20,9 +22,11 @@ final class AsyncWorkloadWiringTest extends KernelTestCase
         self::bootKernel();
         $container = self::getContainer();
         $catalog = $container->get(AsyncWorkloadCatalog::class);
-        self::assertCount(25, $catalog->workloads());
-        self::assertCount(23, array_filter($catalog->workloads(), static fn (array $workload): bool => $workload['default']));
+        self::assertCount(26, $catalog->workloads());
+        self::assertCount(24, array_filter($catalog->workloads(), static fn (array $workload): bool => $workload['default']));
         self::assertSame(['transport' => 'async', 'resource_class' => 'io', 'default' => true], $catalog->workloads()[DrainAlbumMatchesMessage::class]);
+        self::assertSame(['transport' => 'async', 'resource_class' => 'io', 'default' => true], $catalog->workloads()[DrainVideoMatchesMessage::class]);
+        self::assertSame(['transport' => 'async', 'resource_class' => 'io', 'default' => true], $catalog->workloads()[RefreshVideoMatchMessage::class]);
         self::assertSame(['async', 'scheduler'], $catalog->receivers());
         self::assertFalse($catalog->workloads()[FetchLyricsCommand::class]['default']);
         self::assertSame('async', $catalog->workloads()[FailureTransportProbe::class]['transport']);

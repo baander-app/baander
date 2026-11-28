@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Transcode\Interface\Controller;
 
+use App\Shared\Application\Port\SleeperInterface;
 use App\Shared\Infrastructure\Swoole\Async;
 use App\Shared\Infrastructure\Swoole\AsyncSleeper;
 use App\Transcode\Interface\Controller\StreamSegmentController;
@@ -24,9 +25,8 @@ final class StreamSegmentControllerFileStabilityTest extends TestCase
         $this->path = $this->directory . '/segment.m4s';
         file_put_contents($this->path, '0123456789');
         clearstatcache(true, $this->path);
-        $this->controller = (new \ReflectionClass(StreamSegmentController::class))->newInstanceWithoutConstructor();
-        // The stability checks must really pause so the external writer can change the file.
-        (new \ReflectionProperty(StreamSegmentController::class, 'sleeper'))->setValue($this->controller, new AsyncSleeper());
+        // The fallback checks use a monotonic deadline.
+        $this->controller = self::controllerWith(new AsyncSleeper());
         // Load the async primitive before caching file stats; autoloading must
         // not accidentally invalidate the stale-cache reproduction.
         Async::inCoroutine();
@@ -44,20 +44,27 @@ final class StreamSegmentControllerFileStabilityTest extends TestCase
     public function testFastPathRejectsFilesChangedDuringItsSleep(string $change): void
     {
         $writer = $this->startWriter($change);
-        $this->releaseWriter($writer);
         try {
+            $sleeper = $this->createMock(SleeperInterface::class);
+            $sleeper->expects(self::once())->method('sleep')->willReturnCallback(function () use ($writer): void {
+                // The writer must finish between the two snapshots.
+                $this->releaseWriter($writer);
+                self::assertSame("done\n", fgets($writer['output']));
+                self::assertSame('', stream_get_contents($writer['error']));
+            });
+            $this->controller = self::controllerWith($sleeper);
             self::assertNull($this->invoke('isFileSizeStable', $this->path));
         } finally {
-            $this->finishWriter($writer);
+            $this->closeWriter($writer);
         }
     }
 
     /** @return iterable<string, array{string}> */
     public static function externalChanges(): iterable
     {
-        yield 'growing file' => ['grow-continuously'];
+        yield 'growing file' => ['grow-once'];
         yield 'removed file' => ['unlink'];
-        yield 'same-size inode replacement' => ['replace-continuously'];
+        yield 'same-size inode replacement' => ['replace-once'];
     }
 
     public function testFastPathRejectsCachedFileRemovedBeforeItsFirstRead(): void
@@ -114,6 +121,14 @@ final class StreamSegmentControllerFileStabilityTest extends TestCase
         self::assertNull($this->invoke('isFileSizeStable', $this->path));
     }
 
+    private static function controllerWith(SleeperInterface $sleeper): StreamSegmentController
+    {
+        $controller = (new \ReflectionClass(StreamSegmentController::class))->newInstanceWithoutConstructor();
+        (new \ReflectionProperty(StreamSegmentController::class, 'sleeper'))->setValue($controller, $sleeper);
+
+        return $controller;
+    }
+
     private function invoke(string $method, mixed ...$arguments): mixed
     {
         return (new \ReflectionMethod(StreamSegmentController::class, $method))->invoke($this->controller, ...$arguments);
@@ -132,20 +147,16 @@ usleep(100000);
 switch ($change) {
     case 'grow-once': file_put_contents($path, 'abcdefghij', FILE_APPEND); break;
     case 'unlink': unlink($path); break;
+    case 'replace-once':
+        $replacement = $path . '.replacement';
+        file_put_contents($replacement, 'abcdefghij');
+        rename($replacement, $path);
+        break;
     case 'grow-continuously':
-    case 'replace-continuously':
         stream_set_blocking(STDIN, false);
         $deadline = microtime(true) + 5;
-        $i = 0;
         do {
-            if ($change === 'grow-continuously') {
-                file_put_contents($path, 'x', FILE_APPEND);
-            } else {
-                $replacement = $path . '.replacement';
-                file_put_contents($replacement, 'abcdefghij');
-                rename($path, $path . '.old.' . $i++);
-                rename($replacement, $path);
-            }
+            file_put_contents($path, 'x', FILE_APPEND);
             usleep(50000);
             if (fgets(STDIN) === "stop\n" || feof(STDIN)) break;
         } while (microtime(true) < $deadline);

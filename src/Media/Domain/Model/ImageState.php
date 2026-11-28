@@ -26,6 +26,7 @@ final class ImageState
         public ?Uuid $playlistId,
         public DateTimeImmutable $createdAt,
         public DateTimeImmutable $updatedAt,
+        public ?Uuid $libraryId = null,
     ) {
     }
 }

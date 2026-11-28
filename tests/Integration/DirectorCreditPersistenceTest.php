@@ -4,11 +4,12 @@ declare(strict_types=1);
 
 namespace App\Tests\Integration;
 
+use App\Tests\Fixtures\Catalog\IndexedMovie;
+
 use App\Catalog\Domain\ValueObject\DirectorCredit;
 use App\Catalog\Infrastructure\DirectorService;
 use App\Catalog\Infrastructure\Doctrine\Entity\MovieEntity;
 use App\Catalog\Infrastructure\Doctrine\Entity\MoviePersonCreditEntity;
-use App\Catalog\Infrastructure\Doctrine\Entity\MovieVideoEntity;
 use App\Catalog\Infrastructure\Doctrine\Entity\PersonEntity;
 use App\Catalog\Infrastructure\Doctrine\Entity\PersonExternalIdEntity;
 use App\Catalog\Infrastructure\Doctrine\Entity\VideoEntity;
@@ -58,7 +59,7 @@ final class DirectorCreditPersistenceTest extends TestCase
         $this->observer = ArtistImportIdentityRace::connect('public');
         $this->observer->executeStatement('CREATE SCHEMA ' . $this->schema);
         $this->observer->executeStatement('SET search_path TO ' . $this->schema . ', public');
-        foreach (['libraries', 'movies', 'videos', 'movie_video', 'person_id_aliases'] as $table) {
+        foreach (['libraries', 'movies', 'videos', 'movie_video', 'person_id_aliases', 'tv_series', 'tv_seasons', 'tv_episodes', 'video_placements', 'video_placement_episode', 'library_file_index'] as $table) {
             ArtistImportIdentityRace::copyTableWithoutPgroonga($this->observer, $table);
         }
         $this->writer = ArtistImportIdentityRace::connect($this->schema);
@@ -139,7 +140,7 @@ final class DirectorCreditPersistenceTest extends TestCase
 
         $tmdbId = random_int(1_500_000_000, 1_900_000_000);
         $this->writer->beginTransaction();
-        new DirectorRepository($this->manager)->syncMovieDirectors($this->first, [new DirectorCredit($tmdbId, 'Concurrent Director')]);
+        new DirectorRepository($this->manager, IndexedMovie::availability($this->manager))->syncMovieDirectors($this->first, [new DirectorCredit($tmdbId, 'Concurrent Director')]);
         $output = tmpfile();
         self::assertIsResource($output);
         $application = 'director_import_' . bin2hex(random_bytes(6));
@@ -163,7 +164,7 @@ final class DirectorCreditPersistenceTest extends TestCase
         self::assertSame(1, (int) $this->observer->fetchOne('SELECT COUNT(DISTINCT person_id) FROM movie_person_credits'));
     }
 
-    public function testFiftyMovieFilmographyUsesFourQueriesAndIdCursorDoesNotHydrateMovies(): void
+    public function testFiftyMovieFilmographyUsesBoundedQueriesAndIdCursorDoesNotHydrateMovies(): void
     {
         $library = $this->manager->find(MovieEntity::class, $this->first)->getLibrary();
         $person = new PersonEntity('Batch Director');
@@ -174,9 +175,10 @@ final class DirectorCreditPersistenceTest extends TestCase
             $movie = new MovieEntity(new PublicId(), $library, sprintf('Batch Movie %02d', $number));
             $video = new VideoEntity(new PublicId(), '/media/director-batch/' . $number . '.mkv', hash('xxh3', 'director-batch-' . $number));
             $expectedVideoIds[] = $video->getPublicId()->toString();
-            foreach ([$movie, $video, new MovieVideoEntity($movie, $video), MoviePersonCreditEntity::director($movie, $person)] as $entity) {
+            foreach ([$movie, $video, MoviePersonCreditEntity::director($movie, $person)] as $entity) {
                 $this->manager->persist($entity);
             }
+            IndexedMovie::add($this->manager, $movie, $video);
         }
         $this->manager->flush();
         $logger = new class extends AbstractLogger {
@@ -208,10 +210,10 @@ final class DirectorCreditPersistenceTest extends TestCase
         try {
             $manager = ArtistImportIdentityRace::entityManager($connection);
             $movies = new MovieRepository($manager);
-            $directors = new DirectorService(new DirectorRepository($manager), $movies);
+            $directors = new DirectorService(new DirectorRepository($manager, IndexedMovie::availability($manager)), $movies);
             $logger->reset();
             $page = $directors->searchMoviesVisible($person->getPublicId(), SearchOptions::create('', 50), LibraryReadScope::unrestricted());
-            self::assertCount(4, $logger->queries());
+            self::assertCount(6, $logger->queries());
             self::assertSame(50, $page->getTotal());
             self::assertCount(50, $page->getItems());
             foreach ($page->getItems() as $index => $movie) {
@@ -238,7 +240,7 @@ final class DirectorCreditPersistenceTest extends TestCase
 
     public function testMetadataAndCreditsRollbackTogetherAndCascadesRemoveOnlyCredits(): void
     {
-        $repository = new DirectorRepository($this->manager);
+        $repository = new DirectorRepository($this->manager, IndexedMovie::availability($this->manager));
         try {
             $this->writer->transactional(function () use ($repository): void {
                 $movie = $this->manager->find(MovieEntity::class, $this->first);
@@ -298,11 +300,35 @@ final class DirectorCreditPersistenceTest extends TestCase
         self::assertSame([7, 7], $this->observer->fetchFirstColumn('SELECT uuid_extract_version(id) FROM movie_person_credits'));
         self::assertNull($this->observer->fetchOne("SELECT to_regclass('" . $this->schema . ".movie_directors')"));
         $this->manager->clear();
-        $repository = new DirectorRepository($this->manager);
+        $repository = new DirectorRepository($this->manager, IndexedMovie::availability($this->manager));
         $view = $repository->findVisibleByPublicId(PublicId::fromString($publicId), LibraryReadScope::unrestricted());
         self::assertNotNull($view);
         self::assertSame(2, $view->movieCount);
         self::assertSame(2_000_000_092, $view->tmdbId);
+    }
+
+    public function testFilmographyKeysetKeepsTitleTiesAcrossTheAvailabilityBatchBoundary(): void
+    {
+        $library = $this->manager->find(MovieEntity::class, $this->first)->getLibrary();
+        $person = new PersonEntity('Batch Director');
+        $this->manager->persist($person);
+        $this->manager->persist(new PersonExternalIdEntity($person, 'tmdb_person', '2000000999', 'tmdb'));
+        $expected = [];
+        for ($index = 0; $index < 253; ++$index) {
+            $movie = new MovieEntity(new PublicId(), $library, 'Shared title');
+            $this->manager->persist($movie);
+            IndexedMovie::add($this->manager, $movie, available: $index !== 249);
+            $this->manager->persist(MoviePersonCreditEntity::director($movie, $person));
+            if ($index !== 249) {
+                $expected[] = $movie->getId()->toString();
+            }
+        }
+        $this->manager->flush();
+        sort($expected, SORT_STRING);
+        $repository = new DirectorRepository($this->manager, IndexedMovie::availability($this->manager));
+        $page = $repository->searchMovieIdsVisible($person->getPublicId(), SearchOptions::create('', limit: 5, offset: 247), LibraryReadScope::restricted([$library->getId()]));
+        self::assertSame(252, $page->getTotal());
+        self::assertSame(array_slice($expected, 247, 5), array_map(static fn (Uuid $id): string => $id->toString(), $page->getItems()));
     }
 
     public function testTwoProviderIdsForOnePersonProduceOneDirectorCreditAndDirectoryEntry(): void
@@ -317,8 +343,9 @@ final class DirectorCreditPersistenceTest extends TestCase
         ] as $entity) {
             $this->manager->persist($entity);
         }
+        IndexedMovie::add($this->manager, $movie);
         $this->manager->flush();
-        $repository = new DirectorRepository($this->manager);
+        $repository = new DirectorRepository($this->manager, IndexedMovie::availability($this->manager));
         $this->writer->transactional(fn (): bool => $repository->syncMovieDirectors($this->first, [
             new DirectorCredit(2_000_000_093, 'Several Credits'),
             new DirectorCredit(2_000_000_094, 'Several Credits'),

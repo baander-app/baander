@@ -9,6 +9,7 @@ enum VideoProviderProblem
     case Disabled;
     case NotConfigured;
     case Unavailable;
+    case LoginFailed;
     /** The provider refused this title's request. Other titles may continue. */
     case Refused;
 }

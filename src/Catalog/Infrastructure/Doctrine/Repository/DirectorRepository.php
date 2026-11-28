@@ -14,6 +14,7 @@ use App\Catalog\Infrastructure\Doctrine\Entity\MovieEntity;
 use App\Catalog\Infrastructure\Doctrine\ImportIdentity\ImportIdentityLock;
 use App\Catalog\Infrastructure\Doctrine\ImportIdentity\PersonWriteLock;
 use App\Catalog\Infrastructure\Doctrine\Query\CatalogReadScopeQuery;
+use App\Catalog\Infrastructure\Doctrine\Query\VideoWorkAvailability;
 use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\SearchOptions;
 use App\Shared\Domain\Model\SearchResult;
@@ -26,7 +27,12 @@ use LogicException;
 
 final readonly class DirectorRepository implements DirectorRepositoryInterface
 {
-    public function __construct(private EntityManagerInterface $entityManager) {}
+    private const int AVAILABILITY_BATCH_SIZE = 250;
+
+    public function __construct(
+        private EntityManagerInterface $entityManager,
+        private VideoWorkAvailability $availability,
+    ) {}
 
     public function searchVisible(SearchOptions $options, LibraryReadScope $scope): SearchResult
     {
@@ -74,22 +80,37 @@ final readonly class DirectorRepository implements DirectorRepositoryInterface
             )
             ->setParameter('publicId', $publicId);
         self::filterText($query, 'visible.title', $options);
-        $total = (int) (clone $query)
-            ->select('COUNT(DISTINCT visible.id)')
-            ->getQuery()
-            ->getSingleScalarResult();
-        $rows = $query
-            ->select('visible.id AS movieId', 'visible.title AS movieTitle')
+        $query->select('visible.id AS movieId', 'IDENTITY(visible.library) AS libraryId', 'visible.title AS movieTitle')
             ->distinct()
             ->orderBy('visible.title', 'ASC')
             ->addOrderBy('visible.id', 'ASC')
-            ->setFirstResult($options->getOffset())
-            ->setMaxResults($options->getLimit())
-            ->getQuery()
-            ->getArrayResult();
-        $ids = array_map(static fn(array $row): Uuid => $row['movieId'] instanceof Uuid
-            ? $row['movieId']
-            : Uuid::fromString($row['movieId']), $rows);
+            ->setMaxResults(self::AVAILABILITY_BATCH_SIZE);
+        $ids = [];
+        $total = 0;
+        $last = null;
+        do {
+            $batch = clone $query;
+            if ($last !== null) {
+                $batch->andWhere('visible.title > :scanTitle OR (visible.title = :scanTitle AND visible.id > :scanId)')
+                    ->setParameter('scanTitle', $last['movieTitle'])
+                    ->setParameter('scanId', $last['movieId'], 'uuid');
+            }
+            $rows = $batch->getQuery()->getArrayResult();
+            $works = array_map(static fn (array $row): array => [
+                'kind' => 'movie',
+                'id' => (string) $row['movieId'],
+                'libraryId' => (string) $row['libraryId'],
+            ], $rows);
+            foreach ($this->availability->visibleWorks($works) as $work) {
+                if ($total >= $options->getOffset() && count($ids) < $options->getLimit()) {
+                    $ids[] = Uuid::fromString($work['id']);
+                }
+                ++$total;
+            }
+            if ($rows !== []) {
+                $last = $rows[array_key_last($rows)];
+            }
+        } while (count($rows) === self::AVAILABILITY_BATCH_SIZE);
 
         return SearchResult::create($ids, $total);
     }

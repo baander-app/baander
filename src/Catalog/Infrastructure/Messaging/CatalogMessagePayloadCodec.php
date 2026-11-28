@@ -6,16 +6,19 @@ namespace App\Catalog\Infrastructure\Messaging;
 
 use App\Catalog\Application\Command\BatchExtractCoversCommand;
 use App\Catalog\Application\Message\DrainAlbumMatchesMessage;
+use App\Catalog\Application\Message\DrainVideoMatchesMessage;
 use App\Shared\Application\Messaging\MessagePayloadCodecInterface;
 
 final readonly class CatalogMessagePayloadCodec implements MessagePayloadCodecInterface
 {
     private const string BATCH_EXTRACT_COVERS = 'catalog.batch_extract_covers';
     private const string DRAIN_ALBUM_MATCHES = 'catalog.drain_album_matches';
+    private const string DRAIN_VIDEO_MATCHES = 'catalog.drain_video_matches';
 
     private const array FIELDS = [
         self::BATCH_EXTRACT_COVERS => [],
         self::DRAIN_ALBUM_MATCHES => ['chain', 'outages'],
+        self::DRAIN_VIDEO_MATCHES => [],
     ];
 
     public static function types(): array
@@ -23,6 +26,7 @@ final readonly class CatalogMessagePayloadCodec implements MessagePayloadCodecIn
         return [
             self::BATCH_EXTRACT_COVERS => BatchExtractCoversCommand::class,
             self::DRAIN_ALBUM_MATCHES => DrainAlbumMatchesMessage::class,
+            self::DRAIN_VIDEO_MATCHES => DrainVideoMatchesMessage::class,
         ];
     }
 
@@ -36,6 +40,7 @@ final readonly class CatalogMessagePayloadCodec implements MessagePayloadCodecIn
         return match (true) {
             $message instanceof BatchExtractCoversCommand => [],
             $message instanceof DrainAlbumMatchesMessage => [$message->chain, $message->outages],
+            $message instanceof DrainVideoMatchesMessage => [],
             default => throw new \InvalidArgumentException('Unsupported message type.'),
         };
     }
@@ -45,6 +50,7 @@ final readonly class CatalogMessagePayloadCodec implements MessagePayloadCodecIn
         return match (true) {
             $type === self::BATCH_EXTRACT_COVERS && $payload === [] => new BatchExtractCoversCommand(),
             $type === self::DRAIN_ALBUM_MATCHES && self::isDrain($payload) => new DrainAlbumMatchesMessage($payload['chain'], $payload['outages']),
+            $type === self::DRAIN_VIDEO_MATCHES && $payload === [] => new DrainVideoMatchesMessage(),
             default => throw new \InvalidArgumentException('Unsupported message type or payload.'),
         };
     }

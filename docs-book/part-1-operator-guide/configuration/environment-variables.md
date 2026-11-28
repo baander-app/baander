@@ -75,7 +75,7 @@ checks again before launching children; diagnostics identify the setting without
 printing its credential-bearing value. These checks preserve the configured
 streams, group and generated identity. They do not test endpoint connectivity.
 
-The validated workload catalog in `config/packages/messenger.php` supplies twenty
+The validated workload catalog in `config/packages/messenger.php` supplies twenty-three
 default production routes and two explicit-only workloads: lyrics fetch and
 webhook delivery. Container compilation checks routes, handlers, codecs, JSON
 serialization and bounded retry policies; producer dispatch checks the selected
@@ -119,10 +119,13 @@ providers need credentials in the process that makes the request.
 |----------|---------|-------------|
 | `DISCOGS_TOKEN` | — | Discogs API personal access token. The admitted worker recipe cannot currently provision it for queued enrichment; see [External APIs](../media/external-apis.md#configuration). |
 | `LASTFM_API_KEY` | — | Last.fm API key for web artist search and browse information; stored metadata sync does not use it. |
-| `TMDB_BEARER_TOKEN` | empty | Optional bearer token for TMDB movie metadata and director credits. Admitted worker credentials and preset/preview worker setup carry it; apply the [configuration lifecycle](README.md) after changing it. |
+| `TMDB_BEARER_TOKEN` | empty | Optional bearer token for TMDB movie and series metadata, episode orderings and Person credits. Web and admitted preset/preview workers receive it; apply the [configuration lifecycle](README.md) after changing it. |
+| `TVDB_API_KEY` | empty | Licensed TheTVDB v4 key supplied by the installation operator for series metadata, episode orderings and Person credits. Web and admitted preset/preview workers receive it. Baander supports key-only login and has no subscriber-PIN variable; see [Video Matching](../media/video-matching.md#configure-online-credentials). |
 | `SPOTIFY_CLIENT_ID` | — | Adapter credential; no current application workflow calls Spotify. |
 | `SPOTIFY_CLIENT_SECRET` | — | Companion adapter secret; it does not enable a current workflow. |
 | `TASTE_DIVE_API_KEY` | — | Adapter credential; no current application workflow calls TasteDive. |
+
+Provider enablement is a database-backed server setting, not an environment variable. An administrator changes it in **Metadata → Providers** or with [app:metadata:provider:set](../commands/app-metadata-provider-set.md); an empty video key or a switched-off provider does not prevent application startup, local scanning or playback. [Provider information](../../../src/Metadata/Application/Settings/MetadataProvider.php) defines the setting keys.
 
 The MusicBrainz adapter sends a fixed application user agent. See
 [External APIs](../media/external-apis.md) for provider behavior and limits.

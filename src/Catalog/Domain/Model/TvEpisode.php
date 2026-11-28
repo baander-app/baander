@@ -11,6 +11,8 @@ use InvalidArgumentException;
 
 final class TvEpisode
 {
+    private const array METADATA_FIELDS = ['name', 'overview', 'stillUrl', 'airDate', 'absoluteNumber'];
+
     private function __construct(private TvEpisodeState $state) {}
 
     public static function create(
@@ -66,6 +68,12 @@ final class TvEpisode
         $this->state->externalIds = $externalIds;
     }
 
+    public function clearMatch(): void
+    {
+        $this->state->providerId = null;
+        $this->state->externalIds = [];
+    }
+
     public function updateMetadata(
         string $name,
         ?string $overview,
@@ -75,11 +83,66 @@ final class TvEpisode
     ): void {
         self::assertName($name);
         self::assertNumbering($this->state->seasonId, $this->state->episodeNumber, $absoluteNumber);
+        $this->state->airDate = $airDate;
+        $this->state->absoluteNumber = $absoluteNumber;
         $this->state->name = trim($name);
         $this->state->overview = $overview;
         $this->state->stillUrl = $stillUrl;
-        $this->state->airDate = $airDate;
+        foreach (self::METADATA_FIELDS as $field) {
+            $this->lockField($field);
+        }
+    }
+
+    public function applyStructure(?DateTimeImmutable $airDate, ?int $absoluteNumber): void
+    {
+        if (!in_array('airDate', $this->state->lockedFields, true)) {
+            $this->state->airDate = $airDate;
+            $this->state->providerFields['airDate'] = $airDate?->format('Y-m-d');
+        }
+        if (!in_array('absoluteNumber', $this->state->lockedFields, true)) {
+            self::assertNumbering($this->state->seasonId, $this->state->episodeNumber, $absoluteNumber);
+            $this->state->absoluteNumber = $absoluteNumber;
+            $this->state->providerFields['absoluteNumber'] = $absoluteNumber;
+        }
+    }
+
+    /** @param array<string, string|int|null> $values */
+    public function applyProviderMetadata(array $values, bool $force = false): void
+    {
+        $current = [
+            'name' => $this->state->name,
+            'overview' => $this->state->overview,
+            'stillUrl' => $this->state->stillUrl,
+            'airDate' => $this->state->airDate?->format('Y-m-d'),
+            'absoluteNumber' => $this->state->absoluteNumber,
+        ];
+        $merged = ProviderMetadataFields::merge($current, $this->state->providerFields, $values, $this->state->lockedFields, $force);
+        $fields = $merged['values'];
+        $name = ProviderMetadataFields::text($fields['name']) ?? '';
+        $absoluteNumber = ProviderMetadataFields::number($fields['absoluteNumber']);
+        $airDate = ProviderMetadataFields::text($fields['airDate']);
+        self::assertName($name);
+        self::assertNumbering($this->state->seasonId, $this->state->episodeNumber, $absoluteNumber);
+        $this->state->name = $name;
+        $this->state->overview = ProviderMetadataFields::text($fields['overview']);
+        $this->state->stillUrl = ProviderMetadataFields::text($fields['stillUrl']);
         $this->state->absoluteNumber = $absoluteNumber;
+        $this->state->airDate = $airDate === null ? null : new DateTimeImmutable($airDate);
+        $this->state->providerFields = $merged['providerFields'];
+    }
+
+    public function lockField(string $field): void
+    {
+        LockedFields::assertLockable(self::METADATA_FIELDS, $field, 'lock');
+        if (!in_array($field, $this->state->lockedFields, true)) {
+            $this->state->lockedFields[] = $field;
+        }
+    }
+
+    /** @return list<string> */
+    public function getLockedFields(): array
+    {
+        return $this->state->lockedFields;
     }
 
     private static function assertNumbering(?Uuid $seasonId, ?int $episodeNumber, ?int $absoluteNumber): void
@@ -109,5 +172,6 @@ final class TvEpisode
     public function getAirDate(): ?DateTimeImmutable { return $this->state->airDate; }
     public function getProviderId(): ?string { return $this->state->providerId; }
     public function isRetired(): bool { return $this->state->retired; }
+    public function getStillUrl(): ?string { return $this->state->stillUrl; }
     public function getState(): TvEpisodeState { return $this->state; }
 }

@@ -37,11 +37,17 @@ interface MovieRepositoryInterface extends Searchable
     /** Updates an existing movie's provider metadata while preserving its other state. */
     public function saveMetadata(Movie $movie): void;
 
+    /** Updates only an existing movie's matching provider, identifiers and manual choice. */
+    public function saveMatchIdentity(Movie $movie): void;
+
     public function persist(Movie $movie): void;
 
     public function flush(): void;
 
     public function findByUuid(Uuid $uuid): ?Movie;
+
+    /** Loads the current movie and takes a write lock in the caller's placement transaction. */
+    public function lockForPlacement(Uuid $id): ?Movie;
 
     public function findByPublicId(PublicId $publicId): ?Movie;
 

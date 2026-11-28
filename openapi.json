@@ -1735,6 +1735,177 @@
                 }
             }
         },
+        "/api/activity/videos/{publicId}/progress": {
+            "post": {
+                "tags": [
+                    "Activity"
+                ],
+                "summary": "Report the current member's video progress",
+                "operationId": "post_activity_video_progress",
+                "parameters": [
+                    {
+                        "name": "publicId",
+                        "in": "path",
+                        "description": "Video public ID",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "pattern": "^[0-9a-zA-Z_-]{21}$"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/RecordVideoProgressRequest"
+                            }
+                        }
+                    },
+                    "required": true
+                },
+                "responses": {
+                    "200": {
+                        "description": "Report accepted or ignored",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/VideoProgressResource"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Authentication required",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Video or title unavailable",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Invalid progress report",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ValidationError"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/activity/watched/{kind}/{publicId}": {
+            "put": {
+                "tags": [
+                    "Activity"
+                ],
+                "summary": "Mark owned video titles watched or unwatched",
+                "operationId": "put_activity_watched_update",
+                "parameters": [
+                    {
+                        "name": "kind",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "enum": [
+                                "episode",
+                                "season",
+                                "series",
+                                "movie"
+                            ],
+                            "pattern": "episode|season|series|movie"
+                        }
+                    },
+                    {
+                        "name": "publicId",
+                        "in": "path",
+                        "description": "Episode, season, series or movie public ID",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "pattern": "^[0-9a-zA-Z_-]{21}$"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/SetWatchedRequest"
+                            }
+                        }
+                    },
+                    "required": true
+                },
+                "responses": {
+                    "200": {
+                        "description": "Updated watched state",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/WatchedStateResource"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Authentication required",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Title unavailable",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Invalid watched state",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ValidationError"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
         "/api/admin/login-blocks": {
             "get": {
                 "tags": [
@@ -8796,7 +8967,25 @@
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/PaginatedResponse"
+                                    "allOf": [
+                                        {
+                                            "$ref": "#/components/schemas/PaginatedResponse"
+                                        },
+                                        {
+                                            "type": "object",
+                                            "properties": {
+                                                "data": {
+                                                    "type": "array",
+                                                    "items": {
+                                                        "$ref": "#/components/schemas/MovieResource"
+                                                    }
+                                                }
+                                            },
+                                            "required": [
+                                                "data"
+                                            ]
+                                        }
+                                    ]
                                 }
                             }
                         }
@@ -10232,6 +10421,14 @@
                         "schema": {
                             "type": "string"
                         }
+                    },
+                    {
+                        "name": "library",
+                        "in": "query",
+                        "schema": {
+                            "type": "string",
+                            "pattern": "^[0-9a-zA-Z_-]{21}$"
+                        }
                     }
                 ],
                 "responses": {
@@ -10363,6 +10560,22 @@
                         "in": "query",
                         "schema": {
                             "type": "string"
+                        }
+                    },
+                    {
+                        "name": "season",
+                        "in": "query",
+                        "schema": {
+                            "type": "string",
+                            "pattern": "^[0-9a-zA-Z_-]{21}$"
+                        }
+                    },
+                    {
+                        "name": "unseasoned",
+                        "in": "query",
+                        "schema": {
+                            "type": "boolean",
+                            "default": false
                         }
                     }
                 ],
@@ -10767,6 +10980,863 @@
                             "application/json": {
                                 "schema": {
                                     "$ref": "#/components/schemas/ValidationError"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/admin/video-matches/reviews": {
+            "get": {
+                "tags": [
+                    "Catalog"
+                ],
+                "summary": "List video matching reviews and paused providers",
+                "operationId": "get_admin_video_matches_reviews",
+                "parameters": [
+                    {
+                        "name": "limit",
+                        "in": "query",
+                        "schema": {
+                            "type": "integer",
+                            "minimum": 1,
+                            "maximum": 100,
+                            "default": 50
+                        }
+                    },
+                    {
+                        "name": "cursor",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "kind",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "library",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "reason",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Video match operation result",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/VideoMatchReviewPageResource"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid query parameter",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Administrator access required",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Video match target not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "The match operation conflicts with the current state",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Invalid match input",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ValidationError"
+                                }
+                            }
+                        }
+                    },
+                    "503": {
+                        "description": "The metadata provider is unavailable",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/admin/video-matches/{kind}/{publicId}/candidates": {
+            "get": {
+                "tags": [
+                    "Catalog"
+                ],
+                "summary": "Search metadata candidates or browse video edit choices",
+                "operationId": "get_admin_video_matches_candidates",
+                "parameters": [
+                    {
+                        "name": "kind",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "publicId",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "q",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "view",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "type": "string",
+                            "enum": [
+                                "search",
+                                "choices"
+                            ],
+                            "default": "search"
+                        }
+                    },
+                    {
+                        "name": "collection",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "type": "string",
+                            "enum": [
+                                "all",
+                                "orderings",
+                                "episodes",
+                                "files"
+                            ],
+                            "default": "all"
+                        }
+                    },
+                    {
+                        "name": "page",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "type": "integer",
+                            "minimum": 1,
+                            "maximum": 1000000,
+                            "default": 1
+                        }
+                    },
+                    {
+                        "name": "limit",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "type": "integer",
+                            "minimum": 1,
+                            "maximum": 100,
+                            "default": 50
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Video match operation result",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "oneOf": [
+                                                {
+                                                    "$ref": "#/components/schemas/VideoMatchCandidatesResource"
+                                                },
+                                                {
+                                                    "$ref": "#/components/schemas/VideoMatchChoicesResource"
+                                                }
+                                            ]
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid query parameter",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Administrator access required",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Video match target not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "The match operation conflicts with the current state",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Invalid match input",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ValidationError"
+                                }
+                            }
+                        }
+                    },
+                    "503": {
+                        "description": "The metadata provider is unavailable",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/admin/video-matches/{kind}/{publicId}/apply": {
+            "post": {
+                "tags": [
+                    "Catalog"
+                ],
+                "summary": "Apply an explicit provider match to a series or movie",
+                "operationId": "post_admin_video_matches_apply",
+                "parameters": [
+                    {
+                        "name": "kind",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "publicId",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/ApplyVideoMatchRequest"
+                            }
+                        }
+                    },
+                    "required": true
+                },
+                "responses": {
+                    "200": {
+                        "description": "Video match operation result",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "object",
+                                            "properties": {
+                                                "kind": {
+                                                    "type": "string",
+                                                    "enum": [
+                                                        "series",
+                                                        "movie"
+                                                    ]
+                                                },
+                                                "publicId": {
+                                                    "type": "string"
+                                                },
+                                                "provider": {
+                                                    "type": "string",
+                                                    "enum": [
+                                                        "tvdb",
+                                                        "tmdb",
+                                                        "local"
+                                                    ]
+                                                },
+                                                "providerId": {
+                                                    "type": "string"
+                                                },
+                                                "ordering": {
+                                                    "type": "string",
+                                                    "nullable": true
+                                                }
+                                            },
+                                            "required": [
+                                                "kind",
+                                                "publicId",
+                                                "provider",
+                                                "providerId",
+                                                "ordering"
+                                            ]
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Administrator access required",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Video match target not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "The match operation conflicts with the current state",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Invalid match input",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ValidationError"
+                                }
+                            }
+                        }
+                    },
+                    "503": {
+                        "description": "The metadata provider is unavailable",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/admin/video-matches/libraries/{library}/rematch-preview": {
+            "get": {
+                "tags": [
+                    "Catalog"
+                ],
+                "summary": "Preview the titles and manual choices in a library rematch",
+                "operationId": "get_admin_video_matches_library_rematch_preview",
+                "parameters": [
+                    {
+                        "name": "library",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Video match operation result",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/VideoLibraryRematchResource"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Administrator access required",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Video match target not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "The match operation conflicts with the current state",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Invalid match input",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ValidationError"
+                                }
+                            }
+                        }
+                    },
+                    "503": {
+                        "description": "The metadata provider is unavailable",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/admin/video-matches/libraries/{library}/rematch": {
+            "post": {
+                "tags": [
+                    "Catalog"
+                ],
+                "summary": "Confirm a library rematch and choose whether to replace manual matches",
+                "operationId": "post_admin_video_matches_library_rematch",
+                "parameters": [
+                    {
+                        "name": "library",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/RematchVideoLibraryRequest"
+                            }
+                        }
+                    },
+                    "required": true
+                },
+                "responses": {
+                    "200": {
+                        "description": "Video match operation result",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/VideoLibraryRematchResource"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Administrator access required",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Video match target not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "The match operation conflicts with the current state",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Invalid match input",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ValidationError"
+                                }
+                            }
+                        }
+                    },
+                    "503": {
+                        "description": "The metadata provider is unavailable",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/admin/video-matches/series/{publicId}/ordering": {
+            "put": {
+                "tags": [
+                    "Catalog"
+                ],
+                "summary": "Choose an ordering offered by the matched series provider",
+                "operationId": "put_admin_video_matches_ordering",
+                "parameters": [
+                    {
+                        "name": "publicId",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/SetVideoOrderingRequest"
+                            }
+                        }
+                    },
+                    "required": true
+                },
+                "responses": {
+                    "200": {
+                        "description": "Video match operation result",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "object",
+                                            "properties": {
+                                                "publicId": {
+                                                    "type": "string"
+                                                },
+                                                "ordering": {
+                                                    "type": "string"
+                                                }
+                                            },
+                                            "required": [
+                                                "publicId",
+                                                "ordering"
+                                            ]
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Administrator access required",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Video match target not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "The match operation conflicts with the current state",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Invalid match input",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ValidationError"
+                                }
+                            }
+                        }
+                    },
+                    "503": {
+                        "description": "The metadata provider is unavailable",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/admin/video-matches/files/{publicId}/assignment": {
+            "put": {
+                "tags": [
+                    "Catalog"
+                ],
+                "summary": "Assign a video file to episodes or an extra kind",
+                "operationId": "put_admin_video_matches_assignment",
+                "parameters": [
+                    {
+                        "name": "publicId",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/AssignVideoFileRequest"
+                            }
+                        }
+                    },
+                    "required": true
+                },
+                "responses": {
+                    "200": {
+                        "description": "Video match operation result",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "object",
+                                            "properties": {
+                                                "publicId": {
+                                                    "type": "string"
+                                                },
+                                                "episodes": {
+                                                    "type": "array",
+                                                    "items": {
+                                                        "type": "string"
+                                                    }
+                                                },
+                                                "extraKind": {
+                                                    "type": "string",
+                                                    "nullable": true,
+                                                    "enum": [
+                                                        "behind_the_scenes",
+                                                        "deleted_scene",
+                                                        "featurette",
+                                                        "interview",
+                                                        "scene",
+                                                        "short",
+                                                        "trailer",
+                                                        "clip",
+                                                        "sample",
+                                                        "theme_music",
+                                                        "backdrop",
+                                                        "other"
+                                                    ]
+                                                }
+                                            },
+                                            "required": [
+                                                "publicId",
+                                                "episodes",
+                                                "extraKind"
+                                            ]
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Administrator access required",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Video match target not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "The match operation conflicts with the current state",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Invalid match input",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ValidationError"
+                                }
+                            }
+                        }
+                    },
+                    "503": {
+                        "description": "The metadata provider is unavailable",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
                                 }
                             }
                         }
@@ -16085,15 +17155,7 @@
                                         "data": {
                                             "type": "array",
                                             "items": {
-                                                "type": "object",
-                                                "properties": {
-                                                    "publicId": {
-                                                        "type": "string",
-                                                        "minLength": 21,
-                                                        "maxLength": 21,
-                                                        "pattern": "^[0-9a-zA-Z_-]{21}$"
-                                                    }
-                                                }
+                                                "$ref": "#/components/schemas/PartySessionResource"
                                             }
                                         }
                                     }
@@ -26793,6 +27855,63 @@
                     }
                 }
             },
+            "RecordVideoProgressRequest": {
+                "type": "object",
+                "properties": {
+                    "titleKind": {
+                        "type": "string",
+                        "enum": [
+                            "episode",
+                            "movie",
+                            "extra"
+                        ]
+                    },
+                    "titleId": {
+                        "type": "string",
+                        "description": "Episode or movie public ID, or the placement public ID for an extra",
+                        "minLength": 21,
+                        "maxLength": 21,
+                        "pattern": "^[0-9a-zA-Z_-]{21}$"
+                    },
+                    "positionSeconds": {
+                        "type": "number",
+                        "format": "double",
+                        "minimum": 0
+                    },
+                    "action": {
+                        "type": "string",
+                        "enum": [
+                            "progress",
+                            "pause",
+                            "seek",
+                            "end"
+                        ]
+                    },
+                    "reportedAt": {
+                        "type": "string",
+                        "format": "date-time",
+                        "description": "Time the player observed the event, with a timezone and at most six fractional digits. Future reports use server receipt time. By default, observations must be newer than the saved time. The server can allow an older observation within its configured clock tolerance. Reports at or before a manual clear or completion cannot restore the position."
+                    }
+                },
+                "required": [
+                    "titleKind",
+                    "titleId",
+                    "positionSeconds",
+                    "action",
+                    "reportedAt"
+                ]
+            },
+            "SetWatchedRequest": {
+                "type": "object",
+                "properties": {
+                    "watched": {
+                        "type": "boolean"
+                    }
+                },
+                "required": [
+                    "watched"
+                ]
+            },
             "AdminCreateOAuthClientRequest": {
                 "type": "object",
                 "properties": {
@@ -27953,6 +29072,81 @@
                 "required": [
                     "providers"
                 ]
+            },
+            "ApplyVideoMatchRequest": {
+                "type": "object",
+                "properties": {
+                    "provider": {
+                        "type": "string",
+                        "enum": [
+                            "tvdb",
+                            "tmdb",
+                            "local"
+                        ]
+                    },
+                    "candidateId": {
+                        "type": "string",
+                        "minLength": 1
+                    }
+                },
+                "required": [
+                    "provider",
+                    "candidateId"
+                ]
+            },
+            "RematchVideoLibraryRequest": {
+                "type": "object",
+                "properties": {
+                    "confirmed": {
+                        "type": "boolean",
+                        "default": false
+                    },
+                    "force": {
+                        "type": "boolean",
+                        "default": false
+                    }
+                }
+            },
+            "SetVideoOrderingRequest": {
+                "type": "object",
+                "properties": {
+                    "ordering": {
+                        "type": "string",
+                        "minLength": 1
+                    }
+                },
+                "required": [
+                    "ordering"
+                ]
+            },
+            "AssignVideoFileRequest": {
+                "type": "object",
+                "properties": {
+                    "episodePublicIds": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        }
+                    },
+                    "extraKind": {
+                        "type": "string",
+                        "nullable": true,
+                        "enum": [
+                            "behind_the_scenes",
+                            "deleted_scene",
+                            "featurette",
+                            "interview",
+                            "scene",
+                            "short",
+                            "trailer",
+                            "clip",
+                            "sample",
+                            "theme_music",
+                            "backdrop",
+                            "other"
+                        ]
+                    }
+                }
             },
             "RegisterServerRequest": {
                 "type": "object",
@@ -29141,24 +30335,7 @@
                         "nullable": true,
                         "allOf": [
                             {
-                                "type": "object",
-                                "nullable": true,
-                                "additionalProperties": {
-                                    "type": "string"
-                                }
-                            },
-                            {
-                                "type": "object",
-                                "nullable": true,
-                                "properties": {
-                                    "kind": {
-                                        "type": "string",
-                                        "enum": [
-                                            "song",
-                                            "video"
-                                        ]
-                                    }
-                                }
+                                "$ref": "#/components/schemas/PlaybackMediaResource"
                             }
                         ],
                         "default": null
@@ -29237,79 +30414,36 @@
                         "type": "string"
                     },
                     "checkpoint": {
-                        "allOf": [
-                            {
+                        "type": "object",
+                        "properties": {
+                            "media": {
                                 "type": "object",
-                                "additionalProperties": {
-                                    "oneOf": [
-                                        {
-                                            "type": "object",
-                                            "additionalProperties": {
-                                                "type": "string"
-                                            }
-                                        },
-                                        {
-                                            "type": "number",
-                                            "format": "float"
-                                        },
-                                        {
-                                            "type": "integer"
-                                        },
-                                        {
-                                            "type": "object",
-                                            "nullable": true,
-                                            "enum": [
-                                                null
-                                            ]
-                                        }
-                                    ]
-                                }
-                            },
-                            {
-                                "type": "object",
-                                "properties": {
-                                    "media": {
-                                        "oneOf": [
-                                            {
-                                                "allOf": [
-                                                    {
-                                                        "type": "object",
-                                                        "additionalProperties": {
-                                                            "type": "string"
-                                                        }
-                                                    },
-                                                    {
-                                                        "type": "object",
-                                                        "properties": {
-                                                            "kind": {
-                                                                "type": "string",
-                                                                "enum": [
-                                                                    "song",
-                                                                    "video"
-                                                                ]
-                                                            }
-                                                        }
-                                                    }
-                                                ]
-                                            },
-                                            {
-                                                "type": "number",
-                                                "format": "float"
-                                            },
-                                            {
-                                                "type": "integer"
-                                            },
-                                            {
-                                                "type": "object",
-                                                "nullable": true,
-                                                "enum": [
-                                                    null
-                                                ]
-                                            }
-                                        ]
+                                "nullable": true,
+                                "allOf": [
+                                    {
+                                        "$ref": "#/components/schemas/PlaybackMediaResource"
                                     }
-                                }
+                                ]
+                            },
+                            "revision": {
+                                "type": "integer",
+                                "minimum": 0
+                            },
+                            "currentTrackIndex": {
+                                "type": "integer",
+                                "minimum": 0
+                            },
+                            "position": {
+                                "type": "number",
+                                "format": "float",
+                                "minimum": 0
                             }
+                        },
+                        "required": [
+                            "media",
+                            "revision",
+                            "currentTrackIndex",
+                            "position"
                         ]
                     }
                 },
@@ -29327,79 +30461,36 @@
                         "type": "string"
                     },
                     "checkpoint": {
-                        "allOf": [
-                            {
+                        "type": "object",
+                        "properties": {
+                            "media": {
                                 "type": "object",
-                                "additionalProperties": {
-                                    "oneOf": [
-                                        {
-                                            "type": "object",
-                                            "additionalProperties": {
-                                                "type": "string"
-                                            }
-                                        },
-                                        {
-                                            "type": "number",
-                                            "format": "float"
-                                        },
-                                        {
-                                            "type": "integer"
-                                        },
-                                        {
-                                            "type": "object",
-                                            "nullable": true,
-                                            "enum": [
-                                                null
-                                            ]
-                                        }
-                                    ]
-                                }
-                            },
-                            {
-                                "type": "object",
-                                "properties": {
-                                    "media": {
-                                        "oneOf": [
-                                            {
-                                                "allOf": [
-                                                    {
-                                                        "type": "object",
-                                                        "additionalProperties": {
-                                                            "type": "string"
-                                                        }
-                                                    },
-                                                    {
-                                                        "type": "object",
-                                                        "properties": {
-                                                            "kind": {
-                                                                "type": "string",
-                                                                "enum": [
-                                                                    "song",
-                                                                    "video"
-                                                                ]
-                                                            }
-                                                        }
-                                                    }
-                                                ]
-                                            },
-                                            {
-                                                "type": "number",
-                                                "format": "float"
-                                            },
-                                            {
-                                                "type": "integer"
-                                            },
-                                            {
-                                                "type": "object",
-                                                "nullable": true,
-                                                "enum": [
-                                                    null
-                                                ]
-                                            }
-                                        ]
+                                "nullable": true,
+                                "allOf": [
+                                    {
+                                        "$ref": "#/components/schemas/PlaybackMediaResource"
                                     }
-                                }
+                                ]
+                            },
+                            "revision": {
+                                "type": "integer",
+                                "minimum": 0
+                            },
+                            "currentTrackIndex": {
+                                "type": "integer",
+                                "minimum": 0
+                            },
+                            "position": {
+                                "type": "number",
+                                "format": "float",
+                                "minimum": 0
                             }
+                        },
+                        "required": [
+                            "media",
+                            "revision",
+                            "currentTrackIndex",
+                            "position"
                         ]
                     }
                 },
@@ -29932,10 +31023,40 @@
                     },
                     "videos": {
                         "type": "array",
-                        "description": "Video variants",
                         "items": {
-                            "type": "object"
+                            "$ref": "#/components/schemas/VideoVersionResource"
                         }
+                    },
+                    "extras": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/VideoExtraResource"
+                        }
+                    },
+                    "libraryPublicId": {
+                        "type": "string"
+                    },
+                    "metadataSource": {
+                        "type": "string",
+                        "nullable": true,
+                        "enum": [
+                            "tvdb",
+                            "tmdb",
+                            "local"
+                        ]
+                    },
+                    "watched": {
+                        "type": "boolean"
+                    },
+                    "progress": {
+                        "type": "number",
+                        "nullable": true,
+                        "minimum": 0,
+                        "maximum": 1
+                    },
+                    "defaultVideoPublicId": {
+                        "type": "string",
+                        "nullable": true
                     },
                     "createdAt": {
                         "type": "string",
@@ -30314,6 +31435,35 @@
                     "activityType",
                     "songAvailable",
                     "playCount"
+                ]
+            },
+            "VideoProgressResource": {
+                "type": "object",
+                "properties": {
+                    "recorded": {
+                        "type": "boolean",
+                        "description": "Whether the report advanced the stored viewing state"
+                    }
+                },
+                "required": [
+                    "recorded"
+                ]
+            },
+            "WatchedStateResource": {
+                "type": "object",
+                "properties": {
+                    "watched": {
+                        "type": "boolean"
+                    },
+                    "titles": {
+                        "type": "integer",
+                        "description": "Owned episode or movie targets included in the action",
+                        "minimum": 0
+                    }
+                },
+                "required": [
+                    "watched",
+                    "titles"
                 ]
             },
             "LoginBlockResource": {
@@ -32083,13 +33233,45 @@
                     "posterUrl": {
                         "type": "string",
                         "nullable": true
+                    },
+                    "libraryPublicId": {
+                        "type": "string",
+                        "minLength": 21,
+                        "maxLength": 21,
+                        "pattern": "^[0-9a-zA-Z_-]{21}$"
+                    },
+                    "metadataSource": {
+                        "type": "string",
+                        "nullable": true,
+                        "enum": [
+                            "tvdb",
+                            "tmdb",
+                            "local"
+                        ]
+                    },
+                    "seasons": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/TvSeasonResource"
+                        }
+                    },
+                    "unseasonedCount": {
+                        "type": "integer"
+                    },
+                    "extras": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/VideoExtraResource"
+                        }
                     }
                 },
                 "required": [
                     "publicId",
                     "name",
                     "overview",
-                    "posterUrl"
+                    "posterUrl",
+                    "libraryPublicId",
+                    "metadataSource"
                 ]
             },
             "TvEpisodeResource": {
@@ -32117,10 +33299,12 @@
                         "nullable": true
                     },
                     "seasonNumber": {
-                        "type": "integer"
+                        "type": "integer",
+                        "nullable": true
                     },
                     "episodeNumber": {
-                        "type": "integer"
+                        "type": "integer",
+                        "nullable": true
                     },
                     "seriesPublicId": {
                         "type": "string",
@@ -32130,6 +33314,54 @@
                     },
                     "seriesName": {
                         "type": "string"
+                    },
+                    "seasonPublicId": {
+                        "type": "string",
+                        "nullable": true,
+                        "minLength": 21,
+                        "maxLength": 21,
+                        "pattern": "^[0-9a-zA-Z_-]{21}$"
+                    },
+                    "absoluteNumber": {
+                        "type": "integer",
+                        "nullable": true
+                    },
+                    "libraryPublicId": {
+                        "type": "string",
+                        "minLength": 21,
+                        "maxLength": 21,
+                        "pattern": "^[0-9a-zA-Z_-]{21}$"
+                    },
+                    "metadataSource": {
+                        "type": "string",
+                        "nullable": true,
+                        "enum": [
+                            "tvdb",
+                            "tmdb",
+                            "local"
+                        ]
+                    },
+                    "watched": {
+                        "type": "boolean"
+                    },
+                    "progress": {
+                        "type": "number",
+                        "nullable": true,
+                        "minimum": 0,
+                        "maximum": 1
+                    },
+                    "defaultVideoPublicId": {
+                        "type": "string",
+                        "nullable": true,
+                        "minLength": 21,
+                        "maxLength": 21,
+                        "pattern": "^[0-9a-zA-Z_-]{21}$"
+                    },
+                    "videos": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/VideoVersionResource"
+                        }
                     }
                 },
                 "required": [
@@ -32141,7 +33373,15 @@
                     "seasonNumber",
                     "episodeNumber",
                     "seriesPublicId",
-                    "seriesName"
+                    "seriesName",
+                    "seasonPublicId",
+                    "absoluteNumber",
+                    "libraryPublicId",
+                    "metadataSource",
+                    "watched",
+                    "progress",
+                    "defaultVideoPublicId",
+                    "videos"
                 ]
             },
             "LibraryProviderOrderResource": {
@@ -32156,6 +33396,459 @@
                 },
                 "required": [
                     "providers"
+                ]
+            },
+            "VideoMatchReviewPageResource": {
+                "type": "object",
+                "properties": {
+                    "items": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "kind": {
+                                    "type": "string",
+                                    "enum": [
+                                        "series",
+                                        "movie",
+                                        "file"
+                                    ]
+                                },
+                                "publicId": {
+                                    "type": "string"
+                                },
+                                "ownerKind": {
+                                    "type": "string",
+                                    "enum": [
+                                        "series",
+                                        "movie"
+                                    ]
+                                },
+                                "ownerPublicId": {
+                                    "type": "string"
+                                },
+                                "title": {
+                                    "type": "string"
+                                },
+                                "path": {
+                                    "type": "string",
+                                    "nullable": true
+                                },
+                                "libraryPublicId": {
+                                    "type": "string"
+                                },
+                                "libraryName": {
+                                    "type": "string"
+                                },
+                                "reason": {
+                                    "type": "string"
+                                },
+                                "checkedAt": {
+                                    "type": "string",
+                                    "format": "date-time"
+                                },
+                                "bestScore": {
+                                    "type": "integer",
+                                    "nullable": true
+                                }
+                            },
+                            "required": [
+                                "kind",
+                                "publicId",
+                                "ownerKind",
+                                "ownerPublicId",
+                                "title",
+                                "path",
+                                "libraryPublicId",
+                                "libraryName",
+                                "reason",
+                                "checkedAt",
+                                "bestScore"
+                            ]
+                        }
+                    },
+                    "nextCursor": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "hasNextPage": {
+                        "type": "boolean"
+                    },
+                    "perPage": {
+                        "type": "integer"
+                    },
+                    "pausedProviders": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "provider": {
+                                    "type": "string",
+                                    "enum": [
+                                        "tvdb",
+                                        "tmdb",
+                                        "local"
+                                    ]
+                                },
+                                "retryAt": {
+                                    "type": "string",
+                                    "format": "date-time"
+                                },
+                                "failureKind": {
+                                    "type": "string"
+                                }
+                            },
+                            "required": [
+                                "provider",
+                                "retryAt",
+                                "failureKind"
+                            ]
+                        }
+                    }
+                },
+                "required": [
+                    "items",
+                    "nextCursor",
+                    "hasNextPage",
+                    "perPage",
+                    "pausedProviders"
+                ]
+            },
+            "VideoMatchCandidatesResource": {
+                "type": "object",
+                "properties": {
+                    "kind": {
+                        "type": "string",
+                        "enum": [
+                            "series",
+                            "movie"
+                        ]
+                    },
+                    "publicId": {
+                        "type": "string"
+                    },
+                    "providers": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "provider": {
+                                    "type": "string",
+                                    "enum": [
+                                        "tvdb",
+                                        "tmdb",
+                                        "local"
+                                    ]
+                                },
+                                "problem": {
+                                    "type": "string",
+                                    "nullable": true
+                                },
+                                "candidates": {
+                                    "type": "array",
+                                    "items": {
+                                        "type": "object",
+                                        "properties": {
+                                            "id": {
+                                                "type": "string"
+                                            },
+                                            "title": {
+                                                "type": "string"
+                                            },
+                                            "year": {
+                                                "type": "integer",
+                                                "nullable": true
+                                            },
+                                            "externalIds": {
+                                                "type": "object",
+                                                "additionalProperties": {
+                                                    "type": "string"
+                                                }
+                                            }
+                                        },
+                                        "required": [
+                                            "id",
+                                            "title",
+                                            "year",
+                                            "externalIds"
+                                        ]
+                                    }
+                                }
+                            },
+                            "required": [
+                                "provider",
+                                "problem",
+                                "candidates"
+                            ]
+                        }
+                    }
+                },
+                "required": [
+                    "kind",
+                    "publicId",
+                    "providers"
+                ]
+            },
+            "VideoMatchChoicesResource": {
+                "type": "object",
+                "properties": {
+                    "kind": {
+                        "type": "string",
+                        "enum": [
+                            "series",
+                            "movie"
+                        ]
+                    },
+                    "publicId": {
+                        "type": "string"
+                    },
+                    "view": {
+                        "type": "string",
+                        "enum": [
+                            "choices"
+                        ]
+                    },
+                    "collection": {
+                        "type": "string",
+                        "enum": [
+                            "all",
+                            "orderings",
+                            "episodes",
+                            "files"
+                        ]
+                    },
+                    "provider": {
+                        "type": "string",
+                        "nullable": true,
+                        "enum": [
+                            "tvdb",
+                            "tmdb",
+                            "local"
+                        ]
+                    },
+                    "currentOrdering": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "orderingProblem": {
+                        "type": "string",
+                        "nullable": true,
+                        "enum": [
+                            "disabled",
+                            "not_configured",
+                            "unavailable",
+                            "login_failed",
+                            "refused",
+                            "unmatched",
+                            "not_found"
+                        ]
+                    },
+                    "orderings": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "id": {
+                                    "type": "string"
+                                },
+                                "label": {
+                                    "type": "string"
+                                },
+                                "kind": {
+                                    "type": "string"
+                                }
+                            },
+                            "required": [
+                                "id",
+                                "label",
+                                "kind"
+                            ]
+                        }
+                    },
+                    "episodes": {
+                        "type": "object",
+                        "nullable": true,
+                        "properties": {
+                            "items": {
+                                "type": "array",
+                                "items": {
+                                    "type": "object",
+                                    "properties": {
+                                        "publicId": {
+                                            "type": "string"
+                                        },
+                                        "seasonNumber": {
+                                            "type": "integer",
+                                            "nullable": true
+                                        },
+                                        "episodeNumber": {
+                                            "type": "integer",
+                                            "nullable": true
+                                        },
+                                        "title": {
+                                            "type": "string"
+                                        },
+                                        "absoluteNumber": {
+                                            "type": "integer",
+                                            "nullable": true
+                                        },
+                                        "airDate": {
+                                            "type": "string",
+                                            "nullable": true
+                                        }
+                                    },
+                                    "required": [
+                                        "publicId",
+                                        "seasonNumber",
+                                        "episodeNumber",
+                                        "title",
+                                        "absoluteNumber",
+                                        "airDate"
+                                    ]
+                                }
+                            },
+                            "total": {
+                                "type": "integer"
+                            },
+                            "page": {
+                                "type": "integer"
+                            },
+                            "perPage": {
+                                "type": "integer"
+                            },
+                            "hasNextPage": {
+                                "type": "boolean"
+                            }
+                        },
+                        "required": [
+                            "items",
+                            "total",
+                            "page",
+                            "perPage",
+                            "hasNextPage"
+                        ]
+                    },
+                    "files": {
+                        "type": "object",
+                        "nullable": true,
+                        "properties": {
+                            "items": {
+                                "type": "array",
+                                "items": {
+                                    "type": "object",
+                                    "properties": {
+                                        "publicId": {
+                                            "type": "string"
+                                        },
+                                        "path": {
+                                            "type": "string"
+                                        },
+                                        "assigned": {
+                                            "type": "boolean"
+                                        },
+                                        "episodePublicIds": {
+                                            "type": "array",
+                                            "items": {
+                                                "type": "string"
+                                            }
+                                        },
+                                        "extraKind": {
+                                            "type": "string",
+                                            "nullable": true,
+                                            "enum": [
+                                                "behind_the_scenes",
+                                                "deleted_scene",
+                                                "featurette",
+                                                "interview",
+                                                "scene",
+                                                "short",
+                                                "trailer",
+                                                "clip",
+                                                "sample",
+                                                "theme_music",
+                                                "backdrop",
+                                                "other"
+                                            ]
+                                        }
+                                    },
+                                    "required": [
+                                        "publicId",
+                                        "path",
+                                        "assigned",
+                                        "episodePublicIds",
+                                        "extraKind"
+                                    ]
+                                }
+                            },
+                            "total": {
+                                "type": "integer"
+                            },
+                            "page": {
+                                "type": "integer"
+                            },
+                            "perPage": {
+                                "type": "integer"
+                            },
+                            "hasNextPage": {
+                                "type": "boolean"
+                            }
+                        },
+                        "required": [
+                            "items",
+                            "total",
+                            "page",
+                            "perPage",
+                            "hasNextPage"
+                        ]
+                    }
+                },
+                "required": [
+                    "kind",
+                    "publicId",
+                    "view",
+                    "collection",
+                    "provider",
+                    "currentOrdering",
+                    "orderingProblem",
+                    "orderings",
+                    "episodes",
+                    "files"
+                ]
+            },
+            "VideoLibraryRematchResource": {
+                "type": "object",
+                "properties": {
+                    "libraryId": {
+                        "type": "string",
+                        "description": "Library public ID"
+                    },
+                    "totalTitles": {
+                        "type": "integer"
+                    },
+                    "handMatchedTitles": {
+                        "type": "integer"
+                    },
+                    "handAssignedFiles": {
+                        "type": "integer"
+                    },
+                    "confirmed": {
+                        "type": "boolean"
+                    },
+                    "force": {
+                        "type": "boolean"
+                    },
+                    "queued": {
+                        "type": "integer"
+                    },
+                    "skipped": {
+                        "type": "integer"
+                    }
+                },
+                "required": [
+                    "libraryId",
+                    "totalTitles",
+                    "handMatchedTitles",
+                    "handAssignedFiles"
                 ]
             },
             "VideoPlaybackInformationResource": {
@@ -34376,6 +36069,28 @@
                     "definition"
                 ]
             },
+            "PlaybackMediaResource": {
+                "type": "object",
+                "properties": {
+                    "kind": {
+                        "type": "string",
+                        "enum": [
+                            "song",
+                            "video"
+                        ]
+                    },
+                    "publicId": {
+                        "type": "string"
+                    },
+                    "viewing": {
+                        "$ref": "#/components/schemas/PlaybackViewingContextResource"
+                    }
+                },
+                "required": [
+                    "kind",
+                    "publicId"
+                ]
+            },
             "LogFilterRequest": {
                 "type": "object",
                 "properties": {
@@ -34433,6 +36148,128 @@
                         "default": "desc"
                     }
                 }
+            },
+            "VideoVersionResource": {
+                "type": "object",
+                "properties": {
+                    "publicId": {
+                        "type": "string",
+                        "minLength": 21,
+                        "maxLength": 21,
+                        "pattern": "^[0-9a-zA-Z_-]{21}$"
+                    },
+                    "width": {
+                        "type": "integer",
+                        "nullable": true
+                    },
+                    "height": {
+                        "type": "integer",
+                        "nullable": true
+                    },
+                    "duration": {
+                        "type": "number",
+                        "nullable": true
+                    },
+                    "videoBitrate": {
+                        "type": "integer",
+                        "nullable": true
+                    },
+                    "positionSeconds": {
+                        "type": "number",
+                        "nullable": true
+                    },
+                    "lastPlayedAt": {
+                        "type": "string",
+                        "format": "date-time",
+                        "nullable": true
+                    }
+                },
+                "required": [
+                    "publicId",
+                    "width",
+                    "height",
+                    "duration",
+                    "videoBitrate",
+                    "positionSeconds",
+                    "lastPlayedAt"
+                ]
+            },
+            "VideoExtraResource": {
+                "type": "object",
+                "properties": {
+                    "publicId": {
+                        "type": "string",
+                        "minLength": 21,
+                        "maxLength": 21,
+                        "pattern": "^[0-9a-zA-Z_-]{21}$"
+                    },
+                    "width": {
+                        "type": "integer",
+                        "nullable": true
+                    },
+                    "height": {
+                        "type": "integer",
+                        "nullable": true
+                    },
+                    "duration": {
+                        "type": "number",
+                        "nullable": true
+                    },
+                    "videoBitrate": {
+                        "type": "integer",
+                        "nullable": true
+                    },
+                    "positionSeconds": {
+                        "type": "number",
+                        "nullable": true
+                    },
+                    "lastPlayedAt": {
+                        "type": "string",
+                        "format": "date-time",
+                        "nullable": true
+                    },
+                    "placementPublicId": {
+                        "type": "string",
+                        "minLength": 21,
+                        "maxLength": 21,
+                        "pattern": "^[0-9a-zA-Z_-]{21}$"
+                    },
+                    "videoPublicId": {
+                        "type": "string",
+                        "minLength": 21,
+                        "maxLength": 21,
+                        "pattern": "^[0-9a-zA-Z_-]{21}$"
+                    },
+                    "kind": {
+                        "type": "string",
+                        "enum": [
+                            "behind_the_scenes",
+                            "deleted_scene",
+                            "featurette",
+                            "interview",
+                            "scene",
+                            "short",
+                            "trailer",
+                            "clip",
+                            "sample",
+                            "theme_music",
+                            "backdrop",
+                            "other"
+                        ]
+                    }
+                },
+                "required": [
+                    "publicId",
+                    "width",
+                    "height",
+                    "duration",
+                    "videoBitrate",
+                    "positionSeconds",
+                    "lastPlayedAt",
+                    "placementPublicId",
+                    "videoPublicId",
+                    "kind"
+                ]
             },
             "LiveFamily": {
                 "type": "string",
@@ -35180,23 +37017,39 @@
                     "billingOrder"
                 ]
             },
-            "PlaybackMediaResource": {
+            "TvSeasonResource": {
                 "type": "object",
                 "properties": {
-                    "kind": {
-                        "type": "string",
-                        "enum": [
-                            "song",
-                            "video"
-                        ]
-                    },
                     "publicId": {
-                        "type": "string"
+                        "type": "string",
+                        "minLength": 21,
+                        "maxLength": 21,
+                        "pattern": "^[0-9a-zA-Z_-]{21}$"
+                    },
+                    "number": {
+                        "type": "integer"
+                    },
+                    "name": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "ownedCount": {
+                        "type": "integer"
+                    },
+                    "totalCount": {
+                        "type": "integer"
+                    },
+                    "watchedCount": {
+                        "type": "integer"
                     }
                 },
                 "required": [
-                    "kind",
-                    "publicId"
+                    "publicId",
+                    "number",
+                    "name",
+                    "ownedCount",
+                    "totalCount",
+                    "watchedCount"
                 ]
             },
             "PlaybackTransferResource": {
@@ -35614,6 +37467,29 @@
                     "expiresAt",
                     "filters",
                     "nodeSnapshots"
+                ]
+            },
+            "PlaybackViewingContextResource": {
+                "type": "object",
+                "properties": {
+                    "titleKind": {
+                        "type": "string",
+                        "enum": [
+                            "episode",
+                            "movie",
+                            "extra"
+                        ]
+                    },
+                    "titleId": {
+                        "type": "string",
+                        "minLength": 21,
+                        "maxLength": 21,
+                        "pattern": "^[0-9a-zA-Z_-]{21}$"
+                    }
+                },
+                "required": [
+                    "titleKind",
+                    "titleId"
                 ]
             },
             "MatchPredictedArtistResource": {

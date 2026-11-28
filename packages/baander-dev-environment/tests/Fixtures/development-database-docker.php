@@ -55,6 +55,21 @@ if ($command === 'info') {
             exit(82);
         }
     }
+    if (($configuration['requireRehearsalCredentials'] ?? false) && in_array('doctrine:migrations:migrate', $arguments, true)) {
+        $password = getenv('REDIS_PASSWORD');
+        $redis = parse_url(getenv('REDIS_URL') ?: '');
+        $database = getenv('DATABASE_URL');
+        $control = getenv('DATABASE_CONTROL_URL');
+        if (!is_string($password) || strlen($password) < 16
+            || !is_array($redis) || ($redis['pass'] ?? null) !== $password
+            || ($redis['host'] ?? null) !== 'rehearsal-redis'
+            || !is_string($database) || $control !== $database
+            || parse_url($database, PHP_URL_HOST) !== 'database'
+        ) {
+            fwrite(STDERR, 'Rehearsal credentials are incomplete or escape its private endpoints');
+            exit(83);
+        }
+    }
     $id = $kind === 'volume' ? $name : hash('sha256', $name);
     file_put_contents($path($name), json_encode(['Id' => $id, 'Name' => $kind === 'container' ? '/' . $name : $name,
         'arguments' => $arguments, 'Config' => ['Labels' => [$label => $token]], 'Labels' => [$label => $token], 'kind' => $kind,

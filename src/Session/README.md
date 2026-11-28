@@ -6,6 +6,20 @@ intent and accepts acknowledgements from the endpoint that owns each command.
 Each browser tab registers and runs its own playback endpoint. Local music and
 video playback require no casting companion or companion pairing.
 
+Video media may carry optional `viewing` metadata with `titleKind` (`episode`,
+`movie` or `extra`) and the opened title's `titleId`; `publicId` still identifies
+the exact video file. [PlaybackMedia](Domain/Model/Playback/PlaybackMedia.php)
+carries this metadata, and [PlaybackStore](Infrastructure/Doctrine/PlaybackStore.php)
+persists it in the existing media JSON. Snapshots and command payloads retain it.
+Contextless loads clear it, including loads of the same file;
+audio selections cannot carry it. A matching recovery checkpoint retains the
+stored context even when an older client omits it
+([ListeningSession](Domain/Model/ListeningSession/ListeningSession.php)). Session
+authorizes the selected video through Media's playback access port; the opened
+title remains subject to Activity's progress access and association checks
+([PlaybackCoordinator](Application/Service/PlaybackCoordinator.php),
+[RecordVideoProgressHandler](../Activity/Application/CommandHandler/RecordVideoProgressHandler.php)).
+
 ## Domain Concepts
 
 - **ListeningSession** — One aggregate per user, enforced by unique `user_id`.

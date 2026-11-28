@@ -127,7 +127,7 @@ flowchart TB
 **Extras**
 
 - R21. The scanner recognizes extras by the folder names and file suffixes Plex and Jellyfin use, such as `Extras`, `Featurettes`, `Behind The Scenes`, `Trailers`, `Interviews` and `-trailer`, and attaches each to the series or movie it sits beside.
-- R22. Extras appear in their own row on the series page and the movie page and play in the movie player, but never count as episodes or toward a season's or series' watched state.
+- R22. Extras appear in their own row on the series page and the movie page and play in the movie player. Each extra resumes from its file’s saved position. Playing it never marks an episode or movie watched or contributes to a season or series watched count. (session-settled: user-approved.)
 
 **Browsing**
 
@@ -135,12 +135,12 @@ flowchart TB
 - R24. A series page has one tab per season, with specials after the regular seasons, and each tab lists only episodes that have a file, under a count such as "10 of 12 episodes".
 - R25. Each episode row shows the member's watched state and, for a partly watched episode, how far they got.
 - R26. A member can mark an episode, a season or a whole series watched or unwatched.
-- R46. A series, season, episode or movie whose files are all missing disappears for members and returns with its matches, orderings, assignments and member state when a file comes back; nothing is deleted.
+- R46. A series, season, episode or movie whose files are all missing disappears for members and returns with its matches, orderings, assignments and member state when a file comes back; nothing is deleted. The same availability rule applies to the director filmography and the Person credit feed, including mixed-media pages. (session-settled: user-approved.)
 
 **Playback, resume and watched state**
 
 - R27. Episodes play in the movie player.
-- R28. Each member has their own resume position for each file they play, and reopening an episode or movie resumes from the position of the file it opens, with a choice to start over.
+- R28. Each member has their own resume position for each file they play, and reopening an episode or movie resumes from the position of the file it opens, with a choice to start over. A progress report dated in the future uses its server receipt time. An operator can allow a report up to a configured number of seconds behind the saved observation to update the position. Zero seconds keeps strict ordering. (session-settled: user-approved.)
 - R29. A file that holds several episodes has one resume position, and finishing it marks each of its episodes watched.
 - R30. An episode or movie becomes watched for a member once their playback passes 90% of its runtime.
 - R31. Marking a season or series watched marks the episodes it has files for, and episodes added later start unwatched.
@@ -349,7 +349,7 @@ Considered and not built:
 - KTD1. **Catalog owns video matching; Metadata owns the providers behind one provider-neutral port.** Catalog keeps the match queue, file placement and the review list, as it does for albums. A new Metadata contract port searches and identifies series and movies, returns a series' episodes under a named ordering, and returns credits with every person identifier the provider knows. Each answer is one of found, not found, unavailable, disabled or not configured, the outcome shape the MusicBrainz port uses. The port replaces `TvMetadataPortInterface` and the baselined `MovieMetadataEnricher`, so the Deptrac baseline loses entries instead of gaining them. Governs R12, R15, R16, R43.
 - KTD2. **Name parsing is a Catalog domain service that reads library-relative paths.** Library Application may not depend on Catalog (`deptrac.yaml:1567-1577`), and `FilesDiscovered` already carries each file's relative path, so the scanner stays name-agnostic. Each file's raw parse is stored on its placement, because incremental scans never present unchanged files again and placement must be recomputed when a match arrives, an ordering changes or a re-match runs. Governs R4–R10, R21, R49, R51.
 - KTD3. **The TV schema is rewritten in `Version20261121194700`; matching removes no episode except by a merge.** A series records its library, its current folder path, its matching provider, the provider's entry ID and the external IDs of every provider. Ingestion finds a directory's series through the existing placements of its known videos first, as KTD14 does for movies, and only then by folder path, so a renamed series folder updates the stored path instead of creating a second series. A placement is keyed by library and video, stores the file's library-relative path and raw parse, and links the video to its episodes (spans and versions) or to an extra; movies use placements too. A match attaches provider episode IDs to the existing rows, so episode public IDs survive. Apply, re-match and ordering switches re-key rows and retire a row that loses every placement (R46 hides it). When two rows collapse onto one provider episode, the absorbed row folds into the surviving row with its placements and member marks inside the placement transaction; that merge and a library delete are the only ways an episode row leaves the table. Renumbering must survive an update that swaps two numbers. Governs R1–R3, R11, R14, R46, R47, R53, R55.
-- KTD4. **Member progress comes from one member route that the player calls for every delivery.** Original and cached deliveries create no transcode session (`src/Media/Application/Service/DeliveryDecisionService.php:150-161`; `ui/web/src/features/catalog/hooks/useBaanderPlayer.ts:595-601`), so a transcode hook would miss them. The route in Activity takes the video's public ID, the title the member opened (episode or movie), a position and an action. The server checks access through the watchable-title contract (KTD17), clamps the position to the probed duration and ignores reports while the member is in a watch party on that video (R52). One guarded upsert writes only when the position moved 30 seconds or more or the action is pause, seek or end, and the stored reported time only moves forward. Governs R28–R31, R50, R52. (session-settled: user-approved — chosen over keeping watched state on the file and over keeping both on the episode or movie, per the Key Decision; governs R28, R32, R50)
+- KTD4. **Member progress comes from one member route that the player calls for every delivery.** Original and cached deliveries create no transcode session (`src/Media/Application/Service/DeliveryDecisionService.php:150-161`; `ui/web/src/features/catalog/hooks/useBaanderPlayer.ts:595-601`), so a transcode hook would miss them. The route in Activity takes the video's public ID, the item the member opened (episode, movie or extra placement), a position and an action. An extra records progress under the member and file and clears its position past 90% without marking a title. (session-settled: user-approved.) The server checks access through the watchable-title contract (KTD17), clamps the position to the probed duration and ignores reports while the member is in a watch party on that video (R52). One guarded upsert writes only when the position moved 30 seconds or more or the action is pause, seek or end, and the stored reported time only moves forward. Compare the observation with the server receipt time before writing. A future observation takes the receipt time. All other observations keep their original time. The server-wide clock tolerance allows older reports within its configured window to update a position. The saved observation time never moves backwards. The default of zero seconds keeps the existing strict check. Manual clears and completions still prevent a stale report from restoring a cleared position. (session-settled: user-approved tolerance and future cap.) Governs R28–R31, R50, R52. (session-settled: user-approved — chosen over keeping watched state on the file and over keeping both on the episode or movie, per the Key Decision; governs R28, R32, R50)
 - KTD5. **The per-library provider order lives in Catalog, keyed by library.** Library Application cannot see Metadata's provider registry to validate it, and the settings registry has no library scope. The order ranks every provider that serves the library's type. A library with no stored order uses the default: TheTVDB, TMDB, local for TV and TMDB, local for movies. Online providers come first because the local provider knows only episodes that have files, so a series matched locally would show owned-of-owned counts and send every new episode without an NFO to review. Provider IDs in a title's NFO identify it at the online providers as folder tags do (R5), and an admin moves the local provider up for a curated library. TheTVDB above TMDB fits Sonarr's numbering. Governs R5, R13. (session-settled: user-approved — chosen over a local-first default: NFO-carrying series keep full episode lists from the online providers)
 - KTD6. **Provider switches are system settings, enforced inside Metadata Infrastructure.** Each provider gets a boolean setting, `metadata.provider.<id>.enabled`, defaulting to on. Every adapter class checks its switch and answers "disabled" without a request; a decorator would miss the callers that inject the concrete MusicBrainz, Discogs and Last.fm adapters. The album callers sit in Catalog Application, which may not use plain Metadata Application, so the MusicBrainz lookup contract gains the "disabled" outcome and an enabled check that reads the current system setting without contacting the provider. While MusicBrainz is off, the album drain claims nothing and ends its chain, every request keeps its due time, and the album queue's recovery handler restarts the drain once the check passes. The providers route, its command and `app:settings:set` all write the same keys. Workers read each switch from PostgreSQL so a change applies to the next check. The check makes no provider request. Governs R41, R43. (session-settled: user-approved — keep fresh database reads when checking provider availability.)
 - KTD7. **TheTVDB is a new adapter on `PublicHttpClient`.** Login sends the licensed API key from `TVDB_API_KEY`. The bearer token is cached in `cache.app` for 25 days and refreshed once on a 401. The host allowlist covers `api4.thetvdb.com` and the artwork host. The key is admitted to the worker environment beside `TMDB_BEARER_TOKEN`, because the match drain runs in the workers and would otherwise see TheTVDB as unconfigured. The client is built lazily, so an empty key never fails a worker (`docs/solutions/runtime-errors/eager-webpush-client-dead-letters-push-without-vapid-keys.md`). The adapter answers with value objects, the MusicBrainz adapter's shape, and does not throw. Governs R12, R34, R43. (session-settled: user-directed — use the licensed key supplied by the operator.)
@@ -361,9 +361,9 @@ Considered and not built:
 - KTD13. **Opening an episode or movie plays the version the member played last, else the first by sort order.** No picker is added (Scope Boundaries). Resume uses that file's position (R28). Governs R3, R28.
 - KTD14. **A movie is identified by its library and folder path, through its placements, never by title.** Files directly in the library root are each their own movie. An admin's movie PATCH edits are recorded as locked fields, so a re-match cannot overwrite them. No legacy movie rows are converted (R53). Governs R10, R53.
 - KTD15. **Watched marks move through a synchronous Activity port inside the placement transaction.** This follows the album merge pattern (`AlbumActivityMergePortInterface`, consumed by `src/Catalog/Infrastructure/AlbumMergeService.php:52`). A Catalog Infrastructure placement service calls the port once per placement transaction, passing the complete before and after episode sets of every affected video. Activity applies them as one simultaneous mapping under R32's copy rule, and combines the marks of episodes merged under KTD3. An outbox event was rejected: the relay gives no per-key ordering, so two fixes to one video can apply out of order, and a replay applies a move twice. Governs R32.
-- KTD16. **Web playback reuses `MoviePlayerOverlay`, and `useBaanderPlayer` gains a start position and progress reporting.** The start position goes through the existing restore and tail-landing path. A resume in the last second of a finished presentation needs that path (`docs/solutions/runtime-errors/seek-to-the-end-of-a-finished-hls-presentation-never-completes-on-a-fresh-attachment.md`), and R50 clears positions past 90%, so restores near the end are rare. The player calls the progress route of KTD4 for every delivery kind and stops reporting while it plays in a watch party. Governs R27, R28, R52.
+- KTD16. **Web playback reuses `MoviePlayerOverlay`, and `useBaanderPlayer` gains a start position and progress reporting.** The start position goes through the existing restore and tail-landing path. A resume in the last second of a finished presentation needs that path (`docs/solutions/runtime-errors/seek-to-the-end-of-a-finished-hls-presentation-never-completes-on-a-fresh-attachment.md`), and R50 clears positions past 90%, so restores near the end are rare. The player calls the progress route of KTD4 for every delivery kind and stops reporting while it plays in a watch party. The active-party list documents its existing session resource, including the video public ID. Coordinated video playback carries the optional opened item kind and public ID through browser handoffs and reloads. A receiver uses that context with the video ID to report progress in the opened library. (session-settled: user-approved.) Governs R27, R28, R52.
 - KTD17. **Every new cross-context dependency goes through a named Deptrac contract layer.** These layers add no baseline entry:
-  - 'Metadata Video Provider Contract': the port, `DTO\Video\`, the provider ID enum, the kinds each provider serves and a `usableProviders()` call that reads current settings without contacting providers. Catalog Application may use it.
+  - 'Metadata Video Provider Contract': the port, `DTO\Video\`, the provider ID enum, the kinds each provider serves and a `usableProviders()` call that reads current settings without contacting providers. Catalog Application calls the provider port. The named Catalog adapters that load match targets, persist match results, or apply episode placement may also use the published provider DTOs. (session-settled: user-approved — storage adapters consume DTOs only.)
   - 'Catalog Watchable Title Contract': a video's linked episodes or movie and its duration, a season's or series' episodes with files, and a title's library. Activity Application may use it.
   - 'Activity Viewing State Contract': member progress and marks for listings. Catalog Infrastructure may use it.
   - 'Activity Watched Mark Move Contract': KTD15. Catalog Infrastructure may use it.
@@ -516,6 +516,7 @@ Deferred to implementation:
 | U17 | Web admin: providers, order and video review | `ui/web/src/features/admin/` | U6, U10, U13, U15 |
 | U18 | Documentation, concepts and roadmap | `docs-book/`, `CONCEPTS.md`, `ROADMAP.md` | all others |
 | U19 | Browser verification | `ui/web/tests/e2e/tv/` | U16, U17 |
+| U24 | Configurable clock tolerance for recorded video progress | `RecordVideoProgressHandler.php`, Activity settings | U14, U19 |
 
 **Phase A — Catalog foundations: U20, U1, U2, U3, U21, U4, U5**
 
@@ -809,6 +810,7 @@ Deferred to implementation:
   1. Ingest requests a match after its commit (R42); when no provider in the library's order is usable for the title, it records the title as awaiting a provider (KTD9).
   2. Each drain run claims one title and walks the attempt shown in the High-Level Technical Design.
   3. A folder tag or a provider ID in the title's NFO, read through the local provider, resolves through the cross-reference of the provider the order prefers. A failed cross-reference lookup counts as unavailable, not "no counterpart".
+     When the local provider is switched off, matching skips NFO IDs and uses a folder tag or online search. (session-settled: user-approved — the local switch also governs reads of NFO identity.)
   4. Outages and failed logins pause only the failing provider, and the recovery handler re-queues awaiting-provider titles once a provider is usable (KTD9).
 - **Execution note:** Implement `VideoMatchConfidence` test-first.
 - **Patterns to follow:** `src/Catalog/Application/MessageHandler/DrainAlbumMatchesHandler.php`, `src/Catalog/Application/Service/MusicBrainzMatch/MatchConfidence.php`, `src/Catalog/Infrastructure/Doctrine/Repository/AlbumMatchStateRepository.php` (DBAL upsert), `tests/Integration/AlbumMatchClaimRaceTest.php`, `tests/Integration/NewAlbumMetadataSyncTest.php` (handling queued messages).
@@ -851,6 +853,7 @@ Deferred to implementation:
   1. Provider episode IDs attach to existing rows; rows are re-keyed, retired or merged, never deleted (KTD3).
   2. `EpisodePlacer` re-places every stored placement of the title, available or not, from its stored parse under the chosen ordering. Absolute numbers count across aired seasons without season 0; dates use air dates; unlisted season and episode numbers stay visible and go on review (R49).
   3. A refresh that renumbers keeps files on their provider episodes and sends name disagreements to review (R47). If the chosen ordering disappears, the last mapping is kept and the series goes on review.
+     Persist the provider's exact ordering ID. Validate a selection against the matched series' offered orderings so that distinct groups of the same type can be selected separately. (session-settled: user-approved.)
   4. An NFO change does not re-queue a matched title (KTD18).
   5. Each placement transaction ends with one mark move call (KTD15).
 - **Execution note:** Implement `EpisodePlacer` test-first.
@@ -873,7 +876,7 @@ Deferred to implementation:
 - **Dependencies:** U9, U22.
 - **Files:** `src/Catalog/Application/CommandHandler/VideoMatch/ApplyVideoMatchHandler.php` (new), `src/Catalog/Domain/ValueObject/PersonIdentifierNamespace.php` (TheTVDB person case), `src/Catalog/Application/Port/PersonCreditInput.php` (provider-neutral), `src/Catalog/Infrastructure/Doctrine/Repository/PersonCreditRepository.php`, `src/Catalog/Infrastructure/Doctrine/Repository/PersonIdentityRepository.php`, the managed image import for local artwork, a migration that widens `chk_person_external_ids_namespace` for the TheTVDB person namespace; removed `src/Metadata/Application/MovieMetadataEnricher.php`, `src/Metadata/Application/MessageHandler/SyncMovieHandler.php` with its message, codec and routing entries; `deptrac.yaml`, `deptrac.baseline.yaml`; tests `tests/Unit/Catalog/Application/CommandHandler/VideoMatch/ApplyVideoMatchHandlerTest.php`, `tests/Integration/VideoMatchApplyTest.php`, `tests/Integration/TvdbPersonIdentityRaceTest.php`.
 - **Approach:**
-  1. An automatic match fills empty fields; an admin's apply replaces them, except locked ones.
+  1. An automatic movie match fills empty fields; an admin's apply replaces them, except locked ones. A first TV match replaces scan placeholders. Subsequent refreshes update provider-owned TV fields and preserve manual edits and locks. (session-settled: user-approved.)
   2. Credits go through `PersonIdentityRepository::resolve` with every identifier the provider gave, so shared IDs join Persons and disagreements record conflicts.
   3. Local credits without an identifier are skipped (R45).
 - **Patterns to follow:** `PersonIdentityRepository::enrichTmdbPerson`; `src/Catalog/Application/CommandHandler/MusicBrainzMatch/ApplyMatchHandler.php`.
@@ -894,7 +897,7 @@ Deferred to implementation:
 - **Files:** `src/Catalog/Interface/Controller/VideoMatchController.php`, `src/Catalog/Application/Query/VideoMatch/` (review page, candidates), `src/Catalog/Application/CommandHandler/VideoMatch/` (re-match title, re-match library, set ordering, assign file), console commands under `src/Catalog/Interface/Console/`, their docs pages under `docs-book/part-1-operator-guide/commands/`; tests `tests/Functional/Catalog/Interface/Controller/VideoMatchControllerTest.php`, `tests/Functional/Catalog/Interface/Console/VideoMatchCliParityTest.php`, `tests/Integration/AdminCliParityTest.php`.
 - **Approach:**
   1. The review list pages by checked time with a keyset cursor and refuses out-of-range limits with 400. Each entry names its kind (series, movie or file), library and review reason. The response also reports each paused provider with its next retry and last failure kind, so a failed TheTVDB login shows on the list.
-  2. Candidate search spans every usable provider.
+  2. Candidate search spans every usable provider. The same read endpoint and console command expose the matched provider’s ordering IDs and labels, the owner’s files and its active catalog episodes. Admins can assign the first file to an episode that has no file yet. Each review row identifies its owner by kind and public ID.
   3. Re-matching a title records an admin match.
   4. A library re-match first answers a preview with the counts of hand-matched titles and hand-assigned files, and applies only on confirmation, skipping hand-matched titles unless forced (R48).
   5. Setting an ordering and assigning a file go through the placement service, so marks move with them.
@@ -907,6 +910,8 @@ Deferred to implementation:
   - Assigning `finale.mkv` to S01E10 makes it visible as that episode, and a full rescan keeps the assignment.
   - Assigning a file to the series' extras moves it to the extras row.
   - A non-admin is refused on every route, and each console command matches its route's result.
+- **Preview migration rehearsal:** Production boot requires Redis credentials and a control database URL. Give the disposable rehearsal its own Redis identity and point its control connection at the restored scratch database. Verify the candidate migrates twice before the preview activates.
+- **Test fixture:** The interrupted-sleep test's repeating alarm could kill its child during shutdown after the deadline assertions succeeded. Limit the fixture to the two intended signals and cancel the timer after measuring the sleep.
 - **Verification:** the review and fix flows pass through both entry points, and the parity and docs coverage tests pass.
 
 **Phase D — Members and admins: U14, U15, U16, U17**
@@ -921,7 +926,7 @@ Deferred to implementation:
   1. The progress route follows KTD4, and its table KTD19.
   2. A position past 90% of the video's probed duration marks the episodes or movie the member opened, in that library, and clears the position. A video with no duration is never marked automatically.
   3. Marking or unmarking by hand clears the positions of the title's files.
-  4. A report while the member is in a watch party on that video is ignored (R52).
+  4. A report while the member is in a watch party on that video is ignored (R52). For an extra, resolve its placement in the opened library, record the file’s position and clear it past 90% without marking any title. (session-settled: user-approved.)
   5. Episode rows show progress between 2% and 90%.
   6. Member routes are not admin routes and need no console command.
 - **Patterns to follow:** `src/Catalog/Infrastructure/Doctrine/Repository/AlbumMatchStateRepository.php` (DBAL upsert); `.agents/rules/ddd-repositories.md` (tables outside the ORM).
@@ -933,7 +938,7 @@ Deferred to implementation:
   - Covers AE22. A report from a member in a watch party on that video records nothing.
   - A rewatch stopped at 40% leaves the episode watched and records the 40% position.
   - Unmarking E02 of an `S01E01-E02` file leaves E01 watched.
-  - A late report with an older reported time does not overwrite a newer position.
+  - With the default tolerance of zero, a late report with an older reported time does not overwrite a newer position.
   - A position beyond the probed duration is clamped.
   - A member cannot record progress or mark an episode in a library they cannot access.
 - **Verification:** progress and marks behave as the Acceptance Examples state for original, cached, copy and encoded deliveries.
@@ -949,8 +954,8 @@ Deferred to implementation:
   2. A season carries its owned and total counts, and specials sort last.
   3. Episode rows carry watched state and progress, read through the viewing state contract.
   4. Movie videos and extras become typed schemas.
-  5. Each title carries its metadata source for attribution.
-  6. Unavailable items are filtered out (R46).
+  5. Each title carries its metadata source for attribution. Publish the existing active-party list response as a list of Party session resources so the generated client can read the video ID. (session-settled: user-approved.)
+  6. Filter unavailable works before counting and paging the TV and movie lists, director filmography and Person credit feeds. Keep non-video credits and the feeds’ existing response shapes. (session-settled: user-approved, R46.)
 - **Patterns to follow:** `docs-book/part-2-developer-guide/development/api-reference.md` (pagination, limits); `src/Catalog/Interface/Resource/MovieResource.php`.
 - **Test scenarios:**
   - Covers AE1. A series detail lists Season 1 before Specials, with owned and total counts.
@@ -975,6 +980,7 @@ Deferred to implementation:
   5. The overlay's movie-specific copy becomes neutral.
   6. Pages show layout-matching skeletons while loading, an empty state for a library or season with no available episodes and an error state with retry. An unmatched series shows a placeholder poster with episodes titled by number, and a failed mark rolls its row back with a toast.
   7. Sidebar links with no route are removed.
+  8. The phase review found that repeated page offsets re-read earlier candidates during availability checks. Keep exact counts and ordering, and walk each ordered result once. The file-stability regression test also exposed a race between the test writer and the reader. Synchronize the replacement with the reader’s first sample. The web gate found a theme transition callback running after its window closed. Schedule the transition on the window that owns its document.
 - **Patterns to follow:** `ui/web/src/features/catalog/components/MovieGridItem.tsx`, `ui/web/src/features/catalog/components/ListRow.tsx`; `ui/web/src/features/catalog/components/__tests__/MoviePlayerOverlay.test.tsx`.
 - **Test scenarios:**
   - A series page renders one tab per season with Specials last and the owned-of-total count.
@@ -998,7 +1004,7 @@ Deferred to implementation:
 - **Approach:**
   1. The providers table gains switches.
   2. The library page gains an order editor.
-  3. The video review list sits beside the album review on the metadata page.
+  3. Move the existing album review table to the Metadata tab and place the video review table beside it. (session-settled: user-approved.)
   4. The match dialog searches, applies, sets the ordering and assigns files.
   5. A library re-match shows the preview counts before it applies.
   6. The order editor offers move-up and move-down buttons as its keyboard path and marks switched-off or unconfigured providers. The match dialog has search, ordering and files steps, assigns a file to several episodes by multi-select, and shows searching, no-results, provider-unavailable and apply-failed states. A provider switch states what waits while it is off.
@@ -1027,6 +1033,7 @@ Deferred to implementation:
   3. `CONCEPTS.md` updates the "Video library" entries to the delivered rules.
   4. `ROADMAP.md` records the delivery with its verification checkpoint and the database reset of the persistent instance (R53).
   5. All prose goes through `prose-fix`.
+  6. The public site release check reproduced a clean local build failure with the documented Composer `--no-dev` option. The website builder is a development dependency of the scripts package. Align the local build command with the verified website workflow.
 - **Test expectation:** none -- documentation; `tests/Unit/Docs/CommandDocsCoverageTest.php` already covers the command pages.
 - **Verification:** every new command has a page and index row, and the removed commands have neither.
 
@@ -1041,6 +1048,9 @@ Deferred to implementation:
   2. Use a small TV library with a season folder, a specials folder, a multi-episode file and an extra, including one browser-compatible file that plays by original delivery.
   3. Steps assert the state the next action depends on, never a timing (`docs/solutions/best-practices/a-browser-gate-that-passes-by-where-a-server-tick-falls-proves-nothing.md`).
   4. Run in Chromium and Firefox.
+  5. Close the verification gaps found while mapping examples to tests. Read the first five watched episodes and the sixth file’s resume after an ordering change. Exercise a provider-order change through library re-match, add the last two owned files after a season mark, and remount a missing library with its manual assignment and member state. Cover empty and expired provider results and the movie search inputs at the matcher boundary.
+  6. The full review found four corrections covered by release verification. Preserve JSON object shape for a local candidate with no external IDs, issue the latest requested playback load when an earlier one is pending, batch person identity reads across a provider’s credits, and verify report ordering across devices with different clocks. The worker reservation test also needs to wait for both PostgreSQL contenders before it asserts that only one reservation succeeded.
+  7. The U10 full suite found that the OAuth restart fixture selected a PostgreSQL autovacuum worker. Limit the two database restart fixtures to client connections owned by the disposable test database role and retain their recovery assertions.
 - **Test scenarios:**
   - Covers F3. A member opens the series, plays S01E01, stops part way, reloads, reopens the episode and resumes at the saved position.
   - The original-delivery file resumes the same way.
@@ -1050,6 +1060,16 @@ Deferred to implementation:
   - A member marks a season watched from its menu, and the rows show it after a reload.
   - A TMDB-matched title shows the required notice and logo.
 - **Verification:** both specs pass in Chromium and Firefox against a fresh preview.
+
+---
+
+### U24. Configurable clock tolerance for recorded video progress
+
+- **Goal:** let an operator accommodate small differences between playback device clocks. The setting applies to the member progress command for episodes, movies and extras.
+- **Dependency:** U14 and U19.
+- **Behaviour:** accept an older observation at the configured boundary and ignore one outside it. Keep the latest observation and last-played timestamps when an older report updates the position. Continue to cap every future timestamp at server receipt and to protect watched actions and cleared positions from delayed reports.
+- **Persistence:** carry the old strict observation boundary forward for existing rows. A manual action or completion protects the file through its highest recorded observation. A later rewatch keeps that boundary. An accepted late completion still clears the position and marks the titles it covers.
+- **Verification:** exercise the default and a live setting change, microsecond boundaries, manual watched actions, completion, replay and concurrent writes in the CI image. Regenerate the OpenAPI specification and the Orval client together and check both for drift.
 
 ---
 
@@ -1069,6 +1089,33 @@ Deferred to implementation:
 | Whitespace | `git diff --check` | every commit |
 
 The authoritative gates run in the CI image, as the [testing guide](../../docs-book/part-2-developer-guide/testing/README.md) states. `ROADMAP.md` records the suite counts and static gate results of the final run.
+
+### Acceptance tests
+
+| Example | Named regression test |
+|---|---|
+| AE1 | [testASeasonAndSpecialsImportIntoOneSeries](../../tests/Integration/TvLibraryIngestTest.php) |
+| AE2 | [testATwoEpisodeSpanLinksOneVideoToBothEpisodes](../../tests/Integration/TvLibraryIngestTest.php) |
+| AE3 | [testAProviderTagResolvesThroughThePreferredProviderWithoutSearching](../../tests/Unit/Catalog/Application/Service/VideoMatch/AutomaticVideoMatcherTest.php) |
+| AE4 | [testAbsoluteEpisode137MapsToTheAiredFifthSeasonTwelfthEpisodeAcrossPages](../../tests/Unit/Metadata/Infrastructure/Video/TvdbVideoMetadataTest.php) |
+| AE5 | [testUniqueAirDatePlacesTheFile](../../tests/Unit/Catalog/Application/Service/VideoMatch/EpisodePlacerTest.php) |
+| AE6 | [testANumberedUnmatchedFileIsPlayableAndAnUnnumberedFileNeedsReview](../../tests/Integration/TvLibraryIngestTest.php) |
+| AE7 | [testChangingOrderingKeepsWatchedFilesAndTheUnfinishedFilesResume](../../tests/Integration/VideoLibraryAcceptanceTest.php) |
+| AE8 | [testOrderChangeOnlyAffectsNewTitlesUntilTheLibraryIsRematched](../../tests/Integration/VideoLibraryAcceptanceTest.php) |
+| AE9 | [testExtrasAttachToTheSeriesAndSamplesCreateNoCatalogRows](../../tests/Integration/TvLibraryIngestTest.php) |
+| AE10 | [testFilesAddedAfterASeasonMarkStartUnwatched](../../tests/Integration/VideoLibraryAcceptanceTest.php) |
+| AE11 | [testTvdbAndImdbEvidenceJoinTheExistingPerson](../../tests/Integration/TvdbPersonIdentityRaceTest.php) |
+| AE12 | [testTheMovieProviderTagIdentifiesTheMatrixWithoutSearching](../../tests/Unit/Catalog/Application/Service/VideoMatch/AutomaticVideoMatcherTest.php), [testAMovieStillMatchesWhileTheTvProviderIsPaused](../../tests/Unit/Catalog/Application/Service/VideoMatch/AutomaticVideoMatcherTest.php) |
+| AE13 | [testUnavailableOrDeniedTitlesAreNotFoundAndAnonymousReadsRequireAuthentication](../../tests/Functional/Catalog/Interface/Controller/TvReadControllerTest.php) |
+| AE14 | [testAnUnavailableFirstProviderDoesNotFallThrough](../../tests/Unit/Catalog/Application/Service/VideoMatch/AutomaticVideoMatcherTest.php), [testThePausedProviderMatchesAgainAtItsRetryDeadline](../../tests/Unit/Catalog/Application/Service/VideoMatch/AutomaticVideoMatcherTest.php) |
+| AE15 | [testSeriesUsesClassifiedSidecarsForDetailsIdentifiedCastAndArtwork](../../tests/Unit/Metadata/Infrastructure/Local/LocalVideoMetadataTest.php) |
+| AE16 | [testADisabledProviderClaimsNothingAndEndsItsChainUntilRecovery](../../tests/Unit/Catalog/Application/MessageHandler/DrainAlbumMatchesHandlerTest.php) |
+| AE17 | [testFileVersionsKeepSeparatePositionsAndAnUpgradeKeepsWatchedMarks](../../tests/Functional/Activity/WatchedControllerTest.php) |
+| AE18 | [testScanRestoresTheMatchedSeriesWithAssignmentsAndMemberStateAfterTheRootReturns](../../tests/Integration/VideoLibraryAcceptanceTest.php) |
+| AE19 | [testRenamedFolderAndANewFileKeepTheOriginalMovieIdentity](../../tests/Integration/MovieIngestParsingTest.php) |
+| AE20 | [testAbsoluteAndDateNumberedFilesRemainVisibleBeforeAMatch](../../tests/Integration/TvLibraryIngestTest.php) |
+| AE21 | [testLibraryRematchCountsAndProtectsHandMatchedTitlesUnderTheWriteLock](../../tests/Integration/VideoMatchAdminWriteTest.php) |
+| AE22 | [testPartyReportsAreIgnoredWhileManualMarksRemainExplicit](../../tests/Functional/Activity/WatchedControllerTest.php) |
 
 ## Definition of Done
 

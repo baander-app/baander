@@ -985,6 +985,6 @@ final readonly class PlaybackCoordinator implements PlaybackCoordinationInterfac
         if (!is_array($media) || !in_array($media['kind'] ?? null, ['song', 'video'], true) || !is_string($media['publicId'] ?? null)) {
             throw new InvalidArgumentException('Media requires a song or video public identity.');
         }
-        return new PlaybackMedia($media['kind'], PublicId::fromString($media['publicId']));
+        return PlaybackMedia::fromArray($media);
     }
 }

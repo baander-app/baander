@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 use App\Catalog\Application\Command\BatchExtractCoversCommand;
 use App\Catalog\Application\Message\DrainAlbumMatchesMessage;
+use App\Catalog\Application\Message\DrainVideoMatchesMessage;
+use App\Catalog\Application\Message\RefreshVideoMatchMessage;
 use App\Library\Application\Command\ScanLibraryCommand;
 use App\Library\Application\Message\FilesDiscovered;
 use App\Lyrics\Application\Command\FetchLyricsCommand;
@@ -14,7 +16,6 @@ use App\Metadata\Application\Message\SyncAlbumMessage;
 use App\Metadata\Application\Message\SyncArtistMessage;
 use App\Metadata\Application\Message\SyncArtistsMessage;
 use App\Metadata\Application\Message\SyncLibraryMessage;
-use App\Metadata\Application\Message\SyncMovieMessage;
 use App\Metadata\Application\Message\SyncPeopleMessage;
 use App\Metadata\Application\Message\SyncSongMessage;
 use App\Notification\Application\DTO\SendEmailCommand;
@@ -51,6 +52,16 @@ return static function (ContainerConfigurator $container): void {
             'resource_class' => 'io',
             'default' => true,
         ],
+        DrainVideoMatchesMessage::class => [
+            'transport' => 'async',
+            'resource_class' => 'io',
+            'default' => true,
+        ],
+        RefreshVideoMatchMessage::class => [
+            'transport' => 'async',
+            'resource_class' => 'io',
+            'default' => true,
+        ],
         ScanLibraryCommand::class => [
             'transport' => 'async',
             'resource_class' => 'io',
@@ -77,11 +88,6 @@ return static function (ContainerConfigurator $container): void {
             'default' => true,
         ],
         SyncPeopleMessage::class => [
-            'transport' => 'async',
-            'resource_class' => 'io',
-            'default' => true,
-        ],
-        SyncMovieMessage::class => [
             'transport' => 'async',
             'resource_class' => 'io',
             'default' => true,

@@ -9,6 +9,7 @@ use App\Shared\Infrastructure\Worker\DeploymentContainer;
 use App\Shared\Infrastructure\Worker\DoctrineDeploymentInventory;
 use App\Shared\Infrastructure\Worker\DoctrineDeploymentLease;
 use App\Shared\Infrastructure\Worker\DoctrineDeploymentRetirement;
+use App\Shared\Infrastructure\Worker\DeploymentNamespaceLock;
 use App\Tests\Support\DeploymentJournalFixture;
 use App\Tests\Support\FinalSchemaBootstrap;
 use Doctrine\DBAL\Connection;
@@ -26,6 +27,7 @@ final class WorkerDeploymentInventoryTest extends TestCase
     private string $schema;
     private const string NAMESPACE = 'baander.app:workers';
     private const string BOOT = 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
+    private const int CONTENDER_TIMEOUT_SECONDS = 15;
 
     protected function setUp(): void
     {
@@ -247,6 +249,11 @@ final class WorkerDeploymentInventoryTest extends TestCase
         $this->assertConcurrentClaims($operation);
     }
 
+    public function testIndependentCreateContendersWaitThroughASlowNamespaceTransaction(): void
+    {
+        $this->assertConcurrentClaims('create', holdNamespace: true);
+    }
+
     /** @return iterable<string,array{string}> */
     public static function concurrentOperations(): iterable
     {
@@ -255,12 +262,16 @@ final class WorkerDeploymentInventoryTest extends TestCase
         }
     }
 
-    private function assertConcurrentClaims(string $action): void
+    private function assertConcurrentClaims(string $action, bool $holdNamespace = false): void
     {
         if ($action === 'start') {
             DeploymentJournalFixture::ready($this->first, self::NAMESPACE, self::BOOT);
         } elseif ($action === 'create') {
             self::assertTrue($this->reserve(new DoctrineDeploymentInventory($this->first)));
+        }
+        if ($holdNamespace) {
+            $this->first->beginTransaction();
+            DeploymentNamespaceLock::acquire($this->first, self::NAMESPACE);
         }
         $gate = sys_get_temp_dir() . '/baander-start-claim-' . bin2hex(random_bytes(12));
         $code = <<<'PHP'
@@ -268,11 +279,17 @@ require $argv[1];
 $params = (new \Doctrine\DBAL\Tools\DsnParser(['postgresql' => 'pdo_pgsql']))->parse(getenv('OUTBOX_TEST_DATABASE_URL'));
 $connection = \Doctrine\DBAL\DriverManager::getConnection($params);
 $connection->executeStatement('SET search_path TO ' . $argv[2] . ', public');
+$connection->executeQuery("SELECT set_config('application_name', :name, false)", ['name' => basename($argv[3])])->free();
 file_put_contents($argv[3].'.ready', 'ready');
-$deadline = microtime(true) + 3;
+$deadline = microtime(true) + (int) $argv[7];
 while (!is_file($argv[4])) { if (microtime(true) > $deadline) { exit(2); } usleep(1000); }
 $binding = new \App\Shared\Infrastructure\Worker\DeploymentContainer('baander.app:workers', str_repeat('a', 32), 'baander.app:daemon', hash('sha256', 'baander.app:workers' . str_repeat('a', 32) . 'execution'), \App\Shared\Application\DTO\DeploymentUnit::Execution);
-$inventory = new \App\Shared\Infrastructure\Worker\DoctrineDeploymentInventory($connection);
+$timeoutMs = 1000 * (int) $argv[7];
+$inventory = new \App\Shared\Infrastructure\Worker\DoctrineDeploymentInventory(
+    $connection,
+    statementTimeoutMs: $timeoutMs,
+    lockTimeoutMs: $timeoutMs,
+);
 $permission = match ($argv[5]) {
     'start' => $inventory->claimStart($binding),
     'create' => $inventory->claimCreate('baander.app:workers', str_repeat('a',32), \App\Shared\Application\DTO\DeploymentUnit::Control),
@@ -287,28 +304,62 @@ PHP;
                 $output = tmpfile();
                 self::assertIsResource($output);
                 $outputs[] = $output;
-                $process = proc_open([PHP_BINARY, '-r', $code, '--', dirname(__DIR__, 2) . '/vendor/autoload.php', $this->schema, $gate . $i, $gate, $action, (string) $i], [0 => ['file', '/dev/null', 'r'], 1 => $output, 2 => $output], $pipes);
+                $process = proc_open([
+                    PHP_BINARY,
+                    '-r',
+                    $code,
+                    '--',
+                    dirname(__DIR__, 2) . '/vendor/autoload.php',
+                    $this->schema,
+                    $gate . $i,
+                    $gate,
+                    $action,
+                    (string) $i,
+                    (string) self::CONTENDER_TIMEOUT_SECONDS,
+                ], [0 => ['file', '/dev/null', 'r'], 1 => $output, 2 => $output], $pipes);
                 self::assertIsResource($process);
                 $processes[] = $process;
             }
-            $deadline = microtime(true) + 3;
+            $readyDeadline = microtime(true) + self::CONTENDER_TIMEOUT_SECONDS;
             while (!is_file($gate . '0.ready') || !is_file($gate . '1.ready')) {
-                if (microtime(true) > $deadline) {
+                if (microtime(true) > $readyDeadline) {
                     self::fail('Both independent PostgreSQL contenders must become ready.');
                 }
                 usleep(1000);
             }
             file_put_contents($gate, 'start');
+            if ($holdNamespace) {
+                $lockDeadline = microtime(true) + self::CONTENDER_TIMEOUT_SECONDS;
+                do {
+                    $this->first->executeQuery('SELECT pg_stat_clear_snapshot()')->free();
+                    $waiting = (int) $this->first->fetchOne(
+                        "SELECT count(*) FROM pg_stat_activity WHERE application_name IN (:first, :second) AND wait_event_type = 'Lock' AND wait_event = 'advisory'",
+                        ['first' => basename($gate . '0'), 'second' => basename($gate . '1')],
+                    );
+                    if ($waiting === 2) {
+                        break;
+                    }
+                    if (microtime(true) > $lockDeadline) {
+                        self::fail('Both contenders must wait on the held namespace transaction.');
+                    }
+                    usleep(1000);
+                } while (true);
+                usleep(350000);
+                $this->first->commit();
+            }
             $results = [];
+            $completionDeadline = microtime(true) + self::CONTENDER_TIMEOUT_SECONDS;
             foreach ($processes as $index => $process) {
                 while (proc_get_status($process)['running']) {
-                    if (microtime(true) > $deadline) {
+                    if (microtime(true) > $completionDeadline) {
                         self::fail('Concurrent claim did not complete within the fixture deadline.');
                     }
                     usleep(1000);
                 }
-                self::assertSame(0, proc_close($process));
-                $results[] = json_decode(file_get_contents(stream_get_meta_data($outputs[$index])['uri']), true, flags: JSON_THROW_ON_ERROR);
+                rewind($outputs[$index]);
+                $output = stream_get_contents($outputs[$index]);
+                self::assertSame(0, proc_close($process), 'Contender ' . $action . '/' . $index . ': ' . $output);
+                $results[] = json_decode($output, true, flags: JSON_THROW_ON_ERROR);
             }
             sort($results);
             self::assertSame([false, true], $results);

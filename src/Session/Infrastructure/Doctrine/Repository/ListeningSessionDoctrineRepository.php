@@ -85,7 +85,7 @@ final class ListeningSessionDoctrineRepository implements ListeningSessionReposi
             updatedAt: $entity->getUpdatedAt(),
             lastUsedAt: $entity->getLastUsedAt(),
             revision: $entity->getRevision(),
-            media: $entity->getMedia() === null ? null : new PlaybackMedia($entity->getMedia()['kind'], PublicId::fromString($entity->getMedia()['publicId'])),
+            media: $entity->getMedia() === null ? null : PlaybackMedia::fromArray($entity->getMedia()),
             desiredState: PlaybackState::from($entity->getDesiredState()),
             observedState: ObservedPlaybackState::from($entity->getObservedState()),
             selectedDestinationId: $entity->getSelectedDestinationId(),

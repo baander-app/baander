@@ -45,6 +45,40 @@ final class Movie
         return new self($state);
     }
 
+    /** @param array<string, string> $externalIds */
+    public function match(string $provider, string $providerId, array $externalIds, bool $handMatched = false): void
+    {
+        if (trim($provider) === '' || trim($providerId) === '') {
+            throw new InvalidArgumentException('A movie match requires a provider and its entry ID.');
+        }
+        $this->state->matchedProvider = $provider;
+        $this->state->providerId = $providerId;
+        $this->state->externalIds = $externalIds;
+        $this->state->handMatched = $handMatched;
+        $this->state->updatedAt = new DateTimeImmutable();
+    }
+
+    public function getMatchedProvider(): ?string
+    {
+        return $this->state->matchedProvider;
+    }
+
+    public function getProviderId(): ?string
+    {
+        return $this->state->providerId;
+    }
+
+    /** @return array<string, string> */
+    public function getExternalIds(): array
+    {
+        return $this->state->externalIds;
+    }
+
+    public function isHandMatched(): bool
+    {
+        return $this->state->handMatched;
+    }
+
     public function edit(?string $title = null, ?int $year = null, ?string $summary = null): void
     {
         if ($title !== null && trim($title) === '') {

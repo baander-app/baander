@@ -12,6 +12,7 @@ use App\Catalog\Application\Port\GenrePortInterface;
 use App\Catalog\Application\Port\MetadataContentReaderPortInterface;
 use App\Catalog\Domain\Repository\MovieRepositoryInterface;
 use App\Catalog\Application\Port\SongPortInterface;
+use App\Catalog\Application\Port\VideoMatchRequestInterface;
 use App\Catalog\Application\Service\VideoFileIngest;
 use App\Catalog\Domain\Model\Album;
 use App\Catalog\Domain\Model\Song;
@@ -109,6 +110,7 @@ final class FilesDiscoveredHandlerReliabilityTest extends TestCase
             artistIdentities: $this->artistIdentitiesStub(),
             artistSyncs: $this->createStub(ArtistSyncRequestInterface::class),
             tvLibraryIngest: $this->unusedTvIngest(),
+            videoMatches: $this->createStub(VideoMatchRequestInterface::class),
         );
 
         $message = new FilesDiscovered($libraryId, 'music', $directory, [$file]);
@@ -193,6 +195,7 @@ final class FilesDiscoveredHandlerReliabilityTest extends TestCase
             artistIdentities: $this->artistIdentitiesStub(),
             artistSyncs: $this->createStub(ArtistSyncRequestInterface::class),
             tvLibraryIngest: $this->unusedTvIngest(),
+            videoMatches: $this->createStub(VideoMatchRequestInterface::class),
         );
 
         $message = new FilesDiscovered($libraryId, 'music', $directory, [$fileOne, $fileTwo]);
@@ -379,6 +382,7 @@ final class FilesDiscoveredHandlerReliabilityTest extends TestCase
             artistIdentities: $this->artistIdentitiesStub(),
             artistSyncs: $this->createStub(ArtistSyncRequestInterface::class),
             tvLibraryIngest: $this->unusedTvIngest(),
+            videoMatches: $this->createStub(VideoMatchRequestInterface::class),
         );
         $file = $this->observedFile(new DiscoveredFile('/music/Test Album/01-track.mp3', 'Test Album/01-track.mp3', 'mp3', 1_000_000, time(), 'cover-fanout-hash'));
         $message = new FilesDiscovered($libraryId, 'music', '/music/Test Album', [$file]);

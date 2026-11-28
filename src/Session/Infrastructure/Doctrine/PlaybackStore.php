@@ -786,7 +786,7 @@ final readonly class PlaybackStore implements PlaybackStoreInterface
             updatedAt: $row['updatedAt'],
             lastUsedAt: $row['lastUsedAt'],
             revision: $row['revision'],
-            media: $row['media'] === null ? null : new PlaybackMedia($row['media']['kind'], PublicId::fromString($row['media']['publicId'])),
+            media: $row['media'] === null ? null : PlaybackMedia::fromArray($row['media']),
             desiredState: PlaybackState::from($row['desiredState']),
             observedState: ObservedPlaybackState::from($row['observedState']),
             selectedDestinationId: $row['selectedDestinationId'],

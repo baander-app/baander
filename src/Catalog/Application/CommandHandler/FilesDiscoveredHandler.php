@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Catalog\Application\CommandHandler;
 
 use App\Catalog\Application\Port\AlbumMatchRequestInterface;
+use App\Catalog\Application\Port\VideoMatchRequestInterface;
 use App\Catalog\Application\Port\AlbumPortInterface;
 use App\Catalog\Application\Port\ArtistIdentity;
 use App\Catalog\Application\Port\ArtistIdentityResolverInterface;
@@ -78,6 +79,7 @@ final class FilesDiscoveredHandler
         private readonly ArtistIdentityResolverInterface $artistIdentities,
         private readonly ArtistSyncRequestInterface $artistSyncs,
         private readonly TvLibraryIngest $tvLibraryIngest,
+        private readonly VideoMatchRequestInterface $videoMatches,
     ) {
     }
 
@@ -1193,9 +1195,37 @@ final class FilesDiscoveredHandler
             foreach ($written as $path) {
                 $committedPaths[$path] = true;
             }
+            $this->requestVideoMatches($message->libraryId, array_filter(
+                $batch,
+                static fn (DiscoveredFile $file): bool => isset($committedPaths[$file->absolutePath]),
+            ) |> array_values(...));
         }
+        $this->requestVideoMatches($message->libraryId, array_filter(
+            $files,
+            static fn (DiscoveredFile $file): bool => !$file->isVideo(),
+        ) |> array_values(...));
+
         if ($failures !== []) {
             throw new RuntimeException($this->buildFailureMessage($failures));
+        }
+    }
+
+    /** @param list<DiscoveredFile> $files */
+    private function requestVideoMatches(Uuid $libraryId, array $files): void
+    {
+        if ($files === []) {
+            return;
+        }
+        try {
+            $this->videoMatches->requestAfterImport($libraryId, array_map(
+                static fn (DiscoveredFile $file): string => $file->relativePath,
+                $files,
+            ));
+        } catch (\Throwable $failure) {
+            $this->logger->warning('Video files were imported but their match requests could not be queued.', [
+                'library_id' => $libraryId->toString(),
+                'exception' => $failure,
+            ]);
         }
     }
 

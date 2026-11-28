@@ -9,6 +9,8 @@ use App\Shared\Domain\ValueObject\MediaKind;
 
 final readonly class MediaFile
 {
+    public const array VIDEO_SIDECAR_EXTENSIONS = ['nfo', 'jpg', 'jpeg', 'png', 'webp'];
+
     public function __construct(
         private string $absolutePath,
         private string $relativePath,
@@ -50,7 +52,7 @@ final readonly class MediaFile
 
     public static function isVideoSidecarExtension(string $extension): bool
     {
-        return in_array($extension, ['nfo', 'jpg', 'jpeg', 'png', 'webp'], true);
+        return in_array($extension, self::VIDEO_SIDECAR_EXTENSIONS, true);
     }
 
     public function isAudio(): bool

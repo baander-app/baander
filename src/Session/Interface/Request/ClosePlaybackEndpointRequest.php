@@ -4,8 +4,9 @@ declare(strict_types=1);
 
 namespace App\Session\Interface\Request;
 
-use OpenApi\Spec as OA;
+use App\Session\Interface\Resource\PlaybackMediaResource;
 use App\Session\Interface\Validator\PlaybackCheckpoint;
+use OpenApi\Spec as OA;
 use Symfony\Component\Validator\Constraints as Assert;
 
 #[OA\Schema(
@@ -13,59 +14,14 @@ use Symfony\Component\Validator\Constraints as Assert;
     properties: [
         'incarnationId' => new OA\Schema(type: 'string'),
         'checkpoint' => new OA\Schema(
-            allOf: [
-                new OA\Schema(
-                    type: 'object',
-                    additionalProperties: new OA\Schema(
-                        oneOf: [
-                            new OA\Schema(
-                                type: 'object',
-                                additionalProperties: new OA\Schema(type: 'string'),
-                            ),
-                            new OA\Schema(type: 'number', format: 'float'),
-                            new OA\Schema(type: 'integer'),
-                            new OA\Schema(
-                                type: 'object',
-                                nullable: true,
-                                enum: [null],
-                            ),
-                        ],
-                    ),
-                ),
-                new OA\Schema(
-                    type: 'object',
-                    properties: [
-                        'media' => new OA\Schema(
-                            oneOf: [
-                                new OA\Schema(
-                                    allOf: [
-                                        new OA\Schema(
-                                            type: 'object',
-                                            additionalProperties: new OA\Schema(type: 'string'),
-                                        ),
-                                        new OA\Schema(
-                                            type: 'object',
-                                            properties: [
-                                                'kind' => new OA\Schema(
-                                                    type: 'string',
-                                                    enum: ['song', 'video'],
-                                                ),
-                                            ],
-                                        ),
-                                    ],
-                                ),
-                                new OA\Schema(type: 'number', format: 'float'),
-                                new OA\Schema(type: 'integer'),
-                                new OA\Schema(
-                                    type: 'object',
-                                    nullable: true,
-                                    enum: [null],
-                                ),
-                            ],
-                        ),
-                    ],
-                ),
+            type: 'object',
+            properties: [
+                'media' => new OA\Schema(type: 'object', nullable: true, allOf: [new OA\Schema(ref: PlaybackMediaResource::class)]),
+                'revision' => new OA\Schema(type: 'integer', minimum: 0),
+                'currentTrackIndex' => new OA\Schema(type: 'integer', minimum: 0),
+                'position' => new OA\Schema(type: 'number', format: 'float', minimum: 0),
             ],
+            required: ['media', 'revision', 'currentTrackIndex', 'position'],
         ),
     ],
     required: ['incarnationId', 'checkpoint'],
@@ -73,7 +29,7 @@ use Symfony\Component\Validator\Constraints as Assert;
 )]
 final readonly class ClosePlaybackEndpointRequest
 {
-    /** @param array{revision:int,media:?array{kind:string,publicId:string},currentTrackIndex:int,position:float} $checkpoint */
+    /** @param array{revision:int,media:?array{kind:string,publicId:string,viewing?:array{titleKind:string,titleId:string}},currentTrackIndex:int,position:float} $checkpoint */
     public function __construct(
         #[Assert\NotBlank]
         #[Assert\Uuid]

@@ -241,7 +241,7 @@ final class TvdbVideoMetadataTest extends TestCase
     public static function failures(): iterable
     {
         yield 'outage' => [503, VideoProviderProblem::Unavailable];
-        yield 'bad login' => [401, VideoProviderProblem::Unavailable];
+        yield 'rejected bearer after retry' => [401, VideoProviderProblem::Unavailable];
         yield 'refused request' => [400, VideoProviderProblem::Refused];
     }
 
@@ -261,6 +261,12 @@ final class TvdbVideoMetadataTest extends TestCase
         $records = $this->records();
         $records['/v4/episodes/102/extended'] = 404;
         self::assertSame(VideoProviderProblem::Unavailable, $this->provider($records)->identify($this->request()));
+    }
+
+    public function testRejectedKeyIsReportedSeparatelyFromAnUnavailableLoginEndpoint(): void
+    {
+        self::assertSame(VideoProviderProblem::LoginFailed, $this->provider(['/v4/login' => 401])->identify($this->request()));
+        self::assertSame(VideoProviderProblem::Unavailable, $this->provider(['/v4/login' => 503])->identify($this->request()));
     }
 
     public function testDisabledAndUnconfiguredProvidersMakeNoRequests(): void
@@ -533,7 +539,7 @@ final class TvdbVideoMetadataTest extends TestCase
             $query = parse_url($url, PHP_URL_QUERY);
             $path .= $query === null ? '' : '?' . $query;
             $this->requests[] = $path;
-            if ($path === '/v4/login') {
+            if ($path === '/v4/login' && !isset($records[$path])) {
                 return new MockResponse('{"data":{"token":"fixture-token"},"status":"success"}');
             }
             $record = $records[$path] ?? throw new \LogicException('No fixture for ' . $path);

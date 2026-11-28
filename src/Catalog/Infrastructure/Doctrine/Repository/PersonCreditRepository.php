@@ -6,6 +6,7 @@ namespace App\Catalog\Infrastructure\Doctrine\Repository;
 
 use App\Catalog\Application\Port\PersonCreditInput;
 use App\Catalog\Application\Port\PersonCreditPortInterface;
+use App\Catalog\Application\Port\PersonCreditTargetInput;
 use App\Catalog\Domain\ValueObject\PersonIdentifierNamespace;
 use App\Catalog\Infrastructure\Doctrine\ImportIdentity\ImportIdentityLock;
 use App\Catalog\Infrastructure\Doctrine\ImportIdentity\PersonWriteLock;
@@ -24,16 +25,44 @@ final readonly class PersonCreditRepository implements PersonCreditPortInterface
 
     public function syncMovieCredits(Uuid $movieId, ?array $cast, ?array $crew, bool $forceUpdate = false): bool
     {
-        return $this->sync('movie', $movieId, $cast, $crew, $forceUpdate);
+        return $this->syncCredits([new PersonCreditTargetInput('movie', $movieId, $cast, $crew, $forceUpdate)]);
     }
 
     public function syncTvCredits(string $kind, Uuid $targetId, ?array $cast, ?array $crew, bool $forceUpdate = false): bool
     {
-        return match ($kind) {
-            'series' => $this->sync('series', $targetId, $cast, $crew, $forceUpdate),
-            'episode' => $this->sync('episode', $targetId, $cast, $crew, $forceUpdate),
-            default => throw new InvalidArgumentException('Unknown television credit target.'),
-        };
+        if (!in_array($kind, ['series', 'episode'], true)) {
+            throw new InvalidArgumentException('Unknown television credit target.');
+        }
+
+        return $this->syncCredits([new PersonCreditTargetInput($kind, $targetId, $cast, $crew, $forceUpdate)]);
+    }
+
+    public function syncCredits(array $targets): bool
+    {
+        $keys = [];
+        $prepared = [];
+        foreach ($targets as $target) {
+            $keys[] = 'person-work:' . $target->kind . ':' . $target->targetId->toString();
+            $cast = self::validPartition($target->cast, 'cast');
+            $crew = self::validPartition($target->crew, 'crew');
+            $prepared[] = ['target' => $target, 'cast' => $cast, 'crew' => $crew];
+            foreach ([...($cast ?? []), ...($crew ?? [])] as $credit) {
+                foreach ($credit->identifiers as $namespace => $value) {
+                    $keys[] = PersonIdentityRepository::identifierLock($namespace, $value);
+                }
+            }
+        }
+        PersonWriteLock::shared($this->connection);
+        ImportIdentityLock::acquire($this->connection, $keys);
+
+        $accepted = false;
+        foreach ($prepared as $entry) {
+            $target = $entry['target'];
+            $changed = $this->sync($target->kind, $target->targetId, $entry['cast'], $entry['crew'], $target->forceUpdate);
+            $accepted = $changed || $accepted;
+        }
+
+        return $accepted;
     }
 
     /**
@@ -43,8 +72,6 @@ final readonly class PersonCreditRepository implements PersonCreditPortInterface
      */
     private function sync(string $kind, Uuid $target, ?array $cast, ?array $crew, bool $force): bool
     {
-        $cast = self::validPartition($cast, 'cast');
-        $crew = self::validPartition($crew, 'crew');
         if ($cast === null && $crew === null) {
             return false;
         }
@@ -53,13 +80,6 @@ final readonly class PersonCreditRepository implements PersonCreditPortInterface
         $state = $kind . '_person_credit_state';
         $key = $kind . '_id';
         $credits = $kind . '_person_credits';
-        $keys = ['person-work:' . $kind . ':' . $targetId];
-        foreach ([...($cast ?? []), ...($crew ?? [])] as $credit) {
-            $keys[] = PersonIdentityRepository::identifierLock(PersonIdentifierNamespace::TmdbPerson->value, $credit->tmdbId);
-        }
-        PersonWriteLock::shared($this->connection);
-        ImportIdentityLock::acquire($this->connection, $keys);
-
         $flags = $this->connection->fetchAssociative(
             "SELECT * FROM {$state} WHERE {$key} = :target",
             ['target' => $targetId],
@@ -104,14 +124,14 @@ final readonly class PersonCreditRepository implements PersonCreditPortInterface
         array $incoming,
         bool $keepDirectors,
     ): bool {
-        $owners = $this->identities->resolveTmdbCredits($incoming);
+        $owners = $this->identities->resolveCredits($incoming);
         if ($owners === null) {
             return false;
         }
 
         $rows = [];
-        foreach ($incoming as $credit) {
-            $personId = $owners[$credit->tmdbId];
+        foreach ($incoming as $index => $credit) {
+            $personId = $owners[$index];
             $sourceKey = self::creditKey($credit, $personId);
             $rows[$sourceKey] ??= [
                 'id' => Uuid::v7()->toString(),
@@ -198,7 +218,7 @@ final readonly class PersonCreditRepository implements PersonCreditPortInterface
     private static function creditKey(PersonCreditInput $credit, string $personId): string
     {
         if ($credit->providerCreditId !== null && $credit->providerCreditId !== '') {
-            return $credit->category . ':tmdb:' . $credit->providerCreditId;
+            return $credit->category . ':' . $credit->source . ':' . $credit->providerCreditId;
         }
 
         return $credit->category . ':semantic:' . hash('sha256', json_encode([
@@ -216,18 +236,38 @@ final readonly class PersonCreditRepository implements PersonCreditPortInterface
      */
     private static function validPartition(?array $incoming, string $category): ?array
     {
-        foreach ($incoming ?? [] as $credit) {
+        if ($incoming === null) {
+            return null;
+        }
+        $valid = [];
+        foreach ($incoming as $credit) {
+            if (
+                $credit->source === 'local'
+                && array_intersect_key(
+                    $credit->identifiers,
+                    array_flip(['imdb_name', 'tmdb_person', 'tvdb_person']),
+                ) === []
+            ) {
+                continue;
+            }
             if (
                 $credit->category !== $category
-                || PersonIdentifierNamespace::TmdbPerson->normalize($credit->tmdbId) !== $credit->tmdbId
+                || $credit->identifiers === []
+                || !in_array($credit->source, ['tmdb', 'tvdb', 'local'], true)
                 || trim($credit->name) === ''
                 || trim($credit->job) === ''
                 || trim($credit->role) === ''
             ) {
                 return null;
             }
+            foreach ($credit->identifiers as $namespace => $value) {
+                if (PersonIdentifierNamespace::tryFrom($namespace)?->normalize($value) !== $value) {
+                    return null;
+                }
+            }
+            $valid[] = $credit;
         }
 
-        return $incoming;
+        return $valid;
     }
 }

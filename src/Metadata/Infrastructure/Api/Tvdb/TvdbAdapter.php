@@ -247,7 +247,7 @@ final readonly class TvdbAdapter
                 continue;
             }
             if ($status >= 300) {
-                throw new TvdbHttpException($status);
+                throw new TvdbHttpException($status, login: $endpoint === '/login');
             }
             try {
                 $decoded = json_decode($content, true, flags: JSON_THROW_ON_ERROR);

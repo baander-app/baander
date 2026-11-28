@@ -1,5 +1,7 @@
 import type { LiveCoverageDescriptor } from '@/shared/live/coverage-types'
 
+const videoMatchKeySource = "videoMatchKeys={all:['admin-video-matches']asconst,reviews:(filters:VideoMatchReviewFilters)=>['admin-video-matches','reviews',filters]asconst,candidates:(kind:string,publicId:string,query:string)=>['admin-video-matches','candidates',kind,publicId,query]asconst,choices:(kind:string,publicId:string,collection:VideoMatchChoicesCollection,page:number)=>['admin-video-matches','choices',kind,publicId,collection,page]asconst,}"
+
 export const adminLiveCoverage = [
   {
     id: 'admin.logs',
@@ -143,6 +145,86 @@ export const adminLiveCoverage = [
     },
   },
   {
+    id: "admin.metadata-providers",
+    family: "admin-metadata",
+    policy: {
+      kind: "stored",
+      reason: "System settings change which metadata providers are enabled. A new server baseline also refreshes credential presence.",
+    },
+    audiences: ["admin"],
+    sourceTables: ["system_settings"],
+    deploymentTables: [],
+    sources: ["'/api/admin/metadata/providers'"],
+    keyVariants: ["metadataProvidersKey=['admin-metadata-providers']asconst"],
+    dependentFamilies: [],
+    mirrors: [],
+    responseCaches: ["authoritative-read"],
+    consumers: [
+      "src/features/admin/api/metadata-admin-api.ts#getAdminMetadataProviders:generated",
+      "src/features/admin/hooks/use-metadata-admin.ts#useQuery:metadataProvidersKey=['admin-metadata-providers']asconst",
+    ],
+    coverageVerification: ["tests/live-updates/coverage.test.ts"],
+    behaviorVerification: {
+      unitProofs: [
+        "src/features/admin/pages/__tests__/MetadataPage.test.tsx",
+        "tests/live-updates/admin-routing.test.ts",
+      ],
+    },
+  },
+  {
+    id: "admin.video-match-reviews",
+    family: "admin-metadata",
+    policy: {
+      kind: "stored",
+      reason: "Queue reviews, provider pauses, placements, and the library order are stored and can change in another admin session.",
+    },
+    audiences: ["admin"],
+    sourceTables: ["video_match_states", "video_placements", "video_provider_pauses", "library_provider_orders", "movies"],
+    deploymentTables: [],
+    sources: ["'/api/admin/video-matches/reviews'", "/api/admin/video-matches/libraries/{library}/provider-order", "/api/admin/video-matches/libraries/{library}/rematch-preview"],
+    keyVariants: ["videoMatchKeys.reviews(filters)", "getGetAdminVideoMatchesProviderOrderQueryKey(library)", "getGetAdminVideoMatchesLibraryRematchPreviewQueryKey(library)"],
+    dependentFamilies: [],
+    mirrors: [],
+    responseCaches: ["authoritative-read"],
+    consumers: [
+      "src/features/admin/hooks/use-video-match-admin.ts#getAdminVideoMatchesReviews:generated",
+      `src/features/admin/hooks/use-video-match-admin.ts#useInfiniteQuery:videoMatchKeys.reviews(filters);${videoMatchKeySource}`,
+      "src/features/library/hooks/use-video-library-settings.ts#getAdminVideoMatchesProviderOrder:generated",
+      "src/features/library/hooks/use-video-library-settings.ts#getAdminVideoMatchesLibraryRematchPreview:generated",
+      "src/features/library/hooks/use-video-library-settings.ts#useQuery:orderKey=getGetAdminVideoMatchesProviderOrderQueryKey(library)",
+      "src/features/library/hooks/use-video-library-settings.ts#useQuery:previewKey=getGetAdminVideoMatchesLibraryRematchPreviewQueryKey(library)",
+    ],
+    coverageVerification: ["tests/live-updates/coverage.test.ts"],
+    behaviorVerification: {
+      unitProofs: ["tests/live-updates/admin-routing.test.ts"],
+    },
+  },
+  {
+    id: "admin.video-match-choices",
+    family: "admin-metadata",
+    policy: {
+      kind: "demand",
+      reason: "Candidate searches and offered orderings consult providers on demand. File and episode choice pages refresh from stored catalog changes.",
+    },
+    audiences: ["admin"],
+    sourceTables: ["video_placements"],
+    deploymentTables: [],
+    sources: ["/api/admin/video-matches/{kind}/{publicId}/candidates"],
+    keyVariants: ["videoMatchKeys.candidates(kind,publicId,query)", "videoMatchKeys.choices(kind,publicId,collection,page)"],
+    dependentFamilies: [],
+    mirrors: [],
+    responseCaches: ["authoritative-read"],
+    consumers: [
+      "src/features/admin/hooks/use-video-match-admin.ts#getAdminVideoMatchesCandidates:generated",
+      `src/features/admin/hooks/use-video-match-admin.ts#useQuery:videoMatchKeys.candidates(kind,publicId,query);${videoMatchKeySource}`,
+      `src/features/admin/hooks/use-video-match-admin.ts#useQuery:videoMatchKeys.choices(kind,publicId,collection,page);${videoMatchKeySource}`,
+    ],
+    coverageVerification: ["tests/live-updates/coverage.test.ts"],
+    behaviorVerification: {
+      unitProofs: ["tests/live-updates/admin-routing.test.ts"],
+    },
+  },
+  {
     id: "admin.admin-recommendation-jobs",
     family: "admin-metadata",
     policy: {
@@ -177,19 +259,17 @@ export const adminLiveCoverage = [
     family: "deployment-definitions",
     policy: {
       kind: "deployment",
-      reason: "Definitions, scheduler command metadata and provider credential presence are fixed for the server incarnation and reload when it changes.",
+      reason: "Settings definitions and scheduler command metadata reload with a new server incarnation.",
     },
     audiences: ["admin"],
     sourceTables: [],
     deploymentTables: [],
     sources: [
       "compiled setting definitions; registered console command catalog; deployment configuration",
-      "'/api/admin/metadata/providers'",
       "'/api/admin/scheduler/jobs/commands'",
       "[ `/api/admin/settings/definitions` ]",
     ],
     keyVariants: [
-      "['admin-metadata-providers']",
       "COMMANDS_KEY=['admin-scheduler-commands']",
       "[ `/api/admin/settings/definitions` ]",
     ],
@@ -197,9 +277,7 @@ export const adminLiveCoverage = [
     mirrors: [],
     responseCaches: [],
     consumers: [
-      "src/features/admin/api/metadata-admin-api.ts#AXIOS_INSTANCE.get:'/api/admin/metadata/providers'",
       "src/features/admin/api/scheduler-admin-api.ts#AXIOS_INSTANCE.get:'/api/admin/scheduler/jobs/commands'",
-      "src/features/admin/hooks/use-metadata-admin.ts#useQuery:['admin-metadata-providers']",
       "src/features/admin/hooks/use-scheduler-admin.ts#useQuery:COMMANDS_KEY=['admin-scheduler-commands']",
       "src/features/admin/hooks/use-system-settings.ts#useGetAdminSettingsDefinitions:generated",
     ],

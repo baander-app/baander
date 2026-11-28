@@ -1,8 +1,8 @@
 # External APIs
 
-A library scan reads local files and tags. External services can add identifiers, genres and artist information after those catalog records exist. You can import and play local media without configuring API credentials; a failed lookup is a different problem from a missing source file or failed import.
+A library scan reads local files and tags. External services can add identifiers, genres, artwork, credits and episode structure after those catalog records exist. You can import and play local media without configuring API credentials; a failed lookup is a different problem from a missing source file or failed import.
 
-See [Library Management](library-management.md#what-happens-to-new-music) for automatic requests and [Background Work](../workers/background-work.md) for the workers that process them.
+See [Library Management](library-management.md#what-happens-to-new-music) and [Video Matching](video-matching.md) for automatic requests and [Background Work](../workers/background-work.md) for the workers that process them.
 
 ## Supported APIs
 
@@ -12,7 +12,9 @@ See [Library Management](library-management.md#what-happens-to-new-music) for au
 | Cover Art Archive | The front cover of the MusicBrainz release a match applies | No API key. Requests send the same User-Agent and take turns under the MusicBrainz rate limit. |
 | Discogs | Metadata searches that name Discogs as their source | `DISCOGS_TOKEN` |
 | Last.fm | Artist search and artist information in metadata browse responses | `LASTFM_API_KEY` |
-| TMDB | Movie metadata and director credits requested by library metadata sync | `TMDB_BEARER_TOKEN` in the metadata worker |
+| TheTVDB | Series matching, episode structure and orderings, artwork and Person credits | Licensed installation key in `TVDB_API_KEY`; key-only v4 login, with no subscriber PIN flow |
+| TMDB | Movie and series matching, episode orderings, artwork and Person credits | `TMDB_BEARER_TOKEN` in web and metadata workers |
+| Local files | Movie and series NFO metadata and artwork inside the library | No credential; the Local files provider switch governs NFO reads and identity hints |
 | Spotify | Adapter exists, but no application service currently calls it | `SPOTIFY_CLIENT_ID`, `SPOTIFY_CLIENT_SECRET` are not needed for current workflows |
 | TasteDive | Adapter exists, but no application service currently calls it | `TASTE_DIVE_API_KEY` is not needed for current workflows |
 | LRCLIB | Lyrics fetches for songs without local lyrics | No API key. The client sends a fixed application User-Agent. |
@@ -48,7 +50,8 @@ Use this table when catalog records exist but enrichment is missing.
 | **Cover Art Archive** | A match that would add a front cover writes nothing. Automatic matching pauses as it does for a MusicBrainz outage; an administrator's apply answers `503`. A cover the Cover Art Archive refuses is no outage: automatic matching applies the match without the cover, and an administrator's apply with the cover ticked answers `409` and writes nothing. |
 | **Discogs** | Metadata searches that name Discogs as their source get no results from it. Matching and the song sync do not call Discogs. |
 | **Last.fm** | Last.fm artist search and browse information are unavailable. Matching and the song sync do not call Last.fm. |
-| **TMDB** | Movie metadata and director credits remain unchanged when lookup fails; the movie sync reports failure for retry. Missing credentials do not prevent local movie import or playback. |
+| **TheTVDB / TMDB** | Existing metadata and matches remain. Automatic matching pauses only the affected provider after an outage or rejected login, reports the failure and retry time, and keeps pending requests. A disabled or unconfigured provider is skipped for new matches; an existing match keeps its saved provider. Local import and playback remain available. See [Video provider configuration](video-matching.md#configure-online-credentials). |
+| **Local files** | Turning this provider off skips NFO metadata, local artwork matching and NFO identity hints. Folder tags and online matching remain available, and previously applied local metadata remains stored. |
 | **Spotify / TasteDive** | No impact on current application workflows. |
 | **LRCLIB** | Remote lyrics fetches cannot supply lyrics; readable `.lrc` sidecars still provide local lyrics during ingestion. A fetch that found LRCLIB unavailable, or could not be sent within its wait, stores nothing, and a later fetch may succeed. |
 
@@ -66,12 +69,7 @@ An administrator can request a metadata sync of every library; see [`app:metadat
 2. The chosen result must pass the match-quality check.
 3. Accepted changes are stored in the catalog and appear on later reads. Last.fm browse responses do not become an automatic third stage of stored enrichment.
 
-Library sync also queues each movie for TMDB enrichment. A movie's stored TMDB ID
-controls the lookup; otherwise enrichment searches its title and year. Normal
-sync fills missing director credits, while missing or failed credit information
-retains the stored set. See [People and credits](library-management.md#people-and-credits)
-for browsing the credited people. This work starts through metadata sync;
-scanning alone does not request director credits.
+Video ingestion queues new unmatched movies and series independently of `metadata.auto_sync`. Library metadata sync and the daily video refresh retain each matched title's provider and episode ordering. They preserve locked fields and manual TV edits; an administrator uses an explicit rematch to choose another entry. Cast and crew come from that provider's accepted response. See [Video Matching](video-matching.md#choose-providers) and [People and credits](library-management.md#people-and-credits).
 
 Lyrics have a separate `lyrics.auto_fetch` setting, also off by default. It requests LRCLIB lyrics for newly created tracks without an `.lrc` sidecar, and for tracks without lyrics that a rescan gives an artist credit or a new length. The bulk [`app:lyrics:fetch`](../commands/app-lyrics-fetch.md) command can request lyrics for existing tracks independently of that setting. Embedded cover extraction is another separate task; see [Cover Art Extraction](library-management.md#cover-art-extraction).
 
@@ -80,15 +78,9 @@ Lyrics have a separate `lyrics.auto_fetch` setting, also off by default. It requ
 Put web lookup credentials in the `environment` object of the installation's
 [private configuration](../getting-started/installation.md#4-write-the-private-configuration),
 rather than committing them to the checkout. Apply changes using the
-[configuration lifecycle](../configuration/README.md). The preset passes these keys to
-web alone; it does not configure the independent worker image.
+[configuration lifecycle](../configuration/README.md). Web lookup credentials and independent worker credentials have separate admission rules; the video keys below are forwarded to both.
 
-TMDB movie enrichment runs in workers. Set the optional `TMDB_BEARER_TOKEN` in
-the configuration's `environment` object and apply the configuration lifecycle so
-the workers receive the change. The admitted credentials, preset renderer and preview
-worker setup forward this token; the default is empty. An unconfigured token
-does not provide authenticated TMDB lookup, but local movie import and playback
-remain available.
+Set the optional `TMDB_BEARER_TOKEN` and licensed `TVDB_API_KEY` in that private `environment` object. Apply the configuration lifecycle so workers receive each change. The [preset renderer](../../../packages/baander-deployment/src/Presets/Renderer.php) and [preview worker setup](../../../packages/baander-dev-environment/src/Worker/WorkerDeployment.php) forward both values; both default to empty. An empty value does not enable its online provider, but local import and playback remain available. Baander has no shared TheTVDB key or subscriber-PIN setting; see [licensed key setup](video-matching.md#configure-online-credentials).
 
 Queued metadata sync runs in workers. Their credentials file accepts a restricted
 set of keys that currently excludes `DISCOGS_TOKEN` and `LASTFM_API_KEY`, and the
@@ -107,6 +99,13 @@ For current optional integrations, obtain the credential from its provider:
 
 - **Discogs**: generate a personal access token in the provider's developer settings and set `DISCOGS_TOKEN`.
 - **Last.fm**: register an API application and set its API key as `LASTFM_API_KEY`.
+- **TheTVDB**: arrange a licensed v4 key for the installation, following [TheTVDB's key guidance](https://support.thetvdb.com/kb/faq.php?id=81), then set `TVDB_API_KEY`. Baander uses key-only login; it does not implement the per-end-user PIN flow.
 - **TMDB**: configure its bearer token as `TMDB_BEARER_TOKEN` in the private deployment environment, then apply the configuration lifecycle above.
 
 MusicBrainz and LRCLIB do not require an API key for these lookups. Spotify and TasteDive credentials do not activate an application workflow in the current implementation.
+
+## Provider switches and attribution
+
+An administrator can turn each listed metadata provider on or off in **Metadata → Providers**, or use [app:metadata:provider:set](../commands/app-metadata-provider-set.md). The switch applies server-wide and takes effect on the next lookup, including cache-backed lookups. Stored metadata remains available. [app:metadata:providers](../commands/app-metadata-providers.md) reports configured and enabled state without contacting providers; a nonempty credential is not a successful authentication test.
+
+Member pages show the source of video metadata. TMDB metadata carries its logo and required non-endorsement notice, and TheTVDB metadata links to TheTVDB.com. Keep those credits when presenting provider metadata in another client. See [Video attribution](video-matching.md#attribution), the [provider information contract](../../../src/Metadata/Application/Settings/MetadataProvider.php) and [outbound provider security](../maintenance/outbound-provider-security.md) for request boundaries.
