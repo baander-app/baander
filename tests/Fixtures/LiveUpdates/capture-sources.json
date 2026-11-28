@@ -867,6 +867,27 @@
       "capture": "child-row-or-exempt"
     },
     {
+      "parent": "users",
+      "child": "watched_marks",
+      "foreign_key": "user_id",
+      "action": "CASCADE",
+      "capture": "child-row-or-exempt"
+    },
+    {
+      "parent": "tv_episodes",
+      "child": "watched_marks",
+      "foreign_key": "episode_id",
+      "action": "CASCADE",
+      "capture": "child-row-or-exempt"
+    },
+    {
+      "parent": "movies",
+      "child": "watched_marks",
+      "foreign_key": "movie_id",
+      "action": "CASCADE",
+      "capture": "child-row-or-exempt"
+    },
+    {
       "parent": "tv_series",
       "child": "video_match_states",
       "foreign_key": "series_id",
@@ -1945,6 +1966,24 @@
       "mapping": "src/Catalog/Infrastructure/Doctrine/Entity/TvSeriesEntity.php",
       "classification": "excluded",
       "reason": "TV series; the library-scoped TV and People views refresh them by 30-second visible sampling and catalog hints, without capture."
+    },
+    {
+      "table": "watched_marks",
+      "mapping": "src/Activity/Infrastructure/Doctrine/Entity/WatchedMarkEntity.php",
+      "classification": "capture",
+      "operations": ["INSERT", "UPDATE", "DELETE"],
+      "relevant_columns": ["id", "user_id", "episode_id", "movie_id", "watched_at"],
+      "excluded_columns": [],
+      "families": ["activity", "catalog"],
+      "scope_routes": ["user"],
+      "readers": ["src/Activity/Infrastructure/Doctrine/Repository/WatchedMarkRepository.php"],
+      "response_cache": "authoritative-read"
+    },
+    {
+      "table": "watched_mark_moves",
+      "mapping": "src/Activity/Infrastructure/Doctrine/Entity/WatchedMarkMoveEntity.php",
+      "classification": "excluded",
+      "reason": "Transaction receipts prevent a retried placement from moving member marks twice. Member reads use watched_marks."
     },
     {
       "table": "video_match_states",

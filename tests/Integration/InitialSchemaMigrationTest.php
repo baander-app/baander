@@ -114,7 +114,7 @@ final class InitialSchemaMigrationTest extends TestCase
         );
         $factory = $this->factory();
         $factory->getMetadataStorage()->ensureInitialized();
-        self::assertCount(54, $factory->getMigrationRepository()->getMigrations());
+        self::assertCount(55, $factory->getMigrationRepository()->getMigrations());
         self::assertSame(0, $this->migrate($factory));
         self::assertSame([
             'DoctrineMigrations\\Version20261017000000',
@@ -171,8 +171,9 @@ final class InitialSchemaMigrationTest extends TestCase
             'DoctrineMigrations\\Version20261127194100',
             'DoctrineMigrations\\Version20261128121000',
             'DoctrineMigrations\\Version20261128121100',
+            'DoctrineMigrations\\Version20261128122300',
         ], $this->connection->fetchFirstColumn('SELECT version FROM doctrine_migration_versions ORDER BY version'));
-        self::assertSame(113, (int) $this->connection->fetchOne("SELECT count(*) FROM pg_tables WHERE schemaname = 'public' AND tablename <> 'doctrine_migration_versions'"));
+        self::assertSame(115, (int) $this->connection->fetchOne("SELECT count(*) FROM pg_tables WHERE schemaname = 'public' AND tablename <> 'doctrine_migration_versions'"));
         foreach (['video_placements', 'video_placement_episode', 'library_provider_orders'] as $table) {
             self::assertSame($table, $this->connection->fetchOne('SELECT to_regclass(?)::text', [$table]));
         }
@@ -188,13 +189,13 @@ final class InitialSchemaMigrationTest extends TestCase
         self::assertSame($history, $this->connection->fetchAllAssociative('SELECT * FROM doctrine_migration_versions'));
 
         $failure = $this->refused($this->factory(), '0');
-        self::assertStringContainsString('Removing video matching would discard requests', $failure);
+        self::assertStringContainsString('Removing watched state would discard member history', $failure);
         self::assertSame($catalog, $this->catalog('public'));
         self::assertSame($seeds, $this->connection->fetchAllAssociative('SELECT * FROM scheduled_jobs ORDER BY id'));
         self::assertSame($history, $this->connection->fetchAllAssociative('SELECT * FROM doctrine_migration_versions'));
 
         self::assertSame(0, $this->migrate($this->factory(true)));
-        self::assertSame(55, (int) $this->connection->fetchOne('SELECT count(*) FROM doctrine_migration_versions'));
+        self::assertSame(56, (int) $this->connection->fetchOne('SELECT count(*) FROM doctrine_migration_versions'));
         self::assertSame('future_migration_probe', $this->connection->fetchOne("SELECT to_regclass('future_migration_probe')::text"));
     }
 

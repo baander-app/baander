@@ -969,6 +969,10 @@ services:
 
     App\Activity\Application\Port\AlbumActivityMergePortInterface:
         alias: App\Activity\Infrastructure\Doctrine\AlbumActivityMerge
+    App\Activity\Application\Port\WatchedMarkMovePortInterface:
+        alias: App\Activity\Infrastructure\Doctrine\WatchedMarkMove
+    App\Activity\Domain\Repository\WatchedMarkRepositoryInterface:
+        alias: App\Activity\Infrastructure\Doctrine\Repository\WatchedMarkRepository
 
     # --- Playlist Application Ports ---
     App\Playlist\Application\Port\PlaylistPortInterface:

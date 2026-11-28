@@ -139,7 +139,7 @@ final class CaptureCoverageTest extends TestCase
     public function testPrivateAndSecretSourcesCannotBecomeGlobalCapture(): void
     {
         $sources = array_column($this->manifest()['sources'], null, 'table');
-        foreach (['media_activities', 'notifications', 'audio_preferences', 'player_preferences', 'layout_preferences', 'preference_history'] as $table) {
+        foreach (['media_activities', 'notifications', 'audio_preferences', 'player_preferences', 'layout_preferences', 'preference_history', 'watched_marks'] as $table) {
             self::assertSame(['user'], $sources[$table]['scope_routes'], $table);
         }
         foreach (['domain_event_outbox', 'domain_event_outbox_delivery', 'domain_event_outbox_receipt', 'password_reset_tokens', 'email_verification_tokens', 'oauth_auth_codes', 'oauth_pushed_authorization_requests', 'transcode_control_receipts'] as $table) {

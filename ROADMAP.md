@@ -48,7 +48,10 @@ This checkpoint covers the catalog foundation and video metadata providers.
 - U11 queues matches after ingestion commits, claims one title at a time,
   pauses failing providers and retries when a provider becomes usable. Folder
   tags remain available when the local provider is off. NFO IDs follow its switch.
-  Phase C units U23, U22, U12 and U13 remain pending. Phase D member
+- U23 stores watched marks per member and episode or movie. Placement changes
+  move marks in the same transaction and preserve a mark on an old episode
+  that still has a file. Replaying the same move leaves the marks intact.
+  Phase C units U22, U12 and U13 remain pending. Phase D member
   progress, read API and web units U14–U17 and Phase E documentation and browser
   verification units U18–U19 remain pending.
 
@@ -71,7 +74,9 @@ This checkpoint covers the catalog foundation and video metadata providers.
   inventory passed nine tests with 58 assertions. The OpenAPI specification and
   Orval client were regenerated together and their drift checks passed for U6.
 - U7 passed 61 focused CI-image tests, scoped PHPStan and Deptrac with zero
-  violations and 451 existing skipped violations.
+  violations and 451 existing skipped violations. The full run at that U7 commit
+  counted 15,599 tests and 156,581 assertions. It reproduced the same four
+  failures and one teardown error that the later fixture corrections addressed.
 - During U8 and U9, 114 provider tests passed with 548 assertions. Full PHPStan
   and import checks passed. Deptrac reported zero violations and 451 baseline
   entries. After adding support for an NFO containing only a provider ID, the
@@ -93,6 +98,9 @@ This checkpoint covers the catalog foundation and video metadata providers.
   adapter tests passed 41 assertions covering stale claims, rollback, sidecar
   scoping and retained identities. Scoped PHPStan and imports passed. Deptrac
   reported zero violations and 451 existing skipped violations.
+- U23 passed 66 CI-image tests with 3,144 assertions, including the move,
+  member-scoped capture and fresh-install suites. Scoped PHPStan and imports
+  passed. Deptrac reported zero violations and 451 existing skipped violations.
 
 ## Roadmap open items, 2026-11-26
 

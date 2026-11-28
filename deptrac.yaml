@@ -34,7 +34,7 @@ deptrac:
     graphviz:
       groups:
         Shared: ['Shared Domain', 'Shared Application', 'Shared Infrastructure', 'Shared Live Snapshot Infrastructure', 'Shared Interface']
-        Activity: ['Activity Artist Merge Contract', 'Activity Album Merge Contract', 'Activity Domain', 'Activity Application', 'Activity Infrastructure', 'Activity Resources', 'Activity Interface']
+        Activity: ['Activity Watched Mark Move Contract', 'Activity Artist Merge Contract', 'Activity Album Merge Contract', 'Activity Domain', 'Activity Application', 'Activity Infrastructure', 'Activity Resources', 'Activity Interface']
         Auth: ['Auth Live Authority Contract', 'Auth Domain', 'Auth Identity Contract', 'Auth User Identifier Contract', 'Auth Device Approval Event Contract', 'Auth WebSocket Contract', 'Auth Self-Registration Contract', 'Auth Application', 'Auth Infrastructure', 'Auth Resources', 'Auth Interface']
         Catalog: ['Catalog Video Contract', 'Catalog Song Availability Contract', 'Catalog Song Lookup Contract', 'Catalog Movie Contract', 'Catalog Director Contract', 'Catalog Person Contract', 'Catalog Domain', 'Catalog Application', 'Catalog Infrastructure', 'Catalog Video Match Adapters', 'Catalog Persistence Associations', 'Catalog Resources', 'Catalog Interface']
         Filesystem: ['Filesystem Infrastructure', 'Filesystem Application', 'Filesystem Command', 'Filesystem Mime', 'Filesystem Watcher']
@@ -146,6 +146,11 @@ deptrac:
         - type: classLike
           value: '^App\\Activity\\Application\\Port\\AlbumActivityMergePortInterface$'
 
+    - name: 'Activity Watched Mark Move Contract'
+      collectors:
+        - type: classLike
+          value: '^App\\Activity\\Application\\(Port\\WatchedMarkMovePortInterface|DTO\\WatchedMark(VideoMove|EpisodeMerge))$'
+
     - name: 'Activity Application'
       collectors:
         - type: bool
@@ -157,6 +162,9 @@ deptrac:
               value: '^App\\Activity\\Application\\Port\\ArtistActivityMergePortInterface$'
             - type: classLike
               value: '^App\\Activity\\Application\\Port\\AlbumActivityMergePortInterface$'
+
+            - type: classLike
+              value: '^App\\Activity\\Application\\(Port\\WatchedMarkMovePortInterface|DTO\\WatchedMark(VideoMove|EpisodeMerge))$'
 
     - name: 'Activity Infrastructure'
       collectors:
@@ -1305,10 +1313,13 @@ deptrac:
     'Activity Album Merge Contract':
       - Core
       - 'Shared Domain'
+    'Activity Watched Mark Move Contract':
+      - 'Shared Domain'
     'Activity Domain':
       - Core
       - 'Shared Domain'
     'Activity Application':
+      - 'Activity Watched Mark Move Contract'
       - Core
       - 'Activity Domain'
       - 'Shared Domain'
@@ -1317,6 +1328,7 @@ deptrac:
       - Core
       - 'Activity Artist Merge Contract'
       - 'Activity Album Merge Contract'
+      - 'Activity Watched Mark Move Contract'
       - 'Library Read Scope Contract'
       - 'Catalog Song Availability Contract'
       - 'Shared Application'
@@ -1487,6 +1499,7 @@ deptrac:
       - 'Transcode Timeline Preview Contract'
       - 'Activity Artist Merge Contract'
       - 'Activity Album Merge Contract'
+      - 'Activity Watched Mark Move Contract'
       - 'Favorites Artist Merge Contract'
       - 'Favorites Album Merge Contract'
       - 'Playlist Album Merge Contract'
